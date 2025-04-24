@@ -1,8 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
+import httpx
+import os
+from typing import Optional, Union
 # 1. 导入 CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv  # 添加这行
+
+# 加载环境变量
+load_dotenv()  # 添加这行
 
 app = FastAPI()
 
@@ -27,20 +34,69 @@ app.add_middleware(
     allow_headers=["*"],    # 允许所有请求头
 )
 
-
 class Message(BaseModel):
     text: str
+
+class ChatResponse(BaseModel):
+    response: str
+
+class ErrorResponse(BaseModel):
+    error: str
 
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to aiNagisa backend!"}
 
-@app.post("/api/chat")
+@app.post("/api/chat", response_model=Union[ChatResponse, ErrorResponse])
 async def chat_endpoint(message: Message):
-    # TODO: Implement actual LLM logic later
-    response_text = f"Received: {message.text}. Replying soon!"
-    # 注意：FastAPI 会自动将字典转为 JSON 响应
-    return {"response": response_text}
+    # 获取 API key
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="OpenAI API key not found in environment variables"
+        )
+
+    # 准备 OpenAI API 请求
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+            {"role": "user", "content": message.text}
+        ]
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30.0
+            )
+            
+            # 检查响应状态
+            response.raise_for_status()
+            
+            # 解析响应
+            response_data = response.json()
+            if not response_data.get("choices"):
+                raise ValueError("No choices in OpenAI response")
+                
+            # 提取回复文本
+            reply = response_data["choices"][0]["message"]["content"]
+            return ChatResponse(response=reply)
+
+    except httpx.TimeoutException:
+        return ErrorResponse(error="Request to LLM timed out")
+    except httpx.HTTPStatusError as e:
+        return ErrorResponse(error=f"LLM API error: {str(e)}")
+    except Exception as e:
+        return ErrorResponse(error=f"Failed to get response from LLM: {str(e)}")
 
 # Add this block to run directly for testing
 if __name__ == "__main__":
