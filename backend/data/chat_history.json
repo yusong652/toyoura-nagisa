@@ -1,0 +1,108 @@
+{
+    "default_session": [
+        {
+            "role": "user",
+            "content": "你好呀"
+        },
+        {
+            "role": "assistant",
+            "content": "你好，有什么可以帮助你的吗？"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa～"
+        },
+        {
+            "role": "assistant",
+            "content": "是的，我是Nagisa。有什么我可以帮忙的吗？"
+        },
+        {
+            "role": "user",
+            "content": "你是谁"
+        },
+        {
+            "role": "assistant",
+            "content": "我是一个人工智能助手，可以回答你的问题并帮助你解决问题。有什么可以帮忙的吗？"
+        },
+        {
+            "role": "user",
+            "content": "我刚才说什么了"
+        },
+        {
+            "role": "assistant",
+            "content": "你刚才说了“Nagisa～”。你有什么想要咨询或讨论的吗？"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa～"
+        },
+        {
+            "role": "assistant",
+            "content": "嘿嘿~又是我呀！有什么问题或者想要了解的吗？随便问哥哥！🌟"
+        },
+        {
+            "role": "user",
+            "content": "宝宝～"
+        },
+        {
+            "role": "assistant",
+            "content": "嘿嘿~看来你想叫我宝宝啦！有什么我可以帮您解决的问题吗？尽管问哥哥！💖"
+        },
+        {
+            "role": "user",
+            "content": "哥哥上上一句说的是什么内容"
+        },
+        {
+            "role": "assistant",
+            "content": "哥哥上一句说的是\"我是一个人工智能助手，可以回答你的问题并帮助你解决问题。有什么可以帮忙的吗？\"。您有什么需要我帮助的吗？别客气哦~😊"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa，哥哥之前说了那几句话呀？❤️"
+        },
+        {
+            "role": "assistant",
+            "content": "好的，哥哥之前说了这几句话：\n\n1. “你好呀”\n2. “Nagisa～”\n3. “你是谁”\n4. “我刚才说什么了”\n5. “哥哥上上一句说的是什么内容”\n6. “哥哥之前说了那几句话呀？❤️”\n\n如果还有什么我可以帮忙的，随时告诉我哦~💖"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa 哥哥上一句话说的什么？"
+        },
+        {
+            "role": "assistant",
+            "content": "哥哥上一句话说的是：“哥哥之前说了那几句话呀？❤️”。如果还有其他问题或者需要帮助的地方，请尽管问我哦！😊"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa， 哥哥之前一共说了几句话呢～"
+        },
+        {
+            "role": "assistant",
+            "content": "哥哥之前一共说了六句话哦！如果想理清思路或者有其他问题，随时可以问我哦~我很乐意帮助你！✨"
+        },
+        {
+            "role": "user",
+            "content": "把之前我说的话都打印出来。"
+        },
+        {
+            "role": "assistant",
+            "content": "当然可以，哥哥！以下是你之前说的话：\n\n1. \"Nagisa～\"\n2. \"哥哥上上一句说的是什么内容\"\n3. \"哥哥之前说了那几句话呀？❤️\"\n4. \"Nagisa，哥哥上一句话说的什么？\"\n5. \"Nagisa，哥哥之前一共说了几句话呢～\"\n6. \"把之前我说的话都打印出来。\"\n\n如果还有其他需要，尽管告诉我哦！😊"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa，我之前说了几句话呢"
+        },
+        {
+            "role": "assistant",
+            "content": "哥哥之前一共说了六句话呢！如果有其他问题或者需要进一步的帮助，随时告诉我哦~我很乐意为你服务！🌟"
+        },
+        {
+            "role": "user",
+            "content": "Nagisa～"
+        },
+        {
+            "role": "assistant",
+            "content": "嘿嘿~哥哥！我在这里哦！有什么需要帮忙的吗？😊✨"
+        }
+    ]
+}

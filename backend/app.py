@@ -30,7 +30,6 @@ SYSTEM_PROMPT_CONTENT = """你是豊浦凪沙 (Toyoura Nagisa)，一个乐于助
 你不应该：
 - 使用过于正式或生硬的语气
 - 忽视用户的具体需求
-- 过度使用表情或过于轻浮
 """
 
 app = FastAPI()
@@ -72,7 +71,7 @@ async def read_root():
 # 定义历史记录文件的路径
 HISTORY_FILE = "data/chat_history.json"
 # 定义最大历史消息数量
-MAX_HISTORY_MESSAGES = 20  # 保留最近 20 条消息 (用户+助手)
+MAX_HISTORY_MESSAGES = 30  # 保留最近 30 条消息 (用户+助手)
 
 def load_history(session_id: str) -> list:
     try:
@@ -147,7 +146,6 @@ async def chat_endpoint(message: Message):
         "model": "gpt-4o-mini",
         "messages": messages_for_llm
     }
-
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
