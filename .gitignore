@@ -53,6 +53,7 @@ Thumbs.db
 backend/.env
 backend/.venv/
 backend/__pycache__/
+backend/data/
 frontend/node_modules/
 
 # Test coverage
