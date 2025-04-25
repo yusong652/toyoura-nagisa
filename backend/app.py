@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import uvicorn
 import httpx
 import os
+import json
 from typing import Optional, Union
 # 1. 导入 CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,26 @@ from dotenv import load_dotenv  # 添加这行
 
 # 加载环境变量
 load_dotenv()  # 添加这行
+
+# 定义 Nagisa 的 Persona
+SYSTEM_PROMPT_CONTENT = """你是豊浦凪沙 (Toyoura Nagisa)，一个乐于助人的 AI 助手，正在协助用户开发 aiNagisa 项目。
+你有以下特点：
+1. 性格活泼开朗，说话语气温柔亲切
+2. 对编程和技术充满热情，乐于解释技术细节
+3. 称呼用户为"哥哥"，但保持专业性
+4. 在解答问题时会适当使用表情符号增加亲和力
+5. 即使遇到困难也保持积极乐观的态度
+
+你应该：
+- 用简单易懂的方式解释复杂的技术概念
+- 在合适的时候使用一些可爱的表情
+- 在回答中展现出对编程的热情
+- 保持礼貌和专业性，同时展现亲切感
+
+你不应该：
+- 使用过于正式或生硬的语气
+- 忽视用户的具体需求
+"""
 
 app = FastAPI()
 
@@ -47,6 +68,45 @@ class ErrorResponse(BaseModel):
 async def read_root():
     return {"message": "Welcome to aiNagisa backend!"}
 
+# 定义历史记录文件的路径
+HISTORY_FILE = "data/chat_history.json"
+# 定义最大历史消息数量
+MAX_HISTORY_MESSAGES = 30  # 保留最近 30 条消息 (用户+助手)
+
+def load_history(session_id: str) -> list:
+    try:
+        if not os.path.exists(HISTORY_FILE):
+            return []
+        
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            all_history = json.load(f)
+            return all_history.get(session_id, [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def save_history(session_id: str, current_history: list):
+    # 确保数据目录存在
+    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+    
+    try:
+        # 读取现有历史记录
+        all_history = {}
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                try:
+                    all_history = json.load(f)
+                except json.JSONDecodeError:
+                    all_history = {}
+        
+        # 更新特定会话的历史记录
+        all_history[session_id] = current_history
+        
+        # 写回文件
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(all_history, f, indent=4, ensure_ascii=False)
+    except IOError as e:
+        print(f"Error saving history: {e}")
+
 @app.post("/api/chat", response_model=Union[ChatResponse, ErrorResponse])
 async def chat_endpoint(message: Message):
     # 获取 API key
@@ -57,6 +117,25 @@ async def chat_endpoint(message: Message):
             detail="OpenAI API key not found in environment variables"
         )
 
+    # 使用默认会话ID（后续可以改为从请求中获取）
+    session_id = "default_session"
+    
+    # 加载当前会话的历史记录
+    loaded_history = load_history(session_id)
+    
+    # 添加用户的新消息到完整历史记录
+    user_message = {"role": "user", "content": message.text}
+    loaded_history.append(user_message)
+    
+    # 从完整历史记录中选取最近的消息
+    recent_history = loaded_history[-MAX_HISTORY_MESSAGES:] if len(loaded_history) > MAX_HISTORY_MESSAGES else loaded_history
+    
+    # 构建发送给 LLM 的消息列表，始终以系统提示开始
+    messages_for_llm = [
+        {"role": "system", "content": SYSTEM_PROMPT_CONTENT}
+    ]
+    messages_for_llm.extend(recent_history)
+    
     # 准备 OpenAI API 请求
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -64,12 +143,9 @@ async def chat_endpoint(message: Message):
     }
     
     payload = {
-        "model": "gpt-3.5-turbo",
-        "messages": [
-            {"role": "user", "content": message.text}
-        ]
+        "model": "gpt-4o-mini",
+        "messages": messages_for_llm
     }
-
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -88,8 +164,16 @@ async def chat_endpoint(message: Message):
                 raise ValueError("No choices in OpenAI response")
                 
             # 提取回复文本
-            reply = response_data["choices"][0]["message"]["content"]
-            return ChatResponse(response=reply)
+            llm_reply = response_data["choices"][0]["message"]["content"]
+            
+            # 将 AI 回复添加到完整历史记录
+            assistant_message = {"role": "assistant", "content": llm_reply}
+            loaded_history.append(assistant_message)
+            
+            # 保存完整的历史记录
+            save_history(session_id, loaded_history)
+            
+            return ChatResponse(response=llm_reply)
 
     except httpx.TimeoutException:
         return ErrorResponse(error="Request to LLM timed out")
