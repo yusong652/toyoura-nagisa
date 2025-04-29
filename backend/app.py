@@ -10,8 +10,8 @@ from typing import Optional, Union
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from .tts.remote import FishSpeechTTS
-from .tts.base import BaseTTS 
+from tts.remote import FishSpeechTTS
+from tts.base import BaseTTS 
 
 # 加载环境变量
 load_dotenv()  # 添加这行
@@ -169,7 +169,7 @@ async def chat_endpoint(message: Message):
     }
     
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4.1-mini",
         "messages": messages_for_llm
     }
     try:
