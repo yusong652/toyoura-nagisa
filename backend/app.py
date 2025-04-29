@@ -1,13 +1,17 @@
-from fastapi import FastAPI, HTTPException
+import os
+import traceback
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 import uvicorn
 import httpx
-import os
 import json
+import traceback
 from typing import Optional, Union
-# 1. 导入 CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv  # 添加这行
+from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from .tts.remote import FishSpeechTTS
+from .tts.base import BaseTTS 
 
 # 加载环境变量
 load_dotenv()  # 添加这行
@@ -32,7 +36,29 @@ SYSTEM_PROMPT_CONTENT = """你是豊浦凪沙 (Toyoura Nagisa)，一个乐于助
 - 忽视用户的具体需求
 """
 
-app = FastAPI()
+# TTS 请求模型
+class TTSRequest(BaseModel):
+    text: str
+
+# 应用生命周期管理器
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时
+    print("Initializing TTS Engine...")
+    tts_engine = FishSpeechTTS()
+    await tts_engine.initialize()
+    app.state.tts_engine = tts_engine
+    print("TTS Engine Initialized.")
+    
+    yield
+    
+    # 关闭时
+    print("Shutting down TTS Engine...")
+    await app.state.tts_engine.shutdown()
+    print("TTS Engine Shutdown.")
+
+# 创建 FastAPI 应用
+app = FastAPI(lifespan=lifespan)
 
 # 2. 配置允许的源 (origins)
 #    对于本地开发，允许所有源 ("*") 或 file:// (虽然不推荐*用于生产)
@@ -181,6 +207,45 @@ async def chat_endpoint(message: Message):
         return ErrorResponse(error=f"LLM API error: {str(e)}")
     except Exception as e:
         return ErrorResponse(error=f"Failed to get response from LLM: {str(e)}")
+
+@app.post("/api/tts")
+async def text_to_speech_endpoint(request_data: TTSRequest, request: Request):
+    """
+    Endpoint to convert text to speech using the configured TTS engine.
+    Includes optional saving of the audio file for testing/debugging.
+    """
+    try:
+        # 从 app.state 获取初始化好的 TTS 引擎实例
+        # 添加类型提示以便编辑器理解
+        tts_engine: BaseTTS = request.app.state.tts_engine
+        print(f"Received text for TTS: '{request_data.text[:50]}...'") # 打印接收到的文本（部分）
+
+        # 核心：调用 synthesize 获取音频字节流
+        audio_bytes = await tts_engine.synthesize(request_data.text)
+        print(f"Synthesized {len(audio_bytes)} bytes of audio data.") # 打印合成的数据大小
+
+        # --- 添加这部分来测试保存功能 ---
+        print("Attempting to save audio bytes to file...")
+        if isinstance(tts_engine, FishSpeechTTS) and hasattr(tts_engine, 'save_audio_to_file'):
+             saved_path = tts_engine.save_audio_to_file(audio_bytes) # 调用保存方法
+             if saved_path:
+                 print(f"TTS audio successfully saved to: {saved_path}")
+             else:
+                 # 如果 save_audio_to_file 返回 None，说明保存失败
+                 print("Failed to save TTS audio to file (save method returned None).")
+        else:
+             print("Warning: TTS Engine instance does not have a save_audio_to_file method.")
+
+        media_type_to_use = "audio/mpeg" # 假设是 MP3，如果不是请修改！
+        print(f"Returning audio bytes with media type: {media_type_to_use}")
+        return Response(content=audio_bytes, media_type=media_type_to_use)
+
+    except Exception as e:
+        # 打印详细的错误堆栈信息，方便调试
+        print(f"Error in /api/tts endpoint: {e}\n{traceback.format_exc()}")
+        # 返回一个表示错误的响应给前端
+        error_message = f"TTS Endpoint Error: Failed to process text '{request_data.text[:50]}...'. Error: {e}"
+        return Response(content=error_message, status_code=500)
 
 # Add this block to run directly for testing
 if __name__ == "__main__":
