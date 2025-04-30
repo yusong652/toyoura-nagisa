@@ -4,8 +4,8 @@ const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendButton');
 
 // 后端 API 地址
-const CHAT_API_URL = 'http://127.0.0.1:8000/api/chat'; // 确保端口号与后端运行端口一致
-const TTS_API_URL = 'http://127.0.0.1:8000/api/tts'; // 确保端口号与后端运行端口一致
+const CHAT_API_URL = '/api/chat'; // 确保端口号与后端运行端口一致
+const TTS_API_URL = '/api/tts'; // 确保端口号与后端运行端口一致
 // 发送消息的函数
 async function sendMessage() {
     const messageText = userInput.value.trim(); // 获取输入并去除首尾空格

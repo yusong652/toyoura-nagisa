@@ -1,6 +1,9 @@
 import os
 import traceback
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 from pydantic import BaseModel
 import uvicorn
 import httpx
@@ -15,6 +18,11 @@ from tts.base import BaseTTS
 
 # 加载环境变量
 load_dotenv()  # 添加这行
+
+# 计算前端目录的绝对路径
+current_file_path = Path(__file__)
+FRONTEND_DIR = (current_file_path.parent.parent / "frontend").resolve()
+print(f"Serving frontend files from: {FRONTEND_DIR}") # Add log
 
 # 定义 Nagisa 的 Persona
 SYSTEM_PROMPT_CONTENT = """你是豊浦凪沙 (Toyoura Nagisa)，一个乐于助人的 AI 助手，正在协助用户开发 aiNagisa 项目。
@@ -90,9 +98,13 @@ class ChatResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
 
-@app.get("/")
-async def read_root():
-    return {"message": "Welcome to aiNagisa backend!"}
+@app.get("/", tags=["HTML"], include_in_schema=False)
+async def read_index():
+    index_path = FRONTEND_DIR / "index.html"
+    if index_path.is_file():
+        return FileResponse(index_path)
+    else:
+        return Response(content="index.html not found", status_code=404)
 
 # 定义历史记录文件的路径
 HISTORY_FILE = "data/chat_history.json"
@@ -247,7 +259,8 @@ async def text_to_speech_endpoint(request_data: TTSRequest, request: Request):
         error_message = f"TTS Endpoint Error: Failed to process text '{request_data.text[:50]}...'. Error: {e}"
         return Response(content=error_message, status_code=500)
 
-# Add this block to run directly for testing
+# Mount static files directory
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static_assets")
+
 if __name__ == "__main__":
-    # 在这里运行 uvicorn 时，CORS 中间件已添加
     uvicorn.run(app, host="127.0.0.1", port=8000)
