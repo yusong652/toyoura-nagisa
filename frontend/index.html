@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>aiNagisa</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <script src="live2d.min.js"></script>
+    <script src="live2dcubismcore.min.js"></script>
 </head>
 <body>
-    <h1>Welcome to aiNagisa</h1>
+    <h1>aiNagisa</h1>
     <div id="chatbox">
     </div>
     <input type="text" id="userInput" placeholder="Type your message...">
     <button id="sendButton">Send</button>
-
-    <script src="/static/script.js"></script>
+    <canvas id="live2d-canvas"></canvas>
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>

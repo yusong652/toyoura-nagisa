@@ -13,8 +13,8 @@ from typing import Optional, Union
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from tts.remote import FishSpeechTTS
-from tts.base import BaseTTS 
+from .tts.remote import FishSpeechTTS
+from .tts.base import BaseTTS 
 
 # 加载环境变量
 load_dotenv()  # 添加这行
@@ -97,15 +97,7 @@ class ChatResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
-
-@app.get("/", tags=["HTML"], include_in_schema=False)
-async def read_index():
-    index_path = FRONTEND_DIR / "index.html"
-    if index_path.is_file():
-        return FileResponse(index_path)
-    else:
-        return Response(content="index.html not found", status_code=404)
-
+    
 # 定义历史记录文件的路径
 HISTORY_FILE = "data/chat_history.json"
 # 定义最大历史消息数量
@@ -258,9 +250,6 @@ async def text_to_speech_endpoint(request_data: TTSRequest, request: Request):
         # 返回一个表示错误的响应给前端
         error_message = f"TTS Endpoint Error: Failed to process text '{request_data.text[:50]}...'. Error: {e}"
         return Response(content=error_message, status_code=500)
-
-# Mount static files directory
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static_assets")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

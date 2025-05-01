@@ -10,6 +10,25 @@ h1 {
     color: #333;
 }
 
+#live2d-canvas {
+    /* 设置尺寸 */
+    width: 250px;  /* 示例宽度 */
+    height: 350px; /* 示例高度 */
+
+    /* 定位 */
+    position: fixed; /* 固定在视口 */
+    right: 10px;    /* 离右边 10px */
+    bottom: 10px;   /* 离底部 10px */
+    z-index: 99;    /* 确保在其他元素上层 */
+
+    /* (可选) 允许鼠标穿透画布与下方元素交互 */
+    /* pointer-events: none; */
+    background-color: transparent;
+
+    /* (可选) 调试用：加个边框或背景色看看位置对不对 */
+    border: none;
+}
+
 #chatbox {
     display: flex;
     flex-direction: column;

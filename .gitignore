@@ -10,6 +10,7 @@ venv/
 ENV/
 env/
 build/
+data/
 develop-eggs/
 dist/
 downloads/

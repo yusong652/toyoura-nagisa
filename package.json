@@ -1,0 +1,25 @@
+{
+  "name": "ainagisa",
+  "version": "1.0.0",
+  "description": "An AI-powered chat assistant with multi-turn conversation memory and voice output capabilities",
+  "main": "index.js",
+  "scripts": {
+    "install:backend": "cd backend && uv pip install -r requirements.txt",
+    "lint:backend": "cd backend && ruff check .",
+    "format:backend": "cd backend && ruff format .",
+    "start:backend": "python run.py",
+    "dev": "npm run start:backend",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusong652/aiNagisa.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yusong652/aiNagisa/issues"
+  },
+  "homepage": "https://github.com/yusong652/aiNagisa#readme"
+}
