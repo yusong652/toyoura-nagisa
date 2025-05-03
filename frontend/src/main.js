@@ -1,17 +1,17 @@
 import './style.css';
 import { initializeLive2D } from './live2d.js';
-import { sendMessage } from './chat.js';
+import { sendAndGetResponse } from './chat.js';
 import { initializeUI, getCurrentMessage, clearInput } from './ui.js';
 
 async function main() {
     // Initialize UI components
     const { userInput, sendButton } = initializeUI();
-
+    console.log(userInput, sendButton);
     // Set up event listeners
     sendButton.addEventListener('click', async () => {
         const message = getCurrentMessage();
         if (message) {
-            await sendMessage(message);
+            await sendAndGetResponse(message);
             clearInput();
         }
     });
@@ -20,7 +20,7 @@ async function main() {
         if (e.key === 'Enter') {
             const message = getCurrentMessage();
             if (message) {
-                await sendMessage(message);
+                await sendAndGetResponse(message);
                 clearInput();
             }
         }

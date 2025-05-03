@@ -9,24 +9,9 @@
     "Expressions": [
     ],
     "Motions": {
-      "Idle": [
+      "neutral": [
         {
           "File": "motions/Idle.motion3.json"
-        }
-      ],
-      "anger": [
-        {
-          "File": "motions/anger.motion3.json"
-        }
-      ],
-      "cry": [
-        {
-          "File": "motions/cry.motion3.json"
-        }
-      ],
-      "doubt": [
-        {
-          "File": "motions/doubt.motion3.json"
         }
       ],
       "happy": [
@@ -34,42 +19,52 @@
           "File": "motions/happy.motion3.json"
         }
       ],
-      "mid_happy": [
-        {
-          "File": "motions/mid_happy.motion3.json"
-        }
-      ],
-      "pride": [
-        {
-          "File": "motions/pride.motion3.json"
-        }
-      ],
-      "puzzle": [
-        {
-          "File": "motions/puzzle.motion3.json"
-        }
-      ],
       "sad": [
         {
           "File": "motions/sad.motion3.json"
         }
       ],
-      "serious": [
+      "angry": [
         {
-          "File": "motions/serious.motion3.json"
+          "File": "motions/angry.motion3.json"
         }
       ],
-      "shame": [
+      "confused": [
+        {
+          "File": "motions/doubt.motion3.json"
+        }
+      ],
+      "blush": [
         {
           "File": "motions/shame.motion3.json"
         }
       ],
-      "shock": [
+      "thinking": [
+        {
+          "File": "motions/serious.motion3.json"
+        }
+      ],
+      "nod": [
+        {
+          "File": "motions/pride.motion3.json"
+        }
+      ],
+      "shake": [
+        {
+          "File": "motions/puzzle.motion3.json"
+        }
+      ],
+      "cry": [
+        {
+          "File": "motions/cry.motion3.json"
+        }
+      ],
+      "shocked": [
         {
           "File": "motions/shock.motion3.json"
         }
       ],
-      "surprise": [
+      "surprised": [
         {
           "File": "motions/surprise.motion3.json"
         }
@@ -77,16 +72,6 @@
       "upset": [
         {
           "File": "motions/upset.motion3.json"
-        }
-      ],
-      "very_happy": [
-        {
-          "File": "motions/very_happy.motion3.json"
-        }
-      ],
-      "very_sad": [
-        {
-          "File": "motions/very_sad.motion3.json"
         }
       ],
       "": [

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Union, Dict, Any
 from pathlib import Path
+from .utils import clean_text_for_tts
 
 class TTSException(Exception):
     """TTS 模块的基础异常类"""
@@ -63,6 +64,17 @@ class BaseTTS(ABC):
         """
         self.config = config
         self._is_ready = False
+    
+    def clean_text(self, text: str) -> str:
+        """清理文本中的颜文字和特殊符号
+        
+        Args:
+            text: 原始文本
+            
+        Returns:
+            str: 清理后的文本
+        """
+        return clean_text_for_tts(text)
     
     @property
     def is_ready(self) -> bool:

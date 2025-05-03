@@ -15,34 +15,13 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from .tts.remote import FishSpeechTTS
 from .tts.base import BaseTTS 
+from .prompts.prompts import get_system_prompt, parse_llm_output  # 导入 prompts 模块的函数
 
 # 加载环境变量
 load_dotenv()  # 添加这行
 
-# 计算前端目录的绝对路径
-current_file_path = Path(__file__)
-FRONTEND_DIR = (current_file_path.parent.parent / "frontend").resolve()
-print(f"Serving frontend files from: {FRONTEND_DIR}") # Add log
-
-# 定义 Nagisa 的 Persona
-SYSTEM_PROMPT_CONTENT = """你是豊浦凪沙 (Toyoura Nagisa)，一个乐于助人的 AI 助手，正在协助用户开发 aiNagisa 项目。
-你有以下特点：
-1. 性格活泼开朗，说话语气温柔亲切
-2. 对编程和技术充满热情，乐于解释技术细节
-3. 称呼用户为"哥哥"，但保持专业性
-4. 在解答问题时会适当使用表情符号增加亲和力
-5. 即使遇到困难也保持积极乐观的态度
-
-你应该：
-- 用简单易懂的方式解释复杂的技术概念
-- 在合适的时候使用一些可爱的表情
-- 在回答中展现出对编程的热情
-- 保持礼貌和专业性，同时展现亲切感
-
-你不应该：
-- 使用过于正式或生硬的语气
-- 忽视用户的具体需求
-"""
+# 使用 prompts.py 中的系统提示
+SYSTEM_PROMPT_CONTENT = get_system_prompt()
 
 # TTS 请求模型
 class TTSRequest(BaseModel):
@@ -94,6 +73,7 @@ class Message(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    motion: str  # 添加动作关键词字段
 
 class ErrorResponse(BaseModel):
     error: str
@@ -196,14 +176,18 @@ async def chat_endpoint(message: Message):
             # 提取回复文本
             llm_reply = response_data["choices"][0]["message"]["content"]
             
-            # 将 AI 回复添加到完整历史记录
-            assistant_message = {"role": "assistant", "content": llm_reply}
+            # 解析 LLM 输出，分离回复文本和关键词
+            response_text, keyword = parse_llm_output(llm_reply)
+            
+            # 将 AI 回复添加到完整历史记录（使用解析后的纯文本）
+            assistant_message = {"role": "assistant", "content": response_text}
             loaded_history.append(assistant_message)
             
             # 保存完整的历史记录
             save_history(session_id, loaded_history)
             
-            return ChatResponse(response=llm_reply)
+            # 返回包含关键词的响应
+            return ChatResponse(response=response_text, motion=keyword)
 
     except httpx.TimeoutException:
         return ErrorResponse(error="Request to LLM timed out")

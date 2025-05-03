@@ -1,11 +1,11 @@
 import { playTextAsSpeech } from './tts.js';
 import { displayMessage } from './ui.js';
 import { clearInput } from './ui.js';
-import { startLipSync, stopLipSync } from './live2d.js';
+import { startLipSync, stopLipSync, playMotion } from './live2d.js';
 
 const CHAT_API_URL = '/api/chat';
 
-export async function sendMessage(messageText) {
+export async function sendAndGetResponse(messageText) {
     if (messageText.trim() === '') {
         return;
     }
@@ -36,6 +36,10 @@ export async function sendMessage(messageText) {
         // Handle response
         if (data.response) {
             displayMessage(data.response, 'bot');
+            
+            // 直接使用后端返回的动作关键词
+            console.log(`收到动作关键词: ${data.motion}`);
+            playMotion(data.motion);
             
             // 播放语音并同步嘴型
             try {

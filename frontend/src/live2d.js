@@ -193,7 +193,7 @@ export function stopLipSync() {
 
 async function playInitialMotion(model) {
     try {
-        await model.motion('Idle');
+        await model.motion('neutral');
     } catch (error) {
         console.warn('播放初始动作失败:', error);
     }
@@ -222,4 +222,18 @@ function displayModelError(canvas, modelPath, error) {
     errorDiv.innerText = `无法加载模型: ${modelPath}. 请检查路径和模型文件是否完好。\n错误: ${error.message}`;
     errorDiv.style.color = 'red';
     canvas.parentNode.insertBefore(errorDiv, canvas.nextSibling);
+}
+
+export function playMotion(motionName) {
+    if (!currentModel) {
+        console.error('模型未初始化，无法播放动作');
+        return;
+    }
+
+    try {
+        console.log(`尝试播放动作: ${motionName}`);
+        currentModel.motion(motionName);
+    } catch (error) {
+        console.error(`播放动作 ${motionName} 失败:`, error);
+    }
 }
