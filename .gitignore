@@ -30,6 +30,7 @@ wheels/
 node_modules/
 .npm
 .eslintcache
+frontend/.vite/
 *.log
 dist/
 build/
