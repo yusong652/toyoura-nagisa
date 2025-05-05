@@ -1,9 +1,18 @@
-import { playTextAsSpeech } from './tts.js';
 import { displayMessage } from './ui.js';
 import { clearInput } from './ui.js';
-import { startLipSync, stopLipSync, playMotion } from './live2d.js';
+import { playMotion } from './live2d.js';
+import { playAudioWithLipSync } from './audioSync.js';
 
 const CHAT_API_URL = '/api/chat';
+
+// 创建 AudioContext 单例
+let audioContext = null;
+function getAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioContext;
+}
 
 export async function sendAndGetResponse(messageText) {
     if (messageText.trim() === '') {
@@ -23,7 +32,10 @@ export async function sendAndGetResponse(messageText) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text: messageText }),
+            body: JSON.stringify({
+                messageText,
+                session_id: localStorage.getItem('session_id') || undefined,
+            }),
         });
 
         if (!response.ok) {
@@ -32,35 +44,27 @@ export async function sendAndGetResponse(messageText) {
 
         // Parse response
         const data = await response.json();
+        console.log('Received data object from backend:', data);
 
-        // Handle response
-        if (data.response) {
-            displayMessage(data.response, 'bot');
-            
-            // 直接使用后端返回的动作关键词
-            console.log(`收到动作关键词: ${data.motion}`);
-            playMotion(data.motion);
-            
-            // 播放语音并同步嘴型
-            try {
-                console.log('准备播放语音和同步嘴型');
-                await playTextAsSpeech(data.response, (analyser) => {
-                    console.log('收到音频分析器，开始嘴型同步');
-                    startLipSync(analyser);
-                });
-                console.log('语音播放结束，停止嘴型同步');
-                stopLipSync();
-            } catch (error) {
-                console.error('语音播放或嘴型同步失败:', error);
-                stopLipSync(); // 确保在出错时也停止嘴型同步
-            }
-        } else {
-            displayMessage('Error: No response field in reply.', 'error');
+        if (data.detail) {
+            throw new Error(data.detail);
         }
+        if (!data.response || !data.keyword || !data.audio_data) {
+            throw new Error('Invalid response format from server');
+        }
+
+        // Display bot response
+        displayMessage(data.response, 'bot');
+
+        // Handle motion keyword
+        console.log('调用 playMotion，参数：', data.keyword);
+        playMotion(data.keyword);
+
+        // 播放音频并同步嘴型
+        playAudioWithLipSync(data.audio_data);
 
     } catch (error) {
         console.error('Error sending message:', error);
         displayMessage(`Error: ${error.message}`, 'error');   
-        stopLipSync(); // 确保在出错时也停止嘴型同步
     }
 } 
