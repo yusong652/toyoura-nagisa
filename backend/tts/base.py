@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Union, Dict, Any
 from pathlib import Path
+from pydantic import BaseModel
 from .utils import clean_text_for_tts
+
+class TTSRequest(BaseModel):
+    text: str
 
 class TTSException(Exception):
     """TTS 模块的基础异常类"""

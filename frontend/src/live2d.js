@@ -40,7 +40,7 @@ export async function initializeLive2D(canvasId) {
         console.log('模型结构:', {
             hasInternalModel: !!currentModel.internalModel,
             hasParameters: !!currentModel.parameters,
-            modelType: currentModel.type,
+            modelType: currentModel,
             availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(currentModel))
         });
 
@@ -148,10 +148,6 @@ export function startLipSync(analyser) {
                         console.warn('未找到有效的嘴型参数，请检查模型参数列表');
                     }
 
-                    // 确保在说话时不播放其他动作
-                    if (currentModel.internalModel.motionManager) {
-                        currentModel.internalModel.motionManager.stopAllMotions();
-                    }
                 } catch (e) {
                     console.warn('设置嘴型参数失败:', e);
                 }
