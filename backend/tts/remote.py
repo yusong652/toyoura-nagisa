@@ -17,7 +17,7 @@ class FishSpeechConfig(TTSConfig):
     def reference_id(self) -> Optional[str]:
         return self._config.get('reference_id') or os.getenv('FISH_SPEECH_REFERENCE_ID')
 
-class FishSpeechTTS(BaseTTS):
+class FishAudioTTS(BaseTTS):
     """Fish Speech TTS 实现类
     
     使用 Fish Speech API 进行文本到语音的转换。支持流式音频输出和文件保存。

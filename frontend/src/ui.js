@@ -32,6 +32,28 @@ export function displayMessage(message, sender) {
     
     // Scroll to bottom
     chatbox.scrollTop = chatbox.scrollHeight;
+    
+    return messageElement;
+}
+
+export function updateLastMessage(message, sender) {
+    if (!chatbox) {
+        throw new Error('Chatbox not initialized! Call initializeUI first.');
+    }
+
+    // 获取最后一条消息元素
+    const lastMessage = chatbox.lastElementChild;
+    
+    if (lastMessage && lastMessage.classList.contains(`${sender}-message`)) {
+        // 更新现有消息
+        lastMessage.textContent = message;
+    } else {
+        // 如果没有最后一条消息或不是对应发送者的消息，创建新消息
+        displayMessage(message, sender);
+    }
+    
+    // Scroll to bottom
+    chatbox.scrollTop = chatbox.scrollHeight;
 }
 
 export function clearInput() {

@@ -1,23 +1,17 @@
-import { displayMessage } from './ui.js';
-import { clearInput } from './ui.js';
+import { displayMessage, updateLastMessage, clearInput } from './ui.js';
 import { playMotion } from './live2d.js';
-import { playAudioWithLipSync } from './audioSync.js';
+import { queueAndPlayAudio, resetAudioState } from './audioSync.js';
 
 const CHAT_API_URL = '/api/chat';
-
-// 创建 AudioContext 单例
-let audioContext = null;
-function getAudioContext() {
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    return audioContext;
-}
+const CHAT_STREAM_API_URL = '/api/chat/stream';
 
 export async function sendAndGetResponse(messageText) {
     if (messageText.trim() === '') {
         return;
     }
+
+    // 重置音频状态
+    await resetAudioState();
 
     // Display user message
     displayMessage(messageText, 'user');
@@ -26,8 +20,11 @@ export async function sendAndGetResponse(messageText) {
     clearInput();
 
     try {
-        // Send message to backend API
-        const response = await fetch(CHAT_API_URL, {
+        // 创建新的 bot 消息容器
+        displayMessage('', 'bot');
+
+        // 使用流式 API
+        const response = await fetch(CHAT_STREAM_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -42,26 +39,48 @@ export async function sendAndGetResponse(messageText) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Parse response
-        const data = await response.json();
-        console.log('Received data object from backend:', data);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentText = '';
+        let currentKeyword = null;
 
-        if (data.detail) {
-            throw new Error(data.detail);
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        
+                        if (data.text) {
+                            // 更新文本显示
+                            currentText += data.text;
+                            updateLastMessage(currentText, 'bot');
+                        }
+                        
+                        if (data.keyword && !currentKeyword) {
+                            // 只在第一次收到关键词时触发动作
+                            currentKeyword = data.keyword;
+                            console.log('调用 playMotion，参数：', currentKeyword);
+                            playMotion(currentKeyword);
+                        }
+                        
+                        if (data.audio) {
+                            // 将音频添加到队列并播放
+                            queueAndPlayAudio(data.audio);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
         }
-        if (!data.response || !data.keyword || !data.audio_data) {
-            throw new Error('Invalid response format from server');
-        }
-
-        // Display bot response
-        displayMessage(data.response, 'bot');
-
-        // Handle motion keyword
-        console.log('调用 playMotion，参数：', data.keyword);
-        playMotion(data.keyword);
-
-        // 播放音频并同步嘴型
-        playAudioWithLipSync(data.audio_data);
 
     } catch (error) {
         console.error('Error sending message:', error);

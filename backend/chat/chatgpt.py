@@ -11,13 +11,13 @@ class ChatGPTClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, temperature: float = 1.0, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, temperature: float = 1.2, **kwargs):
         """
         初始化 ChatGPT 客户端。
         Args:
             api_key: OpenAI API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
-            temperature: 采样温度，默认1.0。
+            temperature: 采样温度，默认1.2。
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
