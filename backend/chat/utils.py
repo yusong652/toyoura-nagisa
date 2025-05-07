@@ -49,30 +49,25 @@ def split_text_by_punctuations(text: str, punctuations: List[str] = DEFAULT_SPLI
 
 def load_history(session_id: str) -> List[Dict[str, Any]]:
     """
-    加载指定会话ID的聊天历史
-    
-    Args:
-        session_id: 会话ID
-        
-    Returns:
-        聊天历史记录列表
+    加载指定会话ID的聊天历史，自动补全非法或缺失的timestamp
     """
     try:
         if not os.path.exists(HISTORY_FILE):
             return []
         with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
             all_history = json.load(f)
-            return all_history.get(session_id, [])
+            history = all_history.get(session_id, [])
+            # 补全非法或缺失的timestamp
+            for msg in history:
+                if 'timestamp' not in msg or not msg['timestamp']:
+                    msg['timestamp'] = datetime.now().isoformat()
+            return history
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
 def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None:
     """
-    保存指定会话ID的聊天历史，每条消息都包含时间戳
-    
-    Args:
-        session_id: 会话ID
-        current_history: 当前会话的历史记录列表
+    保存指定会话ID的聊天历史，每条消息都包含时间戳，且为字符串
     """
     os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
     try:
@@ -83,12 +78,12 @@ def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None
                     all_history = json.load(f)
                 except json.JSONDecodeError:
                     all_history = {}
-        
-        # 为每条消息添加时间戳
+        # 为每条消息添加/修正时间戳为字符串
         for msg in current_history:
-            if 'timestamp' not in msg:
+            if 'timestamp' not in msg or not msg['timestamp']:
                 msg['timestamp'] = datetime.now().isoformat()
-        
+            elif isinstance(msg['timestamp'], datetime):
+                msg['timestamp'] = msg['timestamp'].isoformat()
         all_history[session_id] = current_history
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(all_history, f, indent=4, ensure_ascii=False)

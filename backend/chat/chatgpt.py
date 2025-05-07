@@ -42,11 +42,18 @@ class ChatGPTClient(LLMClientBase):
         messages_for_llm = [
             {"role": "system", "content": sys_prompt}
         ]
+        has_image = False
         for msg in messages:
-            messages_for_llm.append({"role": msg.role, "content": msg.content})
-
+            if isinstance(msg.content, list):
+                messages_for_llm.append({"role": msg.role, "content": msg.content})
+                # 检查是否有图片
+                if any(c.get("type") == "image_url" for c in msg.content):
+                    has_image = True
+            else:
+                messages_for_llm.append({"role": msg.role, "content": msg.content})
+        model = "gpt-4.1" if has_image else kwargs.get("model", "gpt-4.1-mini")
         payload = {
-            "model": kwargs.get("model", "gpt-4.1-mini"),
+            "model": model,
             "messages": messages_for_llm,
             "temperature": temperature if temperature is not None else self.temperature
         }

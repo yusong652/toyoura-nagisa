@@ -11,8 +11,13 @@
     <h1>aiNagisa</h1>
     <div class="chat-container">
         <div id="chatbox"></div>
-        <div class="input-container">
-            <input type="text" id="userInput" placeholder="Type your message...">
+        <div class="input-container" style="display: flex; align-items: flex-end; gap: 8px;">
+            <button id="addFileBtn" title="上传文件">＋</button>
+            <input type="file" id="fileInput" style="display: none;" multiple>
+            <div class="input-wrapper" style="flex: 1; display: flex; flex-direction: column;">
+                <div id="filePreviewArea"></div>
+                <textarea id="userInput" rows="1" placeholder="Type your message..." style="width: 100%;"></textarea>
+            </div>
             <button id="sendButton">Send</button>
         </div>
     </div>

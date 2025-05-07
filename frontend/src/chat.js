@@ -1,4 +1,4 @@
-import { displayMessage, updateLastMessage, clearInput } from './ui.js';
+import { displayMessage, updateLastMessage, clearInput, showLoading, hideLoading } from './ui.js';
 import { playMotion } from './live2d.js';
 import { queueAndPlayAudio, resetAudioState } from './audioSync.js';
 
@@ -6,8 +6,43 @@ const CHAT_API_URL = '/api/chat';
 const CHAT_STREAM_API_URL = '/api/chat/stream';
 
 export async function sendAndGetResponse(messageText) {
-    if (messageText.trim() === '') {
+    if (messageText.trim() === '' && (!window.uploadCache || window.uploadCache.length === 0)) {
         return;
+    }
+
+    // 统一构造 messageData
+    let messageData;
+    const files = window.uploadCache || [];
+    if (files.length > 0) {
+        const filePromises = files.map(file => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({
+                    name: file.name,
+                    type: file.type,
+                    data: reader.result
+                });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        });
+
+        try {
+            const fileData = await Promise.all(filePromises);
+            messageData = JSON.stringify({
+                text: messageText,
+                files: fileData
+            });
+        } catch (e) {
+            displayMessage('文件处理失败: ' + e.message, 'error');
+            return;
+        }
+    } else {
+        // 没有文件时也要构造 messageData
+        messageData = JSON.stringify({
+            text: messageText,
+            files: []
+        });
     }
 
     // 重置音频状态
@@ -16,12 +51,18 @@ export async function sendAndGetResponse(messageText) {
     // Display user message
     displayMessage(messageText, 'user');
 
+    // 清空上传文件缓存和缩略图
+    window.uploadCache = [];
+    if (window.renderFilePreview) window.renderFilePreview();
+
     // Clear input immediately after displaying the message
     clearInput();
 
     try {
+        // 显示Nagisa思考中loading
+        showLoading();
         // 创建新的 bot 消息容器
-        displayMessage('', 'bot');
+        // displayMessage('', 'bot'); // 这一行注释掉，loading替代
 
         // 使用流式 API
         const response = await fetch(CHAT_STREAM_API_URL, {
@@ -30,7 +71,7 @@ export async function sendAndGetResponse(messageText) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                messageText,
+                messageData,
                 session_id: localStorage.getItem('session_id') || undefined,
             }),
         });
@@ -59,6 +100,11 @@ export async function sendAndGetResponse(messageText) {
                         const data = JSON.parse(line.slice(6));
                         
                         if (data.text) {
+                            // 移除loading，显示Nagisa消息
+                            if (document.querySelector('.loading-message')) {
+                                hideLoading();
+                                displayMessage('', 'bot');
+                            }
                             // 更新文本显示
                             currentText += data.text;
                             updateLastMessage(currentText, 'bot');
@@ -81,9 +127,11 @@ export async function sendAndGetResponse(messageText) {
                 }
             }
         }
-
+        // 回复结束后确保loading被移除
+        hideLoading();
     } catch (error) {
         console.error('Error sending message:', error);
+        hideLoading();
         displayMessage(`Error: ${error.message}`, 'error');   
     }
 } 

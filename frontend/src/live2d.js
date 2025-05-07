@@ -233,3 +233,32 @@ export function playMotion(motionName) {
         console.error(`播放动作 ${motionName} 失败:`, error);
     }
 }
+
+export function enableLive2DDrag() {
+    const canvas = document.getElementById('live2d-canvas');
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    canvas.style.position = 'fixed'; // 保证可拖动
+    canvas.style.cursor = 'grab';
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.clientX - canvas.offsetLeft;
+        offsetY = e.clientY - canvas.offsetTop;
+        canvas.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            canvas.style.left = (e.clientX - offsetX) + 'px';
+            canvas.style.top = (e.clientY - offsetY) + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        canvas.style.cursor = 'grab';
+    });
+}

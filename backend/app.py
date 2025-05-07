@@ -2,6 +2,7 @@ import os
 import traceback
 import json
 import base64
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -89,11 +90,45 @@ async def chat_endpoint(request: Request, chat_req: ChatRequest):
         return ErrorResponse(detail=str(e))
 
 @app.post("/api/chat/stream")
-async def chat_stream_endpoint(request: Request, chat_req: ChatRequest):
-    session_id = chat_req.session_id or "default_session"
+async def chat_stream_endpoint(request: Request):
+    data = await request.json()
+    # 1. 解析 messageData
+    message_data = data.get('messageData')
+    if message_data:
+        # 2. 反序列化
+        msg_obj = json.loads(message_data)
+        text = msg_obj.get('text', '')
+        files = msg_obj.get('files', [])
+        # 3. 处理每个文件
+        for file in files:
+            name = file['name']
+            filetype = file['type']
+            b64data = file['data']
+            # 去掉前缀
+            if ',' in b64data:
+                b64data = b64data.split(',', 1)[1]
+            file_bytes = base64.b64decode(b64data)
+            # 你可以在这里做更多处理
+        # 4. 继续处理text和files
+        print('收到文本:', text)
+        print('收到文件:', [f['name'] for f in files])
+    # 构造多模态 content
+    content = []
+    if text:
+        content.append({"type": "text", "text": text})
+    for file in files:
+        if file['type'].startswith('image/'):
+            b64 = file['data'].split(',')[-1]
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{file['type']};base64,{b64}"
+                }
+            })
+    session_id = "default_session"
     loaded_history = load_history(session_id)
     history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    user_msg = Message(role="user", content=chat_req.messageText)
+    user_msg = Message(role="user", content=content)
     history_msgs.append(user_msg)
     recent_msgs = history_msgs[-MAX_HISTORY_MESSAGES:] if len(history_msgs) > MAX_HISTORY_MESSAGES else history_msgs
     
@@ -101,7 +136,7 @@ async def chat_stream_endpoint(request: Request, chat_req: ChatRequest):
     tts_engine: BaseTTS = request.app.state.tts_engine
     
     try:
-        response_text, keyword = await llm_client.get_response(recent_msgs)
+        response_text, keyword = await llm_client.get_response(recent_msgs, model="gpt-4o")
         # 保存历史
         ai_msg = Message(role="assistant", content=response_text)
         history_msgs.append(ai_msg)
@@ -121,9 +156,13 @@ async def chat_stream_endpoint(request: Request, chat_req: ChatRequest):
                 yield f"data: {json.dumps({'text': sentence})}\n\n"
                 
                 # 合成并发送音频
-                audio_bytes = await tts_engine.synthesize(sentence)
-                audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                yield f"data: {json.dumps({'audio': audio_b64})}\n\n"
+                try:
+                    audio_bytes = await tts_engine.synthesize(sentence)
+                    audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    yield f"data: {json.dumps({'audio': audio_b64})}\n\n"
+                except Exception as e:
+                    print(f"TTS合成失败: {e}")
+                    yield f"data: {json.dumps({'audio': None, 'error': str(e)})}\n\n"
         
         return StreamingResponse(
             generate(),
