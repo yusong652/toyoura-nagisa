@@ -24,7 +24,6 @@ def clean_text_for_tts(text: str) -> str:
     if not isinstance(text, str) or not text:
         return text
 
-    print(f"原始 TTS 文本: '{text}'")
     cleaned_text = text
 
     # 1. 移除可能残留的关键词标记 (如果在末尾)
@@ -47,7 +46,6 @@ def clean_text_for_tts(text: str) -> str:
     # 5. 最后再清理一次首尾空白
     cleaned_text = cleaned_text.strip()
 
-    print(f"清理后 TTS 文本 (修订版): '{cleaned_text}'")
     return cleaned_text
 
 # --- 在 /api/tts 处理函数中调用 ---

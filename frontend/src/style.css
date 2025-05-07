@@ -29,49 +29,104 @@ h1 {
     border: none;
 }
 
-#chatbox {
-    display: flex;
-    flex-direction: column;
-    height: 300px; /* Or whatever height you prefer */
-    overflow-y: auto;
-    border: 1px solid #ccc;
-    margin-bottom: 10px;
-    padding: 10px;
- }
-
-#userInput {
-    width: 80%;
-    padding: 10px;
-    margin-right: 10px;
+/* 聊天窗口整体容器 */
+.chat-container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
 }
 
-#sendButton {
-    padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-}
-
-#sendButton:hover {
-    background-color: #0056b3;
-}
+/* 消息通用样式 */
 .message {
-    margin: 5px;
-    padding: 8px 12px;
+    display: flex;
+    margin-bottom: 15px;
+    align-items: flex-start;
+    width: 100%;
+}
+
+/* 用户消息靠右，头像在右侧 */
+.message.user {
+    justify-content: flex-end;
+}
+.message.user .avatar {
+    margin-left: 10px;
+    margin-right: 0;
+}
+.message.user .message-content {
+    background: #007bff;
+    color: white;
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* Nagisa消息靠左，头像在左侧 */
+.message.bot {
+    justify-content: flex-start;
+}
+.message.bot .avatar {
+    margin-right: 10px;
+    margin-left: 0;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.message-content {
+    background: #f0f0f0;
+    padding: 10px 15px;
     border-radius: 15px;
     max-width: 70%;
+    word-break: break-word;
 }
-.user-message {
-    background-color: #DCF8C6;
-    align-self: flex-end;
-    margin-left: auto;
+
+#chatbox {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
 }
+
+.input-container {
+    display: flex;
+    gap: 10px;
+}
+#userInput {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+#sendButton {
+    padding: 10px 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#sendButton:hover {
+    background: #0056b3;
+}
+
+/* 移除旧的 .user-message、.bot-message、.message 的 max-width、padding、margin-left/auto 等样式，避免冲突 */
+.user-message,
 .bot-message {
-    background-color: #EAEAEA;
-    align-self: flex-start;
-    margin-right: auto;
+    background: none;
+    align-self: unset;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    max-width: unset;
 }
+
 .error-message {
     background-color: #FFCCCC;
     color: red;

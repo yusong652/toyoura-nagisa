@@ -96,7 +96,6 @@ class FishAudioTTS(BaseTTS):
         try:
             # 清理文本中的颜文字和特殊符号
             cleaned_text = self.clean_text(text)
-            print(f"Synthesizing '{cleaned_text[:30]}...' using Fish Speech model {self.reference_id}")
             
             tts_request = TTSRequest(
                 reference_id=self.reference_id,
