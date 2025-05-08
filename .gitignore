@@ -57,6 +57,7 @@ backend/.venv/
 backend/__pycache__/
 backend/data/
 backend/tts/data/
+backend/prompts/
 frontend/node_modules/
 
 # Test coverage
