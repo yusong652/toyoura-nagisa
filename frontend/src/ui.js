@@ -113,7 +113,7 @@ export function initializeUI() {
     };
 }
 
-export function displayMessage(message, sender) {
+export function displayMessage(message, sender, files = []) {
     if (!chatbox) {
         throw new Error('Chatbox not initialized! Call initializeUI first.');
     }
@@ -126,10 +126,10 @@ export function displayMessage(message, sender) {
     avatar.classList.add('avatar');
     
     if (sender === 'user') {
-        avatar.src = '/public/user-avatar.jpg'; // 默认用户头像
+        avatar.src = '/public/user-avatar.jpg';
         avatar.alt = 'User';
     } else {
-        avatar.src = '/public/Nagisa_avatar.jpg'; // Nagisa的头像
+        avatar.src = '/public/Nagisa_avatar.jpg';
         avatar.alt = 'Nagisa';
     }
 
@@ -143,7 +143,6 @@ export function displayMessage(message, sender) {
             tooltip.textContent = 'Toyoura Nagisa\n性格：元气、可爱、黏人\n爱好：和你聊天、卖萌撒娇\n简介：Nagisa是你的AI虚拟伙伴，喜欢陪伴你、和你互动！';
         }
         document.body.appendChild(tooltip);
-        // 定位到头像左侧或右侧
         const rect = avatar.getBoundingClientRect();
         if (sender === 'user') {
             tooltip.style.left = (rect.left - tooltip.offsetWidth - 10) + 'px';
@@ -162,8 +161,101 @@ export function displayMessage(message, sender) {
     const messageContent = document.createElement('div');
     messageContent.classList.add('message-content');
 
-    // 设置消息文本
-    messageContent.textContent = message;
+    // 如果有文本消息，添加文本内容
+    if (message) {
+        const textContent = document.createElement('div');
+        textContent.textContent = message;
+        messageContent.appendChild(textContent);
+    }
+
+    // 如果有文件，添加文件预览
+    if (files && files.length > 0) {
+        const filesContainer = document.createElement('div');
+        filesContainer.className = 'message-files';
+        filesContainer.style.display = 'flex';
+        filesContainer.style.flexWrap = 'wrap';
+        filesContainer.style.gap = '8px';
+        filesContainer.style.marginTop = message ? '8px' : '0';
+
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'message-image-container';
+                imgContainer.style.position = 'relative';
+                imgContainer.style.width = '200px';
+                imgContainer.style.height = '200px';
+                imgContainer.style.borderRadius = '8px';
+                imgContainer.style.overflow = 'hidden';
+
+                const img = document.createElement('img');
+                img.className = 'message-image';
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.cursor = 'pointer';
+
+                // 点击图片放大预览
+                img.onclick = () => {
+                    const preview = document.createElement('div');
+                    preview.className = 'image-preview-overlay';
+                    preview.style.position = 'fixed';
+                    preview.style.top = '0';
+                    preview.style.left = '0';
+                    preview.style.width = '100%';
+                    preview.style.height = '100%';
+                    preview.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                    preview.style.display = 'flex';
+                    preview.style.justifyContent = 'center';
+                    preview.style.alignItems = 'center';
+                    preview.style.zIndex = '1000';
+                    preview.onclick = () => preview.remove();
+
+                    const previewImg = document.createElement('img');
+                    previewImg.src = img.src;
+                    previewImg.style.maxWidth = '90%';
+                    previewImg.style.maxHeight = '90%';
+                    previewImg.style.objectFit = 'contain';
+
+                    preview.appendChild(previewImg);
+                    document.body.appendChild(preview);
+                };
+
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+                imgContainer.appendChild(img);
+                filesContainer.appendChild(imgContainer);
+            } else {
+                // 非图片文件显示文件名和图标
+                const fileBox = document.createElement('div');
+                fileBox.className = 'message-file';
+                fileBox.style.display = 'flex';
+                fileBox.style.alignItems = 'center';
+                fileBox.style.padding = '8px';
+                fileBox.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                fileBox.style.borderRadius = '8px';
+                fileBox.style.cursor = 'pointer';
+
+                const icon = document.createElement('span');
+                icon.textContent = '📄';
+                icon.style.fontSize = '24px';
+                icon.style.marginRight = '8px';
+
+                const name = document.createElement('span');
+                name.textContent = file.name;
+                name.style.fontSize = '14px';
+                name.style.color = '#666';
+
+                fileBox.appendChild(icon);
+                fileBox.appendChild(name);
+                filesContainer.appendChild(fileBox);
+            }
+        });
+
+        messageContent.appendChild(filesContainer);
+    }
 
     // 根据发送者调整布局
     if (sender === 'user') {
@@ -195,7 +287,7 @@ export function displayMessage(message, sender) {
         timeDiv.className = 'message-time';
         timeDiv.textContent = new Date().toLocaleTimeString();
         timeDiv.style.textAlign = 'left';
-        timeDiv.style.margin = '4px 0 0 8px'; // 靠左微缩进，与气泡对齐
+        timeDiv.style.margin = '4px 0 0 8px';
         timeDiv.style.width = 'auto';
         timeDiv.style.display = 'block';
 

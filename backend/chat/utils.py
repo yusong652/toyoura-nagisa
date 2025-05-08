@@ -1,8 +1,10 @@
 import os
 import json
-from typing import List, Dict, Any, AsyncGenerator
+import re
+from typing import List, Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from datetime import datetime
+from ..config import get_prompt_config
 
 # 聊天历史相关工具
 HISTORY_FILE = "backend/chat/data/chat_history.json"
@@ -105,3 +107,29 @@ async def stream_response(response_text: str, chunk_size: int = 3) -> AsyncGener
         chunk = response_text[i:i + chunk_size]
         yield chunk
         await asyncio.sleep(0.1)  # 控制输出速度 
+
+def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
+    """
+    解析 LLM 的输出，提取回复文本和关键词。
+    Args:
+        llm_full_response: LLM 的完整响应文本
+    Returns:
+        (response_text, keyword) 元组
+    """
+    config = get_prompt_config()
+    allowed_keywords = config["allowed_keywords"]
+    
+    keyword = "neutral"  # Default keyword
+    response_text = llm_full_response.strip()
+
+    match = re.search(r'\[\[(\w+)\]\]\s*$', llm_full_response.strip())
+    if match:
+        extracted_keyword = match.group(1).lower()
+        if extracted_keyword in allowed_keywords:
+            keyword = extracted_keyword
+            response_text = llm_full_response[:match.start()].strip()
+        else:
+            print(f"警告: LLM 返回了未定义的关键词 '{extracted_keyword}'")
+            response_text = llm_full_response[:match.start()].strip()
+
+    return response_text, keyword 

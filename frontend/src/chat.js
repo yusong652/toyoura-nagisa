@@ -49,7 +49,7 @@ export async function sendAndGetResponse(messageText) {
     await resetAudioState();
 
     // Display user message
-    displayMessage(messageText, 'user');
+    displayMessage(messageText, 'user', files);
 
     // 清空上传文件缓存和缩略图
     window.uploadCache = [];

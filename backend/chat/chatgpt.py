@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import httpx
 from .base import LLMClientBase
 from .models import Message
-from ..prompts.prompts import parse_llm_output
+from .utils import parse_llm_output
 
 class ChatGPTClient(LLMClientBase):
     """
@@ -27,6 +27,7 @@ class ChatGPTClient(LLMClientBase):
             "Authorization": f"Bearer {self.api_key}"
         }
         self.temperature = temperature
+        print(f"ChatGPTClient initialized.")
 
     async def get_response(
         self,
@@ -38,19 +39,49 @@ class ChatGPTClient(LLMClientBase):
         调用 OpenAI ChatGPT API，返回 (response_text, keyword)。
         """
         # 组装消息，始终以 self.system_prompt 开头
-        sys_prompt = self.system_prompt or "你是豊浦凪沙 (Toyoura Nagisa)，称呼用户为'哥哥'。"
+        sys_prompt = self.system_prompt
         messages_for_llm = [
             {"role": "system", "content": sys_prompt}
         ]
+        
         has_image = False
         for msg in messages:
+            # 自动转换为 OpenAI 多模态格式
             if isinstance(msg.content, list):
-                messages_for_llm.append({"role": msg.role, "content": msg.content})
-                # 检查是否有图片
-                if any(c.get("type") == "image_url" for c in msg.content):
-                    has_image = True
+                openai_content = []
+                for c in msg.content:
+                    if isinstance(c, dict):
+                        if "text" in c and "type" not in c:
+                            # 普通文本，转为 openai 格式
+                            openai_content.append({"type": "text", "text": c["text"]})
+                        elif "inline_data" in c:
+                            # 图片，转为 openai 格式
+                            mime = c["inline_data"].get("mime_type", "image/png")
+                            data = c["inline_data"]["data"]
+                            openai_content.append({
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime};base64,{data}"}
+                            })
+                            has_image = True
+                        elif c.get("type") == "image_url":
+                            openai_content.append(c)
+                            has_image = True
+                        elif c.get("type") == "text":
+                            openai_content.append(c)
+                        else:
+                            # 兜底：原样加入
+                            openai_content.append(c)
+                    else:
+                        # 兜底：原样加入
+                        openai_content.append(c)
+                messages_for_llm.append({"role": msg.role, "content": openai_content})
             else:
-                messages_for_llm.append({"role": msg.role, "content": msg.content})
+                # 其它情况全部转为字符串
+                if isinstance(msg.content, list):
+                    text = "".join(str(c.get("text", "")) if isinstance(c, dict) else str(c) for c in msg.content)
+                else:
+                    text = str(msg.content)
+                messages_for_llm.append({"role": msg.role, "content": text})
         model = "gpt-4.1" if has_image else kwargs.get("model", "gpt-4.1-mini")
         payload = {
             "model": model,
@@ -70,6 +101,7 @@ class ChatGPTClient(LLMClientBase):
                 if not response_data.get("choices"):
                     raise ValueError("No choices in OpenAI response")
                 llm_reply = response_data["choices"][0]["message"]["content"]
+                print(f"LLM 回复: {llm_reply}")
                 response_text, keyword = parse_llm_output(llm_reply)
                 return response_text, keyword
         except httpx.TimeoutException:
