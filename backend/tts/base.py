@@ -3,6 +3,7 @@ from typing import Optional, Union, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel
 from .utils import clean_text_for_tts
+from datetime import datetime
 
 class TTSRequest(BaseModel):
     text: str
@@ -79,6 +80,34 @@ class BaseTTS(ABC):
             str: 清理后的文本
         """
         return clean_text_for_tts(text)
+    
+    def save_audio_to_file(self, audio_bytes: bytes, output_path: Optional[Union[str, Path]] = None, audio_format: str = "mp3") -> Optional[str]:
+        """将音频字节流保存到文件，支持多种音频格式
+        
+        Args:
+            audio_bytes: 要保存的音频字节流
+            output_path: 输出文件路径，可选。如果不提供，将自动生成文件名
+            audio_format: 音频格式（如 'mp3', 'wav'），默认 'mp3'
+        Returns:
+            Optional[str]: 保存的文件路径，如果保存失败则返回 None
+        """
+        try:
+            if not output_path:
+                output_dir = Path(__file__).parent / "data" / "tts_outputs"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                output_path = output_dir / f"tts_{timestamp}.{audio_format}"
+            else:
+                output_path = Path(output_path)
+                if not output_path.suffix:
+                    output_path = output_path.with_suffix(f".{audio_format}")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'wb') as f:
+                f.write(audio_bytes)
+            return str(output_path.absolute())
+        except Exception as e:
+            print(f"Error saving audio to file: {e}")
+            return None
     
     @property
     def is_ready(self) -> bool:

@@ -13,12 +13,13 @@ from typing import Optional, Union
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from .tts.remote import FishAudioTTS
+from .tts.remote.fish_audio import FishAudioTTS
 from .tts.base import BaseTTS, TTSRequest
 from .chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
 from .chat.utils import load_history, save_history, MAX_HISTORY_MESSAGES, split_text_by_punctuations
 import asyncio
 from .chat.llm_factory import get_client
+from .tts.tts_factory import get_tts_engine
 
 
 # 加载环境变量
@@ -27,7 +28,7 @@ load_dotenv()
 # 应用生命周期管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tts_engine = FishAudioTTS()
+    tts_engine = get_tts_engine()
     await tts_engine.initialize()
     app.state.tts_engine = tts_engine
     print("TTS Engine Initialized.")

@@ -58,7 +58,6 @@ class GeminiClient(LLMClientBase):
     def map_role(self, role: str) -> str:
         if role == "assistant":
             return "model"
-        # system 也映射为 user，或直接拼到第一条 user 消息
         return "user"
 
     async def get_response(self, messages: List[Message], **kwargs) -> Tuple[str, str]:
