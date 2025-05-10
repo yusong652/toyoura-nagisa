@@ -1,4 +1,4 @@
-from .chatgpt import ChatGPTClient
+from .gpt import GPTClient
 from .base import LLMClientBase
 from .models import Message, ChatRequest, ChatResponse, ErrorResponse
 from .llm_factory import get_client

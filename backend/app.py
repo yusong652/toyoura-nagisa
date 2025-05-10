@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from .tts.remote import FishAudioTTS
 from .tts.base import BaseTTS, TTSRequest
-from .chat import LLMClientBase, ChatGPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
+from .chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
 from .chat.utils import load_history, save_history, MAX_HISTORY_MESSAGES, split_text_by_punctuations
 import asyncio
 from .chat.llm_factory import get_client

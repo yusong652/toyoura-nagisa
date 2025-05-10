@@ -1,12 +1,12 @@
 from typing import Dict, Optional, Type
 from .base import LLMClientBase
-from .chatgpt import ChatGPTClient
+from .gpt import GPTClient
 from .gemini import GeminiClient
 from ..config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
 
 # 注册的 LLM 客户端类型
 _clients: Dict[str, Type[LLMClientBase]] = {
-    "chatgpt": ChatGPTClient,
+    "chatgpt": GPTClient,
     "gemini": GeminiClient,
 }
 
