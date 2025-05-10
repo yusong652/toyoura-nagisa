@@ -22,6 +22,27 @@ export function initializeUI() {
             fileInput.click();
         });
 
+        // 监听粘贴事件
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile();
+                    if (!window.uploadCache) window.uploadCache = [];
+                    
+                    // 检查是否已存在相同文件
+                    if (!window.uploadCache.some(x => x.name === file.name && x.size === file.size)) {
+                        window.uploadCache.push(file);
+                    }
+                    renderFilePreview();
+                    console.log('已粘贴图片:', file);
+                    break;
+                }
+            }
+        });
+
         // 渲染缩略图的函数
         function renderFilePreview() {
             const previewArea = document.getElementById('filePreviewArea');

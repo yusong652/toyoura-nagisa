@@ -19,8 +19,8 @@ h1 {
 
 #live2d-canvas {
     /* 设置尺寸 */
-    width: 250px;  /* 示例宽度 */
-    height: 350px; /* 示例高度 */
+    width: 400px;  /* 示例宽度 */
+    height: 600px; /* 示例高度 */
 
     /* 定位 */
     position: fixed; /* 固定在视口 */

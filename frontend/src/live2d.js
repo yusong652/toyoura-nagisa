@@ -18,8 +18,8 @@ export async function initializeLive2D(canvasId) {
 
     const app = new PIXI.Application({
         view: canvas,
-        width: 300,
-        height: 450,
+        width: 400,
+        height: 600,
         transparent: true,
         backgroundAlpha: 0,
         autoDensity: true,
@@ -58,7 +58,7 @@ export async function initializeLive2D(canvasId) {
         let scale = Math.min(
             screenWidth / model.width,
             screenHeight / model.height
-        ) * 1.4;
+        ) * 1.2;
         
         if (!isFinite(scale) || scale <= 0) {
             scale = 0.1;
@@ -70,7 +70,7 @@ export async function initializeLive2D(canvasId) {
         const scaledHeight = model.height * 0.7;
         
         model.x = (screenWidth - scaledWidth) / 2;
-        model.y = (screenHeight - scaledHeight) / 2;
+        model.y = (screenHeight - scaledHeight) / 2 - 100;
 
         // 设置初始动作
         await playInitialMotion(model);

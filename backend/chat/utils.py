@@ -13,7 +13,7 @@ MAX_HISTORY_MESSAGES = 20
 # 默认的分割句读点
 DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—']
 # 默认的标点符号数量限制
-DEFAULT_PUNCTUATION_LIMIT = 4
+DEFAULT_PUNCTUATION_LIMIT = 8
 
 def split_text_by_punctuations(text: str, punctuations: List[str] = DEFAULT_SPLIT_PUNCTUATIONS, punctuation_limit: int = DEFAULT_PUNCTUATION_LIMIT) -> List[str]:
     """

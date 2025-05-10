@@ -14,24 +14,45 @@ class GeminiClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, temperature: float = 1.2, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
         """
         初始化 Gemini 客户端。
         Args:
             api_key: Google API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
-            temperature: 采样温度，默认1.2。
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
         self.client = genai.Client(api_key=self.api_key)
-        self.temperature = temperature
         self.safety_settings = [
             types.SafetySetting(
                 category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
                 threshold=types.HarmBlockThreshold.BLOCK_NONE
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE
             )
         ]
+        
+        # 初始化配置
+        self.config = types.GenerateContentConfig(
+            system_instruction=self.system_prompt,
+            safety_settings=self.safety_settings,
+            temperature=self.extra_config.get('temperature', 1.2),
+            topP=self.extra_config.get('top_p', 0.95),
+            topK=self.extra_config.get('top_k', 40),
+            max_output_tokens=self.extra_config.get('max_output_tokens', 500)
+        )
+        
         print(f"Gemini Client initialized.")
 
     def map_role(self, role: str) -> str:
@@ -40,7 +61,7 @@ class GeminiClient(LLMClientBase):
         # system 也映射为 user，或直接拼到第一条 user 消息
         return "user"
 
-    async def get_response(self, messages: List[Message], temperature: Optional[float] = None, **kwargs) -> Tuple[str, str]:
+    async def get_response(self, messages: List[Message], **kwargs) -> Tuple[str, str]:
         contents = []
         # system prompt 通过 config 传递，不加到 contents
         for msg in messages:
@@ -61,29 +82,11 @@ class GeminiClient(LLMClientBase):
                 parts.append({"text": msg.content})
             contents.append({"role": msg.role, "parts": parts})
 
-        # 只允许Gemini支持的参数
-        allowed_keys = {"temperature", "top_p", "top_k", "max_output_tokens", "stop_sequences"}
-        user_config = kwargs.get('generation_config', {})
-        if isinstance(user_config, dict):
-            filtered_config = {k: v for k, v in user_config.items() if k in allowed_keys}
-        else:
-            filtered_config = {}
-        config = types.GenerateContentConfig(
-            system_instruction=self.system_prompt,
-            safety_settings=self.safety_settings,
-            temperature=temperature if temperature is not None else self.temperature,
-            topP=kwargs.get('top_p', get_llm_specific_config('gemini').get('top_p', 0.95)),
-            topK=kwargs.get('top_k', get_llm_specific_config('gemini').get('top_k', 40)),
-            max_output_tokens=kwargs.get('max_output_tokens', get_llm_specific_config('gemini').get('maxOutputTokens', 2048)),
-            **filtered_config
-        )
-
-        # print(f"contents: {contents}")
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
                 contents=contents,
-                config=config
+                config=self.config
             )
             if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
                 response_text = response.candidates[0].content.parts[0].text
