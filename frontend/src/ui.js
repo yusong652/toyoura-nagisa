@@ -2,6 +2,7 @@
 let chatbox = null;
 let userInput = null;
 let sendButton = null;
+let themeToggle = null;
 
 let typingInterval = null;
 
@@ -13,6 +14,23 @@ export function initializeUI() {
     chatbox = document.getElementById('chatbox');
     userInput = document.getElementById('userInput');
     sendButton = document.getElementById('sendButton');
+    themeToggle = document.getElementById('themeToggle');
+
+    // 初始化主题
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', savedTheme);
+    updateThemeToggleIcon(savedTheme);
+
+    // 主题切换事件监听
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggleIcon(newTheme);
+        });
+    }
 
     // 文件上传相关元素
     const fileInput = document.getElementById('fileInput');
@@ -437,4 +455,10 @@ export function hideLoading() {
         clearInterval(typingInterval);
         typingInterval = null;
     }
+}
+
+// 更新主题切换按钮图标
+function updateThemeToggleIcon(theme) {
+    if (!themeToggle) return;
+    themeToggle.innerHTML = theme === 'light' ? '🌙' : '☀️';
 }

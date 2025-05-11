@@ -1,5 +1,41 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
 
+:root {
+    /* Light theme variables */
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --chat-bg: #f0f0f0;
+    --user-message-bg: #1565c0;
+    --user-message-color: #ffffff;
+    --bot-message-bg: #e3f3d5;
+    --bot-message-color: #333333;
+    --input-bg: #ffffff;
+    --input-border: #cccccc;
+    --button-bg: #1565c0;
+    --button-color: #ffffff;
+    --button-hover: #003c8f;
+    --scrollbar-thumb: #b3c6e0;
+    --scrollbar-track: #e3eaf5;
+}
+
+[data-theme="dark"] {
+    /* Dark theme variables */
+    --bg-color: #1a1a1a;
+    --text-color: #ffffff;
+    --chat-bg: #2d2d2d;
+    --user-message-bg: #0d47a1;
+    --user-message-color: #ffffff;
+    --bot-message-bg: #1b5e20;
+    --bot-message-color: #ffffff;
+    --input-bg: #2d2d2d;
+    --input-border: #404040;
+    --button-bg: #0d47a1;
+    --button-color: #ffffff;
+    --button-hover: #002171;
+    --scrollbar-thumb: #404040;
+    --scrollbar-track: #2d2d2d;
+}
+
 body {
     font-family:
         'ZCOOL KuaiLe', 'ZCOOL XiaoWei',
@@ -10,6 +46,9 @@ body {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
 }
 
 h1 {
@@ -66,8 +105,8 @@ h1 {
     order: 1;
 }
 .message.user .message-content {
-    background: #1565c0;
-    color: white;
+    background: var(--user-message-bg);
+    color: var(--user-message-color);
     margin-left: 0;
     margin-right: 0;
 }
@@ -115,7 +154,7 @@ h1 {
 #chatbox {
     height: 400px;
     overflow-y: auto;
-    border: 1px solid #ccc;
+    border: 1px solid var(--input-border);
     padding: 10px;
     margin-bottom: 10px;
     border-radius: 5px;
@@ -123,16 +162,17 @@ h1 {
     flex-direction: column;
     scrollbar-width: thin; /* Firefox: always thin */
     scrollbar-color: transparent transparent; /* 默认透明 */
+    background-color: var(--chat-bg);
 }
 #chatbox:hover {
     scrollbar-color: #b3c6e0 #e3eaf5; /* 悬停时有色 */
 }
 #chatbox::-webkit-scrollbar {
     width: 8px;
-    background: transparent;
+    background: var(--scrollbar-track);
 }
 #chatbox::-webkit-scrollbar-thumb {
-    background: transparent;
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
     transition: background 0.2s;
 }
@@ -150,7 +190,7 @@ h1 {
 #userInput {
     width: 100%;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--input-border);
     border-radius: 5px;
     resize: none;
     min-height: 40px;
@@ -159,11 +199,13 @@ h1 {
     line-height: 1.5;
     box-sizing: border-box;
     overflow-y: auto;
+    background-color: var(--input-bg);
+    color: var(--text-color);
 }
 #sendButton {
     padding: 10px 20px;
-    background: #1565c0;
-    color: white;
+    background: var(--button-bg);
+    color: var(--button-color);
     border: none;
     border-radius: 5px;
     cursor: pointer;
@@ -172,7 +214,7 @@ h1 {
     outline: none;
 }
 #sendButton:hover {
-    background: #003c8f;
+    background: var(--button-hover);
 }
 #sendButton:active {
     background: #0d47a1;
@@ -248,15 +290,16 @@ h1 {
 }
 
 .message.bot .message-content {
-    background: #e3f3d5;
+    background: var(--bot-message-bg);
+    color: var(--bot-message-color);
 }
 
 .avatar-tooltip {
     position: fixed;
     z-index: 100;
-    background: #fff;
-    color: #151615;
-    border: 1px solid #cce;
+    background: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--input-border);
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
     padding: 12px 18px;
@@ -401,5 +444,31 @@ h1 {
 .file-thumb-del:hover {
     background: #e74c3c;
     color: #fff;
+}
+
+/* Theme Toggle Button */
+#themeToggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--button-bg);
+    color: var(--button-color);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+}
+
+#themeToggle:hover {
+    transform: scale(1.1);
+    background: var(--button-hover);
 }
 
