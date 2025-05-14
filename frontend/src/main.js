@@ -2,11 +2,15 @@ import './style.css';
 import { initializeLive2D, enableLive2DDrag } from './live2d.js';
 import { sendAndGetResponse } from './chat.js';
 import { initializeUI, getCurrentMessage, clearInput } from './ui.js';
+import { initializeChatHistory } from './chatHistory.js';
 
 async function main() {
     // Initialize UI components
     const { userInput, sendButton } = initializeUI();
     console.log(userInput, sendButton);
+
+    // Initialize chat history sidebar
+    initializeChatHistory();
 
     // 自适应高度
     userInput.addEventListener('input', function() {

@@ -12,7 +12,7 @@ KEYWORD_MARKER_PATTERN = re.compile(r'\[\[\w+\]\]\s*$')
 WHITESPACE_PATTERN = re.compile(r'\s+')
 
 # 默认的分割尺寸
-DEFAULT_SPLIT_SIZE = 3
+DEFAULT_SPLIT_SIZE = 8
 # 默认的分割句读点
 DEFAULT_SPLIT_PUNCTUATIONS = ['，', '。', ',', '~', '！', '？', '、', '!', '?', '…', '—'] # もっと色々追加してもOK！
 
