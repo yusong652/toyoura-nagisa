@@ -5,18 +5,18 @@ import base64
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pathlib import Path
 from pydantic import BaseModel
 import uvicorn
-from typing import Optional, Union
+from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from .tts.remote.fish_audio import FishAudioTTS
 from .tts.base import BaseTTS, TTSRequest
 from .chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from .chat.utils import load_history, save_history, MAX_HISTORY_MESSAGES, split_text_by_punctuations
+from .chat.utils import load_history, save_history, MAX_HISTORY_MESSAGES, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
 import asyncio
 from .chat.llm_factory import get_client
 from .tts.tts_factory import get_tts_engine
@@ -50,6 +50,119 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 新增历史记录相关模型
+class NewHistoryRequest(BaseModel):
+    name: Optional[str] = None
+
+class HistorySessionResponse(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    updated_at: str
+
+class SwitchSessionRequest(BaseModel):
+    session_id: str
+
+class DeleteSessionRequest(BaseModel):
+    session_id: str
+
+@app.post("/api/history/create", response_model=dict)
+async def create_history_endpoint(request: NewHistoryRequest):
+    """创建新的聊天历史记录"""
+    try:
+        session_id = create_new_history(request.name)
+        return {"session_id": session_id, "success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"创建历史记录失败: {str(e)}")
+
+@app.get("/api/history/sessions", response_model=List[dict])
+async def get_history_sessions():
+    """获取所有可用的聊天会话"""
+    try:
+        sessions = get_all_sessions()
+        return sessions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取会话列表失败: {str(e)}")
+
+@app.get("/api/history/{session_id}", response_model=dict)
+async def get_session_history(session_id: str):
+    """获取指定会话的完整历史记录"""
+    try:
+        # 验证会话ID是否存在
+        sessions = get_all_sessions()
+        session = next((s for s in sessions if s['id'] == session_id), None)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
+        
+        # 加载指定会话的历史记录
+        history = load_history(session_id)
+        
+        return {
+            "session": session,
+            "history": history,
+            "message_count": len(history)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取会话历史记录失败: {str(e)}")
+
+@app.delete("/api/history/{session_id}", response_model=dict)
+async def delete_session(session_id: str):
+    """删除指定的聊天会话"""
+    try:
+        # 验证会话ID是否存在
+        sessions = get_all_sessions()
+        session = next((s for s in sessions if s['id'] == session_id), None)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
+        
+        # 删除会话
+        success = delete_history_session(session_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=f"删除会话 {session_id} 失败")
+        
+        return {
+            "session_id": session_id,
+            "success": True,
+            "message": f"会话 '{session.get('name', session_id)}' 已成功删除"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
+
+@app.post("/api/history/switch", response_model=dict)
+async def switch_session(request: SwitchSessionRequest):
+    """切换到指定的聊天会话"""
+    try:
+        # 验证会话ID是否存在
+        sessions = get_all_sessions()
+        session_exists = any(session['id'] == request.session_id for session in sessions)
+        
+        if not session_exists:
+            raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
+        
+        # 加载指定会话的历史记录
+        history = load_history(request.session_id)
+        
+        # 返回会话信息和最近的消息
+        recent_messages = history[-5:] if len(history) > 5 else history
+        
+        return {
+            "session_id": request.session_id,
+            "success": True,
+            "message_count": len(history),
+            "recent_messages": recent_messages
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"切换会话失败: {str(e)}")
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):
@@ -87,7 +200,8 @@ async def chat_stream_endpoint(request: Request):
                     "data": b64
                 }
             })
-    session_id = "default_session"
+    # 获取会话ID，如果没有提供则使用默认会话
+    session_id = data.get('session_id', "default_session")
     loaded_history = load_history(session_id)
     history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     user_msg = Message(role="user", content=content)

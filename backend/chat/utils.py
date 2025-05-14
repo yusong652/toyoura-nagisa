@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import uuid
+import shutil
 from typing import List, Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from datetime import datetime
@@ -8,6 +10,8 @@ from ..config import get_prompt_config
 
 # 聊天历史相关工具
 HISTORY_FILE = "backend/chat/data/chat_history.json"
+HISTORY_DIR = "backend/chat/data"
+BACKUP_DIR = "backend/chat/data/backups"
 MAX_HISTORY_MESSAGES = 20
 
 # 默认的分割句读点
@@ -49,6 +53,176 @@ def split_text_by_punctuations(text: str, punctuations: List[str] = DEFAULT_SPLI
         
     return sentences
 
+def backup_history() -> str:
+    """
+    备份当前的历史记录文件
+    
+    Returns:
+        备份文件的路径
+    """
+    # 确保备份目录存在
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    
+    # 如果历史记录文件不存在，则不需要备份
+    if not os.path.exists(HISTORY_FILE):
+        return ""
+    
+    # 创建带时间戳的备份文件名
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = os.path.join(BACKUP_DIR, f"chat_history_{timestamp}.json")
+    
+    # 复制文件
+    shutil.copy2(HISTORY_FILE, backup_file)
+    
+    # 同时备份元数据文件
+    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    if os.path.exists(metadata_file):
+        metadata_backup = os.path.join(BACKUP_DIR, f"sessions_metadata_{timestamp}.json")
+        shutil.copy2(metadata_file, metadata_backup)
+    
+    return backup_file
+
+def delete_history_session(session_id: str) -> bool:
+    """
+    删除指定的历史记录会话
+    
+    Args:
+        session_id: 要删除的会话ID
+        
+    Returns:
+        是否删除成功
+    """
+    # 检查历史记录文件是否存在
+    if not os.path.exists(HISTORY_FILE):
+        return False
+    
+    # 备份当前历史记录
+    backup_file = backup_history()
+    if backup_file:
+        print(f"删除会话前已备份历史记录到: {backup_file}")
+    
+    try:
+        # 加载所有历史记录
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            all_history = json.load(f)
+        
+        # 如果会话ID存在，则删除
+        if session_id in all_history:
+            del all_history[session_id]
+            
+            # 保存更新后的历史记录
+            with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+                json.dump(all_history, f, indent=4, ensure_ascii=False)
+            
+            # 同时从元数据中删除
+            metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+            if os.path.exists(metadata_file):
+                try:
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                    
+                    if session_id in metadata:
+                        del metadata[session_id]
+                        
+                        with open(metadata_file, 'w', encoding='utf-8') as f:
+                            json.dump(metadata, f, indent=4, ensure_ascii=False)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass
+            
+            return True
+        else:
+            return False
+    except (FileNotFoundError, json.JSONDecodeError):
+        return False
+
+def create_new_history(name: str = None) -> str:
+    """
+    创建一个新的聊天历史记录
+    
+    Args:
+        name: 历史记录的名称，如果为None则使用当前时间作为名称
+        
+    Returns:
+        新创建的会话ID
+    """
+    # 备份当前历史记录
+    backup_file = backup_history()
+    if backup_file:
+        print(f"历史记录已备份到: {backup_file}")
+    
+    # 确保数据目录存在
+    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+    
+    # 生成唯一的会话ID
+    session_id = str(uuid.uuid4())
+    
+    # 如果没有提供名称，则使用当前时间
+    if not name:
+        name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 创建新的历史记录元数据
+    session_metadata = {
+        "id": session_id,
+        "name": name,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    # 加载所有历史记录
+    all_history = {}
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                all_history = json.load(f)
+        except json.JSONDecodeError:
+            all_history = {}
+    
+    # 初始化新的会话历史和元数据
+    all_history[session_id] = []
+    
+    # 保存元数据到单独的文件
+    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    metadata = {}
+    if os.path.exists(metadata_file):
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        except json.JSONDecodeError:
+            metadata = {}
+    
+    metadata[session_id] = session_metadata
+    
+    # 保存元数据
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4, ensure_ascii=False)
+    
+    # 保存历史记录
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(all_history, f, indent=4, ensure_ascii=False)
+    
+    return session_id
+
+def get_all_sessions() -> List[Dict[str, Any]]:
+    """
+    获取所有可用的聊天会话
+    
+    Returns:
+        会话元数据列表，按更新时间倒序排列
+    """
+    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    if not os.path.exists(metadata_file):
+        return []
+    
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+            # 将字典转换为列表并按更新时间排序
+            sessions = list(metadata.values())
+            sessions.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+            return sessions
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
 def load_history(session_id: str) -> List[Dict[str, Any]]:
     """
     加载指定会话ID的聊天历史，自动补全非法或缺失的timestamp
@@ -87,6 +261,20 @@ def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None
             elif isinstance(msg['timestamp'], datetime):
                 msg['timestamp'] = msg['timestamp'].isoformat()
         all_history[session_id] = current_history
+        
+        # 更新元数据中的更新时间
+        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        if os.path.exists(metadata_file):
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    if session_id in metadata:
+                        metadata[session_id]['updated_at'] = datetime.now().isoformat()
+                        with open(metadata_file, 'w', encoding='utf-8') as f:
+                            json.dump(metadata, f, indent=4, ensure_ascii=False)
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+        
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(all_history, f, indent=4, ensure_ascii=False)
     except IOError as e:
