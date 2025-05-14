@@ -21,6 +21,7 @@ interface ChatProviderProps {
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
 
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -32,16 +33,41 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       sender: 'user',
       text,
       files,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isRead: false // 初始状态为未读
     }
     
     setMessages(prev => [...prev, userMessage])
+    
+    // 设置用户消息为已读状态（在发送消息1秒后）
+    setTimeout(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === userMessage.id
+            ? { ...msg, isRead: true }
+            : msg
+        )
+      )
+    }, 1000)
     
     // 重置音频状态
     console.log('重置音频状态')
     await resetAudioState()
     
-    // 设置加载状态
+    // 创建一个加载消息占位符
+    const loadingId = uuidv4()
+    setLoadingMessageId(loadingId)
+    
+    // 添加加载消息到聊天记录
+    const loadingMessage: Message = {
+      id: loadingId,
+      sender: 'bot',
+      text: '',
+      timestamp: Date.now(),
+      isLoading: true // 标记为加载中
+    }
+    
+    setMessages(prev => [...prev, loadingMessage])
     setIsLoading(true)
     
     try {
@@ -72,16 +98,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      // 创建机器人回复消息
-      const botMessage: Message = {
-        id: uuidv4(),
-        sender: 'bot',
-        text: '',
-        timestamp: Date.now()
-      }
-      
-      setMessages(prev => [...prev, botMessage])
-      
       // 处理流式响应
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
@@ -90,6 +106,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       let currentKeyword = null
       let audioCount = 0
       let pendingAudioQueue: string[] = [] // 用于存储接收到的音频数据
+      let firstResponseReceived = false
       
       console.log('开始处理流式响应')
       while (true) {
@@ -109,6 +126,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             }
           }
           
+          // 响应结束后，更新消息为最终状态
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === loadingId 
+                ? { ...msg, text: currentText, isLoading: false, streaming: false } 
+                : msg
+            )
+          )
+          
           break
         }
         
@@ -116,29 +142,52 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         const lines = buffer.split('\n\n')
         buffer = lines.pop() || ''
         
+        // 处理每一行数据
         for (const line of lines) {
+          if (line.trim() === '') continue
+          
           if (line.startsWith('data: ')) {
+            const jsonData = line.slice(6)
+            
             try {
-              const data = JSON.parse(line.slice(6))
+              const data = JSON.parse(jsonData)
               
+              // 如果是第一次收到响应，标记为已收到
+              if (!firstResponseReceived) {
+                firstResponseReceived = true
+                // 播放Live2D动作
+                playMotion('tap_body')
+              }
+              
+              // 处理文本内容
               if (data.text) {
-                // 更新文本显示
-                currentText += data.text
+                currentText += data.text // 累加文本而不是替换
+                
+                // 更新消息
                 setMessages(prev => 
                   prev.map(msg => 
-                    msg.id === botMessage.id 
-                      ? { ...msg, text: currentText } 
+                    msg.id === loadingId 
+                      ? { ...msg, text: currentText, isLoading: false, streaming: true } 
                       : msg
                   )
                 )
               }
               
-              if (data.keyword && !currentKeyword) {
-                // 只在第一次收到关键词时触发动作
+              // 处理关键词
+              if (data.keyword && data.keyword !== currentKeyword) {
                 currentKeyword = data.keyword
-                console.log('收到关键词，触发动作:', currentKeyword)
-                // 这里可以调用Live2D动作
-                playMotion(currentKeyword)
+                console.log('检测到关键词:', currentKeyword)
+                
+                // 根据关键词播放对应的Live2D动作
+                if (currentKeyword === 'happy') {
+                  playMotion('tap_body')
+                } else if (currentKeyword === 'sad') {
+                  playMotion('shake')
+                } else if (currentKeyword === 'angry') {
+                  playMotion('pinch_in')
+                } else if (currentKeyword === 'surprised') {
+                  playMotion('pinch_out')
+                }
               }
               
               if (data.audio) {
@@ -172,27 +221,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error sending message:', error)
-      // 添加错误消息
-      setMessages(prev => [
-        ...prev, 
-        {
-          id: uuidv4(),
-          sender: 'bot',
-          text: `Error: ${(error as Error).message}`,
-          timestamp: Date.now()
-        }
-      ])
+      // 更新加载消息为错误消息
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === loadingId 
+            ? { ...msg, text: `Error: ${(error as Error).message}`, isLoading: false } 
+            : msg
+        )
+      )
     } finally {
       setIsLoading(false)
+      setLoadingMessageId(null)
     }
   }, [queueAndPlayAudio, resetAudioState])
 
   const clearChat = useCallback(() => {
     setMessages([])
+    setLoadingMessageId(null)
   }, [])
 
   return (
-    <ChatContext.Provider value={{ messages, isLoading, sendMessage, clearChat }}>
+    <ChatContext.Provider value={{ messages, isLoading, loadingMessageId, sendMessage, clearChat }}>
       {children}
     </ChatContext.Provider>
   )

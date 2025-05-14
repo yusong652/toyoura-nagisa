@@ -7,13 +7,36 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
-  const { sender, text, files, streaming } = message
+  const { sender, text, files, streaming, isLoading, isRead } = message
   const [displayText, setDisplayText] = useState('')
+  const [dotCount, setDotCount] = useState(0)
+  const [showReadReceipt, setShowReadReceipt] = useState(false)
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
   
+  // 动态点号效果
+  useEffect(() => {
+    if (!isLoading) return
+    
+    const interval = setInterval(() => {
+      setDotCount(prev => (prev + 1) % 4)
+    }, 500)
+    
+    return () => clearInterval(interval)
+  }, [isLoading])
+  
+  // 处理已读回执显示
+  useEffect(() => {
+    if (sender === 'user' && isRead) {
+      setShowReadReceipt(true)
+    }
+  }, [sender, isRead])
+  
   // 流式显示文本
   useEffect(() => {
+    // 如果是加载中的消息，不处理文本
+    if (isLoading) return
+    
     // 仅对机器人消息且标记为流式显示的消息应用效果
     if (sender !== 'bot' || !streaming) {
       setDisplayText(text)
@@ -32,37 +55,38 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
     if (charIndexRef.current < text.length) {
       const interval = setInterval(() => {
         if (charIndexRef.current < text.length) {
-          // 每次增加2个字符，但不超过文本长度
-          charIndexRef.current = Math.min(charIndexRef.current + 2, text.length)
+          // 每次增加1个字符
+          charIndexRef.current += 1
           setDisplayText(text.substring(0, charIndexRef.current))
         } else {
           clearInterval(interval)
         }
-      }, 100) // 每100毫秒显示两个字符
+      }, 30) // 每30毫秒显示多个字符，比之前更快
       
       return () => clearInterval(interval)
     }
-  }, [sender, text, streaming])
+  }, [sender, text, streaming, isLoading])
   
   // 为流式文本添加渐变效果
   const renderStreamingText = () => {
+    // 如果是加载中的消息，显示加载指示器
+    if (isLoading) {
+      return (
+        <div className="typing-container">
+          <div className="loading-spinner"></div>
+          <div className="typing-text">正在输入{'.'.repeat(dotCount)}</div>
+        </div>
+      )
+    }
+    
     if (!streaming || sender !== 'bot') {
       return <div className="message-text" dangerouslySetInnerHTML={{ __html: displayText }} />
     }
     
-    // 将文本拆分为两个字符一组，并为每组添加渐变效果
-    const textChunks: string[] = []
-    for (let i = 0; i < displayText.length; i += 2) {
-      if (i + 1 < displayText.length) {
-        textChunks.push(displayText.substring(i, i + 2))
-      } else {
-        textChunks.push(displayText.substring(i, i + 1))
-      }
-    }
-    
+    // 将文本拆分为单个字符，并为每个字符添加渐变效果
     return (
       <div className="message-text streaming-text">
-        {textChunks.map((chunk, index) => (
+        {displayText.split('').map((char, index) => (
           <span 
             key={index} 
             className="fade-in-char"
@@ -70,9 +94,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
               animationDelay: '0ms',
             }}
           >
-            {chunk.split('').map((char, charIndex) => 
-              char === '\n' ? <br key={`br-${index}-${charIndex}`} /> : char
-            )}
+            {char === '\n' ? <br /> : char}
           </span>
         ))}
       </div>
@@ -120,7 +142,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       <div className="message-content">
         {renderStreamingText()}
         
-        {files && files.length > 0 && (
+        {files && files.length > 0 && !isLoading && (
           <div className="message-files">
             {files.map((file, index) => (
               <div key={index} className="file-preview">
@@ -137,8 +159,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
           </div>
         )}
       </div>
+      
+      {sender === 'user' && isRead && (
+        <div className={`read-receipt ${showReadReceipt ? 'visible' : ''}`}>
+          已读
+        </div>
+      )}
     </div>
   )
 }
 
-export default MessageItem 
+export default MessageItem
