@@ -1,0 +1,160 @@
+.message {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  animation: fadeIn 0.3s ease-in-out;
+  max-width: 85%;
+}
+
+.message.user {
+  flex-direction: row-reverse;
+  margin-left: auto;
+}
+
+.message:not(.user) {
+  margin-right: auto;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 12px;
+  cursor: help;
+  border: 2px solid var(--primary-color, #4a90e2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.avatar:hover {
+  transform: scale(1.05);
+}
+
+.message-content {
+  background-color: var(--bot-message-bg);
+  border-radius: 18px;
+  padding: 14px 18px;
+  max-width: 100%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.message-content:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.message.user .message-content {
+  background-color: var(--user-message-bg);
+  border-top-right-radius: 4px;
+}
+
+.message:not(.user) .message-content {
+  border-top-left-radius: 4px;
+}
+
+.message-text {
+  color: var(--text-color);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  text-align: left;
+}
+
+/* 流式文本渐变效果 */
+.streaming-text {
+  display: inline;
+}
+
+.fade-in-char {
+  display: inline-block;
+  animation: fadeInChar 100ms ease-out forwards;
+  opacity: 0;
+  margin-right: 0;
+}
+
+@keyframes fadeInChar {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.message-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.file-preview {
+  max-width: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.file-preview:hover {
+  transform: scale(1.03);
+}
+
+.file-image {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--file-bg);
+  border-radius: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.file-info:hover {
+  background-color: var(--file-hover-bg, rgba(0, 0, 0, 0.05));
+}
+
+.file-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.file-name {
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.avatar-tooltip {
+  position: absolute;
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: pre-line;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 
