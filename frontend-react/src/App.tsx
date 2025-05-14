@@ -16,20 +16,24 @@ function App(): React.ReactElement {
   }, [])
 
   return (
-    <AudioProvider>
-      <ChatProvider>
-        <div className="app-container">
-          <ThemeToggle />
-          {/* <h1>aiNagisa</h1> */}
-          <div className="chat-container">
-            <ChatBox />
-            <InputArea />
+    <>
+      <AudioProvider>
+        <ChatProvider>
+          <div className="app-container">
+            <ThemeToggle />
+            {/* <h1>aiNagisa</h1> */}
+            <div className="chat-container">
+              <div className="chat-left-panel">
+                <ChatBox />
+                <InputArea />
+              </div>
+            </div>
+            <ChatHistorySidebar />
           </div>
           <Live2DCanvas />
-          <ChatHistorySidebar />
-        </div>
-      </ChatProvider>
-    </AudioProvider>
+        </ChatProvider>
+      </AudioProvider>
+    </>
   )
 }
 
