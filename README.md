@@ -94,6 +94,21 @@ FISH_SPEECH_API_KEY=your_fish_speech_api_key
 FISH_SPEECH_MODEL_ID=your_model_id
 ```
 
+#### 配置应用
+复制示例配置文件创建您自己的配置：
+
+```bash
+cp backend/config.example.py backend/config.py
+```
+
+编辑 `backend/config.py` 文件添加您的 API 密钥和自定义设置：
+- 添加 OpenAI API 密钥用于 ChatGPT
+- 添加 Google API 密钥用于 Gemini
+- 如果使用 Fish Speech TTS，添加相应的 API 密钥
+- 如果使用 GPT-SoVITS，配置相关设置
+
+注意：`config.py` 文件已被 Git 忽略，以保持您的 API 密钥和个人设置的私密性。
+
 ### 3. 运行项目
 
 确保后端虚拟环境已激活，然后在项目根目录运行：
@@ -222,6 +237,21 @@ OPENAI_API_KEY=your_openai_api_key
 FISH_SPEECH_API_KEY=your_fish_speech_api_key
 FISH_SPEECH_MODEL_ID=your_model_id
 ```
+
+#### Configure Application
+Copy the example configuration file to create your own configuration:
+
+```bash
+cp backend/config.example.py backend/config.py
+```
+
+Edit the `backend/config.py` file to add your API keys and customize settings:
+- Add your OpenAI API key for ChatGPT
+- Add your Google API key for Gemini
+- Add your Fish Speech API key if using that TTS option
+- Configure the GPT-SoVITS settings if using that TTS option
+
+Note: The `config.py` file is ignored by Git to keep your API keys and personal settings private.
 
 ### 3. Running the Project
 

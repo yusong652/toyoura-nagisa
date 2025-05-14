@@ -59,6 +59,7 @@ backend/data/
 backend/tts/data/
 backend/prompts/
 frontend/node_modules/
+backend/config.py
 
 # Test coverage
 .coverage
