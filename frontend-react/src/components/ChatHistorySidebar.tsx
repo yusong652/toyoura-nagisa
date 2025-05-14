@@ -1,21 +1,20 @@
 import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
-
-interface ChatHistoryItem {
-  id: string
-  title: string
-  preview: string
-}
+import { useChat } from '../contexts/ChatContext'
+import { ChatSession } from '../types/chat'
 
 const ChatHistorySidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
-  
-  // 示例聊天历史数据
-  const sampleItems: ChatHistoryItem[] = [
-    { id: '1', title: '日常对话', preview: '你好，今天天气真不错！' },
-    { id: '2', title: '学习讨论', preview: '关于Python的异步编程...' },
-    { id: '3', title: '闲聊', preview: '最近有什么好看的电影推荐吗？' }
-  ]
+  const [newSessionName, setNewSessionName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const { 
+    sessions, 
+    currentSessionId, 
+    createNewSession, 
+    switchSession, 
+    deleteSession,
+    clearChat
+  } = useChat()
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen)
@@ -25,6 +24,52 @@ const ChatHistorySidebar: React.FC = () => {
   const closeSidebar = () => {
     setIsOpen(false)
     document.body.classList.remove('sidebar-open')
+  }
+
+  const handleCreateSession = async () => {
+    try {
+      setIsCreating(true)
+      await createNewSession(newSessionName || undefined)
+      setNewSessionName('')
+      clearChat()
+    } catch (error) {
+      console.error('创建会话失败:', error)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleSwitchSession = async (sessionId: string) => {
+    try {
+      await switchSession(sessionId)
+      closeSidebar()
+    } catch (error) {
+      console.error('切换会话失败:', error)
+    }
+  }
+
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation() // 防止触发切换会话
+    
+    if (window.confirm('确定要删除这个会话吗？')) {
+      try {
+        await deleteSession(sessionId)
+      } catch (error) {
+        console.error('删除会话失败:', error)
+      }
+    }
+  }
+
+  // 格式化日期
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   return (
@@ -44,13 +89,48 @@ const ChatHistorySidebar: React.FC = () => {
           </button>
         </div>
         
+        <div className="chat-history-actions">
+          <div className="new-session-input-container">
+            <input
+              type="text"
+              placeholder="新会话名称"
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              className="new-session-input"
+            />
+            <button 
+              className="new-session-button"
+              onClick={handleCreateSession}
+              disabled={isCreating}
+            >
+              {isCreating ? '创建中...' : '新建'}
+            </button>
+          </div>
+        </div>
+        
         <div className="chat-history-list">
-          {sampleItems.map(item => (
-            <div key={item.id} className="chat-history-item">
-              <div className="chat-history-item-title">{item.title}</div>
-              <div className="chat-history-item-preview">{item.preview}</div>
-            </div>
-          ))}
+          {sessions.length === 0 ? (
+            <div className="no-sessions-message">暂无聊天记录</div>
+          ) : (
+            sessions.map((session: ChatSession) => (
+              <div 
+                key={session.id} 
+                className={`chat-history-item ${currentSessionId === session.id ? 'active' : ''}`}
+                onClick={() => handleSwitchSession(session.id)}
+              >
+                <div className="chat-history-item-title">{session.name}</div>
+                <div className="chat-history-item-preview">
+                  {formatDate(session.updated_at)}
+                </div>
+                <button 
+                  className="delete-session-button"
+                  onClick={(e) => handleDeleteSession(e, session.id)}
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType } from '../types/chat'
+import { Message, FileData, ChatContextType, ChatSession } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
 import { playMotion } from '../utils/live2d'
 
@@ -22,7 +22,189 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
+
+  // 初始化：创建新会话或加载已有会话
+  useEffect(() => {
+    const init = async () => {
+      // 检查本地存储是否有会话ID
+      const storedSessionId = localStorage.getItem('session_id')
+      
+      if (storedSessionId) {
+        // 如果有存储的会话ID，尝试切换到该会话
+        try {
+          await switchSession(storedSessionId)
+        } catch (error) {
+          console.error('无法加载已存储的会话，创建新会话', error)
+          await createNewSession()
+        }
+      } else {
+        // 如果没有存储的会话ID，创建新会话
+        await createNewSession()
+      }
+      
+      // 刷新会话列表
+      await refreshSessions()
+    }
+    
+    init()
+  }, [])
+
+  // 创建新会话
+  const createNewSession = useCallback(async (name?: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/history/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name }),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const newSessionId = data.session_id
+      
+      // 保存到本地存储
+      localStorage.setItem('session_id', newSessionId)
+      
+      // 更新当前会话ID
+      setCurrentSessionId(newSessionId)
+      
+      // 清空消息
+      setMessages([])
+      
+      // 刷新会话列表
+      await refreshSessions()
+      
+      return newSessionId
+    } catch (error) {
+      console.error('创建新会话失败:', error)
+      throw error
+    }
+  }, [])
+
+  // 切换会话
+  const switchSession = useCallback(async (sessionId: string): Promise<void> => {
+    try {
+      const response = await fetch('/api/history/switch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      // 保存到本地存储
+      localStorage.setItem('session_id', sessionId)
+      
+      // 更新当前会话ID
+      setCurrentSessionId(sessionId)
+      
+      // 获取完整会话历史
+      const historyResponse = await fetch(`/api/history/${sessionId}`)
+      if (!historyResponse.ok) {
+        throw new Error(`获取历史记录失败: ${historyResponse.status}`)
+      }
+      
+      const historyData = await historyResponse.json()
+      
+      // 将后端消息格式转换为前端格式
+      const convertedMessages: Message[] = historyData.history.map((msg: any) => {
+        // 判断是用户消息还是机器人消息
+        const sender = msg.role === 'user' ? 'user' : 'bot'
+        
+        // 提取文本内容
+        let text = ''
+        let files: FileData[] = []
+        
+        if (typeof msg.content === 'string') {
+          text = msg.content
+        } else if (Array.isArray(msg.content)) {
+          // 处理多模态内容
+          msg.content.forEach((item: any) => {
+            if (item.text) {
+              text = item.text
+            } else if (item.inline_data) {
+              files.push({
+                name: `image_${files.length + 1}`,
+                type: item.inline_data.mime_type,
+                data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
+              })
+            }
+          })
+        }
+        
+        return {
+          id: uuidv4(), // 生成新的ID
+          sender,
+          text,
+          files: files.length > 0 ? files : undefined,
+          timestamp: new Date(msg.timestamp).getTime(),
+          isRead: true
+        }
+      })
+      
+      // 更新消息列表
+      setMessages(convertedMessages)
+      
+    } catch (error) {
+      console.error('切换会话失败:', error)
+      throw error
+    }
+  }, [])
+
+  // 删除会话
+  const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/history/${sessionId}`, {
+        method: 'DELETE',
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      // 如果删除的是当前会话，创建新会话
+      if (sessionId === currentSessionId) {
+        await createNewSession()
+      }
+      
+      // 刷新会话列表
+      await refreshSessions()
+    } catch (error) {
+      console.error('删除会话失败:', error)
+      throw error
+    }
+  }, [currentSessionId, createNewSession])
+
+  // 刷新会话列表
+  const refreshSessions = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/history/sessions')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setSessions(data)
+    } catch (error) {
+      console.error('获取会话列表失败:', error)
+      throw error
+    }
+  }, [])
 
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
@@ -90,7 +272,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         },
         body: JSON.stringify({
           messageData,
-          session_id: localStorage.getItem('session_id') || undefined,
+          session_id: currentSessionId || localStorage.getItem('session_id') || "default_session",
         }),
       })
       
@@ -134,6 +316,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                 : msg
             )
           )
+          
+          // 刷新会话列表以更新最新状态
+          refreshSessions()
           
           break
         }
@@ -233,7 +418,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setIsLoading(false)
       setLoadingMessageId(null)
     }
-  }, [queueAndPlayAudio, resetAudioState])
+  }, [queueAndPlayAudio, resetAudioState, currentSessionId, refreshSessions])
 
   const clearChat = useCallback(() => {
     setMessages([])
@@ -241,7 +426,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [])
 
   return (
-    <ChatContext.Provider value={{ messages, isLoading, loadingMessageId, sendMessage, clearChat }}>
+    <ChatContext.Provider value={{ 
+      messages, 
+      isLoading, 
+      loadingMessageId, 
+      sessions, 
+      currentSessionId,
+      sendMessage, 
+      clearChat, 
+      createNewSession, 
+      switchSession, 
+      deleteSession, 
+      refreshSessions 
+    }}>
       {children}
     </ChatContext.Provider>
   )
