@@ -6,7 +6,7 @@ import './ChatBox.css'
 const ChatBox: React.FC = () => {
   const { messages } = useChat()
   const chatboxRef = useRef<HTMLDivElement>(null)
-  
+
   // 滚动到底部
   useEffect(() => {
     if (chatboxRef.current) {
