@@ -7,7 +7,7 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
-  const { sender, text, files, streaming, isLoading, isRead } = message
+  const { sender, text, files, streaming, isLoading, isRead, timestamp } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const [showReadReceipt, setShowReadReceipt] = useState(false)
@@ -66,6 +66,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       return () => clearInterval(interval)
     }
   }, [sender, text, streaming, isLoading])
+  
+  // 格式化时间戳
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
   
   // 为流式文本添加渐变效果
   const renderStreamingText = () => {
@@ -139,26 +145,57 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
         onMouseLeave={handleMouseLeave}
       />
       
-      <div className="message-content">
-        {renderStreamingText()}
-        
-        {files && files.length > 0 && !isLoading && (
-          <div className="message-files">
-            {files.map((file, index) => (
-              <div key={index} className="file-preview">
-                {file.type.startsWith('image/') ? (
-                  <img src={file.data} alt={file.name} className="file-image" />
-                ) : (
-                  <div className="file-info">
-                    <span className="file-icon">📄</span>
-                    <span className="file-name">{file.name}</span>
+      {sender === 'bot' ? (
+        <div className="message-wrapper">
+          <div className="message-content">
+            {renderStreamingText()}
+            
+            {files && files.length > 0 && !isLoading && (
+              <div className="message-files">
+                {files.map((file, index) => (
+                  <div key={index} className="file-preview">
+                    {file.type.startsWith('image/') ? (
+                      <img src={file.data} alt={file.name} className="file-image" />
+                    ) : (
+                      <div className="file-info">
+                        <span className="file-icon">📄</span>
+                        <span className="file-name">{file.name}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+          
+          {!streaming && !isLoading && (
+            <div className="message-time">
+              {formatTime(timestamp)}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="message-content">
+          {renderStreamingText()}
+          
+          {files && files.length > 0 && !isLoading && (
+            <div className="message-files">
+              {files.map((file, index) => (
+                <div key={index} className="file-preview">
+                  {file.type.startsWith('image/') ? (
+                    <img src={file.data} alt={file.name} className="file-image" />
+                  ) : (
+                    <div className="file-info">
+                      <span className="file-icon">📄</span>
+                      <span className="file-name">{file.name}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       
       {sender === 'user' && isRead && (
         <div className={`read-receipt ${showReadReceipt ? 'visible' : ''}`}>
