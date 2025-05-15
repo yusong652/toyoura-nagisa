@@ -2,12 +2,16 @@ from typing import Dict, Optional, Type
 from .base import LLMClientBase
 from .gpt import GPTClient
 from .gemini import GeminiClient
+from .mistral import MistralClient
+from .anthropic import AnthropicClient
 from ..config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
 
 # 注册的 LLM 客户端类型
 _clients: Dict[str, Type[LLMClientBase]] = {
     "chatgpt": GPTClient,
     "gemini": GeminiClient,
+    "mistral": MistralClient,
+    "anthropic": AnthropicClient,
 }
 
 # 缓存的客户端实例
@@ -49,19 +53,18 @@ def get_client(name: Optional[str] = None, **kwargs) -> LLMClientBase:
     
     # 合并配置和参数
     client_kwargs = {
-        "temperature": config["temperature"],
         "system_prompt": get_system_prompt(),
         **specific_config,
         **kwargs
     }
     
-    # 创建唯一键
+    # To avoid creating multiple instances with the same configuration
     config_key = f"{name}:{str(sorted(client_kwargs.items()))}"
     
     # 返回现有实例或创建新实例
     if config_key in _instances:
         return _instances[config_key]
-        
+    # instantiation
     client = _clients[name](**client_kwargs)
     _instances[config_key] = client
     return client

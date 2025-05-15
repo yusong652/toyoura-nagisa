@@ -1,0 +1,165 @@
+import os
+from typing import List, Tuple, Optional, Dict, Any
+import httpx
+import json
+from .base import LLMClientBase
+from .models import Message
+from .utils import parse_llm_output
+
+class MistralClient(LLMClientBase):
+    """
+    Mistral 客户端实现。
+    继承自 LLMClientBase，实现具体的 API 调用逻辑。
+    """
+    
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+        """
+        初始化 Mistral 客户端。
+        Args:
+            api_key: Mistral API key。
+            system_prompt: 可选，覆盖初始化时的 system prompt。
+        """
+        super().__init__(system_prompt, **kwargs)
+        self.api_key = api_key
+        self.base_url = "https://api.mistral.ai/v1"
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        print(f"MistralClient initialized.")
+
+    def _format_messages_for_mistral(self, messages: List[Message]) -> Tuple[List[Dict[str, Any]], bool]:
+        """
+        将内部消息格式转换为Mistral API所需的格式。
+        
+        Args:
+            messages: 内部消息列表
+            
+        Returns:
+            Tuple[List[Dict], bool]: 格式化后的消息列表和是否包含图片的标志
+        """
+        messages_for_llm = [
+            {"role": "system", "content": self.system_prompt}
+        ]
+        
+        has_image = False
+        for msg in messages:
+            # 自动转换为 Mistral 多模态格式
+            if isinstance(msg.content, list):
+                mistral_content = []
+                has_text = False
+                
+                # 处理内容
+                for c in msg.content:
+                    if isinstance(c, dict):
+                        if "type" in c and c["type"] == "text" and "text" in c:
+                            # 保持 type=text 的格式
+                            mistral_content.append({
+                                "type": "text",
+                                "text": c["text"]
+                            })
+                            has_text = True
+                        elif "text" in c and "type" not in c:
+                            # 普通文本
+                            mistral_content.append({
+                                "type": "text",
+                                "text": c["text"]
+                            })
+                            has_text = True
+                        elif "inline_data" in c:
+                            # 图片，转为 mistral 格式
+                            mime = c["inline_data"].get("mime_type", "image/png")
+                            data = c["inline_data"]["data"]
+                            mistral_content.append({
+                                "type": "image_url",
+                                "image_url": f"data:{mime};base64,{data}"
+                            })
+                            has_image = True
+                        elif "type" in c and c["type"] == "image_url" and "image_url" in c:
+                            # 已经是 image_url 格式，直接保留
+                            mistral_content.append({
+                                "type": "image_url",
+                                "image_url": c["image_url"]
+                            })
+                            has_image = True
+                        else:
+                            # 兜底：转为文本
+                            text = str(c.get("text", ""))
+                            mistral_content.append({
+                                "type": "text",
+                                "text": text
+                            })
+                            has_text = True
+                    else:
+                        # 字符串直接转为 text 类型
+                        mistral_content.append({
+                            "type": "text",
+                            "text": str(c)
+                        })
+                        has_text = True
+                
+                # 如果只有图片没有文本，添加一个空文本
+                if has_image and not has_text:
+                    mistral_content.insert(0, {
+                        "type": "text",
+                        "text": ""
+                    })
+            
+                messages_for_llm.append({"role": msg.role, "content": mistral_content})
+            else:
+                # 其它情况全部转为字符串
+                messages_for_llm.append({
+                    "role": msg.role, 
+                    "content": [{
+                        "type": "text",
+                        "text": str(msg.content)
+                    }]
+                })
+        
+        return messages_for_llm, has_image
+
+    async def get_response(
+        self,
+        messages: List[Message],
+        **kwargs
+    ) -> Tuple[str, str]:
+        """
+        调用 Mistral API，返回 (response_text, keyword)。
+        """
+        # 使用辅助方法格式化消息
+        messages_for_llm, has_image = self._format_messages_for_mistral(messages)
+        
+        # 使用类属性中的配置值，始终使用配置中定义的模型
+        model = self.extra_config.get("model", "pixtral-large-2411")
+        payload = {
+            "model": model,
+            "messages": messages_for_llm,
+            "temperature": self.extra_config.get("temperature", 0.7),
+            "max_tokens": self.extra_config.get("max_tokens", 1024),
+            "stream": False  # 确保不使用流式响应，等待完整回复
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30.0
+                )
+                
+                if response.status_code != 200:
+                    response.raise_for_status()
+                    
+                response_data = response.json()
+                if not response_data.get("choices"):
+                    raise ValueError("No choices in Mistral response")
+                    
+                llm_reply = response_data["choices"][0]["message"]["content"]
+                response_text, keyword = parse_llm_output(llm_reply)
+                return response_text, keyword
+        except httpx.TimeoutException as e:
+            raise RuntimeError("Request to LLM timed out")
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"LLM API error: {str(e)}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to get response from LLM: {str(e)}") 
