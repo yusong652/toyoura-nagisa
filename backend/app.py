@@ -16,10 +16,11 @@ from contextlib import asynccontextmanager
 from .tts.remote.fish_audio import FishAudioTTS
 from .tts.base import BaseTTS, TTSRequest
 from .chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from .chat.utils import load_history, save_history, MAX_HISTORY_MESSAGES, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
+from .chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
 import asyncio
 from .chat.llm_factory import get_client
 from .tts.tts_factory import get_tts_engine
+from .config import get_llm_config
 
 
 # 加载环境变量
@@ -151,7 +152,8 @@ async def switch_session(request: SwitchSessionRequest):
         history = load_history(request.session_id)
         
         # 返回会话信息和最近的消息
-        recent_messages = history[-5:] if len(history) > 5 else history
+        recent_messages_length = get_llm_config().get("recent_messages_length", 5)
+        recent_messages = history[-recent_messages_length:] if len(history) > recent_messages_length else history
         
         return {
             "session_id": request.session_id,
@@ -206,7 +208,10 @@ async def chat_stream_endpoint(request: Request):
     history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     user_msg = Message(role="user", content=content)
     history_msgs.append(user_msg)
-    recent_msgs = history_msgs[-MAX_HISTORY_MESSAGES:] if len(history_msgs) > MAX_HISTORY_MESSAGES else history_msgs
+    
+    # 使用配置中的recent_messages_length
+    recent_messages_length = get_llm_config().get("recent_messages_length", 20)
+    recent_msgs = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
 
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine

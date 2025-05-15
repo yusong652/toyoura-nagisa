@@ -12,7 +12,6 @@ from ..config import get_prompt_config
 HISTORY_FILE = "backend/chat/data/chat_history.json"
 HISTORY_DIR = "backend/chat/data"
 BACKUP_DIR = "backend/chat/data/backups"
-MAX_HISTORY_MESSAGES = 20
 
 # 默认的分割句读点
 DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—']

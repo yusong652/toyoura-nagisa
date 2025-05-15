@@ -364,15 +364,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                 console.log('检测到关键词:', currentKeyword)
                 
                 // 根据关键词播放对应的Live2D动作
-                if (currentKeyword === 'happy') {
-                  playMotion('tap_body')
-                } else if (currentKeyword === 'sad') {
-                  playMotion('shake')
-                } else if (currentKeyword === 'angry') {
-                  playMotion('pinch_in')
-                } else if (currentKeyword === 'surprised') {
-                  playMotion('pinch_out')
-                }
+                playMotion(currentKeyword)
               }
               
               if (data.audio) {

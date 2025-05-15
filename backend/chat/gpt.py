@@ -27,18 +27,18 @@ class GPTClient(LLMClientBase):
         }
         print(f"ChatGPTClient initialized.")
 
-    async def get_response(
-        self,
-        messages: List[Message],
-        **kwargs
-    ) -> Tuple[str, str]:
+    def _format_messages_for_openai(self, messages: List[Message]) -> Tuple[List[Dict[str, Any]], bool]:
         """
-        调用 OpenAI GPT API，返回 (response_text, keyword)。
+        将内部消息格式转换为OpenAI API所需的格式。
+        
+        Args:
+            messages: 内部消息列表
+            
+        Returns:
+            Tuple[List[Dict], bool]: 格式化后的消息列表和是否包含图片的标志
         """
-        # 组装消息，始终以 self.system_prompt 开头
-        sys_prompt = self.system_prompt
         messages_for_llm = [
-            {"role": "system", "content": sys_prompt}
+            {"role": "system", "content": self.system_prompt}
         ]
         
         has_image = False
@@ -79,6 +79,19 @@ class GPTClient(LLMClientBase):
                 else:
                     text = str(msg.content)
                 messages_for_llm.append({"role": msg.role, "content": text})
+        
+        return messages_for_llm, has_image
+
+    async def get_response(
+        self,
+        messages: List[Message],
+        **kwargs
+    ) -> Tuple[str, str]:
+        """
+        调用 OpenAI GPT API，返回 (response_text, keyword)。
+        """
+        # 使用辅助方法格式化消息
+        messages_for_llm, has_image = self._format_messages_for_openai(messages)
         
         # 使用类属性中的配置值
         model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")

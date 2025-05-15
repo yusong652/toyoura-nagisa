@@ -205,8 +205,7 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
               resolve();
               return;
             }
-            
-            console.log('音频解码成功，准备播放...')
+
             const source = context.createBufferSource()
             source.buffer = decodedData
             
@@ -220,7 +219,6 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
             setCurrentAnalyser(analyser)
             
             // 调用Live2D嘴型同步
-            console.log('开始嘴型同步...')
             startLipSync(analyser)
             
             // 创建一个标志，表示音频是否已完成
@@ -229,7 +227,6 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
             source.onended = () => {
               // 只有在音频正常播放完成时才处理
               if (!audioCompleted && !shouldStopCurrentAudioRef.current) {
-                console.log('音频播放完成')
                 audioCompleted = true;
                 stopLipSync()
                 source.disconnect()
@@ -330,7 +327,6 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
     // 更新队列状态
     setAudioQueue(prev => {
       const newQueue = prev.slice(1)
-      console.log('更新后队列长度:', newQueue.length)
       return newQueue
     })
     
@@ -343,23 +339,17 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
       const newAudioPromise = playAudioWithLipSync(audioData)
       setCurrentAudioPromise(newAudioPromise)
       await newAudioPromise
-      console.log('音频播放完成')
     } catch (error) {
       console.error('播放音频出错:', error)
     } finally {
-      console.log('重置播放状态')
       setIsPlaying(false)
       isPlayingRef.current = false;
       setCurrentAudioPromise(null)
       
       // 使用最新的队列状态检查是否还有音频需要播放
       setTimeout(() => {
-        console.log('检查是否有更多音频需要播放，当前队列长度:', audioQueueRef.current.length)
         if (audioQueueRef.current.length > 0) {
-          console.log('队列中还有音频，继续播放')
           playNextAudio()
-        } else {
-          console.log('队列为空，播放结束')
         }
       }, 100)
     }

@@ -82,7 +82,6 @@ export async function initializeLive2D(canvas: HTMLCanvasElement) {
 }
 
 export function startLipSync(analyser: AnalyserNode) {
-    console.log('开始嘴型同步');
     if (!currentModel) {
         console.error('模型未初始化，无法进行嘴型同步');
         return;
@@ -161,7 +160,6 @@ export function startLipSync(analyser: AnalyserNode) {
 }
 
 export function stopLipSync() {
-    console.log('停止嘴型同步');
     isSpeaking = false;
     if (lipSyncAnimationFrame) {
         cancelAnimationFrame(lipSyncAnimationFrame);
