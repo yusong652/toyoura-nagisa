@@ -6,12 +6,12 @@ import shutil
 from typing import List, Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from datetime import datetime
-from ..config import get_prompt_config
+from backend.config import get_prompt_config
 
 # 聊天历史相关工具
-HISTORY_FILE = "backend/chat/data/chat_history.json"
-HISTORY_DIR = "backend/chat/data"
-BACKUP_DIR = "backend/chat/data/backups"
+HISTORY_FILE = "chat/data/chat_history.json"
+HISTORY_DIR = "chat/data"
+BACKUP_DIR = "chat/data/backups"
 
 # 默认的分割句读点
 DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—']

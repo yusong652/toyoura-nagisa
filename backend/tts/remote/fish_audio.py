@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fish_audio_sdk import Session, TTSRequest
 from datetime import datetime
 from pathlib import Path
-from ..base import BaseTTS, TTSConfig, TTSException, TTSSynthesisError, TTSInitError
+from backend.tts.base import BaseTTS, TTSConfig, TTSException, TTSSynthesisError, TTSInitError
 
 class FishSpeechConfig(TTSConfig):
     """Fish Speech TTS 配置类"""

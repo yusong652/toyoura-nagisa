@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod # 导入 ABC 和 abstractmethod
 from typing import List, Tuple, Optional, Dict, Any       # 导入类型提示
-from .models import Message         # 从同目录的 models.py 导入 Message 模型
+from backend.chat.models import Message         # 从同目录的 models.py 导入 Message 模型
 
 # 定义一个简单的模型来表示 LLM 的输出（或者直接用 Tuple）
 # from pydantic import BaseModel

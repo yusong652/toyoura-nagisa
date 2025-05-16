@@ -1,9 +1,9 @@
 import os
 from typing import List, Tuple, Optional, Dict, Any
 import httpx
-from .base import LLMClientBase
-from .models import Message
-from .utils import parse_llm_output
+from backend.chat.base import LLMClientBase
+from backend.chat.models import Message
+from backend.chat.utils import parse_llm_output
 
 class GPTClient(LLMClientBase):
     """

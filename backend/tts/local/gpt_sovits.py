@@ -8,7 +8,7 @@ import json
 import base64
 from typing import Optional, Union
 from pathlib import Path
-from ..base import BaseTTS, TTSConfig, TTSException, TTSSynthesisError, TTSInitError
+from backend.tts.base import BaseTTS, TTSConfig, TTSException, TTSSynthesisError, TTSInitError
 
 class GPTSoVITSConfig(TTSConfig):
     """GPT-SoVITS TTS 配置类"""

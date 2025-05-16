@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Union, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel
-from .utils import clean_text_for_tts
+from backend.tts.utils import clean_text_for_tts
 from datetime import datetime
 
 class TTSRequest(BaseModel):

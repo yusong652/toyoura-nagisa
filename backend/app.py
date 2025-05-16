@@ -13,14 +13,14 @@ from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from .tts.remote.fish_audio import FishAudioTTS
-from .tts.base import BaseTTS, TTSRequest
-from .chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from .chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
+from backend.tts.remote.fish_audio import FishAudioTTS
+from backend.tts.base import BaseTTS, TTSRequest
+from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
+from backend.chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
 import asyncio
-from .chat.llm_factory import get_client
-from .tts.tts_factory import get_tts_engine
-from .config import get_llm_config
+from backend.chat.llm_factory import get_client
+from backend.tts.tts_factory import get_tts_engine
+from backend.config import get_llm_config
 
 
 # 加载环境变量
@@ -250,7 +250,3 @@ async def chat_stream_endpoint(request: Request):
         )
     except Exception as e:
         return ErrorResponse(detail=str(e))
-    
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -2,4 +2,4 @@
 Remote TTS implementations
 """
 
-from .fish_audio import FishAudioTTS
+from backend.tts.remote.fish_audio import FishAudioTTS

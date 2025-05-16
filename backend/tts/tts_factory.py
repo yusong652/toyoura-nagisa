@@ -4,10 +4,10 @@ TTS Factory module for aiNagisa
 """
 
 from typing import Optional
-from .base import BaseTTS
-from .remote.fish_audio import FishAudioTTS, FishSpeechConfig
-from .local.gpt_sovits import GPTSoVITSTTS, GPTSoVITSConfig
-from ..config import get_tts_config
+from backend.tts.base import BaseTTS
+from backend.tts.remote.fish_audio import FishAudioTTS, FishSpeechConfig
+from backend.tts.local.gpt_sovits import GPTSoVITSTTS, GPTSoVITSConfig
+from backend.config import get_tts_config
 
 def get_tts_engine() -> BaseTTS:
     """

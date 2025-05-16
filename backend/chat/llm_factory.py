@@ -1,10 +1,10 @@
 from typing import Dict, Optional, Type
-from .base import LLMClientBase
-from .gpt import GPTClient
-from .gemini import GeminiClient
-from .mistral import MistralClient
-from .anthropic import AnthropicClient
-from ..config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
+from backend.chat.base import LLMClientBase
+from backend.chat.gpt import GPTClient
+from backend.chat.gemini import GeminiClient
+from backend.chat.mistral import MistralClient
+from backend.chat.anthropic import AnthropicClient
+from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
 
 # 注册的 LLM 客户端类型
 _clients: Dict[str, Type[LLMClientBase]] = {
