@@ -1,0 +1,88 @@
+.connection-error {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease;
+}
+
+.connection-error-content {
+  background-color: var(--bg-color, #fff);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color, #eee);
+  animation: slideUp 0.3s ease;
+}
+
+.connection-error-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--error-color, #e53935);
+  margin-bottom: 16px;
+}
+
+.connection-error h3 {
+  font-size: 20px;
+  margin: 0 0 12px 0;
+  color: var(--text-color, #333);
+}
+
+.connection-error p {
+  font-size: 16px;
+  margin: 0 0 24px 0;
+  color: var(--text-secondary, #666);
+  line-height: 1.5;
+}
+
+.retry-button {
+  background-color: var(--primary-color, #4a90e2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background-color: var(--primary-hover, #3a7bc8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.retry-button:active {
+  transform: translateY(0);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+} 

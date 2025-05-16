@@ -22,12 +22,21 @@ export interface ChatSession {
   updated_at: string;
 }
 
+export enum ConnectionStatus {
+  CONNECTED = 'connected',
+  CONNECTING = 'connecting',
+  DISCONNECTED = 'disconnected',
+  ERROR = 'error'
+}
+
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
   loadingMessageId: string | null;
   sessions: ChatSession[];
   currentSessionId: string | null;
+  connectionStatus: ConnectionStatus;
+  connectionError: string | null;
 }
 
 export interface ChatContextType extends ChatState {
@@ -37,4 +46,5 @@ export interface ChatContextType extends ChatState {
   switchSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  checkConnection: () => Promise<boolean>;
 } 

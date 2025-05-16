@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType, ChatSession } from '../types/chat'
+import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
 import { playMotion } from '../utils/live2d'
 
@@ -24,36 +24,70 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CONNECTING)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
+  const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false);
 
-  // 初始化：创建新会话或加载已有会话
-  useEffect(() => {
-    const init = async () => {
-      // 检查本地存储是否有会话ID
-      const storedSessionId = localStorage.getItem('session_id')
+  // 检查与后端的连接
+  const checkConnection = useCallback(async (): Promise<boolean> => {
+    try {
+      setConnectionStatus(ConnectionStatus.CONNECTING)
+      setConnectionError(null)
       
-      if (storedSessionId) {
-        // 如果有存储的会话ID，尝试切换到该会话
-        try {
-          await switchSession(storedSessionId)
-        } catch (error) {
-          console.error('无法加载已存储的会话，创建新会话', error)
-          await createNewSession()
-        }
+      const response = await fetch('/api/history/sessions', { 
+        signal: AbortSignal.timeout(5000) // 5秒超时
+      })
+      
+      if (response.ok) {
+        setConnectionStatus(ConnectionStatus.CONNECTED)
+        return true
       } else {
-        // 如果没有存储的会话ID，创建新会话
-        await createNewSession()
+        setConnectionStatus(ConnectionStatus.ERROR)
+        setConnectionError(`服务器返回错误: ${response.status}`)
+        return false
+      }
+    } catch (error) {
+      console.error('连接检查失败:', error)
+      setConnectionStatus(ConnectionStatus.DISCONNECTED)
+      setConnectionError(error instanceof Error ? error.message : '无法连接到服务器')
+      return false
+    }
+  }, [])
+
+  // 刷新会话列表
+  const refreshSessions = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch('/api/history/sessions')
+      
+      if (!response.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`获取会话列表失败: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      // 刷新会话列表
-      await refreshSessions()
+      const data = await response.json()
+      setSessions(data)
+      setConnectionStatus(ConnectionStatus.CONNECTED); // Successfully fetched
+    } catch (error) {
+      console.error('获取会话列表失败:', error);
+      if (!(error instanceof DOMException && error.name === 'AbortError')) { // Don't set error if it's an abort
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(error instanceof Error ? error.message : '获取会话列表失败');
+      }
+      throw error;
     }
-    
-    init()
   }, [])
 
   // 创建新会话
   const createNewSession = useCallback(async (name?: string): Promise<string> => {
+    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      const canConnect = await checkConnection();
+      if (!canConnect) {
+         // checkConnection sets connectionError state.
+         throw new Error(connectionError || "无法连接到服务器，请重试。");
+      }
+    }
     try {
       const response = await fetch('/api/history/create', {
         method: 'POST',
@@ -64,33 +98,37 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       })
       
       if (!response.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`创建新会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const data = await response.json()
       const newSessionId = data.session_id
       
-      // 保存到本地存储
       localStorage.setItem('session_id', newSessionId)
-      
-      // 更新当前会话ID
       setCurrentSessionId(newSessionId)
-      
-      // 清空消息
       setMessages([])
-      
-      // 刷新会话列表
       await refreshSessions()
-      
+      setConnectionStatus(ConnectionStatus.CONNECTED);
       return newSessionId
     } catch (error) {
-      console.error('创建新会话失败:', error)
-      throw error
+      console.error('创建新会话失败:', error);
+      setConnectionStatus(ConnectionStatus.ERROR);
+      setConnectionError(error instanceof Error ? error.message : '创建新会话失败');
+      throw error;
     }
-  }, [])
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError])
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
+     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      const canConnect = await checkConnection();
+      if (!canConnect) {
+        // checkConnection sets connectionError state.
+        throw new Error(connectionError || "无法连接到服务器，请重试。");
+      }
+    }
     try {
       const response = await fetch('/api/history/switch', {
         method: 'POST',
@@ -101,38 +139,30 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       })
       
       if (!response.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`切换会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const data = await response.json()
-      
-      // 保存到本地存储
       localStorage.setItem('session_id', sessionId)
-      
-      // 更新当前会话ID
       setCurrentSessionId(sessionId)
       
-      // 获取完整会话历史
       const historyResponse = await fetch(`/api/history/${sessionId}`)
       if (!historyResponse.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`获取历史记录失败: ${historyResponse.status}`);
         throw new Error(`获取历史记录失败: ${historyResponse.status}`)
       }
       
       const historyData = await historyResponse.json()
-      
-      // 将后端消息格式转换为前端格式
       const convertedMessages: Message[] = historyData.history.map((msg: any) => {
-        // 判断是用户消息还是机器人消息
         const sender = msg.role === 'user' ? 'user' : 'bot'
-        
-        // 提取文本内容
         let text = ''
         let files: FileData[] = []
-        
         if (typeof msg.content === 'string') {
           text = msg.content
         } else if (Array.isArray(msg.content)) {
-          // 处理多模态内容
           msg.content.forEach((item: any) => {
             if (item.text) {
               text = item.text
@@ -145,9 +175,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             }
           })
         }
-        
         return {
-          id: uuidv4(), // 生成新的ID
+          id: uuidv4(),
           sender,
           text,
           files: files.length > 0 ? files : undefined,
@@ -155,59 +184,149 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           isRead: true
         }
       })
-      
-      // 更新消息列表
       setMessages(convertedMessages)
-      
+      setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
-      console.error('切换会话失败:', error)
-      throw error
+      console.error('切换会话失败:', error);
+      setConnectionStatus(ConnectionStatus.ERROR);
+      setConnectionError(error instanceof Error ? error.message : '切换会话失败');
+      throw error;
     }
-  }, [])
+  }, [connectionStatus, checkConnection, connectionError])
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
+    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      const canConnect = await checkConnection();
+      if (!canConnect) {
+        // checkConnection sets connectionError state.
+        throw new Error(connectionError || "无法连接到服务器，请重试。");
+      }
+    }
     try {
       const response = await fetch(`/api/history/${sessionId}`, {
         method: 'DELETE',
       })
       
       if (!response.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`删除会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      // 如果删除的是当前会话，创建新会话
       if (sessionId === currentSessionId) {
         await createNewSession()
       }
-      
-      // 刷新会话列表
       await refreshSessions()
+      setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
-      console.error('删除会话失败:', error)
-      throw error
+      console.error('删除会话失败:', error);
+      setConnectionStatus(ConnectionStatus.ERROR);
+      setConnectionError(error instanceof Error ? error.message : '删除会话失败');
+      throw error;
     }
-  }, [currentSessionId, createNewSession])
+  }, [currentSessionId, createNewSession, refreshSessions, connectionStatus, checkConnection, connectionError])
 
-  // 刷新会话列表
-  const refreshSessions = useCallback(async (): Promise<void> => {
-    try {
-      const response = await fetch('/api/history/sessions')
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+  // 初始化 Effect
+  useEffect(() => {
+    const init = async () => {
+      const isConnected = await checkConnection()
+      if (!isConnected) {
+        setSessionLoadAttempted(true);
+        return
       }
       
-      const data = await response.json()
-      setSessions(data)
-    } catch (error) {
-      console.error('获取会话列表失败:', error)
-      throw error
+      const storedSessionId = localStorage.getItem('session_id')
+      if (storedSessionId) {
+        try {
+          await switchSession(storedSessionId)
+          // If switchSession was successful and we are still connected, refresh sessions.
+          if (connectionStatus === ConnectionStatus.CONNECTED) {
+            await refreshSessions();
+          }
+        } catch (error) {
+          console.error('无法加载已存储的会话，创建新会话', error)
+          // If switchSession fails due to connection, it will be handled there.
+          // If it's other error, and we are still connected, try creating a new session.
+          if (connectionStatus === ConnectionStatus.CONNECTED) {
+            try {
+              await createNewSession() // This calls refreshSessions
+            } catch (newSessionError) {
+              console.error('Failed to create new session during initial load after switch failure:', newSessionError);
+            }
+          }
+        }
+      } else {
+        try {
+          await createNewSession() // This calls refreshSessions
+        } catch (newSessionError) {
+          console.error('Failed to create new session during initial load:', newSessionError);
+        }
+      }
+      // Ensure refreshSessions is called if no session was established but connection is good.
+      if (connectionStatus === ConnectionStatus.CONNECTED && !currentSessionId) {
+        // This case implies initial attempts to load/create session failed, but we are connected.
+        // Try creating one last new session or just refresh. Refreshing seems safer.
+        await refreshSessions();
+      }
+      setSessionLoadAttempted(true);
     }
-  }, [])
+
+    // Ensure this init logic only runs once.
+    if (!sessionLoadAttempted) {
+        init()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Removed checkConnection from here, it's called inside init
+
+  // Effect to load session if connection is established *after* initial attempt failed or was interrupted
+  useEffect(() => {
+    const loadSessionOnReconnect = async () => {
+      // Run if:
+      // 1. Connection is now CONNECTED.
+      // 2. The initial load sequence has been attempted.
+      // 3. No current session is active (currentSessionId is null).
+      // 4. Not currently in a loading state from sendMessage.
+      if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId && !isLoading) {
+        console.log('Reconnected or connection confirmed. Attempting to load/initialize session.');
+        setConnectionError(null); // Clear previous connection errors as we are trying to load data now.
+        const storedSessionId = localStorage.getItem('session_id');
+        try {
+          if (storedSessionId) {
+            await switchSession(storedSessionId);
+            // If switchSession was successful and we are still connected, refresh sessions.
+            if (connectionStatus === ConnectionStatus.CONNECTED) {
+              await refreshSessions();
+            }
+          } else {
+            await createNewSession(); // This calls refreshSessions
+          }
+        } catch (error) {
+          console.error('Failed to load/initialize session on reconnect:', error);
+          // Errors and connectionStatus are set by switchSession/createNewSession.
+        }
+      }
+    };
+
+    loadSessionOnReconnect();
+  }, [connectionStatus, sessionLoadAttempted, currentSessionId, isLoading, switchSession, createNewSession, refreshSessions, setConnectionError]);
 
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
+
+    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      const canConnect = await checkConnection();
+      if (!canConnect) {
+        setMessages(prev => {
+          const lastMessage = prev[prev.length -1];
+          if (lastMessage && lastMessage.isLoading) {
+            return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text: `错误: 无法连接到服务器。请检查网络连接或稍后重试。`, isLoading: false } : msg)
+          }
+          return prev;
+        });
+        return;
+      }
+    }
 
     // 添加用户消息
     const userMessage: Message = {
@@ -277,6 +396,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       })
       
       if (!response.ok) {
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`发送消息失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
@@ -397,12 +518,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
     } catch (error) {
-      console.error('Error sending message:', error)
-      // 更新加载消息为错误消息
+      console.error('Error sending message:', error);
+      setConnectionStatus(ConnectionStatus.ERROR);
+      const errorMsg = error instanceof Error ? error.message : '发送消息失败';
+      setConnectionError(errorMsg);
       setMessages(prev => 
         prev.map(msg => 
           msg.id === loadingId 
-            ? { ...msg, text: `Error: ${(error as Error).message}`, isLoading: false } 
+            ? { ...msg, text: `错误: ${errorMsg}`, isLoading: false } 
             : msg
         )
       )
@@ -410,7 +533,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setIsLoading(false)
       setLoadingMessageId(null)
     }
-  }, [queueAndPlayAudio, resetAudioState, currentSessionId, refreshSessions])
+  }, [queueAndPlayAudio, resetAudioState, currentSessionId, refreshSessions, connectionStatus, checkConnection, connectionError])
 
   const clearChat = useCallback(() => {
     setMessages([])
@@ -424,12 +547,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       loadingMessageId, 
       sessions, 
       currentSessionId,
+      connectionStatus,
+      connectionError,
       sendMessage, 
       clearChat, 
       createNewSession, 
       switchSession, 
       deleteSession, 
-      refreshSessions 
+      refreshSessions,
+      checkConnection
     }}>
       {children}
     </ChatContext.Provider>

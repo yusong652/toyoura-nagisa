@@ -5,8 +5,33 @@ import InputArea from './components/InputArea'
 import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar'
 import ThemeToggle from './components/ThemeToggle'
+import ConnectionError from './components/ConnectionError'
 import { AudioProvider } from './contexts/AudioContext'
-import { ChatProvider } from './contexts/ChatContext'
+import { ChatProvider, useChat } from './contexts/ChatContext'
+import { ConnectionStatus } from './types/chat'
+
+function AppContent(): React.ReactElement {
+  const { connectionStatus, connectionError, checkConnection } = useChat()
+
+  return (
+    <div className="app-container">
+      <ThemeToggle />
+      <div className="chat-container">
+        <div className="chat-left-panel">
+          <ChatBox />
+          <InputArea />
+        </div>
+      </div>
+      <ChatHistorySidebar />
+      {connectionStatus !== ConnectionStatus.CONNECTED && connectionError && (
+        <ConnectionError 
+          message={connectionError} 
+          onRetry={checkConnection} 
+        />
+      )}
+    </div>
+  )
+}
 
 function App(): React.ReactElement {
   // 初始化主题
@@ -19,17 +44,7 @@ function App(): React.ReactElement {
     <>
       <AudioProvider>
         <ChatProvider>
-          <div className="app-container">
-            <ThemeToggle />
-            {/* <h1>aiNagisa</h1> */}
-            <div className="chat-container">
-              <div className="chat-left-panel">
-                <ChatBox />
-                <InputArea />
-              </div>
-            </div>
-            <ChatHistorySidebar />
-          </div>
+          <AppContent />
           <Live2DCanvas />
         </ChatProvider>
       </AudioProvider>
