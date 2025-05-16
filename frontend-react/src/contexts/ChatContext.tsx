@@ -227,89 +227,107 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [currentSessionId, createNewSession, refreshSessions, connectionStatus, checkConnection, connectionError])
 
-  // 初始化 Effect
+  // 初始化 Effect: ComponentDidMount
   useEffect(() => {
-    const init = async () => {
-      const isConnected = await checkConnection()
-      if (!isConnected) {
-        setSessionLoadAttempted(true);
-        return
+    const initLoad = async () => {
+      // Attempt to establish connection and load initial data
+      const connected = await checkConnection();
+      if (!connected) {
+        setSessionLoadAttempted(true); // Mark that an initial load attempt failed due to connection
+        return;
       }
-      
-      const storedSessionId = localStorage.getItem('session_id')
-      if (storedSessionId) {
-        try {
-          await switchSession(storedSessionId)
-          // If switchSession was successful and we are still connected, refresh sessions.
-          if (connectionStatus === ConnectionStatus.CONNECTED) {
-            await refreshSessions();
-          }
-        } catch (error) {
-          console.error('无法加载已存储的会话，创建新会话', error)
-          // If switchSession fails due to connection, it will be handled there.
-          // If it's other error, and we are still connected, try creating a new session.
-          if (connectionStatus === ConnectionStatus.CONNECTED) {
-            try {
-              await createNewSession() // This calls refreshSessions
-            } catch (newSessionError) {
-              console.error('Failed to create new session during initial load after switch failure:', newSessionError);
+
+      // Connection successful, now try to load session list and then the active session
+      try {
+        await refreshSessions(); // Load all session details first
+
+        const storedSessionId = localStorage.getItem('session_id');
+        if (storedSessionId) {
+          try {
+            await switchSession(storedSessionId); // This loads messages for the session
+            setSessionLoadAttempted(false); // Successfully loaded a session
+          } catch (switchError) {
+            console.error('初始化时无法切换到已存储会话，尝试创建新会话:', switchError);
+            if (connectionStatus === ConnectionStatus.CONNECTED) {
+              try {
+                await createNewSession(); // This loads messages for new session & refreshes list
+                setSessionLoadAttempted(false); // Successfully created a new session
+              } catch (createError) {
+                console.error('初始化时创建新会话失败（切换会话后）:', createError);
+                setSessionLoadAttempted(true); // Failed to establish a session
+              }
+            } else {
+              setSessionLoadAttempted(true); // Connection lost during switchSession attempt
             }
           }
+        } else {
+          // No stored session, create a new one
+          try {
+            await createNewSession();
+            setSessionLoadAttempted(false); // Successfully created a new session
+          } catch (createError) {
+            console.error('初始化时创建新会话失败（无存储ID）:', createError);
+            setSessionLoadAttempted(true); // Failed to establish a session
+          }
         }
-      } else {
-        try {
-          await createNewSession() // This calls refreshSessions
-        } catch (newSessionError) {
-          console.error('Failed to create new session during initial load:', newSessionError);
-        }
+      } catch (refreshError) {
+        // Error from refreshSessions()
+        console.error('初始化时加载会话列表失败:', refreshError);
+        setSessionLoadAttempted(true); // Mark that the load was attempted and failed
       }
-      // Ensure refreshSessions is called if no session was established but connection is good.
-      if (connectionStatus === ConnectionStatus.CONNECTED && !currentSessionId) {
-        // This case implies initial attempts to load/create session failed, but we are connected.
-        // Try creating one last new session or just refresh. Refreshing seems safer.
-        await refreshSessions();
-      }
-      setSessionLoadAttempted(true);
-    }
+    };
 
-    // Ensure this init logic only runs once.
-    if (!sessionLoadAttempted) {
-        init()
-    }
+    initLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Removed checkConnection from here, it's called inside init
+  }, []); // Run only once on mount
 
-  // Effect to load session if connection is established *after* initial attempt failed or was interrupted
+  // 尝试在重新连接后加载会话
   useEffect(() => {
     const loadSessionOnReconnect = async () => {
-      // Run if:
-      // 1. Connection is now CONNECTED.
-      // 2. The initial load sequence has been attempted.
-      // 3. No current session is active (currentSessionId is null).
-      // 4. Not currently in a loading state from sendMessage.
-      if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId && !isLoading) {
-        console.log('Reconnected or connection confirmed. Attempting to load/initialize session.');
-        setConnectionError(null); // Clear previous connection errors as we are trying to load data now.
-        const storedSessionId = localStorage.getItem('session_id');
+      if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId) {
+        console.log("检测到重新连接，尝试加载/刷新会话...");
+        setSessionLoadAttempted(false); // We are attempting to load now
+
         try {
+          await refreshSessions(); // Load all session details first
+
+          const storedSessionId = localStorage.getItem('session_id');
           if (storedSessionId) {
-            await switchSession(storedSessionId);
-            // If switchSession was successful and we are still connected, refresh sessions.
-            if (connectionStatus === ConnectionStatus.CONNECTED) {
-              await refreshSessions();
+            try {
+              await switchSession(storedSessionId);
+              // Successfully loaded session on reconnect
+            } catch (switchError) {
+              console.error('重新连接后无法切换到已存储会话，尝试创建新会话:', switchError);
+              if (connectionStatus === ConnectionStatus.CONNECTED) {
+                try {
+                  await createNewSession();
+                } catch (createError) {
+                  console.error('重新连接后创建新会话也失败（切换会话后）:', createError);
+                  setSessionLoadAttempted(true); // Mark failed attempt
+                }
+              } else {
+                 setSessionLoadAttempted(true); // Connection lost during switch
+              }
             }
           } else {
-            await createNewSession(); // This calls refreshSessions
+            // No stored session, create a new one
+            try {
+              await createNewSession();
+            } catch (createError) {
+              console.error('重新连接后创建新会话失败（无存储ID）:', createError);
+              setSessionLoadAttempted(true); // Mark failed attempt
+            }
           }
-        } catch (error) {
-          console.error('Failed to load/initialize session on reconnect:', error);
-          // Errors and connectionStatus are set by switchSession/createNewSession.
+        } catch (refreshError) {
+          // Error from refreshSessions() during reconnect
+          console.error('重新连接后加载会话列表失败:', refreshError);
+          setSessionLoadAttempted(true); // Mark failed attempt so it can retry if connection cycles
         }
       }
     };
 
     loadSessionOnReconnect();
-  }, [connectionStatus, sessionLoadAttempted, currentSessionId, isLoading, switchSession, createNewSession, refreshSessions, setConnectionError]);
+  }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession]);
 
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
