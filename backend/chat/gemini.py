@@ -90,6 +90,7 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=self.config
             )
+
             if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
                 response_text = response.candidates[0].content.parts[0].text
             else:
