@@ -176,17 +176,7 @@ async def chat_stream_endpoint(request: Request):
         msg_obj = json.loads(message_data)
         text = msg_obj.get('text', '')
         files = msg_obj.get('files', [])
-        # # 3. 处理每个文件
-        # for file in files:
-        #     name = file['name']
-        #     filetype = file['type']
-        #     b64data = file['data']
-        #     # 去掉前缀
-        #     if ',' in b64data:
-        #         b64data = b64data.split(',', 1)[1]
-        #     file_bytes = base64.b64decode(b64data)
-        #     # 可以在这里做更多处理
-        # 4. 继续处理text和files
+ 
         print('收到文本:', text)
         print('收到文件:', [f['name'] for f in files])
     # 构造多模态 content
@@ -218,6 +208,7 @@ async def chat_stream_endpoint(request: Request):
     
     try:
         response_text, keyword = await llm_client.get_response(recent_msgs)
+        
         # 保存历史
         ai_msg = Message(role="assistant", content=response_text)
         history_msgs.append(ai_msg)

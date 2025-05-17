@@ -144,7 +144,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
-      const data = await response.json()
       localStorage.setItem('session_id', sessionId)
       setCurrentSessionId(sessionId)
       
