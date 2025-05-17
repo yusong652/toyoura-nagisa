@@ -397,16 +397,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
     
     try {
-      // 尝试解码一小部分以验证格式是否正确
-      const testBuffer = Uint8Array.from(atob(audioData.slice(0, 100)), c => c.charCodeAt(0)).buffer
-      console.log(`收到第 ${count} 段音频数据，长度: ${audioData.length}`)
-      console.log('音频数据有效，添加到播放队列')
-      
-      // 将音频添加到队列并播放
+      // 将音频数据添加到队列并播放，无需验证
       queueAndPlayAudio(audioData)
       return true
     } catch (error) {
-      console.error('音频数据格式无效:', error)
+      console.error('音频处理失败:', error)
       return false
     }
   }, [queueAndPlayAudio])
@@ -424,7 +419,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     })
     
     // 调用API
-    console.log('发送聊天请求')
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: {
@@ -459,17 +453,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let audioCount = 0
     let firstResponseReceived = false
     
-    console.log('开始处理流式响应')
     while (true) {
       const { done, value } = await reader.read()
       if (done) {
-        console.log('流式响应结束')
         
         // 响应结束后，更新消息为最终状态
         setMessages(prev => 
           prev.map(msg => 
             msg.id === loadingId 
-              ? { ...msg, text: currentText, isLoading: false, streaming: false } 
+              ? { 
+                  ...msg, 
+                  text: currentText, // 确保这里保留了原始格式
+                  isLoading: false, 
+                  streaming: false 
+                } 
               : msg
           )
         )
@@ -497,14 +494,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             // 如果是第一次收到响应，标记为已收到
             if (!firstResponseReceived) {
               firstResponseReceived = true
-              // 播放Live2D动作
-              playMotion('tap_body')
+              // 播放Live2D动作已移除，因为tap_body动作不存在
             }
             
             // 处理关键词
             if (data.keyword && data.keyword !== currentKeyword) {
               currentKeyword = data.keyword
-              console.log('检测到关键词:', currentKeyword)
               
               // 根据关键词播放对应的Live2D动作
               // 表情关键词只在回复开始时发送一次
@@ -516,7 +511,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               // 后端现在发送配对的文本和音频数据，确保同步
               currentText += data.text // 累加文本
               
-              // 更新消息
+              // 更新消息，保持原始格式，包括换行符
               setMessages(prev => 
                 prev.map(msg => 
                   msg.id === loadingId 
@@ -532,7 +527,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               }
             }
           } catch (e) {
-            console.error('Error parsing SSE data:', e)
+            // 处理解析错误
           }
         }
       }
@@ -562,7 +557,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     addUserMessage(text, files)
     
     // 重置音频状态
-    console.log('重置音频状态')
     await resetAudioState()
     
     // 添加机器人加载消息
@@ -575,7 +569,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // 处理流式响应
       await processStreamResponse(response, loadingId)
     } catch (error) {
-      console.error('Error sending message:', error)
       // 更新加载消息为错误消息
       setConnectionStatus(ConnectionStatus.ERROR);
       const errorMsg = error instanceof Error ? error.message : '发送消息失败';

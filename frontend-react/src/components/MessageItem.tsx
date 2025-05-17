@@ -86,22 +86,34 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
     }
     
     if (!streaming || sender !== 'bot') {
-      return <div className="message-text" dangerouslySetInnerHTML={{ __html: displayText }} />
+      // 替换为一致的换行符处理方式，确保非流式渲染也正确显示换行
+      const textWithBreaks = displayText.split('\n').map((line, i) => (
+        <React.Fragment key={i}>
+          {line}
+          {i < displayText.split('\n').length - 1 && <br />}
+        </React.Fragment>
+      ));
+      return <div className="message-text">{textWithBreaks}</div>;
     }
     
-    // 将文本拆分为单个字符，并为每个字符添加渐变效果
+    // 将文本拆分成行，确保每行正确显示，并且字符有渐变效果
     return (
       <div className="message-text streaming-text">
-        {displayText.split('').map((char, index) => (
-          <span 
-            key={index} 
-            className="fade-in-char"
-            style={{ 
-              animationDelay: '0ms',
-            }}
-          >
-            {char === '\n' ? <br /> : char}
-          </span>
+        {displayText.split('\n').map((line, lineIndex) => (
+          <React.Fragment key={`line-${lineIndex}`}>
+            {line.split('').map((char, charIndex) => (
+              <span 
+                key={`${lineIndex}-${charIndex}`} 
+                className="fade-in-char"
+                style={{ 
+                  animationDelay: '0ms',
+                }}
+              >
+                {char}
+              </span>
+            ))}
+            {lineIndex < displayText.split('\n').length - 1 && <br />}
+          </React.Fragment>
         ))}
       </div>
     )
