@@ -225,24 +225,37 @@ async def chat_stream_endpoint(request: Request):
         
         # 流式返回文本和音频
         async def generate():
-            # 首先发送关键词
+            # 首先发送关键词（仅发送一次，在整个响应的开头）
             yield f"data: {json.dumps({'keyword': keyword})}\n\n"
             
             # 按句子分割文本
             sentences = split_text_by_punctuations(response_text)
-            # 逐句处理
+            
+            # 逐句处理 - 注意: 我们先合成音频，再一起发送文本和音频，确保它们同步
             for sentence in sentences:
-                # 发送文本
-                yield f"data: {json.dumps({'text': sentence})}\n\n"
-                
-                # 合成并发送音频
+                if not sentence.strip():
+                    continue
+                    
+                # 先合成音频
+                audio_b64 = None
+                audio_error = None
                 try:
                     audio_bytes = await tts_engine.synthesize(sentence)
                     audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                    yield f"data: {json.dumps({'audio': audio_b64})}\n\n"
                 except Exception as e:
                     print(f"TTS合成失败: {e}")
-                    yield f"data: {json.dumps({'audio': None, 'error': str(e)})}\n\n"
+                    audio_error = str(e)
+                
+                # 将文本和音频一起发送，不再包含关键词
+                response_data = {
+                    'text': sentence,
+                    'audio': audio_b64
+                }
+                
+                if audio_error:
+                    response_data['error'] = audio_error
+                    
+                yield f"data: {json.dumps(response_data)}\n\n"
         
         return StreamingResponse(
             generate(),

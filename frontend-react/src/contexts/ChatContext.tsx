@@ -206,10 +206,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [])
 
-  const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
-    if (text.trim() === '' && files.length === 0) return
-
-    // 添加用户消息
+  // 添加用户消息到聊天记录
+  const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
+    // 创建用户消息
     const userMessage: Message = {
       id: uuidv4(),
       sender: 'user',
@@ -219,6 +218,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       isRead: false // 初始状态为未读
     }
     
+    // 添加到消息列表
     setMessages(prev => [...prev, userMessage])
     
     // 设置用户消息为已读状态（在发送消息1秒后）
@@ -232,10 +232,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       )
     }, 1000)
     
-    // 重置音频状态
-    console.log('重置音频状态')
-    await resetAudioState()
-    
+    return userMessage.id
+  }, [])
+
+  // 添加机器人加载消息
+  const addLoadingMessage = useCallback((): string => {
     // 创建一个加载消息占位符
     const loadingId = uuidv4()
     setLoadingMessageId(loadingId)
@@ -252,165 +253,197 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages(prev => [...prev, loadingMessage])
     setIsLoading(true)
     
+    return loadingId
+  }, [])
+
+  // 更新加载消息为错误状态
+  const updateMessageWithError = useCallback((loadingId: string, error: Error) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === loadingId 
+          ? { ...msg, text: `Error: ${error.message}`, isLoading: false } 
+          : msg
+      )
+    )
+  }, [])
+
+  // 处理音频数据
+  const processAudioData = useCallback((audioData: string, count: number): boolean => {
+    if (typeof audioData !== 'string' || audioData.length === 0) {
+      console.warn('收到空的音频数据或格式不正确')
+      return false
+    }
+    
     try {
-      // 构造请求数据
-      const messageData = JSON.stringify({
-        text,
-        files: files.map(file => ({
-          name: file.name,
-          type: file.type,
-          data: file.data
-        }))
-      })
+      // 尝试解码一小部分以验证格式是否正确
+      const testBuffer = Uint8Array.from(atob(audioData.slice(0, 100)), c => c.charCodeAt(0)).buffer
+      console.log(`收到第 ${count} 段音频数据，长度: ${audioData.length}`)
+      console.log('音频数据有效，添加到播放队列')
       
-      // 调用API
-      console.log('发送聊天请求')
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messageData,
-          session_id: currentSessionId || localStorage.getItem('session_id') || "default_session",
-        }),
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      // 将音频添加到队列并播放
+      queueAndPlayAudio(audioData)
+      return true
+    } catch (error) {
+      console.error('音频数据格式无效:', error)
+      return false
+    }
+  }, [queueAndPlayAudio])
+
+  // 创建聊天API请求
+  const createChatRequest = useCallback(async (text: string, files: FileData[] = []): Promise<Response> => {
+    // 构造请求数据
+    const messageData = JSON.stringify({
+      text,
+      files: files.map(file => ({
+        name: file.name,
+        type: file.type,
+        data: file.data
+      }))
+    })
+    
+    // 调用API
+    console.log('发送聊天请求')
+    const response = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messageData,
+        session_id: currentSessionId || localStorage.getItem('session_id') || "default_session",
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    return response
+  }, [currentSessionId])
+
+  // 处理聊天API响应
+  const processStreamResponse = useCallback(async (
+    response: Response, 
+    loadingId: string
+  ) => {
+    // 处理流式响应
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let currentText = ''
+    let currentKeyword = null
+    let audioCount = 0
+    let firstResponseReceived = false
+    
+    console.log('开始处理流式响应')
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        console.log('流式响应结束')
+        
+        // 响应结束后，更新消息为最终状态
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === loadingId 
+              ? { ...msg, text: currentText, isLoading: false, streaming: false } 
+              : msg
+          )
+        )
+        
+        // 刷新会话列表以更新最新状态
+        refreshSessions()
+        
+        break
       }
       
-      // 处理流式响应
-      const reader = response.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let currentText = ''
-      let currentKeyword = null
-      let audioCount = 0
-      let pendingAudioQueue: string[] = [] // 用于存储接收到的音频数据
-      let firstResponseReceived = false
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      buffer = lines.pop() || ''
       
-      console.log('开始处理流式响应')
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          console.log('流式响应结束')
-          
-          // 确保所有接收到的音频数据都被处理
-          if (pendingAudioQueue.length > 0) {
-            console.log(`响应结束时还有 ${pendingAudioQueue.length} 段音频未处理，开始处理...`)
-            for (const audioData of pendingAudioQueue) {
-              await new Promise(resolve => {
-                queueAndPlayAudio(audioData)
-                // 等待一小段时间确保音频被添加到队列
-                setTimeout(resolve, 100)
-              })
-            }
-          }
-          
-          // 响应结束后，更新消息为最终状态
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === loadingId 
-                ? { ...msg, text: currentText, isLoading: false, streaming: false } 
-                : msg
-            )
-          )
-          
-          // 刷新会话列表以更新最新状态
-          refreshSessions()
-          
-          break
-        }
+      // 处理每一行数据
+      for (const line of lines) {
+        if (line.trim() === '') continue
         
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-        
-        // 处理每一行数据
-        for (const line of lines) {
-          if (line.trim() === '') continue
+        if (line.startsWith('data: ')) {
+          const jsonData = line.slice(6)
           
-          if (line.startsWith('data: ')) {
-            const jsonData = line.slice(6)
+          try {
+            const data = JSON.parse(jsonData)
             
-            try {
-              const data = JSON.parse(jsonData)
+            // 如果是第一次收到响应，标记为已收到
+            if (!firstResponseReceived) {
+              firstResponseReceived = true
+              // 播放Live2D动作
+              playMotion('tap_body')
+            }
+            
+            // 处理关键词
+            if (data.keyword && data.keyword !== currentKeyword) {
+              currentKeyword = data.keyword
+              console.log('检测到关键词:', currentKeyword)
               
-              // 如果是第一次收到响应，标记为已收到
-              if (!firstResponseReceived) {
-                firstResponseReceived = true
-                // 播放Live2D动作
-                playMotion('tap_body')
-              }
+              // 根据关键词播放对应的Live2D动作
+              // 表情关键词只在回复开始时发送一次
+              playMotion(currentKeyword)
+            }
+            
+            // 处理文本和音频（新的组合格式）
+            if (data.text) {
+              // 后端现在发送配对的文本和音频数据，确保同步
+              currentText += data.text // 累加文本
               
-              // 处理文本内容
-              if (data.text) {
-                currentText += data.text // 累加文本而不是替换
-                
-                // 更新消息
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === loadingId 
-                      ? { ...msg, text: currentText, isLoading: false, streaming: true } 
-                      : msg
-                  )
+              // 更新消息
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === loadingId 
+                    ? { ...msg, text: currentText, isLoading: false, streaming: true } 
+                    : msg
                 )
-              }
+              )
               
-              // 处理关键词
-              if (data.keyword && data.keyword !== currentKeyword) {
-                currentKeyword = data.keyword
-                console.log('检测到关键词:', currentKeyword)
-                
-                // 根据关键词播放对应的Live2D动作
-                playMotion(currentKeyword)
-              }
-              
+              // 如果同时收到了音频数据，处理音频
               if (data.audio) {
                 audioCount++
-                console.log(`收到第 ${audioCount} 段音频数据，长度: ${data.audio.length}`)
-                
-                // 验证音频数据是否有效
-                if (typeof data.audio === 'string' && data.audio.length > 0) {
-                  try {
-                    // 尝试解码一小部分以验证格式是否正确
-                    const testBuffer = Uint8Array.from(atob(data.audio.slice(0, 100)), c => c.charCodeAt(0)).buffer
-                    console.log('音频数据有效，添加到播放队列')
-                    
-                    // 将音频添加到队列并播放
-                    queueAndPlayAudio(data.audio)
-                    
-                    // 给音频处理一些时间
-                    await new Promise(resolve => setTimeout(resolve, 50))
-                  } catch (error) {
-                    console.error('音频数据格式无效:', error)
-                  }
-                } else {
-                  console.warn('收到空的音频数据或格式不正确')
-                }
+                processAudioData(data.audio, audioCount)
               }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e)
             }
+          } catch (e) {
+            console.error('Error parsing SSE data:', e)
           }
         }
       }
+    }
+  }, [refreshSessions, playMotion, processAudioData])
+  
+  // 主发送消息函数
+  const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
+    if (text.trim() === '' && files.length === 0) return
+    
+    // 添加用户消息
+    addUserMessage(text, files)
+    
+    // 重置音频状态
+    console.log('重置音频状态')
+    await resetAudioState()
+    
+    // 添加机器人加载消息
+    const loadingId = addLoadingMessage()
+    
+    try {
+      // 创建并发送API请求
+      const response = await createChatRequest(text, files)
+      
+      // 处理流式响应
+      await processStreamResponse(response, loadingId)
     } catch (error) {
       console.error('Error sending message:', error)
       // 更新加载消息为错误消息
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === loadingId 
-            ? { ...msg, text: `Error: ${(error as Error).message}`, isLoading: false } 
-            : msg
-        )
-      )
+      updateMessageWithError(loadingId, error as Error)
     } finally {
       setIsLoading(false)
       setLoadingMessageId(null)
     }
-  }, [queueAndPlayAudio, resetAudioState, currentSessionId, refreshSessions])
+  }, [addUserMessage, resetAudioState, addLoadingMessage, createChatRequest, processStreamResponse, updateMessageWithError])
 
   const clearChat = useCallback(() => {
     setMessages([])
