@@ -16,11 +16,12 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session
+from backend.chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session, delete_message
 import asyncio
 from backend.chat.llm_factory import get_client
 from backend.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config
+import uuid
 
 
 # 加载环境变量
@@ -67,6 +68,10 @@ class SwitchSessionRequest(BaseModel):
 
 class DeleteSessionRequest(BaseModel):
     session_id: str
+
+class DeleteMessageRequest(BaseModel):
+    session_id: str
+    message_id: str
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -215,7 +220,7 @@ async def chat_stream_endpoint(request: Request):
     # 使用配置中的recent_messages_length
     recent_messages_length = get_llm_config().get("recent_messages_length", 20)
     recent_msgs = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
-
+    print(recent_msgs)
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     
@@ -233,12 +238,15 @@ async def chat_stream_endpoint(request: Request):
                 response_text, keyword = await llm_client.get_response(recent_msgs)
                 
                 # 保存历史
+                ai_msg_id = str(uuid.uuid4())  # 为AI回复生成唯一ID
                 ai_msg = Message(role="assistant", content=response_text)
-                history_msgs.append(ai_msg)
+                ai_msg_dict = ai_msg.dict()
+                ai_msg_dict["id"] = ai_msg_id  # 为AI回复添加ID
+                history_msgs.append(Message(**ai_msg_dict))
                 save_history(session_id, [msg.dict() for msg in history_msgs])
                 
-                # 首先发送关键词（仅发送一次，在整个响应的开头）
-                yield f"data: {json.dumps({'keyword': keyword})}\n\n"
+                # 首先发送关键词和AI消息ID（仅发送一次，在整个响应的开头）
+                yield f"data: {json.dumps({'keyword': keyword, 'message_id': ai_msg_id})}\n\n"
                 
                 # 按句子分割文本
                 sentences = split_text_by_punctuations(response_text)
@@ -268,7 +276,7 @@ async def chat_stream_endpoint(request: Request):
                         print(f"TTS合成失败: {e}")
                         audio_error = str(e)
                     
-                    # 将文本和音频一起发送，不再包含关键词
+                    # 将文本和音频一起发送
                     response_data = {
                         'text': sentence,
                         'audio': audio_b64
@@ -289,3 +297,31 @@ async def chat_stream_endpoint(request: Request):
         )
     except Exception as e:
         return ErrorResponse(detail=str(e))
+
+@app.post("/api/messages/delete", response_model=dict)
+async def delete_message_endpoint(request: DeleteMessageRequest):
+    """删除指定会话中的特定消息"""
+    try:
+        # 验证会话ID是否存在
+        sessions = get_all_sessions()
+        session = next((s for s in sessions if s['id'] == request.session_id), None)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
+        
+        # 删除消息
+        success = delete_message(request.session_id, request.message_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"未找到消息ID {request.message_id} 或删除失败")
+        
+        return {
+            "session_id": request.session_id,
+            "message_id": request.message_id,
+            "success": True,
+            "message": "消息已成功删除"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除消息失败: {str(e)}")

@@ -5,6 +5,7 @@
   animation: fadeIn 0.3s ease-in-out;
   max-width: 85%;
   position: relative;
+  cursor: pointer;
 }
 
 .message.user {
@@ -15,6 +16,11 @@
 
 .message:not(.user) {
   margin-right: auto;
+}
+
+/* 被选中的消息样式 */
+.message.selected .message-content {
+  box-shadow: 0 0 0 2px var(--primary-color, #4a90e2);
 }
 
 .avatar {
@@ -40,7 +46,7 @@
   padding: 12px 16px;
   max-width: 100%;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.3s ease;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -48,8 +54,7 @@
 }
 
 .message-content:hover {
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 0 12px var(--message-hover-glow, rgba(74, 144, 226, 0.2));
 }
 
 .message.user .message-content {
@@ -58,8 +63,31 @@
   align-items: flex-end;
 }
 
+.message.user .message-content:hover {
+  box-shadow: 0 0 12px var(--user-message-hover-glow, rgba(74, 144, 226, 0.3));
+}
+
 .message:not(.user) .message-content {
   border-top-left-radius: 4px;
+}
+
+.message:not(.user) .message-content:hover {
+  box-shadow: 0 0 12px var(--bot-message-hover-glow, rgba(130, 130, 130, 0.25));
+}
+
+/* Dark mode adjustments for message hover effects */
+@media (prefers-color-scheme: dark) {
+  .message-content:hover {
+    box-shadow: 0 0 12px var(--message-hover-glow-dark, rgba(100, 180, 255, 0.25));
+  }
+  
+  .message.user .message-content:hover {
+    box-shadow: 0 0 12px var(--user-message-hover-glow-dark, rgba(100, 180, 255, 0.3));
+  }
+  
+  .message:not(.user) .message-content:hover {
+    box-shadow: 0 0 12px var(--bot-message-hover-glow-dark, rgba(180, 180, 180, 0.25));
+  }
 }
 
 .message-text {
@@ -209,42 +237,73 @@
 
 /* 消息状态样式 */
 .message-status {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--status-sending-color);
   position: absolute;
-  right: 60px;
   bottom: -18px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  z-index: 5;
-  opacity: 0.85;
-  transition: all 0.2s ease;
+  right: 8px;
+  font-size: 11px;
+  user-select: none;
+  opacity: 0.7;
+}
+
+/* 删除按钮样式 */
+.message-delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: rgba(150, 150, 150, 0.2);
+  color: var(--text-color);
   display: flex;
   align-items: center;
-  line-height: 1;
-  background-color: transparent;
-  backdrop-filter: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  pointer-events: none;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.25s ease;
+  z-index: 10;
 }
 
-.message-status:hover {
+/* SVG 样式 */
+.message-delete-button svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+/* 当消息被选中时，显示删除按钮 */
+.message.selected .message-delete-button {
+  opacity: 0.8;
+  transform: scale(1);
+  animation: fadeInButton 0.25s ease-out;
+}
+
+/* 删除按钮的淡入动画 */
+@keyframes fadeInButton {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}
+
+.message-delete-button:hover {
   opacity: 1;
+  background-color: var(--status-error-color, #ff5252);
+  color: white;
+  transform: scale(1.1);
 }
 
-.message-status::before {
-  content: '';
-  display: inline-block;
-  margin-right: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.message.user .message-delete-button {
+  right: unset;
+  left: 5px;
 }
 
+/* 消息状态颜色 */
 .status-sending {
   color: var(--status-sending-color);
 }
@@ -327,4 +386,41 @@
   vertical-align: top;
   position: relative;
   max-width: 100%;
+}
+
+/* 消息点击和悬停效果 */
+.message .message-content {
+  position: relative;
+}
+
+.message .message-content::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.message:hover .message-content::after {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.message:active .message-content::after {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 深色模式调整 */
+@media (prefers-color-scheme: dark) {
+  .message:hover .message-content::after {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .message:active .message-content::after {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
 }

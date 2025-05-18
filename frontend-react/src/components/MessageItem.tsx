@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './MessageItem.css'
 import { Message, MessageStatus } from '../types/chat'
+import { useChat } from '../contexts/ChatContext'
 
 interface MessageItemProps {
   message: Message
+  onMessageSelect: (id: string | null) => void
+  selectedMessageId: string | null
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
-  const { sender, text, files, streaming, isLoading, status, timestamp } = message
+const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
+  const { sender, text, files, streaming, isLoading, status, timestamp, id } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
+  const { deleteMessage } = useChat()
+  
+  // 检查当前消息是否被选中
+  const isSelected = id && selectedMessageId === id
   
   // 动态点号效果
   useEffect(() => {
@@ -58,6 +65,34 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       return () => clearInterval(interval)
     }
   }, [sender, text, streaming, isLoading])
+  
+  // 处理消息点击
+  const handleMessageClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!id) return;
+    
+    // 如果当前消息已被选中，则取消选中；否则选中当前消息
+    if (isSelected) {
+      onMessageSelect(null);
+    } else {
+      onMessageSelect(id);
+    }
+  }
+  
+  // 处理删除消息
+  const handleDeleteMessage = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!id) return
+    
+    try {
+      await deleteMessage(id)
+      // 删除后清除选中状态
+      onMessageSelect(null)
+    } catch (error) {
+      console.error('删除消息失败:', error)
+      // 可以在这里添加错误提示
+    }
+  }
   
   // 格式化时间戳
   const formatTime = (timestamp: number) => {
@@ -177,7 +212,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   }
 
   return (
-    <div className={`message ${sender}`}>
+    <div 
+      className={`message ${sender} ${isSelected ? 'selected' : ''}`}
+      onClick={handleMessageClick}
+    >
       <img 
         src={sender === 'user' ? '/user-avatar.jpg' : '/Nagisa_avatar.jpg'} 
         alt={sender === 'user' ? 'User' : 'Nagisa'} 
@@ -240,6 +278,15 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       
       {/* 显示消息状态 */}
       {renderMessageStatus()}
+      
+      {/* 删除按钮 - 仅在消息被选中时显示 */}
+      {isSelected && id && !isLoading && !streaming && (
+        <div className="message-delete-button" onClick={handleDeleteMessage}>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L12 12M2 12L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      )}
     </div>
   )
 }

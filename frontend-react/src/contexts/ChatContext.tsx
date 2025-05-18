@@ -226,6 +226,69 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [currentSessionId, createNewSession, refreshSessions, connectionStatus, checkConnection, connectionError])
 
+  // 删除消息
+  const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
+    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      const canConnect = await checkConnection();
+      if (!canConnect) {
+        throw new Error(connectionError || "无法连接到服务器，请重试。");
+      }
+    }
+    
+    // 确保有当前会话ID
+    if (!currentSessionId) {
+      throw new Error("没有活动的会话");
+    }
+    
+    try {
+      // 先检查消息是否存在于当前消息列表中
+      const messageExists = messages.some(msg => msg.id === messageId);
+      if (!messageExists) {
+        console.error(`消息 ${messageId} 不存在于当前会话中`);
+        throw new Error("消息不存在于当前会话中");
+      }
+      
+      // 首先在前端更新消息列表，删除指定消息
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      
+      // 调用后端API删除消息
+      const response = await fetch('/api/messages/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: currentSessionId,
+          message_id: messageId
+        }),
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error('删除消息失败:', responseData);
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(`删除消息失败: ${responseData.detail || response.status}`);
+        
+        // 如果后端删除失败但前端已移除，恢复被删除的消息
+        if (response.status === 404) {
+          // 恢复被删除的消息列表
+          await switchSession(currentSessionId);
+          throw new Error(`删除消息失败: ${responseData.detail}`);
+        }
+      }
+      
+      // 删除成功后刷新会话列表
+      await refreshSessions();
+      setConnectionStatus(ConnectionStatus.CONNECTED);
+    } catch (error) {
+      console.error('删除消息失败:', error);
+      setConnectionStatus(ConnectionStatus.ERROR);
+      setConnectionError(error instanceof Error ? error.message : '删除消息失败');
+      throw error;
+    }
+  }, [currentSessionId, connectionStatus, checkConnection, connectionError, refreshSessions, messages, switchSession]);
+
   // 初始化 Effect: ComponentDidMount
   useEffect(() => {
     const initLoad = async () => {
@@ -455,6 +518,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let audioCount = 0
     let firstResponseReceived = false
     let loadingId: string | null = null
+    let aiMessageId: string | null = null // 新增：存储后端返回的AI消息ID
     
     console.log('开始处理流式响应')
     
@@ -464,13 +528,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         console.log('流式响应结束')
         
         if (loadingId) {
-          // 响应结束后，更新消息为最终状态
+          // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
           setMessages(prev => 
-            prev.map(msg => 
-              msg.id === loadingId 
-                ? { ...msg, text: currentText, isLoading: false, streaming: false } 
-                : msg
-            )
+            prev.map(msg => {
+              if (msg.id === loadingId) {
+                return { 
+                  ...msg, 
+                  text: currentText, 
+                  isLoading: false, 
+                  streaming: false,
+                  // 确保ID永远是字符串，如果没有后端ID就使用原来的ID
+                  id: aiMessageId || msg.id 
+                };
+              }
+              return msg;
+            })
           )
         }
         
@@ -545,6 +617,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               loadingId = addLoadingMessage();
             }
             
+            // 处理后端返回的AI消息ID
+            if (data.message_id && !aiMessageId) {
+              aiMessageId = data.message_id;
+              console.log('收到AI消息ID:', aiMessageId);
+              
+              // 立即更新loading消息的ID为后端返回的ID
+              if (loadingId) {
+                setMessages(prev => 
+                  prev.map(msg => {
+                    if (msg.id === loadingId && aiMessageId) {
+                      return { ...msg, id: aiMessageId };
+                    }
+                    return msg;
+                  })
+                );
+                if (aiMessageId) {
+                  loadingId = aiMessageId; // 更新loadingId
+                }
+              }
+            }
+            
             // 如果是第一次收到响应，标记为已收到
             if (!firstResponseReceived && data.keyword) {
               firstResponseReceived = true
@@ -586,7 +679,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
     }
-  }, [refreshSessions, playMotion, processAudioData, setConnectionStatus, setConnectionError, addLoadingMessage])
+  }, [addLoadingMessage, processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -667,6 +760,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       createNewSession, 
       switchSession, 
       deleteSession, 
+      deleteMessage,
       refreshSessions,
       checkConnection
     }}>
