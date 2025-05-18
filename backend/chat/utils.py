@@ -320,3 +320,72 @@ def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
             response_text = llm_full_response[:match.start()].strip()
 
     return response_text, keyword 
+
+def delete_message(session_id: str, message_id: str) -> bool:
+    """
+    从指定会话中删除特定ID的消息
+    
+    Args:
+        session_id: 会话ID
+        message_id: 要删除的消息ID
+        
+    Returns:
+        bool: 是否成功删除
+    """
+    try:
+        if not os.path.exists(HISTORY_FILE):
+            return False
+            
+        # 备份当前历史记录
+        backup_file = backup_history()
+        if backup_file:
+            print(f"删除消息前已备份历史记录到: {backup_file}")
+            
+        # 加载所有历史记录
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            all_history = json.load(f)
+            
+        # 如果会话不存在
+        if session_id not in all_history:
+            return False
+            
+        # 获取会话历史
+        session_history = all_history[session_id]
+        
+        # 找到并删除消息
+        message_found = False
+        new_history = []
+        for msg in session_history:
+            if 'id' in msg and msg['id'] == message_id:
+                message_found = True
+                continue  # 跳过此消息，相当于删除
+            new_history.append(msg)
+            
+        # 如果找不到消息
+        if not message_found:
+            return False
+            
+        # 更新历史记录
+        all_history[session_id] = new_history
+        
+        # 保存更新后的历史记录
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(all_history, f, indent=4, ensure_ascii=False)
+            
+        # 更新元数据中的更新时间
+        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        if os.path.exists(metadata_file):
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    if session_id in metadata:
+                        metadata[session_id]['updated_at'] = datetime.now().isoformat()
+                        with open(metadata_file, 'w', encoding='utf-8') as f:
+                            json.dump(metadata, f, indent=4, ensure_ascii=False)
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+                
+        return True
+    except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+        print(f"删除消息时出错: {e}")
+        return False 

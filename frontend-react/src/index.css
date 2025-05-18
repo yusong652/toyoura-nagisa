@@ -40,6 +40,20 @@
   --status-sent-color: #555555;
   --status-read-color: #4a9c30;
   --status-error-color: #d32f2f;
+  
+  /* 消息气泡悬停效果 */
+  --message-hover-glow: rgba(74, 144, 226, 0.15);
+  --user-message-hover-glow: rgba(79, 109, 245, 0.2);
+  --bot-message-hover-glow: rgba(130, 130, 130, 0.15);
+  
+  /* 额外UI元素颜色 */
+  --accent-color: #9E9CFF;
+  --card-bg: #ffffff;
+  --input-border: #dcd8c9;
+  --input-text: #444444;
+  --button-hover: #3a56d4;
+  --button-active: #2e44a8;
+  --scrollbar-bg: #f2f0e8;
 }
 
 [data-theme="dark"] {
@@ -71,6 +85,20 @@
   --status-sent-color: #c0c0c0;
   --status-read-color: #8aff65;
   --status-error-color: #ff5252;
+  
+  /* 消息气泡悬停效果 - 深色主题 */
+  --message-hover-glow-dark: rgba(100, 180, 255, 0.25);
+  --user-message-hover-glow-dark: rgba(93, 123, 247, 0.3);
+  --bot-message-hover-glow-dark: rgba(180, 180, 180, 0.2);
+  
+  /* 额外UI元素颜色 */
+  --accent-color: #9E9CFF;
+  --card-bg: #2a2a2a;
+  --input-border: #444444;
+  --input-text: #e0e0e0;
+  --button-hover: #7089f8;
+  --button-active: #5d7bf7;
+  --scrollbar-bg: #1a1a1a;
 }
 
 * {
@@ -160,5 +188,45 @@ button:focus-visible {
   .live2d-container {
     transform: scale(0.7);
     transform-origin: bottom right;
+  }
+}
+
+/* 亮色主题 */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* 基础UI颜色 - 亮色主题 */
+    --primary-color: #6c5ce7;
+    --secondary-color: #e5e3ff;
+    --accent-color: #9E9CFF;
+    --background-color: #f8f7f2;
+    --card-bg: #ffffff;
+    --text-color: #333333;
+    --text-secondary: #666666;
+    --border-color: #e6e6e6;
+    --input-bg: #ffffff;
+    --input-border: #d9d9d9;
+    --input-text: #333333;
+    --button-hover: #5b4bc9;
+    --button-active: #483da7;
+    --scrollbar-bg: #f0f0f0;
+    --scrollbar-thumb: #c0c0c0;
+    
+    /* 消息气泡颜色 - 亮色主题 */
+    --bot-message-bg: #f0f0f0;
+    --user-message-bg: #e5e3ff;
+    
+    /* 文件预览 - 亮色主题 */
+    --file-bg: rgba(0, 0, 0, 0.03);
+    --file-hover-bg: rgba(0, 0, 0, 0.06);
+    
+    /* 提示框 - 亮色主题 */
+    --tooltip-bg: #ffffff;
+    --tooltip-text: #333333;
+    
+    /* 状态颜色 - 亮色主题 */
+    --status-sending-color: #888888;
+    --status-sent-color: #6c5ce7;
+    --status-read-color: #4834d4;
+    --status-error-color: #e74c3c;
   }
 }
