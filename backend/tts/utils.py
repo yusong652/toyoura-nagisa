@@ -12,9 +12,9 @@ KEYWORD_MARKER_PATTERN = re.compile(r'\[\[\w+\]\]\s*$')
 WHITESPACE_PATTERN = re.compile(r'\s+')
 
 # 默认的分割尺寸
-DEFAULT_SPLIT_SIZE = 8
+DEFAULT_SPLIT_SIZE = 6
 # 默认的分割句读点
-DEFAULT_SPLIT_PUNCTUATIONS = ['，', '。', ',', '~', '！', '？', '、', '!', '?', '…', '—'] # もっと色々追加してもOK！
+DEFAULT_SPLIT_PUNCTUATIONS = ['，', '。', ',', '~', '！', '？', '、', '!', '?', '…', '—', '：', '；'] # もっと色々追加してもOK！
 
 def clean_text_for_tts(text: str) -> str:
     """
