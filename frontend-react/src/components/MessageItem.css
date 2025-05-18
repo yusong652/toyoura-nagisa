@@ -1,16 +1,16 @@
 .message {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 22px;
   animation: fadeIn 0.3s ease-in-out;
   max-width: 85%;
+  position: relative;
 }
 
 .message.user {
   flex-direction: row-reverse;
   margin-left: auto;
-  position: relative;
-  margin-bottom: 30px;
+  margin-bottom: 26px;
 }
 
 .message:not(.user) {
@@ -37,9 +37,9 @@
 .message-content {
   background-color: var(--bot-message-bg);
   border-radius: 18px;
-  padding: 14px 18px;
+  padding: 12px 16px;
   max-width: 100%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   display: flex;
@@ -48,7 +48,7 @@
 }
 
 .message-content:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
 
@@ -207,41 +207,95 @@
   }
 }
 
-/* 已读回执样式 */
-.read-receipt {
+/* 消息状态样式 */
+.message-status {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--status-sending-color);
   position: absolute;
   right: 60px;
-  bottom: -15px;
-  text-align: right;
-  margin: 0;
-  padding: 0;
-  font-size: 12px;
-  color: #2ecc71;
-  background: transparent;
-  line-height: 1.1;
-  letter-spacing: 0.5px;
+  bottom: -18px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  z-index: 5;
+  opacity: 0.85;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  background-color: transparent;
+  backdrop-filter: none;
   user-select: none;
-  z-index: 10;
-  min-width: 36px;
-  font-weight: 500;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  pointer-events: none;
 }
 
-.read-receipt.visible {
+.message-status:hover {
   opacity: 1;
-  animation: fadeInReceipt 0.3s ease-out;
 }
 
-@keyframes fadeInReceipt {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
+.message-status::before {
+  content: '';
+  display: inline-block;
+  margin-right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-sending {
+  color: var(--status-sending-color);
+}
+
+.status-sending::before {
+  background-color: var(--status-sending-color);
+  animation: pulse 1.2s infinite;
+}
+
+.status-sent {
+  color: var(--status-sent-color);
+}
+
+.status-sent::before {
+  background-color: var(--status-sent-color);
+}
+
+.status-read {
+  color: var(--status-read-color);
+}
+
+.status-read::before {
+  background-color: var(--status-read-color);
+}
+
+.status-error {
+  color: var(--status-error-color);
+}
+
+.status-error::before {
+  background-color: var(--status-error-color);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8);
   }
-  to {
+  50% {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1.1);
   }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+
+/* 移除旧的已读样式 */
+.read-receipt {
+  display: none;
 }
 
 /* 时间戳样式 */

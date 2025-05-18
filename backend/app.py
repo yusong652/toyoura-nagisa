@@ -220,46 +220,68 @@ async def chat_stream_endpoint(request: Request):
     tts_engine: BaseTTS = request.app.state.tts_engine
     
     try:
-        response_text, keyword = await llm_client.get_response(recent_msgs)
-        
-        # 保存历史
-        ai_msg = Message(role="assistant", content=response_text)
-        history_msgs.append(ai_msg)
-        save_history(session_id, [msg.dict() for msg in history_msgs])
-        
-        # 流式返回文本和音频
+        # 首先发送"已发送"状态
         async def generate():
-            # 首先发送关键词（仅发送一次，在整个响应的开头）
-            yield f"data: {json.dumps({'keyword': keyword})}\n\n"
+            # 发送"已发送"的状态确认
+            yield f"data: {json.dumps({'status': 'sent'})}\n\n"
             
-            # 按句子分割文本
-            sentences = split_text_by_punctuations(response_text)
-            
-            # 逐句处理 - 注意: 我们先合成音频，再一起发送文本和音频，确保它们同步
-            for sentence in sentences:
-                if not sentence.strip():
-                    continue
-                    
-                # 先合成音频
-                audio_b64 = None
-                audio_error = None
-                try:
-                    audio_bytes = await tts_engine.synthesize(sentence)
-                    audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                except Exception as e:
-                    print(f"TTS合成失败: {e}")
-                    audio_error = str(e)
+            try:
+                # 在调用LLM之前发送"已读"状态
+                yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 
-                # 将文本和音频一起发送，不再包含关键词
-                response_data = {
-                    'text': sentence,
-                    'audio': audio_b64
-                }
+                # 调用LLM
+                response_text, keyword = await llm_client.get_response(recent_msgs)
                 
-                if audio_error:
-                    response_data['error'] = audio_error
+                # 保存历史
+                ai_msg = Message(role="assistant", content=response_text)
+                history_msgs.append(ai_msg)
+                save_history(session_id, [msg.dict() for msg in history_msgs])
+                
+                # 首先发送关键词（仅发送一次，在整个响应的开头）
+                yield f"data: {json.dumps({'keyword': keyword})}\n\n"
+                
+                # 按句子分割文本
+                sentences = split_text_by_punctuations(response_text)
+                
+                # 逐句处理 - 注意: 我们先合成音频，再一起发送文本和音频，确保它们同步
+                for sentence in sentences:
+                    # 保留空行，只跳过None或空字符串
+                    if sentence is None or sentence == '':
+                        continue
+                        
+                    # 处理空行的情况，发送没有音频的行
+                    if sentence.strip() == '':
+                        response_data = {
+                            'text': sentence,
+                            'audio': None
+                        }
+                        yield f"data: {json.dumps(response_data)}\n\n"
+                        continue
+                        
+                    # 先合成音频
+                    audio_b64 = None
+                    audio_error = None
+                    try:
+                        audio_bytes = await tts_engine.synthesize(sentence)
+                        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    except Exception as e:
+                        print(f"TTS合成失败: {e}")
+                        audio_error = str(e)
                     
-                yield f"data: {json.dumps(response_data)}\n\n"
+                    # 将文本和音频一起发送，不再包含关键词
+                    response_data = {
+                        'text': sentence,
+                        'audio': audio_b64
+                    }
+                    
+                    if audio_error:
+                        response_data['error'] = audio_error
+                        
+                    yield f"data: {json.dumps(response_data)}\n\n"
+            except Exception as e:
+                # 如果在处理过程中出错，返回错误状态
+                yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+                raise e
         
         return StreamingResponse(
             generate(),

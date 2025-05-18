@@ -5,8 +5,17 @@ export interface Message {
   files?: FileData[];
   timestamp: number;
   streaming?: boolean; // 标记是否正在流式显示文本
+  status?: MessageStatus; // 用户消息状态
   isLoading?: boolean; // 标记是否为加载中的消息
   isRead?: boolean; // 标记用户消息是否已读
+}
+
+// 消息状态枚举
+export enum MessageStatus {
+  SENDING = 'sending', // 正在发送
+  SENT = 'sent',       // 已发送到后端
+  READ = 'read',       // 后端已传给LLM API
+  ERROR = 'error'      // 发送出错
 }
 
 export interface FileData {
