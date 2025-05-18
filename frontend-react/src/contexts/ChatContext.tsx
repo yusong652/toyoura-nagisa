@@ -329,7 +329,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession]);
 
   // 添加用户消息到聊天记录
-  const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
+  const addUserMessage = useCallback((text: string, files: FileData[] = []): Message => {
     // 创建用户消息
     const userMessage: Message = {
       id: uuidv4(),
@@ -354,7 +354,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       )
     }, 1000)
     
-    return userMessage.id
+    return userMessage
   }, [])
 
   // 添加机器人加载消息
@@ -407,15 +407,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [queueAndPlayAudio])
 
   // 创建聊天API请求
-  const createChatRequest = useCallback(async (text: string, files: FileData[] = []): Promise<Response> => {
+  const createChatRequest = useCallback(async (message: Message): Promise<Response> => {
     // 构造请求数据
     const messageData = JSON.stringify({
-      text,
-      files: files.map(file => ({
+      id: message.id,
+      text: message.text,
+      timestamp: message.timestamp,
+      files: message.files ? message.files.map(file => ({
         name: file.name,
         type: file.type,
         data: file.data
-      }))
+      })) : []
     })
     
     // 调用API
@@ -553,8 +555,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     }
     
-    // 添加用户消息
-    addUserMessage(text, files)
+    // 添加用户消息并获取完整消息对象
+    const userMessage = addUserMessage(text, files)
     
     // 重置音频状态
     await resetAudioState()
@@ -563,8 +565,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const loadingId = addLoadingMessage()
     
     try {
-      // 创建并发送API请求
-      const response = await createChatRequest(text, files)
+      // 创建并发送API请求，传递完整消息对象
+      const response = await createChatRequest(userMessage)
       
       // 处理流式响应
       await processStreamResponse(response, loadingId)

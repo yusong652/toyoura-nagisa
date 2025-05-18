@@ -176,6 +176,9 @@ async def chat_stream_endpoint(request: Request):
         msg_obj = json.loads(message_data)
         text = msg_obj.get('text', '')
         files = msg_obj.get('files', [])
+        # 获取前端生成的消息ID和时间戳
+        message_id = msg_obj.get('id')
+        timestamp = msg_obj.get('timestamp')
         
     # 构造多模态 content
     content = []
@@ -194,8 +197,20 @@ async def chat_stream_endpoint(request: Request):
     session_id = data.get('session_id', "default_session")
     loaded_history = load_history(session_id)
     history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    user_msg = Message(role="user", content=content)
-    history_msgs.append(user_msg)
+    
+    # 创建用户消息，使用前端提供的ID和时间戳
+    user_msg = Message(
+        role="user", 
+        content=content,
+        timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now()
+    )
+    # 在保存到历史记录时使用前端提供的ID (如果有)
+    if message_id:
+        user_msg_dict = user_msg.dict()
+        user_msg_dict["id"] = message_id
+        history_msgs.append(Message(**user_msg_dict))
+    else:
+        history_msgs.append(user_msg)
     
     # 使用配置中的recent_messages_length
     recent_messages_length = get_llm_config().get("recent_messages_length", 20)
