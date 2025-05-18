@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './MessageItem.css'
-import { Message } from '../types/chat'
+import { Message, MessageStatus } from '../types/chat'
 
 interface MessageItemProps {
   message: Message
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
-  const { sender, text, files, streaming, isLoading, isRead, timestamp } = message
+  const { sender, text, files, streaming, isLoading, status, timestamp } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
-  const [showReadReceipt, setShowReadReceipt] = useState(false)
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
   
@@ -24,13 +23,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
     
     return () => clearInterval(interval)
   }, [isLoading])
-  
-  // 处理已读回执显示
-  useEffect(() => {
-    if (sender === 'user' && isRead) {
-      setShowReadReceipt(true)
-    }
-  }, [sender, isRead])
   
   // 流式显示文本
   useEffect(() => {
@@ -96,11 +88,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       return <div className="message-text">{textWithBreaks}</div>;
     }
     
-    // 将文本拆分成行，确保每行正确显示，并且字符有渐变效果
+    // 将文本按换行符拆分，保留空行
+    const lines = displayText.split('\n');
+    
     return (
       <div className="message-text streaming-text">
-        {displayText.split('\n').map((line, lineIndex) => (
+        {lines.map((line, lineIndex) => (
           <React.Fragment key={`line-${lineIndex}`}>
+            {/* 渲染每个字符，添加渐变效果 */}
             {line.split('').map((char, charIndex) => (
               <span 
                 key={`${lineIndex}-${charIndex}`} 
@@ -112,11 +107,45 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
                 {char}
               </span>
             ))}
-            {lineIndex < displayText.split('\n').length - 1 && <br />}
+            {/* 在每行后添加换行，除了最后一行 */}
+            {lineIndex < lines.length - 1 && <br />}
           </React.Fragment>
         ))}
       </div>
     )
+  }
+  
+  // 渲染消息状态
+  const renderMessageStatus = () => {
+    // 对用户消息强制设置状态
+    if (sender !== 'user') return null;
+    
+    let statusText = '';
+    let statusClass = '';
+    
+    if (status === MessageStatus.SENDING) {
+      statusText = '发送中';
+      statusClass = 'status-sending';
+    } else if (status === MessageStatus.SENT) {
+      statusText = '已发送';
+      statusClass = 'status-sent';
+    } else if (status === MessageStatus.READ) {
+      statusText = '已读';
+      statusClass = 'status-read';
+    } else if (status === MessageStatus.ERROR) {
+      statusText = '发送失败';
+      statusClass = 'status-error';
+    } else {
+      // 没有状态信息的消息（如历史消息）默认显示为已读
+      statusText = '已读';
+      statusClass = 'status-read';
+    }
+    
+    return (
+      <div className={`message-status ${statusClass}`}>
+        {statusText}
+      </div>
+    );
   }
   
   // 头像悬停显示信息
@@ -209,11 +238,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
         </div>
       )}
       
-      {sender === 'user' && isRead && (
-        <div className={`read-receipt ${showReadReceipt ? 'visible' : ''}`}>
-          已读
-        </div>
-      )}
+      {/* 显示消息状态 */}
+      {renderMessageStatus()}
     </div>
   )
 }

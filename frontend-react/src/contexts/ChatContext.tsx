@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus } from '../types/chat'
+import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
 import { playMotion } from '../utils/live2d'
 
@@ -180,7 +180,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           text,
           files: files.length > 0 ? files : undefined,
           timestamp: new Date(msg.timestamp).getTime(),
-          isRead: true
+          status: sender === 'user' ? MessageStatus.READ : undefined // 为历史用户消息设置已读状态
         }
       })
       setMessages(convertedMessages)
@@ -337,22 +337,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       text,
       files,
       timestamp: Date.now(),
-      isRead: false // 初始状态为未读
+      status: MessageStatus.SENDING // 初始状态为发送中
     }
     
     // 添加到消息列表
     setMessages(prev => [...prev, userMessage])
-    
-    // 设置用户消息为已读状态（在发送消息1秒后）
-    setTimeout(() => {
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessage.id
-            ? { ...msg, isRead: true }
-            : msg
-        )
-      )
-    }, 1000)
     
     return userMessage.id
   }, [])
@@ -407,7 +396,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [queueAndPlayAudio])
 
   // 创建聊天API请求
-  const createChatRequest = useCallback(async (text: string, files: FileData[] = []): Promise<Response> => {
+  const createChatRequest = useCallback(async (text: string, files: FileData[] = [], userMessageId: string): Promise<Response> => {
     // 构造请求数据
     const messageData = JSON.stringify({
       text,
@@ -419,6 +408,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     })
     
     // 调用API
+    console.log('发送聊天请求')
+    
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: {
@@ -431,6 +422,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     })
     
     if (!response.ok) {
+      // 更新消息为错误状态
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === userMessageId
+            ? { ...msg, status: MessageStatus.ERROR }
+            : msg
+        )
+      )
+      
       setConnectionStatus(ConnectionStatus.ERROR);
       setConnectionError(`发送消息失败: ${response.status}`);
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -442,7 +442,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   // 处理聊天API响应
   const processStreamResponse = useCallback(async (
     response: Response, 
-    loadingId: string
+    userMessageId: string
   ) => {
     // 处理流式响应
     const reader = response.body!.getReader()
@@ -452,24 +452,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let currentKeyword = null
     let audioCount = 0
     let firstResponseReceived = false
+    let loadingId: string | null = null
+    
+    console.log('开始处理流式响应')
     
     while (true) {
       const { done, value } = await reader.read()
       if (done) {
+        console.log('流式响应结束')
         
-        // 响应结束后，更新消息为最终状态
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === loadingId 
-              ? { 
-                  ...msg, 
-                  text: currentText, // 确保这里保留了原始格式
-                  isLoading: false, 
-                  streaming: false 
-                } 
-              : msg
+        if (loadingId) {
+          // 响应结束后，更新消息为最终状态
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === loadingId 
+                ? { ...msg, text: currentText, isLoading: false, streaming: false } 
+                : msg
+            )
           )
-        )
+        }
         
         // 刷新会话列表以更新最新状态
         refreshSessions()
@@ -491,8 +492,59 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           try {
             const data = JSON.parse(jsonData)
             
+            // 处理消息状态更新
+            if (data.status) {
+              console.log('收到消息状态更新:', data.status);
+              if (data.status === 'sent') {
+                // 后端确认消息已发送
+                console.log('消息已发送到后端, userMessageId:', userMessageId);
+                setMessages(prev => {
+                  return prev.map(msg => 
+                    msg.id === userMessageId
+                      ? { ...msg, status: MessageStatus.SENT }
+                      : msg
+                  );
+                });
+              } else if (data.status === 'read') {
+                // 后端确认消息已读（已传递给LLM）
+                console.log('消息已传递给LLM, userMessageId:', userMessageId);
+                
+                // 更新用户消息为已读状态
+                setMessages(prev => {
+                  return prev.map(msg => 
+                    msg.id === userMessageId
+                      ? { ...msg, status: MessageStatus.READ }
+                      : msg
+                  );
+                });
+                
+                // 在用户消息状态为已读后，添加机器人加载消息
+                if (!loadingId) {
+                  loadingId = addLoadingMessage();
+                }
+              } else if (data.status === 'error') {
+                // 处理错误状态
+                console.error('消息处理错误:', data.error);
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === userMessageId
+                      ? { ...msg, status: MessageStatus.ERROR }
+                      : msg
+                  )
+                );
+                setConnectionStatus(ConnectionStatus.ERROR);
+                setConnectionError(data.error || '发送消息失败');
+              }
+              continue;
+            }
+            
+            // 检查是否已经添加了加载消息
+            if (!loadingId) {
+              loadingId = addLoadingMessage();
+            }
+            
             // 如果是第一次收到响应，标记为已收到
-            if (!firstResponseReceived) {
+            if (!firstResponseReceived && data.keyword) {
               firstResponseReceived = true
               // 播放Live2D动作已移除，因为tap_body动作不存在
             }
@@ -507,7 +559,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             }
             
             // 处理文本和音频（新的组合格式）
-            if (data.text) {
+            if (data.text && loadingId) {
               // 后端现在发送配对的文本和音频数据，确保同步
               currentText += data.text // 累加文本
               
@@ -532,8 +584,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
     }
-  }, [refreshSessions, playMotion, processAudioData])
-  
+  }, [refreshSessions, playMotion, processAudioData, setConnectionStatus, setConnectionError, addLoadingMessage])
+
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
@@ -553,27 +605,32 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     }
     
-    // 添加用户消息
-    addUserMessage(text, files)
-    
     // 重置音频状态
     await resetAudioState()
     
-    // 添加机器人加载消息
-    const loadingId = addLoadingMessage()
+    // 添加用户消息，初始状态为正在发送
+    const userMessageId = addUserMessage(text, files)
     
     try {
       // 创建并发送API请求
-      const response = await createChatRequest(text, files)
+      const response = await createChatRequest(text, files, userMessageId)
       
-      // 处理流式响应
-      await processStreamResponse(response, loadingId)
+      // 处理流式响应 - 不再立即添加loading消息，而是在statusRead事件中添加
+      await processStreamResponse(response, userMessageId)
     } catch (error) {
-      // 更新加载消息为错误消息
+      console.error('Error sending message:', error)
+      // 更新用户消息为错误状态
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === userMessageId
+            ? { ...msg, status: MessageStatus.ERROR }
+            : msg
+        )
+      )
+      
       setConnectionStatus(ConnectionStatus.ERROR);
       const errorMsg = error instanceof Error ? error.message : '发送消息失败';
       setConnectionError(errorMsg);
-      updateMessageWithError(loadingId, error as Error)
     } finally {
       setIsLoading(false)
       setLoadingMessageId(null)
@@ -581,10 +638,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [
     addUserMessage, 
     resetAudioState, 
-    addLoadingMessage, 
     createChatRequest, 
     processStreamResponse, 
-    updateMessageWithError, 
     connectionStatus, 
     checkConnection, 
     setConnectionStatus, 
