@@ -220,7 +220,7 @@ async def chat_stream_endpoint(request: Request):
     # 使用配置中的recent_messages_length
     recent_messages_length = get_llm_config().get("recent_messages_length", 20)
     recent_msgs = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
-    print(recent_msgs)
+
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     
