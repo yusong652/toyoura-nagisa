@@ -17,6 +17,7 @@ from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
 from backend.chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session, delete_message
+from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
 from backend.tts.tts_factory import get_tts_engine
@@ -286,6 +287,58 @@ async def chat_stream_endpoint(request: Request):
                         response_data['error'] = audio_error
                         
                     yield f"data: {json.dumps(response_data)}\n\n"
+                
+                # 检查是否需要生成标题：
+                # 1. 获取会话信息
+                sessions = get_all_sessions()
+                current_session = next((s for s in sessions if s['id'] == session_id), None)
+                
+                # 2. 判断是否需要生成标题
+                # 仅当会话存在且恰好有2条消息（一条用户消息和一条AI回复）时生成标题
+                is_first_round = len(history_msgs) == 2  # 限制为恰好2条消息
+                has_default_title = current_session is not None  # 只要会话存在
+                
+                should_generate_title = is_first_round and has_default_title
+                
+                # 只在第一轮对话后生成标题
+                if should_generate_title:
+                    # 提取用户第一条消息的文本
+                    first_user_msg = history_msgs[0]
+                    first_user_text = ""
+                    
+                    # 解析用户消息内容
+                    if isinstance(first_user_msg.content, str):
+                        first_user_text = first_user_msg.content
+                    elif isinstance(first_user_msg.content, list):
+                        # 如果content是列表，查找text类型的内容
+                        for item in first_user_msg.content:
+                            if isinstance(item, dict) and "text" in item:
+                                first_user_text = item["text"]
+                                break
+                    
+                    # 生成标题
+                    new_title = await generate_conversation_title(
+                        first_user_text,
+                        response_text,
+                        llm_client
+                    )
+                    
+                    if new_title:
+                        # 更新会话标题
+                        from backend.chat.utils import update_session_title
+                        update_success = update_session_title(session_id, new_title)
+                        
+                        if update_success:
+                            # 通过SSE流发送标题更新通知
+                            title_update_data = {
+                                'type': 'TITLE_UPDATE', 
+                                'payload': {
+                                    'session_id': session_id, 
+                                    'title': new_title
+                                }
+                            }
+                            yield f"data: {json.dumps(title_update_data)}\n\n"
+                
             except Exception as e:
                 # 如果在处理过程中出错，返回错误状态
                 yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"

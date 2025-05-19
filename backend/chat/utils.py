@@ -155,9 +155,14 @@ def create_new_history(name: str = None) -> str:
     # 生成唯一的会话ID
     session_id = str(uuid.uuid4())
     
-    # 如果没有提供名称，则使用当前时间
+    # 如果没有提供名称，则使用标准格式"New Chat"加时间
     if not name:
-        name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        name = f"New Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    # 如果提供了名称但不是标准格式，也强制使用标准格式
+    elif not name.startswith("New Chat") and "新对话" not in name:
+        name = f"New Chat - {name}"
+    
+    print(f"创建新会话，ID: {session_id}, 名称: '{name}'")
     
     # 创建新的历史记录元数据
     session_metadata = {
@@ -388,4 +393,41 @@ def delete_message(session_id: str, message_id: str) -> bool:
         return True
     except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
         print(f"删除消息时出错: {e}")
+        return False 
+
+def update_session_title(session_id: str, new_title: str) -> bool:
+    """
+    更新会话的标题
+    
+    Args:
+        session_id: 要更新的会话ID
+        new_title: 新的会话标题
+        
+    Returns:
+        是否更新成功
+    """
+    try:
+        # 加载会话元数据
+        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        if not os.path.exists(metadata_file):
+            return False
+            
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        # 检查会话是否存在
+        if session_id not in metadata:
+            return False
+            
+        # 更新标题和更新时间
+        metadata[session_id]["name"] = new_title
+        metadata[session_id]["updated_at"] = datetime.now().isoformat()
+        
+        # 保存更新后的元数据
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=4, ensure_ascii=False)
+            
+        return True
+    except Exception as e:
+        print(f"更新会话标题时出错: {str(e)}")
         return False 

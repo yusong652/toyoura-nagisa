@@ -449,7 +449,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
     
     try {
-      // 将音频数据添加到队列并播放，无需验证
       queueAndPlayAudio(audioData)
       return true
     } catch (error) {
@@ -471,9 +470,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         data: file.data
       }))
     })
-    
-    // 调用API
-    console.log('发送聊天请求')
     
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
@@ -517,15 +513,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let currentKeyword = null
     let audioCount = 0
     let firstResponseReceived = false
-    let loadingId: string | null = null
+    let loadingId: string | null = null // 新增：存储加载消息的ID
     let aiMessageId: string | null = null // 新增：存储后端返回的AI消息ID
-    
-    console.log('开始处理流式响应')
     
     while (true) {
       const { done, value } = await reader.read()
       if (done) {
-        console.log('流式响应结束')
         
         if (loadingId) {
           // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
@@ -566,12 +559,35 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           try {
             const data = JSON.parse(jsonData)
             
+            // 优先处理标题更新事件
+            if (data.type === 'TITLE_UPDATE') {
+              // 确保payload存在并包含必要的字段
+              if (data.payload && data.payload.session_id && data.payload.title) {
+                const { session_id: updatedSessionId, title: newTitle } = data.payload;
+                
+                // 更新会话列表中的会话标题
+                setSessions(prevSessions => 
+                  prevSessions.map(session => 
+                    session.id === updatedSessionId 
+                      ? { ...session, name: newTitle } // 注意：sessions中的标题属性是name，而不是title
+                      : session
+                  )
+                );
+                
+                // 如果更新的是当前活跃会话，立即刷新会话列表
+                if (updatedSessionId === currentSessionId) {
+                  refreshSessions().catch(error => {
+                    console.error('刷新会话列表失败:', error);
+                  });
+                }
+              }
+              continue;
+            }
+            
             // 处理消息状态更新
-            if (data.status) {
-              console.log('收到消息状态更新:', data.status);
+            else if (data.status) {
               if (data.status === 'sent') {
                 // 后端确认消息已发送
-                console.log('消息已发送到后端, userMessageId:', userMessageId);
                 setMessages(prev => {
                   return prev.map(msg => 
                     msg.id === userMessageId
@@ -581,7 +597,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                 });
               } else if (data.status === 'read') {
                 // 后端确认消息已读（已传递给LLM）
-                console.log('消息已传递给LLM, userMessageId:', userMessageId);
                 
                 // 更新用户消息为已读状态
                 setMessages(prev => {
@@ -620,7 +635,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             // 处理后端返回的AI消息ID
             if (data.message_id && !aiMessageId) {
               aiMessageId = data.message_id;
-              console.log('收到AI消息ID:', aiMessageId);
               
               // 立即更新loading消息的ID为后端返回的ID
               if (loadingId) {
@@ -679,7 +693,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
     }
-  }, [addLoadingMessage, processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion])
+  }, [addLoadingMessage, processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
