@@ -7,6 +7,7 @@ const ChatBox: React.FC = () => {
   const { messages, sessions, currentSessionId } = useChat()
   const chatboxRef = useRef<HTMLDivElement>(null)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const prevLastMessageId = useRef(messages[messages.length - 1]?.id);
   
   // 获取当前会话标题
   const currentSessionTitle = sessions.find(session => session.id === currentSessionId)?.name || '新会话'
@@ -19,51 +20,19 @@ const ChatBox: React.FC = () => {
     }
   };
 
-  // Add automatic scrolling effect when messages change
+  // 只在最后一条消息id变化时自动滚动到底部
   useEffect(() => {
-    if (chatboxRef.current) {
-      // Use smooth scrolling to bottom when new messages arrive
-      chatboxRef.current.scrollTo({
-        top: chatboxRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, [messages]);
-
-  // Add a MutationObserver to detect content changes and scroll down
-  useEffect(() => {
-    const chatboxElement = chatboxRef.current;
-    if (!chatboxElement) return;
-
-    const scrollToBottom = () => {
-      chatboxElement.scrollTo({
-        top: chatboxElement.scrollHeight,
-        behavior: 'smooth'
-      });
-    };
-
-    // Create a MutationObserver to watch for content changes
-    const observer = new MutationObserver((mutations) => {
-      // If there were character data changes or child list changes, scroll down
-      if (mutations.some(mutation => 
-          mutation.type === 'characterData' || 
-          mutation.type === 'childList')) {
-        scrollToBottom();
+    const lastMessageId = messages[messages.length - 1]?.id;
+    if (lastMessageId && lastMessageId !== prevLastMessageId.current) {
+      if (chatboxRef.current) {
+        chatboxRef.current.scrollTo({
+          top: chatboxRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
       }
-    });
-
-    // Start observing the chatbox with options
-    observer.observe(chatboxElement, {
-      childList: true,      // Watch for changes to child elements
-      subtree: true,        // Watch the entire subtree
-      characterData: true   // Watch for changes to text content
-    });
-
-    // Clean up the observer on component unmount
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+    }
+    prevLastMessageId.current = lastMessageId;
+  }, [messages]);
 
   return (
     <>
