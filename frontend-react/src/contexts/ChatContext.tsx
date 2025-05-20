@@ -507,11 +507,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           setMessages(prev => 
             prev.map(msg => {
               if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
+                // Create a new message object to ensure state updates trigger scroll
                 return { 
                   ...msg, 
                   text: currentText, 
                   streaming: true,
-                  isLoading: false
+                  isLoading: false,
+                  // Add a small timestamp increment to force UI update
+                  timestamp: Date.now()
                 };
               }
               return msg;

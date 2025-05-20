@@ -51,6 +51,8 @@
   position: relative;
   width: 100%;
   border-radius: 12px;
+  overflow-anchor: auto; /* Enable automatic scroll anchoring */
+  scroll-behavior: smooth; /* Enable smooth scrolling */
 }
 
 .chatbox::before {
@@ -161,6 +163,14 @@
     border-color: rgba(255, 255, 255, 0.2);
     border-top-color: var(--primary-color, #4a90e2);
   }
+}
+
+/* Create a scroll anchor element at the bottom */
+.scroll-anchor {
+  height: 1px;
+  width: 100%;
+  margin-top: auto;
+  overflow-anchor: auto;
 }
 
 .chatbox > *:last-child {
