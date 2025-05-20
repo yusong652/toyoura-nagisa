@@ -4,9 +4,12 @@ import MessageItem from './MessageItem.tsx'
 import './ChatBox.css'
 
 const ChatBox: React.FC = () => {
-  const { messages } = useChat()
+  const { messages, sessions, currentSessionId } = useChat()
   const chatboxRef = useRef<HTMLDivElement>(null)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+
+  // Get the current session title
+  const currentSessionTitle = sessions.find(session => session.id === currentSessionId)?.name || '新会话'
 
   // 滚动到底部
   useEffect(() => {
@@ -24,16 +27,23 @@ const ChatBox: React.FC = () => {
   };
 
   return (
-    <div className="chatbox" ref={chatboxRef} onClick={handleChatboxClick}>
-      {messages.map((message) => (
-        <MessageItem 
-          key={message.id} 
-          message={message} 
-          selectedMessageId={selectedMessageId}
-          onMessageSelect={setSelectedMessageId}
-        />
-      ))}
-    </div>
+    <>
+      <div className="chatbox-title-bar">
+        <h2 className="chatbox-title">{currentSessionTitle}</h2>
+      </div>
+      <div className="chatbox-container">
+        <div className="chatbox" ref={chatboxRef} onClick={handleChatboxClick}>
+          {messages.map((message) => (
+            <MessageItem 
+              key={message.id} 
+              message={message} 
+              selectedMessageId={selectedMessageId}
+              onMessageSelect={setSelectedMessageId}
+            />
+          ))}
+        </div>
+      </div>
+    </>
   )
 }
 
