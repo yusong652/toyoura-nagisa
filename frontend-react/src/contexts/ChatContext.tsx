@@ -510,16 +510,190 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const decoder = new TextDecoder()
     let buffer = ''
     let currentText = ''
-    let currentKeyword = null
+    let currentKeyword: string | null = null
     let audioCount = 0
     let firstResponseReceived = false
     let loadingId: string | null = null // 新增：存储加载消息的ID
     let aiMessageId: string | null = null // 新增：存储后端返回的AI消息ID
     
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
+    // 处理标题更新事件
+    const handleTitleUpdate = (data: any) => {
+      // 确保payload存在并包含必要的字段
+      if (data.payload && data.payload.session_id && data.payload.title) {
+        const { session_id: updatedSessionId, title: newTitle } = data.payload;
         
+        // 更新会话列表中的会话标题
+        setSessions(prevSessions => 
+          prevSessions.map(session => 
+            session.id === updatedSessionId 
+              ? { ...session, name: newTitle } // 注意：sessions中的标题属性是name，而不是title
+              : session
+          )
+        );
+        
+        // 如果更新的是当前活跃会话，立即刷新会话列表
+        if (updatedSessionId === currentSessionId) {
+          refreshSessions().catch(error => {
+            console.error('刷新会话列表失败:', error);
+          });
+        }
+      }
+    };
+
+    // 处理消息状态更新
+    const handleStatusUpdate = (data: any) => {
+      if (data.status === 'sent') {
+        // 后端确认消息已发送
+        setMessages(prev => {
+          return prev.map(msg => 
+            msg.id === userMessageId
+              ? { ...msg, status: MessageStatus.SENT }
+              : msg
+          );
+        });
+      } else if (data.status === 'read') {
+        // 后端确认消息已读（已传递给LLM）
+        
+        // 更新用户消息为已读状态
+        setMessages(prev => {
+          return prev.map(msg => 
+            msg.id === userMessageId
+              ? { ...msg, status: MessageStatus.READ }
+              : msg
+          );
+        });
+        
+        // 在用户消息状态为已读后，添加机器人加载消息
+        if (!loadingId) {
+          loadingId = addLoadingMessage();
+        }
+      } else if (data.status === 'error') {
+        // 处理错误状态
+        console.error('消息处理错误:', data.error);
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === userMessageId
+              ? { ...msg, status: MessageStatus.ERROR }
+              : msg
+          )
+        );
+        setConnectionStatus(ConnectionStatus.ERROR);
+        setConnectionError(data.error || '发送消息失败');
+      }
+    };
+
+    // 处理AI消息ID
+    const handleAiMessageId = (data: any) => {
+      if (data.message_id && !aiMessageId) {
+        aiMessageId = data.message_id;
+        
+        // 立即更新loading消息的ID为后端返回的ID
+        if (loadingId) {
+          setMessages(prev => 
+            prev.map(msg => {
+              if (msg.id === loadingId && aiMessageId) {
+                return { ...msg, id: aiMessageId };
+              }
+              return msg;
+            })
+          );
+          if (aiMessageId) {
+            loadingId = aiMessageId; // 更新loadingId
+          }
+        }
+      }
+    };
+
+    // 处理关键词和动作
+    const handleKeyword = (data: any) => {
+      if (data.keyword && data.keyword !== currentKeyword) {
+        currentKeyword = data.keyword;
+        
+        // 根据关键词播放对应的Live2D动作
+        // 表情关键词只在回复开始时发送一次
+        if (currentKeyword) {
+          playMotion(currentKeyword);
+        }
+      }
+    };
+
+    // 处理文本和音频内容
+    const handleContentUpdate = (data: any) => {
+      if (data.text && loadingId) {
+        // 后端现在发送配对的文本和音频数据，确保同步
+        currentText += data.text; // 累加文本
+        
+        // 更新消息，保持原始格式，包括换行符
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === loadingId 
+              ? { ...msg, text: currentText, isLoading: false, streaming: true } 
+              : msg
+          )
+        );
+        
+        // 如果同时收到了音频数据，处理音频
+        if (data.audio) {
+          audioCount++;
+          processAudioData(data.audio, audioCount);
+        }
+      }
+    };
+
+    // 处理第一次响应
+    const handleFirstResponse = (data: any) => {
+      if (!firstResponseReceived && data.keyword) {
+        firstResponseReceived = true;
+      }
+    };
+
+    // 处理一行数据
+    const processLine = (line: string) => {
+      if (line.trim() === '') return;
+      
+      if (line.startsWith('data: ')) {
+        const jsonData = line.slice(6);
+        
+        try {
+          const data = JSON.parse(jsonData);
+          
+          // 优先处理标题更新事件
+          if (data.type === 'TITLE_UPDATE') {
+            handleTitleUpdate(data);
+            return;
+          }
+          
+          // 处理消息状态更新
+          if (data.status) {
+            handleStatusUpdate(data);
+            return;
+          }
+          
+          // 检查是否已经添加了加载消息
+          if (!loadingId) {
+            loadingId = addLoadingMessage();
+          }
+          
+          // 处理后端返回的AI消息ID
+          handleAiMessageId(data);
+          
+          // 处理第一次响应
+          handleFirstResponse(data);
+          
+          // 处理关键词
+          handleKeyword(data);
+          
+          // 处理文本和音频
+          handleContentUpdate(data);
+        } catch (e) {
+          // 处理解析错误
+        }
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
         if (loadingId) {
           // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
           setMessages(prev => 
@@ -536,161 +710,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               }
               return msg;
             })
-          )
+          );
         }
         
         // 刷新会话列表以更新最新状态
-        refreshSessions()
-        
-        break
+        refreshSessions();
+        break;
       }
       
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n\n')
-      buffer = lines.pop() || ''
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
       
       // 处理每一行数据
       for (const line of lines) {
-        if (line.trim() === '') continue
-        
-        if (line.startsWith('data: ')) {
-          const jsonData = line.slice(6)
-          
-          try {
-            const data = JSON.parse(jsonData)
-            
-            // 优先处理标题更新事件
-            if (data.type === 'TITLE_UPDATE') {
-              // 确保payload存在并包含必要的字段
-              if (data.payload && data.payload.session_id && data.payload.title) {
-                const { session_id: updatedSessionId, title: newTitle } = data.payload;
-                
-                // 更新会话列表中的会话标题
-                setSessions(prevSessions => 
-                  prevSessions.map(session => 
-                    session.id === updatedSessionId 
-                      ? { ...session, name: newTitle } // 注意：sessions中的标题属性是name，而不是title
-                      : session
-                  )
-                );
-                
-                // 如果更新的是当前活跃会话，立即刷新会话列表
-                if (updatedSessionId === currentSessionId) {
-                  refreshSessions().catch(error => {
-                    console.error('刷新会话列表失败:', error);
-                  });
-                }
-              }
-              continue;
-            }
-            
-            // 处理消息状态更新
-            else if (data.status) {
-              if (data.status === 'sent') {
-                // 后端确认消息已发送
-                setMessages(prev => {
-                  return prev.map(msg => 
-                    msg.id === userMessageId
-                      ? { ...msg, status: MessageStatus.SENT }
-                      : msg
-                  );
-                });
-              } else if (data.status === 'read') {
-                // 后端确认消息已读（已传递给LLM）
-                
-                // 更新用户消息为已读状态
-                setMessages(prev => {
-                  return prev.map(msg => 
-                    msg.id === userMessageId
-                      ? { ...msg, status: MessageStatus.READ }
-                      : msg
-                  );
-                });
-                
-                // 在用户消息状态为已读后，添加机器人加载消息
-                if (!loadingId) {
-                  loadingId = addLoadingMessage();
-                }
-              } else if (data.status === 'error') {
-                // 处理错误状态
-                console.error('消息处理错误:', data.error);
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === userMessageId
-                      ? { ...msg, status: MessageStatus.ERROR }
-                      : msg
-                  )
-                );
-                setConnectionStatus(ConnectionStatus.ERROR);
-                setConnectionError(data.error || '发送消息失败');
-              }
-              continue;
-            }
-            
-            // 检查是否已经添加了加载消息
-            if (!loadingId) {
-              loadingId = addLoadingMessage();
-            }
-            
-            // 处理后端返回的AI消息ID
-            if (data.message_id && !aiMessageId) {
-              aiMessageId = data.message_id;
-              
-              // 立即更新loading消息的ID为后端返回的ID
-              if (loadingId) {
-                setMessages(prev => 
-                  prev.map(msg => {
-                    if (msg.id === loadingId && aiMessageId) {
-                      return { ...msg, id: aiMessageId };
-                    }
-                    return msg;
-                  })
-                );
-                if (aiMessageId) {
-                  loadingId = aiMessageId; // 更新loadingId
-                }
-              }
-            }
-            
-            // 如果是第一次收到响应，标记为已收到
-            if (!firstResponseReceived && data.keyword) {
-              firstResponseReceived = true
-              // 播放Live2D动作已移除，因为tap_body动作不存在
-            }
-            
-            // 处理关键词
-            if (data.keyword && data.keyword !== currentKeyword) {
-              currentKeyword = data.keyword
-              
-              // 根据关键词播放对应的Live2D动作
-              // 表情关键词只在回复开始时发送一次
-              playMotion(currentKeyword)
-            }
-            
-            // 处理文本和音频（新的组合格式）
-            if (data.text && loadingId) {
-              // 后端现在发送配对的文本和音频数据，确保同步
-              currentText += data.text // 累加文本
-              
-              // 更新消息，保持原始格式，包括换行符
-              setMessages(prev => 
-                prev.map(msg => 
-                  msg.id === loadingId 
-                    ? { ...msg, text: currentText, isLoading: false, streaming: true } 
-                    : msg
-                )
-              )
-              
-              // 如果同时收到了音频数据，处理音频
-              if (data.audio) {
-                audioCount++
-                processAudioData(data.audio, audioCount)
-              }
-            }
-          } catch (e) {
-            // 处理解析错误
-          }
-        }
+        processLine(line);
       }
     }
   }, [addLoadingMessage, processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId])
