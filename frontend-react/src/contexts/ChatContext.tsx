@@ -520,6 +520,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         if (nextItem.audio) {
           audioCount++;
           console.log(`处理音频 #${audioCount}, 等待播放完成...`);
+          
           // 确保等待音频真正播放完成
           const audioResult = await processAudioData(nextItem.audio, audioCount);
           console.log(`音频 #${audioCount} 播放完成, 结果: ${audioResult}`);

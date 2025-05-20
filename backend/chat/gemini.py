@@ -82,7 +82,6 @@ class GeminiClient(LLMClientBase):
             # 使用 map_role 函数转换角色名称
             mapped_role = self.map_role(msg.role)
             contents.append({"role": mapped_role, "parts": parts})
-        print(contents)
 
         try:
             response = self.client.models.generate_content(

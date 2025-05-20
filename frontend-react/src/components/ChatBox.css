@@ -161,4 +161,8 @@
     border-color: rgba(255, 255, 255, 0.2);
     border-top-color: var(--primary-color, #4a90e2);
   }
+}
+
+.chatbox > *:last-child {
+  margin-bottom: 20px;
 } 
