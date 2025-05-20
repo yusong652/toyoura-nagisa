@@ -41,7 +41,6 @@ export enum ConnectionStatus {
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
-  loadingMessageId: string | null;
   sessions: ChatSession[];
   currentSessionId: string | null;
   connectionStatus: ConnectionStatus;

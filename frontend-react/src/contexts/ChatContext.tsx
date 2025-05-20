@@ -21,7 +21,6 @@ interface ChatProviderProps {
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CONNECTING)
@@ -409,51 +408,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     return userMessage.id
   }, [])
 
-  // 添加机器人加载消息
-  const addLoadingMessage = useCallback((): string => {
-    // 创建一个加载消息占位符
-    const loadingId = uuidv4()
-    setLoadingMessageId(loadingId)
-    
-    // 添加加载消息到聊天记录
-    const loadingMessage: Message = {
-      id: loadingId,
-      sender: 'bot',
-      text: '',
-      timestamp: Date.now(),
-      isLoading: true // 标记为加载中
-    }
-    
-    setMessages(prev => [...prev, loadingMessage])
-    setIsLoading(true)
-    
-    return loadingId
-  }, [])
-
-  // 更新加载消息为错误状态
-  const updateMessageWithError = useCallback((loadingId: string, error: Error) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === loadingId 
-          ? { ...msg, text: `Error: ${error.message}`, isLoading: false } 
-          : msg
-      )
-    )
-  }, [])
-
-  // 处理音频数据
-  const processAudioData = useCallback((audioData: string, count: number): boolean => {
+  // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
+  const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
     if (typeof audioData !== 'string' || audioData.length === 0) {
       console.warn('收到空的音频数据或格式不正确')
       return false
     }
     
     try {
-      queueAndPlayAudio(audioData)
-      return true
+      console.log(`开始播放音频 #${count}，等待播放完成...`);
+      // 等待音频播放完成后再返回
+      const startTime = Date.now();
+      await queueAndPlayAudio(audioData);
+      const duration = (Date.now() - startTime) / 1000;
+      console.log(`音频 #${count} 已完成播放，耗时: ${duration.toFixed(2)}秒`);
+      return true;
     } catch (error) {
-      console.error('音频处理失败:', error)
-      return false
+      console.error(`音频 #${count} 处理失败:`, error);
+      return false;
     }
   }, [queueAndPlayAudio])
 
@@ -513,8 +485,65 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let currentKeyword: string | null = null
     let audioCount = 0
     let firstResponseReceived = false
-    let loadingId: string | null = null // 新增：存储加载消息的ID
-    let aiMessageId: string | null = null // 新增：存储后端返回的AI消息ID
+    let botMessageId = uuidv4() // 直接生成机器人消息ID
+    let finalAiMessageId: string | null = null // 存储后端返回的最终AI消息ID
+    
+    // 标记是否正在播放音频，用于同步控制
+    let isPlayingAudio = false
+    // 音频队列 - 存储待处理的数据
+    let audioQueue: {text: string, audio?: string}[] = []
+    
+    // 添加一个函数来处理下一个音频，确保顺序播放
+    const processNextAudio = async () => {
+      if (audioQueue.length === 0 || isPlayingAudio) return;
+      
+      isPlayingAudio = true;
+      const nextItem = audioQueue.shift()!;
+      
+      try {
+        // 更新文本
+        currentText += nextItem.text;
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === botMessageId
+              ? { 
+                  ...msg, 
+                  text: currentText, 
+                  streaming: true,
+                  isLoading: false
+                } 
+              : msg
+          )
+        );
+        
+        // 如果有音频，播放并等待完成
+        if (nextItem.audio) {
+          audioCount++;
+          console.log(`处理音频 #${audioCount}, 等待播放完成...`);
+          // 确保等待音频真正播放完成
+          const audioResult = await processAudioData(nextItem.audio, audioCount);
+          console.log(`音频 #${audioCount} 播放完成, 结果: ${audioResult}`);
+        } else {
+          // 如果只有文本没有音频，添加一个短暂停顿
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      } catch (error) {
+        console.error('处理音频或文本时出错:', error);
+      } finally {
+        isPlayingAudio = false;
+        // 继续处理下一个
+        processNextAudio();
+      }
+    };
+    
+    // 直接添加一个机器人消息，初始状态为加载中
+    setMessages(prev => [...prev, {
+      id: botMessageId,
+      sender: 'bot',
+      text: '',
+      timestamp: Date.now(),
+      isLoading: true // 初始显示为加载状态
+    }])
     
     // 处理标题更新事件
     const handleTitleUpdate = (data: any) => {
@@ -553,8 +582,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         });
       } else if (data.status === 'read') {
         // 后端确认消息已读（已传递给LLM）
-        
-        // 更新用户消息为已读状态
         setMessages(prev => {
           return prev.map(msg => 
             msg.id === userMessageId
@@ -562,11 +589,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               : msg
           );
         });
-        
-        // 在用户消息状态为已读后，添加机器人加载消息
-        if (!loadingId) {
-          loadingId = addLoadingMessage();
-        }
+        // 我们已经在开始时添加了机器人消息，不需要在这里再添加
       } else if (data.status === 'error') {
         // 处理错误状态
         console.error('消息处理错误:', data.error);
@@ -584,23 +607,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // 处理AI消息ID
     const handleAiMessageId = (data: any) => {
-      if (data.message_id && !aiMessageId) {
-        aiMessageId = data.message_id;
-        
-        // 立即更新loading消息的ID为后端返回的ID
-        if (loadingId) {
-          setMessages(prev => 
-            prev.map(msg => {
-              if (msg.id === loadingId && aiMessageId) {
-                return { ...msg, id: aiMessageId };
-              }
-              return msg;
-            })
-          );
-          if (aiMessageId) {
-            loadingId = aiMessageId; // 更新loadingId
-          }
-        }
+      if (data.message_id && !finalAiMessageId) {
+        finalAiMessageId = data.message_id;
       }
     };
 
@@ -619,23 +627,23 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // 处理文本和音频内容
     const handleContentUpdate = (data: any) => {
-      if (data.text && loadingId) {
-        // 后端现在发送配对的文本和音频数据，确保同步
-        currentText += data.text; // 累加文本
+      if (data.text) {
+        console.log(`收到新的文本和音频chunk: ${data.text.length}字符${data.audio ? '，有音频' : '，无音频'}`);
         
-        // 更新消息，保持原始格式，包括换行符
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === loadingId 
-              ? { ...msg, text: currentText, isLoading: false, streaming: true } 
-              : msg
-          )
-        );
+        // 将收到的文本和音频添加到队列
+        audioQueue.push({
+          text: data.text,
+          audio: data.audio
+        });
         
-        // 如果同时收到了音频数据，处理音频
-        if (data.audio) {
-          audioCount++;
-          processAudioData(data.audio, audioCount);
+        // 如果当前没有播放，开始处理队列
+        if (!isPlayingAudio) {
+          console.log('当前没有音频播放，开始处理新的chunk');
+          processNextAudio().catch(err => {
+            console.error('处理音频队列时出错:', err);
+          });
+        } else {
+          console.log('当前有音频正在播放，新chunk已加入队列，等待处理');
         }
       }
     };
@@ -669,10 +677,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             return;
           }
           
-          // 检查是否已经添加了加载消息
-          if (!loadingId) {
-            loadingId = addLoadingMessage();
-          }
+          // 不再需要检查或添加loadingId，因为我们在开始时就已经添加了机器人消息
           
           // 处理后端返回的AI消息ID
           handleAiMessageId(data);
@@ -694,24 +699,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        if (loadingId) {
-          // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
-          setMessages(prev => 
-            prev.map(msg => {
-              if (msg.id === loadingId) {
-                return { 
-                  ...msg, 
-                  text: currentText, 
-                  isLoading: false, 
-                  streaming: false,
-                  // 确保ID永远是字符串，如果没有后端ID就使用原来的ID
-                  id: aiMessageId || msg.id 
-                };
-              }
-              return msg;
-            })
-          );
+        // 等待所有音频播放完成
+        while (audioQueue.length > 0 || isPlayingAudio) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
+        
+        // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
+        setMessages(prev => 
+          prev.map(msg => {
+            if (msg.id === botMessageId) {
+              return { 
+                ...msg, 
+                text: currentText, 
+                isLoading: false,
+                streaming: false,
+                // 确保ID永远是字符串，如果没有后端ID就使用原来的ID
+                id: finalAiMessageId || botMessageId
+              };
+            }
+            return msg;
+          })
+        );
         
         // 刷新会话列表以更新最新状态
         refreshSessions();
@@ -727,7 +735,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [addLoadingMessage, processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId])
+  }, [processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -738,9 +746,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const canConnect = await checkConnection();
       if (!canConnect) {
         setMessages(prev => {
-          const lastMessage = prev[prev.length -1];
-          if (lastMessage && lastMessage.isLoading) {
-            return prev.map(msg => msg.id === lastMessage.id ? { ...msg, text: `错误: 无法连接到服务器。请检查网络连接或稍后重试。`, isLoading: false } : msg)
+          // 找到最后一条机器人消息，如果是加载状态的话，更新它为错误消息
+          const botMessages = prev.filter(msg => msg.sender === 'bot' && msg.isLoading);
+          if (botMessages.length > 0) {
+            const lastBotMessage = botMessages[botMessages.length - 1];
+            return prev.map(msg => 
+              msg.id === lastBotMessage.id 
+                ? { ...msg, text: `错误: 无法连接到服务器。请检查网络连接或稍后重试。`, isLoading: false } 
+                : msg
+            );
           }
           return prev;
         });
@@ -758,7 +772,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // 创建并发送API请求
       const response = await createChatRequest(text, files, userMessageId)
       
-      // 处理流式响应 - 不再立即添加loading消息，而是在statusRead事件中添加
+      // 处理流式响应
       await processStreamResponse(response, userMessageId)
     } catch (error) {
       console.error('Error sending message:', error)
@@ -776,7 +790,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setConnectionError(errorMsg);
     } finally {
       setIsLoading(false)
-      setLoadingMessageId(null)
     }
   }, [
     addUserMessage, 
@@ -791,14 +804,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   const clearChat = useCallback(() => {
     setMessages([])
-    setLoadingMessageId(null)
   }, [])
 
   return (
     <ChatContext.Provider value={{ 
       messages, 
       isLoading, 
-      loadingMessageId, 
       sessions, 
       currentSessionId,
       connectionStatus,

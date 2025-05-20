@@ -1,8 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
 import { startLipSync, stopLipSync } from '../utils/live2d'
 
+// 定义音频队列项的接口
+interface AudioQueueItem {
+  data: string;
+  onComplete: (value: void | PromiseLike<void>) => void;
+}
+
 interface AudioContextType {
-  queueAndPlayAudio: (audioBase64: string) => void
+  queueAndPlayAudio: (audioBase64: string) => Promise<void>
   resetAudioState: () => Promise<void>
 }
 
@@ -25,12 +31,12 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
   const audioContextRef = useRef<AudioContext | null>(null)
   const [currentSource, setCurrentSource] = useState<AudioBufferSourceNode | null>(null)
   const [currentAnalyser, setCurrentAnalyser] = useState<AnalyserNode | null>(null)
-  const [audioQueue, setAudioQueue] = useState<string[]>([])
+  const [audioQueue, setAudioQueue] = useState<AudioQueueItem[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentAudioPromise, setCurrentAudioPromise] = useState<Promise<void> | null>(null)
   const [audioContextInitialized, setAudioContextInitialized] = useState(false)
   // 添加一个ref来跟踪队列状态，避免闭包问题
-  const audioQueueRef = useRef<string[]>([])
+  const audioQueueRef = useRef<AudioQueueItem[]>([])
   const isPlayingRef = useRef<boolean>(false)
   // 添加一个ref来跟踪是否应该停止当前音频
   const shouldStopCurrentAudioRef = useRef<boolean>(false)
@@ -155,18 +161,6 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
     // 重置标记
     shouldStopCurrentAudioRef.current = false;
   }, [currentSource, currentAnalyser])
-
-  // 重置音频状态
-  const resetAudioState = useCallback(async () => {
-    console.log('重置音频状态')
-    setAudioQueue([])
-    audioQueueRef.current = [];
-    await stopCurrentAudio()
-    setIsPlaying(false)
-    isPlayingRef.current = false;
-    setCurrentAudioPromise(null)
-    console.log('音频状态已重置')
-  }, [stopCurrentAudio])
 
   // 播放单个音频
   const playAudioWithLipSync = useCallback((audioBase64: string): Promise<void> => {
@@ -321,7 +315,7 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
     setIsPlaying(true)
     isPlayingRef.current = true;
     
-    const audioData = audioQueueRef.current[0]
+    const audioItem = audioQueueRef.current[0]
     console.log('从队列中取出第一个音频数据，剩余:', audioQueueRef.current.length - 1)
     
     // 更新队列状态
@@ -336,11 +330,16 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
       
       // 创建新的音频播放 Promise
       console.log('开始播放音频')
-      const newAudioPromise = playAudioWithLipSync(audioData)
+      const newAudioPromise = playAudioWithLipSync(audioItem.data)
       setCurrentAudioPromise(newAudioPromise)
       await newAudioPromise
+      
+      // 音频播放完成，调用完成回调
+      audioItem.onComplete();
     } catch (error) {
       console.error('播放音频出错:', error)
+      // 即使出错也调用完成回调，避免阻塞
+      audioItem.onComplete();
     } finally {
       setIsPlaying(false)
       isPlayingRef.current = false;
@@ -353,38 +352,66 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
         }
       }, 100)
     }
-  }, [stopCurrentAudio, playAudioWithLipSync, getAudioContext])
+  }, [getAudioContext, playAudioWithLipSync])
+
+  // 重置音频状态
+  const resetAudioState = useCallback(async () => {
+    console.log('重置音频状态')
+    
+    // 取消队列中所有音频的Promise
+    audioQueueRef.current.forEach(item => {
+      if (item.onComplete) {
+        item.onComplete(); // 调用所有等待中音频的完成回调
+      }
+    });
+    
+    setAudioQueue([])
+    audioQueueRef.current = [];
+    await stopCurrentAudio()
+    setIsPlaying(false)
+    isPlayingRef.current = false;
+    setCurrentAudioPromise(null)
+    console.log('音频状态已重置')
+  }, [stopCurrentAudio])
 
   // 添加音频到队列并开始播放
-  const queueAndPlayAudio = useCallback((audioData: string) => {
+  const queueAndPlayAudio = useCallback((audioData: string): Promise<void> => {
     console.log('添加音频到队列，当前队列长度:', audioQueueRef.current.length, '是否正在播放:', isPlayingRef.current)
     
     if (!audioData || audioData.length === 0) {
       console.warn('收到空的音频数据，跳过')
-      return
+      return Promise.resolve()
     }
     
-    // 直接使用函数式更新确保状态正确更新
-    setAudioQueue(prev => {
-      const newQueue = [...prev, audioData]
-      console.log('更新后的队列长度:', newQueue.length)
-      audioQueueRef.current = newQueue
-      return newQueue
-    })
-    
-    // 如果当前没有播放，则开始播放
-    if (!isPlayingRef.current) {
-      console.log('当前没有播放中的音频，开始播放队列')
-      // 使用setTimeout确保状态更新后再调用
-      setTimeout(() => {
-        console.log('开始播放队列中的音频，当前队列长度:', audioQueueRef.current.length)
-        if (audioQueueRef.current.length > 0) {
-          playNextAudio().catch(err => console.error('播放音频失败:', err))
-        }
-      }, 50)
-    } else {
-      console.log('当前有音频正在播放，新音频已加入队列')
-    }
+    return new Promise<void>((resolve) => {
+      // 创建一个标识，记录当前添加的音频在队列中的位置
+      const currentQueueLength = audioQueueRef.current.length;
+      
+      // 直接使用函数式更新确保状态正确更新
+      setAudioQueue(prev => {
+        const newQueue = [...prev, {
+          data: audioData,
+          onComplete: resolve // 存储resolve回调，音频播放完成时调用
+        }]
+        console.log('更新后的队列长度:', newQueue.length)
+        audioQueueRef.current = newQueue
+        return newQueue
+      })
+      
+      // 如果当前没有播放，则开始播放
+      if (!isPlayingRef.current) {
+        console.log('当前没有播放中的音频，开始播放队列')
+        // 使用setTimeout确保状态更新后再调用
+        setTimeout(() => {
+          console.log('开始播放队列中的音频，当前队列长度:', audioQueueRef.current.length)
+          if (audioQueueRef.current.length > 0) {
+            playNextAudio().catch(err => console.error('播放音频失败:', err))
+          }
+        }, 50)
+      } else {
+        console.log('当前有音频正在播放，新音频已加入队列')
+      }
+    });
   }, [playNextAudio])
 
   return (
