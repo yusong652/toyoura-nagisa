@@ -174,7 +174,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           })
         }
         return {
-          id: uuidv4(),
+          id: msg.id || uuidv4(),
           sender,
           text,
           files: files.length > 0 ? files : undefined,
@@ -489,34 +489,37 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     let finalAiMessageId: string | null = null // 存储后端返回的最终AI消息ID
     
     // 标记是否正在播放音频，用于同步控制
-    let isPlayingAudio = false
+    let isProcessingChunk = false
     // 音频队列 - 存储待处理的数据
-    let audioQueue: {text: string, audio?: string}[] = []
+    let chunkQueue: {text: string, audio?: string}[] = []
     
-    // 添加一个函数来处理下一个音频，确保顺序播放
-    const processNextAudio = async () => {
-      if (audioQueue.length === 0 || isPlayingAudio) return;
+    // 添加一个函数来处理下一个文字+音频chunk，确保顺序播放
+    const processNextChunk = async () => {
+      if (chunkQueue.length === 0 || isProcessingChunk) return;
       
-      isPlayingAudio = true;
-      const nextItem = audioQueue.shift()!;
+      isProcessingChunk = true;
+      const nextItem = chunkQueue.shift()!;
       
       try {
-        // 更新文本
-        currentText += nextItem.text;
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === botMessageId
-              ? { 
+        // 1. 先更新文本
+        if (nextItem.text) {
+          currentText += nextItem.text;
+          setMessages(prev => 
+            prev.map(msg => {
+              if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
+                return { 
                   ...msg, 
                   text: currentText, 
                   streaming: true,
                   isLoading: false
-                } 
-              : msg
-          )
-        );
+                };
+              }
+              return msg;
+            })
+          );
+        }
         
-        // 如果有音频，播放并等待完成
+        // 2. 如果有音频，播放并等待完成
         if (nextItem.audio) {
           audioCount++;
           console.log(`处理音频 #${audioCount}, 等待播放完成...`);
@@ -526,14 +529,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           console.log(`音频 #${audioCount} 播放完成, 结果: ${audioResult}`);
         } else {
           // 如果只有文本没有音频，添加一个短暂停顿
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
       } catch (error) {
-        console.error('处理音频或文本时出错:', error);
+        console.error('处理chunk时出错:', error);
       } finally {
-        isPlayingAudio = false;
+        isProcessingChunk = false;
         // 继续处理下一个
-        processNextAudio();
+        processNextChunk();
       }
     };
     
@@ -556,7 +559,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         setSessions(prevSessions => 
           prevSessions.map(session => 
             session.id === updatedSessionId 
-              ? { ...session, name: newTitle } // 注意：sessions中的标题属性是name，而不是title
+              ? { ...session, name: newTitle }
               : session
           )
         );
@@ -590,7 +593,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               : msg
           );
         });
-        // 我们已经在开始时添加了机器人消息，不需要在这里再添加
       } else if (data.status === 'error') {
         // 处理错误状态
         console.error('消息处理错误:', data.error);
@@ -610,6 +612,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const handleAiMessageId = (data: any) => {
       if (data.message_id && !finalAiMessageId) {
         finalAiMessageId = data.message_id;
+        // Immediately update the message ID to match the backend
+        console.log(`Updating bot message ID from ${botMessageId} to ${finalAiMessageId}`);
+        setMessages(prev => 
+          prev.map(msg => {
+            if (msg.id === botMessageId) {
+              return { ...msg, id: finalAiMessageId! };
+            }
+            return msg;
+          })
+        );
       }
     };
 
@@ -619,7 +631,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         currentKeyword = data.keyword;
         
         // 根据关键词播放对应的Live2D动作
-        // 表情关键词只在回复开始时发送一次
         if (currentKeyword) {
           playMotion(currentKeyword);
         }
@@ -631,20 +642,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       if (data.text) {
         console.log(`收到新的文本和音频chunk: ${data.text.length}字符${data.audio ? '，有音频' : '，无音频'}`);
         
-        // 将收到的文本和音频添加到队列
-        audioQueue.push({
+        // 将文本和音频作为一个完整的chunk添加到队列
+        chunkQueue.push({
           text: data.text,
           audio: data.audio
         });
         
-        // 如果当前没有播放，开始处理队列
-        if (!isPlayingAudio) {
-          console.log('当前没有音频播放，开始处理新的chunk');
-          processNextAudio().catch(err => {
-            console.error('处理音频队列时出错:', err);
+        // 如果当前没有处理中的chunk，开始处理队列
+        if (!isProcessingChunk) {
+          console.log('当前没有正在处理的chunk，开始处理新的chunk');
+          processNextChunk().catch(err => {
+            console.error('处理chunk队列时出错:', err);
           });
         } else {
-          console.log('当前有音频正在播放，新chunk已加入队列，等待处理');
+          console.log('当前有chunk正在处理，新chunk已加入队列，等待处理');
         }
       }
     };
@@ -678,8 +689,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             return;
           }
           
-          // 不再需要检查或添加loadingId，因为我们在开始时就已经添加了机器人消息
-          
           // 处理后端返回的AI消息ID
           handleAiMessageId(data);
           
@@ -692,7 +701,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           // 处理文本和音频
           handleContentUpdate(data);
         } catch (e) {
-          // 处理解析错误
+          console.error('解析响应数据时出错:', e);
         }
       }
     };
@@ -700,21 +709,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        // 等待所有音频播放完成
-        while (audioQueue.length > 0 || isPlayingAudio) {
+        // 等待所有chunk处理完成
+        while (chunkQueue.length > 0 || isProcessingChunk) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // 响应结束后，更新消息为最终状态，并使用后端返回的ID（如果有）
+        // 响应结束后，更新消息为最终状态
         setMessages(prev => 
           prev.map(msg => {
-            if (msg.id === botMessageId) {
+            // Check either the original botMessageId or the finalAiMessageId that may have been set
+            if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
               return { 
                 ...msg, 
-                text: currentText, 
+                text: currentText || '(空白消息)', // 防止空消息
                 isLoading: false,
                 streaming: false,
-                // 确保ID永远是字符串，如果没有后端ID就使用原来的ID
+                // Make sure to keep using the backend ID
                 id: finalAiMessageId || botMessageId
               };
             }
