@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_history_session, delete_message
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_history_session, delete_message, update_session_title
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
@@ -74,6 +74,10 @@ class DeleteSessionRequest(BaseModel):
 class DeleteMessageRequest(BaseModel):
     session_id: str
     message_id: str
+
+# 添加新的请求模型用于标题生成
+class GenerateTitleRequest(BaseModel):
+    session_id: str
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -327,7 +331,6 @@ async def chat_stream_endpoint(request: Request):
                     
                     if new_title:
                         # 更新会话标题
-                        from backend.chat.utils import update_session_title
                         update_success = update_session_title(session_id, new_title)
                         
                         if update_success:
@@ -380,3 +383,90 @@ async def delete_message_endpoint(request: DeleteMessageRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除消息失败: {str(e)}")
+
+@app.post("/api/history/generate-title", response_model=dict)
+async def generate_title_endpoint(request: Request):
+    """根据会话历史生成一个新的标题"""
+    try:
+        # 从请求体中获取会话ID
+        data = await request.json()
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            raise HTTPException(status_code=400, detail="请求中未提供会话ID")
+            
+        # 验证会话ID是否存在
+        sessions = get_all_sessions()
+        session = next((s for s in sessions if s['id'] == session_id), None)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
+        
+        # 加载指定会话的历史记录
+        history = load_history(session_id)
+        
+        # 确保有足够的消息来生成标题（至少一个用户消息和一个AI响应）
+        if len(history) < 2:
+            raise HTTPException(status_code=400, detail="会话中的消息数量不足，无法生成标题")
+        
+        # 获取最新的用户消息和助手回复
+        last_user_msg = None
+        last_assistant_msg = None
+        
+        # 从后向前遍历，找到最新的消息
+        for msg in reversed(history):
+            if not last_assistant_msg and msg['role'] == 'assistant':
+                last_assistant_msg = msg
+            elif not last_user_msg and msg['role'] == 'user':
+                last_user_msg = msg
+            
+            # 如果两种消息都找到了，就可以退出循环
+            if last_user_msg and last_assistant_msg:
+                break
+        
+        if not last_user_msg or not last_assistant_msg:
+            raise HTTPException(status_code=400, detail="无法找到有效的用户消息和助手回复")
+        
+        # 提取文本内容
+        last_user_text = ""
+        last_assistant_text = ""
+        
+        # 处理不同格式的内容
+        if isinstance(last_user_msg['content'], str):
+            last_user_text = last_user_msg['content']
+        elif isinstance(last_user_msg['content'], list):
+            for item in last_user_msg['content']:
+                if isinstance(item, dict) and "text" in item:
+                    last_user_text = item["text"]
+                    break
+        
+        if isinstance(last_assistant_msg['content'], str):
+            last_assistant_text = last_assistant_msg['content']
+            
+        # 生成标题 - 从app state中获取llm_client
+        llm_client: LLMClientBase = request.app.state.llm_client
+        new_title = await generate_conversation_title(
+            last_user_text,
+            last_assistant_text,
+            llm_client
+        )
+        
+        if not new_title:
+            raise HTTPException(status_code=500, detail="标题生成失败")
+        
+        # 更新会话标题
+        update_success = update_session_title(session_id, new_title)
+        
+        if not update_success:
+            raise HTTPException(status_code=500, detail="标题更新失败")
+        
+        return {
+            "session_id": session_id,
+            "title": new_title,
+            "success": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"生成标题失败: {str(e)}")

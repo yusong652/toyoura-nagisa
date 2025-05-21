@@ -1,4 +1,5 @@
 import os
+import re
 import httpx
 from typing import List, Tuple, Optional, Dict, Any
 from google import genai
@@ -99,3 +100,90 @@ class GeminiClient(LLMClientBase):
         except Exception as e:
             print(f"Gemini API error: {e}")
             raise RuntimeError(f"Failed to get response from Gemini: {str(e)}")
+
+    async def generate_title_from_messages(
+        self,
+        first_user_message_content: str,
+        first_assistant_message_content: str,
+        title_generation_system_prompt: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        根据对话的第一轮消息生成一个简洁的对话标题。
+        为Gemini API定制的实现。
+
+        Args:
+            first_user_message_content: 用户的第一条消息内容
+            first_assistant_message_content: AI助手对第一条消息的回复内容
+            title_generation_system_prompt: 用于生成标题的特定system prompt
+
+        Returns:
+            生成的对话标题，如果生成失败则返回None
+        """
+        try:
+            # 使用提供的system prompt或默认值
+            system_prompt = title_generation_system_prompt or "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，并且除了这些标签和标题本身外，不要输出任何其他内容。"
+            
+            # 构造user prompt
+            user_prompt = f"""以下是对话内容，请为这个对话生成一个简洁的标题：
+
+{first_user_message_content}
+
+{first_assistant_message_content}
+
+请生成一个5-15个字的标题，并将标题放在<title></title>标签中。
+你的回复应该只包含这对标签和标题内容，不要包含任何其他文字。
+
+例如，回复应该是这样的格式：<title>这是一个标题示例</title>"""
+
+            # 准备请求参数
+            title_config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.5,  # 使用较低的温度以获得更确定性的标题
+                max_output_tokens=100  # 标题生成不需要太多token
+            )
+            
+            # 构造消息
+            contents = [{
+                "role": "user",
+                "parts": [{"text": user_prompt}]
+            }]
+            
+            # 调用API
+            response = self.client.models.generate_content(
+                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
+                contents=contents,
+                config=title_config
+            )
+            
+            # 处理响应
+            if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
+                title_response_text = response.candidates[0].content.parts[0].text
+                
+                # 从回复中提取标题
+                title_match = re.search(r'<title>(.*?)</title>', title_response_text, re.DOTALL)
+                
+                if title_match:
+                    # 提取并清理标题
+                    title = title_match.group(1).strip()
+                    
+                    # 确保标题长度合理
+                    if not title:
+                        return None
+                        
+                    if len(title) > 30:
+                        title = title[:30]
+                        
+                    return title
+                else:
+                    # 如果没有找到标签，尝试直接使用整个回复作为标题（备选方案）
+                    cleaned_title = title_response_text.strip().strip('"\'').strip()
+                    # 确保标题不超过合理长度
+                    if cleaned_title and len(cleaned_title) <= 30:
+                        return cleaned_title
+                    return None
+            else:
+                return None
+                
+        except Exception as e:
+            print(f"Gemini生成标题时出错: {str(e)}")
+            return None
