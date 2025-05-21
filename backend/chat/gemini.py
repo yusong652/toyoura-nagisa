@@ -138,8 +138,8 @@ class GeminiClient(LLMClientBase):
             # 准备请求参数
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
-                temperature=0.5,  # 使用较低的温度以获得更确定性的标题
-                max_output_tokens=100  # 标题生成不需要太多token
+                temperature=2.0,  # A higher temperature for more creative titles
+                max_output_tokens=100  # No need for a large number of tokens
             )
             
             # 构造消息

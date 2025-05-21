@@ -168,7 +168,7 @@ class GPTClient(LLMClientBase):
             payload = {
                 "model": self.extra_config.get("model", "gpt-4.1-mini"),
                 "messages": messages_for_llm,
-                "temperature": 0.5  # 对标题生成使用较低的温度
+                "temperature": 2.0  # A higher temperature for more creative titles
             }
             
             # 调用API
