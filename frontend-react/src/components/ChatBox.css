@@ -18,6 +18,7 @@
   margin-bottom: 12px;
   width: 100%;
   animation: fadeIn 0.5s ease-in-out forwards;
+  position: relative; /* 添加相对定位 */
 }
 
 @keyframes fadeIn {
@@ -35,6 +36,10 @@
   font-weight: 600;
   color: var(--text-color);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .chatbox {
@@ -182,4 +187,53 @@
 
 .chatbox > *:last-child {
   margin-bottom: 20px;
+}
+
+/* 刷新标题按钮样式 */
+.refresh-title-button {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.refresh-title-button:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.refresh-title-button.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.refresh-title-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.refresh-title-button.loading {
+  animation: button-spin 1s linear infinite;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes button-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 } 
