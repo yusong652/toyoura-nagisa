@@ -217,7 +217,7 @@ async def chat_stream_endpoint(request: Request):
     )
     # 在保存到历史记录时使用前端提供的ID (如果有)
     if message_id:
-        user_msg_dict = user_msg.dict()
+        user_msg_dict = user_msg.model_dump()
         user_msg_dict["id"] = message_id
         history_msgs.append(Message(**user_msg_dict))
     else:
