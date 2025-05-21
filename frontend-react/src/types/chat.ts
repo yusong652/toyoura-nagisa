@@ -56,4 +56,5 @@ export interface ChatContextType extends ChatState {
   deleteMessage: (messageId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
   checkConnection: () => Promise<boolean>;
+  refreshTitle: (sessionId: string) => Promise<void>;
 } 

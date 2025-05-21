@@ -820,6 +820,44 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages([])
   }, [])
 
+  // 添加刷新标题方法
+  const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
+    try {
+      if (!sessionId) {
+        throw new Error('会话ID不能为空');
+      }
+
+      const response = await fetch('/api/history/generate-title', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // 如果成功生成了新标题，更新会话列表
+      if (data.success && data.title) {
+        // 更新本地状态中的会话标题
+        setSessions(prevSessions => 
+          prevSessions.map(session => 
+            session.id === sessionId 
+              ? { ...session, name: data.title }
+              : session
+          )
+        );
+      }
+    } catch (error) {
+      console.error('刷新标题失败:', error);
+      throw error;
+    }
+  }, []);
+
   return (
     <ChatContext.Provider value={{ 
       messages, 
@@ -835,7 +873,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       deleteSession, 
       deleteMessage,
       refreshSessions,
-      checkConnection
+      checkConnection,
+      refreshTitle
     }}>
       {children}
     </ChatContext.Provider>

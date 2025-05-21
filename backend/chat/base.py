@@ -40,6 +40,28 @@ class LLMClientBase(ABC):
         """
         pass
 
+    @abstractmethod
+    async def generate_title_from_messages(
+        self,
+        first_user_message_content: str,
+        first_assistant_message_content: str,
+        title_generation_system_prompt: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        根据对话的第一轮消息生成一个简洁的对话标题。
+        不同的LLM客户端会有不同的实现方式，以适应各自API的特点。
+
+        Args:
+            first_user_message_content: 用户的第一条消息内容
+            first_assistant_message_content: AI助手对第一条消息的回复内容
+            title_generation_system_prompt: 用于生成标题的特定system prompt，
+                                           如果不提供则使用客户端默认的system prompt
+
+        Returns:
+            生成的对话标题，如果生成失败则返回None
+        """
+        pass
+
     def set_system_prompt(self, prompt: str):
         """动态设置/更新 system prompt。"""
         self.system_prompt = prompt
