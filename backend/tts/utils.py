@@ -2,6 +2,7 @@
 
 import re
 import emoji # 需要 pip install emoji
+from backend.config import get_tts_config
 
 # 预编译一些可能用到的、比较安全的正则表达式
 # 匹配括号及内部2-15个非括号字符 (尝试匹配简单颜文字如 (^_^) )
@@ -11,12 +12,10 @@ KEYWORD_MARKER_PATTERN = re.compile(r'\[\[\w+\]\]\s*$')
 # 匹配连续的空白字符
 WHITESPACE_PATTERN = re.compile(r'\s+')
 
-# 默认的分割尺寸
-DEFAULT_SPLIT_SIZE = 4
-# 更新默认标点符号列表，与 chat/utils.py 保持一致
-DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'] 
-# 默认的标点符号数量限制
-DEFAULT_PUNCTUATION_LIMIT = 8
+# 从配置文件获取默认值
+TTS_CONFIG = get_tts_config()
+DEFAULT_SPLIT_PUNCTUATIONS = TTS_CONFIG.get("split_punctuations", ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'])
+DEFAULT_PUNCTUATION_LIMIT = int(TTS_CONFIG.get("split_size", 4))
 
 def clean_text_for_tts(text: str) -> str:
     """
@@ -55,19 +54,25 @@ def clean_text_for_tts(text: str) -> str:
 # cleaned_text = clean_text_for_tts_revised(text_from_frontend)
 # call_actual_tts_engine(cleaned_text)
 
-def split_text_by_punctuations(text: str, punctuations: list[str] = DEFAULT_SPLIT_PUNCTUATIONS, punctuation_limit: int = DEFAULT_PUNCTUATION_LIMIT) -> list[str]:
+def split_text_by_punctuations(text: str, punctuations: list[str] = None, punctuation_limit: int = None) -> list[str]:
     """
     根据标点符号将文本分割成多个段落。
     使用正则表达式实现，更高效且能处理更多边界情况。
 
     Args:
         text: 要分割的文本
-        punctuations: 用作分割的标点符号列表
-        punctuation_limit: 每多少个标点符号分割一次（对应之前的 group_size）
+        punctuations: 用作分割的标点符号列表，默认使用配置文件中的值
+        punctuation_limit: 每多少个标点符号分割一次，默认使用配置文件中的值
 
     Returns:
         分割后的文本列表
     """
+    # 使用配置文件中的默认值
+    if punctuations is None:
+        punctuations = DEFAULT_SPLIT_PUNCTUATIONS
+    if punctuation_limit is None:
+        punctuation_limit = DEFAULT_PUNCTUATION_LIMIT
+        
     if not text or not punctuations or punctuation_limit <= 0:
         return [text] if text else []
 
