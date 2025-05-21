@@ -13,45 +13,6 @@ HISTORY_FILE = "chat/data/chat_history.json"
 HISTORY_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
 
-# 默认的分割句读点
-DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—']
-# 默认的标点符号数量限制
-DEFAULT_PUNCTUATION_LIMIT = 8
-
-def split_text_by_punctuations(text: str, punctuations: List[str] = DEFAULT_SPLIT_PUNCTUATIONS, punctuation_limit: int = DEFAULT_PUNCTUATION_LIMIT) -> List[str]:
-    """
-    按标点符号分割文本，每N个标点符号为一组
-    
-    Args:
-        text: 要分割的文本
-        punctuations: 用于分割的标点符号列表
-        punctuation_limit: 每组包含的标点符号数量限制
-        
-    Returns:
-        分割后的文本列表
-    """
-    if not text:
-        return []
-        
-    sentences = []
-    current_sentence = ""
-    punctuation_count = 0
-    
-    for char in text:
-        current_sentence += char
-        if char in punctuations:
-            punctuation_count += 1
-            if punctuation_count >= punctuation_limit:
-                sentences.append(current_sentence)
-                current_sentence = ""
-                punctuation_count = 0
-            
-    # 添加最后一个句子（如果有）
-    if current_sentence:
-        sentences.append(current_sentence)
-        
-    return sentences
-
 def backup_history() -> str:
     """
     备份当前的历史记录文件

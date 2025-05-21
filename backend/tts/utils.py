@@ -13,8 +13,10 @@ WHITESPACE_PATTERN = re.compile(r'\s+')
 
 # 默认的分割尺寸
 DEFAULT_SPLIT_SIZE = 4
-# 默认的分割句读点
-DEFAULT_SPLIT_PUNCTUATIONS = ['，', '。', ',', '~', '～', '*', '！', '？', '、', '!', '?', '…', '—', '：', '；', '...', '..'] # もっと色々追加してもOK！
+# 更新默认标点符号列表，与 chat/utils.py 保持一致
+DEFAULT_SPLIT_PUNCTUATIONS = ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'] 
+# 默认的标点符号数量限制
+DEFAULT_PUNCTUATION_LIMIT = 8
 
 def clean_text_for_tts(text: str) -> str:
     """
@@ -53,54 +55,54 @@ def clean_text_for_tts(text: str) -> str:
 # cleaned_text = clean_text_for_tts_revised(text_from_frontend)
 # call_actual_tts_engine(cleaned_text)
 
-def split_text_by_punctuations(text: str, group_size: int = DEFAULT_SPLIT_SIZE, punctuations: list[str] = DEFAULT_SPLIT_PUNCTUATIONS) -> list[str]:
+def split_text_by_punctuations(text: str, punctuations: list[str] = DEFAULT_SPLIT_PUNCTUATIONS, punctuation_limit: int = DEFAULT_PUNCTUATION_LIMIT) -> list[str]:
     """
-    テキストを指定された句読点の出現回数に基づいて分割する関数。
+    根据标点符号将文本分割成多个段落。
+    使用正则表达式实现，更高效且能处理更多边界情况。
 
     Args:
-        text: 分割対象のテキスト。
-        group_size: 何個の句読点が出現したら区切るかのサイズ。
-        punctuations: 区切り文字として認識する句読点のリスト (例: ['，', '。', ',', '~'])。
+        text: 要分割的文本
+        punctuations: 用作分割的标点符号列表
+        punctuation_limit: 每多少个标点符号分割一次（对应之前的 group_size）
+
     Returns:
-        分割されたテキストのリスト。
+        分割后的文本列表
     """
-    if not text or not punctuations or group_size <= 0:
+    if not text or not punctuations or punctuation_limit <= 0:
         return [text] if text else []
 
-    # 句読点を正規表現で扱えるようにエスケープし、OR条件で結合する
-    # 例: '，|。|,'
+    # 构建标点符号的正则表达式模式
     punctuation_pattern = '|'.join(re.escape(p) for p in punctuations)
     
-    # 正規表現で、句読点を含む区切り位置を見つける
-    # (句読点の直後までを一つの区切りと見なす)
-    # (.*? (?:句読点パターン|$)) を group_size 回繰り返す感じのイメージだけど、
-    # もう少し賢くやる必要があるね。
+    # 使用正则表达式查找所有标点符号的位置
+    matches = list(re.finditer(f'[{punctuation_pattern}]', text))
+    
+    if not matches:
+        return [text]
 
     segments = []
-    current_segment = ""
-    punctuation_count = 0
+    start_pos = 0
     
-    # 一文字ずつ見ていく方法（もっと効率的な方法もあるかも！）
-    temp_buffer = "" # 句読点までを一時的に保持するバッファ
-    for char in text:
-        temp_buffer += char
-        if char in punctuations:
-            punctuation_count += 1
+    # 每 punctuation_limit 个标点符号分割一次
+    for i in range(0, len(matches), punctuation_limit):
+        if i + punctuation_limit <= len(matches):
+            # 获取当前分组的最后一个标点符号的位置
+            end_pos = matches[i + punctuation_limit - 1].end()
+        else:
+            # 处理最后一组（不足 punctuation_limit 个标点的情况）
+            end_pos = matches[-1].end()
         
-        if punctuation_count >= group_size:
-            # group_size 個の句読点が見つかったら、そこまでをセグメントとする
-            segments.append(temp_buffer.strip())
-            temp_buffer = ""
-            punctuation_count = 0
-        elif char in punctuations and punctuation_count < group_size:
-            # 句読点だけどまだgroup_sizeに達していない場合、
-            # ここで区切るか、次の句読点まで続けるか、仕様によるね！
-            # 今回の「3つ出てくるたびに区切る」だと、このままでOKかな。
-            pass # 次の文字へ
-
-    # 最後の残りの部分を追加
-    if temp_buffer.strip():
-        segments.append(temp_buffer.strip())
+        # 提取当前段落并清理空白
+        segment = text[start_pos:end_pos].strip()
+        if segment:
+            segments.append(segment)
+        
+        start_pos = end_pos
     
-    # もし空のセグメントができてしまったら除去する (例: 連続する句読点の場合など)
-    return [s for s in segments if s]
+    # 处理最后剩余的文本
+    if start_pos < len(text):
+        remaining = text[start_pos:].strip()
+        if remaining:
+            segments.append(remaining)
+    
+    return segments

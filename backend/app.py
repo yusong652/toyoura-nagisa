@@ -16,13 +16,14 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, split_text_by_punctuations, create_new_history, get_all_sessions, delete_history_session, delete_message
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_history_session, delete_message
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
 from backend.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config
 import uuid
+from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts
 
 
 # 加载环境变量
@@ -249,8 +250,9 @@ async def chat_stream_endpoint(request: Request):
                 # 首先发送关键词和AI消息ID（仅发送一次，在整个响应的开头）
                 yield f"data: {json.dumps({'keyword': keyword, 'message_id': ai_msg_id})}\n\n"
                 
-                # 按句子分割文本
-                sentences = split_text_by_punctuations(response_text)
+                # 按句子分割文本之前先清理文本
+                cleaned_response_text = clean_text_for_tts(response_text)
+                sentences = split_text_by_punctuations(cleaned_response_text)
                 
                 # 逐句处理 - 注意: 我们先合成音频，再一起发送文本和音频，确保它们同步
                 for sentence in sentences:
