@@ -40,6 +40,9 @@ const ChatBox: React.FC = () => {
         <h2 className="chatbox-title">{currentSessionTitle}</h2>
       </div>
       <div className="chatbox-container">
+        {/* 添加固定的顶部阴影 */}
+        <div className="chatbox-top-shadow"></div>
+        
         <div className="chatbox" ref={chatboxRef} onClick={handleChatboxClick}>
           {messages.map((message) => (
             <MessageItem 
@@ -52,6 +55,9 @@ const ChatBox: React.FC = () => {
           {/* Add scroll anchor element that will always be at the bottom */}
           <div className="scroll-anchor"></div>
         </div>
+        
+        {/* 添加固定的底部阴影 */}
+        <div className="chatbox-bottom-shadow"></div>
       </div>
     </>
   )
