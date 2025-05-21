@@ -43,8 +43,8 @@ class LLMClientBase(ABC):
     @abstractmethod
     async def generate_title_from_messages(
         self,
-        first_user_message_content: str,
-        first_assistant_message_content: str,
+        first_user_message: Message,
+        first_assistant_message: Message,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
@@ -52,8 +52,8 @@ class LLMClientBase(ABC):
         不同的LLM客户端会有不同的实现方式，以适应各自API的特点。
 
         Args:
-            first_user_message_content: 用户的第一条消息内容
-            first_assistant_message_content: AI助手对第一条消息的回复内容
+            first_user_message: 用户的第一条消息（Message对象，支持多模态）
+            first_assistant_message: AI助手对第一条消息的回复（Message对象，支持多模态）
             title_generation_system_prompt: 用于生成标题的特定system prompt，
                                            如果不提供则使用客户端默认的system prompt
 

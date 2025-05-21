@@ -24,6 +24,14 @@ from backend.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config
 import uuid
 from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts
+from backend.utils.helpers import (
+    parse_message_data,
+    create_user_message,
+    process_llm_response,
+    process_tts_sentence,
+    should_generate_title
+)
+from backend.chat.models import Message
 
 
 # 加载环境变量
@@ -180,50 +188,26 @@ async def switch_session(request: SwitchSessionRequest):
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):
     data = await request.json()
-    # 1. 解析 messageData
-    message_data = data.get('messageData')
-    if message_data:
-        # 2. 反序列化
-        msg_obj = json.loads(message_data)
-        text = msg_obj.get('text', '')
-        files = msg_obj.get('files', [])
-        # 获取前端生成的消息ID和时间戳
-        message_id = msg_obj.get('id')
-        timestamp = msg_obj.get('timestamp')
+    
+    # 1. 解析消息数据
+    parsed_data, session_id = parse_message_data(data)
+    if not parsed_data:
+        return ErrorResponse(detail="无效的消息数据")
         
-    # 构造多模态 content
-    content = []
-    if text:
-        content.append({"text": text})
-    for file in files:
-        if file['type'].startswith('image/'):
-            b64 = file['data'].split(',', 1)[1]
-            content.append({
-                "inline_data": {
-                    "mime_type": file['type'],
-                    "data": b64
-                }
-            })
-    # 获取会话ID，如果没有提供则使用默认会话
-    session_id = data.get('session_id', "default_session")
+    # 2. 加载历史记录
     loaded_history = load_history(session_id)
     history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     
-    # 创建用户消息，使用前端提供的ID和时间戳
-    user_msg = Message(
-        role="user", 
-        content=content,
-        timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now()
-    )
-    # 在保存到历史记录时使用前端提供的ID (如果有)
-    if message_id:
+    # 3. 创建并添加用户消息
+    user_msg = create_user_message(parsed_data)
+    if parsed_data.get('message_id'):
         user_msg_dict = user_msg.model_dump()
-        user_msg_dict["id"] = message_id
+        user_msg_dict["id"] = parsed_data['message_id']
         history_msgs.append(Message(**user_msg_dict))
     else:
         history_msgs.append(user_msg)
     
-    # 使用配置中的recent_messages_length
+    # 4. 获取最近的对话历史
     recent_messages_length = get_llm_config().get("recent_messages_length", 20)
     recent_msgs = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
 
@@ -231,121 +215,55 @@ async def chat_stream_endpoint(request: Request):
     tts_engine: BaseTTS = request.app.state.tts_engine
     
     try:
-        # 首先发送"已发送"状态
         async def generate():
             # 发送"已发送"的状态确认
             yield f"data: {json.dumps({'status': 'sent'})}\n\n"
             
             try:
-                # 在调用LLM之前发送"已读"状态
+                # 发送"已读"状态
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 
-                # 调用LLM
+                # 调用LLM获取响应
                 response_text, keyword = await llm_client.get_response(recent_msgs)
                 
-                # 保存历史
-                ai_msg_id = str(uuid.uuid4())  # 为AI回复生成唯一ID
-                ai_msg = Message(role="assistant", content=response_text)
-                ai_msg_dict = ai_msg.dict()
-                ai_msg_dict["id"] = ai_msg_id  # 为AI回复添加ID
-                history_msgs.append(Message(**ai_msg_dict))
-                save_history(session_id, [msg.dict() for msg in history_msgs])
+                # 处理LLM响应
+                ai_msg_id = process_llm_response(response_text, keyword, history_msgs, session_id)
                 
-                # 首先发送关键词和AI消息ID（仅发送一次，在整个响应的开头）
+                # 发送关键词和AI消息ID
                 yield f"data: {json.dumps({'keyword': keyword, 'message_id': ai_msg_id})}\n\n"
                 
-                # 按句子分割文本之前先清理文本
+                # 处理TTS合成
                 cleaned_response_text = clean_text_for_tts(response_text)
                 sentences = split_text_by_punctuations(cleaned_response_text)
                 
-                # 逐句处理 - 注意: 我们先合成音频，再一起发送文本和音频，确保它们同步
                 for sentence in sentences:
-                    # 保留空行，只跳过None或空字符串
-                    if sentence is None or sentence == '':
-                        continue
-                        
-                    # 处理空行的情况，发送没有音频的行
-                    if sentence.strip() == '':
-                        response_data = {
-                            'text': sentence,
-                            'audio': None
-                        }
-                        yield f"data: {json.dumps(response_data)}\n\n"
-                        continue
-                        
-                    # 先合成音频
-                    audio_b64 = None
-                    audio_error = None
-                    try:
-                        audio_bytes = await tts_engine.synthesize(sentence)
-                        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-                    except Exception as e:
-                        print(f"TTS合成失败: {e}")
-                        audio_error = str(e)
-                    
-                    # 将文本和音频一起发送
-                    response_data = {
-                        'text': sentence,
-                        'audio': audio_b64
-                    }
-                    
-                    if audio_error:
-                        response_data['error'] = audio_error
-                        
-                    yield f"data: {json.dumps(response_data)}\n\n"
+                    tts_result = await process_tts_sentence(sentence, tts_engine)
+                    if tts_result:
+                        yield f"data: {json.dumps(tts_result)}\n\n"
                 
-                # 检查是否需要生成标题：
-                # 1. 获取会话信息
-                sessions = get_all_sessions()
-                current_session = next((s for s in sessions if s['id'] == session_id), None)
-                
-                # 2. 判断是否需要生成标题
-                # 仅当会话存在且恰好有2条消息（一条用户消息和一条AI回复）时生成标题
-                is_first_round = len(history_msgs) == 2  # 限制为恰好2条消息
-                has_default_title = current_session is not None  # 只要会话存在
-                
-                should_generate_title = is_first_round and has_default_title
-                
-                # 只在第一轮对话后生成标题
-                if should_generate_title:
-                    # 提取用户第一条消息的文本
+                # 处理标题生成
+                if should_generate_title(session_id, history_msgs):
                     first_user_msg = history_msgs[0]
-                    first_user_text = ""
-                    
-                    # 解析用户消息内容
-                    if isinstance(first_user_msg.content, str):
-                        first_user_text = first_user_msg.content
-                    elif isinstance(first_user_msg.content, list):
-                        # 如果content是列表，查找text类型的内容
-                        for item in first_user_msg.content:
-                            if isinstance(item, dict) and "text" in item:
-                                first_user_text = item["text"]
-                                break
-                    
-                    # 生成标题
+                    first_assistant_msg = history_msgs[1]
                     new_title = await generate_conversation_title(
-                        first_user_text,
-                        response_text,
+                        first_user_msg,
+                        first_assistant_msg,
                         llm_client
                     )
                     
                     if new_title:
-                        # 更新会话标题
                         update_success = update_session_title(session_id, new_title)
-                        
                         if update_success:
-                            # 通过SSE流发送标题更新通知
                             title_update_data = {
-                                'type': 'TITLE_UPDATE', 
+                                'type': 'TITLE_UPDATE',
                                 'payload': {
-                                    'session_id': session_id, 
+                                    'session_id': session_id,
                                     'title': new_title
                                 }
                             }
                             yield f"data: {json.dumps(title_update_data)}\n\n"
                 
             except Exception as e:
-                # 如果在处理过程中出错，返回错误状态
                 yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
                 raise e
         
@@ -427,27 +345,17 @@ async def generate_title_endpoint(request: Request):
         if not last_user_msg or not last_assistant_msg:
             raise HTTPException(status_code=400, detail="无法找到有效的用户消息和助手回复")
         
-        # 提取文本内容
-        last_user_text = ""
-        last_assistant_text = ""
-        
-        # 处理不同格式的内容
-        if isinstance(last_user_msg['content'], str):
-            last_user_text = last_user_msg['content']
-        elif isinstance(last_user_msg['content'], list):
-            for item in last_user_msg['content']:
-                if isinstance(item, dict) and "text" in item:
-                    last_user_text = item["text"]
-                    break
-        
-        if isinstance(last_assistant_msg['content'], str):
-            last_assistant_text = last_assistant_msg['content']
-            
+        # 转换为 Message 对象
+        if isinstance(last_user_msg, dict):
+            last_user_msg = Message(**last_user_msg)
+        if isinstance(last_assistant_msg, dict):
+            last_assistant_msg = Message(**last_assistant_msg)
+
         # 生成标题 - 从app state中获取llm_client
         llm_client: LLMClientBase = request.app.state.llm_client
         new_title = await generate_conversation_title(
-            last_user_text,
-            last_assistant_text,
+            last_user_msg,
+            last_assistant_msg,
             llm_client
         )
         
