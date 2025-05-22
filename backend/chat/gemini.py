@@ -126,9 +126,16 @@ class GeminiClient(LLMClientBase):
                 max_output_tokens=100
             )
             
+            # 构造消息序列，最后一条为user
+            messages = [
+                first_user_message,
+                first_assistant_message,
+                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+            ]
+            
             # 处理消息内容
             contents = []
-            for msg in [first_user_message, first_assistant_message]:
+            for msg in messages:
                 parts = []
                 if isinstance(msg.content, list):
                     for item in msg.content:

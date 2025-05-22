@@ -123,8 +123,15 @@ class GPTClient(LLMClientBase):
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         try:
+            # 构造消息序列，最后一条为user
+            messages = [
+                first_user_message,
+                first_assistant_message,
+                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+            ]
+            
             messages_for_llm, has_image = self._format_messages_for_openai(
-                [first_user_message, first_assistant_message],
+                messages,
                 system_prompt=title_generation_system_prompt
             )
             model = 'gpt-4.1' if has_image else self.extra_config.get("model", "gpt-4.1-mini")

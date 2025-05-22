@@ -203,12 +203,15 @@ class AnthropicClient(LLMClientBase):
         try:
             system_prompt = title_generation_system_prompt or "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，并且除了这些标签和标题本身外，不要输出任何其他内容。"
             
-            # 使用相同的消息格式转换逻辑
-            messages_for_llm, has_image = self._format_messages_for_anthropic([
-                
+            # 构造消息序列，最后一条为user
+            messages = [
                 first_user_message,
-                first_assistant_message
-            ])
+                first_assistant_message,
+                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+            ]
+            
+            # 使用相同的消息格式转换逻辑
+            messages_for_llm, has_image = self._format_messages_for_anthropic(messages)
             
             payload = {
                 "model": self.extra_config.get("model", "claude-3-5-sonnet-20241022"),
