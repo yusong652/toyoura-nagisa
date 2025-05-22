@@ -182,7 +182,7 @@ class MistralClient(LLMClientBase):
             payload = {
                 "model": model,
                 "messages": messages_for_llm,
-                "temperature": self.extra_config.get("temperature", 0.7),
+                "temperature": self.extra_config.get("temperature", 1.0),
                 "max_tokens": 100,
                 "stream": False
             }
