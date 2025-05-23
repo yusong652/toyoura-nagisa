@@ -250,7 +250,6 @@ class GeminiClient(LLMClientBase):
             for tool in mcp_tools
         ]
         tools = types.Tool(function_declarations=function_declarations)
-        print(f"[DEBUG] Gemini function_declarations: {function_declarations}")
         return [tools]
 
     async def handle_function_call(self, function_call: dict):
@@ -276,7 +275,6 @@ class GeminiClient(LLMClientBase):
         2. 再次调用Gemini，获得最终自然语言回复
         """
         tool_schemas = await self.get_function_call_schemas()
-        print(f"[DEBUG] tool_schemas in handle_function_call_closed_loop: {tool_schemas}")
         # 1. 先把原始messages转为contents
         contents = []
         for msg in messages:

@@ -15,7 +15,6 @@ class GPTSoVITSConfig(TTSConfig):
     @property
     def server_url(self) -> str:
         url = self._config.get('server_url', 'http://localhost:9880')
-        print(f"[DEBUG] GPTSoVITSConfig.server_url = {url}")
         return url
     
     @property

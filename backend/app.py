@@ -235,15 +235,12 @@ async def chat_stream_endpoint(request: Request):
                         'arguments': llm_response.function_args
                     }
                     tool_result = llm_response.function_result
-                    print(f"[DEBUG] tool_call: {tool_call}")
-                    print(f"[DEBUG] tool_result: {tool_result}")
                     # 闭环：将function call及其结果传回llm，获取最终回复
                     final_llm_response = await llm_client.handle_function_call_closed_loop(
                         history_msgs,
                         tool_call,
                         tool_result
                     )
-                    print(f"[DEBUG] final_llm_response: content={final_llm_response.content}, keyword={final_llm_response.keyword}")
                     ai_msg_id = process_llm_response(
                         final_llm_response.content,
                         final_llm_response.keyword,
@@ -254,13 +251,18 @@ async def chat_stream_endpoint(request: Request):
                     sentences = split_text_by_punctuations(final_llm_response.content)
                     for sentence in sentences:
                         if sentence.strip():
-                            chunk_data = {
+                            # 1. 文本 chunk
+                            text_data = {
                                 'type': 'text',
-                                'text': sentence,
+                                'content': sentence,
                                 'keyword': final_llm_response.keyword,
                                 'message_id': ai_msg_id
                             }
-                            yield f"data: {json.dumps(chunk_data)}\n\n"
+                            yield f"data: {json.dumps(text_data)}\n\n"
+                            # 2. TTS 音频 chunk
+                            tts_result = await process_tts_sentence(sentence, tts_engine)
+                            if tts_result:
+                                yield f"data: {json.dumps(tts_result)}\n\n"
                     
                 elif llm_response.response_type == ResponseType.TEXT:
                     # 处理普通文本响应
