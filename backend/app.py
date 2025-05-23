@@ -250,14 +250,17 @@ async def chat_stream_endpoint(request: Request):
                         history_msgs,
                         session_id
                     )
-                    text_data = {
-                        'type': 'text',
-                        'content': final_llm_response.content,
-                        'keyword': final_llm_response.keyword,
-                        'message_id': ai_msg_id
-                    }
-                    print(f"[DEBUG] text_data to frontend: {text_data}")
-                    yield f"data: {json.dumps(text_data)}\n\n"
+                    # 流式输出闭环回复
+                    sentences = split_text_by_punctuations(final_llm_response.content)
+                    for sentence in sentences:
+                        if sentence.strip():
+                            chunk_data = {
+                                'type': 'text',
+                                'text': sentence,
+                                'keyword': final_llm_response.keyword,
+                                'message_id': ai_msg_id
+                            }
+                            yield f"data: {json.dumps(chunk_data)}\n\n"
                     
                 elif llm_response.response_type == ResponseType.TEXT:
                     # 处理普通文本响应

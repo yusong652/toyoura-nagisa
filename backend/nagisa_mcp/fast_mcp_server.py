@@ -11,7 +11,7 @@ print(f"[DEBUG] Fast MCP Server initialized")
 @mcp.tool()
 async def get_current_time() -> str:
     """获取当前时间"""
-    print(f"[DEBUG] get_current_time called")
+    print(f"[DEBUG] Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
 # 启动服务器

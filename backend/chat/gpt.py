@@ -3,7 +3,7 @@ import re
 from typing import List, Tuple, Optional, Dict, Any
 import httpx
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message
+from backend.chat.models import Message, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output
 
 class GPTClient(LLMClientBase):
@@ -79,14 +79,11 @@ class GPTClient(LLMClientBase):
         self,
         messages: List[Message],
         **kwargs
-    ) -> Tuple[str, str]:
+    ) -> 'LLMResponse':
         """
-        调用 OpenAI GPT API，返回 (response_text, keyword)。
+        调用 OpenAI GPT API，返回 LLMResponse。
         """
-        # 使用辅助方法格式化消息
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
-        
-        # 使用类属性中的配置值
         model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")
         payload = {
             "model": model,
@@ -108,13 +105,20 @@ class GPTClient(LLMClientBase):
                 llm_reply = response_data["choices"][0]["message"]["content"]
                 print(f"LLM 回复: {llm_reply}")
                 response_text, keyword = parse_llm_output(llm_reply)
-                return response_text, keyword
+                return LLMResponse(
+                    content=response_text,
+                    response_type=ResponseType.TEXT,
+                    keyword=keyword
+                )
         except httpx.TimeoutException:
             raise RuntimeError("Request to LLM timed out")
         except httpx.HTTPStatusError as e:
             raise RuntimeError(f"LLM API error: {str(e)}")
         except Exception as e:
-            raise RuntimeError(f"Failed to get response from LLM: {str(e)}")
+            return LLMResponse(
+                content=str(e),
+                response_type=ResponseType.ERROR
+            )
 
     async def generate_title_from_messages(
         self,
@@ -167,3 +171,29 @@ class GPTClient(LLMClientBase):
         except Exception as e:
             print(f"GPT生成标题时出错: {str(e)}")
             return None
+
+    async def get_function_call_schemas(self):
+        """
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
+        """
+        # 占位实现，返回空列表
+        return []
+
+    async def handle_function_call_closed_loop(
+        self,
+        messages: List[Message],
+        tool_call: dict,
+        tool_result: Any,
+        **kwargs
+    ) -> 'LLMResponse':
+        """
+        GPT function call闭环：
+        1. 将function_call和其结果作为新对话轮次加入messages
+        2. 再次调用GPT，获得最终自然语言回复
+        """
+        # 占位实现，返回错误响应
+        from backend.chat.models import LLMResponse, ResponseType
+        return LLMResponse(
+            content="Function call closed-loop not supported in GPT client.",
+            response_type=ResponseType.ERROR
+        )

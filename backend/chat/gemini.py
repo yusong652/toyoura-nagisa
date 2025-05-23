@@ -68,7 +68,6 @@ class GeminiClient(LLMClientBase):
     async def get_response(self, messages: List[Message], **kwargs) -> LLMResponse:
         # 1. 获取 MCP 工具 schema
         tool_schemas = await self.get_function_call_schemas()
-        print(f"[DEBUG] tool_schemas in get_response: {tool_schemas}")
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = []
@@ -105,7 +104,6 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config
             )
-            print(f"[DEBUG] Gemini response: {response}")
             if hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
                 # 遍历所有 parts，优先处理 function_call

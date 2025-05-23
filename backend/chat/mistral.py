@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import httpx
 import json
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message
+from backend.chat.models import Message, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output
 import re
 
@@ -107,23 +107,19 @@ class MistralClient(LLMClientBase):
         self,
         messages: List[Message],
         **kwargs
-    ) -> Tuple[str, str]:
+    ) -> 'LLMResponse':
         """
-        调用 Mistral API，返回 (response_text, keyword)。
+        调用 Mistral API，返回 LLMResponse。
         """
-        # 使用辅助方法格式化消息
         messages_for_llm, has_image = self._format_messages_for_mistral(messages)
-        
-        # 使用类属性中的配置值，始终使用配置中定义的模型
         model = self.extra_config.get("model", "pixtral-large-2411")
         payload = {
             "model": model,
             "messages": messages_for_llm,
             "temperature": self.extra_config.get("temperature", 0.7),
             "max_tokens": self.extra_config.get("max_tokens", 1024),
-            "stream": False  # 确保不使用流式响应，等待完整回复
+            "stream": False
         }
-        print('Mistral payload (get_response):', json.dumps(payload, ensure_ascii=False, indent=2))
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -132,23 +128,32 @@ class MistralClient(LLMClientBase):
                     json=payload,
                     timeout=30.0
                 )
-                
-                if response.status_code != 200:
-                    response.raise_for_status()
-                    
+                response.raise_for_status()
                 response_data = response.json()
                 if not response_data.get("choices"):
                     raise ValueError("No choices in Mistral response")
-                    
                 llm_reply = response_data["choices"][0]["message"]["content"]
                 response_text, keyword = parse_llm_output(llm_reply)
-                return response_text, keyword
+                return LLMResponse(
+                    content=response_text,
+                    response_type=ResponseType.TEXT,
+                    keyword=keyword
+                )
         except httpx.TimeoutException as e:
-            raise RuntimeError("Request to LLM timed out")
+            return LLMResponse(
+                content="Request to LLM timed out",
+                response_type=ResponseType.ERROR
+            )
         except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"LLM API error: {str(e)}")
+            return LLMResponse(
+                content=f"LLM API error: {str(e)}",
+                response_type=ResponseType.ERROR
+            )
         except Exception as e:
-            raise RuntimeError(f"Failed to get response from LLM: {str(e)}")
+            return LLMResponse(
+                content=f"Failed to get response from LLM: {str(e)}",
+                response_type=ResponseType.ERROR
+            )
 
     async def generate_title_from_messages(
         self,
@@ -213,3 +218,29 @@ class MistralClient(LLMClientBase):
         except Exception as e:
             print(f"Mistral生成标题时出错: {str(e)}")
             return None 
+
+    async def get_function_call_schemas(self):
+        """
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
+        """
+        # 占位实现，返回空列表
+        return []
+
+    async def handle_function_call_closed_loop(
+        self,
+        messages: List[Message],
+        tool_call: dict,
+        tool_result: Any,
+        **kwargs
+    ) -> 'LLMResponse':
+        """
+        Mistral function call闭环：
+        1. 将function_call和其结果作为新对话轮次加入messages
+        2. 再次调用Mistral，获得最终自然语言回复
+        """
+        # 占位实现，返回错误响应
+        from backend.chat.models import LLMResponse, ResponseType
+        return LLMResponse(
+            content="Function call closed-loop not supported in Mistral client.",
+            response_type=ResponseType.ERROR
+        ) 

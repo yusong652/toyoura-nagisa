@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import httpx
 import json
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message
+from backend.chat.models import Message, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output
 
 class AnthropicClient(LLMClientBase):
@@ -134,17 +134,12 @@ class AnthropicClient(LLMClientBase):
         self,
         messages: List[Message],
         **kwargs
-    ) -> Tuple[str, str]:
+    ) -> 'LLMResponse':
         """
-        调用 Anthropic API，返回 (response_text, keyword)。
+        调用 Anthropic API，返回 LLMResponse。
         """
-        # 使用辅助方法格式化消息
         anthropic_messages, has_image = self._format_messages_for_anthropic(messages)
-        
-        # 使用类属性中的配置值
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
-        
-        # 构建请求体
         payload = {
             "model": model,
             "messages": anthropic_messages,
@@ -152,7 +147,6 @@ class AnthropicClient(LLMClientBase):
             "max_tokens": self.extra_config.get("max_tokens", 1024),
             "temperature": self.extra_config.get("temperature", 0.7),
         }
-        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -161,29 +155,36 @@ class AnthropicClient(LLMClientBase):
                     json=payload,
                     timeout=20.0
                 )
-                
                 if response.status_code != 200:
                     response.raise_for_status()
-                    
                 response_data = response.json()
                 if "content" not in response_data or not response_data["content"]:
                     raise ValueError("No content in Anthropic response")
-                
-                # 获取文本内容
                 llm_reply = ""
                 for content_item in response_data["content"]:
                     if content_item["type"] == "text":
                         llm_reply += content_item["text"]
-                
                 response_text, keyword = parse_llm_output(llm_reply)
-                return response_text, keyword
+                return LLMResponse(
+                    content=response_text,
+                    response_type=ResponseType.TEXT,
+                    keyword=keyword
+                )
         except httpx.TimeoutException:
-            raise RuntimeError("Request to LLM timed out")
+            return LLMResponse(
+                content="Request to LLM timed out",
+                response_type=ResponseType.ERROR
+            )
         except httpx.HTTPStatusError as e:
-            print("Anthropic API error response:", e.response.text)
-            raise RuntimeError(f"LLM API error: {str(e)}")
+            return LLMResponse(
+                content=f"LLM API error: {str(e)}",
+                response_type=ResponseType.ERROR
+            )
         except Exception as e:
-            raise RuntimeError(f"Failed to get response from LLM: {str(e)}")
+            return LLMResponse(
+                content=f"Failed to get response from LLM: {str(e)}",
+                response_type=ResponseType.ERROR
+            )
 
     async def generate_title_from_messages(
         self,
@@ -263,3 +264,29 @@ class AnthropicClient(LLMClientBase):
         except Exception as e:
             print(f"Anthropic生成标题时出错: {str(e)}")
             return None 
+
+    async def get_function_call_schemas(self):
+        """
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
+        """
+        # 占位实现，返回空列表
+        return []
+
+    async def handle_function_call_closed_loop(
+        self,
+        messages: List[Message],
+        tool_call: dict,
+        tool_result: Any,
+        **kwargs
+    ) -> 'LLMResponse':
+        """
+        Anthropic function call闭环：
+        1. 将function_call和其结果作为新对话轮次加入messages
+        2. 再次调用Anthropic，获得最终自然语言回复
+        """
+        # 占位实现，返回错误响应
+        from backend.chat.models import LLMResponse, ResponseType
+        return LLMResponse(
+            content="Function call closed-loop not supported in Anthropic client.",
+            response_type=ResponseType.ERROR
+        ) 
