@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field # 导入 Pydantic 的 BaseModel 和 Field
-from typing import List, Optional, Literal, Union # 导入类型提示和 Literal 以及 Union
+from typing import List, Optional, Literal, Union, Dict, Any # 导入类型提示和 Literal 以及 Union
 from datetime import datetime # 导入 datetime 模块
+from enum import Enum
 
 # 定义单条消息的结构 (可选，但对于管理历史记录很有用)
 class Message(BaseModel):
@@ -23,3 +24,35 @@ class ChatResponse(BaseModel):
 # (可选) 也可以定义一个错误时的响应模型
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="错误信息")
+
+class ResponseType(str, Enum):
+    TEXT = "text"
+    FUNCTION_CALL = "function_call"
+    ERROR = "error"
+
+class LLMResponse:
+    def __init__(
+        self,
+        content: str,
+        response_type: ResponseType,
+        keyword: Optional[str] = None,
+        function_name: Optional[str] = None,
+        function_args: Optional[Dict[str, Any]] = None,
+        function_result: Optional[Any] = None
+    ):
+        self.content = content
+        self.response_type = response_type
+        self.keyword = keyword
+        self.function_name = function_name
+        self.function_args = function_args
+        self.function_result = function_result
+
+    def to_dict(self) -> dict:
+        return {
+            "content": self.content,
+            "response_type": self.response_type,
+            "keyword": self.keyword,
+            "function_name": self.function_name,
+            "function_args": self.function_args,
+            "function_result": self.function_result
+        }

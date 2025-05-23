@@ -11,3 +11,4 @@ websockets>=11.0.3
 aiofiles>=23.1.0
 fish_audio_sdk>=0.1.0 
 emoji>=2.0.0
+fastmcp>=2.4.0

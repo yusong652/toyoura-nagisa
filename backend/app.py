@@ -31,7 +31,7 @@ from backend.utils.helpers import (
     process_tts_sentence,
     should_generate_title
 )
-from backend.chat.models import Message
+from backend.chat.models import Message, ResponseType, LLMResponse
 
 
 # 加载环境变量
@@ -224,22 +224,61 @@ async def chat_stream_endpoint(request: Request):
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 
                 # 调用LLM获取响应
-                response_text, keyword = await llm_client.get_response(recent_msgs)
+                llm_response = await llm_client.get_response(recent_msgs)
                 
-                # 处理LLM响应
-                ai_msg_id = process_llm_response(response_text, keyword, history_msgs, session_id)
-                
-                # 发送关键词和AI消息ID
-                yield f"data: {json.dumps({'keyword': keyword, 'message_id': ai_msg_id})}\n\n"
-                
-                # 处理TTS合成
-                cleaned_response_text = clean_text_for_tts(response_text)
-                sentences = split_text_by_punctuations(cleaned_response_text)
-                
-                for sentence in sentences:
-                    tts_result = await process_tts_sentence(sentence, tts_engine)
-                    if tts_result:
-                        yield f"data: {json.dumps(tts_result)}\n\n"
+                # 处理不同类型的响应
+                if llm_response.response_type == ResponseType.FUNCTION_CALL:
+                    # 处理函数调用结果
+                    ai_msg_id = process_llm_response(
+                        llm_response.content,
+                        "function_call",
+                        history_msgs,
+                        session_id
+                    )
+                    
+                    # 发送函数调用相关信息
+                    data = {
+                        'type': 'function_call',
+                        'function_name': llm_response.function_name,
+                        'function_args': llm_response.function_args,
+                        'function_result': llm_response.function_result,
+                        'message_id': ai_msg_id
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                    
+                elif llm_response.response_type == ResponseType.TEXT:
+                    # 处理普通文本响应
+                    ai_msg_id = process_llm_response(
+                        llm_response.content,
+                        llm_response.keyword,
+                        history_msgs,
+                        session_id
+                    )
+                    
+                    # 发送文本响应
+                    text_data = {
+                        'type': 'text',
+                        'content': llm_response.content,
+                        'keyword': llm_response.keyword,
+                        'message_id': ai_msg_id
+                    }
+                    yield f"data: {json.dumps(text_data)}\n\n"
+                    
+                    # 处理TTS合成
+                    cleaned_response_text = clean_text_for_tts(llm_response.content)
+                    sentences = split_text_by_punctuations(cleaned_response_text)
+                    
+                    for sentence in sentences:
+                        tts_result = await process_tts_sentence(sentence, tts_engine)
+                        if tts_result:
+                            yield f"data: {json.dumps(tts_result)}\n\n"
+                    
+                elif llm_response.response_type == ResponseType.ERROR:
+                    error_data = {
+                        'type': 'error',
+                        'error': llm_response.content
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
                 
                 # 处理标题生成
                 if should_generate_title(session_id, history_msgs):
@@ -264,7 +303,11 @@ async def chat_stream_endpoint(request: Request):
                             yield f"data: {json.dumps(title_update_data)}\n\n"
                 
             except Exception as e:
-                yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+                error_data = {
+                    'type': 'error',
+                    'error': str(e)
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
                 raise e
         
         return StreamingResponse(
