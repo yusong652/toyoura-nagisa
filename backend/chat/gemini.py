@@ -8,7 +8,7 @@ from backend.config import get_llm_specific_config
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, ResponseType, LLMResponse
 from backend.chat.utils import parse_llm_output
-from backend.nagisa_mcp.client import MCPClient
+from fastmcp import Client as MCPClient
 
 class GeminiClient(LLMClientBase):
     """
@@ -57,7 +57,8 @@ class GeminiClient(LLMClientBase):
         
         print(f"Gemini Client initialized.")
         # 集成 MCPClient
-        self.mcp_client = MCPClient("nagisa_mcp/server/__init__.py")
+        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+
 
     def map_role(self, role: str) -> str:
         if role == "assistant":
@@ -67,6 +68,7 @@ class GeminiClient(LLMClientBase):
     async def get_response(self, messages: List[Message], **kwargs) -> LLMResponse:
         # 1. 获取 MCP 工具 schema
         tool_schemas = await self.get_function_call_schemas()
+        print(f"[DEBUG] tool_schemas in get_response: {tool_schemas}")
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = []
@@ -93,7 +95,7 @@ class GeminiClient(LLMClientBase):
             system_instruction=self.system_prompt,
             safety_settings=self.safety_settings,
             temperature=self.extra_config.get('temperature', 1.2),
-            max_output_tokens=self.extra_config.get('max_output_tokens', 500),
+            max_output_tokens=self.extra_config.get('max_output_tokens', 1024),
             tools=tool_schemas
         )
 
@@ -103,31 +105,35 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config
             )
+            print(f"[DEBUG] Gemini response: {response}")
             if hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
-                # 检查 Gemini 是否返回 tool_uses 字段
-                if hasattr(candidate, 'tool_uses') and candidate.tool_uses:
-                    tool_call = candidate.tool_uses[0]
-                    tool_result = await self.handle_function_call({
-                        "name": tool_call.name,
-                        "arguments": tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments
-                    })
-                    return LLMResponse(
-                        content=str(tool_result),
-                        response_type=ResponseType.FUNCTION_CALL,
-                        function_name=tool_call.name,
-                        function_args=tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments,
-                        function_result=tool_result
-                    )
-                # 否则直接返回 LLM 普通回复
+                # 遍历所有 parts，优先处理 function_call
                 if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
-                    response_text = candidate.content.parts[0].text
-                    response_text, keyword = parse_llm_output(response_text)
-                    return LLMResponse(
-                        content=response_text,
-                        response_type=ResponseType.TEXT,
-                        keyword=keyword
-                    )
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            tool_call = part.function_call
+                            tool_result = await self.handle_function_call({
+                                "name": tool_call.name,
+                                "arguments": tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments
+                            })
+                            return LLMResponse(
+                                content=str(tool_result),
+                                response_type=ResponseType.FUNCTION_CALL,
+                                function_name=tool_call.name,
+                                function_args=tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments,
+                                function_result=tool_result
+                            )
+                    # 如果没有 function_call，找第一个有 text 的 part
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            response_text = part.text
+                            response_text, keyword = parse_llm_output(response_text)
+                            return LLMResponse(
+                                content=response_text,
+                                response_type=ResponseType.TEXT,
+                                keyword=keyword
+                            )
             return LLMResponse(
                 content="",
                 response_type=ResponseType.ERROR
@@ -161,7 +167,7 @@ class GeminiClient(LLMClientBase):
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=2.0,
-                max_output_tokens=100
+                max_output_tokens=1024
             )
             
             # 构造消息序列，最后一条为user
@@ -221,11 +227,33 @@ class GeminiClient(LLMClientBase):
             print(f"Gemini生成标题时出错: {str(e)}")
             return None
 
+    def convert_mcp_schema_to_gemini(self, schema: dict) -> dict:
+        """
+        Convert a fastMCP tool schema to Gemini-compatible function call schema.
+        """
+        return {
+            "name": schema["name"],
+            "description": schema.get("description", ""),
+            "parameters": schema.get("inputSchema", {"type": "object", "properties": {}})
+        }
+
     async def get_function_call_schemas(self):
         """
-        获取所有 MCP 工具的 schema，供 LLM function call 注册用
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
         """
-        return await self.mcp_client.get_tool_schemas()
+        async with self.mcp_client as mcp_async_client:
+            mcp_tools = await mcp_async_client.list_tools()
+        function_declarations = [
+            {
+                "name": tool.name,
+                "description": getattr(tool, "description", ""),
+                "parameters": getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            }
+            for tool in mcp_tools
+        ]
+        tools = types.Tool(function_declarations=function_declarations)
+        print(f"[DEBUG] Gemini function_declarations: {function_declarations}")
+        return [tools]
 
     async def handle_function_call(self, function_call: dict):
         """
@@ -234,4 +262,87 @@ class GeminiClient(LLMClientBase):
         """
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
-        return await self.mcp_client.call_tool(tool_name, params)
+        async with self.mcp_client as mcp_async_client:
+            return await mcp_async_client.call_tool(tool_name, params)
+
+    async def handle_function_call_closed_loop(
+        self,
+        messages: List[Message],
+        tool_call: dict,
+        tool_result: Any,
+        **kwargs
+    ) -> LLMResponse:
+        """
+        Gemini function call闭环：
+        1. 将function_call和其结果作为新对话轮次加入contents
+        2. 再次调用Gemini，获得最终自然语言回复
+        """
+        tool_schemas = await self.get_function_call_schemas()
+        print(f"[DEBUG] tool_schemas in handle_function_call_closed_loop: {tool_schemas}")
+        # 1. 先把原始messages转为contents
+        contents = []
+        for msg in messages:
+            parts = []
+            if isinstance(msg.content, list):
+                for item in msg.content:
+                    if "text" in item:
+                        parts.append({"text": item['text']})
+                    elif "inline_data" in item:
+                        parts.append({
+                            "inline_data": {
+                                "mime_type": item['inline_data'].get('mime_type', 'image/png'),
+                                "data": item['inline_data']['data']
+                            }
+                        })
+            else:
+                parts.append({"text": msg.content})
+            mapped_role = self.map_role(msg.role)
+            contents.append({"role": mapped_role, "parts": parts})
+
+        # 2. 构造function_call和function_response part
+        function_call_part = types.Part(function_call=types.FunctionCall(
+            name=tool_call['name'],
+            args=tool_call.get('arguments', {})
+        ))
+        function_response_part = types.Part.from_function_response(
+            name=tool_call['name'],
+            response={"result": tool_result}
+        )
+        # 3. 按Gemini推荐方式追加两轮
+        contents.append(types.Content(role="model", parts=[function_call_part]))
+        contents.append(types.Content(role="user", parts=[function_response_part]))
+
+        config = types.GenerateContentConfig(
+            system_instruction=self.system_prompt,
+            safety_settings=self.safety_settings,
+            temperature=self.extra_config.get('temperature', 1.2),
+            max_output_tokens=self.extra_config.get('max_output_tokens', 500),
+            tools=tool_schemas
+        )
+        # 4. 再次请求LLM
+        try:
+            response = self.client.models.generate_content(
+                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
+                contents=contents,
+                config=config
+            )
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
+                    response_text = candidate.content.parts[0].text
+                    response_text, keyword = parse_llm_output(response_text)
+                    return LLMResponse(
+                        content=response_text,
+                        response_type=ResponseType.TEXT,
+                        keyword=keyword
+                    )
+            return LLMResponse(
+                content="",
+                response_type=ResponseType.ERROR
+            )
+        except Exception as e:
+            print(f"Gemini闭环API error: {e}")
+            return LLMResponse(
+                content=str(e),
+                response_type=ResponseType.ERROR
+            )

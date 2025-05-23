@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod # 导入 ABC 和 abstractmethod
 from typing import List, Tuple, Optional, Dict, Any       # 导入类型提示
-from backend.chat.models import Message         # 从同目录的 models.py 导入 Message 模型
+from backend.chat.models import Message, LLMResponse         # 从同目录的 models.py 导入 Message 模型
 
 # 定义一个简单的模型来表示 LLM 的输出（或者直接用 Tuple）
 # from pydantic import BaseModel
@@ -59,6 +59,26 @@ class LLMClientBase(ABC):
 
         Returns:
             生成的对话标题，如果生成失败则返回None
+        """
+        pass
+
+    @abstractmethod
+    async def handle_function_call_closed_loop(
+        self,
+        messages: List[Message],
+        tool_call: dict,
+        tool_result: Any,
+        **kwargs
+    ) -> 'LLMResponse':
+        """
+        Handle the function call closed-loop: after receiving a function_call from LLM, call the tool,
+        then send the function call and its result back to the LLM to get the final natural language response.
+        Args:
+            messages: The original conversation history (list of Message)
+            tool_call: The function call info (name, arguments, etc)
+            tool_result: The result from the tool execution
+        Returns:
+            LLMResponse: The final LLM response after the closed-loop
         """
         pass
 

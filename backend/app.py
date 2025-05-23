@@ -227,24 +227,37 @@ async def chat_stream_endpoint(request: Request):
                 llm_response = await llm_client.get_response(recent_msgs)
                 
                 # 处理不同类型的响应
+                print(f"[DEBUG] llm_response type: {llm_response.response_type}")
                 if llm_response.response_type == ResponseType.FUNCTION_CALL:
                     # 处理函数调用结果
+                    tool_call = {
+                        'name': llm_response.function_name,
+                        'arguments': llm_response.function_args
+                    }
+                    tool_result = llm_response.function_result
+                    print(f"[DEBUG] tool_call: {tool_call}")
+                    print(f"[DEBUG] tool_result: {tool_result}")
+                    # 闭环：将function call及其结果传回llm，获取最终回复
+                    final_llm_response = await llm_client.handle_function_call_closed_loop(
+                        history_msgs,
+                        tool_call,
+                        tool_result
+                    )
+                    print(f"[DEBUG] final_llm_response: content={final_llm_response.content}, keyword={final_llm_response.keyword}")
                     ai_msg_id = process_llm_response(
-                        llm_response.content,
-                        "function_call",
+                        final_llm_response.content,
+                        final_llm_response.keyword,
                         history_msgs,
                         session_id
                     )
-                    
-                    # 发送函数调用相关信息
-                    data = {
-                        'type': 'function_call',
-                        'function_name': llm_response.function_name,
-                        'function_args': llm_response.function_args,
-                        'function_result': llm_response.function_result,
+                    text_data = {
+                        'type': 'text',
+                        'content': final_llm_response.content,
+                        'keyword': final_llm_response.keyword,
                         'message_id': ai_msg_id
                     }
-                    yield f"data: {json.dumps(data)}\n\n"
+                    print(f"[DEBUG] text_data to frontend: {text_data}")
+                    yield f"data: {json.dumps(text_data)}\n\n"
                     
                 elif llm_response.response_type == ResponseType.TEXT:
                     # 处理普通文本响应
