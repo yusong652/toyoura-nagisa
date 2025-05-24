@@ -8,6 +8,8 @@ from backend.chat.utils import parse_llm_output
 import re
 import mistralai
 from fastmcp import Client as MCPClient
+import random
+import string
 
 class MistralClient(LLMClientBase):
     """
@@ -263,7 +265,12 @@ class MistralClient(LLMClientBase):
         import json as _json
         function_name = tool_call.get("name")
         arguments = tool_call.get("arguments")
-        tool_call_id = tool_call.get("id", "tool_call_id")
+        # 生成合法的tool_call_id: 9位a-zA-Z0-9
+        def gen_tool_call_id():
+            return ''.join(random.choices(string.ascii_letters + string.digits, k=9))
+        tool_call_id = tool_call.get("id")
+        if not tool_call_id or not (isinstance(tool_call_id, str) and len(tool_call_id) == 9 and tool_call_id.isalnum()):
+            tool_call_id = gen_tool_call_id()
         if not isinstance(arguments, str):
             arguments = _json.dumps(arguments, ensure_ascii=False)
         messages_for_llm, _ = self._format_messages_for_mistral(messages)

@@ -4,7 +4,11 @@ from typing import Dict, Any, List, Optional
 from fastmcp import FastMCP, Client
 from datetime import datetime
 
-mcp = FastMCP("Fast MCP Server")
+mcp = FastMCP("Fast MCP Server", 
+              instructions="""
+              This is a Fast MCP Server for Nagisa
+              Call get_current_time() to get the current time""")
+
 print(f"[DEBUG] Fast MCP Server initialized")
 
 # 工具函数定义
