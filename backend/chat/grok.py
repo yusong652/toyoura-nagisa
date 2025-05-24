@@ -115,7 +115,7 @@ class GrokClient(LLMClientBase):
             response = self.client.chat.completions.create(
                 model=self.extra_config.get("model", "grok-3"),
                 messages=messages_for_llm,
-                temperature=2.0,
+                temperature=1.0,
                 max_tokens=100
             )
             if response.choices:
