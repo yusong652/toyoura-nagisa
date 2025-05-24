@@ -10,8 +10,7 @@
     "lint:backend": "cd backend && ruff check .",
     "format:backend": "cd backend && ruff format .",
     "start:backend": "cd backend && uv run run.py",
-    "start:mcp": "cd backend/nagisa_mcp && uv run fast_mcp_server.py",
-    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\" \"npm run start:mcp\"",
+    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

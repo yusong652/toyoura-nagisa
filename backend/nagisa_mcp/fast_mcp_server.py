@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Dict, Any, List, Optional
 from fastmcp import FastMCP, Client
+from common_tools import register_common_tools
 from datetime import datetime
 
 mcp = FastMCP("Fast MCP Server", 
@@ -11,12 +12,7 @@ mcp = FastMCP("Fast MCP Server",
 
 print(f"[DEBUG] Fast MCP Server initialized")
 
-# 工具函数定义
-@mcp.tool()
-async def get_current_time() -> str:
-    """获取当前时间"""
-    print(f"[DEBUG] Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+register_common_tools(mcp)
     
 # 启动服务器
 if __name__ == "__main__":

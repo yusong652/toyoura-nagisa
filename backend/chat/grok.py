@@ -12,12 +12,12 @@ class GrokClient(LLMClientBase):
     """
     Grok 客户端实现（基于 OpenAI SDK）。
     """
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
         self.client = OpenAI(api_key=self.api_key, base_url="https://api.x.ai/v1")
         print(f"GrokClient (OpenAI SDK) initialized.")
-        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
     def _format_messages_for_grok(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[list, bool]:
         messages_for_llm = [
@@ -142,6 +142,8 @@ class GrokClient(LLMClientBase):
         tools = []
         for tool in mcp_tools:
             params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            if "properties" in params:
+                params["required"] = list(params["properties"].keys())
             if "additionalProperties" not in params:
                 params["additionalProperties"] = False
             tools.append({

@@ -17,12 +17,13 @@ class MistralClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
         """
         初始化 Mistral 客户端。
         Args:
             api_key: Mistral API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
+            mcp_client: 可选，用于 in-process tool calls via app.state.mcp
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
@@ -32,7 +33,7 @@ class MistralClient(LLMClientBase):
             "Authorization": f"Bearer {self.api_key}"
         }
         self.mistral_client = mistralai.Mistral(api_key=self.api_key)
-        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         print(f"MistralClient initialized.")
 
     def _format_messages_for_mistral(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
@@ -233,13 +234,22 @@ class MistralClient(LLMClientBase):
         tools = []
         for tool in mcp_tools:
             params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            # 自动补全 required 字段
+            if "properties" in params:
+                params["required"] = list(params["properties"].keys())
+                # 确保每个参数有 description
+                for k, v in params["properties"].items():
+                    if "description" not in v or not v["description"]:
+                        v["description"] = f"{k} parameter"
+            if "type" not in params:
+                params["type"] = "object"
             if "additionalProperties" not in params:
                 params["additionalProperties"] = False
             tools.append({
                 "type": "function",
                 "function": {
                     "name": tool.name,
-                    "description": getattr(tool, "description", ""),
+                    "description": getattr(tool, "description", tool.name),
                     "parameters": params
                 }
             })

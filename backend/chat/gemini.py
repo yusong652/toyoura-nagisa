@@ -16,12 +16,13 @@ class GeminiClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
         """
         初始化 Gemini 客户端。
         Args:
             api_key: Google API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
+            mcp_client: 可选，用于替换默认的 MCPClient。
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
@@ -55,7 +56,7 @@ class GeminiClient(LLMClientBase):
         
         print(f"Gemini Client initialized.")
         # 集成 MCPClient
-        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
 
     def map_role(self, role: str) -> str:
@@ -243,7 +244,7 @@ class GeminiClient(LLMClientBase):
             {
                 "name": tool.name,
                 "description": getattr(tool, "description", ""),
-                "parameters": getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+                "parameters": (lambda params: (params.update({"required": list(params["properties"].keys())}) if "properties" in params else None, params)[-1])(getattr(tool, "inputSchema", {"type": "object", "properties": {}}))
             }
             for tool in mcp_tools
         ]

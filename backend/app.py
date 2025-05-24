@@ -32,10 +32,18 @@ from backend.utils.helpers import (
     should_generate_title
 )
 from backend.chat.models import Message, ResponseType, LLMResponse
+from fastmcp import FastMCP, Client
+from backend.nagisa_mcp.common_tools import register_common_tools
+import threading
 
 
 # 加载环境变量
 load_dotenv()
+
+# Initialize MCP server and register tools
+mcp = FastMCP("Nagisa MCP Server", instructions="You can call get_weather, get_current_time, etc.")
+register_common_tools(mcp)
+mcp_client = Client(mcp)
 
 # 应用生命周期管理器
 @asynccontextmanager
@@ -44,13 +52,20 @@ async def lifespan(app: FastAPI):
     await tts_engine.initialize()
     app.state.tts_engine = tts_engine
     print("TTS Engine Initialized.")
-    # 初始化 LLM Client
-    llm_client = get_client()
+    # 初始化 LLM Client，传递 mcp_client 实例
+    llm_client = get_client(mcp_client=mcp_client)
     app.state.llm_client = llm_client
+    app.state.mcp = mcp
+    app.state.mcp_client = mcp_client
+    # 启动 MCP SSE server（如需对外暴露）
+    mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9000), daemon=True)
+    mcp_thread.start()
+    print("MCP Server Initialized and running on SSE port 9000.")
     yield
     print("Shutting down TTS Engine...")
     await app.state.tts_engine.shutdown()
     print("TTS Engine Shutdown.")
+    # MCP server will exit with main process
 
 app = FastAPI(lifespan=lifespan)
 

@@ -15,12 +15,13 @@ class AnthropicClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
         """
         初始化 Anthropic 客户端。
         Args:
             api_key: Anthropic API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
+            mcp_client: 可选，用于 in-process tool calls via app.state.mcp
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
@@ -31,7 +32,7 @@ class AnthropicClient(LLMClientBase):
             "anthropic-version": "2023-06-01"
         }
         self.anthropic_client = anthropic.Anthropic(api_key=self.api_key)
-        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
     def _format_messages_for_anthropic(self, messages: List[Message]) -> Tuple[List[Dict[str, Any]], bool]:
         """
@@ -155,12 +156,13 @@ class AnthropicClient(LLMClientBase):
                 temperature=self.extra_config.get("temperature", 0.7),
                 tools=tools if tools else None
             )
+            print("[Anthropic LLM Raw Response]", response)
             # 检查是否有function call
             if hasattr(response, "content") and response.content:
                 for item in response.content:
-                    if item["type"] == "tool_use":
-                        function_name = item["name"]
-                        arguments = item["input"]
+                    if hasattr(item, "type") and item.type == "tool_use":
+                        function_name = getattr(item, "name", None)
+                        arguments = getattr(item, "input", None)
                         return LLMResponse(
                             content="",
                             response_type=ResponseType.FUNCTION_CALL,
@@ -171,8 +173,8 @@ class AnthropicClient(LLMClientBase):
             # 普通文本回复
             llm_reply = ""
             for content_item in response.content:
-                if content_item["type"] == "text":
-                    llm_reply += content_item["text"]
+                if hasattr(content_item, "type") and content_item.type == "text":
+                    llm_reply += getattr(content_item, "text", "")
             response_text, keyword = parse_llm_output(llm_reply)
             return LLMResponse(
                 content=response_text,
@@ -180,6 +182,9 @@ class AnthropicClient(LLMClientBase):
                 keyword=keyword
             )
         except Exception as e:
+            import traceback
+            print("[Anthropic LLM Exception]", e)
+            traceback.print_exc()
             return LLMResponse(
                 content=f"Anthropic SDK error: {str(e)}",
                 response_type=ResponseType.ERROR
@@ -273,13 +278,23 @@ class AnthropicClient(LLMClientBase):
         tools = []
         for tool in mcp_tools:
             params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            # 自动补全 required 字段
+            if "properties" in params:
+                params["required"] = list(params["properties"].keys())
+                # 确保每个参数有 description
+                for k, v in params["properties"].items():
+                    if "description" not in v or not v["description"]:
+                        v["description"] = f"{k} parameter"
+            if "type" not in params:
+                params["type"] = "object"
             if "additionalProperties" not in params:
                 params["additionalProperties"] = False
-            tools.append({
+            tool_schema = {
                 "name": tool.name,
-                "description": getattr(tool, "description", ""),
+                "description": getattr(tool, "description", tool.name),
                 "input_schema": params
-            })
+            }
+
         return tools
 
     async def handle_function_call(self, function_call: dict):
@@ -292,6 +307,34 @@ class AnthropicClient(LLMClientBase):
         async with self.mcp_client as mcp_async_client:
             return await mcp_async_client.call_tool(tool_name, params)
 
+    # 工具函数：规范化 tool_result 为 Anthropic 支持的 content block
+    def _normalize_tool_content(self, tool_result):
+        content = []
+        if isinstance(tool_result, list):
+            for c in tool_result:
+                if isinstance(c, dict) and "type" in c and c["type"] in ("text", "image"):
+                    content.append(c)
+                elif isinstance(c, dict) and "inline_data" in c:
+                    mime = c["inline_data"].get("mime_type", "image/png")
+                    data = c["inline_data"]["data"]
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": mime,
+                            "data": data
+                        }
+                    })
+                elif isinstance(c, dict) and "text" in c:
+                    content.append({"type": "text", "text": str(c["text"])})
+                elif c is not None:
+                    content.append({"type": "text", "text": str(c)})
+        elif tool_result is not None:
+            content = [{"type": "text", "text": str(tool_result)}]
+        else:
+            content = [{"type": "text", "text": ""}]
+        return content
+
     async def handle_function_call_closed_loop(
         self,
         messages: List[Message],
@@ -301,8 +344,7 @@ class AnthropicClient(LLMClientBase):
     ) -> 'LLMResponse':
         """
         Anthropic function call闭环：
-        1. 将function_call和其结果作为新对话轮次加入messages
-        2. 再次调用Anthropic，获得最终自然语言回复
+        1. assistant发tool_use，user发tool_result，均为dict格式，符合Anthropic 0.52.0官方要求。
         """
         import json as _json
         function_name = tool_call.get("name")
@@ -311,21 +353,31 @@ class AnthropicClient(LLMClientBase):
         if not isinstance(arguments, str):
             arguments = _json.dumps(arguments, ensure_ascii=False)
         anthropic_messages, _ = self._format_messages_for_anthropic(messages)
-        # 1. 先加 assistant function_call 消息
+        # 1. assistant 发送 tool_use（content 为 list，含 text/思考和 tool_use block）
+        tool_use_block = {
+            "type": "tool_use",
+            "id": tool_call_id,
+            "name": function_name,
+            "input": _json.loads(arguments)
+        }
+        # 可选：可加一个思考text block
+        content_blocks = [
+            {"type": "text", "text": "<thinking>Calling tool: {}...</thinking>".format(function_name)},
+            tool_use_block
+        ]
         anthropic_messages.append({
             "role": "assistant",
-            "content": None,
-            "tool_use": {
-                "id": tool_call_id,
-                "name": function_name,
-                "input": arguments
-            }
+            "content": content_blocks
         })
-        # 2. 再加 tool 消息
-        anthropic_messages.append({
-            "role": "tool",
+        # 2. user 发送工具结果（type=tool_result block）
+        tool_result_block = {
+            "type": "tool_result",
             "tool_use_id": tool_call_id,
             "content": str(tool_result)
+        }
+        anthropic_messages.append({
+            "role": "user",
+            "content": [tool_result_block]
         })
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         try:
@@ -336,10 +388,11 @@ class AnthropicClient(LLMClientBase):
                 system=self.system_prompt,
                 temperature=self.extra_config.get("temperature", 0.7)
             )
+            print("[Anthropic LLM Raw Response]", response)
             llm_reply = ""
             for content_item in response.content:
-                if content_item["type"] == "text":
-                    llm_reply += content_item["text"]
+                if hasattr(content_item, "type") and content_item.type == "text":
+                    llm_reply += getattr(content_item, "text", "")
             response_text, keyword = parse_llm_output(llm_reply)
             return LLMResponse(
                 content=response_text,
@@ -347,6 +400,9 @@ class AnthropicClient(LLMClientBase):
                 keyword=keyword
             )
         except Exception as e:
+            import traceback
+            print("[Anthropic LLM Exception]", e)
+            traceback.print_exc()
             return LLMResponse(
                 content=f"Anthropic SDK error: {str(e)}",
                 response_type=ResponseType.ERROR

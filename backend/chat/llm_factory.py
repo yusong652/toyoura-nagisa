@@ -29,12 +29,13 @@ def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     """
     _clients[name] = client_class
 
-def get_client(name: Optional[str] = None, **kwargs) -> LLMClientBase:
+def get_client(name: Optional[str] = None, mcp_client=None, **kwargs) -> LLMClientBase:
     """
     Get or create an LLM client instance.
     
     Args:
         name: Name of the LLM client to get. If None, uses the configured type.
+        mcp_client: MCP client instance to inject (for in-process tool calls)
         **kwargs: Arguments to pass to the client constructor
         
     Returns:
@@ -59,6 +60,9 @@ def get_client(name: Optional[str] = None, **kwargs) -> LLMClientBase:
         **specific_config,
         **kwargs
     }
+    
+    if mcp_client is not None:
+        client_kwargs["mcp_client"] = mcp_client
     
     # To avoid creating multiple instances with the same configuration
     config_key = f"{name}:{str(sorted(client_kwargs.items()))}"

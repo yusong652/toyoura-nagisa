@@ -14,12 +14,13 @@ class GPTClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
         """
         初始化 GPT 客户端。
         Args:
             api_key: OpenAI API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
+            mcp_client: 可选，MCPClient实例，用于直接调用MCP工具。
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
@@ -29,8 +30,8 @@ class GPTClient(LLMClientBase):
             "Authorization": f"Bearer {self.api_key}"
         }
         print(f"ChatGPTClient initialized.")
-        # 集成 MCPClient
-        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        from fastmcp import Client as MCPClient
+        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         self.openai_client = OpenAI(api_key=self.api_key)
 
     def _format_messages_for_openai(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
@@ -198,7 +199,9 @@ class GPTClient(LLMClientBase):
         tools = []
         for tool in mcp_tools:
             params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
-            # 自动补充 additionalProperties: False
+            # 自动补全 required 字段
+            if "properties" in params:
+                params["required"] = list(params["properties"].keys())
             if "additionalProperties" not in params:
                 params["additionalProperties"] = False
             tools.append({
