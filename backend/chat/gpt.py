@@ -5,6 +5,8 @@ import httpx
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output
+from fastmcp import Client as MCPClient
+from openai import OpenAI
 
 class GPTClient(LLMClientBase):
     """
@@ -27,6 +29,9 @@ class GPTClient(LLMClientBase):
             "Authorization": f"Bearer {self.api_key}"
         }
         print(f"ChatGPTClient initialized.")
+        # 集成 MCPClient
+        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
+        self.openai_client = OpenAI(api_key=self.api_key)
 
     def _format_messages_for_openai(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
         """
@@ -80,9 +85,6 @@ class GPTClient(LLMClientBase):
         messages: List[Message],
         **kwargs
     ) -> 'LLMResponse':
-        """
-        调用 OpenAI GPT API，返回 LLMResponse。
-        """
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
         model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")
         payload = {
@@ -90,31 +92,46 @@ class GPTClient(LLMClientBase):
             "messages": messages_for_llm,
             "temperature": self.extra_config.get("temperature", 1.2)
         }
+        # 自动获取 tools
+        tools = await self.get_function_call_schemas()
+        if tools:
+            payload["tools"] = tools
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=self.headers,
-                    json=payload,
-                    timeout=30.0
-                )
-                response.raise_for_status()
-                response_data = response.json()
-                if not response_data.get("choices"):
-                    raise ValueError("No choices in OpenAI response")
-                llm_reply = response_data["choices"][0]["message"]["content"]
-                print(f"LLM 回复: {llm_reply}")
-                response_text, keyword = parse_llm_output(llm_reply)
+            response = self.openai_client.chat.completions.create(
+                model=payload["model"],
+                messages=payload["messages"],
+                temperature=payload["temperature"],
+                tools=payload.get("tools")
+            )
+            if not response.choices:
+                raise ValueError("No choices in OpenAI response")
+            choice = response.choices[0].message
+            if hasattr(choice, "tool_calls") and choice.tool_calls:
+                tool_call = choice.tool_calls[0]
+                function_name = tool_call.function.name
+                arguments = tool_call.function.arguments
+                import json as _json
+                try:
+                    function_args = _json.loads(arguments) if isinstance(arguments, str) else arguments
+                except Exception:
+                    function_args = arguments
                 return LLMResponse(
-                    content=response_text,
-                    response_type=ResponseType.TEXT,
-                    keyword=keyword
+                    content="",
+                    response_type=ResponseType.FUNCTION_CALL,
+                    function_name=function_name,
+                    function_args=function_args,
+                    function_result=None
                 )
-        except httpx.TimeoutException:
-            raise RuntimeError("Request to LLM timed out")
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"LLM API error: {str(e)}")
+            llm_reply = choice.content
+            print(f"LLM 回复: {llm_reply}")
+            response_text, keyword = parse_llm_output(llm_reply)
+            return LLMResponse(
+                content=response_text,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
+            )
         except Exception as e:
+            print("OpenAI SDK error:", e)
             return LLMResponse(
                 content=str(e),
                 response_type=ResponseType.ERROR
@@ -174,10 +191,36 @@ class GPTClient(LLMClientBase):
 
     async def get_function_call_schemas(self):
         """
-        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 OpenAI tools 格式列表
         """
-        # 占位实现，返回空列表
-        return []
+        async with self.mcp_client as mcp_async_client:
+            mcp_tools = await mcp_async_client.list_tools()
+        tools = []
+        for tool in mcp_tools:
+            params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            # 自动补充 additionalProperties: False
+            if "additionalProperties" not in params:
+                params["additionalProperties"] = False
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": getattr(tool, "description", ""),
+                    "parameters": params,
+                    "strict": True
+                }
+            })
+        return tools
+
+    async def handle_function_call(self, function_call: dict):
+        """
+        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
+        function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
+        """
+        tool_name = function_call["name"]
+        params = function_call.get("arguments", {})
+        async with self.mcp_client as mcp_async_client:
+            return await mcp_async_client.call_tool(tool_name, params)
 
     async def handle_function_call_closed_loop(
         self,
@@ -191,9 +234,59 @@ class GPTClient(LLMClientBase):
         1. 将function_call和其结果作为新对话轮次加入messages
         2. 再次调用GPT，获得最终自然语言回复
         """
-        # 占位实现，返回错误响应
-        from backend.chat.models import LLMResponse, ResponseType
-        return LLMResponse(
-            content="Function call closed-loop not supported in GPT client.",
-            response_type=ResponseType.ERROR
-        )
+        import json as _json
+        function_name = tool_call.get("name")
+        arguments = tool_call.get("arguments")
+        tool_call_id = tool_call.get("id", "tool_call_id")
+        # arguments 必须是字符串
+        if not isinstance(arguments, str):
+            arguments = _json.dumps(arguments, ensure_ascii=False)
+        messages_for_llm, _ = self._format_messages_for_openai(messages)
+        # 1. 先加 assistant function_call 消息
+        messages_for_llm.append({
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": function_name,
+                        "arguments": arguments
+                    }
+                }
+            ]
+        })
+        # 2. 再加 tool 消息
+        messages_for_llm.append({
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": str(tool_result)
+        })
+        model = self.extra_config.get("model", "gpt-4.1-mini")
+        payload = {
+            "model": model,
+            "messages": messages_for_llm,
+            "temperature": self.extra_config.get("temperature", 1.2)
+        }
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=payload["model"],
+                messages=payload["messages"],
+                temperature=payload["temperature"]
+            )
+            if not response.choices:
+                raise ValueError("No choices in OpenAI response")
+            llm_reply = response.choices[0].message.content
+            response_text, keyword = parse_llm_output(llm_reply)
+            return LLMResponse(
+                content=response_text,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
+            )
+        except Exception as e:
+            print("OpenAI SDK error:", e)
+            return LLMResponse(
+                content=str(e),
+                response_type=ResponseType.ERROR
+            )

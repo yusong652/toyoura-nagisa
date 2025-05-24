@@ -232,10 +232,12 @@ async def chat_stream_endpoint(request: Request):
                     # 处理函数调用结果
                     tool_call = {
                         'name': llm_response.function_name,
-                        'arguments': llm_response.function_args
+                        'arguments': llm_response.function_args,
+                        'id': getattr(llm_response, 'function_call_id', 'tool_call_id')
                     }
-                    tool_result = llm_response.function_result
-                    # 闭环：将function call及其结果传回llm，获取最终回复
+                    # 这里要主动调用工具
+                    tool_result = await llm_client.handle_function_call(tool_call)
+                    # 闭环
                     final_llm_response = await llm_client.handle_function_call_closed_loop(
                         history_msgs,
                         tool_call,

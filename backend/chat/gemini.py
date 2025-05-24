@@ -50,8 +50,6 @@ class GeminiClient(LLMClientBase):
             system_instruction=self.system_prompt,
             safety_settings=self.safety_settings,
             temperature=self.extra_config.get('temperature', 1.2),
-            topP=self.extra_config.get('top_p', 0.95),
-            topK=self.extra_config.get('top_k', 40),
             max_output_tokens=self.extra_config.get('max_output_tokens', 500)
         )
         
