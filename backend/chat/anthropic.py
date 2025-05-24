@@ -6,6 +6,8 @@ import json
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output
+import anthropic
+from fastmcp import Client as MCPClient
 
 class AnthropicClient(LLMClientBase):
     """
@@ -28,6 +30,8 @@ class AnthropicClient(LLMClientBase):
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01"
         }
+        self.anthropic_client = anthropic.Anthropic(api_key=self.api_key)
+        self.mcp_client = MCPClient("nagisa_mcp/fast_mcp_server.py")
 
     def _format_messages_for_anthropic(self, messages: List[Message]) -> Tuple[List[Dict[str, Any]], bool]:
         """
@@ -140,49 +144,44 @@ class AnthropicClient(LLMClientBase):
         """
         anthropic_messages, has_image = self._format_messages_for_anthropic(messages)
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
-        payload = {
-            "model": model,
-            "messages": anthropic_messages,
-            "system": self.system_prompt,
-            "max_tokens": self.extra_config.get("max_tokens", 1024),
-            "temperature": self.extra_config.get("temperature", 0.7),
-        }
+        # 自动获取 tools
+        tools = await self.get_function_call_schemas()
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/messages",
-                    headers=self.headers,
-                    json=payload,
-                    timeout=20.0
-                )
-                if response.status_code != 200:
-                    response.raise_for_status()
-                response_data = response.json()
-                if "content" not in response_data or not response_data["content"]:
-                    raise ValueError("No content in Anthropic response")
-                llm_reply = ""
-                for content_item in response_data["content"]:
-                    if content_item["type"] == "text":
-                        llm_reply += content_item["text"]
-                response_text, keyword = parse_llm_output(llm_reply)
-                return LLMResponse(
-                    content=response_text,
-                    response_type=ResponseType.TEXT,
-                    keyword=keyword
-                )
-        except httpx.TimeoutException:
-            return LLMResponse(
-                content="Request to LLM timed out",
-                response_type=ResponseType.ERROR
+            response = self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=self.extra_config.get("max_tokens", 1024),
+                messages=anthropic_messages,
+                system=self.system_prompt,
+                temperature=self.extra_config.get("temperature", 0.7),
+                tools=tools if tools else None
             )
-        except httpx.HTTPStatusError as e:
+            # 检查是否有function call
+            if hasattr(response, "content") and response.content:
+                for item in response.content:
+                    if item["type"] == "tool_use":
+                        function_name = item["name"]
+                        arguments = item["input"]
+                        return LLMResponse(
+                            content="",
+                            response_type=ResponseType.FUNCTION_CALL,
+                            function_name=function_name,
+                            function_args=arguments,
+                            function_result=None
+                        )
+            # 普通文本回复
+            llm_reply = ""
+            for content_item in response.content:
+                if content_item["type"] == "text":
+                    llm_reply += content_item["text"]
+            response_text, keyword = parse_llm_output(llm_reply)
             return LLMResponse(
-                content=f"LLM API error: {str(e)}",
-                response_type=ResponseType.ERROR
+                content=response_text,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
             )
         except Exception as e:
             return LLMResponse(
-                content=f"Failed to get response from LLM: {str(e)}",
+                content=f"Anthropic SDK error: {str(e)}",
                 response_type=ResponseType.ERROR
             )
 
@@ -267,10 +266,31 @@ class AnthropicClient(LLMClientBase):
 
     async def get_function_call_schemas(self):
         """
-        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Anthropic tools 格式列表
         """
-        # 占位实现，返回空列表
-        return []
+        async with self.mcp_client as mcp_async_client:
+            mcp_tools = await mcp_async_client.list_tools()
+        tools = []
+        for tool in mcp_tools:
+            params = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            if "additionalProperties" not in params:
+                params["additionalProperties"] = False
+            tools.append({
+                "name": tool.name,
+                "description": getattr(tool, "description", ""),
+                "input_schema": params
+            })
+        return tools
+
+    async def handle_function_call(self, function_call: dict):
+        """
+        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
+        function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
+        """
+        tool_name = function_call["name"]
+        params = function_call.get("arguments", {})
+        async with self.mcp_client as mcp_async_client:
+            return await mcp_async_client.call_tool(tool_name, params)
 
     async def handle_function_call_closed_loop(
         self,
@@ -284,9 +304,50 @@ class AnthropicClient(LLMClientBase):
         1. 将function_call和其结果作为新对话轮次加入messages
         2. 再次调用Anthropic，获得最终自然语言回复
         """
-        # 占位实现，返回错误响应
-        from backend.chat.models import LLMResponse, ResponseType
-        return LLMResponse(
-            content="Function call closed-loop not supported in Anthropic client.",
-            response_type=ResponseType.ERROR
-        ) 
+        import json as _json
+        function_name = tool_call.get("name")
+        arguments = tool_call.get("arguments")
+        tool_call_id = tool_call.get("id", "tool_call_id")
+        if not isinstance(arguments, str):
+            arguments = _json.dumps(arguments, ensure_ascii=False)
+        anthropic_messages, _ = self._format_messages_for_anthropic(messages)
+        # 1. 先加 assistant function_call 消息
+        anthropic_messages.append({
+            "role": "assistant",
+            "content": None,
+            "tool_use": {
+                "id": tool_call_id,
+                "name": function_name,
+                "input": arguments
+            }
+        })
+        # 2. 再加 tool 消息
+        anthropic_messages.append({
+            "role": "tool",
+            "tool_use_id": tool_call_id,
+            "content": str(tool_result)
+        })
+        model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
+        try:
+            response = self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=self.extra_config.get("max_tokens", 1024),
+                messages=anthropic_messages,
+                system=self.system_prompt,
+                temperature=self.extra_config.get("temperature", 0.7)
+            )
+            llm_reply = ""
+            for content_item in response.content:
+                if content_item["type"] == "text":
+                    llm_reply += content_item["text"]
+            response_text, keyword = parse_llm_output(llm_reply)
+            return LLMResponse(
+                content=response_text,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
+            )
+        except Exception as e:
+            return LLMResponse(
+                content=f"Anthropic SDK error: {str(e)}",
+                response_type=ResponseType.ERROR
+            ) 
