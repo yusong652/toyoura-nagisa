@@ -267,6 +267,9 @@ async def chat_stream_endpoint(request: Request):
                         tool_result
                     )
                     
+                    # 发送工具使用结束状态
+                    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+                    
                     ai_msg_id = process_llm_response(
                         final_llm_response.content,
                         final_llm_response.keyword,
