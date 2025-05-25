@@ -7,14 +7,6 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-class WeatherInput(BaseModel):
-    city: str = Field(..., description="The city name, e.g. 'London'")
-    unit: str = Field("metric", description="'metric' for Celsius, 'imperial' for Fahrenheit")
-    class Config:
-        json_schema_extra = {
-            "additionalProperties": False
-        }
-
 def register_common_tools(mcp: FastMCP):
 
     @mcp.tool()
