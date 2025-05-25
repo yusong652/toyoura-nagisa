@@ -50,7 +50,9 @@ def create_user_message(parsed_data: dict) -> Message:
 def process_llm_response(response_text: str, keyword: str, history_msgs: list, session_id: str) -> str:
     """处理LLM响应，保存历史记录并返回AI消息ID"""
     ai_msg_id = str(uuid.uuid4())
-    ai_msg = Message(role="assistant", content=response_text)
+    # 将关键词添加到响应文本中
+    content = f"{response_text}\n[[{keyword}]]" if keyword else response_text
+    ai_msg = Message(role="assistant", content=content)
     ai_msg_dict = ai_msg.model_dump()
     ai_msg_dict["id"] = ai_msg_id
     history_msgs.append(Message(**ai_msg_dict))
