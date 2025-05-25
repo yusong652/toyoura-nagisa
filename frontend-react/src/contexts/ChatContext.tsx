@@ -27,6 +27,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false);
+  // 添加工具状态
+  const [toolState, setToolState] = useState<{
+    type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
+    tool_name?: string;
+    parameters?: Record<string, any>;
+    action_text?: string;
+  } | null>(null);
 
   // 检查与后端的连接
   const checkConnection = useCallback(async (): Promise<boolean> => {
@@ -640,6 +647,48 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
+    // 处理工具状态
+    const handleToolState = (data: any) => {
+      if (data.type === 'NAGISA_IS_USING_TOOL') {
+        // 更新当前机器人消息的工具状态
+        setMessages(prev => 
+          prev.map(msg => {
+            if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
+              return {
+                ...msg,
+                toolState: {
+                  isUsingTool: true,
+                  toolName: data.tool_name,
+                  toolParams: data.parameters,
+                  action: data.action_text
+                }
+              };
+            }
+            return msg;
+          })
+        );
+        // 更新全局工具状态
+        setToolState(data);
+      } else if (data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
+        // 清除当前机器人消息的工具状态
+        setMessages(prev => 
+          prev.map(msg => {
+            if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
+              return {
+                ...msg,
+                toolState: {
+                  isUsingTool: false
+                }
+              };
+            }
+            return msg;
+          })
+        );
+        // 清除全局工具状态
+        setToolState(data);
+      }
+    };
+
     // 处理文本和音频内容
     const handleContentUpdate = (data: any) => {
       if (data.text) {
@@ -700,6 +749,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           
           // 处理关键词
           handleKeyword(data);
+          
+          // 处理工具状态
+          if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
+            handleToolState(data);
+            return;
+          }
           
           // 处理文本和音频
           handleContentUpdate(data);
@@ -874,7 +929,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       deleteMessage,
       refreshSessions,
       checkConnection,
-      refreshTitle
+      refreshTitle,
+      toolState // 添加工具状态到context
     }}>
       {children}
     </ChatContext.Provider>

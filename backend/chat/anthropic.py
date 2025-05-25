@@ -156,7 +156,6 @@ class AnthropicClient(LLMClientBase):
                 temperature=self.extra_config.get("temperature", 0.7),
                 tools=tools if tools else None
             )
-            print("[Anthropic LLM Raw Response]", response)
             # 检查是否有function call
             if hasattr(response, "content") and response.content:
                 for item in response.content:
@@ -294,6 +293,7 @@ class AnthropicClient(LLMClientBase):
                 "description": getattr(tool, "description", tool.name),
                 "input_schema": params
             }
+            tools.append(tool_schema)
 
         return tools
 

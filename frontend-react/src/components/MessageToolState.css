@@ -1,0 +1,131 @@
+.message-tool-state {
+  margin-bottom: 8px;
+  width: 100%;
+  animation: fadeIn 0.3s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.message-tool-state::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+  pointer-events: none;
+}
+
+.message-tool-state-content {
+  background-color: var(--tool-state-bg, rgba(74, 144, 226, 0.08));
+  border: 1px solid var(--tool-state-border, rgba(74, 144, 226, 0.15));
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-color);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.message-tool-action {
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: #102040;
+  letter-spacing: 0.3px;
+}
+
+.message-tool-name {
+  margin-bottom: 4px;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  color: #133f87;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.message-tool-params {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.message-tool-param {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.param-name {
+  color: var(--tool-state-param-name, #888);
+  font-weight: 500;
+}
+
+.param-value {
+  color: var(--tool-state-param-value, #666);
+  word-break: break-all;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .message-tool-state-content {
+    background-color: var(--tool-state-bg-dark, rgba(74, 144, 226, 0.12));
+    border-color: var(--tool-state-border-dark, rgba(74, 144, 226, 0.25));
+    color: var(--tool-state-text-dark, #ccc);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .message-tool-action {
+    color: var(--tool-state-action-dark, #64b4ff);
+  }
+
+  .message-tool-name {
+    color: #93c5fd;
+  }
+
+  .message-tool-state::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+  }
+
+  .param-name {
+    color: var(--tool-state-param-name-dark, #aaa);
+  }
+
+  .param-value {
+    color: var(--tool-state-param-value-dark, #ccc);
+  }
+} 

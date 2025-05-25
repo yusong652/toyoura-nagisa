@@ -8,6 +8,11 @@ export interface Message {
   status?: MessageStatus; // 用户消息状态
   isLoading?: boolean; // 标记是否为加载中的消息
   isRead?: boolean; // 标记用户消息是否已读
+  toolState?: {
+    isUsingTool: boolean;
+    toolName?: string;
+    action?: string;
+  };
 }
 
 // 消息状态枚举
@@ -57,4 +62,10 @@ export interface ChatContextType extends ChatState {
   refreshSessions: () => Promise<void>;
   checkConnection: () => Promise<boolean>;
   refreshTitle: (sessionId: string) => Promise<void>;
+  toolState: {
+    type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
+    tool_name?: string;
+    parameters?: Record<string, any>;
+    action_text?: string;
+  } | null;
 } 

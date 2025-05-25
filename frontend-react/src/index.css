@@ -54,6 +54,14 @@
   --button-hover: #3a56d4;
   --button-active: #2e44a8;
   --scrollbar-bg: #f2f0e8;
+
+  /* 工具状态相关颜色 */
+  --tool-state-bg: rgba(74, 144, 226, 0.08);
+  --tool-state-border: rgba(74, 144, 226, 0.15);
+  --tool-state-text: #333333;
+  --tool-state-action: #0c2341;
+  --tool-state-param-name: #202020;
+  --tool-state-param-value: #333333;
 }
 
 [data-theme="dark"] {
@@ -99,6 +107,14 @@
   --button-hover: #7089f8;
   --button-active: #5d7bf7;
   --scrollbar-bg: #1a1a1a;
+
+  /* 工具状态相关颜色 - 深色主题 */
+  --tool-state-bg-dark: rgba(74, 144, 226, 0.12);
+  --tool-state-border-dark: rgba(74, 144, 226, 0.25);
+  --tool-state-text-dark: #cccccc;
+  --tool-state-action-dark: #64b4ff;
+  --tool-state-param-name-dark: #aaaaaa;
+  --tool-state-param-value-dark: #cccccc;
 }
 
 * {

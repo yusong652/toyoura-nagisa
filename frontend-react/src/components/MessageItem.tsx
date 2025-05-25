@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import './MessageItem.css'
 import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/ChatContext'
+import MessageToolState from './MessageToolState'
 
 interface MessageItemProps {
   message: Message
@@ -10,7 +11,7 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
-  const { sender, text, files, streaming, isLoading, status, timestamp, id } = message
+  const { sender, text, files, streaming, isLoading, status, timestamp, id, toolState } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const textRef = useRef(text)
@@ -226,6 +227,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
       
       {sender === 'bot' ? (
         <div className="message-wrapper">
+          {toolState && <MessageToolState toolState={toolState} />}
           <div className="message-content">
             {renderStreamingText()}
             

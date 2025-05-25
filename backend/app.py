@@ -244,6 +244,14 @@ async def chat_stream_endpoint(request: Request):
                 # 处理不同类型的响应
                 print(f"[DEBUG] llm_response type: {llm_response.response_type}")
                 if llm_response.response_type == ResponseType.FUNCTION_CALL:
+                    # 发送工具使用开始状态
+                    tool_state = {
+                        'type': 'NAGISA_IS_USING_TOOL',
+                        'tool_name': llm_response.function_name,
+                        'action_text': f"I'll use the {llm_response.function_name} tool to help you."
+                    }
+                    yield f"data: {json.dumps(tool_state)}\n\n"
+                    
                     # 处理函数调用结果
                     tool_call = {
                         'name': llm_response.function_name,
@@ -258,6 +266,10 @@ async def chat_stream_endpoint(request: Request):
                         tool_call,
                         tool_result
                     )
+                    
+                    # 发送工具使用结束状态
+                    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+                    
                     ai_msg_id = process_llm_response(
                         final_llm_response.content,
                         final_llm_response.keyword,
@@ -282,6 +294,9 @@ async def chat_stream_endpoint(request: Request):
                                 yield f"data: {json.dumps(tts_result)}\n\n"
                     
                 elif llm_response.response_type == ResponseType.TEXT:
+                    # 发送工具使用结束状态（如果是纯文本响应，说明没有使用工具）
+                    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+                    
                     # 处理普通文本响应
                     ai_msg_id = process_llm_response(
                         llm_response.content,
@@ -309,6 +324,9 @@ async def chat_stream_endpoint(request: Request):
                             yield f"data: {json.dumps(tts_result)}\n\n"
                     
                 elif llm_response.response_type == ResponseType.ERROR:
+                    # 发送工具使用结束状态（如果是错误响应，也要结束工具状态）
+                    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+                    
                     error_data = {
                         'type': 'error',
                         'error': llm_response.content
@@ -338,6 +356,9 @@ async def chat_stream_endpoint(request: Request):
                             yield f"data: {json.dumps(title_update_data)}\n\n"
                 
             except Exception as e:
+                # 发送工具使用结束状态（如果发生错误，也要结束工具状态）
+                yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+                
                 error_data = {
                     'type': 'error',
                     'error': str(e)

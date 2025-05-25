@@ -16,18 +16,24 @@ def register_common_tools(mcp: FastMCP):
 
     @mcp.tool()
     def get_weather(
-        city: str = Field(..., description="The city name, e.g. 'London'"),
+        city: str = Field(..., description="The city name in English, e.g. 'London' (please do not use Chinese)"),
         unit: str = Field("metric", description="'metric' for Celsius, 'imperial' for Fahrenheit")
     ) -> dict:
         """
-        Get the current weather for a city using OpenWeatherMap API.
+        Get the current weather for a city using the OpenWeatherMap API.
+
+        Note: The 'city' parameter must be provided in English (e.g., 'London'). 
+        Do not use Chinese or other non-English city names, as the API only supports English input.
+
         Args:
-            city: The city name, e.g. 'London'
-            unit: 'metric' for Celsius, 'imperial' for Fahrenheit
+            city: The city name in English, e.g. 'London'. Do not use Chinese.
+            unit: 'metric' for Celsius, 'imperial' for Fahrenheit.
+
         Returns:
-            A dictionary with weather info (temperature, description, etc.)
+            A dictionary with weather information (temperature, description, etc.)
         """
         API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
+        print(city)
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units={unit}"
         try:
             resp = requests.get(url, timeout=10)
