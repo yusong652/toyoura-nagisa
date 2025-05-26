@@ -5,10 +5,12 @@ from enum import Enum
 
 # 定义单条消息的结构 (可选，但对于管理历史记录很有用)
 class Message(BaseModel):
-    role: Literal['user', 'assistant', 'system'] = Field(..., description="消息发送者角色")
+    role: Literal['user', 'assistant', 'system', 'tool'] = Field(..., description="消息发送者角色，兼容OpenAI function call，包括'tool'")
     content: Union[str, List[dict]] = Field(..., description="消息内容，可以是字符串或多模态内容列表")
     timestamp: Optional[datetime] = Field(None, description="消息时间戳（可选）")
     id: Optional[str] = Field(None, description="消息唯一ID（可选）")
+    tool_call_id: Optional[str] = Field(None, description="工具调用唯一ID，仅role为tool时使用")
+    tool_calls: Optional[List[dict]] = Field(None, description="OpenAI function call专用，assistant消息携带的tool_calls")
 
 # 定义前端发送到 /api/chat 的请求体结构
 class ChatRequest(BaseModel):
@@ -38,7 +40,8 @@ class LLMResponse:
         keyword: Optional[str] = None,
         function_name: Optional[str] = None,
         function_args: Optional[Dict[str, Any]] = None,
-        function_result: Optional[Any] = None
+        function_result: Optional[Any] = None,
+        function_call_id: Optional[str] = None,
     ):
         self.content = content
         self.response_type = response_type
@@ -46,6 +49,7 @@ class LLMResponse:
         self.function_name = function_name
         self.function_args = function_args
         self.function_result = function_result
+        self.function_call_id = function_call_id
 
     def to_dict(self) -> dict:
         return {
@@ -54,5 +58,6 @@ class LLMResponse:
             "keyword": self.keyword,
             "function_name": self.function_name,
             "function_args": self.function_args,
-            "function_result": self.function_result
+            "function_result": self.function_result,
+            "function_call_id": self.function_call_id,
         }

@@ -1,5 +1,6 @@
 import os
 import re
+import json 
 from typing import List, Tuple, Optional, Dict, Any
 import httpx
 from backend.chat.base import LLMClientBase
@@ -49,6 +50,22 @@ class GPTClient(LLMClientBase):
         has_image = False
         for msg in messages:
             # 自动转换为 OpenAI 多模态格式
+            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                # function_call assistant消息，带tool_calls
+                messages_for_llm.append({
+                    "role": msg.role,
+                    "content": msg.content,
+                    "tool_calls": msg.tool_calls
+                })
+                continue
+            if msg.role == "tool":
+                # tool消息，带tool_call_id
+                messages_for_llm.append({
+                    "role": msg.role,
+                    "content": msg.content,
+                    "tool_call_id": msg.tool_call_id
+                })
+                continue
             if isinstance(msg.content, list):
                 openai_content = []
                 for c in msg.content:
@@ -87,6 +104,9 @@ class GPTClient(LLMClientBase):
         **kwargs
     ) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
+        # print("\n========== OpenAI API 请求消息格式 ==========")
+        # import pprint; pprint.pprint(messages_for_llm)
+        # print("========== END ==========")
         model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")
         payload = {
             "model": model,
@@ -111,20 +131,20 @@ class GPTClient(LLMClientBase):
                 tool_call = choice.tool_calls[0]
                 function_name = tool_call.function.name
                 arguments = tool_call.function.arguments
-                import json as _json
+                tool_call_id = tool_call.id
                 try:
-                    function_args = _json.loads(arguments) if isinstance(arguments, str) else arguments
+                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
                 except Exception:
                     function_args = arguments
                 return LLMResponse(
-                    content="",
+                    content=choice.content,
                     response_type=ResponseType.FUNCTION_CALL,
                     function_name=function_name,
                     function_args=function_args,
-                    function_result=None
+                    function_result=None,
+                    function_call_id=tool_call_id
                 )
             llm_reply = choice.content
-            print(f"LLM 回复: {llm_reply}")
             response_text, keyword = parse_llm_output(llm_reply)
             return LLMResponse(
                 content=response_text,
@@ -224,72 +244,3 @@ class GPTClient(LLMClientBase):
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
             return await mcp_async_client.call_tool(tool_name, params)
-
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> 'LLMResponse':
-        """
-        GPT function call闭环：
-        1. 将function_call和其结果作为新对话轮次加入messages
-        2. 再次调用GPT，获得最终自然语言回复
-        """
-        import json as _json
-        function_name = tool_call.get("name")
-        arguments = tool_call.get("arguments")
-        tool_call_id = tool_call.get("id", "tool_call_id")
-        # arguments 必须是字符串
-        if not isinstance(arguments, str):
-            arguments = _json.dumps(arguments, ensure_ascii=False)
-        messages_for_llm, _ = self._format_messages_for_openai(messages)
-        # 1. 先加 assistant function_call 消息
-        messages_for_llm.append({
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": function_name,
-                        "arguments": arguments
-                    }
-                }
-            ]
-        })
-        # 2. 再加 tool 消息
-        messages_for_llm.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": str(tool_result)
-        })
-        model = self.extra_config.get("model", "gpt-4.1-mini")
-        payload = {
-            "model": model,
-            "messages": messages_for_llm,
-            "temperature": self.extra_config.get("temperature", 1.2)
-        }
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=payload["model"],
-                messages=payload["messages"],
-                temperature=payload["temperature"]
-            )
-            if not response.choices:
-                raise ValueError("No choices in OpenAI response")
-            llm_reply = response.choices[0].message.content
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
-        except Exception as e:
-            print("OpenAI SDK error:", e)
-            return LLMResponse(
-                content=str(e),
-                response_type=ResponseType.ERROR
-            )

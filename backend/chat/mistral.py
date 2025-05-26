@@ -45,7 +45,44 @@ class MistralClient(LLMClientBase):
         ]
         has_image = False
         for msg in messages:
-            # 自动转换为 Mistral 多模态格式
+            # 1. assistant function_call 消息
+            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                messages_for_llm.append({
+                    "role": "assistant",
+                    "content": "",  # 必须为空字符串
+                    "tool_calls": msg.tool_calls
+                })
+                continue
+
+            # 2. tool 消息
+            if msg.role == "tool":
+                # content 兜底转字符串，优先取 text 属性
+                tool_content = msg.content
+                if not isinstance(tool_content, str):
+                    # 优先取 text 属性（如 TextContent），否则转 str
+                    tool_content = getattr(tool_content, 'text', str(tool_content))
+                # name/tool_call_id 兜底
+                tool_call_id = getattr(msg, "tool_call_id", None)
+                name = getattr(msg, "name", None)
+                # 如果没有 name/tool_call_id，尝试从上一条 assistant 的 tool_calls 自动补全
+                if (not tool_call_id or not name) and messages_for_llm:
+                    for prev in reversed(messages_for_llm):
+                        if prev.get("role") == "assistant" and prev.get("tool_calls"):
+                            tc = prev["tool_calls"][0]
+                            if not tool_call_id:
+                                tool_call_id = tc.get("id")
+                            if not name:
+                                name = tc.get("function", {}).get("name")
+                            break
+                messages_for_llm.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "name": name,
+                    "content": tool_content
+                })
+                continue
+
+            # 3. 其他消息（user/assistant普通回复，多模态）
             if isinstance(msg.content, list):
                 mistral_content = []
                 has_text = False
@@ -100,13 +137,9 @@ class MistralClient(LLMClientBase):
                     "content": mistral_content
                 })
             else:
-                # 所有消息都使用统一的数组格式
                 messages_for_llm.append({
                     "role": msg.role, 
-                    "content": [{
-                        "type": "text",
-                        "text": str(msg.content)
-                    }]
+                    "content": str(msg.content)
                 })
         return messages_for_llm, has_image
 
@@ -119,6 +152,9 @@ class MistralClient(LLMClientBase):
         调用 Mistral API，返回 LLMResponse。
         """
         messages_for_llm, has_image = self._format_messages_for_mistral(messages)
+        print("\n========== Mistral API 请求消息格式 ==========")
+        import pprint; pprint.pprint(messages_for_llm)
+        print("========== END ==========")
         model = self.extra_config.get("model", "mistral-large-latest")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
@@ -137,16 +173,19 @@ class MistralClient(LLMClientBase):
                 function_name = tool_call.function.name
                 import json as _json
                 arguments = tool_call.function.arguments
+                tool_call_id = tool_call.id
                 try:
                     function_args = _json.loads(arguments) if isinstance(arguments, str) else arguments
                 except Exception:
                     function_args = arguments
+                natural_content = response.choices[0].message.content if hasattr(response.choices[0].message, "content") else ""
                 return LLMResponse(
-                    content="",
+                    content=natural_content or "",
                     response_type=ResponseType.FUNCTION_CALL,
                     function_name=function_name,
                     function_args=function_args,
-                    function_result=None
+                    function_result=None,
+                    function_call_id=tool_call_id
                 )
             llm_reply = response.choices[0].message.content
             response_text, keyword = parse_llm_output(llm_reply)
@@ -263,66 +302,4 @@ class MistralClient(LLMClientBase):
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
-            return await mcp_async_client.call_tool(tool_name, params)
-
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> 'LLMResponse':
-        import json as _json
-        function_name = tool_call.get("name")
-        arguments = tool_call.get("arguments")
-        # 生成合法的tool_call_id: 9位a-zA-Z0-9
-        def gen_tool_call_id():
-            return ''.join(random.choices(string.ascii_letters + string.digits, k=9))
-        tool_call_id = tool_call.get("id")
-        if not tool_call_id or not (isinstance(tool_call_id, str) and len(tool_call_id) == 9 and tool_call_id.isalnum()):
-            tool_call_id = gen_tool_call_id()
-        if not isinstance(arguments, str):
-            arguments = _json.dumps(arguments, ensure_ascii=False)
-        messages_for_llm, _ = self._format_messages_for_mistral(messages)
-        # 1. 先加 assistant function_call 消息
-        messages_for_llm.append({
-            "role": "assistant",
-            "content": "",
-            "tool_calls": [
-                {
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": function_name,
-                        "arguments": arguments
-                    }
-                }
-            ]
-        })
-        # 2. 再加 tool 消息
-        messages_for_llm.append({
-            "role": "tool",
-            "name": function_name,
-            "content": str(tool_result),
-            "tool_call_id": tool_call_id
-        })
-        model = self.extra_config.get("model", "mistral-large-latest")
-        try:
-            response = await self.mistral_client.chat.complete_async(
-                model=model,
-                messages=messages_for_llm,
-                temperature=self.extra_config.get("temperature", 0.7),
-                max_tokens=self.extra_config.get("max_tokens", 1024)
-            )
-            llm_reply = response.choices[0].message.content
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
-        except Exception as e:
-            return LLMResponse(
-                content=f"Mistral SDK error: {str(e)}",
-                response_type=ResponseType.ERROR
-            ) 
+            return await mcp_async_client.call_tool(tool_name, params) 

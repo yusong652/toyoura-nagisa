@@ -243,12 +243,20 @@ class AnthropicClient(LLMClientBase):
                     if hasattr(item, "type") and item.type == "tool_use":
                         function_name = getattr(item, "name", None)
                         arguments = getattr(item, "input", None)
+                        tool_call_id = getattr(item, "id", None)
+                        # 查找同一条消息中的 text 内容
+                        text_content = ""
+                        for prev in response.content:
+                            if hasattr(prev, "type") and prev.type == "text":
+                                text_content = getattr(prev, "text", "")
+                                break
                         return LLMResponse(
-                            content="",
+                            content=text_content,  # 用真实自然语言内容
                             response_type=ResponseType.FUNCTION_CALL,
                             function_name=function_name,
                             function_args=arguments,
-                            function_result=None
+                            function_result=None,
+                            function_call_id=tool_call_id
                         )
             # 普通文本回复
             llm_reply = ""

@@ -59,6 +59,9 @@ class GrokClient(LLMClientBase):
 
     async def get_response(self, messages: List[Message], **kwargs) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_grok(messages)
+        print("\n========== Grok API 请求消息格式 ==========")
+        import pprint; pprint.pprint(messages_for_llm)
+        print("========== END ==========")
         model = self.extra_config.get("model", "grok-3")
         tools = await self.get_function_call_schemas()
         try:
@@ -69,16 +72,24 @@ class GrokClient(LLMClientBase):
                 max_tokens=self.extra_config.get("max_tokens", 1024),
                 tools=tools if tools else None
             )
+
             if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
                 tool_call = response.choices[0].message.tool_calls[0]
                 function_name = tool_call.function.name
                 arguments = tool_call.function.arguments
+                tool_call_id = tool_call.id
+                try:
+                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                except Exception:
+                    function_args = arguments
+
                 return LLMResponse(
                     content="",
                     response_type=ResponseType.FUNCTION_CALL,
                     function_name=function_name,
-                    function_args=arguments,
-                    function_result=None
+                    function_args=function_args,
+                    function_result=None,
+                    function_call_id=tool_call_id
                 )
             if response.choices:
                 llm_reply = response.choices[0].message.content
@@ -198,7 +209,7 @@ class GrokClient(LLMClientBase):
         messages_for_llm.append({
             "role": "tool",
             "tool_call_id": tool_call_id,
-            "content": str(tool_result)
+            "content": getattr(tool_result, 'text', str(tool_result))
         })
         model = self.extra_config.get("model", "grok-3")
         try:

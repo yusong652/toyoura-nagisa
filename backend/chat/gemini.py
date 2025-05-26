@@ -1,6 +1,7 @@
 import os
 import re
 import httpx
+import json
 from typing import List, Tuple, Optional, Dict, Any
 from google import genai
 from google.genai import types
@@ -71,6 +72,33 @@ class GeminiClient(LLMClientBase):
         # 2. 构造 Gemini API payload，注册 tools
         contents = []
         for msg in messages:
+            # Gemini function call标准：
+            # - assistant function_call消息用model+function_call结构
+            # - tool响应用user+function_response结构
+            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                # function_call消息
+                for tool_call in msg.tool_calls:
+                    arguments = tool_call["function"].get("arguments", {})
+                    if isinstance(arguments, str):
+                        try:
+                            arguments = json.loads(arguments)
+                        except Exception:
+                            arguments = {}
+                    parts = [types.Part(function_call=types.FunctionCall(
+                        name=tool_call["function"]["name"],
+                        args=arguments
+                    ))]
+                    contents.append({"role": "model", "parts": parts})
+                continue
+            if msg.role == "tool" and msg.tool_call_id:
+                # 工具响应消息
+                parts = [types.Part.from_function_response(
+                    name="",  # Gemini要求name与function_call一致，建议补全
+                    response={"result": msg.content}
+                )]
+                contents.append({"role": "user", "parts": parts})
+                continue
+            # 普通消息
             parts = []
             if isinstance(msg.content, list):
                 for item in msg.content:
@@ -97,6 +125,10 @@ class GeminiClient(LLMClientBase):
             tools=tool_schemas
         )
 
+        print("\n========== Gemini API 请求消息格式 ==========")
+        import pprint; pprint.pprint(contents)
+        print("========== END ==========")
+
         try:
             response = self.client.models.generate_content(
                 model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
@@ -107,20 +139,22 @@ class GeminiClient(LLMClientBase):
                 candidate = response.candidates[0]
                 # 遍历所有 parts，优先处理 function_call
                 if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
+                    natural_content = ""
+                    tool_call = None
                     for part in candidate.content.parts:
                         if hasattr(part, 'function_call') and part.function_call:
                             tool_call = part.function_call
-                            tool_result = await self.handle_function_call({
-                                "name": tool_call.name,
-                                "arguments": tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments
-                            })
-                            return LLMResponse(
-                                content=str(tool_result),
-                                response_type=ResponseType.FUNCTION_CALL,
-                                function_name=tool_call.name,
-                                function_args=tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments,
-                                function_result=tool_result
-                            )
+                            break
+                        if hasattr(part, 'text') and part.text:
+                            natural_content = part.text  # 记录 function_call 前的自然语言内容
+                    if tool_call:
+                        return LLMResponse(
+                            content=natural_content,  # 优先用自然语言内容
+                            response_type=ResponseType.FUNCTION_CALL,
+                            function_name=tool_call.name,
+                            function_args=tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments,
+                            function_result=None
+                        )
                     # 如果没有 function_call，找第一个有 text 的 part
                     for part in candidate.content.parts:
                         if hasattr(part, 'text') and part.text:
@@ -260,84 +294,3 @@ class GeminiClient(LLMClientBase):
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
             return await mcp_async_client.call_tool(tool_name, params)
-
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> LLMResponse:
-        """
-        Gemini function call闭环：
-        1. 将function_call和其结果作为新对话轮次加入contents
-        2. 再次调用Gemini，获得最终自然语言回复
-        """
-        tool_schemas = await self.get_function_call_schemas()
-        # 1. 先把原始messages转为contents
-        contents = []
-        for msg in messages:
-            parts = []
-            if isinstance(msg.content, list):
-                for item in msg.content:
-                    if "text" in item:
-                        parts.append({"text": item['text']})
-                    elif "inline_data" in item:
-                        parts.append({
-                            "inline_data": {
-                                "mime_type": item['inline_data'].get('mime_type', 'image/png'),
-                                "data": item['inline_data']['data']
-                            }
-                        })
-            else:
-                parts.append({"text": msg.content})
-            mapped_role = self.map_role(msg.role)
-            contents.append({"role": mapped_role, "parts": parts})
-
-        # 2. 构造function_call和function_response part
-        function_call_part = types.Part(function_call=types.FunctionCall(
-            name=tool_call['name'],
-            args=tool_call.get('arguments', {})
-        ))
-        function_response_part = types.Part.from_function_response(
-            name=tool_call['name'],
-            response={"result": tool_result}
-        )
-        # 3. 按Gemini推荐方式追加两轮
-        contents.append(types.Content(role="model", parts=[function_call_part]))
-        contents.append(types.Content(role="user", parts=[function_response_part]))
-
-        config = types.GenerateContentConfig(
-            system_instruction=self.system_prompt,
-            safety_settings=self.safety_settings,
-            temperature=self.extra_config.get('temperature', 1.2),
-            max_output_tokens=self.extra_config.get('max_output_tokens', 500),
-            tools=tool_schemas
-        )
-        # 4. 再次请求LLM
-        try:
-            response = self.client.models.generate_content(
-                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
-                contents=contents,
-                config=config
-            )
-            if hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
-                    response_text = candidate.content.parts[0].text
-                    response_text, keyword = parse_llm_output(response_text)
-                    return LLMResponse(
-                        content=response_text,
-                        response_type=ResponseType.TEXT,
-                        keyword=keyword
-                    )
-            return LLMResponse(
-                content="",
-                response_type=ResponseType.ERROR
-            )
-        except Exception as e:
-            print(f"Gemini闭环API error: {e}")
-            return LLMResponse(
-                content=str(e),
-                response_type=ResponseType.ERROR
-            )
