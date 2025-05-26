@@ -388,7 +388,6 @@ class AnthropicClient(LLMClientBase):
                 system=self.system_prompt,
                 temperature=self.extra_config.get("temperature", 0.7)
             )
-            print("[Anthropic LLM Raw Response]", response)
             llm_reply = ""
             for content_item in response.content:
                 if hasattr(content_item, "type") and content_item.type == "text":

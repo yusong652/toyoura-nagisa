@@ -51,8 +51,9 @@ def process_llm_response(response_text: str, keyword: str, history_msgs: list, s
     """处理LLM响应，保存历史记录并返回AI消息ID"""
     ai_msg_id = str(uuid.uuid4())
     # 将关键词添加到响应文本中
-    content = f"{response_text}\n[[{keyword}]]" if keyword else response_text
+    content = f"{response_text}[[{keyword}]]" if keyword else response_text
     ai_msg = Message(role="assistant", content=content)
+    print(f"ai_msg: {ai_msg}")
     ai_msg_dict = ai_msg.model_dump()
     ai_msg_dict["id"] = ai_msg_id
     history_msgs.append(Message(**ai_msg_dict))
