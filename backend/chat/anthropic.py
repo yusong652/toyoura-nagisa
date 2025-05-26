@@ -46,10 +46,97 @@ class AnthropicClient(LLMClientBase):
         has_image = False
         
         for msg in messages:
+            # 跳过 system
             if msg.role == "system":
                 continue  # Anthropic 使用单独的 system 参数
-            
+
+            # 处理 assistant function_call 消息（带 tool_calls 字段，转为 Anthropic 官方格式）
+            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                # 取自然语言内容
+                text_block = {"type": "text", "text": msg.content or "正在调用工具..."}
+                tool_blocks = []
+                for call in msg.tool_calls:
+                    # 兼容 arguments 为 str 或 dict
+                    arguments = call["function"].get("arguments", {})
+                    if isinstance(arguments, str):
+                        try:
+                            arguments = json.loads(arguments)
+                        except Exception:
+                            arguments = {}
+                    tool_blocks.append({
+                        "type": "tool_use",
+                        "id": call["id"],
+                        "name": call["function"]["name"],
+                        "input": arguments
+                    })
+                anthropic_messages.append({
+                    "role": "assistant",
+                    "content": [text_block] + tool_blocks
+                })
+                continue
+
+            # 1. 处理 tool 角色（转为 user+tool_result 块）
+            if msg.role == "tool":
+                tool_result_content = msg.content
+                if isinstance(tool_result_content, str):
+                    tool_result_content = [{"type": "text", "text": tool_result_content}]
+                elif not isinstance(tool_result_content, list):
+                    tool_result_content = []
+                else:
+                    # 过滤掉空白/空字符串的 text 块，并保证每个元素为 content block
+                    filtered = []
+                    for c in tool_result_content:
+                        if isinstance(c, dict) and c.get("type") == "text":
+                            text_val = str(c.get("text", "")).strip()
+                            if text_val:
+                                filtered.append({"type": "text", "text": c["text"]})
+                        elif isinstance(c, dict):
+                            filtered.append(c)
+                        elif isinstance(c, str):
+                            filtered.append({"type": "text", "text": c})
+                    tool_result_content = filtered
+                tool_result_block = {
+                    "type": "tool_result",
+                    "tool_use_id": getattr(msg, "tool_call_id", getattr(msg, "id", "")),
+                    "content": tool_result_content
+                }
+                anthropic_messages.append({
+                    "role": "user",
+                    "content": [tool_result_block]
+                })
+                continue
+
+            # 2. 处理 user/assistant 角色
             if isinstance(msg.content, list):
+                # 检查是否是 tool_result 块（已是 user+tool_result）
+                if (
+                    msg.role == "user"
+                    and len(msg.content) == 1
+                    and isinstance(msg.content[0], dict)
+                    and msg.content[0].get("type") == "tool_result"
+                ):
+                    tool_result_block = msg.content[0]
+                    # --- 修正：如果 content 是字符串，自动包装为 content block 数组 ---
+                    content_val = tool_result_block.get("content", [])
+                    if isinstance(content_val, str):
+                        tool_result_block["content"] = [{"type": "text", "text": content_val}]
+                    elif isinstance(content_val, list):
+                        filtered = []
+                        for c in content_val:
+                            if isinstance(c, dict) and c.get("type") == "text":
+                                text_val = str(c.get("text", "")).strip()
+                                if text_val:
+                                    filtered.append({"type": "text", "text": c["text"]})
+                            elif isinstance(c, dict):
+                                filtered.append(c)
+                            elif isinstance(c, str):
+                                filtered.append({"type": "text", "text": c})
+                        tool_result_block["content"] = filtered
+                    anthropic_messages.append({
+                        "role": "user",
+                        "content": [tool_result_block]
+                    })
+                    continue
                 # 处理多模态内容
                 content = []
                 for c in msg.content:
@@ -57,15 +144,14 @@ class AnthropicClient(LLMClientBase):
                         if "type" in c and c["type"] == "text" and "text" in c:
                             content.append({
                                 "type": "text",
-                                "text": c["text"]
+                                "text": c["text"] or " "
                             })
                         elif "text" in c and "type" not in c:
                             content.append({
                                 "type": "text",
-                                "text": c["text"]
+                                "text": c["text"] or " "
                             })
                         elif "inline_data" in c:
-                            # 图片，转为 Anthropic 格式
                             mime = c["inline_data"].get("mime_type", "image/png")
                             data = c["inline_data"]["data"]
                             content.append({
@@ -103,36 +189,31 @@ class AnthropicClient(LLMClientBase):
                                 })
                                 has_image = True
                         else:
-                            # 兜底：转为文本
-                            text = str(c.get("text", ""))
+                            text = str(c.get("text", "")) or " "
                             content.append({
                                 "type": "text",
                                 "text": text
                             })
                     else:
-                        # 字符串直接转为 text 类型
                         content.append({
                             "type": "text",
-                            "text": str(c)
+                            "text": str(c) or " "
                         })
-                # 兜底：如果 content 为空，补一个空字符串
                 if not content:
-                    content = [{"type": "text", "text": ""}]
+                    content = [{"type": "text", "text": " "}]
                 anthropic_messages.append({
                     "role": "user" if msg.role == "user" else "assistant",
                     "content": content
                 })
             else:
-                # 普通字符串内容
-                text = str(msg.content) if msg.content else ""
+                text = str(msg.content) if msg.content else " "
                 anthropic_messages.append({
                     "role": "user" if msg.role == "user" else "assistant",
                     "content": [{
                         "type": "text",
-                        "text": text
+                        "text": text or " "
                     }]
                 })
-        
         return anthropic_messages, has_image
 
     async def get_response(
@@ -334,75 +415,3 @@ class AnthropicClient(LLMClientBase):
         else:
             content = [{"type": "text", "text": ""}]
         return content
-
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> 'LLMResponse':
-        """
-        Anthropic function call闭环：
-        1. assistant发tool_use，user发tool_result，均为dict格式，符合Anthropic 0.52.0官方要求。
-        """
-        import json as _json
-        function_name = tool_call.get("name")
-        arguments = tool_call.get("arguments")
-        tool_call_id = tool_call.get("id", "tool_call_id")
-        if not isinstance(arguments, str):
-            arguments = _json.dumps(arguments, ensure_ascii=False)
-        anthropic_messages, _ = self._format_messages_for_anthropic(messages)
-        # 1. assistant 发送 tool_use（content 为 list，含 text/思考和 tool_use block）
-        tool_use_block = {
-            "type": "tool_use",
-            "id": tool_call_id,
-            "name": function_name,
-            "input": _json.loads(arguments)
-        }
-        # 可选：可加一个思考text block
-        content_blocks = [
-            {"type": "text", "text": "<thinking>Calling tool: {}...</thinking>".format(function_name)},
-            tool_use_block
-        ]
-        anthropic_messages.append({
-            "role": "assistant",
-            "content": content_blocks
-        })
-        # 2. user 发送工具结果（type=tool_result block）
-        tool_result_block = {
-            "type": "tool_result",
-            "tool_use_id": tool_call_id,
-            "content": str(tool_result)
-        }
-        anthropic_messages.append({
-            "role": "user",
-            "content": [tool_result_block]
-        })
-        model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
-        try:
-            response = self.anthropic_client.messages.create(
-                model=model,
-                max_tokens=self.extra_config.get("max_tokens", 1024),
-                messages=anthropic_messages,
-                system=self.system_prompt,
-                temperature=self.extra_config.get("temperature", 0.7)
-            )
-            llm_reply = ""
-            for content_item in response.content:
-                if hasattr(content_item, "type") and content_item.type == "text":
-                    llm_reply += getattr(content_item, "text", "")
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
-        except Exception as e:
-            import traceback
-            print("[Anthropic LLM Exception]", e)
-            traceback.print_exc()
-            return LLMResponse(
-                content=f"Anthropic SDK error: {str(e)}",
-                response_type=ResponseType.ERROR
-            ) 
