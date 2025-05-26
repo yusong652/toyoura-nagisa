@@ -161,34 +161,40 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
       
       const historyData = await historyResponse.json()
-      const convertedMessages: Message[] = historyData.history.map((msg: any) => {
-        const sender = msg.role === 'user' ? 'user' : 'bot'
-        let text = ''
-        let files: FileData[] = []
-        if (typeof msg.content === 'string') {
-          text = msg.content
-        } else if (Array.isArray(msg.content)) {
-          msg.content.forEach((item: any) => {
-            if (item.text) {
-              text = item.text
-            } else if (item.inline_data) {
-              files.push({
-                name: `image_${files.length + 1}`,
-                type: item.inline_data.mime_type,
-                data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
-              })
-            }
-          })
-        }
-        return {
-          id: msg.id || uuidv4(),
-          sender,
-          text,
-          files: files.length > 0 ? files : undefined,
-          timestamp: new Date(msg.timestamp).getTime(),
-          status: sender === 'user' ? MessageStatus.READ : undefined // 为历史用户消息设置已读状态
-        }
-      })
+      const convertedMessages: Message[] = historyData.history
+        .filter((msg: any) => {
+          // 过滤掉工具相关的消息
+          const isToolMessage = msg.role === 'tool' || (msg.role === 'assistant' && msg.tool_calls);
+          return !isToolMessage;
+        })
+        .map((msg: any) => {
+          const sender = msg.role === 'user' ? 'user' : 'bot'
+          let text = ''
+          let files: FileData[] = []
+          if (typeof msg.content === 'string') {
+            text = msg.content
+          } else if (Array.isArray(msg.content)) {
+            msg.content.forEach((item: any) => {
+              if (item.text) {
+                text = item.text
+              } else if (item.inline_data) {
+                files.push({
+                  name: `image_${files.length + 1}`,
+                  type: item.inline_data.mime_type,
+                  data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
+                })
+              }
+            })
+          }
+          return {
+            id: msg.id || uuidv4(),
+            sender,
+            text,
+            files: files.length > 0 ? files : undefined,
+            timestamp: new Date(msg.timestamp).getTime(),
+            status: sender === 'user' ? MessageStatus.READ : undefined // 为历史用户消息设置已读状态
+          }
+        })
       setMessages(convertedMessages)
       setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
