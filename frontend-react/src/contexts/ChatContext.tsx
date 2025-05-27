@@ -804,22 +804,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        // 等待所有chunk处理完成
+        // Wait for all chunks to be processed
         while (chunkQueue.length > 0 || isProcessingChunk) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // 响应结束后，更新消息为最终状态
+        // After streaming all sentences, only update isLoading and streaming flags
         setMessages(prev => 
           prev.map(msg => {
-            // Check either the original botMessageId or the finalAiMessageId that may have been set
             if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
               return { 
                 ...msg, 
-                text: currentText || '(空白消息)', // 防止空消息
                 isLoading: false,
                 streaming: false,
-                // Make sure to keep using the backend ID
                 id: finalAiMessageId || botMessageId
               };
             }
@@ -827,7 +824,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           })
         );
         
-        // 刷新会话列表以更新最新状态
+        // Refresh session list to update latest state
         refreshSessions();
         break;
       }
