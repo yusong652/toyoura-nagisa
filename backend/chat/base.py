@@ -62,26 +62,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    @abstractmethod
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> 'LLMResponse':
-        """
-        Handle the function call closed-loop: after receiving a function_call from LLM, call the tool,
-        then send the function call and its result back to the LLM to get the final natural language response.
-        Args:
-            messages: The original conversation history (list of Message)
-            tool_call: The function call info (name, arguments, etc)
-            tool_result: The result from the tool execution
-        Returns:
-            LLMResponse: The final LLM response after the closed-loop
-        """
-        pass
-
     def set_system_prompt(self, prompt: str):
         """动态设置/更新 system prompt。"""
         self.system_prompt = prompt

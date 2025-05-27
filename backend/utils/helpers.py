@@ -78,10 +78,7 @@ def should_generate_title(session_id: str, history_msgs: list) -> bool:
     """判断是否需要生成标题"""
     sessions = get_all_sessions()
     current_session = next((s for s in sessions if s['id'] == session_id), None)
-    # 检查是否是第一轮对话（第一条用户消息和第一条纯文本助手回复）
-    has_user_msg = any(msg.role == "user" for msg in history_msgs)
-    has_pure_text_assistant_msg = any(is_pure_text_assistant(msg) for msg in history_msgs)
-    is_first_round = has_user_msg and has_pure_text_assistant_msg
+    is_first_round = len(history_msgs) == 2
     has_default_title = current_session is not None
     return is_first_round and has_default_title
 
