@@ -23,7 +23,7 @@ from backend.chat.llm_factory import get_client
 from backend.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config
 import uuid
-from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts
+from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
 from backend.utils.helpers import (
     parse_message_data,
     create_user_message,
@@ -262,18 +262,16 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
             history_msgs,
             session_id
         )
-        text_data = {
-            'type': 'text',
-            'content': llm_response.content,
-            'keyword': llm_response.keyword,
-            'message_id': ai_msg_id
-        }
-        yield f"data: {json.dumps(text_data)}\n\n"
-        cleaned_response_text = clean_text_for_tts(llm_response.content)
-        sentences = split_text_by_punctuations(cleaned_response_text)
+        # 新增：表情/颜文字占位处理
+        text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(llm_response.content)
+        restored_text = restore_emoticons(text_with_placeholders, kaomoji_list, emoji_list)
+        # 分句用占位符文本
+        sentences = split_text_by_punctuations(text_with_placeholders)
         for sentence in sentences:
-            tts_result = await process_tts_sentence(sentence, tts_engine)
+            tts_text = clean_text_for_tts(sentence)
+            tts_result = await process_tts_sentence(tts_text, tts_engine)
             if tts_result:
+                tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)  # 确保占位符能正确匹配
                 yield f"data: {json.dumps(tts_result)}\n\n"
         # ------ 标题生成判断逻辑移动到这里 ------
         loaded_history = load_history(session_id)
