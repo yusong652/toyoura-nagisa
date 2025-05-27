@@ -280,17 +280,20 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
         history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
         if should_generate_title(session_id, history_msgs_after):
             new_title = await generate_title_for_session(session_id, llm_client)
-            if new_title:
-                update_success = update_session_title(session_id, new_title)
-                if update_success:
-                    title_update_data = {
-                        'type': 'TITLE_UPDATE',
-                        'payload': {
-                            'session_id': session_id,
-                            'title': new_title
-                        }
+            if new_title is None:
+                raise HTTPException(status_code=400, detail="No valid user message or pure text assistant message found for title generation.")
+            if not new_title:
+                raise HTTPException(status_code=500, detail="标题生成失败")
+            update_success = update_session_title(session_id, new_title)
+            if update_success:
+                title_update_data = {
+                    'type': 'TITLE_UPDATE',
+                    'payload': {
+                        'session_id': session_id,
+                        'title': new_title
                     }
-                    yield f"data: {json.dumps(title_update_data)}\n\n"
+                }
+                yield f"data: {json.dumps(title_update_data)}\n\n"
     elif llm_response.response_type == ResponseType.ERROR:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {
@@ -372,38 +375,18 @@ async def delete_message_endpoint(request: DeleteMessageRequest):
 async def generate_title_endpoint(request: Request):
     """根据会话历史生成一个新的标题"""
     try:
-        # 从请求体中获取会话ID
         data = await request.json()
         session_id = data.get('session_id')
-        
         if not session_id:
             raise HTTPException(status_code=400, detail="请求中未提供会话ID")
-            
-        # 验证会话ID是否存在
         sessions = get_all_sessions()
         session = next((s for s in sessions if s['id'] == session_id), None)
-        
         if not session:
             raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
-        
-        # 加载指定会话的历史记录
-        history = load_history(session_id)
-        
-        # 确保有足够的消息来生成标题（至少一个用户消息和一个AI响应）
-        if len(history) < 2:
-            raise HTTPException(status_code=400, detail="会话中的消息数量不足，无法生成标题")
-        
-        # 获取最新的用户消息和助手回复
-        last_user_msg = next((message_factory(msg) if isinstance(msg, dict) else msg for msg in reversed(history) if (isinstance(msg, dict) and msg.get('role') == 'user') or (hasattr(msg, 'role') and msg.role == 'user')), None)
-        last_assistant_msg = next((message_factory(msg) if isinstance(msg, dict) else msg for msg in reversed(history) if is_pure_text_assistant(message_factory(msg) if isinstance(msg, dict) else msg)), None)
-        if not last_user_msg or not last_assistant_msg:
-            raise HTTPException(status_code=400, detail="无法找到有效的用户消息和助手回复")
         llm_client: LLMClientBase = request.app.state.llm_client
-        new_title = await generate_conversation_title(
-            last_user_msg,
-            last_assistant_msg,
-            llm_client
-        )
+        new_title = await generate_title_for_session(session_id, llm_client)
+        if new_title is None:
+            raise HTTPException(status_code=400, detail="No valid user message or pure text assistant message found for title generation.")
         if not new_title:
             raise HTTPException(status_code=500, detail="标题生成失败")
         update_success = update_session_title(session_id, new_title)
