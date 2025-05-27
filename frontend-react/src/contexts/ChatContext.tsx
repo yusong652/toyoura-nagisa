@@ -163,21 +163,37 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const historyData = await historyResponse.json()
       const convertedMessages: Message[] = historyData.history
         .filter((msg: any) => {
-          // 过滤掉工具相关的消息
-          const isToolMessage = msg.role === 'tool' || (msg.role === 'assistant' && msg.tool_calls);
-          return !isToolMessage;
+          // 过滤掉工具消息
+          if (msg.role === 'tool') return false;
+          // 过滤掉assistant的工具请求消息（只要有tool_calls字段且非空）
+          if (msg.role === 'assistant' && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) return false;
+          // 过滤掉 user 伪装的 tool_result 块（如有）
+          if (
+            msg.role === 'user' &&
+            Array.isArray(msg.content) &&
+            msg.content.length === 1 &&
+            msg.content[0].type === 'tool_result'
+          ) return false;
+          return true;
         })
         .map((msg: any) => {
           const sender = msg.role === 'user' ? 'user' : 'bot'
           let text = ''
           let files: FileData[] = []
+          
+          // 处理消息内容
           if (typeof msg.content === 'string') {
             text = msg.content
           } else if (Array.isArray(msg.content)) {
+            // 合并所有文本内容
+            const textContents = msg.content
+              .filter((item: any) => item.text)
+              .map((item: any) => item.text)
+            text = textContents.join('\n')
+            
+            // 处理所有文件
             msg.content.forEach((item: any) => {
-              if (item.text) {
-                text = item.text
-              } else if (item.inline_data) {
+              if (item.inline_data) {
                 files.push({
                   name: `image_${files.length + 1}`,
                   type: item.inline_data.mime_type,
@@ -186,13 +202,28 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               }
             })
           }
+          
+          // 处理工具状态
+          let toolState = undefined
+          if (msg.tool_state) {
+            toolState = {
+              isUsingTool: msg.tool_state.is_using_tool || false,
+              toolName: msg.tool_state.tool_name,
+              action: msg.tool_state.action
+            }
+          }
+          
           return {
             id: msg.id || uuidv4(),
             sender,
             text,
             files: files.length > 0 ? files : undefined,
             timestamp: new Date(msg.timestamp).getTime(),
-            status: sender === 'user' ? MessageStatus.READ : undefined // 为历史用户消息设置已读状态
+            status: sender === 'user' ? MessageStatus.READ : undefined,
+            streaming: false,
+            isLoading: false,
+            isRead: true,
+            toolState
           }
         })
       setMessages(convertedMessages)

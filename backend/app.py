@@ -32,7 +32,7 @@ from backend.utils.helpers import (
     should_generate_title,
     is_pure_text_assistant
 )
-from backend.chat.models import Message, ResponseType, LLMResponse
+from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, ToolMessage, SystemMessage, message_factory
 from fastmcp import FastMCP, Client
 from backend.nagisa_mcp.common_tools import register_common_tools
 import threading
@@ -227,7 +227,7 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
 
         # 将function_call和tool_result作为消息加入历史
         # 1. assistant function_call 消息（带tool_calls字段，content必须为空字符串）
-        function_call_msg = Message(
+        function_call_msg = AssistantMessage(
             role="assistant",
             content="",
             id=tool_call['id'],
@@ -241,7 +241,7 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
             }]
         )
         # 2. tool 消息
-        tool_msg = Message(
+        tool_msg = ToolMessage(
             role="tool",
             content=str(tool_result),
             tool_call_id=tool_call['id'],
@@ -289,12 +289,12 @@ async def chat_stream_endpoint(request: Request):
     if not parsed_data:
         return ErrorResponse(detail="无效的消息数据")
     loaded_history = load_history(session_id)
-    history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     user_msg = create_user_message(parsed_data)
     if parsed_data.get('message_id'):
         user_msg_dict = user_msg.model_dump()
         user_msg_dict["id"] = parsed_data['message_id']
-        history_msgs.append(Message(**user_msg_dict))
+        history_msgs.append(message_factory(user_msg_dict))
     else:
         history_msgs.append(user_msg)
     recent_messages_length = get_llm_config().get("recent_messages_length", 20)
@@ -308,14 +308,9 @@ async def chat_stream_endpoint(request: Request):
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
-                # 重新加载最新的历史记录
-                updated_history = load_history(session_id)
-                updated_history_msgs = [Message(**msg) if isinstance(msg, dict) else msg for msg in updated_history]
-                if should_generate_title(session_id, updated_history_msgs):
-                    # 获取第一条用户消息
-                    first_user_msg = next((m for m in updated_history_msgs if m.role == "user"), None)
-                    # 获取第一条纯文本助手回复（跳过工具调用）
-                    first_assistant_msg = next((m for m in updated_history_msgs if is_pure_text_assistant(m)), None)
+                if should_generate_title(session_id, history_msgs):
+                    first_user_msg = next((m for m in history_msgs if m.role == "user"), None)
+                    first_assistant_msg = next((m for m in history_msgs if is_pure_text_assistant(m)), None)
                     if first_user_msg and first_assistant_msg:
                         new_title = await generate_conversation_title(
                             first_user_msg,
@@ -402,9 +397,8 @@ async def generate_title_endpoint(request: Request):
             raise HTTPException(status_code=400, detail="会话中的消息数量不足，无法生成标题")
         
         # 获取最新的用户消息和助手回复
-        from backend.utils.helpers import is_pure_text_assistant
-        last_user_msg = next((Message(**msg) if isinstance(msg, dict) else msg for msg in reversed(history) if (isinstance(msg, dict) and msg.get('role') == 'user') or (hasattr(msg, 'role') and msg.role == 'user')), None)
-        last_assistant_msg = next((Message(**msg) if isinstance(msg, dict) else msg for msg in reversed(history) if is_pure_text_assistant(Message(**msg) if isinstance(msg, dict) else msg)), None)
+        last_user_msg = next((message_factory(msg) if isinstance(msg, dict) else msg for msg in reversed(history) if (isinstance(msg, dict) and msg.get('role') == 'user') or (hasattr(msg, 'role') and msg.role == 'user')), None)
+        last_assistant_msg = next((message_factory(msg) if isinstance(msg, dict) else msg for msg in reversed(history) if is_pure_text_assistant(message_factory(msg) if isinstance(msg, dict) else msg)), None)
         if not last_user_msg or not last_assistant_msg:
             raise HTTPException(status_code=400, detail="无法找到有效的用户消息和助手回复")
         llm_client: LLMClientBase = request.app.state.llm_client
