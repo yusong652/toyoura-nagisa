@@ -30,7 +30,8 @@ from backend.utils.helpers import (
     process_llm_response,
     process_tts_sentence,
     should_generate_title,
-    is_pure_text_assistant
+    is_pure_text_assistant,
+    generate_title_for_session
 )
 from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, ToolMessage, SystemMessage, message_factory
 from fastmcp import FastMCP, Client
@@ -274,6 +275,22 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
             tts_result = await process_tts_sentence(sentence, tts_engine)
             if tts_result:
                 yield f"data: {json.dumps(tts_result)}\n\n"
+        # ------ 标题生成判断逻辑移动到这里 ------
+        loaded_history = load_history(session_id)
+        history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+        if should_generate_title(session_id, history_msgs_after):
+            new_title = await generate_title_for_session(session_id, llm_client)
+            if new_title:
+                update_success = update_session_title(session_id, new_title)
+                if update_success:
+                    title_update_data = {
+                        'type': 'TITLE_UPDATE',
+                        'payload': {
+                            'session_id': session_id,
+                            'title': new_title
+                        }
+                    }
+                    yield f"data: {json.dumps(title_update_data)}\n\n"
     elif llm_response.response_type == ResponseType.ERROR:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {
@@ -308,26 +325,6 @@ async def chat_stream_endpoint(request: Request):
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
-                if should_generate_title(session_id, history_msgs):
-                    first_user_msg = next((m for m in history_msgs if m.role == "user"), None)
-                    first_assistant_msg = next((m for m in history_msgs if is_pure_text_assistant(m)), None)
-                    if first_user_msg and first_assistant_msg:
-                        new_title = await generate_conversation_title(
-                            first_user_msg,
-                            first_assistant_msg,
-                            llm_client
-                        )
-                        if new_title:
-                            update_success = update_session_title(session_id, new_title)
-                            if update_success:
-                                title_update_data = {
-                                    'type': 'TITLE_UPDATE',
-                                    'payload': {
-                                        'session_id': session_id,
-                                        'title': new_title
-                                    }
-                                }
-                                yield f"data: {json.dumps(title_update_data)}\n\n"
             except Exception as e:
                 yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
                 error_data = {

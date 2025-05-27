@@ -4,10 +4,11 @@ import asyncio
 import uuid
 from datetime import datetime
 from backend.chat import Message
-from backend.chat.utils import get_all_sessions, update_session_title, save_history
+from backend.chat.utils import get_all_sessions, update_session_title, save_history, load_history
 from backend.tts.base import BaseTTS
 from backend.chat.title_generator import generate_conversation_title
 from backend.config import get_llm_config
+from backend.chat.models import message_factory
 
 
 def parse_message_data(data: dict) -> tuple:
@@ -75,17 +76,36 @@ async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
         return {'text': sentence, 'audio': None, 'error': str(e)}
 
 def should_generate_title(session_id: str, history_msgs: list) -> bool:
-    """判断是否需要生成标题"""
+    """判断是否需要生成标题：只要当前为默认标题且有一条纯文本assistant消息即可。"""
     sessions = get_all_sessions()
     current_session = next((s for s in sessions if s['id'] == session_id), None)
-    is_first_round = len(history_msgs) == 2
-    has_default_title = current_session is not None
-    return is_first_round and has_default_title
+    has_default_title = (
+        current_session is not None and
+        (
+            current_session.get('name', '').startswith('New Chat')
+            or '新对话' in current_session.get('name', '')
+        )
+    )
+    has_pure_text_assistant = any(is_pure_text_assistant(msg) for msg in history_msgs)
+    return has_default_title and has_pure_text_assistant
 
 def is_pure_text_assistant(msg):
     """
-    判断 assistant 消息是否为非 tool/function_call（即无 tool_calls 字段）。
+    判断 assistant 消息是否为非 tool/function_call（即 tool_calls 字段不存在或为空）。
     """
     return (
-        getattr(msg, "role", None) == "assistant" and not getattr(msg, "tool_calls", None)
+        getattr(msg, "role", None) == "assistant" and not (getattr(msg, "tool_calls", None) or [])
     )
+
+async def generate_title_for_session(session_id: str, llm_client) -> str:
+    """
+    工具函数：根据session_id自动查找第一条user和第一条纯文本assistant消息并生成标题。
+    """
+    history = load_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    user_msg = next((msg for msg in history_msgs if getattr(msg, 'role', None) == 'user'), None)
+    assistant_msg = next((msg for msg in history_msgs if is_pure_text_assistant(msg)), None)
+    if not user_msg or not assistant_msg:
+        return None
+    title = await generate_conversation_title(user_msg, assistant_msg, llm_client)
+    return title
