@@ -8,7 +8,8 @@ from backend.chat.utils import get_all_sessions, update_session_title, save_hist
 from backend.tts.base import BaseTTS
 from backend.chat.title_generator import generate_conversation_title
 from backend.config import get_llm_config
-from backend.chat.models import message_factory
+from backend.chat.models import message_factory, AssistantMessage, UserToolMessage, UserMessage, AssistantToolMessage, BaseMessage
+from typing import Any
 
 
 def parse_message_data(data: dict) -> tuple:
@@ -19,8 +20,8 @@ def parse_message_data(data: dict) -> tuple:
     msg_obj = json.loads(message_data)
     text = msg_obj.get('text', '')
     files = msg_obj.get('files', [])
-    message_id = msg_obj.get('id')
     timestamp = msg_obj.get('timestamp')
+    msg_id = msg_obj.get('id')  # 修复：解析id字段
     content = []
     if text:
         content.append({"text": text})
@@ -35,33 +36,63 @@ def parse_message_data(data: dict) -> tuple:
             })
     return {
         'content': content,
-        'message_id': message_id,
-        'timestamp': timestamp
+        'timestamp': timestamp,
+        'id': msg_id  # 修复：返回id字段
     }, data.get('session_id', "default_session")
 
-def create_user_message(parsed_data: dict) -> Message:
-    """创建用户消息对象"""
+def process_user_message(parsed_data: dict) -> UserMessage:
+    """处理用户消息，创建并返回消息对象"""
     timestamp = parsed_data.get('timestamp')
-    return Message(
-        role="user",
+    user_msg = UserMessage(
         content=parsed_data['content'],
-        timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now()
+        timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
+        id=parsed_data.get('id')  # 使用前端传来的ID
     )
+    return user_msg
 
-def process_llm_response(response_text: str, keyword: str, history_msgs: list, session_id: str) -> str:
-    """处理LLM响应，保存历史记录并返回AI消息ID"""
+def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, AssistantMessage]:
+    """处理AI文本消息，保存历史记录并返回消息ID和消息对象"""
     ai_msg_id = str(uuid.uuid4())
-    # 将关键词添加到响应文本中
     content = f"{response_text}[[{keyword}]]" if keyword else response_text
-    # 直接创建带ID的消息对象
-    ai_msg = Message(
-        role="assistant",
+    ai_msg = AssistantMessage(
         content=content,
         id=ai_msg_id
     )
-    print(f"ai_msg: {ai_msg}")
     history_msgs.append(ai_msg)
-    save_history(session_id, [msg.model_dump() for msg in history_msgs])
+    save_history(session_id, [{
+        **msg.model_dump(),
+        'role': msg.role
+    } for msg in history_msgs])
+    return ai_msg_id, ai_msg
+
+def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:
+    """处理工具调用消息，创建并返回工具调用消息对象（不再追加到 history_msgs）"""
+    function_call_msg = AssistantToolMessage(
+        content="",
+        id=tool_call['id'],
+        tool_calls=[{
+            "id": tool_call['id'],
+            "type": "function",
+            "function": {
+                "name": tool_call['name'],
+                "arguments": json.dumps(tool_call['arguments'], ensure_ascii=False) if not isinstance(tool_call['arguments'], str) else tool_call['arguments']
+            }
+        }]
+    )
+    return function_call_msg
+
+def process_tool_response_message(tool_call: dict, tool_result: Any) -> UserToolMessage:
+    """处理工具响应消息，创建并返回工具响应消息对象（不再追加到 history_msgs）"""
+    tool_msg = UserToolMessage(
+        tool_request=tool_call,
+        content=str(tool_result),
+        id=tool_call['id']
+    )
+    return tool_msg
+
+def process_llm_response(response_text: str, keyword: str, history_msgs: list, session_id: str) -> str:
+    """处理LLM响应，保存历史记录并返回AI消息ID"""
+    ai_msg_id, _ = process_ai_text_message(response_text, keyword, history_msgs, session_id)
     return ai_msg_id
 
 async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
@@ -106,8 +137,8 @@ async def generate_title_for_session(session_id: str, llm_client) -> str:
     """
     history = load_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-    user_msg = next((msg for msg in history_msgs if getattr(msg, 'role', None) == 'user'), None)
-    assistant_msg = next((msg for msg in history_msgs if is_pure_text_assistant(msg)), None)
+    user_msg: BaseMessage = next((msg for msg in history_msgs if getattr(msg, 'role', None) == 'user'), None)
+    assistant_msg: BaseMessage = next((msg for msg in history_msgs if is_pure_text_assistant(msg)), None)
     if not user_msg or not assistant_msg:
         return None
     title = await generate_conversation_title(user_msg, assistant_msg, llm_client)
