@@ -53,11 +53,14 @@ def process_llm_response(response_text: str, keyword: str, history_msgs: list, s
     ai_msg_id = str(uuid.uuid4())
     # 将关键词添加到响应文本中
     content = f"{response_text}[[{keyword}]]" if keyword else response_text
-    ai_msg = Message(role="assistant", content=content)
+    # 直接创建带ID的消息对象
+    ai_msg = Message(
+        role="assistant",
+        content=content,
+        id=ai_msg_id
+    )
     print(f"ai_msg: {ai_msg}")
-    ai_msg_dict = ai_msg.model_dump()
-    ai_msg_dict["id"] = ai_msg_id
-    history_msgs.append(Message(**ai_msg_dict))
+    history_msgs.append(ai_msg)
     save_history(session_id, [msg.model_dump() for msg in history_msgs])
     return ai_msg_id
 
