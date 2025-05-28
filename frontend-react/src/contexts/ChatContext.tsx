@@ -163,24 +163,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const historyData = await historyResponse.json()
       const convertedMessages: Message[] = historyData.history
         .filter((msg: any) => {
-          // 过滤掉工具消息
-          if (msg.role === 'tool') return false;
-          // 过滤掉assistant的工具请求消息（只要有tool_calls字段且非空）
-          if (msg.role === 'assistant' && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) return false;
-          // 过滤掉 user 伪装的 tool_result 块（如有）
-          if (
-            msg.role === 'user' &&
-            Array.isArray(msg.content) &&
-            msg.content.length === 1 &&
-            msg.content[0].type === 'tool_result'
-          ) return false;
-          return true;
+          // 只保留真正的用户发言和AI文本
+          if (msg.role === 'user' && !msg.tool_request) return true;
+          if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true;
+          return false;
         })
         .map((msg: any) => {
-          const sender = msg.role === 'user' ? 'user' : 'bot'
+          // sender 判断更精确
+          let sender: 'user' | 'bot';
+          if (msg.role === 'user' && !msg.tool_request) {
+            sender = 'user';
+          } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
+            sender = 'bot';
+          } else {
+            // 理论上不会走到这里
+            sender = 'bot';
+          }
           let text = ''
           let files: FileData[] = []
-          
           // 处理消息内容
           if (typeof msg.content === 'string') {
             text = msg.content
@@ -190,7 +190,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               .filter((item: any) => item.text)
               .map((item: any) => item.text)
             text = textContents.join('\n')
-            
             // 处理所有文件
             msg.content.forEach((item: any) => {
               if (item.inline_data) {
@@ -202,7 +201,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               }
             })
           }
-          
           // 处理工具状态
           let toolState = undefined
           if (msg.tool_state) {
@@ -212,7 +210,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               action: msg.tool_state.action
             }
           }
-          
           return {
             id: msg.id || uuidv4(),
             sender,
@@ -438,7 +435,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
     // 创建用户消息
     const userMessage: Message = {
-      id: uuidv4(),
+      id: uuidv4(), // 使用前端生成的UUID
       sender: 'user',
       text,
       files,

@@ -1,6 +1,6 @@
 from typing import Optional
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message
+from backend.chat.models import BaseMessage
 import traceback
 
 def multimodal_to_prompt(content):
@@ -19,8 +19,8 @@ def multimodal_to_prompt(content):
     return prompt
 
 async def generate_conversation_title(
-    user_message: Message,
-    assistant_message: Message,
+    user_message: BaseMessage,
+    assistant_message: BaseMessage,
     llm_client: LLMClientBase,
     title_specific_system_prompt: Optional[str] = "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，并且除了这些标签和标题本身外，不要输出任何其他内容。"
 ) -> Optional[str]:

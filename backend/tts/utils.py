@@ -38,7 +38,7 @@ def extract_and_replace_emoticons(text: str):
     text = KAOMOJI_PATTERN_PARENS.sub(_kaomoji_repl, text)
     # 再替换emoji
     emoji_idx = [0]
-    def _emoji_repl(char):
+    def _emoji_repl(char, data=None):  # 修正：接收两个参数
         idx = emoji_idx[0]
         emoji_list.append(char)
         emoji_idx[0] += 1

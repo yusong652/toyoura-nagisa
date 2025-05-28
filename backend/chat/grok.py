@@ -4,7 +4,7 @@ import json
 from typing import List, Tuple, Optional, Dict, Any
 from openai import OpenAI
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, LLMResponse, ResponseType
+from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
 
@@ -19,12 +19,19 @@ class GrokClient(LLMClientBase):
         print(f"GrokClient (OpenAI SDK) initialized.")
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
-    def _format_messages_for_grok(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[list, bool]:
+    def _format_messages_for_grok(self, messages: List[BaseMessage], system_prompt: Optional[str] = None) -> Tuple[list, bool]:
         messages_for_llm = [
             {"role": "system", "content": system_prompt if system_prompt is not None else self.system_prompt}
         ]
         has_image = False
         for msg in messages:
+            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
+                messages_for_llm.append({
+                    "role": "tool",
+                    "content": msg.content,
+                    "tool_call_id": getattr(msg, "id", None)
+                })
+                continue
             if isinstance(msg.content, list):
                 grok_content = []
                 for c in msg.content:
@@ -57,7 +64,7 @@ class GrokClient(LLMClientBase):
                 messages_for_llm.append({"role": msg.role, "content": text})
         return messages_for_llm, has_image
 
-    async def get_response(self, messages: List[Message], **kwargs) -> 'LLMResponse':
+    async def get_response(self, messages: List[BaseMessage], **kwargs) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_grok(messages)
         print("\n========== Grok API 请求消息格式 ==========")
         import pprint; pprint.pprint(messages_for_llm)
@@ -111,8 +118,8 @@ class GrokClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: Message,
-        first_assistant_message: Message,
+        first_user_message: BaseMessage,
+        first_assistant_message: BaseMessage,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         try:
@@ -120,7 +127,7 @@ class GrokClient(LLMClientBase):
             messages = [
                 first_user_message,
                 first_assistant_message,
-                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             messages_for_llm, has_image = self._format_messages_for_grok(messages, system_prompt=system_prompt)
             response = self.client.chat.completions.create(

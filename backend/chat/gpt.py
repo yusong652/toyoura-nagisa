@@ -4,7 +4,7 @@ import json
 from typing import List, Tuple, Optional, Dict, Any
 import httpx
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, LLMResponse, ResponseType
+from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
 from openai import OpenAI
@@ -35,7 +35,7 @@ class GPTClient(LLMClientBase):
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         self.openai_client = OpenAI(api_key=self.api_key)
 
-    def _format_messages_for_openai(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
+    def _format_messages_for_openai(self, messages: List[BaseMessage], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
         """
         将内部消息格式转换为OpenAI API所需的格式。
         Args:
@@ -49,21 +49,18 @@ class GPTClient(LLMClientBase):
         ]
         has_image = False
         for msg in messages:
-            # 自动转换为 OpenAI 多模态格式
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
-                # function_call assistant消息，带tool_calls
                 messages_for_llm.append({
                     "role": msg.role,
                     "content": msg.content,
                     "tool_calls": msg.tool_calls
                 })
                 continue
-            if msg.role == "tool":
-                # tool消息，带tool_call_id
+            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
                 messages_for_llm.append({
-                    "role": msg.role,
+                    "role": "tool",
                     "content": msg.content,
-                    "tool_call_id": msg.tool_call_id
+                    "tool_call_id": getattr(msg, "id", None)
                 })
                 continue
             if isinstance(msg.content, list):
@@ -100,7 +97,7 @@ class GPTClient(LLMClientBase):
 
     async def get_response(
         self,
-        messages: List[Message],
+        messages: List[BaseMessage],
         **kwargs
     ) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
@@ -160,8 +157,8 @@ class GPTClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: Message,
-        first_assistant_message: Message,
+        first_user_message: BaseMessage,
+        first_assistant_message: BaseMessage,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         try:
@@ -169,7 +166,7 @@ class GPTClient(LLMClientBase):
             messages = [
                 first_user_message,
                 first_assistant_message,
-                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             
             messages_for_llm, has_image = self._format_messages_for_openai(

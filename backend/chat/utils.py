@@ -219,13 +219,18 @@ def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None
                     all_history = json.load(f)
                 except json.JSONDecodeError:
                     all_history = {}
-        # 为每条消息添加/修正时间戳为字符串
+        # 处理所有消息，确保timestamp为字符串
+        processed_history = []
         for msg in current_history:
-            if 'timestamp' not in msg or not msg['timestamp']:
-                msg['timestamp'] = datetime.now().isoformat()
-            elif isinstance(msg['timestamp'], datetime):
-                msg['timestamp'] = msg['timestamp'].isoformat()
-        all_history[session_id] = current_history
+            msg_copy = msg.copy()
+            if 'timestamp' not in msg_copy or not msg_copy['timestamp']:
+                msg_copy['timestamp'] = datetime.now().isoformat()
+            elif isinstance(msg_copy['timestamp'], datetime):
+                msg_copy['timestamp'] = msg_copy['timestamp'].isoformat()
+            if 'role' not in msg_copy and hasattr(msg, 'role'):
+                msg_copy['role'] = msg.role
+            processed_history.append(msg_copy)
+        all_history[session_id] = processed_history
         
         # 更新元数据中的更新时间
         metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
@@ -392,3 +397,11 @@ def update_session_title(session_id: str, new_title: str) -> bool:
     except Exception as e:
         print(f"更新会话标题时出错: {str(e)}")
         return False 
+
+def load_and_restore_history(session_id: str):
+    """
+    加载并还原指定会话ID的聊天历史，返回消息对象列表
+    """
+    from backend.chat.models import message_factory
+    history = load_history(session_id)
+    return [message_factory(msg) if isinstance(msg, dict) else msg for msg in history] 

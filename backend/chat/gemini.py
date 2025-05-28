@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from backend.config import get_llm_specific_config
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, ResponseType, LLMResponse
+from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
 
@@ -65,7 +65,7 @@ class GeminiClient(LLMClientBase):
             return "model"
         return "user"
 
-    async def get_response(self, messages: List[Message], **kwargs) -> LLMResponse:
+    async def get_response(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:
         # 1. 获取 MCP 工具 schema
         tool_schemas = await self.get_function_call_schemas()
 
@@ -90,10 +90,10 @@ class GeminiClient(LLMClientBase):
                     ))]
                     contents.append({"role": "model", "parts": parts})
                 continue
-            if msg.role == "tool" and msg.tool_call_id:
-                # 工具响应消息
+            # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
+            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
                 parts = [types.Part.from_function_response(
-                    name="",  # Gemini要求name与function_call一致，建议补全
+                    name=getattr(msg, "tool_request", {}).get("name", ""),
                     response={"result": msg.content}
                 )]
                 contents.append({"role": "user", "parts": parts})
@@ -178,8 +178,8 @@ class GeminiClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: Message,
-        first_assistant_message: Message,
+        first_user_message: BaseMessage,
+        first_assistant_message: BaseMessage,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
@@ -205,7 +205,7 @@ class GeminiClient(LLMClientBase):
             messages = [
                 first_user_message,
                 first_assistant_message,
-                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             
             # 处理消息内容

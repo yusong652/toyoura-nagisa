@@ -3,7 +3,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import httpx
 import json
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, LLMResponse, ResponseType
+from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 import re
 import mistralai
@@ -36,7 +36,7 @@ class MistralClient(LLMClientBase):
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         print(f"MistralClient initialized.")
 
-    def _format_messages_for_mistral(self, messages: List[Message], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
+    def _format_messages_for_mistral(self, messages: List[BaseMessage], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
         messages_for_llm = [
             {"role": "system", "content": [{
                 "type": "text",
@@ -45,7 +45,6 @@ class MistralClient(LLMClientBase):
         ]
         has_image = False
         for msg in messages:
-            # 1. assistant function_call 消息
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
                 messages_for_llm.append({
                     "role": "assistant",
@@ -53,36 +52,15 @@ class MistralClient(LLMClientBase):
                     "tool_calls": msg.tool_calls
                 })
                 continue
-
-            # 2. tool 消息
-            if msg.role == "tool":
-                # content 兜底转字符串，优先取 text 属性
-                tool_content = msg.content
-                if not isinstance(tool_content, str):
-                    # 优先取 text 属性（如 TextContent），否则转 str
-                    tool_content = getattr(tool_content, 'text', str(tool_content))
-                # name/tool_call_id 兜底
-                tool_call_id = getattr(msg, "tool_call_id", None)
-                name = getattr(msg, "name", None)
-                # 如果没有 name/tool_call_id，尝试从上一条 assistant 的 tool_calls 自动补全
-                if (not tool_call_id or not name) and messages_for_llm:
-                    for prev in reversed(messages_for_llm):
-                        if prev.get("role") == "assistant" and prev.get("tool_calls"):
-                            tc = prev["tool_calls"][0]
-                            if not tool_call_id:
-                                tool_call_id = tc.get("id")
-                            if not name:
-                                name = tc.get("function", {}).get("name")
-                            break
+            # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
+            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
                 messages_for_llm.append({
                     "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "name": name,
-                    "content": tool_content
+                    "tool_call_id": getattr(msg, "id", None),
+                    "name": getattr(msg, "tool_request", {}).get("name", None),
+                    "content": msg.content
                 })
                 continue
-
-            # 3. 其他消息（user/assistant普通回复，多模态）
             if isinstance(msg.content, list):
                 mistral_content = []
                 has_text = False
@@ -145,7 +123,7 @@ class MistralClient(LLMClientBase):
 
     async def get_response(
         self,
-        messages: List[Message],
+        messages: List[BaseMessage],
         **kwargs
     ) -> 'LLMResponse':
         """
@@ -202,8 +180,8 @@ class MistralClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: Message,
-        first_assistant_message: Message,
+        first_user_message: BaseMessage,
+        first_assistant_message: BaseMessage,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
@@ -222,7 +200,7 @@ class MistralClient(LLMClientBase):
             messages = [
                 first_user_message,
                 first_assistant_message,
-                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             messages_for_llm, has_image = self._format_messages_for_mistral(
                 messages,

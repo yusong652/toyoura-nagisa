@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import httpx
 import json
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, LLMResponse, ResponseType
+from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserToolMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 import anthropic
 from fastmcp import Client as MCPClient
@@ -34,7 +34,7 @@ class AnthropicClient(LLMClientBase):
         self.anthropic_client = anthropic.Anthropic(api_key=self.api_key)
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
-    def _format_messages_for_anthropic(self, messages: List[Message]) -> Tuple[List[Dict[str, Any]], bool]:
+    def _format_messages_for_anthropic(self, messages: List[BaseMessage]) -> Tuple[List[Dict[str, Any]], bool]:
         """
         将内部消息格式转换为Anthropic API所需的格式。
         Args:
@@ -46,9 +46,9 @@ class AnthropicClient(LLMClientBase):
         has_image = False
         
         for msg in messages:
-            # 跳过 system
-            if msg.role == "system":
-                continue  # Anthropic 使用单独的 system 参数
+            # 不再跳过 system 消息，因为我们已经不再有 system message
+            # if msg.role == "system":
+            #     continue  # Anthropic 使用单独的 system 参数
 
             # 处理 assistant function_call 消息（带 tool_calls 字段，转为 Anthropic 官方格式）
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
@@ -75,8 +75,8 @@ class AnthropicClient(LLMClientBase):
                 })
                 continue
 
-            # 1. 处理 tool 角色（转为 user+tool_result 块）
-            if msg.role == "tool":
+            # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
+            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
                 tool_result_content = msg.content
                 if isinstance(tool_result_content, str):
                     tool_result_content = [{"type": "text", "text": tool_result_content}]
@@ -97,7 +97,7 @@ class AnthropicClient(LLMClientBase):
                     tool_result_content = filtered
                 tool_result_block = {
                     "type": "tool_result",
-                    "tool_use_id": getattr(msg, "tool_call_id", getattr(msg, "id", "")),
+                    "tool_use_id": getattr(msg, "id", ""),
                     "content": tool_result_content
                 }
                 anthropic_messages.append({
@@ -218,13 +218,14 @@ class AnthropicClient(LLMClientBase):
 
     async def get_response(
         self,
-        messages: List[Message],
+        messages: List[BaseMessage],
         **kwargs
     ) -> 'LLMResponse':
         """
         调用 Anthropic API，返回 LLMResponse。
         """
         anthropic_messages, has_image = self._format_messages_for_anthropic(messages)
+        print("[DEBUG] Anthropic API payload messages:", json.dumps(anthropic_messages, ensure_ascii=False, indent=2))
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
@@ -280,8 +281,8 @@ class AnthropicClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: Message,
-        first_assistant_message: Message,
+        first_user_message: BaseMessage,
+        first_assistant_message: BaseMessage,
         title_generation_system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
@@ -300,7 +301,7 @@ class AnthropicClient(LLMClientBase):
             messages = [
                 first_user_message,
                 first_assistant_message,
-                Message(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             
             # 使用相同的消息格式转换逻辑
