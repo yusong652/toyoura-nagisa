@@ -26,14 +26,16 @@ import uuid
 from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
 from backend.utils.helpers import (
     parse_message_data,
-    create_user_message,
-    process_llm_response,
+    process_user_message,
+    process_ai_text_message,
+    process_tool_call_message,
+    process_tool_response_message,
     process_tts_sentence,
     should_generate_title,
     is_pure_text_assistant,
-    generate_title_for_session
+    generate_title_for_session,
 )
-from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, ToolMessage, SystemMessage, message_factory
+from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory
 from fastmcp import FastMCP, Client
 from backend.nagisa_mcp.common_tools import register_common_tools
 import threading
@@ -135,11 +137,12 @@ async def get_session_history(session_id: str):
         
         # 加载指定会话的历史记录
         history = load_history(session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         return {
             "session": session,
-            "history": history,
-            "message_count": len(history)
+            "history": [msg.model_dump() | {"role": msg.role} for msg in history_msgs],
+            "message_count": len(history_msgs)
         }
     except HTTPException:
         raise
@@ -186,27 +189,28 @@ async def switch_session(request: SwitchSessionRequest):
         
         # 加载指定会话的历史记录
         history = load_history(request.session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         # 返回会话信息和最近的消息
         recent_messages_length = get_llm_config().get("recent_messages_length", 5)
-        recent_messages = history[-recent_messages_length:] if len(history) > recent_messages_length else history
+        recent_messages = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
         
         return {
             "session_id": request.session_id,
             "success": True,
-            "message_count": len(history),
-            "recent_messages": recent_messages
+            "message_count": len(history_msgs),
+            "recent_messages": [msg.model_dump() | {"role": msg.role} for msg in recent_messages]
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"切换会话失败: {str(e)}")
 
-async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
+async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
     """
     递归处理LLM响应，支持多轮连续tool call。
     """
-    llm_response = await llm_client.get_response(history_msgs)
+    llm_response = await llm_client.get_response(recent_msgs)
     print(f"[DEBUG] llm_response type: {llm_response.response_type}")
     if llm_response.response_type == ResponseType.FUNCTION_CALL:
         # 发送工具使用开始状态
@@ -226,40 +230,24 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
         tool_result = await llm_client.handle_function_call(tool_call)
         print(f"[DEBUG] tool_result: {tool_result}")
 
-        # 将function_call和tool_result作为消息加入历史
-        # 1. assistant function_call 消息（带tool_calls字段，content必须为空字符串）
-        function_call_msg = AssistantMessage(
-            role="assistant",
-            content="",
-            id=tool_call['id'],
-            tool_calls=[{
-                "id": tool_call['id'],
-                "type": "function",
-                "function": {
-                    "name": tool_call['name'],
-                    "arguments": json.dumps(tool_call['arguments'], ensure_ascii=False) if not isinstance(tool_call['arguments'], str) else tool_call['arguments']
-                }
-            }]
-        )
-        # 2. tool 消息
-        tool_msg = ToolMessage(
-            role="tool",
-            content=str(tool_result),
-            tool_call_id=tool_call['id'],
-            id=tool_call['id']
-        )
-        new_history = history_msgs + [function_call_msg, tool_msg]
+        # 只组装消息，不再在 helpers 里 append
+        function_call_msg = process_tool_call_message(tool_call)
+        tool_msg = process_tool_response_message(tool_call, tool_result)
+        new_recent_msgs = recent_msgs + [function_call_msg, tool_msg]
 
-        # 递归处理下一步
-        async for chunk in handle_llm_response(new_history, session_id, llm_client, tts_engine):
+        # 递归处理下一步，传递 new_recent_msgs
+        async for chunk in handle_llm_response(new_recent_msgs, session_id, llm_client, tts_engine):
             yield chunk
         return
     elif llm_response.response_type == ResponseType.TEXT:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        ai_msg_id = process_llm_response(
+        # 使用新的消息处理器处理AI文本消息，使用原始的history_msgs而不是recent_msgs
+        loaded_history = load_history(session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+        ai_msg_id, _ = process_ai_text_message(
             llm_response.content,
             llm_response.keyword,
-            history_msgs,
+            history_msgs,  # 使用history_msgs而不是recent_msgs
             session_id
         )
         # 发送消息ID
@@ -276,24 +264,30 @@ async def handle_llm_response(history_msgs, session_id, llm_client, tts_engine):
                 tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)  # 确保占位符能正确匹配
                 yield f"data: {json.dumps(tts_result)}\n\n"
         # ------ 标题生成判断逻辑移动到这里 ------
-        loaded_history = load_history(session_id)
-        history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-        if should_generate_title(session_id, history_msgs_after):
-            new_title = await generate_title_for_session(session_id, llm_client)
-            if new_title is None:
-                raise HTTPException(status_code=400, detail="No valid user message or pure text assistant message found for title generation.")
-            if not new_title:
-                raise HTTPException(status_code=500, detail="标题生成失败")
-            update_success = update_session_title(session_id, new_title)
-            if update_success:
-                title_update_data = {
-                    'type': 'TITLE_UPDATE',
-                    'payload': {
-                        'session_id': session_id,
-                        'title': new_title
-                    }
-                }
-                yield f"data: {json.dumps(title_update_data)}\n\n"
+        try:
+            loaded_history = load_history(session_id)
+            history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+            if should_generate_title(session_id, history_msgs_after):
+                new_title = await generate_title_for_session(session_id, llm_client)
+                if new_title:
+                    update_success = update_session_title(session_id, new_title)
+                    if update_success:
+                        title_update_data = {
+                            'type': 'TITLE_UPDATE',
+                            'payload': {
+                                'session_id': session_id,
+                                'title': new_title
+                            }
+                        }
+                        yield f"data: {json.dumps(title_update_data)}\n\n"
+        except Exception as e:
+            print(f"Title generation failed: {str(e)}")
+            # 在流式响应中，我们只记录错误而不抛出异常
+            error_data = {
+                'type': 'error',
+                'error': f"Title generation failed: {str(e)}"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
     elif llm_response.response_type == ResponseType.ERROR:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {
@@ -310,15 +304,13 @@ async def chat_stream_endpoint(request: Request):
         return ErrorResponse(detail="无效的消息数据")
     loaded_history = load_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    user_msg = create_user_message(parsed_data)
-    if parsed_data.get('message_id'):
-        user_msg_dict = user_msg.model_dump()
-        user_msg_dict["id"] = parsed_data['message_id']
-        history_msgs.append(message_factory(user_msg_dict))
-    else:
-        history_msgs.append(user_msg)
-    recent_messages_length = get_llm_config().get("recent_messages_length", 20)
-    recent_msgs = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
+    user_msg = process_user_message(parsed_data)
+    history_msgs.append(user_msg)
+    # 保存用户消息到历史记录
+    save_history(session_id, [{
+        **msg.model_dump(),
+        'role': msg.role
+    } for msg in history_msgs])
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     try:
@@ -326,6 +318,9 @@ async def chat_stream_endpoint(request: Request):
             yield f"data: {json.dumps({'status': 'sent'})}\n\n"
             try:
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
+                # 只在这里切片 recent_msgs
+                recent_messages_length = get_llm_config().get("recent_messages_length", 20)
+                recent_msgs = history_msgs[-recent_messages_length:]
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
             except Exception as e:
