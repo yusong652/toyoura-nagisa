@@ -115,7 +115,7 @@ class GeminiClient(LLMClientBase):
                 parts.append({"text": msg.content})
             mapped_role = self.map_role(msg.role)
             contents.append({"role": mapped_role, "parts": parts})
-
+        
         # 动态构造 config，把 tools 放进去
         config = types.GenerateContentConfig(
             system_instruction=self.system_prompt,

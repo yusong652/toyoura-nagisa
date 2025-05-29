@@ -31,7 +31,6 @@ class GPTClient(LLMClientBase):
             "Authorization": f"Bearer {self.api_key}"
         }
         print(f"ChatGPTClient initialized.")
-        from fastmcp import Client as MCPClient
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         self.openai_client = OpenAI(api_key=self.api_key)
 
