@@ -46,20 +46,76 @@ class MistralClient(LLMClientBase):
         has_image = False
         for msg in messages:
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                # Format tool calls according to Mistral's API structure
+                formatted_tool_calls = []
+                for tool_call in msg.tool_calls:
+                    # Ensure we have valid function name and arguments
+                    function_name = tool_call.get("function", {}).get("name", "")
+                    function_args = tool_call.get("function", {}).get("arguments", {})
+                    
+                    # Convert arguments to string if it's a dict
+                    if isinstance(function_args, dict):
+                        function_args = json.dumps(function_args)
+                    
+                    formatted_tool_calls.append({
+                        "id": tool_call.get("id", "".join(random.choices(string.ascii_letters + string.digits, k=8))),
+                        "type": "function",
+                        "function": {
+                            "name": function_name,
+                            "arguments": function_args
+                        }
+                    })
                 messages_for_llm.append({
                     "role": "assistant",
-                    "content": "",  # 必须为空字符串
-                    "tool_calls": msg.tool_calls
+                    "content": "",  # Must be empty string for tool calls
+                    "tool_calls": formatted_tool_calls
                 })
                 continue
-            # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
+            # Handle tool responses
             if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
-                messages_for_llm.append({
+                # Extract actual content from TextContent or other content types
+                content = msg.content
+                if isinstance(content, list):
+                    # If content is a list of content blocks, extract the text
+                    text_contents = []
+                    for item in content:
+                        if isinstance(item, dict) and "text" in item:
+                            text_contents.append(item["text"])
+                        elif hasattr(item, "text"):
+                            text_contents.append(item.text)
+                    content = " ".join(text_contents) if text_contents else ""
+                elif hasattr(content, "text"):
+                    # If content is a TextContent object
+                    content = content.text
+                elif content is None:
+                    content = ""
+                elif isinstance(content, str) and content.startswith("[TextContent"):
+                    # Handle stringified TextContent object
+                    try:
+                        # Extract text from stringified TextContent
+                        import re
+                        text_match = re.search(r"text='([^']*)'", content)
+                        if text_match:
+                            content = text_match.group(1)
+                        else:
+                            content = str(content)
+                    except Exception:
+                        content = str(content)
+                else:
+                    content = str(content)
+
+                tool_response = {
                     "role": "tool",
-                    "tool_call_id": getattr(msg, "id", None),
-                    "name": getattr(msg, "tool_request", {}).get("name", None),
-                    "content": msg.content
-                })
+                    "content": content,
+                }
+                
+                # Handle tool_call_id
+                if hasattr(msg, "id") and msg.id:
+                    tool_response["tool_call_id"] = msg.id
+                elif hasattr(msg, "tool_request") and isinstance(msg.tool_request, dict):
+                    tool_response["tool_call_id"] = msg.tool_request.get("id")
+                
+                messages_for_llm.append(tool_response)
                 continue
             if isinstance(msg.content, list):
                 mistral_content = []
