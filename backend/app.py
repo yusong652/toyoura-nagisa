@@ -252,6 +252,9 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
         )
         # 发送消息ID
         yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
+        # 发送关键词
+        if llm_response.keyword:
+            yield f"data: {json.dumps({'keyword': llm_response.keyword})}\n\n"
         # 新增：表情/颜文字占位处理
         text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(llm_response.content)
         restored_text = restore_emoticons(text_with_placeholders, kaomoji_list, emoji_list)
