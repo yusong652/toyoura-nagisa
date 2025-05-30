@@ -29,7 +29,7 @@ class GrokClient(LLMClientBase):
                 messages_for_llm.append({
                     "role": "tool",
                     "content": msg.content,
-                    "tool_call_id": getattr(msg, "id", None)
+                    "tool_call_id": getattr(msg, "tool_call_id", None)
                 })
                 continue
             if isinstance(msg.content, list):

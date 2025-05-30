@@ -110,8 +110,8 @@ class MistralClient(LLMClientBase):
                 }
                 
                 # Handle tool_call_id
-                if hasattr(msg, "id") and msg.id:
-                    tool_response["tool_call_id"] = msg.id
+                if hasattr(msg, "tool_call_id") and msg.tool_call_id:
+                    tool_response["tool_call_id"] = msg.tool_call_id
                 elif hasattr(msg, "tool_request") and isinstance(msg.tool_request, dict):
                     tool_response["tool_call_id"] = msg.tool_request.get("id")
                 
@@ -186,9 +186,13 @@ class MistralClient(LLMClientBase):
         调用 Mistral API，返回 LLMResponse。
         """
         messages_for_llm, has_image = self._format_messages_for_mistral(messages)
-        print("\n========== Mistral API 请求消息格式 ==========")
-        import pprint; pprint.pprint(messages_for_llm)
-        print("========== END ==========")
+        
+        # 根据配置决定是否打印调试信息
+        if self.extra_config.get('debug', False):
+            print("\n========== Mistral API 请求消息格式 ==========")
+            import pprint; pprint.pprint(messages_for_llm)
+            print("========== END ==========")
+            
         model = self.extra_config.get("model", "mistral-large-latest")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()

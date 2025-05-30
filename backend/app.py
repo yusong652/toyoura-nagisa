@@ -208,37 +208,59 @@ async def switch_session(request: SwitchSessionRequest):
 
 async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
     """
-    递归处理LLM响应，支持多轮连续tool call。
+    处理LLM响应，支持单轮多工具调用。
     """
     llm_response = await llm_client.get_response(recent_msgs)
     print(f"[DEBUG] llm_response type: {llm_response.response_type}")
+    
     if llm_response.response_type == ResponseType.FUNCTION_CALL:
-        # 发送工具使用开始状态
-        tool_state = {
-            'type': 'NAGISA_IS_USING_TOOL',
-            'tool_name': llm_response.function_name,
-            'action_text': f"I'll use the {llm_response.function_name} tool to help you."
-        }
-        yield f"data: {json.dumps(tool_state)}\n\n"
+        # 创建包含所有工具调用的消息
+        tool_calls_msg = message_factory({
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tool_call['id'],
+                    "type": "function",
+                    "function": {
+                        "name": tool_call['name'],
+                        "arguments": json.dumps(tool_call['arguments'])
+                    }
+                }
+                for tool_call in llm_response.tool_calls
+            ]
+        })
+        recent_msgs.append(tool_calls_msg)
+        
+        # 处理所有工具调用
+        for tool_call in llm_response.tool_calls:
+            # 发送工具使用开始状态
+            tool_state = {
+                'type': 'NAGISA_IS_USING_TOOL',
+                'tool_name': tool_call['name'],
+                'action_text': f"I'll use the {tool_call['name']} tool to help you."
+            }
+            yield f"data: {json.dumps(tool_state)}\n\n"
 
-        # 处理函数调用结果
-        tool_call = {
-            'name': llm_response.function_name,
-            'arguments': llm_response.function_args,
-            'id': getattr(llm_response, 'function_call_id', 'tool_call_id')
-        }
-        tool_result = await llm_client.handle_function_call(tool_call)
-        print(f"[DEBUG] tool_result: {tool_result}")
+            # 处理函数调用结果
+            tool_result = await llm_client.handle_function_call(tool_call)
+            print(f"[DEBUG] tool_result for {tool_call['name'], tool_call['id']}: {tool_result}")
 
-        # 只组装消息，不再在 helpers 里 append
-        function_call_msg = process_tool_call_message(tool_call)
-        tool_msg = process_tool_response_message(tool_call, tool_result)
-        new_recent_msgs = recent_msgs + [function_call_msg, tool_msg]
+            # 添加工具响应消息
+            tool_response_msg = message_factory({
+                "role": "tool",
+                "tool_call_id": tool_call['id'],
+                "name": tool_call['name'],
+                "content": str(tool_result)
+            })
+            print(f"[DEBUG] tool_response_msg: {tool_response_msg.model_dump()}")
+            recent_msgs.append(tool_response_msg)
 
-        # 递归处理下一步，传递 new_recent_msgs
-        async for chunk in handle_llm_response(new_recent_msgs, session_id, llm_client, tts_engine):
+        # 所有工具调用完成后，获取最终响应
+        async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
             yield chunk
         return
+        
     elif llm_response.response_type == ResponseType.TEXT:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         # 使用新的消息处理器处理AI文本消息，使用原始的history_msgs而不是recent_msgs
@@ -312,7 +334,9 @@ async def chat_stream_endpoint(request: Request):
     # 保存用户消息到历史记录
     save_history(session_id, [{
         **msg.model_dump(),
-        'role': msg.role
+        'role': msg.role,
+        'tool_call_id': getattr(msg, 'tool_call_id', None),  # 确保保存 tool_call_id
+        'name': getattr(msg, 'name', None)  # 确保保存 name
     } for msg in history_msgs])
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine

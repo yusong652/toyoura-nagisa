@@ -59,7 +59,7 @@ class GPTClient(LLMClientBase):
                 messages_for_llm.append({
                     "role": "tool",
                     "content": msg.content,
-                    "tool_call_id": getattr(msg, "id", None)
+                    "tool_call_id": getattr(msg, "tool_call_id", None)
                 })
                 continue
             if isinstance(msg.content, list):
@@ -100,9 +100,14 @@ class GPTClient(LLMClientBase):
         **kwargs
     ) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
-        # print("\n========== OpenAI API 请求消息格式 ==========")
-        # import pprint; pprint.pprint(messages_for_llm)
-        # print("========== END ==========")
+        
+        # 根据配置决定是否打印调试信息
+        print(self.extra_config)
+        if self.extra_config.get('debug', False):
+            print("\n========== OpenAI API 请求消息格式 ==========")
+            import pprint; pprint.pprint(messages_for_llm)
+            print("========== END ==========")
+            
         model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")
         payload = {
             "model": model,
@@ -124,21 +129,24 @@ class GPTClient(LLMClientBase):
                 raise ValueError("No choices in OpenAI response")
             choice = response.choices[0].message
             if hasattr(choice, "tool_calls") and choice.tool_calls:
-                tool_call = choice.tool_calls[0]
-                function_name = tool_call.function.name
-                arguments = tool_call.function.arguments
-                tool_call_id = tool_call.id
-                try:
-                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
-                except Exception:
-                    function_args = arguments
+                tool_calls = []
+                for tool_call in choice.tool_calls:
+                    function_name = tool_call.function.name
+                    arguments = tool_call.function.arguments
+                    tool_call_id = tool_call.id
+                    try:
+                        function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                    except Exception:
+                        function_args = arguments
+                    tool_calls.append({
+                        'name': function_name,
+                        'arguments': function_args,
+                        'id': tool_call_id
+                    })
                 return LLMResponse(
                     content=choice.content,
                     response_type=ResponseType.FUNCTION_CALL,
-                    function_name=function_name,
-                    function_args=function_args,
-                    function_result=None,
-                    function_call_id=tool_call_id
+                    tool_calls=tool_calls
                 )
             llm_reply = choice.content
             response_text, keyword = parse_llm_output(llm_reply)

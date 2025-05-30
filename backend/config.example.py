@@ -48,9 +48,8 @@ LLM_CONFIG = {
     # 当前使用的 LLM 类型
     "type": "gemini",  # 可选: "chatgpt", "gemini"
     
-    # LLM 通用配置
-    "temperature": 1.5,
     "system_prompt": None,  # 如果为 None，将使用默认的 system prompt
+    "debug": False,  # 是否打印调试信息（API请求payload等）
     
     # ChatGPT 特定配置
     "chatgpt": {

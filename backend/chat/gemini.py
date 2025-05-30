@@ -101,17 +101,48 @@ class GeminiClient(LLMClientBase):
                     print(f"[WARNING] Tool response missing name: {msg}")
                     continue
 
-                # 解析工具响应内容
+                # 解析工具响应内容，确保是结构化数据
                 try:
+                    # 首先尝试直接获取内容
                     if isinstance(msg.content, str):
                         response_data = json.loads(msg.content)
                     else:
                         response_data = msg.content
+
+                    # 处理 TextContent 对象
+                    if hasattr(response_data, 'text'):
+                        try:
+                            # 如果 text 是 JSON 字符串，解析它
+                            response_data = json.loads(response_data.text)
+                        except:
+                            # 如果不是 JSON，直接使用文本
+                            response_data = {"result": response_data.text}
+                    # 处理包含 TextContent 的列表
+                    elif isinstance(response_data, list) and len(response_data) > 0:
+                        if hasattr(response_data[0], 'text'):
+                            try:
+                                # 如果 text 是 JSON 字符串，解析它
+                                response_data = json.loads(response_data[0].text)
+                            except:
+                                # 如果不是 JSON，直接使用文本
+                                response_data = {"result": response_data[0].text}
+                        else:
+                            # 如果列表中的元素不是 TextContent，尝试直接使用
+                            response_data = response_data[0]
+                    # 如果响应是字典且包含 result 字段，且 result 是字符串
+                    elif isinstance(response_data, dict) and 'result' in response_data and isinstance(response_data['result'], str):
+                        try:
+                            # 尝试解析 result 字段中的 JSON 字符串
+                            response_data = json.loads(response_data['result'])
+                        except:
+                            # 如果解析失败，保持原样
+                            pass
+
                 except Exception as e:
                     print(f"[WARNING] Failed to parse tool response: {e}")
-                    response_data = {"result": msg.content}
+                    response_data = {"result": str(msg.content)}
 
-                # 创建工具响应
+                # 创建工具响应，直接使用结构化数据
                 function_response = {
                     "functionResponse": {
                         "name": tool_name,

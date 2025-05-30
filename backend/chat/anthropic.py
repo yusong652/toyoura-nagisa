@@ -97,7 +97,7 @@ class AnthropicClient(LLMClientBase):
                     tool_result_content = filtered
                 tool_result_block = {
                     "type": "tool_result",
-                    "tool_use_id": getattr(msg, "id", ""),
+                    "tool_use_id": getattr(msg, "tool_call_id", ""),
                     "content": tool_result_content
                 }
                 anthropic_messages.append({
@@ -225,7 +225,13 @@ class AnthropicClient(LLMClientBase):
         调用 Anthropic API，返回 LLMResponse。
         """
         anthropic_messages, has_image = self._format_messages_for_anthropic(messages)
-        print("[DEBUG] Anthropic API payload messages:", json.dumps(anthropic_messages, ensure_ascii=False, indent=2))
+        
+        # 根据配置决定是否打印调试信息
+        if self.extra_config.get('debug', False):
+            print("\n========== Anthropic API 请求消息格式 ==========")
+            import pprint; pprint.pprint(anthropic_messages)
+            print("========== END ==========")
+            
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
@@ -240,25 +246,26 @@ class AnthropicClient(LLMClientBase):
             )
             # 检查是否有function call
             if hasattr(response, "content") and response.content:
+                tool_calls = []
+                text_content = ""
                 for item in response.content:
-                    if hasattr(item, "type") and item.type == "tool_use":
+                    if hasattr(item, "type") and item.type == "text":
+                        text_content = getattr(item, "text", "")
+                    elif hasattr(item, "type") and item.type == "tool_use":
                         function_name = getattr(item, "name", None)
                         arguments = getattr(item, "input", None)
                         tool_call_id = getattr(item, "id", None)
-                        # 查找同一条消息中的 text 内容
-                        text_content = ""
-                        for prev in response.content:
-                            if hasattr(prev, "type") and prev.type == "text":
-                                text_content = getattr(prev, "text", "")
-                                break
-                        return LLMResponse(
-                            content=text_content,  # 用真实自然语言内容
-                            response_type=ResponseType.FUNCTION_CALL,
-                            function_name=function_name,
-                            function_args=arguments,
-                            function_result=None,
-                            function_call_id=tool_call_id
-                        )
+                        tool_calls.append({
+                            'name': function_name,
+                            'arguments': arguments,
+                            'id': tool_call_id
+                        })
+                if tool_calls:
+                    return LLMResponse(
+                        content=text_content,  # 用真实自然语言内容
+                        response_type=ResponseType.FUNCTION_CALL,
+                        tool_calls=tool_calls
+                    )
             # 普通文本回复
             llm_reply = ""
             for content_item in response.content:
@@ -271,11 +278,9 @@ class AnthropicClient(LLMClientBase):
                 keyword=keyword
             )
         except Exception as e:
-            import traceback
-            print("[Anthropic LLM Exception]", e)
-            traceback.print_exc()
+            print(f"Anthropic API error: {e}")
             return LLMResponse(
-                content=f"Anthropic SDK error: {str(e)}",
+                content=str(e),
                 response_type=ResponseType.ERROR
             )
 

@@ -50,6 +50,8 @@ class AssistantToolMessage(BaseMessage):
     LLM 触发的工具调用消息（function call），等待工具执行并返回结果。
     """
     tool_calls: List[Dict[str, Any]]
+    content: Optional[Union[str, List[dict]]] = None  # 使 content 成为可选字段
+    
     @property
     def role(self):
         return 'assistant'
@@ -62,10 +64,13 @@ class UserToolMessage(BaseMessage):
     工具调用的结果消息（tool result），用于回复 AssistantToolMessage。
     注意：虽然 role 是 'user'，但这不是用户输入，而是工具的响应。
     """
-    tool_request: Dict[str, Any]
+    tool_call_id: str  # 确保这是必需的字段
+    name: str
+    content: Any  # 使用 Any 类型，因为工具返回的内容可能是任何类型
+    
     @property
     def role(self):
-        return 'user'
+        return 'tool'
 
 # =====================
 # 类型提示用 Union
@@ -78,11 +83,16 @@ MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, UserToo
 def message_factory(data: dict) -> BaseMessage:
     """
     根据输入字典自动实例化正确的消息类型。
-    UserToolMessage 不是用户输入，而是工具调用的结果（tool result），role 依然是 'user'。
     """
     # First check for tool-related messages
-    if 'tool_request' in data:
-        return UserToolMessage(**{k: v for k, v in data.items() if k != 'role'})
+    if data.get('role') == 'tool':
+        if 'tool_call_id' not in data:
+            raise ValueError("Tool response message must have a tool_call_id")
+        return UserToolMessage(
+            tool_call_id=data['tool_call_id'],
+            name=data['name'],
+            content=data['content']
+        )
     elif 'tool_calls' in data:
         return AssistantToolMessage(**{k: v for k, v in data.items() if k != 'role'})
     
@@ -152,6 +162,7 @@ class LLMResponse:
         function_args: Optional[Dict[str, Any]] = None,
         function_result: Optional[Any] = None,
         function_call_id: Optional[str] = None,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
     ):
         self.content = content
         self.response_type = response_type
@@ -160,6 +171,7 @@ class LLMResponse:
         self.function_args = function_args
         self.function_result = function_result
         self.function_call_id = function_call_id
+        self.tool_calls = tool_calls or []
 
     def to_dict(self) -> dict:
         return {
@@ -170,4 +182,5 @@ class LLMResponse:
             "function_args": self.function_args,
             "function_result": self.function_result,
             "function_call_id": self.function_call_id,
+            "tool_calls": self.tool_calls,
         }

@@ -202,6 +202,12 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
             for msg in history:
                 if 'timestamp' not in msg or not msg['timestamp']:
                     msg['timestamp'] = datetime.now().isoformat()
+                # 确保工具消息包含必要的字段
+                if msg.get('role') == 'tool':
+                    if 'tool_call_id' not in msg:
+                        print(f"[WARNING] Tool message missing tool_call_id: {msg}")
+                    if 'name' not in msg:
+                        print(f"[WARNING] Tool message missing name: {msg}")
             return history
     except (FileNotFoundError, json.JSONDecodeError):
         return []
@@ -229,6 +235,12 @@ def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None
                 msg_copy['timestamp'] = msg_copy['timestamp'].isoformat()
             if 'role' not in msg_copy and hasattr(msg, 'role'):
                 msg_copy['role'] = msg.role
+            # 确保工具消息包含必要的字段
+            if msg_copy.get('role') == 'tool':
+                if 'tool_call_id' not in msg_copy:
+                    print(f"[WARNING] Tool message missing tool_call_id: {msg_copy}")
+                if 'name' not in msg_copy:
+                    print(f"[WARNING] Tool message missing name: {msg_copy}")
             processed_history.append(msg_copy)
         all_history[session_id] = processed_history
         
