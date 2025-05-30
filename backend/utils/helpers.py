@@ -133,13 +133,28 @@ def is_pure_text_assistant(msg):
 
 async def generate_title_for_session(session_id: str, llm_client) -> str:
     """
-    工具函数：根据session_id自动查找第一条user和第一条纯文本assistant消息并生成标题。
+    工具函数：根据session_id查找最新的user和纯文本assistant消息并生成标题。
+    从历史记录末尾开始向前查找，找到最近的一对非tool消息。
     """
     history = load_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-    user_msg: BaseMessage = next((msg for msg in history_msgs if getattr(msg, 'role', None) == 'user'), None)
-    assistant_msg: BaseMessage = next((msg for msg in history_msgs if is_pure_text_assistant(msg)), None)
-    if not user_msg or not assistant_msg:
+    
+    # 从后向前遍历，找到最近的一对非tool消息
+    latest_user_msg = None
+    latest_assistant_msg = None
+    
+    for msg in reversed(history_msgs):
+        if not latest_user_msg and getattr(msg, 'role', None) == 'user':
+            latest_user_msg = msg
+        elif not latest_assistant_msg and is_pure_text_assistant(msg):
+            latest_assistant_msg = msg
+        
+        # 如果找到了最近的一对消息，就停止搜索
+        if latest_user_msg and latest_assistant_msg:
+            break
+    
+    if not latest_user_msg or not latest_assistant_msg:
         return None
-    title = await generate_conversation_title(user_msg, assistant_msg, llm_client)
+        
+    title = await generate_conversation_title(latest_user_msg, latest_assistant_msg, llm_client)
     return title
