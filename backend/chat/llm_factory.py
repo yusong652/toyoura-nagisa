@@ -50,14 +50,19 @@ def get_client(name: Optional[str] = None, mcp_client=None, **kwargs) -> LLMClie
     if name not in _clients:
         raise ValueError(f"Unknown LLM client: {name}")
     
-    # 获取配置
-    config = get_llm_config()
+    # 获取全局配置和特定 LLM 的配置
+    global_config = get_llm_config()
     specific_config = get_llm_specific_config(name)
     
     # 合并配置和参数
     client_kwargs = {
-        "system_prompt": get_system_prompt(),
+        # 首先应用全局配置中的通用参数
+        "system_prompt": global_config.get("system_prompt") or get_system_prompt(),
+        "recent_messages_length": global_config.get("recent_messages_length", 20),
+        "debug": global_config.get("debug", False),
+        # 然后应用特定 LLM 的配置
         **specific_config,
+        # 最后应用传入的参数，这些参数会覆盖之前的配置
         **kwargs
     }
     
