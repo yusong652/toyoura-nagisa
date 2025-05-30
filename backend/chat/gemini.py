@@ -77,6 +77,7 @@ class GeminiClient(LLMClientBase):
             # - tool响应用user+function_response结构
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
                 # function_call消息
+                parts = []
                 for tool_call in msg.tool_calls:
                     arguments = tool_call["function"].get("arguments", {})
                     if isinstance(arguments, str):
@@ -84,19 +85,52 @@ class GeminiClient(LLMClientBase):
                             arguments = json.loads(arguments)
                         except Exception:
                             arguments = {}
-                    parts = [types.Part(function_call=types.FunctionCall(
+                    parts.append(types.Part(function_call=types.FunctionCall(
                         name=tool_call["function"]["name"],
-                        args=arguments
-                    ))]
-                    contents.append({"role": "model", "parts": parts})
+                        args=arguments,
+                        id=tool_call.get("id", tool_call["function"]["name"])  # 使用工具调用ID或函数名作为ID
+                    )))
+                contents.append({"role": "model", "parts": parts})
                 continue
             # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
             if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
-                parts = [types.Part.from_function_response(
-                    name=getattr(msg, "tool_request", {}).get("name", ""),
-                    response={"result": msg.content}
-                )]
-                contents.append({"role": "user", "parts": parts})
+                tool_name = getattr(msg, "tool_request", {}).get("name", "")
+                if not tool_name and hasattr(msg, "name"):
+                    tool_name = msg.name
+                if not tool_name:
+                    print(f"[WARNING] Tool response missing name: {msg}")
+                    continue
+
+                # 解析工具响应内容
+                try:
+                    if isinstance(msg.content, str):
+                        response_data = json.loads(msg.content)
+                    else:
+                        response_data = msg.content
+                except Exception as e:
+                    print(f"[WARNING] Failed to parse tool response: {e}")
+                    response_data = {"result": msg.content}
+
+                # 创建工具响应
+                function_response = {
+                    "functionResponse": {
+                        "name": tool_name,
+                        "response": response_data
+                    }
+                }
+                
+                # 检查是否已经有工具响应消息
+                if contents and contents[-1]["role"] == "user" and any(
+                    "functionResponse" in part for part in contents[-1]["parts"]
+                ):
+                    # 添加到现有的工具响应消息中
+                    contents[-1]["parts"].append(function_response)
+                else:
+                    # 创建新的工具响应消息
+                    contents.append({
+                        "role": "user",
+                        "parts": [function_response]
+                    })
                 continue
             # 普通消息
             parts = []
@@ -125,9 +159,21 @@ class GeminiClient(LLMClientBase):
             tools=tool_schemas
         )
 
-        print("\n========== Gemini API 请求消息格式 ==========")
-        import pprint; pprint.pprint(contents)
-        print("========== END ==========")
+        # 根据配置决定是否打印调试信息
+        if self.extra_config.get('debug', False):
+            print("\n========== Gemini API 请求消息格式 ==========")
+            print("Payload:")
+            import pprint; pprint.pprint({
+                "model": self.extra_config.get('model', "gemini-2.0-flash-lite"),
+                "contents": contents,
+                "config": {
+                    "system_instruction": self.system_prompt,
+                    "temperature": self.extra_config.get('temperature', 1.2),
+                    "max_output_tokens": self.extra_config.get('max_output_tokens', 1024),
+                    "tools": tool_schemas
+                }
+            })
+            print("========== END ==========")
 
         try:
             response = self.client.models.generate_content(
@@ -135,36 +181,46 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config
             )
+            
+            # 打印 Gemini API 响应格式
+            if self.extra_config.get('debug', False):
+                print("\n========== Gemini API 响应格式 ==========")
+                if hasattr(response, 'candidates') and response.candidates:
+                    print("Response parts:")
+                    pprint.pprint(response.candidates[0].content.parts)
+                print("========== END ==========")
+
             if hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
-                # 遍历所有 parts，优先处理 function_call
+                # 遍历所有 parts，处理所有 function_call
                 if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
                     natural_content = ""
-                    tool_call = None
+                    tool_calls = []
                     for part in candidate.content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
-                            tool_call = part.function_call
-                            break
                         if hasattr(part, 'text') and part.text:
                             natural_content = part.text  # 记录 function_call 前的自然语言内容
-                    if tool_call:
+                        elif hasattr(part, 'function_call') and part.function_call:
+                            tool_calls.append({
+                                'name': part.function_call.name,
+                                'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
+                                'id': part.function_call.id or part.function_call.name  # 使用工具调用ID或函数名
+                            })
+                    
+                    if tool_calls:
                         return LLMResponse(
                             content=natural_content,  # 优先用自然语言内容
                             response_type=ResponseType.FUNCTION_CALL,
-                            function_name=tool_call.name,
-                            function_args=tool_call.args if hasattr(tool_call, 'args') else tool_call.arguments,
-                            function_result=None
+                            tool_calls=tool_calls
                         )
-                    # 如果没有 function_call，找第一个有 text 的 part
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            response_text = part.text
-                            response_text, keyword = parse_llm_output(response_text)
-                            return LLMResponse(
-                                content=response_text,
-                                response_type=ResponseType.TEXT,
-                                keyword=keyword
-                            )
+                    
+                    # 如果没有 function_call，返回文本响应
+                    if natural_content:
+                        response_text, keyword = parse_llm_output(natural_content)
+                        return LLMResponse(
+                            content=response_text,
+                            response_type=ResponseType.TEXT,
+                            keyword=keyword
+                        )
             return LLMResponse(
                 content="",
                 response_type=ResponseType.ERROR
