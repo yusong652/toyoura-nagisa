@@ -25,6 +25,13 @@ class GrokClient(LLMClientBase):
         ]
         has_image = False
         for msg in messages:
+            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
+                messages_for_llm.append({
+                    "role": msg.role,
+                    "content": msg.content,
+                    "tool_calls": msg.tool_calls
+                })
+                continue
             if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
                 messages_for_llm.append({
                     "role": "tool",
@@ -81,22 +88,24 @@ class GrokClient(LLMClientBase):
             )
 
             if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
-                tool_call = response.choices[0].message.tool_calls[0]
-                function_name = tool_call.function.name
-                arguments = tool_call.function.arguments
-                tool_call_id = tool_call.id
-                try:
-                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
-                except Exception:
-                    function_args = arguments
-
+                tool_calls = []
+                for tool_call in response.choices[0].message.tool_calls:
+                    function_name = tool_call.function.name
+                    arguments = tool_call.function.arguments
+                    tool_call_id = tool_call.id
+                    try:
+                        function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                    except Exception:
+                        function_args = arguments
+                    tool_calls.append({
+                        'name': function_name,
+                        'arguments': function_args,
+                        'id': tool_call_id
+                    })
                 return LLMResponse(
                     content="",
                     response_type=ResponseType.FUNCTION_CALL,
-                    function_name=function_name,
-                    function_args=function_args,
-                    function_result=None,
-                    function_call_id=tool_call_id
+                    tool_calls=tool_calls
                 )
             if response.choices:
                 llm_reply = response.choices[0].message.content

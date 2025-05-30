@@ -190,7 +190,7 @@ class GeminiClient(LLMClientBase):
             tools=tool_schemas
         )
 
-        # 根据配置决定是否打印调试信息
+        # 只保留一个调试信息块，由 config debug 控制
         if self.extra_config.get('debug', False):
             print("\n========== Gemini API 请求消息格式 ==========")
             print("Payload:")
@@ -213,12 +213,11 @@ class GeminiClient(LLMClientBase):
                 config=config
             )
             
-            # 打印 Gemini API 响应格式
             if self.extra_config.get('debug', False):
                 print("\n========== Gemini API 响应格式 ==========")
                 if hasattr(response, 'candidates') and response.candidates:
                     print("Response parts:")
-                    pprint.pprint(response.candidates[0].content.parts)
+                    import pprint; pprint.pprint(response.candidates[0].content.parts)
                 print("========== END ==========")
 
             if hasattr(response, 'candidates') and response.candidates:
