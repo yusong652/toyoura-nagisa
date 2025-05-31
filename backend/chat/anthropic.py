@@ -8,6 +8,7 @@ from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserTool
 from backend.chat.utils import parse_llm_output
 import anthropic
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 
 class AnthropicClient(LLMClientBase):
     """
@@ -76,29 +77,13 @@ class AnthropicClient(LLMClientBase):
                 continue
 
             # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
-            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
-                tool_result_content = msg.content
-                if isinstance(tool_result_content, str):
-                    tool_result_content = [{"type": "text", "text": tool_result_content}]
-                elif not isinstance(tool_result_content, list):
-                    tool_result_content = []
-                else:
-                    # 过滤掉空白/空字符串的 text 块，并保证每个元素为 content block
-                    filtered = []
-                    for c in tool_result_content:
-                        if isinstance(c, dict) and c.get("type") == "text":
-                            text_val = str(c.get("text", "")).strip()
-                            if text_val:
-                                filtered.append({"type": "text", "text": c["text"]})
-                        elif isinstance(c, dict):
-                            filtered.append(c)
-                        elif isinstance(c, str):
-                            filtered.append({"type": "text", "text": c})
-                    tool_result_content = filtered
+            if isinstance(msg, UserToolMessage) or getattr(msg, "role", None) == "tool":
+                import json
+                json_str = json.dumps(msg.content, ensure_ascii=False)
                 tool_result_block = {
                     "type": "tool_result",
                     "tool_use_id": getattr(msg, "tool_call_id", ""),
-                    "content": tool_result_content
+                    "content": [{"type": "text", "text": json_str}]
                 }
                 anthropic_messages.append({
                     "role": "user",
@@ -400,7 +385,8 @@ class AnthropicClient(LLMClientBase):
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
-            return await mcp_async_client.call_tool(tool_name, params)
+            result = await mcp_async_client.call_tool(tool_name, params)
+            return extract_text_from_mcp_result(result)
 
     # 工具函数：规范化 tool_result 为 Anthropic 支持的 content block
     def _normalize_tool_content(self, tool_result):
