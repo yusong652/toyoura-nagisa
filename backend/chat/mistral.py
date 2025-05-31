@@ -8,6 +8,7 @@ from backend.chat.utils import parse_llm_output
 import re
 import mistralai
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 import random
 import string
 
@@ -72,49 +73,18 @@ class MistralClient(LLMClientBase):
                 })
                 continue
             # Handle tool responses
-            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
-                # Extract actual content from TextContent or other content types
-                content = msg.content
-                if isinstance(content, list):
-                    # If content is a list of content blocks, extract the text
-                    text_contents = []
-                    for item in content:
-                        if isinstance(item, dict) and "text" in item:
-                            text_contents.append(item["text"])
-                        elif hasattr(item, "text"):
-                            text_contents.append(item.text)
-                    content = " ".join(text_contents) if text_contents else ""
-                elif hasattr(content, "text"):
-                    # If content is a TextContent object
-                    content = content.text
-                elif content is None:
-                    content = ""
-                elif isinstance(content, str) and content.startswith("[TextContent"):
-                    # Handle stringified TextContent object
-                    try:
-                        # Extract text from stringified TextContent
-                        import re
-                        text_match = re.search(r"text='([^']*)'", content)
-                        if text_match:
-                            content = text_match.group(1)
-                        else:
-                            content = str(content)
-                    except Exception:
-                        content = str(content)
-                else:
-                    content = str(content)
-
+            if isinstance(msg, UserToolMessage) or getattr(msg, "role", None) == "tool":
+                import json
+                json_str = json.dumps(msg.content, ensure_ascii=False)
                 tool_response = {
                     "role": "tool",
-                    "content": content,
+                    "content": [{"type": "text", "text": json_str}]
                 }
-                
                 # Handle tool_call_id
                 if hasattr(msg, "tool_call_id") and msg.tool_call_id:
                     tool_response["tool_call_id"] = msg.tool_call_id
                 elif hasattr(msg, "tool_request") and isinstance(msg.tool_request, dict):
                     tool_response["tool_call_id"] = msg.tool_request.get("id")
-                
                 messages_for_llm.append(tool_response)
                 continue
             if isinstance(msg.content, list):
@@ -340,4 +310,5 @@ class MistralClient(LLMClientBase):
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
-            return await mcp_async_client.call_tool(tool_name, params) 
+            result = await mcp_async_client.call_tool(tool_name, params)
+            return extract_text_from_mcp_result(result) 

@@ -7,6 +7,7 @@ from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 
 class GrokClient(LLMClientBase):
     """
@@ -32,10 +33,11 @@ class GrokClient(LLMClientBase):
                     "tool_calls": msg.tool_calls
                 })
                 continue
-            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
+            if isinstance(msg, UserToolMessage) or getattr(msg, "role", None) == "tool":
+                json_str = json.dumps(msg.content, ensure_ascii=False)
                 messages_for_llm.append({
                     "role": "tool",
-                    "content": msg.content,
+                    "content": [{"type": "text", "text": json_str}],
                     "tool_call_id": getattr(msg, "tool_call_id", None)
                 })
                 continue
@@ -192,63 +194,5 @@ class GrokClient(LLMClientBase):
             except Exception:
                 params = {}
         async with self.mcp_client as mcp_async_client:
-            return await mcp_async_client.call_tool(tool_name, params)
-
-    async def handle_function_call_closed_loop(
-        self,
-        messages: List[Message],
-        tool_call: dict,
-        tool_result: Any,
-        **kwargs
-    ) -> 'LLMResponse':
-        import json as _json
-        function_name = tool_call.get("name")
-        arguments = tool_call.get("arguments")
-        tool_call_id = tool_call.get("id", "tool_call_id")
-        if not isinstance(arguments, str):
-            arguments = _json.dumps(arguments, ensure_ascii=False)
-        messages_for_llm, _ = self._format_messages_for_grok(messages)
-        messages_for_llm.append({
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": function_name,
-                        "arguments": arguments
-                    }
-                }
-            ]
-        })
-        messages_for_llm.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": getattr(tool_result, 'text', str(tool_result))
-        })
-        model = self.extra_config.get("model", "grok-3")
-        try:
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages_for_llm,
-                temperature=self.extra_config.get("temperature", 0.7),
-                max_tokens=self.extra_config.get("max_tokens", 1024)
-            )
-            if response.choices:
-                llm_reply = response.choices[0].message.content
-                response_text, keyword = parse_llm_output(llm_reply)
-                return LLMResponse(
-                    content=response_text,
-                    response_type=ResponseType.TEXT,
-                    keyword=keyword
-                )
-            return LLMResponse(
-                content="",
-                response_type=ResponseType.ERROR
-            )
-        except Exception as e:
-            return LLMResponse(
-                content=f"Grok (OpenAI SDK) error: {str(e)}",
-                response_type=ResponseType.ERROR
-            ) 
+            result = await mcp_async_client.call_tool(tool_name, params)
+            return extract_text_from_mcp_result(result)

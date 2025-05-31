@@ -7,6 +7,7 @@ from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from openai import OpenAI
 
 class GPTClient(LLMClientBase):
@@ -55,10 +56,11 @@ class GPTClient(LLMClientBase):
                     "tool_calls": msg.tool_calls
                 })
                 continue
-            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
+            if isinstance(msg, UserToolMessage) or getattr(msg, "role", None) == "tool":
+                json_str = json.dumps(msg.content, ensure_ascii=False)
                 messages_for_llm.append({
                     "role": "tool",
-                    "content": msg.content,
+                    "content": [{"type": "text", "text": json_str}],
                     "tool_call_id": getattr(msg, "tool_call_id", None)
                 })
                 continue
@@ -247,4 +249,5 @@ class GPTClient(LLMClientBase):
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
         async with self.mcp_client as mcp_async_client:
-            return await mcp_async_client.call_tool(tool_name, params)
+            result = await mcp_async_client.call_tool(tool_name, params)
+            return extract_text_from_mcp_result(result)
