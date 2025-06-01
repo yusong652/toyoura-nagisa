@@ -66,11 +66,16 @@ class GeminiClient(LLMClientBase):
             return "model"
         return "user"
 
-    async def get_response(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:
-        # 1. 获取 MCP 工具 schema
-        tool_schemas = await self.get_function_call_schemas()
-
-        # 2. 构造 Gemini API payload，注册 tools
+    def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> List[Dict[str, Any]]:
+        """
+        Format messages into Gemini API compatible format.
+        
+        Args:
+            messages: List of BaseMessage objects to format
+            
+        Returns:
+            List of formatted message dictionaries for Gemini API
+        """
         contents = []
         for msg in messages:
             # Gemini function call标准：
@@ -135,6 +140,60 @@ class GeminiClient(LLMClientBase):
                 parts.append({"text": msg.content})
             mapped_role = self.map_role(msg.role)
             contents.append({"role": mapped_role, "parts": parts})
+        return contents
+
+    def _format_llm_response(self, response) -> LLMResponse:
+        """
+        Format Gemini API response into LLMResponse object.
+        
+        Args:
+            response: Raw response from Gemini API
+            
+        Returns:
+            LLMResponse object containing the formatted response
+        """
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0]
+            # 遍历所有 parts，处理所有 function_call
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
+                natural_content = ""
+                tool_calls = []
+                for part in candidate.content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        natural_content = part.text  # 记录 function_call 前的自然语言内容
+                    elif hasattr(part, 'function_call') and part.function_call:
+                        tool_calls.append({
+                            'name': part.function_call.name,
+                            'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
+                            'id': part.function_call.id or part.function_call.name  # 使用工具调用ID或函数名
+                        })
+                
+                if tool_calls:
+                    return LLMResponse(
+                        content=natural_content,  # 优先用自然语言内容
+                        response_type=ResponseType.FUNCTION_CALL,
+                        tool_calls=tool_calls
+                    )
+                
+                # 如果没有 function_call，返回文本响应
+                if natural_content:
+                    response_text, keyword = parse_llm_output(natural_content)
+                    return LLMResponse(
+                        content=response_text,
+                        response_type=ResponseType.TEXT,
+                        keyword=keyword
+                    )
+        return LLMResponse(
+            content="",
+            response_type=ResponseType.ERROR
+        )
+
+    async def get_response(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:
+        # 1. 获取 MCP 工具 schema
+        tool_schemas = await self.get_function_call_schemas()
+
+        # 2. 构造 Gemini API payload，注册 tools
+        contents = self._format_messages_for_gemini(messages)
         
         # 动态构造 config，把 tools 放进去
         config = types.GenerateContentConfig(
@@ -150,14 +209,7 @@ class GeminiClient(LLMClientBase):
             print("\n========== Gemini API 请求消息格式 ==========")
             print("Payload:")
             import pprint; pprint.pprint({
-                "model": self.extra_config.get('model', "gemini-2.0-flash-lite"),
                 "contents": contents,
-                "config": {
-                    "system_instruction": self.system_prompt,
-                    "temperature": self.extra_config.get('temperature', 1.2),
-                    "max_output_tokens": self.extra_config.get('max_output_tokens', 1024),
-                    "tools": tool_schemas
-                }
             })
             print("========== END ==========")
 
@@ -168,48 +220,8 @@ class GeminiClient(LLMClientBase):
                 config=config
             )
             
-            if self.extra_config.get('debug', False):
-                print("\n========== Gemini API 响应格式 ==========")
-                if hasattr(response, 'candidates') and response.candidates:
-                    print("Response parts:")
-                    import pprint; pprint.pprint(response.candidates[0].content.parts)
-                print("========== END ==========")
-
-            if hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
-                # 遍历所有 parts，处理所有 function_call
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
-                    natural_content = ""
-                    tool_calls = []
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            natural_content = part.text  # 记录 function_call 前的自然语言内容
-                        elif hasattr(part, 'function_call') and part.function_call:
-                            tool_calls.append({
-                                'name': part.function_call.name,
-                                'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
-                                'id': part.function_call.id or part.function_call.name  # 使用工具调用ID或函数名
-                            })
-                    
-                    if tool_calls:
-                        return LLMResponse(
-                            content=natural_content,  # 优先用自然语言内容
-                            response_type=ResponseType.FUNCTION_CALL,
-                            tool_calls=tool_calls
-                        )
-                    
-                    # 如果没有 function_call，返回文本响应
-                    if natural_content:
-                        response_text, keyword = parse_llm_output(natural_content)
-                        return LLMResponse(
-                            content=response_text,
-                            response_type=ResponseType.TEXT,
-                            keyword=keyword
-                        )
-            return LLMResponse(
-                content="",
-                response_type=ResponseType.ERROR
-            )
+            return self._format_llm_response(response)
+            
         except Exception as e:
             print(f"Gemini API error: {e}")
             return LLMResponse(
@@ -313,6 +325,9 @@ class GeminiClient(LLMClientBase):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
         """
+        if not self.tools_enabled:
+            return None
+            
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         function_declarations = [

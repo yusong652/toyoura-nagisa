@@ -23,6 +23,7 @@ class LLMClientBase(ABC):
         """
         self.system_prompt = system_prompt or ""
         self.extra_config = kwargs
+        self.tools_enabled = kwargs.get("tools_enabled", False)  # 默认关闭工具
 
     @abstractmethod
     async def get_response(
@@ -73,10 +74,22 @@ class LLMClientBase(ABC):
     def update_config(self, **kwargs):
         """动态更新额外配置参数。"""
         self.extra_config.update(kwargs)
+        if "tools_enabled" in kwargs:
+            self.tools_enabled = kwargs["tools_enabled"]
 
     def get_config(self) -> Dict[str, Any]:
         """获取当前所有配置参数。"""
         return self.extra_config
+
+    async def get_function_call_schemas(self):
+        """
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用。
+        如果 tools_enabled 为 False，则返回 None。
+        """
+        if not self.tools_enabled:
+            return None
+        # 子类需要实现具体的获取工具schema的逻辑
+        raise NotImplementedError("Subclasses must implement get_function_call_schemas")
 
     # 可以根据需要添加其他通用的抽象方法，比如初始化、设置参数等
     # def __init__(self, api_key: str, model_name: str, ...) -> None:

@@ -201,6 +201,51 @@ class AnthropicClient(LLMClientBase):
                 })
         return anthropic_messages, has_image
 
+    def _format_llm_response(self, response) -> LLMResponse:
+        """
+        Format Anthropic API response into LLMResponse object.
+        
+        Args:
+            response: Raw response from Anthropic API
+            
+        Returns:
+            LLMResponse object containing the formatted response
+        """
+        # 检查是否有function call
+        if hasattr(response, "content") and response.content:
+            tool_calls = []
+            text_content = ""
+            for item in response.content:
+                if hasattr(item, "type") and item.type == "text":
+                    text_content = getattr(item, "text", "")
+                elif hasattr(item, "type") and item.type == "tool_use":
+                    function_name = getattr(item, "name", None)
+                    arguments = getattr(item, "input", None)
+                    tool_call_id = getattr(item, "id", None)
+                    tool_calls.append({
+                        'name': function_name,
+                        'arguments': arguments,
+                        'id': tool_call_id
+                    })
+            if tool_calls:
+                return LLMResponse(
+                    content=text_content,  # 用真实自然语言内容
+                    response_type=ResponseType.FUNCTION_CALL,
+                    tool_calls=tool_calls
+                )
+                
+        # 普通文本回复
+        llm_reply = ""
+        for content_item in response.content:
+            if hasattr(content_item, "type") and content_item.type == "text":
+                llm_reply += getattr(content_item, "text", "")
+        response_text, keyword = parse_llm_output(llm_reply)
+        return LLMResponse(
+            content=response_text,
+            response_type=ResponseType.TEXT,
+            keyword=keyword
+        )
+
     async def get_response(
         self,
         messages: List[BaseMessage],
@@ -210,58 +255,26 @@ class AnthropicClient(LLMClientBase):
         调用 Anthropic API，返回 LLMResponse。
         """
         anthropic_messages, has_image = self._format_messages_for_anthropic(messages)
-        
         # 根据配置决定是否打印调试信息
         if self.extra_config.get('debug', False):
             print("\n========== Anthropic API 请求消息格式 ==========")
             import pprint; pprint.pprint(anthropic_messages)
             print("========== END ==========")
-            
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
         try:
-            response = self.anthropic_client.messages.create(
+            kwargs_api = dict(
                 model=model,
                 max_tokens=self.extra_config.get("max_tokens", 1024),
                 messages=anthropic_messages,
                 system=self.system_prompt,
                 temperature=self.extra_config.get("temperature", 0.7),
-                tools=tools if tools else None
             )
-            # 检查是否有function call
-            if hasattr(response, "content") and response.content:
-                tool_calls = []
-                text_content = ""
-                for item in response.content:
-                    if hasattr(item, "type") and item.type == "text":
-                        text_content = getattr(item, "text", "")
-                    elif hasattr(item, "type") and item.type == "tool_use":
-                        function_name = getattr(item, "name", None)
-                        arguments = getattr(item, "input", None)
-                        tool_call_id = getattr(item, "id", None)
-                        tool_calls.append({
-                            'name': function_name,
-                            'arguments': arguments,
-                            'id': tool_call_id
-                        })
-                if tool_calls:
-                    return LLMResponse(
-                        content=text_content,  # 用真实自然语言内容
-                        response_type=ResponseType.FUNCTION_CALL,
-                        tool_calls=tool_calls
-                    )
-            # 普通文本回复
-            llm_reply = ""
-            for content_item in response.content:
-                if hasattr(content_item, "type") and content_item.type == "text":
-                    llm_reply += getattr(content_item, "text", "")
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
+            if tools and len(tools) > 0:
+                kwargs_api["tools"] = tools
+            response = self.anthropic_client.messages.create(**kwargs_api)
+            return self._format_llm_response(response)
         except Exception as e:
             print(f"Anthropic API error: {e}")
             return LLMResponse(
@@ -352,6 +365,8 @@ class AnthropicClient(LLMClientBase):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Anthropic tools 格式列表
         """
+        if not self.tools_enabled:
+            return None
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         tools = []
@@ -374,7 +389,6 @@ class AnthropicClient(LLMClientBase):
                 "input_schema": params
             }
             tools.append(tool_schema)
-
         return tools
 
     async def handle_function_call(self, function_call: dict):

@@ -147,14 +147,49 @@ class MistralClient(LLMClientBase):
                 })
         return messages_for_llm, has_image
 
+    def _format_llm_response(self, response) -> LLMResponse:
+        """
+        Format Mistral API response into LLMResponse object.
+        
+        Args:
+            response: Raw response from Mistral API
+            
+        Returns:
+            LLMResponse object containing the formatted response
+        """
+        if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
+            tool_call = response.choices[0].message.tool_calls[0]
+            function_name = tool_call.function.name
+            import json as _json
+            arguments = tool_call.function.arguments
+            tool_call_id = tool_call.id
+            try:
+                function_args = _json.loads(arguments) if isinstance(arguments, str) else arguments
+            except Exception:
+                function_args = arguments
+            natural_content = response.choices[0].message.content if hasattr(response.choices[0].message, "content") else ""
+            return LLMResponse(
+                content=natural_content or "",
+                response_type=ResponseType.FUNCTION_CALL,
+                function_name=function_name,
+                function_args=function_args,
+                function_result=None,
+                function_call_id=tool_call_id
+            )
+            
+        llm_reply = response.choices[0].message.content
+        response_text, keyword = parse_llm_output(llm_reply)
+        return LLMResponse(
+            content=response_text,
+            response_type=ResponseType.TEXT,
+            keyword=keyword
+        )
+
     async def get_response(
         self,
         messages: List[BaseMessage],
         **kwargs
     ) -> 'LLMResponse':
-        """
-        调用 Mistral API，返回 LLMResponse。
-        """
         messages_for_llm, has_image = self._format_messages_for_mistral(messages)
         
         # 根据配置决定是否打印调试信息
@@ -166,6 +201,7 @@ class MistralClient(LLMClientBase):
         model = self.extra_config.get("model", "mistral-large-latest")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
+        
         try:
             response = await self.mistral_client.chat.complete_async(
                 model=model,
@@ -176,32 +212,7 @@ class MistralClient(LLMClientBase):
                 tool_choice="auto",
                 parallel_tool_calls=False
             )
-            if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
-                tool_call = response.choices[0].message.tool_calls[0]
-                function_name = tool_call.function.name
-                import json as _json
-                arguments = tool_call.function.arguments
-                tool_call_id = tool_call.id
-                try:
-                    function_args = _json.loads(arguments) if isinstance(arguments, str) else arguments
-                except Exception:
-                    function_args = arguments
-                natural_content = response.choices[0].message.content if hasattr(response.choices[0].message, "content") else ""
-                return LLMResponse(
-                    content=natural_content or "",
-                    response_type=ResponseType.FUNCTION_CALL,
-                    function_name=function_name,
-                    function_args=function_args,
-                    function_result=None,
-                    function_call_id=tool_call_id
-                )
-            llm_reply = response.choices[0].message.content
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
+            return self._format_llm_response(response)
         except Exception as e:
             return LLMResponse(
                 content=f"Mistral SDK error: {str(e)}",
@@ -276,6 +287,9 @@ class MistralClient(LLMClientBase):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Mistral tools 格式列表
         """
+        if not self.tools_enabled:
+            return None
+            
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         tools = []

@@ -96,6 +96,49 @@ class GPTClient(LLMClientBase):
                 messages_for_llm.append({"role": msg.role, "content": text})
         return messages_for_llm, has_image
 
+    def _format_llm_response(self, response) -> LLMResponse:
+        """
+        Format OpenAI API response into LLMResponse object.
+        
+        Args:
+            response: Raw response from OpenAI API
+            
+        Returns:
+            LLMResponse object containing the formatted response
+        """
+        if not response.choices:
+            raise ValueError("No choices in OpenAI response")
+            
+        choice = response.choices[0].message
+        if hasattr(choice, "tool_calls") and choice.tool_calls:
+            tool_calls = []
+            for tool_call in choice.tool_calls:
+                function_name = tool_call.function.name
+                arguments = tool_call.function.arguments
+                tool_call_id = tool_call.id
+                try:
+                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                except Exception:
+                    function_args = arguments
+                tool_calls.append({
+                    'name': function_name,
+                    'arguments': function_args,
+                    'id': tool_call_id
+                })
+            return LLMResponse(
+                content=choice.content,
+                response_type=ResponseType.FUNCTION_CALL,
+                tool_calls=tool_calls
+            )
+            
+        llm_reply = choice.content
+        response_text, keyword = parse_llm_output(llm_reply)
+        return LLMResponse(
+            content=response_text,
+            response_type=ResponseType.TEXT,
+            keyword=keyword
+        )
+
     async def get_response(
         self,
         messages: List[BaseMessage],
@@ -104,22 +147,22 @@ class GPTClient(LLMClientBase):
         messages_for_llm, has_image = self._format_messages_for_openai(messages)
         
         # 根据配置决定是否打印调试信息
-        print(self.extra_config)
         if self.extra_config.get('debug', False):
             print("\n========== OpenAI API 请求消息格式 ==========")
             import pprint; pprint.pprint(messages_for_llm)
             print("========== END ==========")
             
-        model = "gpt-4.1" if has_image else self.extra_config.get("model", "gpt-4.1-mini")
+        model = self.extra_config.get("model", "gpt-4-turbo-preview")
+        # 自动获取 tools
+        tools = await self.get_function_call_schemas()
+        
         payload = {
             "model": model,
             "messages": messages_for_llm,
-            "temperature": self.extra_config.get("temperature", 1.2)
+            "temperature": self.extra_config.get("temperature", 0.7),
+            "tools": tools if tools else None
         }
-        # 自动获取 tools
-        tools = await self.get_function_call_schemas()
-        if tools:
-            payload["tools"] = tools
+        
         try:
             response = self.openai_client.chat.completions.create(
                 model=payload["model"],
@@ -127,36 +170,7 @@ class GPTClient(LLMClientBase):
                 temperature=payload["temperature"],
                 tools=payload.get("tools")
             )
-            if not response.choices:
-                raise ValueError("No choices in OpenAI response")
-            choice = response.choices[0].message
-            if hasattr(choice, "tool_calls") and choice.tool_calls:
-                tool_calls = []
-                for tool_call in choice.tool_calls:
-                    function_name = tool_call.function.name
-                    arguments = tool_call.function.arguments
-                    tool_call_id = tool_call.id
-                    try:
-                        function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
-                    except Exception:
-                        function_args = arguments
-                    tool_calls.append({
-                        'name': function_name,
-                        'arguments': function_args,
-                        'id': tool_call_id
-                    })
-                return LLMResponse(
-                    content=choice.content,
-                    response_type=ResponseType.FUNCTION_CALL,
-                    tool_calls=tool_calls
-                )
-            llm_reply = choice.content
-            response_text, keyword = parse_llm_output(llm_reply)
-            return LLMResponse(
-                content=response_text,
-                response_type=ResponseType.TEXT,
-                keyword=keyword
-            )
+            return self._format_llm_response(response)
         except Exception as e:
             print("OpenAI SDK error:", e)
             return LLMResponse(
@@ -220,6 +234,9 @@ class GPTClient(LLMClientBase):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 OpenAI tools 格式列表
         """
+        if not self.tools_enabled:
+            return None
+            
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         tools = []

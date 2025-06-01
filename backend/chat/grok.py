@@ -73,6 +73,51 @@ class GrokClient(LLMClientBase):
                 messages_for_llm.append({"role": msg.role, "content": text})
         return messages_for_llm, has_image
 
+    def _format_llm_response(self, response) -> LLMResponse:
+        """
+        Format Grok API response into LLMResponse object.
+        
+        Args:
+            response: Raw response from Grok API
+            
+        Returns:
+            LLMResponse object containing the formatted response
+        """
+        if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
+            tool_calls = []
+            for tool_call in response.choices[0].message.tool_calls:
+                function_name = tool_call.function.name
+                arguments = tool_call.function.arguments
+                tool_call_id = tool_call.id
+                try:
+                    function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                except Exception:
+                    function_args = arguments
+                tool_calls.append({
+                    'name': function_name,
+                    'arguments': function_args,
+                    'id': tool_call_id
+                })
+            return LLMResponse(
+                content="",
+                response_type=ResponseType.FUNCTION_CALL,
+                tool_calls=tool_calls
+            )
+            
+        if response.choices:
+            llm_reply = response.choices[0].message.content
+            response_text, keyword = parse_llm_output(llm_reply)
+            return LLMResponse(
+                content=response_text,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
+            )
+            
+        return LLMResponse(
+            content="",
+            response_type=ResponseType.ERROR
+        )
+
     async def get_response(self, messages: List[BaseMessage], **kwargs) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_grok(messages)
         print("\n========== Grok API 请求消息格式 ==========")
@@ -88,39 +133,7 @@ class GrokClient(LLMClientBase):
                 max_tokens=self.extra_config.get("max_tokens", 1024),
                 tools=tools if tools else None
             )
-
-            if response.choices and hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
-                tool_calls = []
-                for tool_call in response.choices[0].message.tool_calls:
-                    function_name = tool_call.function.name
-                    arguments = tool_call.function.arguments
-                    tool_call_id = tool_call.id
-                    try:
-                        function_args = json.loads(arguments) if isinstance(arguments, str) else arguments
-                    except Exception:
-                        function_args = arguments
-                    tool_calls.append({
-                        'name': function_name,
-                        'arguments': function_args,
-                        'id': tool_call_id
-                    })
-                return LLMResponse(
-                    content="",
-                    response_type=ResponseType.FUNCTION_CALL,
-                    tool_calls=tool_calls
-                )
-            if response.choices:
-                llm_reply = response.choices[0].message.content
-                response_text, keyword = parse_llm_output(llm_reply)
-                return LLMResponse(
-                    content=response_text,
-                    response_type=ResponseType.TEXT,
-                    keyword=keyword
-                )
-            return LLMResponse(
-                content="",
-                response_type=ResponseType.ERROR
-            )
+            return self._format_llm_response(response)
         except Exception as e:
             return LLMResponse(
                 content=f"Grok (OpenAI SDK) error: {str(e)}",
@@ -166,6 +179,12 @@ class GrokClient(LLMClientBase):
             return None
 
     async def get_function_call_schemas(self):
+        """
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Grok tools 格式列表
+        """
+        if not self.tools_enabled:
+            return None
+            
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         tools = []

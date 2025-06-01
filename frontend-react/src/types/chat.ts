@@ -68,4 +68,6 @@ export interface ChatContextType extends ChatState {
     parameters?: Record<string, any>;
     action_text?: string;
   } | null;
+  toolsEnabled: boolean;
+  updateToolsEnabled: (enabled: boolean) => Promise<void>;
 } 

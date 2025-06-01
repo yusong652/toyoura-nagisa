@@ -106,6 +106,9 @@ class DeleteMessageRequest(BaseModel):
 class GenerateTitleRequest(BaseModel):
     session_id: str
 
+class UpdateToolsEnabledRequest(BaseModel):
+    enabled: bool
+
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
     """创建新的聊天历史记录"""
@@ -251,7 +254,7 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                 "role": "tool",
                 "tool_call_id": tool_call['id'],
                 "name": tool_call['name'],
-                "content": str(tool_result)
+                "content": tool_result  # 保持结构化
             })
             print(f"[DEBUG] tool_response_msg: {tool_response_msg.model_dump()}")
             recent_msgs.append(tool_response_msg)
@@ -279,7 +282,6 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
             yield f"data: {json.dumps({'keyword': llm_response.keyword})}\n\n"
         # 新增：表情/颜文字占位处理
         text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(llm_response.content)
-        restored_text = restore_emoticons(text_with_placeholders, kaomoji_list, emoji_list)
         # 分句用占位符文本
         sentences = split_text_by_punctuations(text_with_placeholders)
         for sentence in sentences:
@@ -424,3 +426,19 @@ async def generate_title_endpoint(request: Request):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"生成标题失败: {str(e)}")
+
+@app.post("/api/chat/tools-enabled", response_model=dict)
+async def update_tools_enabled(request: UpdateToolsEnabledRequest):
+    """更新LLM客户端的tools_enabled状态"""
+    try:
+        print(f"[DEBUG] /api/chat/tools-enabled received enabled: {request.enabled} (type: {type(request.enabled)})")
+        llm_client: LLMClientBase = app.state.llm_client
+        llm_client.update_config(tools_enabled=request.enabled)
+        return {
+            "success": True,
+            "tools_enabled": request.enabled
+        }
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 打印详细堆栈
+        raise HTTPException(status_code=500, detail=f"更新工具状态失败: {str(e)}")

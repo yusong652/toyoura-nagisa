@@ -34,6 +34,33 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     parameters?: Record<string, any>;
     action_text?: string;
   } | null>(null);
+  // 添加工具开关状态
+  const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
+
+  // 添加更新工具状态的函数
+  const updateToolsEnabled = useCallback(async (enabled: boolean) => {
+    try {
+      const response = await fetch('/api/chat/tools-enabled', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setToolsEnabled(data.tools_enabled);
+      }
+    } catch (error) {
+      console.error('更新工具状态失败:', error);
+      throw error;
+    }
+  }, []);
 
   // 检查与后端的连接
   const checkConnection = useCallback(async (): Promise<boolean> => {
@@ -961,7 +988,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       refreshSessions,
       checkConnection,
       refreshTitle,
-      toolState // 添加工具状态到context
+      toolState,
+      toolsEnabled,  // 添加工具开关状态
+      updateToolsEnabled  // 添加更新工具状态的函数
     }}>
       {children}
     </ChatContext.Provider>
