@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 def register_common_tools(mcp: FastMCP):
+    # Register only common tools here
 
     @mcp.tool()
     def get_current_time() -> str:
@@ -16,17 +17,15 @@ def register_common_tools(mcp: FastMCP):
 
     @mcp.tool()
     def get_weather(
-        city: str = Field(..., description="The city name in English, e.g. 'London' (please do not use Chinese)"),
+        city: str = Field(..., description="The city name in English, e.g. 'London' (do not use non-English names)"),
         unit: str = Field("metric", description="'metric' for Celsius, 'imperial' for Fahrenheit")
     ) -> dict:
         """
         Get the current weather for a city using the OpenWeatherMap API.
 
-        Note: The 'city' parameter must be provided in English (e.g., 'London'). 
-        Do not use Chinese or other non-English city names, as the API only supports English input.
-
         Args:
-            city: The city name in English, e.g. 'London'. Do not use Chinese.
+            city: The city name in English, e.g. 'London'.
+            Note: The 'city' parameter must be provided in English (e.g., 'London').
             unit: 'metric' for Celsius, 'imperial' for Fahrenheit.
 
         Returns:
@@ -54,14 +53,14 @@ def register_common_tools(mcp: FastMCP):
     @mcp.tool()
     def get_location() -> dict:
         """
-        获取当前服务器的公网IP地理位置信息。
+        Get the public IP geolocation information of the current server.
 
-        本工具通过后端服务器的公网IP调用第三方API（如ip-api.com）获取地理位置。
-        返回内容包括城市名、经纬度等。
-        未来可扩展为前端定位（如浏览器或移动端定位）。
+        This tool uses the server's public IP to call a third-party API (such as ip-api.com) to obtain geolocation.
+        The returned content includes city name, latitude, longitude, etc.
+        In the future, this can be extended to frontend geolocation (such as browser or mobile device location).
 
         Returns:
-            一个包含地理位置信息的字典，例如：
+            A dictionary containing geolocation information, for example:
             {
                 "city": "Beijing",
                 "latitude": 39.9042,

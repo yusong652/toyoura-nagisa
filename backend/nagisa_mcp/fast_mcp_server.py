@@ -2,7 +2,8 @@ import asyncio
 import json
 from typing import Dict, Any, List, Optional
 from fastmcp import FastMCP, Client
-from common_tools import register_common_tools
+from backend.nagisa_mcp.tools.common_tools import register_common_tools
+from backend.nagisa_mcp.tools.web_search import register_web_search_tools
 from datetime import datetime
 
 mcp = FastMCP("Fast MCP Server", 
@@ -13,6 +14,7 @@ mcp = FastMCP("Fast MCP Server",
 print(f"[DEBUG] Fast MCP Server initialized")
 
 register_common_tools(mcp)
+register_web_search_tools(mcp)
     
 # 启动服务器
 if __name__ == "__main__":

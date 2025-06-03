@@ -94,6 +94,10 @@ TTS_CONFIG = {
     }
 }
 
+# Google Custom Search API 配置
+GOOGLE_CUSTOM_SEARCH_API_KEY = "your_google_custom_search_api_key_here"
+GOOGLE_CUSTOM_SEARCH_ENGINE_ID = "your_google_custom_search_engine_id_here"
+
 def get_llm_config() -> Dict[str, Any]:
     """
     获取 LLM 配置。

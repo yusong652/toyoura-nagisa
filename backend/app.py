@@ -36,17 +36,15 @@ from backend.utils.helpers import (
     generate_title_for_session,
 )
 from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory
-from fastmcp import FastMCP, Client
-from backend.nagisa_mcp.common_tools import register_common_tools
+from backend.nagisa_mcp.fast_mcp_server import mcp
+from fastmcp import Client
 import threading
 
 
 # 加载环境变量
 load_dotenv()
 
-# Initialize MCP server and register tools
-mcp = FastMCP("Nagisa MCP Server", instructions="You can call get_weather, get_current_time, etc.")
-register_common_tools(mcp)
+# 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
 
 # 应用生命周期管理器
@@ -247,7 +245,6 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
 
             # 处理函数调用结果
             tool_result = await llm_client.handle_function_call(tool_call)
-            print(f"[DEBUG] tool_result for {tool_call['name'], tool_call['id']}: {tool_result}")
 
             # 添加工具响应消息
             tool_response_msg = message_factory({
