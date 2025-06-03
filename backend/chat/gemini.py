@@ -98,30 +98,22 @@ class GeminiClient(LLMClientBase):
                     )))
                 contents.append({"role": "model", "parts": parts})
                 continue
-            # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
-            if isinstance(msg, UserToolMessage) or hasattr(msg, "tool_request"):
-                tool_name = getattr(msg, "tool_request", {}).get("name", "")
-                if not tool_name and hasattr(msg, "name"):
-                    tool_name = msg.name
+            # 处理工具响应消息
+            if isinstance(msg, UserToolMessage):
+                tool_name = msg.name
                 if not tool_name:
                     print(f"[WARNING] Tool response missing name: {msg}")
                     continue
-                # 直接结构化传递内容
-                function_response = {
-                    "functionResponse": {
-                        "name": tool_name,
-                        "response": msg.content  # 直接结构化
-                    }
-                }
-                if contents and contents[-1]["role"] == "user" and any(
-                    "functionResponse" in part for part in contents[-1]["parts"]
-                ):
-                    contents[-1]["parts"].append(function_response)
-                else:
-                    contents.append({
-                        "role": "user",
-                        "parts": [function_response]
-                    })
+                # 保证 response 字段为 dict
+                response_dict = msg.content if isinstance(msg.content, dict) else {"result": msg.content}
+                parts = [types.Part(function_response=types.FunctionResponse(
+                    name=tool_name,
+                    response=response_dict
+                ))]
+                contents.append({
+                    "role": "user",
+                    "parts": parts
+                })
                 continue
             # 普通消息
             parts = []
