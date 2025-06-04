@@ -7,6 +7,7 @@ const ChatHistorySidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [newSessionName, setNewSessionName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  
   const { 
     sessions, 
     currentSessionId, 
@@ -27,55 +28,41 @@ const ChatHistorySidebar: React.FC = () => {
   }
 
   const handleCreateSession = async () => {
+    if (!newSessionName.trim()) return
+    setIsCreating(true)
     try {
-      setIsCreating(true)
-      await createNewSession(newSessionName || undefined)
+      await createNewSession(newSessionName)
       setNewSessionName('')
-      clearChat()
-    } catch (error) {
-      console.error('创建会话失败:', error)
     } finally {
       setIsCreating(false)
     }
   }
 
-  const handleSwitchSession = async (sessionId: string) => {
-    try {
-      await switchSession(sessionId)
-      closeSidebar()
-    } catch (error) {
-      console.error('切换会话失败:', error)
-    }
+  const handleSwitchSession = (sessionId: string) => {
+    switchSession(sessionId)
+    closeSidebar()
   }
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation() // 防止触发切换会话
-    
+    e.stopPropagation()
     if (window.confirm('确定要删除这个会话吗？')) {
-      try {
-        await deleteSession(sessionId)
-      } catch (error) {
-        console.error('删除会话失败:', error)
-      }
+      await deleteSession(sessionId)
     }
   }
 
   // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleString()
   }
 
   return (
     <>
-      <button className="chat-history-toggle" onClick={toggleSidebar}>
-        ☰
+      <button className="history-toggle" onClick={toggleSidebar} aria-label="Toggle chat history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
       </button>
       
       <div className={`chat-history-sidebar ${isOpen ? 'open' : ''}`}>
@@ -140,4 +127,4 @@ const ChatHistorySidebar: React.FC = () => {
   )
 }
 
-export default ChatHistorySidebar 
+export default ChatHistorySidebar

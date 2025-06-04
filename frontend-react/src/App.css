@@ -44,33 +44,30 @@
 
 .app-container {
   display: flex;
-  height: 100vh;
+  flex-direction: column;
   width: 100vw;
+  height: 100vh;
   position: relative;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  overflow: hidden;
 }
 
 .chat-container {
   display: flex;
-  flex-direction: row;
-  height: 100%;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  box-sizing: border-box;
-  padding: 0 20px;
+  flex: 1;
+  overflow: hidden;
+  padding: 12px;
+  position: relative;
 }
 
 .chat-left-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 20px;
-  box-sizing: border-box;
-  max-width: 800px;
+  min-width: 0;
+  max-width: 100%;
   margin: 0 auto;
+  width: 100%;
+  padding: 0 8px;
 }
 
 .chat-right-panel {

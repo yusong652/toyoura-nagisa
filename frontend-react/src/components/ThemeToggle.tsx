@@ -19,13 +19,20 @@ const ThemeToggle: React.FC = () => {
   }
 
   return (
-    <button 
-      className="theme-toggle" 
-      onClick={toggleTheme}
-      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-    >
-      {theme === 'light' ? '🌙' : '☀️'}
-    </button>
+    <div className="theme-toggle-container">
+      <input
+        type="checkbox"
+        id="theme-toggle"
+        className="theme-toggle-input"
+        checked={theme === 'dark'}
+        onChange={toggleTheme}
+      />
+      <label htmlFor="theme-toggle" className="theme-toggle-label">
+        <span className="theme-toggle-slider"></span>
+        <span className="theme-toggle-icon light">☀️</span>
+        <span className="theme-toggle-icon dark">🌙</span>
+      </label>
+    </div>
   )
 }
 

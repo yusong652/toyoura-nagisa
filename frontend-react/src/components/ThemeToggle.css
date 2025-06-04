@@ -1,44 +1,77 @@
-.theme-toggle {
+.theme-toggle-container {
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background-color: var(--secondary-color);
-  color: white;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 900;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(var(--secondary-color-rgb, 100, 100, 100), 0.3);
-  overflow: hidden;
 }
 
-.theme-toggle:hover {
-  background-color: var(--secondary-hover);
-  transform: rotate(30deg);
+.theme-toggle-input {
+  display: none;
+}
+
+.theme-toggle-label {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 30px;
+  background-color: var(--secondary-color);
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(var(--secondary-color-rgb, 100, 100, 100), 0.3);
+}
+
+.theme-toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 26px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.theme-toggle-icon.light {
+  left: 8px;
+  opacity: 1;
+}
+
+.theme-toggle-icon.dark {
+  right: 8px;
+  opacity: 0.5;
+}
+
+.theme-toggle-input:checked + .theme-toggle-label {
+  background-color: var(--primary-color);
+}
+
+.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-slider {
+  transform: translateX(30px);
+}
+
+.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon.light {
+  opacity: 0.5;
+}
+
+.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon.dark {
+  opacity: 1;
+}
+
+.theme-toggle-label:hover {
+  transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(var(--secondary-color-rgb, 100, 100, 100), 0.4);
 }
 
-.theme-toggle:active {
-  transform: scale(0.9);
-}
-
-.theme-toggle::before {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.theme-toggle:hover::before {
-  opacity: 0.3;
+.theme-toggle-label:active {
+  transform: scale(0.95);
 } 
