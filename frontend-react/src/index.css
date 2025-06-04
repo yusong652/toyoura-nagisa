@@ -65,54 +65,54 @@
 }
 
 [data-theme="dark"] {
-  /* Dark Theme */
-  --bg-color: #1a1a1a;
-  --text-color: #e0e0e0;
+  /* ChatGPT 4o 风格深色主题 + 半透明气泡/卡片 */
+  --bg-color: #18181a;
+  --text-color: #f3f3f3;
   --text-secondary: #a0a0a0;
-  --border-color: #444444;
-  --primary-color: #5d7bf7;
-  --primary-hover: #7089f8;
-  --secondary-color: #ff7eb6;
-  --secondary-hover: #ff5c9e;
-  --user-message-bg: #2c3e50;
-  --bot-message-bg: #2a2a2a;
-  --input-bg: #2a2a2a;
-  --input-area-bg: #222222;
-  --sidebar-bg: #2a2a2a;
-  --item-bg: #333333;
-  --item-hover-bg: #444444;
-  --scrollbar-track: #2a2a2a;
-  --scrollbar-thumb: #555555;
-  --disabled-color: #555555;
-  --file-bg: #333333;
-  --tooltip-bg: #f0f0f0;
-  --tooltip-text: #333333;
-  
+  --border-color: #232324;
+  --primary-color: #2d2d2f;
+  --primary-hover: #232324;
+  --secondary-color: #232324;
+  --secondary-hover: #232324;
+  --user-message-bg: rgba(35,35,36,0.85);
+  --bot-message-bg: rgba(35,35,36,0.75);
+  --input-bg: rgba(35,35,36,0.85);
+  --input-area-bg: #18181a;
+  --sidebar-bg: #18181a;
+  --item-bg: rgba(35,35,36,0.7);
+  --item-hover-bg: rgba(35,35,36,0.85);
+  --scrollbar-track: #18181a;
+  --scrollbar-thumb: #232324;
+  --disabled-color: #232324;
+  --file-bg: rgba(35,35,36,0.7);
+  --tooltip-bg: rgba(35,35,36,0.85);
+  --tooltip-text: #f3f3f3;
+
   /* 消息状态颜色 - 深色主题 */
   --status-sending-color: #a0a0a0;
   --status-sent-color: #c0c0c0;
   --status-read-color: #8aff65;
   --status-error-color: #ff5252;
-  
+
   /* 消息气泡悬停效果 - 深色主题 */
-  --message-hover-glow-dark: rgba(100, 180, 255, 0.25);
-  --user-message-hover-glow-dark: rgba(93, 123, 247, 0.3);
-  --bot-message-hover-glow-dark: rgba(180, 180, 180, 0.2);
-  
+  --message-hover-glow-dark: rgba(255,255,255,0.04);
+  --user-message-hover-glow-dark: rgba(255,255,255,0.06);
+  --bot-message-hover-glow-dark: rgba(255,255,255,0.04);
+
   /* 额外UI元素颜色 */
-  --accent-color: #9E9CFF;
-  --card-bg: #2a2a2a;
-  --input-border: #444444;
-  --input-text: #e0e0e0;
-  --button-hover: #7089f8;
-  --button-active: #5d7bf7;
-  --scrollbar-bg: #1a1a1a;
+  --accent-color: #232324;
+  --card-bg: rgba(35,35,36,0.7);
+  --input-border: #232324;
+  --input-text: #f3f3f3;
+  --button-hover: #232324;
+  --button-active: #232324;
+  --scrollbar-bg: #18181a;
 
   /* 工具状态相关颜色 - 深色主题 */
-  --tool-state-bg-dark: rgba(74, 144, 226, 0.12);
-  --tool-state-border-dark: rgba(74, 144, 226, 0.25);
+  --tool-state-bg-dark: rgba(255,255,255,0.03);
+  --tool-state-border-dark: rgba(255,255,255,0.08);
   --tool-state-text-dark: #cccccc;
-  --tool-state-action-dark: #64b4ff;
+  --tool-state-action-dark: #f3f3f3;
   --tool-state-param-name-dark: #aaaaaa;
   --tool-state-param-value-dark: #cccccc;
 }

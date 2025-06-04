@@ -200,7 +200,7 @@ class GPTClient(LLMClientBase):
             payload = {
                 "model": model,
                 "messages": messages_for_llm,
-                "temperature": 2.0
+                "temperature": 1.0
             }
             async with httpx.AsyncClient() as client:
                 response = await client.post(

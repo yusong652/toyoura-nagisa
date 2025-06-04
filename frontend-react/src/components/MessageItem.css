@@ -4,7 +4,7 @@
   margin-bottom: 16px;
   margin-top: 12px;
   animation: fadeIn 0.3s ease-in-out;
-  max-width: 85%;
+  max-width: 98%;
   position: relative;
   cursor: pointer;
 }
@@ -22,7 +22,7 @@
 
 /* 被选中的消息样式 */
 .message.selected .message-content {
-  box-shadow: 0 0 0 2px var(--primary-color, #4a90e2);
+  box-shadow: 0 0 0 2px rgba(158, 156, 255, 0.35), 0 0 16px 4px rgba(158, 156, 255, 0.18);
 }
 
 .avatar {

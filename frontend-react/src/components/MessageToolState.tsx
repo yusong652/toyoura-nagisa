@@ -20,11 +20,11 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
     <div className="message-tool-state">
       <div className="message-tool-state-content">
         <div className="message-tool-action">
-          {action || '正在使用工具'}
+          {action || 'using tool'}
         </div>
         {toolName && (
           <div className="message-tool-name">
-            工具: {toolName}
+            tool: {toolName}
           </div>
         )}
       </div>
