@@ -6,8 +6,9 @@
   min-height: 300px;
   border-radius: 12px;
   overflow: hidden;
-  margin: 0 0 12px 0; /* 减小底部边距 */
-  position: relative; /* 添加相对定位，用于固定阴影元素 */
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto 12px auto;
 }
 
 .chatbox-title-bar {
@@ -61,6 +62,7 @@
   /* 添加以下属性以优化滚动体验 */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  max-width: 900px;
 }
 
 /* 移除之前的chatbox伪元素阴影 */
