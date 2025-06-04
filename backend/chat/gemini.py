@@ -275,7 +275,7 @@ class GeminiClient(LLMClientBase):
                 contents.append({"role": mapped_role, "parts": parts})
             
             response = self.client.models.generate_content(
-                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
+                model="gemini-2.5-flash-preview-05-20",
                 contents=contents,
                 config=title_config
             )
