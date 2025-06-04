@@ -1,8 +1,8 @@
 .message {
   display: flex;
   align-items: flex-start;
-  margin-bottom: auto;
-  margin-top: 16px;
+  margin-bottom: 16px;
+  margin-top: 12px;
   animation: fadeIn 0.3s ease-in-out;
   max-width: 85%;
   position: relative;
@@ -12,8 +12,8 @@
 .message.user {
   flex-direction: row-reverse;
   margin-left: auto;
-  margin-bottom: auto;
-  margin-top: auto;
+  margin-bottom: 16px;
+  margin-top: 12px;
 }
 
 .message:not(.user) {

@@ -28,13 +28,27 @@ const ChatHistorySidebar: React.FC = () => {
   }
 
   const handleCreateSession = async () => {
-    if (!newSessionName.trim()) return
-    setIsCreating(true)
+    console.log('Creating new session with name:', newSessionName);
+    setIsCreating(true);
     try {
-      await createNewSession(newSessionName)
-      setNewSessionName('')
+      console.log('Calling createNewSession...');
+      // 如果没有输入名称，使用当前时间作为默认标题
+      const defaultTitle = newSessionName.trim() || new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      await createNewSession(defaultTitle);
+      console.log('Session created successfully');
+      setNewSessionName('');
+    } catch (error) {
+      console.error('Error creating session:', error);
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
   }
 

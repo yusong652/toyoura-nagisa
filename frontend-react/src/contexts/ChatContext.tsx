@@ -114,44 +114,49 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 创建新会话
   const createNewSession = useCallback(async (name?: string): Promise<string> => {
+    console.log('createNewSession called with name:', name);
     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+      console.log('Checking connection...');
       const canConnect = await checkConnection();
       if (!canConnect) {
-         // checkConnection sets connectionError state.
-         throw new Error(connectionError || "无法连接到服务器，请重试。");
+        console.error('Connection check failed:', connectionError);
+        throw new Error(connectionError || "无法连接到服务器，请重试。");
       }
     }
     try {
+      console.log('Sending create session request...');
       const response = await fetch('/api/history/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name }),
-      })
+      });
       
       if (!response.ok) {
+        console.error('Create session request failed:', response.status);
         setConnectionStatus(ConnectionStatus.ERROR);
         setConnectionError(`创建新会话失败: ${response.status}`);
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json()
-      const newSessionId = data.session_id
+      const data = await response.json();
+      console.log('Create session response:', data);
+      const newSessionId = data.session_id;
       
-      localStorage.setItem('session_id', newSessionId)
-      setCurrentSessionId(newSessionId)
-      setMessages([])
-      await refreshSessions()
+      localStorage.setItem('session_id', newSessionId);
+      setCurrentSessionId(newSessionId);
+      setMessages([]);
+      await refreshSessions();
       setConnectionStatus(ConnectionStatus.CONNECTED);
-      return newSessionId
+      return newSessionId;
     } catch (error) {
-      console.error('创建新会话失败:', error);
+      console.error('Error in createNewSession:', error);
       setConnectionStatus(ConnectionStatus.ERROR);
       setConnectionError(error instanceof Error ? error.message : '创建新会话失败');
       throw error;
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError])
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError]);
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {

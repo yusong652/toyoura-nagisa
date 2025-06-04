@@ -42,13 +42,37 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  // 添加自动滚动功能
+  useEffect(() => {
+    if (chatboxRef.current) {
+      const chatBox = chatboxRef.current;
+      const shouldAutoScroll = 
+        // 当新消息添加时
+        chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100 ||
+        // 当正在流式输出时
+        messages.some(msg => msg.streaming);
+      
+      if (shouldAutoScroll) {
+        // 计算滚动位置，留出 20% 的空间在底部
+        const scrollPosition = chatBox.scrollHeight - chatBox.clientHeight * 0.8;
+        chatBox.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [messages]);
+
   // 只在最后一条消息id变化时自动滚动到底部
   useEffect(() => {
     const lastMessageId = messages[messages.length - 1]?.id;
     if (lastMessageId && lastMessageId !== prevLastMessageId.current) {
       if (chatboxRef.current) {
-        chatboxRef.current.scrollTo({
-          top: chatboxRef.current.scrollHeight,
+        const chatBox = chatboxRef.current;
+        // 计算滚动位置，留出 20% 的空间在底部
+        const scrollPosition = chatBox.scrollHeight - chatBox.clientHeight * 0.8;
+        chatBox.scrollTo({
+          top: scrollPosition,
           behavior: 'smooth'
         });
       }

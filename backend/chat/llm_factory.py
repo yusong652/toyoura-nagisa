@@ -9,7 +9,7 @@ from backend.config import get_llm_config, get_current_llm_type, get_llm_specifi
 
 # 注册的 LLM 客户端类型
 _clients: Dict[str, Type[LLMClientBase]] = {
-    "chatgpt": GPTClient,
+    "gpt": GPTClient,
     "gemini": GeminiClient,
     "mistral": MistralClient,
     "anthropic": AnthropicClient,
