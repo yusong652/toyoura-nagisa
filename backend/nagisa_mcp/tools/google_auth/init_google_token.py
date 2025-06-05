@@ -18,7 +18,6 @@ def main():
         print(f"Please download your credentials.json from Google Cloud Console and place it at: {credentials_path}")
         return
 
-    print("建议使用无痕/隐私窗口进行授权，以确保Google返回refresh_token。")
     flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
     # 强制Google返回refresh_token
     creds = flow.run_local_server(

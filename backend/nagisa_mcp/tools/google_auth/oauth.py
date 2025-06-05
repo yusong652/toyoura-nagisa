@@ -9,6 +9,8 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar.events',
 ]
 
 def get_credentials(email, tokens_dir=None, credentials_path=None):
