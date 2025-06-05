@@ -98,6 +98,18 @@ TTS_CONFIG = {
 GOOGLE_CUSTOM_SEARCH_API_KEY = "your_google_custom_search_api_key_here"
 GOOGLE_CUSTOM_SEARCH_ENGINE_ID = "your_google_custom_search_engine_id_here"
 
+# 邮件配置
+EMAIL_CONFIG = {
+    "smtp_server": "smtp.example.com",  # SMTP 服务器地址
+    "smtp_port": 587,  # SMTP 服务器端口
+    "username": "your_email@example.com",  # 邮箱账号
+    "password": "your_email_password",  # 邮箱密码或应用专用密码
+    "use_tls": True,  # 是否使用 TLS
+    "sender_name": "Nagisa Assistant",  # 发件人显示名称
+    "imap_server": "imap.example.com",  # IMAP 服务器地址
+    "imap_port": 993,  # IMAP 服务器端口
+}
+
 def get_llm_config() -> Dict[str, Any]:
     """
     获取 LLM 配置。
@@ -155,3 +167,12 @@ def get_tts_config() -> dict:
             - 其他 TTS 引擎特定的配置项
     """
     return TTS_CONFIG 
+
+def get_email_config() -> dict:
+    """
+    获取邮件配置
+    
+    Returns:
+        dict: 邮件配置字典，包含 SMTP 和 IMAP 相关配置
+    """
+    return EMAIL_CONFIG 

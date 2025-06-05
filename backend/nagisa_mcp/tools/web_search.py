@@ -13,8 +13,6 @@ load_dotenv()
 # Get Google API credentials from environment variables
 GOOGLE_CUSTOM_SEARCH_API_KEY = os.getenv("GOOGLE_CUSTOM_SEARCH_API_KEY")
 GOOGLE_CUSTOM_SEARCH_API_ENGINE_ID = os.getenv("GOOGLE_CUSTOM_SEARCH_API_ENGINE_ID")
-print(GOOGLE_CUSTOM_SEARCH_API_KEY)
-print(GOOGLE_CUSTOM_SEARCH_API_ENGINE_ID)
 
 def search_web(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     """
