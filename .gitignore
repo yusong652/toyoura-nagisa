@@ -69,4 +69,8 @@ htmlcov/
 
 # Environment variables
 .env*
-!.env.example 
+!.env.example
+
+# Google OAuth credentials and tokens
+backend/nagisa_mcp/tools/google_auth/credentials.json
+backend/nagisa_mcp/tools/google_auth/tokens/ 

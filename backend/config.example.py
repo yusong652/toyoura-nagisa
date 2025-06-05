@@ -110,6 +110,12 @@ EMAIL_CONFIG = {
     "imap_port": 993,  # IMAP 服务器端口
 }
 
+# Google Auth 配置
+AUTH_CONFIG = {
+    "client_id": os.getenv("AUTH_CLIENT_ID", "your_google_client_id_here"),
+    "client_secret": os.getenv("AUTH_CLIENT_SECRET", "your_google_client_secret_here"),
+}
+
 def get_llm_config() -> Dict[str, Any]:
     """
     获取 LLM 配置。
@@ -176,3 +182,11 @@ def get_email_config() -> dict:
         dict: 邮件配置字典，包含 SMTP 和 IMAP 相关配置
     """
     return EMAIL_CONFIG 
+
+def get_auth_config() -> dict:
+    """
+    获取 Google Auth 配置
+    Returns:
+        dict: 包含 client_id 和 client_secret
+    """
+    return AUTH_CONFIG 
