@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 import os
 from .google_auth.google_calendar import build_google_calendar_service
+from backend.nagisa_mcp.utils import ensure_future_datetime
 
 # 这里可以扩展更多模型和工具
 
@@ -69,7 +70,12 @@ def register_calendar_tools(mcp: FastMCP):
         calendar_id: str = Field('primary', description="Calendar ID to add event to. Default is 'primary'.")
     ) -> dict:
         """
-        Create a new event to the user's Google Calendar.
+        Create a new event in the user's Google Calendar.
+
+        **Important for LLM/Agent:**
+        If the user input does not specify a year, you should first check the current date (by calling the get_current_time tool),
+        and complete the date as the next upcoming occurrence of that date in the future. This ensures the event is always scheduled in the future.
+        This tool will also automatically adjust the event time to the nearest future date if needed.
 
         The user email is determined by the USER_GMAIL_ADDRESS environment variable.
 
@@ -85,19 +91,66 @@ def register_calendar_tools(mcp: FastMCP):
         try:
             user_email = get_user_email()
             service = build_google_calendar_service(user_email)
+            
+            # 调试信息
+            print(f"[DEBUG] Creating event for user: {user_email}, calendar_id: {calendar_id}, start: {start}, end: {end}")
+            
+            # Validate date format
+            try:
+                start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            except ValueError as e:
+                return {
+                    'status': 'error',
+                    'message': f'Invalid date format: {str(e)}. Please use RFC3339 format (e.g. 2024-06-06T10:00:00+09:00)'
+                }
+            # 自动修正为未来时间
+            now = datetime.now(start_dt.tzinfo)
+            start_dt = ensure_future_datetime(start_dt, now)
+            end_dt = ensure_future_datetime(end_dt, now)
+            start = start_dt.isoformat()
+            end = end_dt.isoformat()
+            
             event = {
                 'summary': summary,
                 'start': {'dateTime': start},
                 'end': {'dateTime': end}
             }
-            created = service.events().insert(calendarId=calendar_id, body=event).execute()
+            print(f"[DEBUG] Event body: {event}")
+            
+            try:
+                created = service.events().insert(calendarId=calendar_id, body=event).execute()
+                print(f"[DEBUG] Created event response: {created}")
+                return {
+                    'status': 'success',
+                    'event_id': created['id'],
+                    'message': f"Event created: {created.get('htmlLink', '')}"
+                }
+            except Exception as e:
+                if 'Not Found' in str(e):
+                    return {
+                        'status': 'error',
+                        'message': f'Calendar not found: {calendar_id}. Please check if the calendar ID is correct.'
+                    }
+                elif 'Invalid Value' in str(e):
+                    return {
+                        'status': 'error',
+                        'message': f'Invalid event data: {str(e)}'
+                    }
+                else:
+                    print(f"[DEBUG] Exception: {e}")
+                    raise e
+                    
+        except FileNotFoundError as e:
             return {
-                'status': 'success',
-                'event_id': created['id'],
-                'message': f"Event created: {created.get('htmlLink', '')}"
+                'status': 'error',
+                'message': f'Authentication error: {str(e)}. Please make sure you have completed the OAuth2 setup.'
             }
         except Exception as e:
-            return {'status': 'error', 'message': f'Failed to add event: {str(e)}'}
+            return {
+                'status': 'error',
+                'message': f'Failed to create event: {str(e)}'
+            }
 
     @mcp.tool()
     def delete_calendar_event(

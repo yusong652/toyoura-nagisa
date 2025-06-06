@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 def extract_text_from_mcp_result(result):
     """
@@ -39,4 +40,18 @@ def extract_text_from_mcp_result(result):
         return try_json(result)
     # 5. fallback: 其他类型
 
-    return result 
+    return result
+
+def ensure_future_datetime(dt: datetime, now: datetime = None) -> datetime:
+    """
+    如果 dt 在 now 之前，则自动补全年份为今年或明年，确保返回的时间在未来。
+    """
+    if now is None:
+        now = datetime.now(dt.tzinfo)
+    if dt >= now:
+        return dt
+    dt_this_year = dt.replace(year=now.year)
+    if dt_this_year >= now:
+        return dt_this_year
+    dt_next_year = dt.replace(year=now.year + 1)
+    return dt_next_year 
