@@ -62,14 +62,14 @@ def register_calendar_tools(mcp: FastMCP):
             return [{"error": f"Failed to list events: {str(e)}"}]
 
     @mcp.tool()
-    def add_calendar_event(
+    def create_calendar_event(
         summary: str = Field(..., description="Event summary/title."),
         start: str = Field(..., description="Event start time in RFC3339 format (e.g. 2024-06-06T10:00:00+09:00)."),
         end: str = Field(..., description="Event end time in RFC3339 format (e.g. 2024-06-06T11:00:00+09:00)."),
         calendar_id: str = Field('primary', description="Calendar ID to add event to. Default is 'primary'.")
     ) -> dict:
         """
-        Add a new event to the user's Google Calendar.
+        Create a new event to the user's Google Calendar.
 
         The user email is determined by the USER_GMAIL_ADDRESS environment variable.
 
