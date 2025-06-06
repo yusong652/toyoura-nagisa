@@ -6,6 +6,7 @@ from backend.nagisa_mcp.tools.common_tools import register_common_tools
 from backend.nagisa_mcp.tools.web_search import register_web_search_tools
 from backend.nagisa_mcp.tools.email_tools import register_email_tools
 from backend.nagisa_mcp.tools.calendar import register_calendar_tools
+from backend.nagisa_mcp.tools.coding import register_coding_tools
 from datetime import datetime
 
 mcp = FastMCP("Fast MCP Server", 
@@ -19,6 +20,7 @@ register_common_tools(mcp)
 register_web_search_tools(mcp)
 register_email_tools(mcp)
 register_calendar_tools(mcp)
+register_coding_tools(mcp)
     
 # 启动服务器
 if __name__ == "__main__":

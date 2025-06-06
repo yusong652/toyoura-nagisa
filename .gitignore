@@ -60,6 +60,7 @@ backend/tts/data/
 backend/prompts/
 frontend/node_modules/
 backend/config.py
+workspace/
 
 # Test coverage
 .coverage
