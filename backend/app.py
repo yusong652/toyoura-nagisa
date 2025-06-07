@@ -15,8 +15,8 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
-from backend.chat import LLMClientBase, GPTClient, Message, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_history_session, delete_message, update_session_title
+from backend.chat import LLMClientBase, GPTClient, ChatRequest, ChatResponse, ErrorResponse
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
@@ -162,7 +162,7 @@ async def delete_session(session_id: str):
             raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
         
         # 删除会话
-        success = delete_history_session(session_id)
+        success = delete_session_data(session_id)
         
         if not success:
             raise HTTPException(status_code=500, detail=f"删除会话 {session_id} 失败")
@@ -175,6 +175,7 @@ async def delete_session(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Delete session error: {e}")
         raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
 
 @app.post("/api/history/switch", response_model=dict)
