@@ -26,10 +26,7 @@ def register_calendar_tools(mcp: FastMCP):
     ) -> List[dict]:
         """
         List upcoming events from the user's Google Calendar.
-        This tool can be used for: checking calendar, viewing schedule, listing calendar events, showing my calendar, querying upcoming meetings, etc.
-        Example user queries: "show my calendar", "list my schedule", "check my events", "查查日历", "查看日程", "列出我的日历事件", "查询未来的会议安排".
-
-        The user email is determined by the USER_GMAIL_ADDRESS environment variable.
+        This tool can be used for: checking calendar, viewing schedule, listing calendar events, querying upcoming meetings, etc.
 
         Args:
             max_results (int): Maximum number of events to retrieve. Default is 10.
@@ -67,6 +64,7 @@ def register_calendar_tools(mcp: FastMCP):
         summary: str = Field(..., description="Event summary/title."),
         start: str = Field(..., description="Event start time in RFC3339 format (e.g. 2024-06-06T10:00:00+09:00)."),
         end: str = Field(..., description="Event end time in RFC3339 format (e.g. 2024-06-06T11:00:00+09:00)."),
+        location: Optional[str] = Field(None, description="Event location (e.g. 'Conference Room A', '123 Main St, City')."),
         calendar_id: str = Field('primary', description="Calendar ID to add event to. Default is 'primary'.")
     ) -> dict:
         """
@@ -75,14 +73,12 @@ def register_calendar_tools(mcp: FastMCP):
         **Important for LLM/Agent:**
         If the user input does not specify a year, you should first check the current date (by calling the get_current_time tool),
         and complete the date as the next upcoming occurrence of that date in the future. This ensures the event is always scheduled in the future.
-        This tool will also automatically adjust the event time to the nearest future date if needed.
-
-        The user email is determined by the USER_GMAIL_ADDRESS environment variable.
 
         Args:
             summary (str): Event summary/title.
             start (str): Event start time in RFC3339 format.
             end (str): Event end time in RFC3339 format.
+            location (Optional[str]): Event location. Can be a room name, address, or any location description.
             calendar_id (str): Calendar ID to add event to. Default is 'primary'.
 
         Returns:
@@ -91,9 +87,6 @@ def register_calendar_tools(mcp: FastMCP):
         try:
             user_email = get_user_email()
             service = build_google_calendar_service(user_email)
-            
-            # 调试信息
-            print(f"[DEBUG] Creating event for user: {user_email}, calendar_id: {calendar_id}, start: {start}, end: {end}")
             
             # Validate date format
             try:
@@ -116,11 +109,12 @@ def register_calendar_tools(mcp: FastMCP):
                 'start': {'dateTime': start},
                 'end': {'dateTime': end}
             }
-            print(f"[DEBUG] Event body: {event}")
+            
+            if location:
+                event['location'] = location
             
             try:
                 created = service.events().insert(calendarId=calendar_id, body=event).execute()
-                print(f"[DEBUG] Created event response: {created}")
                 return {
                     'status': 'success',
                     'event_id': created['id'],
@@ -138,7 +132,6 @@ def register_calendar_tools(mcp: FastMCP):
                         'message': f'Invalid event data: {str(e)}'
                     }
                 else:
-                    print(f"[DEBUG] Exception: {e}")
                     raise e
                     
         except FileNotFoundError as e:
@@ -159,8 +152,6 @@ def register_calendar_tools(mcp: FastMCP):
     ) -> dict:
         """
         Delete an event from the user's Google Calendar.
-
-        The user email is determined by the USER_GMAIL_ADDRESS environment variable.
 
         Args:
             event_id (str): ID of the event to delete.
@@ -187,8 +178,6 @@ def register_calendar_tools(mcp: FastMCP):
     ) -> dict:
         """
         Update an event in the user's Google Calendar.
-
-        The user email is determined by the USER_GMAIL_ADDRESS environment variable.
 
         Args:
             event_id (str): ID of the event to update.
