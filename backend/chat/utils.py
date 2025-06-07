@@ -7,15 +7,18 @@ from typing import List, Dict, Any, AsyncGenerator, Tuple
 import asyncio
 from datetime import datetime
 from backend.config import get_prompt_config
+import requests
 
 # 聊天历史相关工具
-HISTORY_DIR = "chat/data"
+HISTORY_BASE_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
 
+def _get_session_dir(session_id: str) -> str:
+    return os.path.join(HISTORY_BASE_DIR, session_id)
+
 def _get_session_file(session_id: str) -> str:
-    # 文件名格式: YYYYMMDD_sessionid.json
-    date_str = datetime.now().strftime('%Y%m%d')
-    return os.path.join(HISTORY_DIR, f"{date_str}_{session_id}.json")
+    # 文件名固定为 history.json
+    return os.path.join(_get_session_dir(session_id), "history.json")
 
 # 备份单个 session 聊天记录
 
@@ -32,8 +35,9 @@ def backup_history(session_id: str) -> str:
 # 保存指定会话ID的聊天历史
 
 def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None:
+    session_dir = _get_session_dir(session_id)
     session_file = _get_session_file(session_id)
-    os.makedirs(HISTORY_DIR, exist_ok=True)
+    os.makedirs(session_dir, exist_ok=True)
     processed_history = []
     for msg in current_history:
         msg_copy = msg.copy()
@@ -52,7 +56,7 @@ def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None
     with open(session_file, 'w', encoding='utf-8') as f:
         json.dump(processed_history, f, indent=4, ensure_ascii=False)
     # 更新元数据中的更新时间
-    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     if os.path.exists(metadata_file):
         try:
             with open(metadata_file, 'r', encoding='utf-8') as f:
@@ -90,11 +94,11 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
 
 def delete_session_data(session_id: str) -> bool:
     try:
-        session_file = _get_session_file(session_id)
-        if os.path.exists(session_file):
-            os.remove(session_file)
+        session_dir = _get_session_dir(session_id)
+        if os.path.exists(session_dir):
+            shutil.rmtree(session_dir)
         # 更新元数据
-        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if os.path.exists(metadata_file):
             try:
                 with open(metadata_file, 'r', encoding='utf-8') as f:
@@ -133,7 +137,7 @@ def create_new_history(name: str = None) -> str:
     }
 
     # 保存元数据
-    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     metadata = {}
     if os.path.exists(metadata_file):
         try:
@@ -145,7 +149,9 @@ def create_new_history(name: str = None) -> str:
     with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
-    # 创建空的聊天记录文件
+    # 创建会话目录和空的聊天记录文件
+    session_dir = _get_session_dir(session_id)
+    os.makedirs(session_dir, exist_ok=True)
     session_file = _get_session_file(session_id)
     with open(session_file, 'w', encoding='utf-8') as f:
         json.dump([], f, indent=4, ensure_ascii=False)
@@ -159,7 +165,7 @@ def get_all_sessions() -> List[Dict[str, Any]]:
     Returns:
         会话元数据列表，按更新时间倒序排列
     """
-    metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+    metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     if not os.path.exists(metadata_file):
         return []
     
@@ -227,7 +233,7 @@ def delete_message(session_id: str, message_id: str) -> bool:
         bool: 是否成功删除
     """
     try:
-        if not os.path.exists(HISTORY_FILE):
+        if not os.path.exists(HISTORY_BASE_DIR):
             return False
             
         # 备份当前历史记录
@@ -236,7 +242,7 @@ def delete_message(session_id: str, message_id: str) -> bool:
             print(f"删除消息前已备份历史记录到: {backup_file}")
             
         # 加载所有历史记录
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+        with open(HISTORY_BASE_DIR, 'r', encoding='utf-8') as f:
             all_history = json.load(f)
             
         # 如果会话不存在
@@ -263,11 +269,11 @@ def delete_message(session_id: str, message_id: str) -> bool:
         all_history[session_id] = new_history
         
         # 保存更新后的历史记录
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        with open(HISTORY_BASE_DIR, 'w', encoding='utf-8') as f:
             json.dump(all_history, f, indent=4, ensure_ascii=False)
             
         # 更新元数据中的更新时间
-        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if os.path.exists(metadata_file):
             try:
                 with open(metadata_file, 'r', encoding='utf-8') as f:
@@ -297,7 +303,7 @@ def update_session_title(session_id: str, new_title: str) -> bool:
     """
     try:
         # 加载会话元数据
-        metadata_file = os.path.join(HISTORY_DIR, "sessions_metadata.json")
+        metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if not os.path.exists(metadata_file):
             return False
             
@@ -328,3 +334,24 @@ def load_and_restore_history(session_id: str):
     from backend.chat.models import message_factory
     history = load_history(session_id)
     return [message_factory(msg) if isinstance(msg, dict) else msg for msg in history] 
+
+def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = "chat/data") -> str:
+    """
+    下载图片并保存到指定session目录
+    Args:
+        image_url (str): 图片链接
+        session_id (str): 会话ID
+        output_dir_base (str): 基础输出目录
+    Returns:
+        str: 保存的图片路径
+    """
+
+    session_dir = os.path.join(output_dir_base, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"generated_image_{timestamp}.png"
+    filepath = os.path.join(session_dir, filename)
+    image_data = requests.get(image_url).content
+    with open(filepath, "wb") as f:
+        f.write(image_data)
+    return filepath 

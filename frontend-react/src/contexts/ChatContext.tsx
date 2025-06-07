@@ -89,19 +89,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [])
 
   // 刷新会话列表
-  const refreshSessions = useCallback(async (): Promise<void> => {
+  const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
     try {
       const response = await fetch('/api/history/sessions')
-      
       if (!response.ok) {
         setConnectionStatus(ConnectionStatus.ERROR);
         setConnectionError(`获取会话列表失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
       const data = await response.json()
       setSessions(data)
       setConnectionStatus(ConnectionStatus.CONNECTED); // Successfully fetched
+      return data;
     } catch (error) {
       console.error('获取会话列表失败:', error);
       if (!(error instanceof DOMException && error.name === 'AbortError')) { // Don't set error if it's an abort
@@ -160,10 +159,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
-     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
+    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
       const canConnect = await checkConnection();
       if (!canConnect) {
-        // checkConnection sets connectionError state.
         throw new Error(connectionError || "无法连接到服务器，请重试。");
       }
     }
@@ -193,6 +191,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
       
       const historyData = await historyResponse.json()
+      if (!historyData.history || !Array.isArray(historyData.history)) {
+        console.error('Invalid history data format:', historyData);
+        setMessages([]);
+        return;
+      }
+
       const convertedMessages: Message[] = historyData.history
         .filter((msg: any) => {
           // 只保留真正的用户发言和AI文本
@@ -208,20 +212,23 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
             sender = 'bot';
           } else {
-            // 理论上不会走到这里
-            sender = 'bot';
+            console.warn('Unexpected message format:', msg);
+            return null;
           }
-          let text = ''
-          let files: FileData[] = []
+
+          let text = '';
+          let files: FileData[] = [];
+          
           // 处理消息内容
           if (typeof msg.content === 'string') {
-            text = msg.content
+            text = msg.content;
           } else if (Array.isArray(msg.content)) {
             // 合并所有文本内容
             const textContents = msg.content
               .filter((item: any) => item.text)
-              .map((item: any) => item.text)
-            text = textContents.join('\n')
+              .map((item: any) => item.text);
+            text = textContents.join('\n');
+            
             // 处理所有文件
             msg.content.forEach((item: any) => {
               if (item.inline_data) {
@@ -229,33 +236,40 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                   name: `image_${files.length + 1}`,
                   type: item.inline_data.mime_type,
                   data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
-                })
+                });
               }
-            })
+            });
+          } else {
+            console.warn('Invalid message content format:', msg.content);
+            text = '消息格式错误';
           }
+
           // 处理工具状态
-          let toolState = undefined
+          let toolState = undefined;
           if (msg.tool_state) {
             toolState = {
               isUsingTool: msg.tool_state.is_using_tool || false,
               toolName: msg.tool_state.tool_name,
               action: msg.tool_state.action
-            }
+            };
           }
+
           return {
             id: msg.id || uuidv4(),
             sender,
             text,
             files: files.length > 0 ? files : undefined,
-            timestamp: new Date(msg.timestamp).getTime(),
+            timestamp: new Date(msg.timestamp || Date.now()).getTime(),
             status: sender === 'user' ? MessageStatus.READ : undefined,
             streaming: false,
             isLoading: false,
             isRead: true,
             toolState
-          }
+          };
         })
-      setMessages(convertedMessages)
+        .filter((msg: Message | null): msg is Message => msg !== null);
+
+      setMessages(convertedMessages);
       setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
       console.error('切换会话失败:', error);
@@ -263,14 +277,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setConnectionError(error instanceof Error ? error.message : '切换会话失败');
       throw error;
     }
-  }, [connectionStatus, checkConnection, connectionError])
+  }, [connectionStatus, checkConnection, connectionError]);
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
       const canConnect = await checkConnection();
       if (!canConnect) {
-        // checkConnection sets connectionError state.
         throw new Error(connectionError || "无法连接到服务器，请重试。");
       }
     }
@@ -278,17 +291,23 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const response = await fetch(`/api/history/${sessionId}`, {
         method: 'DELETE',
       })
-      
       if (!response.ok) {
         setConnectionStatus(ConnectionStatus.ERROR);
         setConnectionError(`删除会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
+
+      // 用最新的 sessions 判断
+      const latestSessions = await refreshSessions();
+
       if (sessionId === currentSessionId) {
-        await createNewSession()
+        if (latestSessions.length > 0) {
+          await switchSession(latestSessions[0].id);
+        } else {
+          await createNewSession();
+        }
       }
-      await refreshSessions()
+
       setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
       console.error('删除会话失败:', error);
@@ -296,7 +315,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setConnectionError(error instanceof Error ? error.message : '删除会话失败');
       throw error;
     }
-  }, [currentSessionId, createNewSession, refreshSessions, connectionStatus, checkConnection, connectionError])
+  }, [currentSessionId, createNewSession, refreshSessions, switchSession, connectionStatus, checkConnection, connectionError]);
 
   // 删除消息
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
