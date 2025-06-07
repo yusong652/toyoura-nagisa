@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
@@ -247,12 +247,23 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
             # 处理函数调用结果
             tool_result = await llm_client.handle_function_call(tool_call)
 
+            # Special handling for text_to_image tool
+            if tool_call['name'] == "text_to_image":
+                if isinstance(tool_result, dict) and tool_result.get("status") == "success" and tool_result.get("output"):
+                    image_url = tool_result["output"][0]
+                    local_path = save_image_from_url(image_url, session_id)
+                    tool_natural_response = "The image has been generated and saved to your session."
+                else:
+                    tool_natural_response = "Image generation failed, please try again."
+            else:
+                tool_natural_response = str(tool_result)
+
             # 添加工具响应消息
             tool_response_msg = message_factory({
                 "role": "tool",
                 "tool_call_id": tool_call['id'],
                 "name": tool_call['name'],
-                "content": tool_result  # 保持结构化
+                "content": tool_natural_response
             })
             print(f"[DEBUG] tool_response_msg: {tool_response_msg.model_dump()}")
             recent_msgs.append(tool_response_msg)
