@@ -247,8 +247,8 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
             # 处理函数调用结果
             tool_result = await llm_client.handle_function_call(tool_call)
 
-            # Special handling for text_to_image tool
-            if tool_call['name'] == "text_to_image":
+            # Special handling for generate_image_from_description tool
+            if tool_call['name'] == "generate_image_from_description":
                 if isinstance(tool_result, dict) and tool_result.get("status") == "success" and tool_result.get("output"):
                     image_url = tool_result["output"][0]
                     local_path = save_image_from_url(image_url, session_id)

@@ -1,7 +1,6 @@
 from fastmcp import FastMCP
 from pydantic import Field
 import requests
-import os
 from dotenv import load_dotenv
 import json
 from backend.config import get_models_lab_config
@@ -10,17 +9,23 @@ load_dotenv()
 
 def register_text_to_image_tool(mcp: FastMCP):
     @mcp.tool()
-    def text_to_image(
-        prompt: str = Field(..., description="A detailed description of the image you want to generate."),
-        negative_prompt: str = Field(None, description="Elements you want to avoid in the image.")
+    def generate_image_from_description(
+        prompt: str = Field(..., description="A detailed and specific description of the image you want to generate. The more detailed your description, the better the image quality will be. Include specific details about: subject, style, mood, colors, lighting, composition, and any other relevant visual elements.")
     ) -> dict:
         """
-        Generate an image based on your description.
+        Generate a high-quality image based on your detailed description.
         
-        - Use the 'prompt' to describe the desired image as clearly and specifically as possible. Include details such as subject, style, mood, color, background, and any other relevant attributes.
-        - Use the 'negative_prompt' to specify anything you do NOT want to appear in the image (e.g., "blurry", "text", "extra hands").
-        - The more detailed and precise your prompt, the better the generated image will match your expectations.
-        - Example: "A futuristic cityscape at sunset, vibrant colors, flying cars, in the style of digital art."
+        Important guidelines for best results:
+        - Your prompt MUST be detailed and specific to achieve high-quality results
+        - Include specific details about:
+          * Main subject and its characteristics
+          * Artistic style (e.g., photorealistic, anime, oil painting)
+          * Mood and atmosphere
+          * Color palette and lighting
+          * Composition and perspective
+          * Background elements
+          * Any special effects or details
+        - Example of a good prompt: "A photorealistic portrait of a young woman with long silver hair, wearing a flowing white dress, standing in a misty forest at dawn. Soft golden light filtering through trees, ethereal atmosphere, detailed facial features, 8k resolution, cinematic lighting."
         """
         import time
         cfg = get_models_lab_config()
