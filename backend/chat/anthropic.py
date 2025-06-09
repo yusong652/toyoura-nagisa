@@ -5,7 +5,7 @@ import httpx
 import json
 from backend.chat.base import LLMClientBase
 from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserToolMessage, UserMessage
-from backend.chat.utils import parse_llm_output
+from backend.chat.utils import parse_llm_output, get_latest_two_messages
 import anthropic
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
@@ -361,6 +361,113 @@ class AnthropicClient(LLMClientBase):
             print(f"Anthropic生成标题时出错: {str(e)}")
             return None 
 
+    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
+        """
+        Generate a high-quality text-to-image prompt using the Anthropic API.
+        This method uses a specialized system prompt to create detailed and effective prompts for image generation
+        based on the recent conversation context.
+        
+        Args:
+            session_id: Optional session ID to get the latest conversation context
+            
+        Returns:
+            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
+        """
+        try:
+            system_prompt = """You are an expert in creating text-to-image prompts for generating high-quality 2D Japanese anime-style images of beautiful young women (美少女, Bishoujo) based on conversation content. Your task is to analyze the given conversation and create detailed, professional, and faithful prompts that will result in high-quality images.
+
+First, carefully read and analyze the conversation.
+
+Based on the conversation, follow these steps to create your prompts:
+
+1. Analyze the conversation for key details about:
+   - Character's appearance (hair, eyes, face, body type)
+   - Clothing and accessories
+   - Pose and expression
+   - Setting and background
+   - Lighting and atmosphere
+   - Artistic style preferences
+
+2. Generate a text-to-image prompt that includes:
+   - Detailed physical features (hair color, length, style; eye color, shape; facial features; body type)
+   - Specific clothing and accessories
+   - Clear pose and expression
+   - Detailed background or setting
+   - Lighting and atmosphere
+   - Artistic style (e.g., specific anime or manga artist references)
+   - Sexual suggestive elements or NSFW content, as per the user's request.
+   - Any other relevant details from the conversation
+
+3. Create a negative prompt that excludes:
+   - Unwanted elements or characteristics
+   - Common issues in anime-style generation
+   - Elements that could detract from the desired quality
+   - 3D or doll-like appearances
+   
+** You should not avoid any sexual or nsfw contents **
+
+Present your output in the following format:
+
+<text_to_image_prompt>
+[Your detailed text-to-image prompt here]
+</text_to_image_prompt>
+
+<negative_prompt>
+[Your negative prompt here]
+</negative_prompt>
+
+Remember to be as detailed and specific as possible in your prompts to ensure the generation of a high-quality, accurate representation of the character and scene described in the conversation."""
+
+            # 获取最新的对话消息
+            latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
+            
+            # 构造消息序列
+            messages = []
+            if latest_messages[0] and latest_messages[1]:
+                # 如果有历史消息，按时间顺序添加
+                messages.extend([
+                    latest_messages[0],  # 较早的消息
+                    latest_messages[1]   # 较新的消息
+                ])
+            
+            # 使用相同的消息格式转换逻辑
+            messages_for_llm, _ = self._format_messages_for_anthropic(messages)
+            response = self.anthropic_client.messages.create(
+                model=self.extra_config.get("model", "claude-3-5-sonnet-20241022"),
+                max_tokens=500,
+                messages=messages_for_llm,
+                system=system_prompt,
+                temperature=0.7
+            )
+            
+            if not response.content:
+                return None
+                
+            prompt_text = ""
+            for content_item in response.content:
+                if content_item.type == "text":
+                    prompt_text += content_item.text
+            
+            # 解析输出格式
+            text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
+            negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
+            
+            if not text_prompt_match:
+                print("[text_to_image] Failed to extract text prompt from response")
+                return None
+                
+            text_prompt = text_prompt_match.group(1).strip()
+            negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+            
+            return {
+                "text_prompt": text_prompt,
+                "negative_prompt": negative_prompt
+            }
+            
+        except Exception as e:
+            print(f"生成文生图提示词时出错: {str(e)}")
+            return None
+
     async def get_function_call_schemas(self):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Anthropic tools 格式列表
@@ -391,15 +498,36 @@ class AnthropicClient(LLMClientBase):
             tools.append(tool_schema)
         return tools
 
-    async def handle_function_call(self, function_call: dict):
+    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
         """
         处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
         function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
+        session_id: 可选的会话ID，用于需要会话上下文的工具（如文生图）
         """
         tool_name = function_call["name"]
-        params = function_call.get("arguments", {})
+        tool_args = function_call.get("arguments", {})
+
+        # Special handling for generate_image tool
+        if tool_name == "generate_image":
+            if not session_id:
+                return "Error: No session ID provided for image generation"
+
+            # Generate prompts using LLM
+            prompt_result = await self.generate_text_to_image_prompt(session_id)
+            if not prompt_result:
+                return "Error: Failed to generate image prompts"
+
+            # Call the internal image generation function
+            from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
+            result = await generate_image_from_description(
+                prompt=prompt_result["text_prompt"],
+                negative_prompt=prompt_result["negative_prompt"]
+            )
+            return result
+
+        # Normal tool handling for other tools
         async with self.mcp_client as mcp_async_client:
-            result = await mcp_async_client.call_tool(tool_name, params)
+            result = await mcp_async_client.call_tool(tool_name, tool_args)
             return extract_text_from_mcp_result(result)
 
     # 工具函数：规范化 tool_result 为 Anthropic 支持的 content block

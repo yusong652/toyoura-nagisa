@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pathlib import Path
 from pydantic import BaseModel
 import uvicorn
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict, Any, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
@@ -35,9 +35,9 @@ from backend.utils.helpers import (
     is_pure_text_assistant,
     generate_title_for_session,
 )
-from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory
+from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage
 from backend.nagisa_mcp.fast_mcp_server import mcp
-from fastmcp import Client
+from fastmcp import Client, Context
 import threading
 
 
@@ -208,9 +208,15 @@ async def switch_session(request: SwitchSessionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"切换会话失败: {str(e)}")
 
-async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
+async def handle_llm_response(
+    recent_msgs: List[BaseMessage],
+    session_id: str,
+    llm_client: LLMClientBase,
+    tts_engine: BaseTTS
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理LLM响应，支持单轮多工具调用。
+    处理 LLM 的响应，包括普通文本回复和工具调用。
+    对于文生图工具，会先生成提示词，然后再调用文生图工具。
     """
     llm_response = await llm_client.get_response(recent_msgs)
     print(f"[DEBUG] llm_response type: {llm_response.response_type}")
@@ -244,13 +250,13 @@ async def handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
             }
             yield f"data: {json.dumps(tool_state)}\n\n"
 
-            # 处理函数调用结果
-            tool_result = await llm_client.handle_function_call(tool_call)
+            # 处理函数调用结果，传入 session_id
+            tool_result = await llm_client.handle_function_call(tool_call, session_id)
 
-            # Special handling for generate_image_from_description tool
-            if tool_call['name'] == "generate_image_from_description":
-                if isinstance(tool_result, dict) and tool_result.get("status") == "success" and tool_result.get("output"):
-                    image_url = tool_result["output"][0]
+            # Special handling for generate_image
+            if tool_call['name'] == "generate_image":
+                if isinstance(tool_result, dict) and tool_result.get("type") == "image_url" and tool_result.get("image_url"):
+                    image_url = tool_result["image_url"]
                     local_path = save_image_from_url(image_url, session_id)
                     tool_natural_response = "The image has been generated and saved to your session."
                 else:

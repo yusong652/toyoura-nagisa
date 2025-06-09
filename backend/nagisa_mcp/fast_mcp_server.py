@@ -17,11 +17,11 @@ mcp = FastMCP("Fast MCP Server",
 
 print(f"[DEBUG] Fast MCP Server initialized")
 
-# register_common_tools(mcp)
-# register_web_search_tools(mcp)
-# register_email_tools(mcp)
-# register_calendar_tools(mcp)
-# register_coding_tools(mcp)
+register_common_tools(mcp)
+register_web_search_tools(mcp)
+register_email_tools(mcp)
+register_calendar_tools(mcp)
+register_coding_tools(mcp)
 register_text_to_image_tool(mcp)
     
 # 启动服务器

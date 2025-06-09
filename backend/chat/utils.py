@@ -3,7 +3,7 @@ import json
 import re
 import uuid
 import shutil
-from typing import List, Dict, Any, AsyncGenerator, Tuple
+from typing import List, Dict, Any, AsyncGenerator, Tuple, Optional
 import asyncio
 from datetime import datetime
 from backend.config import get_prompt_config
@@ -19,18 +19,6 @@ def _get_session_dir(session_id: str) -> str:
 def _get_session_file(session_id: str) -> str:
     # 文件名固定为 history.json
     return os.path.join(_get_session_dir(session_id), "history.json")
-
-# 备份单个 session 聊天记录
-
-def backup_history(session_id: str) -> str:
-    session_file = _get_session_file(session_id)
-    if not os.path.exists(session_file):
-        return ""
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = os.path.join(BACKUP_DIR, f"{session_id}_{timestamp}.json")
-    shutil.copy2(session_file, backup_file)
-    return backup_file
 
 # 保存指定会话ID的聊天历史
 
@@ -224,54 +212,22 @@ def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
 def delete_message(session_id: str, message_id: str) -> bool:
     """
     从指定会话中删除特定ID的消息
-    
     Args:
         session_id: 会话ID
         message_id: 要删除的消息ID
-        
     Returns:
         bool: 是否成功删除
     """
     try:
-        if not os.path.exists(HISTORY_BASE_DIR):
+        session_history = load_history(session_id)
+        if not session_history:
             return False
-            
-        # 备份当前历史记录
-        backup_file = backup_history()
-        if backup_file:
-            print(f"删除消息前已备份历史记录到: {backup_file}")
-            
-        # 加载所有历史记录
-        with open(HISTORY_BASE_DIR, 'r', encoding='utf-8') as f:
-            all_history = json.load(f)
-            
-        # 如果会话不存在
-        if session_id not in all_history:
-            return False
-            
-        # 获取会话历史
-        session_history = all_history[session_id]
-        
-        # 找到并删除消息
-        message_found = False
-        new_history = []
-        for msg in session_history:
-            if 'id' in msg and msg['id'] == message_id:
-                message_found = True
-                continue  # 跳过此消息，相当于删除
-            new_history.append(msg)
-            
-        # 如果找不到消息
-        if not message_found:
-            return False
-            
-        # 更新历史记录
-        all_history[session_id] = new_history
-        
-        # 保存更新后的历史记录
-        with open(HISTORY_BASE_DIR, 'w', encoding='utf-8') as f:
-            json.dump(all_history, f, indent=4, ensure_ascii=False)
-            
+        # 删除消息
+        new_history = [msg for msg in session_history if msg.get('id') != message_id]
+        if len(new_history) == len(session_history):
+            return False  # 没找到要删的
+        # 保存
+        save_history(session_id, new_history)
         # 更新元数据中的更新时间
         metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if os.path.exists(metadata_file):
@@ -284,11 +240,10 @@ def delete_message(session_id: str, message_id: str) -> bool:
                             json.dump(metadata, f, indent=4, ensure_ascii=False)
             except (FileNotFoundError, json.JSONDecodeError):
                 pass
-                
         return True
-    except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+    except Exception as e:
         print(f"删除消息时出错: {e}")
-        return False 
+        return False
 
 def update_session_title(session_id: str, new_title: str) -> bool:
     """
@@ -355,3 +310,25 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     with open(filepath, "wb") as f:
         f.write(image_data)
     return filepath 
+
+def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
+    """
+    获取指定会话中最新的两条消息（返回消息对象而非dict）
+    Args:
+        session_id: 会话ID
+    Returns:
+        Tuple[Optional[BaseMessage], Optional[BaseMessage]]: 最新的两条消息，按时间顺序排列，如果不存在则返回None
+    """
+    history = load_and_restore_history(session_id)  # 返回消息对象
+    if not history:
+        return None, None
+    latest_messages = []
+    for msg in reversed(history):
+        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
+            latest_messages.append(msg)
+            if len(latest_messages) == 2:
+                break
+    while len(latest_messages) < 2:
+        latest_messages.append(None)
+    latest_messages.reverse()
+    return tuple(latest_messages) 

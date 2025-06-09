@@ -1,71 +1,89 @@
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from pydantic import Field
 import requests
 from dotenv import load_dotenv
 import json
 from backend.config import get_models_lab_config
+from typing import Optional, Dict, Any, List
+import httpx
+from fastapi import FastAPI
+import traceback
 
 load_dotenv()
 
-def register_text_to_image_tool(mcp: FastMCP):
-    @mcp.tool()
-    def generate_image_from_description(
-        prompt: str = Field(..., description="A detailed and specific description of the image you want to generate. The more detailed your description, the better the image quality will be. Include specific details about: subject, style, mood, colors, lighting, composition, and any other relevant visual elements.")
-    ) -> dict:
-        """
-        Generate a high-quality image based on your detailed description.
+app = FastAPI()
+
+async def generate_image_from_description(prompt: str, negative_prompt: str) -> Optional[Dict[str, Any]]:
+    """
+    Internal function to generate an image using the text-to-image API.
+    This function is called by the wrapper function after getting the prompts.
+    
+    Args:
+        session_id: The session ID for saving the generated image
+        prompt: The text prompt for image generation
+        negative_prompt: The negative prompt for image generation
         
-        Important guidelines for best results:
-        - Your prompt MUST be detailed and specific to achieve high-quality results
-        - Include specific details about:
-          * Main subject and its characteristics
-          * Artistic style (e.g., photorealistic, anime, oil painting)
-          * Mood and atmosphere
-          * Color palette and lighting
-          * Composition and perspective
-          * Background elements
-          * Any special effects or details
-        - Example of a good prompt: "A photorealistic portrait of a young woman with long silver hair, wearing a flowing white dress, standing in a misty forest at dawn. Soft golden light filtering through trees, ethereal atmosphere, detailed facial features, 8k resolution, cinematic lighting."
-        """
-        import time
-        cfg = get_models_lab_config()
-        api_key = cfg["api_key"]
-        model_id = cfg["model_id"]
-        print(f"[text_to_image] api_key: {api_key}")
-        print(f"[text_to_image] model_id: {model_id}")
-        if not api_key:
-            print("[text_to_image] ERROR: MODELS_LAB_API_KEY environment variable is not set")
-            return {"error": "MODELS_LAB_API_KEY environment variable is not set"}
-        if not model_id:
-            print("[text_to_image] ERROR: MODELS_LAB_MODEL_ID environment variable is not set")
-            return {"error": "MODELS_LAB_MODEL_ID environment variable is not set"}
-        url = "https://modelslab.com/api/v6/realtime/text2img"
-        extra_keys = [
-            "width", "height", "samples", "num_inference_steps", "safety_checker", "safety_checker_type", "enhance_prompt", "style",
-            "seed", "guidance_scale", "panorama", "self_attention", "upscale", "lora_model", "tomesd", "use_karras_sigmas", "vae",
-            "lora_strength", "scheduler", "webhook", "track_id"
-        ]
-        # 固定负面提示词
-        negative_prompt = "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
-        payload = {
-            "key": api_key,
-            "model_id": model_id,
-            "prompt": prompt,
-            "negative_prompt": negative_prompt
-        }
-        for k in extra_keys:
-            v = cfg.get(k, None)
-            if v is not None:
-                payload[k] = v
-        print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
-        headers = {"Content-Type": "application/json"}
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
-            print(f"[text_to_image] HTTP status: {resp.status_code}")
-            print(f"[text_to_image] Response text: {resp.text}")
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            print(f"[text_to_image] Exception: {str(e)}")
-            return {"error": str(e)}
+    Returns:
+        Optional[Dict[str, Any]]: A dictionary containing the generated image data, or None if generation fails
+    """
+    try:
+        if not prompt:
+            print("[text_to_image] No prompt provided")
+            return None
+
+        # 获取配置
+        models_lab_config = get_models_lab_config()
+
+        # 构造 payload，优先用函数参数，其余用 config
+        payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
+        print(f"[text_to_image][DEBUG] Request payload: {json.dumps(payload, ensure_ascii=False)}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://modelslab.com/api/v6/images/text2img",
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=60.0
+            )
+            print(f"[text_to_image][DEBUG] Response status: {response.status_code}")
+            print(f"[text_to_image][DEBUG] Response content: {response.text}")
+            response.raise_for_status()
+            result = response.json()
+            
+            if "output" not in result or not result["output"]:
+                print("[text_to_image] No images in response")
+                return None
+                
+            # 返回第一张生成的图片链接
+            return {
+                "type": "image_url",
+                "image_url": result["output"][0]
+            }
+            
+    except Exception as e:
+        print(f"[text_to_image] Error generating image: {str(e)}")
+        traceback.print_exc()
+        return None
+
+async def generate_image() -> str:
+    """
+    Generate an image based on the current conversation context.
+    This tool will analyze the conversation and create a beautiful anime-style image.
+    No parameters are needed as it uses the conversation context automatically.
+    
+    Returns:
+        str: A status message indicating the result of image generation:
+            - "The image has been generated and saved to your session." on success
+            - "Image generation failed, please try again." on failure
+    """
+    return ""  # This is just a placeholder, the actual implementation is in handle_function_call
+
+def register_text_to_image_tool(mcp: FastMCP):
+    """
+    Register the text-to-image generation tool with the MCP server.
+    
+    Args:
+        mcp: The FastMCP instance to register the tool with
+    """
+    mcp.tool()(generate_image)
 
