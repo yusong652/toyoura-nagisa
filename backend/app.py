@@ -40,6 +40,7 @@ from backend.nagisa_mcp.fast_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
+from backend.routes import images
 
 
 # 加载环境变量
@@ -80,6 +81,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(images.router)
 
 # 新增历史记录相关模型
 class NewHistoryRequest(BaseModel):

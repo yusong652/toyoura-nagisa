@@ -5,7 +5,7 @@ import { useChat } from '../contexts/ChatContext';
 const CHECK_DISPLAY_TIME = 3600; // ms
 
 const GenerateImageButton: React.FC = () => {
-  const { generateImage, currentSessionId } = useChat();
+  const { generateImage, currentSessionId, switchSession } = useChat();
   const [loading, setLoading] = useState(false);
   const [showCheck, setShowCheck] = useState(false);
 
@@ -18,6 +18,7 @@ const GenerateImageButton: React.FC = () => {
       setLoading(false);
       if (res.success) {
         setShowCheck(true);
+        await switchSession(currentSessionId);
         setTimeout(() => setShowCheck(false), CHECK_DISPLAY_TIME);
       }
       // No error UI

@@ -8,6 +8,7 @@ import asyncio
 from datetime import datetime
 from backend.config import get_prompt_config
 import requests
+from backend.chat.models import ImageMessage
 
 # 聊天历史相关工具
 HISTORY_BASE_DIR = "chat/data"
@@ -300,9 +301,6 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     Returns:
         str: 保存的图片路径
     """
-    from backend.chat.models import ImageMessage
-    import uuid
-    from datetime import datetime
 
     session_dir = os.path.join(output_dir_base, session_id)
     os.makedirs(session_dir, exist_ok=True)
@@ -318,7 +316,7 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     # 创建图片消息
     relative_path = os.path.join(session_id, filename)
     image_message = ImageMessage(
-        content="Generated image",
+        content="",
         image_path=relative_path,
         id=str(uuid.uuid4()),
         timestamp=datetime.now()
