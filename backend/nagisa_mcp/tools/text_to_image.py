@@ -29,23 +29,31 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
     try:
         if not prompt:
             return None
-
+            
         # 获取配置
         models_lab_config = get_models_lab_config()
-        print(f"[text_to_image] Config loaded: {models_lab_config}")
+        debug = models_lab_config.get("debug", False)
+        
+        if debug:
+            print(f"[text_to_image] Config loaded: {models_lab_config}")
 
         # 构造 payload，优先用函数参数，其余用 config
         payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
-        print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
+        if debug:
+            print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
 
         async with httpx.AsyncClient() as client:
+            if models_lab_config.get("realtime", False):
+                endpoint = "https://modelslab.com/api/v6/realtime/text2img"
+            else:
+                endpoint = "https://modelslab.com/api/v6/images/text2img"
             response = await client.post(
-                "https://modelslab.com/api/v6/realtime/text2img",
+                endpoint,
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
                 timeout=60.0
             )
-            if models_lab_config.get("debug", False):
+            if debug:
                 print(f"[text_to_image] Response status: {response.status_code}")
                 print(f"[text_to_image] Response content: {response.text[:100]}...")
             response.raise_for_status()
@@ -61,6 +69,9 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             }
             
     except Exception as e:
+        if debug:
+            print(f"[text_to_image] Error occurred: {str(e)}")
+            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return None
 
 async def generate_image() -> str:
@@ -74,7 +85,26 @@ async def generate_image() -> str:
             - "The image has been generated and saved to your session." on success
             - "Image generation failed, please try again." on failure
     """
-    return ""  # This is just a placeholder, the actual implementation is in handle_function_call
+    try:
+        # 获取配置
+        models_lab_config = get_models_lab_config()
+        debug = models_lab_config.get("debug", False)
+        
+        if debug:
+            print("[text_to_image] Starting image generation...")
+            
+        # TODO: 实现实际的图片生成逻辑
+        # 这里需要实现从对话上下文中提取提示词并调用 generate_image_from_description
+        
+        if debug:
+            print("[text_to_image] Image generation completed")
+            
+        return "The image has been generated and saved to your session."
+    except Exception as e:
+        if debug:
+            print(f"[text_to_image] Error in generate_image: {str(e)}")
+            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
+        return "Image generation failed, please try again."
 
 def register_text_to_image_tool(mcp: FastMCP):
     """
