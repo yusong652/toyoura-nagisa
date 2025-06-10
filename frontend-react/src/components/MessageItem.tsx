@@ -3,6 +3,7 @@ import './MessageItem.css'
 import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/ChatContext'
 import MessageToolState from './MessageToolState'
+import ImagePreview from './ImagePreview'
 
 interface MessageItemProps {
   message: Message
@@ -17,6 +18,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
   const { deleteMessage } = useChat()
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   
   // 检查当前消息是否被选中
   const isSelected = id && selectedMessageId === id
@@ -69,15 +72,11 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   
   // 处理消息点击
   const handleMessageClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!id) return;
-    
-    // 如果当前消息已被选中，则取消选中；否则选中当前消息
-    if (isSelected) {
-      onMessageSelect(null);
-    } else {
-      onMessageSelect(id);
+    // 如果点击的是图片，不触发消息选中
+    if ((e.target as HTMLElement).closest('.file-image')) {
+      return;
     }
+    onMessageSelect(isSelected ? null : message.id);
   }
   
   // 处理删除消息
@@ -212,22 +211,63 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     if (tooltip) tooltip.remove()
   }
 
+  const handleImageClick = (imageUrl: string) => {
+    setPreviewImage(imageUrl);
+  };
+
   return (
-    <div 
-      className={`message ${sender} ${isSelected ? 'selected' : ''}`}
-      onClick={handleMessageClick}
-    >
-      <img 
-        src={sender === 'user' ? '/user-avatar.jpg' : '/Nagisa_avatar.jpg'} 
-        alt={sender === 'user' ? 'User' : 'Nagisa'} 
-        className="avatar"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      />
-      
-      {sender === 'bot' ? (
-        <div className="message-wrapper">
-          {toolState && <MessageToolState toolState={toolState} />}
+    <>
+      <div 
+        className={`message ${sender} ${isSelected ? 'selected' : ''}`}
+        onClick={handleMessageClick}
+      >
+        <img 
+          src={sender === 'user' ? '/user-avatar.jpg' : '/Nagisa_avatar.jpg'} 
+          alt={sender === 'user' ? 'User' : 'Nagisa'} 
+          className="avatar"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        />
+        
+        {sender === 'bot' ? (
+          <div className="message-wrapper">
+            {toolState && <MessageToolState toolState={toolState} />}
+            <div className="message-content">
+              {renderStreamingText()}
+              
+              {files && files.length > 0 && !isLoading && (
+                <div className="message-files">
+                  {files.map((file, index) => (
+                    <div key={index} className="file-preview">
+                      {file.type.startsWith('image/') ? (
+                        <img 
+                          src={file.data} 
+                          alt={file.name} 
+                          className="file-image" 
+                          onClick={(e) => {
+                            e.stopPropagation(); // 阻止事件冒泡
+                            handleImageClick(file.data);
+                          }}
+                        />
+                      ) : (
+                        <div className="file-info">
+                          <span className="file-icon">📄</span>
+                          <span className="file-name">{file.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {!streaming && !isLoading && (
+              <div className="message-time">
+                {formatTime(timestamp)}
+              </div>
+            )}
+          </div>
+        ) : (
           <div className="message-content">
             {renderStreamingText()}
             
@@ -248,48 +288,28 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
               </div>
             )}
           </div>
-          
-          {!streaming && !isLoading && (
-            <div className="message-time">
-              {formatTime(timestamp)}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="message-content">
-          {renderStreamingText()}
-          
-          {files && files.length > 0 && !isLoading && (
-            <div className="message-files">
-              {files.map((file, index) => (
-                <div key={index} className="file-preview">
-                  {file.type.startsWith('image/') ? (
-                    <img src={file.data} alt={file.name} className="file-image" />
-                  ) : (
-                    <div className="file-info">
-                      <span className="file-icon">📄</span>
-                      <span className="file-name">{file.name}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
+        
+        {/* 显示消息状态 */}
+        {renderMessageStatus()}
+        
+        {/* 删除按钮 - 仅在消息被选中时显示 */}
+        {isSelected && id && !isLoading && !streaming && (
+          <div className="message-delete-button" onClick={handleDeleteMessage}>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 2L12 12M2 12L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        )}
+      </div>
+      {previewImage && (
+        <ImagePreview
+          open={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage}
+        />
       )}
-      
-      {/* 显示消息状态 */}
-      {renderMessageStatus()}
-      
-      {/* 删除按钮 - 仅在消息被选中时显示 */}
-      {isSelected && id && !isLoading && !streaming && (
-        <div className="message-delete-button" onClick={handleDeleteMessage}>
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 2L12 12M2 12L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-      )}
-    </div>
+    </>
   )
 }
 

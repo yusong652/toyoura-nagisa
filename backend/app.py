@@ -266,6 +266,17 @@ async def handle_llm_response(
                     image_url = tool_result["image_url"]
                     local_path = save_image_from_url(image_url, session_id)
                     tool_natural_response = "The image has been generated and saved to your session."
+                    # 发送会话刷新信号
+                    refresh_signal = {
+                        'type': 'SESSION_REFRESH',
+                        'payload': {
+                            'session_id': session_id,
+                            'message': 'Image generated, please refresh session'
+                        }
+                    }
+                    yield f"data: {json.dumps(refresh_signal)}\n\n"
+                    # 添加短暂延迟，确保前端有足够时间处理图片消息
+                    await asyncio.sleep(0.5)
                 else:
                     tool_natural_response = "Image generation failed, please try again."
             else:

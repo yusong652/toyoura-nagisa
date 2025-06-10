@@ -679,6 +679,56 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
+    // 处理会话刷新事件
+    const handleSessionRefresh = async (data: any) => {
+      if (data.payload && data.payload.session_id) {
+        const { session_id: refreshSessionId } = data.payload;
+        
+        // 如果刷新的是当前活跃会话，重新加载会话内容
+        if (refreshSessionId === currentSessionId) {
+          try {
+            // 获取最新的会话历史
+            const response = await fetch(`/api/history/${refreshSessionId}`);
+            if (!response.ok) {
+              throw new Error(`获取会话历史失败: ${response.status}`);
+            }
+            
+            const historyData = await response.json();
+            if (!historyData.history || !Array.isArray(historyData.history)) {
+              throw new Error('无效的历史数据格式');
+            }
+
+            // 找到最后一条图片消息
+            const lastImageMessage = historyData.history
+              .filter((msg: any) => msg.role === 'image')
+              .pop();
+
+            if (lastImageMessage) {
+              // 创建图片消息对象
+              const imageMessage: Message = {
+                id: lastImageMessage.id || uuidv4(),
+                sender: 'bot',
+                text: lastImageMessage.content || '',
+                timestamp: new Date(lastImageMessage.timestamp || Date.now()).getTime(),
+                files: [{
+                  name: 'generated_image',
+                  type: 'image/png',
+                  data: `/api/images/${lastImageMessage.image_path}`
+                }]
+              };
+
+              // 更新消息列表，添加图片消息
+              setMessages(prev => [...prev, imageMessage]);
+            }
+          } catch (error) {
+            console.error('刷新会话内容失败:', error);
+            // 如果获取历史失败，回退到完整的会话切换
+            await switchSession(refreshSessionId);
+          }
+        }
+      }
+    };
+
     // 处理消息状态更新
     const handleStatusUpdate = (data: any) => {
       if (data.status === 'sent') {
@@ -828,6 +878,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           // 优先处理标题更新事件
           if (data.type === 'TITLE_UPDATE') {
             handleTitleUpdate(data);
+            return;
+          }
+          
+          // 处理会话刷新事件
+          if (data.type === 'SESSION_REFRESH') {
+            handleSessionRefresh(data);
             return;
           }
           
