@@ -39,6 +39,7 @@ from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage,
 from backend.nagisa_mcp.fast_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
+from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 
 
 # 加载环境变量
@@ -106,6 +107,9 @@ class GenerateTitleRequest(BaseModel):
 
 class UpdateToolsEnabledRequest(BaseModel):
     enabled: bool
+
+class GenerateImageRequest(BaseModel):
+    session_id: str
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -457,3 +461,28 @@ async def update_tools_enabled(request: UpdateToolsEnabledRequest):
         import traceback
         print(traceback.format_exc())  # 打印详细堆栈
         raise HTTPException(status_code=500, detail=f"更新工具状态失败: {str(e)}")
+
+@app.post("/api/generate-image", response_model=dict)
+async def generate_image_endpoint(request: GenerateImageRequest):
+    """One-click generate image from recent session messages."""
+    try:
+        session_id = request.session_id
+        llm_client: LLMClientBase = app.state.llm_client
+        # 1. Generate prompts from LLM client
+        prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
+        if not prompt_result:
+            return {"success": False, "error": "Failed to generate image prompts from conversation."}
+        # 2. Generate image from description
+        image_result = await generate_image_from_description(
+            prompt=prompt_result["text_prompt"],
+            negative_prompt=prompt_result["negative_prompt"]
+        )
+        if not image_result or not image_result.get("image_url"):
+            return {"success": False, "error": "Image generation failed."}
+        # 3. Save image to session folder
+        local_path = save_image_from_url(image_result["image_url"], session_id)
+        return {"success": True, "image_path": local_path}
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return {"success": False, "error": str(e)}

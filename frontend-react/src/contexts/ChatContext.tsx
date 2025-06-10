@@ -995,6 +995,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // 一键生成图片
+  const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
+    try {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      });
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Network error' };
+    }
+  }, []);
+
   return (
     <ChatContext.Provider value={{ 
       messages, 
@@ -1014,7 +1029,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       refreshTitle,
       toolState,
       toolsEnabled,  // 添加工具开关状态
-      updateToolsEnabled  // 添加更新工具状态的函数
+      updateToolsEnabled,  // 添加更新工具状态的函数
+      generateImage // 新增一键生成图片
     }}>
       {children}
     </ChatContext.Provider>
