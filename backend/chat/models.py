@@ -73,9 +73,22 @@ class UserToolMessage(BaseMessage):
         return 'tool'
 
 # =====================
+# 图片消息
+# =====================
+class ImageMessage(BaseModel):
+    """
+    生成的图片消息。
+    """
+    content: Union[str, List[dict]]
+    id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    image_path: str
+    role: str = "image"  # 直接加字段，默认值为 image
+
+# =====================
 # 类型提示用 Union
 # =====================
-MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, UserToolMessage]
+MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, UserToolMessage, ImageMessage]
 
 # =====================
 # 消息工厂函数
@@ -92,6 +105,15 @@ def message_factory(data: dict) -> BaseMessage:
             tool_call_id=data['tool_call_id'],
             name=data['name'],
             content=data['content']
+        )
+    elif data.get('role') == 'image':
+        if 'image_path' not in data:
+            raise ValueError("Image message must have an image_path")
+        return ImageMessage(
+            content=data.get('content', ''),
+            image_path=data['image_path'],
+            id=data.get('id'),
+            timestamp=data.get('timestamp')
         )
     elif 'tool_calls' in data:
         return AssistantToolMessage(**{k: v for k, v in data.items() if k != 'role'})

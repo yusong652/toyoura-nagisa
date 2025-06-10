@@ -190,7 +190,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     tooltip.className = 'avatar-tooltip'
     
     if (sender === 'user') {
-      tooltip.textContent = 'User\n昵称：你自己\n简介：这是你在本聊天中的形象，可以自定义头像和昵称哦~'
+      tooltip.textContent = 'User\nName：yusong\nIntroduction： developer of aiNagisa.'
     } else {
       tooltip.textContent = 'Toyoura Nagisa\n性格：元气、可爱、黏人\n爱好：和你聊天、卖萌撒娇\n简介：Nagisa是你的AI虚拟伙伴，喜欢陪伴你、和你互动！'
     }

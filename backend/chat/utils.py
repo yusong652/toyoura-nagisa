@@ -292,7 +292,7 @@ def load_and_restore_history(session_id: str):
 
 def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = "chat/data") -> str:
     """
-    下载图片并保存到指定session目录
+    下载图片并保存到指定session目录，同时创建图片消息并保存到历史记录
     Args:
         image_url (str): 图片链接
         session_id (str): 会话ID
@@ -300,16 +300,36 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     Returns:
         str: 保存的图片路径
     """
+    from backend.chat.models import ImageMessage
+    import uuid
+    from datetime import datetime
 
     session_dir = os.path.join(output_dir_base, session_id)
     os.makedirs(session_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"generated_image_{timestamp}.png"
     filepath = os.path.join(session_dir, filename)
+    
+    # 下载并保存图片
     image_data = requests.get(image_url).content
     with open(filepath, "wb") as f:
         f.write(image_data)
-    return filepath 
+    
+    # 创建图片消息
+    relative_path = os.path.join(session_id, filename)
+    image_message = ImageMessage(
+        content="Generated image",
+        image_path=relative_path,
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now()
+    )
+    
+    # 将图片消息添加到历史记录
+    history = load_history(session_id)
+    history.append(image_message.dict())
+    save_history(session_id, history)
+    
+    return filepath
 
 def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
     """
@@ -324,7 +344,7 @@ def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[An
         return None, None
     latest_messages = []
     for msg in reversed(history):
-        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
+        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:  # 只获取用户和助手的消息
             latest_messages.append(msg)
             if len(latest_messages) == 2:
                 break

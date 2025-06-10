@@ -199,9 +199,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
       const convertedMessages: Message[] = historyData.history
         .filter((msg: any) => {
-          // 只保留真正的用户发言和AI文本
+          // 只保留真正的用户发言、AI文本和图片消息
           if (msg.role === 'user' && !msg.tool_request) return true;
           if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true;
+          if (msg.role === 'image') return true;
           return false;
         })
         .map((msg: any) => {
@@ -211,6 +212,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             sender = 'user';
           } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
             sender = 'bot';
+          } else if (msg.role === 'image') {
+            sender = 'bot';  // 图片消息也作为bot的消息显示
           } else {
             console.warn('Unexpected message format:', msg);
             return null;
@@ -220,7 +223,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           let files: FileData[] = [];
           
           // 处理消息内容
-          if (typeof msg.content === 'string') {
+          if (msg.role === 'image') {
+            // 处理图片消息
+            text = msg.content || '';
+            files.push({
+              name: 'generated_image',
+              type: 'image/png',
+              data: `/api/images/${msg.image_path}`  // 通过API路由访问图片
+            });
+          } else if (typeof msg.content === 'string') {
             text = msg.content;
           } else if (Array.isArray(msg.content)) {
             // 合并所有文本内容
@@ -635,7 +646,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
     
-    // 直接添加一个机器人消息，初始状态为加载中
+    // 直接添加一个Bot Message，初始状态为加载中
     setMessages(prev => [...prev, {
       id: botMessageId,
       sender: 'bot',
