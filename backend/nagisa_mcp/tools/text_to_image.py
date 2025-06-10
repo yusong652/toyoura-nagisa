@@ -28,25 +28,32 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
     """
     try:
         if not prompt:
+            print("[text_to_image] No prompt provided")
             return None
 
         # 获取配置
         models_lab_config = get_models_lab_config()
+        print(f"[text_to_image] Config loaded: {models_lab_config}")
 
         # 构造 payload，优先用函数参数，其余用 config
         payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
+        print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://modelslab.com/api/v6/realtime/text2img",
+                "https://modelslab.com/api/v6/images/text2img",
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
                 timeout=60.0
             )
+            if models_lab_config.get("debug", False):
+                print(f"[text_to_image] Response status: {response.status_code}")
+                print(f"[text_to_image] Response content: {response.text}")
             response.raise_for_status()
             result = response.json()
             
             if "output" not in result or not result["output"]:
+                print("[text_to_image] No images in response")
                 return None
                 
             # 返回第一张生成的图片链接
@@ -56,6 +63,8 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             }
             
     except Exception as e:
+        print(f"[text_to_image] Error generating image: {str(e)}")
+        traceback.print_exc()
         return None
 
 async def generate_image() -> str:

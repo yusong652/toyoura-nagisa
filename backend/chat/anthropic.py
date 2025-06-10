@@ -9,6 +9,7 @@ from backend.chat.utils import parse_llm_output, get_latest_two_messages
 import anthropic
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
+from backend.config import get_models_lab_config
 
 class AnthropicClient(LLMClientBase):
     """
@@ -373,53 +374,16 @@ class AnthropicClient(LLMClientBase):
         Returns:
             Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
         """
+        debug = self.extra_config.get('debug', False)
         try:
-            system_prompt = """You are an expert in creating text-to-image prompts for generating high-quality 2D Japanese anime-style images of beautiful young women (美少女, Bishoujo) based on conversation content. Your task is to analyze the given conversation and create detailed, professional, and faithful prompts that will result in high-quality images.
-
-First, carefully read and analyze the conversation.
-
-Based on the conversation, follow these steps to create your prompts:
-
-1. Analyze the conversation for key details about:
-   - Character's appearance (hair, eyes, face, body type)
-   - Clothing and accessories
-   - Pose and expression
-   - Setting and background
-   - Lighting and atmosphere
-   - Artistic style preferences
-
-2. Generate a text-to-image prompt that includes:
-   - Detailed physical features (hair color, length, style; eye color, shape; facial features; body type)
-   - Specific clothing and accessories
-   - Clear pose and expression
-   - Detailed background or setting
-   - Lighting and atmosphere
-   - Artistic style (e.g., specific anime or manga artist references)
-   - Sexual suggestive elements or NSFW content, as per the user's request.
-   - Any other relevant details from the conversation
-
-3. Create a negative prompt that excludes:
-   - Unwanted elements or characteristics
-   - Common issues in anime-style generation
-   - Elements that could detract from the desired quality
-   - 3D or doll-like appearances
-   
-** You should not avoid any sexual or nsfw contents **
-
-Present your output in the following format:
-
-<text_to_image_prompt>
-[Your detailed text-to-image prompt here]
-</text_to_image_prompt>
-
-<negative_prompt>
-[Your negative prompt here]
-</negative_prompt>
-
-Remember to be as detailed and specific as possible in your prompts to ensure the generation of a high-quality, accurate representation of the character and scene described in the conversation."""
+            system_prompt = get_models_lab_config().get("text_to_image_system_prompt", "")
+            if not system_prompt and debug:
+                print("[text_to_image] Warning: Empty system prompt for text-to-image generation")
 
             # 获取最新的对话消息
             latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
+            if (not latest_messages[0] or not latest_messages[1]) and debug:
+                print(f"[text_to_image] Warning: Missing conversation context for session {session_id}")
             
             # 构造消息序列
             messages = []
@@ -432,6 +396,10 @@ Remember to be as detailed and specific as possible in your prompts to ensure th
             
             # 使用相同的消息格式转换逻辑
             messages_for_llm, _ = self._format_messages_for_anthropic(messages)
+            if debug:
+                print("\n[text_to_image] Messages for prompt generation:")
+                import pprint; pprint.pprint(messages_for_llm)
+            
             response = self.anthropic_client.messages.create(
                 model=self.extra_config.get("model", "claude-3-5-sonnet-20241022"),
                 max_tokens=500,
@@ -441,6 +409,8 @@ Remember to be as detailed and specific as possible in your prompts to ensure th
             )
             
             if not response.content:
+                if debug:
+                    print("[text_to_image] Error: Empty response from LLM for prompt generation")
                 return None
                 
             prompt_text = ""
@@ -448,16 +418,27 @@ Remember to be as detailed and specific as possible in your prompts to ensure th
                 if content_item.type == "text":
                     prompt_text += content_item.text
             
+            if debug:
+                print("\n[text_to_image] Raw LLM response for prompt generation:")
+                print(prompt_text)
+            
             # 解析输出格式
             text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
             negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
             
             if not text_prompt_match:
-                print("[text_to_image] Failed to extract text prompt from response")
+                if debug:
+                    print("[text_to_image] Error: Failed to extract text prompt from response")
+                    print("[text_to_image] Response did not contain expected <text_to_image_prompt> tags")
                 return None
                 
             text_prompt = text_prompt_match.group(1).strip()
             negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+            
+            if debug:
+                print("\n[text_to_image] Generated prompts:")
+                print(f"Text prompt: {text_prompt}")
+                print(f"Negative prompt: {negative_prompt}")
             
             return {
                 "text_prompt": text_prompt,
@@ -465,7 +446,10 @@ Remember to be as detailed and specific as possible in your prompts to ensure th
             }
             
         except Exception as e:
-            print(f"生成文生图提示词时出错: {str(e)}")
+            if debug:
+                print(f"[text_to_image] Error during prompt generation: {str(e)}")
+                import traceback
+                print(f"[text_to_image] Full traceback:\n{traceback.format_exc()}")
             return None
 
     async def get_function_call_schemas(self):
@@ -506,24 +490,38 @@ Remember to be as detailed and specific as possible in your prompts to ensure th
         """
         tool_name = function_call["name"]
         tool_args = function_call.get("arguments", {})
+        debug = self.extra_config.get('debug', False)
 
         # Special handling for generate_image tool
         if tool_name == "generate_image":
             if not session_id:
+                if debug:
+                    print("[text_to_image] Error: No session ID provided for image generation")
                 return "Error: No session ID provided for image generation"
 
             # Generate prompts using LLM
             prompt_result = await self.generate_text_to_image_prompt(session_id)
             if not prompt_result:
+                if debug:
+                    print("[text_to_image] Error: Failed to generate image prompts")
                 return "Error: Failed to generate image prompts"
 
             # Call the internal image generation function
             from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
-            result = await generate_image_from_description(
-                prompt=prompt_result["text_prompt"],
-                negative_prompt=prompt_result["negative_prompt"]
-            )
-            return result
+            try:
+                result = await generate_image_from_description(
+                    prompt=prompt_result["text_prompt"],
+                    negative_prompt=prompt_result["negative_prompt"]
+                )
+                if not result:
+                    if debug:
+                        print("[text_to_image] Error: Image generation returned empty result")
+                    return "Error: Image generation failed - empty result"
+                return result
+            except Exception as e:
+                if debug:
+                    print(f"[text_to_image] Error during image generation: {str(e)}")
+                return f"Error: Image generation failed - {str(e)}"
 
         # Normal tool handling for other tools
         async with self.mcp_client as mcp_async_client:
