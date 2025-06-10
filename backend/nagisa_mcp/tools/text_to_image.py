@@ -1,6 +1,7 @@
 from fastmcp import FastMCP, Context
 from pydantic import Field
 import requests
+import asyncio
 from dotenv import load_dotenv
 import json
 from backend.config import get_models_lab_config
@@ -47,26 +48,36 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
                 endpoint = "https://modelslab.com/api/v6/realtime/text2img"
             else:
                 endpoint = "https://modelslab.com/api/v6/images/text2img"
-            response = await client.post(
-                endpoint,
-                headers={"Content-Type": "application/json"},
-                data=json.dumps(payload),
-                timeout=60.0
-            )
-            if debug:
-                print(f"[text_to_image] Response status: {response.status_code}")
-                print(f"[text_to_image] Response content: {response.text[:100]}...")
-            response.raise_for_status()
-            result = response.json()
-            
-            if "output" not in result or not result["output"]:
-                return None
-                
-            # 返回第一张生成的图片链接
-            return {
-                "type": "image_url",
-                "image_url": result["output"][0]
-            }
+            max_retries = 20
+            retry_interval = 2  # seconds
+            for attempt in range(max_retries):
+                response = await client.post(
+                    endpoint,
+                    headers={"Content-Type": "application/json"},
+                    data=json.dumps(payload),
+                    timeout=60.0
+                )
+                if debug:
+                    print(f"[text_to_image] Response status: {response.status_code}")
+                    print(f"[text_to_image] Response content: {response.text[:100]}...")
+                response.raise_for_status()
+                result = response.json()
+                status = result.get("status")
+                if status == "success" and "output" in result and result["output"]:
+                    return {
+                        "type": "image_url",
+                        "image_url": result["output"][0]
+                    }
+                elif status == "processing":
+                    if debug:
+                        print(f"[text_to_image] Status is processing, waiting {retry_interval}s before retrying...")
+                    await asyncio.sleep(retry_interval)
+                    continue
+                else:
+                    if debug:
+                        print(f"[text_to_image] Unexpected status or empty output: {status}")
+                    break
+            return None
             
     except Exception as e:
         if debug:
