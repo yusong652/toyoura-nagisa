@@ -18,7 +18,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
   const { deleteMessage } = useChat()
-  const [showTooltip, setShowTooltip] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   
   // 检查当前消息是否被选中
