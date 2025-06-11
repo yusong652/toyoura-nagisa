@@ -8,6 +8,7 @@ from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserTool
 from backend.chat.utils import parse_llm_output, get_latest_two_messages
 import anthropic
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.config import get_models_lab_config
 
@@ -394,11 +395,9 @@ class AnthropicClient(LLMClientBase):
             # 构造消息序列
             messages = []
             if latest_messages[0] and latest_messages[1]:
-                # 如果有历史消息，按时间顺序添加
-                messages.extend([
-                    latest_messages[0],  # 较早的消息
-                    latest_messages[1]   # 较新的消息
-                ])
+                # 将对话内容组合成一个专门用于生成提示词的用户消息
+                conversation_text = f"Please generate text to image prompt based on the following conversation:\n\n{latest_messages[0].role}: {latest_messages[0].content}\n{latest_messages[1].role}: {latest_messages[1].content}"
+                messages.append(UserMessage(role="user", content=conversation_text))
             
             # 使用相同的消息格式转换逻辑
             messages_for_llm, _ = self._format_messages_for_anthropic(messages)
@@ -559,7 +558,6 @@ class AnthropicClient(LLMClientBase):
                 return "Error: Failed to generate image prompts"
 
             # Call the internal image generation function
-            from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
             try:
                 result = await generate_image_from_description(
                     prompt=prompt_result["text_prompt"],

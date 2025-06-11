@@ -61,10 +61,7 @@ def process_ai_text_message(response_text: str, keyword: str, history_msgs: list
         id=ai_msg_id
     )
     history_msgs.append(ai_msg)
-    save_history(session_id, [{
-        **msg.model_dump(),
-        'role': msg.role
-    } for msg in history_msgs])
+    save_history(session_id, history_msgs)
     return ai_msg_id, ai_msg
 
 def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:

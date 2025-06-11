@@ -8,7 +8,8 @@ import asyncio
 from datetime import datetime
 from backend.config import get_prompt_config
 import requests
-from backend.chat.models import ImageMessage
+from backend.chat.models import ImageMessage, BaseMessage
+from backend.chat.models import message_factory
 
 # 聊天历史相关工具
 HISTORY_BASE_DIR = "chat/data"
@@ -23,19 +24,21 @@ def _get_session_file(session_id: str) -> str:
 
 # 保存指定会话ID的聊天历史
 
-def save_history(session_id: str, current_history: List[Dict[str, Any]]) -> None:
+def save_history(session_id: str, current_history: List[BaseMessage]) -> None:
     session_dir = _get_session_dir(session_id)
     session_file = _get_session_file(session_id)
     os.makedirs(session_dir, exist_ok=True)
     processed_history = []
     for msg in current_history:
-        msg_copy = msg.copy()
+        # 如果是Pydantic模型，转为dict
+        if hasattr(msg, 'model_dump'):
+            msg_copy = msg.model_dump()
+        else:
+            msg_copy = dict(msg)
         if 'timestamp' not in msg_copy or not msg_copy['timestamp']:
             msg_copy['timestamp'] = datetime.now().isoformat()
         elif isinstance(msg_copy['timestamp'], datetime):
             msg_copy['timestamp'] = msg_copy['timestamp'].isoformat()
-        if 'role' not in msg_copy and hasattr(msg, 'role'):
-            msg_copy['role'] = msg.role
         if msg_copy.get('role') == 'tool':
             if 'tool_call_id' not in msg_copy:
                 print(f"[WARNING] Tool message missing tool_call_id: {msg_copy}")
@@ -66,6 +69,8 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
     try:
         with open(session_file, 'r', encoding='utf-8') as f:
             history = json.load(f)
+            # 读取后，过滤掉 image 类型
+            history = [msg for msg in history if msg.get('role') != 'image']
             for msg in history:
                 if 'timestamp' not in msg or not msg['timestamp']:
                     msg['timestamp'] = datetime.now().isoformat()
@@ -287,8 +292,7 @@ def load_and_restore_history(session_id: str):
     """
     加载并还原指定会话ID的聊天历史，返回消息对象列表
     """
-    from backend.chat.models import message_factory
-    history = load_history(session_id)
+    history = load_all_message_history(session_id)
     return [message_factory(msg) if isinstance(msg, dict) else msg for msg in history] 
 
 def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = "chat/data") -> str:
@@ -323,8 +327,8 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     )
     
     # 将图片消息添加到历史记录
-    history = load_history(session_id)
-    history.append(image_message.dict())
+    history = load_all_message_history(session_id)
+    history.append(image_message)
     save_history(session_id, history)
     
     return filepath
@@ -332,21 +336,39 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
 def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
     """
     获取指定会话中最新的两条消息（返回消息对象而非dict）
-    Args:
-        session_id: 会话ID
-    Returns:
-        Tuple[Optional[BaseMessage], Optional[BaseMessage]]: 最新的两条消息，按时间顺序排列，如果不存在则返回None
+    只返回 user/assistant 消息，过滤掉 image/tool 等其它类型
     """
-    history = load_and_restore_history(session_id)  # 返回消息对象
-    if not history:
+    history = load_history(session_id)  # 只返回非 image 消息
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    if not history_msgs:
         return None, None
     latest_messages = []
-    for msg in reversed(history):
-        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:  # 只获取用户和助手的消息
+    for msg in reversed(history_msgs):
+        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
             latest_messages.append(msg)
             if len(latest_messages) == 2:
                 break
     while len(latest_messages) < 2:
         latest_messages.append(None)
     latest_messages.reverse()
-    return tuple(latest_messages) 
+    return tuple(latest_messages)
+
+def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
+    session_file = _get_session_file(session_id)
+    if not os.path.exists(session_file):
+        return []
+    try:
+        with open(session_file, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+            for msg in history:
+                if 'timestamp' not in msg or not msg['timestamp']:
+                    msg['timestamp'] = datetime.now().isoformat()
+                if msg.get('role') == 'tool':
+                    if 'tool_call_id' not in msg:
+                        print(f"[WARNING] Tool message missing tool_call_id: {msg}")
+                    if 'name' not in msg:
+                        print(f"[WARNING] Tool message missing name: {msg}")
+            return history
+    except Exception as e:
+        print(f"[ERROR] Failed to load all message history for session {session_id}: {str(e)}")
+        return [] 
