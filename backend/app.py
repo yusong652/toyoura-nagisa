@@ -197,7 +197,7 @@ async def switch_session(request: SwitchSessionRequest):
             raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
         
         # 加载指定会话的历史记录
-        history = load_history(request.session_id)
+        history = load_all_message_history(request.session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         # 返回会话信息和最近的消息
@@ -325,7 +325,7 @@ async def handle_llm_response(
                 yield f"data: {json.dumps(tts_result)}\n\n"
         # ------ 标题生成判断逻辑移动到这里 ------
         try:
-            loaded_history = load_history(session_id)
+            loaded_history = load_all_message_history(session_id)
             history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
             if should_generate_title(session_id, history_msgs_after):
                 new_title = await generate_title_for_session(session_id, llm_client)
@@ -362,11 +362,12 @@ async def chat_stream_endpoint(request: Request):
     parsed_data, session_id = parse_message_data(data)
     if not parsed_data:
         return ErrorResponse(detail="无效的消息数据")
-    loaded_history = load_history(session_id)
+    # 使用 load_all_message_history 来保存完整的消息历史
+    loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     user_msg = process_user_message(parsed_data)
     history_msgs.append(user_msg)
-    # 保存用户消息到历史记录
+    # 保存用户消息到完整的历史记录
     save_history(session_id, history_msgs)
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
@@ -375,9 +376,11 @@ async def chat_stream_endpoint(request: Request):
             yield f"data: {json.dumps({'status': 'sent'})}\n\n"
             try:
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
-                # 只在这里切片 recent_msgs
+                # 使用 load_history 获取不含图片消息的最近对话
+                recent_history = load_history(session_id)
+                recent_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in recent_history]
                 recent_messages_length = get_llm_config().get("recent_messages_length", 20)
-                recent_msgs = history_msgs[-recent_messages_length:]
+                recent_msgs = recent_msgs[-recent_messages_length:]
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
             except Exception as e:
