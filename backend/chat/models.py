@@ -15,11 +15,6 @@ class BaseMessage(BaseModel):
     id: Optional[str] = None
     timestamp: Optional[datetime] = None
 
-    # 子类必须实现 role 属性
-    @property
-    def role(self) -> str:
-        raise NotImplementedError
-
 # =====================
 # 纯文本用户消息
 # =====================
@@ -27,9 +22,7 @@ class UserMessage(BaseMessage):
     """
     用户的普通文本消息。
     """
-    @property
-    def role(self):
-        return 'user'
+    role: Literal["user"] = "user"
 
 # =====================
 # 纯文本助手消息
@@ -38,9 +31,7 @@ class AssistantMessage(BaseMessage):
     """
     助手的普通文本消息。
     """
-    @property
-    def role(self):
-        return 'assistant'
+    role: Literal["assistant"] = "assistant"
 
 # =====================
 # 工具调用消息（助手发起）
@@ -51,10 +42,7 @@ class AssistantToolMessage(BaseMessage):
     """
     tool_calls: List[Dict[str, Any]]
     content: Optional[Union[str, List[dict]]] = None  # 使 content 成为可选字段
-    
-    @property
-    def role(self):
-        return 'assistant'
+    role: Literal["assistant"] = "assistant"
 
 # =====================
 # 工具调用结果消息（工具响应，回复 AssistantToolMessage）
@@ -67,10 +55,7 @@ class UserToolMessage(BaseMessage):
     tool_call_id: str  # 确保这是必需的字段
     name: str
     content: Any  # 使用 Any 类型，因为工具返回的内容可能是任何类型
-    
-    @property
-    def role(self):
-        return 'tool'
+    role: Literal["tool"] = "tool"
 
 # =====================
 # 图片消息
@@ -83,7 +68,7 @@ class ImageMessage(BaseModel):
     id: Optional[str] = None
     timestamp: Optional[datetime] = None
     image_path: str
-    role: str = "image"  # 直接加字段，默认值为 image
+    role: Literal["image"] = "image"
 
 # =====================
 # 类型提示用 Union

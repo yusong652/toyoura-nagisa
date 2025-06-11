@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, ChatRequest, ChatResponse, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, load_all_message_history
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
@@ -144,7 +144,7 @@ async def get_session_history(session_id: str):
             raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
         
         # 加载指定会话的历史记录
-        history = load_history(session_id)
+        history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         return {
@@ -232,7 +232,7 @@ async def handle_llm_response(
         # 创建包含所有工具调用的消息
         tool_calls_msg = message_factory({
             "role": "assistant",
-            "content": None,
+            "content": "",
             "tool_calls": [
                 {
                     "id": tool_call['id'],
@@ -300,12 +300,12 @@ async def handle_llm_response(
     elif llm_response.response_type == ResponseType.TEXT:
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         # 使用新的消息处理器处理AI文本消息，使用原始的history_msgs而不是recent_msgs
-        loaded_history = load_history(session_id)
+        loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
         ai_msg_id, _ = process_ai_text_message(
             llm_response.content,
             llm_response.keyword,
-            history_msgs,  # 使用history_msgs而不是recent_msgs
+            history_msgs,
             session_id
         )
         # 发送消息ID
@@ -367,12 +367,7 @@ async def chat_stream_endpoint(request: Request):
     user_msg = process_user_message(parsed_data)
     history_msgs.append(user_msg)
     # 保存用户消息到历史记录
-    save_history(session_id, [{
-        **msg.model_dump(),
-        'role': msg.role,
-        'tool_call_id': getattr(msg, 'tool_call_id', None),  # 确保保存 tool_call_id
-        'name': getattr(msg, 'name', None)  # 确保保存 name
-    } for msg in history_msgs])
+    save_history(session_id, history_msgs)
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     try:

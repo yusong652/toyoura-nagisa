@@ -53,16 +53,15 @@ def process_user_message(parsed_data: dict) -> UserMessage:
 def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, AssistantMessage]:
     """处理AI文本消息，保存历史记录并返回消息ID和消息对象"""
     ai_msg_id = str(uuid.uuid4())
+    # 确保 response_text 不为 None
+    response_text = response_text or ""
     content = f"{response_text}[[{keyword}]]" if keyword else response_text
     ai_msg = AssistantMessage(
         content=content,
         id=ai_msg_id
     )
     history_msgs.append(ai_msg)
-    save_history(session_id, [{
-        **msg.model_dump(),
-        'role': msg.role
-    } for msg in history_msgs])
+    save_history(session_id, history_msgs)
     return ai_msg_id, ai_msg
 
 def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:
