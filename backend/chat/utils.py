@@ -225,7 +225,7 @@ def delete_message(session_id: str, message_id: str) -> bool:
         bool: 是否成功删除
     """
     try:
-        session_history = load_history(session_id)
+        session_history = load_all_message_history(session_id)
         if not session_history:
             return False
         # 删除消息
