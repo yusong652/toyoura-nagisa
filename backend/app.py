@@ -232,7 +232,7 @@ async def handle_llm_response(
         # 创建包含所有工具调用的消息
         tool_calls_msg = message_factory({
             "role": "assistant",
-            "content": None,
+            "content": "",
             "tool_calls": [
                 {
                     "id": tool_call['id'],

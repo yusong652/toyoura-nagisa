@@ -377,13 +377,19 @@ class AnthropicClient(LLMClientBase):
         debug = self.extra_config.get('debug', False)
         try:
             system_prompt = get_models_lab_config().get("text_to_image_system_prompt", "")
-            if not system_prompt and debug:
-                print("[text_to_image] Warning: Empty system prompt for text-to-image generation")
+            if not system_prompt:
+                error_msg = "Empty system prompt for text-to-image generation"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                return None
 
             # 获取最新的对话消息
             latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
-            if (not latest_messages[0] or not latest_messages[1]) and debug:
-                print(f"[text_to_image] Warning: Missing conversation context for session {session_id}")
+            if not latest_messages[0] or not latest_messages[1]:
+                error_msg = f"Missing conversation context for session {session_id}"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                return None
             
             # 构造消息序列
             messages = []
@@ -400,26 +406,64 @@ class AnthropicClient(LLMClientBase):
                 print("\n[text_to_image] Messages for prompt generation:")
                 import pprint; pprint.pprint(messages_for_llm)
             
+            # 添加请求前的日志
+            if debug:
+                print("\n[text_to_image] Sending request to Anthropic API with:")
+                print(f"Model: {self.extra_config.get('model', 'claude-3-5-sonnet-20241022')}")
+                print(f"System prompt length: {len(system_prompt)}")
+                print(f"Messages count: {len(messages_for_llm)}")
+            
             response = self.anthropic_client.messages.create(
-                model=self.extra_config.get("model", "claude-3-5-sonnet-20241022"),
-                max_tokens=500,
+                model=self.extra_config.get("model", "claude-3-5-sonnet-20241022"), 
+                max_tokens=4096,
                 messages=messages_for_llm,
                 system=system_prompt,
-                temperature=0.7
-            )
+                temperature=0.7)
             
-            if not response.content:
+            
+            # 添加响应检查
+            if not response:
+                error_msg = "Empty response from Anthropic API"
                 if debug:
-                    print("[text_to_image] Error: Empty response from LLM for prompt generation")
+                    print(f"[text_to_image] Error: {error_msg}")
                 return None
                 
-            prompt_text = ""
-            for content_item in response.content:
-                if content_item.type == "text":
-                    prompt_text += content_item.text
+            if not hasattr(response, 'content'):
+                error_msg = "Response missing content attribute"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                    print(f"Response object: {response}")
+                return None
+                
+            if not response.content:
+                error_msg = "Empty content in response"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                    print(f"Response object: {response}")
+                return None
             
             if debug:
-                print("\n[text_to_image] Raw LLM response for prompt generation:")
+                print("\n[text_to_image] Raw response from Anthropic API:")
+                print(response)
+            
+            prompt_text = ""
+            for content_item in response.content:
+                if hasattr(content_item, 'type') and content_item.type == "text":
+                    if hasattr(content_item, 'text'):
+                        prompt_text += content_item.text
+                    else:
+                        if debug:
+                            print(f"[text_to_image] Warning: Content item missing text attribute: {content_item}")
+            
+            if not prompt_text:
+                error_msg = "No text content found in response"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                    print(f"Response content items: {response.content}")
+                return None
+            
+            if debug:
+                print("\n[text_to_image] Extracted prompt text:")
                 print(prompt_text)
             
             # 解析输出格式
@@ -427,13 +471,21 @@ class AnthropicClient(LLMClientBase):
             negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
             
             if not text_prompt_match:
+                error_msg = "Failed to extract text prompt from response"
                 if debug:
-                    print("[text_to_image] Error: Failed to extract text prompt from response")
-                    print("[text_to_image] Response did not contain expected <text_to_image_prompt> tags")
+                    print(f"[text_to_image] Error: {error_msg}")
+                    print(f"Response did not contain expected <text_to_image_prompt> tags")
+                    print(f"Full prompt text: {prompt_text}")
                 return None
                 
             text_prompt = text_prompt_match.group(1).strip()
             negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+            
+            if not text_prompt:
+                error_msg = "Extracted text prompt is empty"
+                if debug:
+                    print(f"[text_to_image] Error: {error_msg}")
+                return None
             
             if debug:
                 print("\n[text_to_image] Generated prompts:")
