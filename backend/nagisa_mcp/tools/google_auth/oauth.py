@@ -15,7 +15,7 @@ SCOPES = [
     
 ]
 
-def get_credentials(email, tokens_dir=None, credentials_path=None):
+def get_credentials(email, tokens_dir=None):
     """
     Load OAuth2 credentials for the given email from the tokens directory.
     If token does not exist, raise FileNotFoundError.
