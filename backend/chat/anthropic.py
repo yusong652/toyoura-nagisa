@@ -408,12 +408,12 @@ class AnthropicClient(LLMClientBase):
             # 添加请求前的日志
             if debug:
                 print("\n[text_to_image] Sending request to Anthropic API with:")
-                print(f"Model: {self.extra_config.get('model', 'claude-3-5-sonnet-20241022')}")
+                print(f"Model: {self.extra_config.get('model_for_text_to_image', 'claude-3-5-sonnet-20241022')}")
                 print(f"System prompt length: {len(system_prompt)}")
                 print(f"Messages count: {len(messages_for_llm)}")
             
             response = self.anthropic_client.messages.create(
-                model=self.extra_config.get("model", "claude-3-5-sonnet-20241022"), 
+                model=self.extra_config.get("model_for_text_to_image", "claude-3-5-sonnet-20241022"), 
                 max_tokens=4096,
                 messages=messages_for_llm,
                 system=system_prompt,

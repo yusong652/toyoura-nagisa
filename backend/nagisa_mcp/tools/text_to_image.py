@@ -50,7 +50,7 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
                 endpoint,
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=60.0
+                timeout=120.0
             )
             if debug:
                 print(f"[text_to_image] Response status: {response.status_code}")
@@ -59,7 +59,7 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             result = response.json()
             status = result.get("status")
             
-            # 如果第一次请求就成功
+            # 无论第一次请求是否成功，都需要进入fetch流程
             if status == "success" and "output" in result and result["output"]:
                 return {
                     "type": "image_url",
@@ -104,7 +104,7 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
                             print(f"[text_to_image] Error or unexpected fetch status: {fetch_status}, message: {fetch_result.get('messeg', fetch_result.get('message', ''))}")
                         return {
                             "type": "error",
-                            "message": fetch_result.get("messeg") or fetch_result.get("message") or "Image generation failed, please try again."
+                            "message": fetch_result.get("messege") or fetch_result.get("message") or "Image generation failed, please try again."
                         }
                 
                 if debug:
