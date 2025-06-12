@@ -20,22 +20,22 @@ def register_contact_tools(mcp: FastMCP):
         max_contacts: int = Field(100, description="Maximum number of contacts to retrieve")
     ) -> List[dict]:
         """
-        Retrieve contacts from Google Contacts API using OAuth2 authentication.
+            Retrieve contacts from Google Contacts API using OAuth2 authentication.
 
-        The account is determined by the AI_GMAIL_ADDRESS environment variable.
+            The account is determined by the AI_GMAIL_ADDRESS environment variable.
 
         Args:
-            max_contacts (int): Maximum number of contacts to retrieve. Default is 100.
+                max_contacts (int): Maximum number of contacts to retrieve. Default is 100.
 
         Returns:
-            List[dict]: A list of contact dictionaries. Each dictionary contains:
-                - id (str): Contact's unique identifier
-                - name (str): Contact's display name
-                - emails (List[str]): List of contact's email addresses
-                - phones (List[str]): List of contact's phone numbers
-            If an error occurs, returns a list with a single dictionary containing:
-                - error (str): Error message
-                - timestamp (str): ISO format timestamp
+                List[dict]: A list of contact dictionaries. Each dictionary contains:
+                    - id (str): Contact's unique identifier
+                    - name (str): Contact's display name
+                    - emails (List[str]): List of contact's email addresses
+                    - phones (List[str]): List of contact's phone numbers
+                If an error occurs, returns a list with a single dictionary containing:
+                    - error (str): Error message
+                    - timestamp (str): ISO format timestamp
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")
@@ -43,14 +43,13 @@ def register_contact_tools(mcp: FastMCP):
                 return [{"error": "AI_GMAIL_ADDRESS environment variable not set", "timestamp": datetime.now().isoformat()}]
             
             service = build_google_contacts_service(nagisa_email)
-            
             # Get the list of connections (contacts)
             results = service.people().connections().list(
                 resourceName='people/me',
-                pageSize=max_contacts,
+                        pageSize=max_contacts,
                 personFields='names,emailAddresses,phoneNumbers'
             ).execute()
-            
+        
             contacts = []
             if 'connections' in results:
                 for person in results['connections']:
@@ -77,8 +76,8 @@ def register_contact_tools(mcp: FastMCP):
                         contact['phones'] = [phone['value'] for phone in person['phoneNumbers']]
                     
                     contacts.append(contact)
-            
-            return contacts
+                return contacts
+        
         except Exception as e:
             return [{
                 "error": f"Failed to retrieve contacts: {str(e)}",
@@ -91,23 +90,23 @@ def register_contact_tools(mcp: FastMCP):
         max_results: int = Field(100, description="Maximum number of results to return")
     ) -> List[dict]:
         """
-        Search contacts in Google Contacts API using OAuth2 authentication.
+            Search contacts in Google Contacts API using OAuth2 authentication.
 
-        The account is determined by the AI_GMAIL_ADDRESS environment variable.
+            The account is determined by the AI_GMAIL_ADDRESS environment variable.
 
         Args:
-            query (str): Search query for contacts (name, relationship, email, or phone).
-            max_results (int): Maximum number of results to return. Default is 100.
+                query (str): Search query for contacts (name, relationship, email, or phone).
+                max_results (int): Maximum number of results to return. Default is 100.
 
         Returns:
-            List[dict]: A list of matching contact dictionaries. Each dictionary contains:
-                - id (str): Contact's unique identifier
-                - name (str): Contact's display name
-                - emails (List[str]): List of contact's email addresses
-                - phones (List[str]): List of contact's phone numbers
-            If an error occurs, returns a list with a single dictionary containing:
-                - error (str): Error message
-                - timestamp (str): ISO format timestamp
+                List[dict]: A list of matching contact dictionaries. Each dictionary contains:
+                    - id (str): Contact's unique identifier
+                    - name (str): Contact's display name
+                    - emails (List[str]): List of contact's email addresses
+                    - phones (List[str]): List of contact's phone numbers
+                If an error occurs, returns a list with a single dictionary containing:
+                    - error (str): Error message
+                    - timestamp (str): ISO format timestamp
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")
@@ -115,11 +114,10 @@ def register_contact_tools(mcp: FastMCP):
                 return [{"error": "AI_GMAIL_ADDRESS environment variable not set", "timestamp": datetime.now().isoformat()}]
             
             service = build_google_contacts_service(nagisa_email)
-            
             # Search for contacts
             results = service.people().searchContacts(
                 query=query,
-                pageSize=max_results,
+                        pageSize=max_results,
                 readMask='names,emailAddresses,phoneNumbers'
             ).execute()
             
@@ -150,8 +148,8 @@ def register_contact_tools(mcp: FastMCP):
                         contact['phones'] = [phone['value'] for phone in person['phoneNumbers']]
                     
                     contacts.append(contact)
-            
-            return contacts
+            return contacts 
+        
         except Exception as e:
             return [{
                 "error": f"Failed to search contacts: {str(e)}",

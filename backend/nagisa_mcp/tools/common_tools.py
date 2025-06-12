@@ -17,23 +17,20 @@ def register_common_tools(mcp: FastMCP):
 
     @mcp.tool()
     def get_weather(
-        city: str = Field(..., description="The city name in English, e.g. 'London' (do not use non-English names)"),
-        unit: str = Field("metric", description="'metric' for Celsius, 'imperial' for Fahrenheit")
+        city: str = Field(..., description="The city name in English, e.g. 'London' (do not use non-English names)")
     ) -> dict:
         """
-        Get the current weather for a city using the OpenWeatherMap API.
+        Get the current weather for a city (in Celsius).
 
         Args:
             city: The city name in English, e.g. 'London'.
-            Note: The 'city' parameter must be provided in English (e.g., 'London').
-            unit: 'metric' for Celsius, 'imperial' for Fahrenheit.
 
         Returns:
-            A dictionary with weather information (temperature, description, etc.)
+            dict: A dictionary with weather information (temperature in Celsius, description, etc.)
         """
         API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
         print(city)
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units={unit}"
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
         try:
             resp = requests.get(url, timeout=10)
             if resp.status_code == 200:
@@ -53,14 +50,12 @@ def register_common_tools(mcp: FastMCP):
     @mcp.tool()
     def get_location() -> dict:
         """
-        Get the public IP geolocation information of the current server.
+        Get the current geographical location information.
 
-        This tool uses the server's public IP to call a third-party API (such as ip-api.com) to obtain geolocation.
-        The returned content includes city name, latitude, longitude, etc.
-        In the future, this can be extended to frontend geolocation (such as browser or mobile device location).
+        Returns a dictionary containing location details including city name, coordinates, country, and region.
 
         Returns:
-            A dictionary containing geolocation information, for example:
+            dict: A dictionary containing geographical information, for example:
             {
                 "city": "Beijing",
                 "latitude": 39.9042,
