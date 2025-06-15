@@ -9,8 +9,11 @@ from backend.tts.base import BaseTTS
 from backend.chat.title_generator import generate_conversation_title
 from backend.config import get_llm_config
 from backend.chat.models import message_factory, AssistantMessage, UserToolMessage, UserMessage, AssistantToolMessage, BaseMessage
+from backend.memory import MemoryManager
 from typing import Any
 
+# 初始化MemoryManager
+memory_manager = MemoryManager()
 
 def parse_message_data(data: dict) -> tuple:
     """解析消息数据，返回消息内容和会话ID"""
@@ -40,18 +43,45 @@ def parse_message_data(data: dict) -> tuple:
         'id': msg_id  # 修复：返回id字段
     }, data.get('session_id', "default_session")
 
-def process_user_message(parsed_data: dict) -> UserMessage:
-    """处理用户消息，创建并返回消息对象"""
+def process_user_message(parsed_data: dict, session_id: str, history_msgs: list) -> UserMessage:
+    """处理用户消息，创建并返回消息对象，同时保存到历史记录和向量数据库"""
     timestamp = parsed_data.get('timestamp')
     user_msg = UserMessage(
         content=parsed_data['content'],
         timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
         id=parsed_data.get('id')  # 使用前端传来的ID
     )
+    # 保存到历史记录
+    history_msgs.append(user_msg)
+    save_history(session_id, history_msgs)
+    
+    # 保存到向量数据库
+    # 只提取纯文本内容
+    text_content = ""
+    if isinstance(user_msg.content, list):
+        for item in user_msg.content:
+            if isinstance(item, dict) and "text" in item:
+                text_content += item["text"] + " "
+    elif isinstance(user_msg.content, str):
+        text_content = user_msg.content
+    
+    # 只有当有纯文本内容时才保存到向量数据库
+    if text_content.strip():
+        memory_manager.add_conversation_memory(
+            user_id="default",
+            conversation_id=session_id,
+            content=text_content.strip(),
+            additional_metadata={
+                "message_id": user_msg.id,
+                "timestamp": user_msg.timestamp.isoformat(),
+                "type": "user_message"
+            }
+        )
+    
     return user_msg
 
 def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, AssistantMessage]:
-    """处理AI文本消息，保存历史记录并返回消息ID和消息对象"""
+    """处理AI文本消息，保存历史记录和向量数据库，并返回消息ID和消息对象"""
     ai_msg_id = str(uuid.uuid4())
     # 确保 response_text 不为 None
     response_text = response_text or ""
@@ -62,6 +92,20 @@ def process_ai_text_message(response_text: str, keyword: str, history_msgs: list
     )
     history_msgs.append(ai_msg)
     save_history(session_id, history_msgs)
+    
+    # 保存到向量数据库
+    memory_manager.add_conversation_memory(
+        user_id="default",
+        conversation_id=session_id,
+        content=response_text.strip(),
+        additional_metadata={
+            "message_id": ai_msg_id,
+            "timestamp": datetime.now().isoformat(),
+            "type": "ai_message",
+            "keyword": keyword
+        }
+    )
+    
     return ai_msg_id, ai_msg
 
 def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:

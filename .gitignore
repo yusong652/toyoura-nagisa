@@ -58,6 +58,7 @@ backend/__pycache__/
 backend/data/
 backend/tts/data/
 backend/prompts/
+backend/memory_db/
 frontend/node_modules/
 backend/config.py
 workspace/

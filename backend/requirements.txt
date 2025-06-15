@@ -54,3 +54,6 @@ idna>=3.10
 google-auth>=2.0.0
 google-auth-oauthlib>=1.0.0
 googlemaps>=4.10.0
+
+# Vector Database
+chromadb>=0.4.22

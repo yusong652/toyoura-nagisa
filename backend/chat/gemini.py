@@ -8,9 +8,11 @@ from google.genai import types
 from backend.config import get_llm_specific_config
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
-from backend.chat.utils import parse_llm_output
+from backend.chat.utils import parse_llm_output, get_latest_two_messages
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
+from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
+from backend.config import get_models_lab_config
 
 class GeminiClient(LLMClientBase):
     """
@@ -140,7 +142,6 @@ class GeminiClient(LLMClientBase):
         
         Args:
             response: Raw response from Gemini API
-            
         Returns:
             LLMResponse object containing the formatted response
         """
@@ -159,14 +160,12 @@ class GeminiClient(LLMClientBase):
                             'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
                             'id': part.function_call.id or part.function_call.name  # 使用工具调用ID或函数名
                         })
-                
                 if tool_calls:
                     return LLMResponse(
                         content=natural_content,  # 优先用自然语言内容
                         response_type=ResponseType.FUNCTION_CALL,
                         tool_calls=tool_calls
                     )
-                
                 # 如果没有 function_call，返回文本响应
                 if natural_content:
                     response_text, keyword = parse_llm_output(natural_content)
@@ -191,8 +190,8 @@ class GeminiClient(LLMClientBase):
         config = types.GenerateContentConfig(
             system_instruction=self.system_prompt,
             safety_settings=self.safety_settings,
-            temperature=self.extra_config.get('temperature', 1.2),
-            max_output_tokens=self.extra_config.get('max_output_tokens', 1024),
+            temperature=self.extra_config.get('temperature', 2.0),
+            max_output_tokens=self.extra_config.get('max_output_tokens', 4096),
             tools=tool_schemas
         )
 
@@ -333,13 +332,118 @@ class GeminiClient(LLMClientBase):
         tools = types.Tool(function_declarations=function_declarations)
         return [tools]
 
-    async def handle_function_call(self, function_call: dict):
+    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
         """
-        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
+        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具。
+        对于需要 session_id 的工具（如 generate_image），由后端逻辑传递 session_id，避免 LLM 填写。
+        其余工具直接用 mcp_client 调用。
         function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
+        session_id: 可选的会话ID，用于需要会话上下文的工具
         """
         tool_name = function_call["name"]
         params = function_call.get("arguments", {})
+        # 需要 session_id 的工具
+        tools_need_session = {"generate_image"}
+        if tool_name in tools_need_session:
+            if not session_id:
+                return "Error: No session ID provided for this tool."
+            # generate_image 需要先生成 prompt，再调用图片生成
+            prompt_result = await self.generate_text_to_image_prompt(session_id)
+            if not prompt_result:
+                return "Error: Failed to generate image prompts."
+            try:
+                result = await generate_image_from_description(
+                    prompt=prompt_result["text_prompt"],
+                    negative_prompt=prompt_result["negative_prompt"]
+                )
+                if not result:
+                    return "Error: Image generation failed - empty result"
+                return result
+            except Exception as e:
+                return f"Error: Image generation failed - {str(e)}"
+        # 其余工具直接调用
         async with self.mcp_client as mcp_async_client:
             result = await mcp_async_client.call_tool(tool_name, params)
             return extract_text_from_mcp_result(result)
+
+    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
+        """
+        Generate a high-quality text-to-image prompt using the Gemini API.
+        This method uses a specialized system prompt to create detailed and effective prompts for image generation
+        based on the recent conversation context.
+        Args:
+            session_id: Optional session ID to get the latest conversation context
+        Returns:
+            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
+        """
+        debug = self.extra_config.get('debug', False)
+        try:
+            system_prompt = get_models_lab_config().get("text_to_image_system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
+            latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
+            if not latest_messages[0] or not latest_messages[1]:
+                if debug:
+                    print(f"[text_to_image] Error: Missing conversation context for session {session_id}")
+                return None
+            messages = []
+            if latest_messages[0] and latest_messages[1]:
+                conversation_text = f"Please generate text to image prompt based on the following conversation:\n\n{latest_messages[0].role}: {latest_messages[0].content}\n{latest_messages[1].role}: {latest_messages[1].content}"
+                messages.append(UserMessage(role="user", content=conversation_text))
+            contents = self._format_messages_for_gemini(messages)
+            safety_settings = self.safety_settings
+            prompt_config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                safety_settings=safety_settings,
+                temperature=1.2,
+                max_output_tokens=self.extra_config.get('max_output_tokens', 1024)
+            )
+            if debug:
+                print("\n[Gemini][text_to_image] System prompt:")
+                print(system_prompt)
+                print("[Gemini][text_to_image] Messages for prompt generation:")
+                import pprint; pprint.pprint(messages)
+                print("[Gemini][text_to_image] Formatted contents:")
+                pprint.pprint(contents)
+                print("[Gemini][text_to_image] Prompt config:")
+                pprint.pprint(prompt_config)
+            
+            response = self.client.models.generate_content(
+                model=self.extra_config.get("model_for_text_to_image", "gemini-2.5-flash-preview-05-20"),
+                contents=contents,
+                config=prompt_config
+            )
+            if debug:
+                print("[Gemini][text_to_image] Raw response:")
+                pprint.pprint(response)
+            if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
+                prompt_text = response.candidates[0].content.parts[0].text
+                if debug:
+                    print("[Gemini][text_to_image] Extracted prompt text:")
+                    print(prompt_text)
+                import re
+                text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
+                negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
+                if debug:
+                    print(f"[Gemini][text_to_image] text_prompt_match: {text_prompt_match}")
+                    print(f"[Gemini][text_to_image] negative_prompt_match: {negative_prompt_match}")
+                if not text_prompt_match:
+                    if debug:
+                        print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {prompt_text}")
+                    return None
+                text_prompt = text_prompt_match.group(1).strip()
+                negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+                if not text_prompt:
+                    if debug:
+                        print(f"[text_to_image] Error: Extracted text prompt is empty")
+                    return None
+                if debug:
+                    print(f"[Gemini][text_to_image] Final text_prompt: {text_prompt}")
+                    print(f"[Gemini][text_to_image] Final negative_prompt: {negative_prompt}")
+                return {
+                    "text_prompt": text_prompt,
+                    "negative_prompt": negative_prompt
+                }
+            return None
+        except Exception as e:
+            if debug:
+                print(f"[text_to_image] Error during prompt generation: {str(e)}")
+            return None

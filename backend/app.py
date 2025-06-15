@@ -41,6 +41,7 @@ from fastmcp import Client, Context
 import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.routes import images
+from backend.memory.memory_manager import MemoryManager
 
 
 # 加载环境变量
@@ -168,8 +169,12 @@ async def delete_session(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
         
-        # 删除会话
+        # 删除会话历史和元数据
         success = delete_session_data(session_id)
+        
+        # 删除向量数据库中的相关记忆
+        memory_manager = MemoryManager()
+        memory_manager.delete_conversation_memories(session_id)
         
         if not success:
             raise HTTPException(status_code=500, detail=f"删除会话 {session_id} 失败")
@@ -365,10 +370,7 @@ async def chat_stream_endpoint(request: Request):
     # 使用 load_all_message_history 来保存完整的消息历史
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    user_msg = process_user_message(parsed_data)
-    history_msgs.append(user_msg)
-    # 保存用户消息到完整的历史记录
-    save_history(session_id, history_msgs)
+    user_msg = process_user_message(parsed_data, session_id, history_msgs)
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     try:
