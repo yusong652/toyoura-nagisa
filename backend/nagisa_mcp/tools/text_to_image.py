@@ -43,7 +43,7 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             else:
                 endpoint = "https://modelslab.com/api/v6/images/text2img"
             max_retries = 20
-            retry_interval = 2  # seconds
+            retry_interval = 4  # seconds
             
             # 第一次POST发起生成
             response = await client.post(

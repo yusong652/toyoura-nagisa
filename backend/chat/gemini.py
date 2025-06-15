@@ -393,7 +393,7 @@ class GeminiClient(LLMClientBase):
             prompt_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 safety_settings=safety_settings,
-                temperature=1.2,
+                temperature=1.0,
                 max_output_tokens=self.extra_config.get('max_output_tokens', 1024)
             )
             if debug:
