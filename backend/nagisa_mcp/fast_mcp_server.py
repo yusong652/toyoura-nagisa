@@ -28,7 +28,7 @@ print(f"[DEBUG] Fast MCP Server initialized")
 # register_text_to_image_tool(mcp)
 # register_contact_tools(mcp)
 # register_places_tools(mcp)
-register_memory_tools(mcp)
+# register_memory_tools(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

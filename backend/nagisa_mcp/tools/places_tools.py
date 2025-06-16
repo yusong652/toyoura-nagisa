@@ -33,7 +33,7 @@ def register_places_tools(mcp: FastMCP):
     @mcp.tool()
     def search_places(
         query: str = Field(..., description="Search query for places (e.g., 'restaurant', 'Starbucks')"),
-        location: str = Field(..., description="Location coordinates in 'latitude,longitude' format (e.g., '40.7128,-74.0060')"),
+        location: str = Field(..., description="Location name or coordinates in 'latitude,longitude' format (e.g., '40.7128,-74.0060')"),
         radius: int = Field(5000, description="Search radius in meters (default: 5000)"),
         max_results: int = Field(5, description="Maximum number of results to return (default: 5)")
     ) -> List[dict]:
