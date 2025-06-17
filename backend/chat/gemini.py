@@ -50,14 +50,6 @@ class GeminiClient(LLMClientBase):
             )
         ]
         
-        # 初始化配置
-        self.config = types.GenerateContentConfig(
-            system_instruction=self.system_prompt,
-            safety_settings=self.safety_settings,
-            temperature=self.extra_config.get('temperature', 1.2),
-            max_output_tokens=self.extra_config.get('max_output_tokens', 500)
-        )
-        
         print(f"Gemini Client initialized.")
         # 集成 MCPClient
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
@@ -179,30 +171,98 @@ class GeminiClient(LLMClientBase):
             response_type=ResponseType.ERROR
         )
 
+    def _print_debug_request(self, contents, config):
+        print("\n========== Gemini API 请求消息格式 ==========")
+        print("Payload:")
+        import pprint; pprint.pprint({
+            "contents": contents,
+            "config": config
+        })
+        print("========== END ==========")
+
+    def _print_debug_response(self, response):
+        print("\n========== Gemini API 响应详情 ==========")
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                for part in candidate.content.parts:
+                    if not getattr(part, 'text', None):
+                        continue
+                    if getattr(part, 'thought', False):
+                        print("\n## **Thoughts summary:**")
+                        print(part.text)
+                        print()
+                    else:
+                        print("\n## **Answer:**")
+                        print(part.text)
+                        print()
+                    # 代码相关内容依然保留
+                    if hasattr(part, 'executable_code') and part.executable_code:
+                        print("\n可执行代码:")
+                        print(f"```python\n{part.executable_code.code}\n```")
+                        print("---")
+                    if hasattr(part, 'code_execution_result') and part.code_execution_result:
+                        print("\n代码执行结果:")
+                        print(f"```{part.code_execution_result.output}\n```")
+                        print("---")
+        # 打印 token 使用情况
+        if hasattr(response, 'usage_metadata'):
+            print("\nToken 使用情况:")
+            print(f"Prompt Tokens: {response.usage_metadata.prompt_token_count}")
+            print(f"Thoughts Tokens: {getattr(response.usage_metadata, 'thoughts_token_count', '-')}")
+            print(f"Output Tokens: {getattr(response.usage_metadata, 'candidates_token_count', '-')}")
+            print(f"Total Tokens: {response.usage_metadata.total_token_count}")
+        print("========== END ==========")
+
+    async def get_function_call_schemas(self):
+        """
+        获取所有工具的 schema，包括 MCP 工具和 Gemini 内置代码执行工具
+        Returns:
+            List[types.Tool]: 所有可用工具的 schema 列表
+        """
+        if not self.tools_enabled:
+            return []
+            
+        tools = []
+        # 1. 添加 MCP 工具
+        async with self.mcp_client as mcp_async_client:
+            mcp_tools = await mcp_async_client.list_tools()
+        function_declarations = [
+            {
+                "name": tool.name,
+                "description": getattr(tool, "description", ""),
+                "parameters": (lambda params: (params.update({"required": list(params["properties"].keys())}) if "properties" in params else None, params)[-1])(getattr(tool, "inputSchema", {"type": "object", "properties": {}}))
+            }
+            for tool in mcp_tools
+        ]
+        if function_declarations:
+            tools.append(types.Tool(function_declarations=function_declarations))
+        
+        # 2. 添加代码执行工具
+        # tools.append(types.Tool(code_execution=types.ToolCodeExecution()))
+        # tools.append(types.Tool(google_search=types.GoogleSearch()))
+        
+        return tools
+
     async def get_response(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:
-        # 1. 获取 MCP 工具 schema
+        # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
         tool_schemas = await self.get_function_call_schemas()
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = self._format_messages_for_gemini(messages)
-        
-        # 动态构造 config，把 tools 放进去
-        config = types.GenerateContentConfig(
+        config_kwargs = dict(
             system_instruction=self.system_prompt,
             safety_settings=self.safety_settings,
             temperature=self.extra_config.get('temperature', 2.0),
             max_output_tokens=self.extra_config.get('max_output_tokens', 4096),
             tools=tool_schemas
         )
+        if self.extra_config.get('model', "").startswith("gemini-2.5"):
+            config_kwargs["thinking_config"] = types.ThinkingConfig(include_thoughts=True)
+        config = types.GenerateContentConfig(**config_kwargs)
 
-        # 只保留一个调试信息块，由 config debug 控制
         if self.extra_config.get('debug', False):
-            print("\n========== Gemini API 请求消息格式 ==========")
-            print("Payload:")
-            import pprint; pprint.pprint({
-                "contents": contents,
-            })
-            print("========== END ==========")
+            self._print_debug_request(contents, config)
 
         try:
             response = self.client.models.generate_content(
@@ -210,6 +270,9 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config
             )
+            
+            if self.extra_config.get('debug', False):
+                self._print_debug_response(response)
             
             return self._format_llm_response(response)
             
@@ -312,26 +375,6 @@ class GeminiClient(LLMClientBase):
             "parameters": schema.get("inputSchema", {"type": "object", "properties": {}})
         }
 
-    async def get_function_call_schemas(self):
-        """
-        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini Tool 对象列表
-        """
-        if not self.tools_enabled:
-            return None
-            
-        async with self.mcp_client as mcp_async_client:
-            mcp_tools = await mcp_async_client.list_tools()
-        function_declarations = [
-            {
-                "name": tool.name,
-                "description": getattr(tool, "description", ""),
-                "parameters": (lambda params: (params.update({"required": list(params["properties"].keys())}) if "properties" in params else None, params)[-1])(getattr(tool, "inputSchema", {"type": "object", "properties": {}}))
-            }
-            for tool in mcp_tools
-        ]
-        tools = types.Tool(function_declarations=function_declarations)
-        return [tools]
-
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
         """
         处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具。
@@ -416,15 +459,8 @@ class GeminiClient(LLMClientBase):
                 pprint.pprint(response)
             if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
                 prompt_text = response.candidates[0].content.parts[0].text
-                if debug:
-                    print("[Gemini][text_to_image] Extracted prompt text:")
-                    print(prompt_text)
-                import re
                 text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
                 negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
-                if debug:
-                    print(f"[Gemini][text_to_image] text_prompt_match: {text_prompt_match}")
-                    print(f"[Gemini][text_to_image] negative_prompt_match: {negative_prompt_match}")
                 if not text_prompt_match:
                     if debug:
                         print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {prompt_text}")
