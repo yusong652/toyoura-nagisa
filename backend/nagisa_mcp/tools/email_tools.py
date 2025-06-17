@@ -30,6 +30,39 @@ def register_email_tools(mcp: FastMCP):
     """Register Gmail API based email tools to MCP (OAuth2 version)"""
     
     @mcp.tool()
+    def get_user_email() -> dict:
+        """
+        Get the user's email address from environment variables.
+
+        Returns:
+            dict: A dictionary with the following keys:
+                - status (str): "success" or "error"
+                - email (str): User's email address if found
+                - message (str): Success message or error description
+                - timestamp (str): ISO format timestamp of the operation
+        """
+        try:
+            user_email = os.getenv("USER_GMAIL_ADDRESS")
+            if not user_email:
+                return {
+                    "status": "error",
+                    "message": "USER_GMAIL_ADDRESS environment variable not set",
+                    "timestamp": datetime.now().isoformat()
+                }
+            return {
+                "status": "success",
+                "email": user_email,
+                "message": "Successfully retrieved user email address",
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to get user email: {str(e)}",
+                "timestamp": datetime.now().isoformat()
+            }
+
+    @mcp.tool()
     def send_email(
         subject: str = Field(..., description="Email subject"),
         body: str = Field(..., description="Email body content"),

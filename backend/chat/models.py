@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any, Union, Literal # 导入类型提�
 from datetime import datetime # 导入 datetime 模块
 from enum import Enum
 import json
+from backend.utils.text_clean import extract_response_without_think
 
 # =====================
 # 消息模型基类
@@ -101,7 +102,11 @@ def message_factory(data: dict) -> BaseMessage:
             timestamp=data.get('timestamp')
         )
     elif 'tool_calls' in data:
-        return AssistantToolMessage(**{k: v for k, v in data.items() if k != 'role'})
+        # AssistantToolMessage 也需要过滤 content
+        filtered_data = {k: v for k, v in data.items() if k != 'role'}
+        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
+            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
+        return AssistantToolMessage(**filtered_data)
     
     # Check for tool_use in content
     if isinstance(data.get('content'), list):
@@ -123,7 +128,10 @@ def message_factory(data: dict) -> BaseMessage:
     # Then check for regular messages based on role
     role = data.get('role')
     if role == 'assistant':
-        return AssistantMessage(**{k: v for k, v in data.items() if k != 'role'})
+        filtered_data = {k: v for k, v in data.items() if k != 'role'}
+        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
+            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
+        return AssistantMessage(**filtered_data)
     elif role == 'user':
         return UserMessage(**{k: v for k, v in data.items() if k != 'role'})
     else:

@@ -237,7 +237,7 @@ async def handle_llm_response(
         # 创建包含所有工具调用的消息
         tool_calls_msg = message_factory({
             "role": "assistant",
-            "content": "",
+            "content": llm_response.content,
             "tool_calls": [
                 {
                     "id": tool_call['id'],
@@ -307,7 +307,7 @@ async def handle_llm_response(
         # 使用新的消息处理器处理AI文本消息，使用原始的history_msgs而不是recent_msgs
         loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-        ai_msg_id, _ = process_ai_text_message(
+        ai_msg_id, processed_content = process_ai_text_message(
             llm_response.content,
             llm_response.keyword,
             history_msgs,
@@ -319,7 +319,7 @@ async def handle_llm_response(
         if llm_response.keyword:
             yield f"data: {json.dumps({'keyword': llm_response.keyword})}\n\n"
         # 新增：表情/颜文字占位处理
-        text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(llm_response.content)
+        text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(processed_content)
         # 分句用占位符文本
         sentences = split_text_by_punctuations(text_with_placeholders)
         for sentence in sentences:

@@ -3,7 +3,6 @@ import base64
 import asyncio
 import uuid
 from datetime import datetime
-from backend.chat import Message
 from backend.chat.utils import get_all_sessions, update_session_title, save_history, load_history
 from backend.tts.base import BaseTTS
 from backend.chat.title_generator import generate_conversation_title
@@ -11,6 +10,8 @@ from backend.config import get_llm_config
 from backend.chat.models import message_factory, AssistantMessage, UserToolMessage, UserMessage, AssistantToolMessage, BaseMessage
 from backend.memory import MemoryManager
 from typing import Any
+import re
+from backend.utils.text_clean import extract_response_without_think
 
 # 初始化MemoryManager
 memory_manager = MemoryManager()
@@ -80,8 +81,8 @@ def process_user_message(parsed_data: dict, session_id: str, history_msgs: list)
     
     return user_msg
 
-def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, AssistantMessage]:
-    """处理AI文本消息，保存历史记录和向量数据库，并返回消息ID和消息对象"""
+def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
+    """处理AI文本消息，保存历史记录和向量数据库，并返回消息ID和处理后的消息内容"""
     ai_msg_id = str(uuid.uuid4())
     # 确保 response_text 不为 None
     response_text = response_text or ""
@@ -92,12 +93,14 @@ def process_ai_text_message(response_text: str, keyword: str, history_msgs: list
     )
     history_msgs.append(ai_msg)
     save_history(session_id, history_msgs)
-    
-    # 保存到向量数据库
+
+    # 用 extract_response_without_think 处理 response_text
+    processed_content = extract_response_without_think(ai_msg.content)
+    # 保存到向量数据库时也只存储去除<thinking>标签后的内容
     memory_manager.add_conversation_memory(
         user_id="default",
         conversation_id=session_id,
-        content=response_text.strip(),
+        content=processed_content.strip(),
         additional_metadata={
             "message_id": ai_msg_id,
             "timestamp": datetime.now().isoformat(),
@@ -105,8 +108,8 @@ def process_ai_text_message(response_text: str, keyword: str, history_msgs: list
             "keyword": keyword
         }
     )
-    
-    return ai_msg_id, ai_msg
+
+    return ai_msg_id, processed_content
 
 def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:
     """处理工具调用消息，创建并返回工具调用消息对象（不再追加到 history_msgs）"""
@@ -132,11 +135,6 @@ def process_tool_response_message(tool_call: dict, tool_result: Any) -> UserTool
         id=tool_call['id']
     )
     return tool_msg
-
-def process_llm_response(response_text: str, keyword: str, history_msgs: list, session_id: str) -> str:
-    """处理LLM响应，保存历史记录并返回AI消息ID"""
-    ai_msg_id, _ = process_ai_text_message(response_text, keyword, history_msgs, session_id)
-    return ai_msg_id
 
 async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
     """处理单个句子的TTS合成"""
@@ -201,3 +199,11 @@ async def generate_title_for_session(session_id: str, llm_client) -> str:
         
     title = await generate_conversation_title(latest_user_msg, latest_assistant_msg, llm_client)
     return title
+
+def extract_response_without_think(response_text: str) -> str:
+    """
+    提取 <thinking> 标签外部的内容，只返回 LLM 给用户的最终回复。
+    如果没有 <thinking> 标签，则返回原始内容。
+    """
+    # 移除 <thinking>...</thinking> 及其内容
+    return re.sub(r'<thinking>[\s\S]*?</thinking>', '', response_text, flags=re.IGNORECASE).strip()
