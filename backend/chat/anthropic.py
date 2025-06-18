@@ -486,6 +486,36 @@ class AnthropicClient(LLMClientBase):
                     print(f"[text_to_image] Error: {error_msg}")
                 return None
             
+            # 获取默认关键词
+            text_to_image_config = get_text_to_image_config()
+            default_positive_prompt = text_to_image_config.get("default_positive_prompt", "")
+            default_negative_prompt = text_to_image_config.get("default_negative_prompt", "")
+
+            # 检查并补充默认关键词
+            if default_positive_prompt:
+                # 用逗号分隔关键词
+                default_keywords = default_positive_prompt.split(",")
+                existing_keywords = text_prompt.split(",")
+                # 找出缺失的关键词
+                missing_keywords = [kw for kw in default_keywords if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]]
+                if missing_keywords:
+                    # 清理原始提示词
+                    text_prompt = text_prompt.strip().lstrip(",").strip()
+                    # 用逗号连接所有关键词
+                    text_prompt = ", ".join(missing_keywords) + (", " + text_prompt if text_prompt else "")
+
+            if default_negative_prompt:
+                # 用逗号分隔关键词
+                default_keywords = default_negative_prompt.split(",")
+                existing_keywords = negative_prompt.split(",")
+                # 找出缺失的关键词
+                missing_keywords = [kw for kw in default_keywords if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]]
+                if missing_keywords:
+                    # 清理原始提示词
+                    negative_prompt = negative_prompt.strip().lstrip(",").strip()
+                    # 用逗号连接所有关键词
+                    negative_prompt = ", ".join(missing_keywords) + (", " + negative_prompt if negative_prompt else "")
+            
             if debug:
                 print("\n[text_to_image] Generated prompts:")
                 print(f"Text prompt: {text_prompt}")
