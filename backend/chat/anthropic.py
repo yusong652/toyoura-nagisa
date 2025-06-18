@@ -10,7 +10,7 @@ import anthropic
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
-from backend.config import get_models_lab_config
+from backend.config import get_models_lab_config, get_text_to_image_config
 
 class AnthropicClient(LLMClientBase):
     """
@@ -377,7 +377,7 @@ class AnthropicClient(LLMClientBase):
         """
         debug = self.extra_config.get('debug', False)
         try:
-            system_prompt = get_models_lab_config().get("text_to_image_system_prompt", "")
+            system_prompt = get_text_to_image_config().get("system_prompt", "")
             if not system_prompt:
                 error_msg = "Empty system prompt for text-to-image generation"
                 if debug:
@@ -544,6 +544,7 @@ class AnthropicClient(LLMClientBase):
         debug = self.extra_config.get('debug', False)
 
         # Special handling for generate_image tool
+        
         if tool_name == "generate_image":
             if not session_id:
                 if debug:
