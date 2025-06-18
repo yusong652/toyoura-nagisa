@@ -93,28 +93,41 @@
 }
 
 .message-text {
-  color: var(--text-color);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 15px;
+  width: 100%;
   text-align: left;
+}
+
+.streaming-text {
+  display: block;
   width: 100%;
 }
 
-/* 流式文本渐变效果 */
-.streaming-text {
+.completed-text {
+  width: 100%;
   display: inline;
-  text-align: left;
 }
 
-.fade-in-char {
-  display: inline-block;
-  animation: fadeInChar 0.15s ease-out forwards;
-  opacity: 0;
+.fade-in-chunk {
+  animation: fadeIn 0.3s ease-in-out;
+  animation-fill-mode: both;
+  display: inline;
 }
 
-@keyframes fadeInChar {
+/* 确保 markdown 内容的一致性 */
+.message-text p,
+.completed-text p,
+.fade-in-chunk p {
+  margin: 0;
+  display: inline;
+}
+
+.message-text code,
+.completed-text code,
+.fade-in-chunk code {
+  white-space: pre-wrap;
+}
+
+@keyframes fadeIn {
   from {
     opacity: 0;
   }
@@ -129,7 +142,11 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 24px;
   text-align: left;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  padding: 4px 0;
 }
 
 .loading-spinner {
@@ -140,6 +157,7 @@
   height: 16px;
   animation: spin-breath 1s linear infinite;
   flex-shrink: 0;
+  will-change: transform;
 }
 
 .typing-text {
@@ -150,6 +168,8 @@
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
+  transition: opacity 0.2s ease;
+  min-width: 80px;
 }
 
 @keyframes spin-breath {

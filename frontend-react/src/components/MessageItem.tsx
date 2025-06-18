@@ -4,6 +4,7 @@ import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/ChatContext'
 import MessageToolState from './MessageToolState'
 import ImagePreview from './ImagePreview'
+import ReactMarkdown from 'react-markdown'
 
 interface MessageItemProps {
   message: Message
@@ -11,63 +12,60 @@ interface MessageItemProps {
   selectedMessageId: string | null
 }
 
+interface FileData {
+  type: string
+  data: string
+  name: string
+}
+
+interface ToolState {
+  // Add appropriate properties for ToolState
+}
+
 const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
-  const { sender, text, files, streaming, isLoading, status, id, toolState } = message
+  const { sender, text, files, streaming, isLoading, status, id, toolState, newText, onRenderComplete } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const textRef = useRef(text)
   const charIndexRef = useRef(0)
   const { deleteMessage } = useChat()
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [chunks, setChunks] = useState<string[]>([])
   
   // 检查当前消息是否被选中
   const isSelected = id && selectedMessageId === id
   
-  // 动态点号效果
+  // 处理文本更新
   useEffect(() => {
-    if (!isLoading) return
-    
-    const interval = setInterval(() => {
-      setDotCount(prev => (prev + 1) % 4)
-    }, 500)
-    
-    return () => clearInterval(interval)
-  }, [isLoading])
-  
-  // 流式显示文本
+    if (streaming && sender === 'bot') {
+      if (newText) {
+        // 添加新的文本块，同时更新完整文本
+        setChunks(prev => [...prev, newText])
+        setDisplayText(prev => prev + newText)
+        // 调用渲染完成回调
+        onRenderComplete?.()
+      }
+    } else {
+      // 非流式情况，直接设置文本
+      setDisplayText(text || '')
+      setChunks([])
+    }
+  }, [text, newText, streaming, sender, onRenderComplete])
+
+  // 处理加载动画
   useEffect(() => {
-    // 如果是加载中的消息，不处理文本
-    if (isLoading) return
-    
-    // 仅对机器人消息且标记为流式显示的消息应用效果
-    if (sender !== 'bot' || !streaming) {
-      setDisplayText(text)
-      return
+    let timer: number
+    if (isLoading || (streaming && sender === 'bot' && chunks.length === 0)) {
+      timer = window.setInterval(() => {
+        setDotCount(prev => (prev % 3) + 1)
+      }, 500)
     }
-    
-    // 如果文本发生变化，更新引用并重置字符索引
-    if (textRef.current !== text) {
-      textRef.current = text
-      // 只显示到当前索引，保留已显示的部分
-      const currentDisplayLength = Math.min(charIndexRef.current, text.length)
-      setDisplayText(text.substring(0, currentDisplayLength))
+    return () => {
+      if (timer) {
+        window.clearInterval(timer)
+      }
     }
-    
-    // 如果还有字符未显示，继续显示
-    if (charIndexRef.current < text.length) {
-      const interval = setInterval(() => {
-        if (charIndexRef.current < text.length) {
-          // 每次增加1个字符
-          charIndexRef.current += 1
-          setDisplayText(text.substring(0, charIndexRef.current))
-        } else {
-          clearInterval(interval)
-        }
-      }, 30) // 每30毫秒显示多个字符，比之前更快
-      
-      return () => clearInterval(interval)
-    }
-  }, [sender, text, streaming, isLoading])
+  }, [isLoading, streaming, sender, chunks.length])
   
   // 处理消息点击
   const handleMessageClick = (e: React.MouseEvent) => {
@@ -101,50 +99,32 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   
   // 为流式文本添加渐变效果
   const renderStreamingText = () => {
-    // 如果是加载中的消息，显示加载指示器
-    if (isLoading) {
+    if (!streaming || sender !== 'bot') {
       return (
-        <div className="typing-container">
-          <div className="loading-spinner"></div>
-          <div className="typing-text">正在输入{'.'.repeat(dotCount)}</div>
+        <div className="message-text">
+          <ReactMarkdown>{displayText}</ReactMarkdown>
         </div>
       )
     }
     
-    if (!streaming || sender !== 'bot') {
-      // 替换为一致的换行符处理方式，确保非流式渲染也正确显示换行
-      const textWithBreaks = displayText.split('\n').map((line, i) => (
-        <React.Fragment key={i}>
-          {line}
-          {i < displayText.split('\n').length - 1 && <br />}
-        </React.Fragment>
-      ));
-      return <div className="message-text">{textWithBreaks}</div>;
-    }
-    
-    // 将文本按换行符拆分，保留空行
-    const lines = displayText.split('\n');
+    // 流式渲染，使用完整文本进行渲染，但保持块级淡入效果
+    const renderedText = displayText
+    const lastChunkStart = renderedText.length - (chunks[chunks.length - 1]?.length || 0)
     
     return (
       <div className="message-text streaming-text">
-        {lines.map((line, lineIndex) => (
-          <React.Fragment key={`line-${lineIndex}`}>
-            {/* 渲染每个字符，添加渐变效果 */}
-            {line.split('').map((char, charIndex) => (
-              <span 
-                key={`${lineIndex}-${charIndex}`} 
-                className="fade-in-char"
-                style={{ 
-                  animationDelay: '0ms',
-                }}
-              >
-                {char}
-              </span>
-            ))}
-            {/* 在每行后添加换行，除了最后一行 */}
-            {lineIndex < lines.length - 1 && <br />}
-          </React.Fragment>
-        ))}
+        {/* 渲染已完成的部分 */}
+        {lastChunkStart > 0 && (
+          <div className="completed-text">
+            <ReactMarkdown>{renderedText.slice(0, lastChunkStart)}</ReactMarkdown>
+          </div>
+        )}
+        {/* 渲染最新的块 */}
+        {chunks.length > 0 && (
+          <div key={`chunk-${chunks.length}`} className="fade-in-chunk">
+            <ReactMarkdown>{renderedText.slice(lastChunkStart)}</ReactMarkdown>
+          </div>
+        )}
       </div>
     )
   }
