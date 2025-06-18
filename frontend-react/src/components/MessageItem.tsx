@@ -258,6 +258,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                   ))}
                 </div>
               )}
+              <span className="message-time">{formatTime(message.timestamp)}</span>
             </div>
           </div>
         ) : (
@@ -280,6 +281,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                 ))}
               </div>
             )}
+            <span className="message-time">{formatTime(message.timestamp)}</span>
           </div>
         )}
         
