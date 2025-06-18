@@ -13,11 +13,16 @@
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/material": "^5.15.12",
+    "@types/dompurify": "^3.0.5",
+    "@types/marked": "^5.0.2",
     "@types/uuid": "^10.0.0",
+    "dompurify": "^3.2.6",
+    "marked": "^15.0.12",
     "pixi-live2d-display": "0.5.0-beta",
     "pixi.js": "7.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

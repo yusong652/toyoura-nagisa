@@ -170,6 +170,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       localStorage.setItem('session_id', newSessionId);
       setCurrentSessionId(newSessionId);
       setMessages([]);
+
+      // 同步 TTS 状态到后端
+      try {
+        await fetch('/api/chat/tts-enabled', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ enabled: ttsEnabled }),
+        });
+      } catch (error) {
+        console.error('同步 TTS 状态失败:', error);
+      }
+
       await refreshSessions();
       setConnectionStatus(ConnectionStatus.CONNECTED);
       return newSessionId;
@@ -179,7 +193,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setConnectionError(error instanceof Error ? error.message : '创建新会话失败');
       throw error;
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError]);
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled]);
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -206,6 +220,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       localStorage.setItem('session_id', sessionId)
       setCurrentSessionId(sessionId)
+
+      // 同步 TTS 状态到后端
+      try {
+        await fetch('/api/chat/tts-enabled', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ enabled: ttsEnabled }),
+        });
+      } catch (error) {
+        console.error('同步 TTS 状态失败:', error);
+      }
       
       const historyResponse = await fetch(`/api/history/${sessionId}`)
       if (!historyResponse.ok) {
@@ -312,7 +339,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setConnectionError(error instanceof Error ? error.message : '切换会话失败');
       throw error;
     }
-  }, [connectionStatus, checkConnection, connectionError]);
+  }, [connectionStatus, checkConnection, connectionError, ttsEnabled]);
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -605,85 +632,162 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     response: Response, 
     userMessageId: string
   ) => {
+    // 直接添加一个Bot Message，初始状态为加载中
+    const botMessageId = uuidv4();
+    const botMessage = {
+      id: botMessageId,
+      sender: 'bot' as const,
+      text: '',
+      timestamp: Date.now(),
+      streaming: true,
+      isLoading: true,
+      toolState: undefined
+    };
+    setMessages(prev => [...prev, botMessage]);
+
     // 处理流式响应
-    const reader = response.body!.getReader()
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法读取响应流');
+    }
+
     const decoder = new TextDecoder()
     let buffer = ''
     let currentText = ''
     let currentKeyword: string | null = null
     let audioCount = 0
     let firstResponseReceived = false
-    let botMessageId = uuidv4() // 直接生成机器人消息ID
     let finalAiMessageId: string | null = null // 存储后端返回的最终AI消息ID
     
     // 标记是否正在播放音频，用于同步控制
     let isProcessingChunk = false
     // 音频队列 - 存储待处理的数据
-    let chunkQueue: {text: string, audio?: string}[] = []
+    let chunkQueue: {text: string, audio?: string, next?: any}[] = []
     
-    // 添加一个函数来处理下一个文字+音频chunk，确保顺序播放
-    const processNextChunk = async () => {
-      if (chunkQueue.length === 0 || isProcessingChunk) return;
+    // 处理文本和音频内容
+    const handleContentUpdate = (data: any) => {
+      if (!data) return;
       
-      isProcessingChunk = true;
-      const nextItem = chunkQueue.shift()!;
+      console.log(`收到新的文本和音频chunk:`, data);
       
-      try {
-        // 1. 先更新文本
-        if (nextItem.text) {
-          currentText += nextItem.text;
-          setMessages(prev => 
-            prev.map(msg => {
-              if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
-                // Create a new message object to ensure state updates trigger scroll
-                return { 
-                  ...msg, 
-                  text: currentText, 
-                  streaming: true,
-                  isLoading: false,
-                  // Add a small timestamp increment to force UI update
-                  timestamp: Date.now()
-                };
-              }
-              return msg;
-            })
-          );
+      // 将文本和音频作为一个完整的chunk添加到队列
+      chunkQueue.push({
+        text: data.text || '',
+        audio: data.audio,
+        next: data.next
+      });
+      
+      // 如果当前没有处理中的chunk，开始处理队列
+      if (!isProcessingChunk) {
+        console.log('当前没有正在处理的chunk，开始处理新的chunk');
+        isProcessingChunk = true;
+        processNextChunk(chunkQueue.shift()).catch(err => {
+          console.error('处理chunk队列时出错:', err);
+          isProcessingChunk = false;
+        });
+      } else {
+        console.log('当前有chunk正在处理，新chunk已加入队列，等待处理');
+      }
+    };
 
-          // 如果TTS被禁用，添加一个较短的延迟来模拟打字效果
-          if (!ttsEnabled) {
-            await new Promise(resolve => setTimeout(resolve, nextItem.text.length * 15));
+    // 处理一个chunk的文本和音频
+    const processNextChunk = async (chunk: any) => {
+      if (!chunk) {
+        isProcessingChunk = false;
+        return;
+      }
+
+      try {
+        // 处理文本 - 只有当有文本内容时才更新
+        if (chunk.text !== undefined && chunk.text !== null) {
+          // 过滤掉任何undefined或null值，确保文本是字符串
+          let newText = '';
+          if (typeof chunk.text === 'string') {
+            newText = chunk.text;
+          } else if (Array.isArray(chunk.text)) {
+            newText = chunk.text.filter((t: unknown) => typeof t === 'string').join('');
+          }
+
+          if (newText.length > 0) {
+            // 创建一个 Promise 来等待文本渲染完成
+            const renderPromise = new Promise<void>((resolve) => {
+              setMessages(prev => {
+                const newMessages = prev.map(msg => {
+                  if (msg.id === (finalAiMessageId || botMessageId)) {
+                    // 确保现有文本是字符串
+                    const existingText = typeof msg.text === 'string' ? msg.text : '';
+                    const updatedText = existingText + newText;
+                    return {
+                      ...msg,
+                      text: updatedText,
+                      newText, // 添加新文本用于流式渲染
+                      streaming: true,
+                      // 保持加载状态，直到收到足够的文本内容
+                      isLoading: updatedText.length < 10,
+                      onRenderComplete: resolve
+                    };
+                  }
+                  return msg;
+                });
+                return newMessages;
+              });
+            });
+
+            // 等待文本渲染完成
+            await renderPromise;
+            
+            // 添加小延迟以实现流式效果
+            await new Promise(resolve => setTimeout(resolve, 10));
           }
         }
-        
-        // 2. 如果有音频且TTS已启用，播放并等待完成
-        if (nextItem.audio && ttsEnabled) {
-          audioCount++;
-          console.log(`处理音频 #${audioCount}, 等待播放完成...`);
-          
-          // 确保等待音频真正播放完成
-          const audioResult = await processAudioData(nextItem.audio, audioCount);
-          console.log(`音频 #${audioCount} 播放完成, 结果: ${audioResult}`);
+
+        // 如果有音频且TTS已启用，使用音频队列系统播放
+        if (ttsEnabled && chunk.audio && typeof chunk.audio === 'string' && chunk.audio.length > 0) {
+          try {
+            console.log('开始处理音频...');
+            await processAudioData(chunk.audio, audioCount++);
+            console.log('音频处理完成');
+          } catch (error) {
+            console.error('音频处理失败:', error);
+          }
+        }
+
+        // 处理下一个chunk
+        if (chunk.next) {
+          await processNextChunk(chunk.next);
         } else {
-          // 如果没有音频或TTS被禁用，添加一个短暂停顿
-          await new Promise(resolve => setTimeout(resolve, 10));
+          // 检查队列中是否还有其他chunk
+          const nextChunk = chunkQueue.shift();
+          if (nextChunk) {
+            await processNextChunk(nextChunk);
+          } else {
+            // 所有chunk处理完成，更新消息状态
+            setMessages(prev => 
+              prev.map(msg => {
+                if (msg.id === (finalAiMessageId || botMessageId)) {
+                  // 确保最终文本是字符串
+                  const finalText = typeof msg.text === 'string' ? msg.text : '';
+                  return {
+                    ...msg,
+                    text: finalText,
+                    streaming: false,
+                    isLoading: false,
+                    id: finalAiMessageId || botMessageId,
+                    newText: undefined,
+                    onRenderComplete: undefined
+                  };
+                }
+                return msg;
+              })
+            );
+            isProcessingChunk = false;
+          }
         }
       } catch (error) {
         console.error('处理chunk时出错:', error);
-      } finally {
         isProcessingChunk = false;
-        // 继续处理下一个
-        processNextChunk();
       }
     };
-    
-    // 直接添加一个Bot Message，初始状态为加载中
-    setMessages(prev => [...prev, {
-      id: botMessageId,
-      sender: 'bot',
-      text: '',
-      timestamp: Date.now(),
-      isLoading: true // 初始显示为加载状态
-    }])
     
     // 处理标题更新事件
     const handleTitleUpdate = (data: any) => {
@@ -865,29 +969,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
-    // 处理文本和音频内容
-    const handleContentUpdate = (data: any) => {
-      if (data.text) {
-        console.log(`收到新的文本和音频chunk: ${data.text.length}字符${data.audio ? '，有音频' : '，无音频'}`);
-        
-        // 将文本和音频作为一个完整的chunk添加到队列
-        chunkQueue.push({
-          text: data.text,
-          audio: data.audio
-        });
-        
-        // 如果当前没有处理中的chunk，开始处理队列
-        if (!isProcessingChunk) {
-          console.log('当前没有正在处理的chunk，开始处理新的chunk');
-          processNextChunk().catch(err => {
-            console.error('处理chunk队列时出错:', err);
-          });
-        } else {
-          console.log('当前有chunk正在处理，新chunk已加入队列，等待处理');
-        }
-      }
-    };
-
     // 处理第一次响应
     const handleFirstResponse = (data: any) => {
       if (!firstResponseReceived && data.keyword) {
@@ -954,13 +1035,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // After streaming all sentences, only update isLoading and streaming flags
+        // After streaming all sentences, only update streaming flag
         setMessages(prev => 
           prev.map(msg => {
             if (msg.id === botMessageId || (finalAiMessageId && msg.id === finalAiMessageId)) {
               return { 
                 ...msg, 
-                isLoading: false,
                 streaming: false,
                 id: finalAiMessageId || botMessageId
               };
@@ -1000,7 +1080,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             const lastBotMessage = botMessages[botMessages.length - 1];
             return prev.map(msg => 
               msg.id === lastBotMessage.id 
-                ? { ...msg, text: `错误: 无法连接到服务器。请检查网络连接或稍后重试。`, isLoading: false } 
+                ? { ...msg, text: "错误: 无法连接到服务器。请检查网络连接或稍后重试。", isLoading: false }
                 : msg
             );
           }
@@ -1013,21 +1093,31 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     // 重置音频状态
     await resetAudioState()
     
-    // 添加用户消息，初始状态为正在发送
-    const userMessageId = addUserMessage(text, files)
+    // 创建用户消息
+    const userMessage: Message = {
+      id: uuidv4(),
+      sender: 'user',
+      text,
+      files,
+      timestamp: Date.now(),
+      status: MessageStatus.SENDING
+    }
+    
+    // 添加到消息列表
+    setMessages(prev => [...prev, userMessage])
     
     try {
       // 创建并发送API请求
-      const response = await createChatRequest(text, files, userMessageId)
+      const response = await createChatRequest(text, files, userMessage.id)
       
       // 处理流式响应
-      await processStreamResponse(response, userMessageId)
+      await processStreamResponse(response, userMessage.id)
     } catch (error) {
       console.error('Error sending message:', error)
       // 更新用户消息为错误状态
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === userMessageId
+          msg.id === userMessage.id
             ? { ...msg, status: MessageStatus.ERROR }
             : msg
         )
@@ -1039,17 +1129,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-  }, [
-    addUserMessage, 
-    resetAudioState, 
-    createChatRequest, 
-    processStreamResponse, 
-    connectionStatus, 
-    checkConnection, 
-    setConnectionStatus, 
-    setConnectionError,
-    ttsEnabled
-  ])
+  }, [connectionStatus, checkConnection, createChatRequest, processStreamResponse, resetAudioState, setConnectionStatus, setConnectionError])
 
   const clearChat = useCallback(() => {
     setMessages([])
@@ -1091,7 +1171,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       console.error('刷新标题失败:', error);
       throw error;
     }
-  }, []);
+  }, [setSessions]);
 
   // 一键生成图片
   const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
@@ -1109,30 +1189,30 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, []);
 
   return (
-    <ChatContext.Provider value={{ 
-      messages, 
-      isLoading, 
-      sessions, 
+    <ChatContext.Provider value={{
+      messages,
+      isLoading,
+      sessions,
       currentSessionId,
       connectionStatus,
       connectionError,
-      sendMessage, 
-      clearChat, 
-      createNewSession, 
-      switchSession, 
-      deleteSession, 
+      sendMessage,
+      clearChat,
+      createNewSession,
+      switchSession,
+      deleteSession,
       deleteMessage,
       refreshSessions,
       checkConnection,
       refreshTitle,
       toolState,
-      toolsEnabled,  // 添加工具开关状态
-      updateToolsEnabled,  // 添加更新工具状态的函数
-      generateImage, // 新增一键生成图片
+      toolsEnabled,
+      updateToolsEnabled,
+      generateImage,
       ttsEnabled,
-      updateTtsEnabled,
+      updateTtsEnabled
     }}>
       {children}
     </ChatContext.Provider>
   )
-} 
+}

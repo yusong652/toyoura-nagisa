@@ -8,6 +8,8 @@ export interface Message {
   status?: MessageStatus; // 用户消息状态
   isLoading?: boolean; // 标记是否为加载中的消息
   isRead?: boolean; // 标记用户消息是否已读
+  newText?: string; // 新增的文本部分，用于流式显示
+  onRenderComplete?: () => void; // 渲染完成的回调函数
   toolState?: {
     isUsingTool: boolean;
     toolName?: string;

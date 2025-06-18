@@ -274,12 +274,44 @@ class GeminiClient(LLMClientBase):
             if self.extra_config.get('debug', False):
                 self._print_debug_response(response)
             
+            # 检查响应中是否有错误
+            if hasattr(response, 'error'):
+                error_message = f"Gemini API error: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
+                print(f"[DEBUG] llm_response type: error")
+                print(f"[DEBUG] {error_message}")
+                return LLMResponse(
+                    content=error_message,
+                    response_type=ResponseType.ERROR
+                )
+            
+            # 检查响应是否为空
+            if not hasattr(response, 'candidates') or not response.candidates:
+                error_message = "Gemini API returned empty response"
+                print(f"[DEBUG] llm_response type: error")
+                print(f"[DEBUG] {error_message}")
+                return LLMResponse(
+                    content=error_message,
+                    response_type=ResponseType.ERROR
+                )
+            
             return self._format_llm_response(response)
             
         except Exception as e:
-            print(f"Gemini API error: {e}")
+            error_message = f"Gemini API error: {str(e)}"
+            print(f"[DEBUG] llm_response type: error")
+            print(f"[DEBUG] {error_message}")
+            if hasattr(e, 'status_code'):
+                error_message += f" (Status code: {e.status_code})"
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                try:
+                    error_details = json.loads(e.response.text)
+                    if 'error' in error_details:
+                        error_message += f"\nDetails: {error_details['error'].get('message', str(error_details))}"
+                except:
+                    error_message += f"\nRaw error: {e.response.text}"
+            
             return LLMResponse(
-                content=str(e),
+                content=error_message,
                 response_type=ResponseType.ERROR
             )
 
