@@ -69,6 +69,17 @@ class BaseTTS(ABC):
         """
         self.config = config
         self._is_ready = False
+        self._enabled = True  # 默认启用TTS
+    
+    @property
+    def enabled(self) -> bool:
+        """获取TTS引擎的启用状态"""
+        return self._enabled
+    
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
+        """设置TTS引擎的启用状态"""
+        self._enabled = value
     
     def clean_text(self, text: str) -> str:
         """清理文本中的颜文字和特殊符号

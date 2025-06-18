@@ -2,27 +2,25 @@ import React, { useState } from 'react';
 import './GenerateImageButton.css';
 import { useChat } from '../contexts/ChatContext';
 
-const CHECK_DISPLAY_TIME = 3600; // ms
-
 const GenerateImageButton: React.FC = () => {
   const { generateImage, currentSessionId, switchSession } = useChat();
   const [loading, setLoading] = useState(false);
-  const [showCheck, setShowCheck] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleClick = async () => {
     if (!currentSessionId) return;
     setLoading(true);
-    setShowCheck(false);
+    setShowSuccess(false);
     try {
       const res = await generateImage(currentSessionId);
-      setLoading(false);
       if (res.success) {
-        setShowCheck(true);
+        setShowSuccess(true);
         await switchSession(currentSessionId);
-        setTimeout(() => setShowCheck(false), CHECK_DISPLAY_TIME);
+        setTimeout(() => setShowSuccess(false), 2000);
       }
-      // No error UI
     } catch (e: any) {
+      console.error('Failed to generate image:', e);
+    } finally {
       setLoading(false);
     }
   };
@@ -30,27 +28,25 @@ const GenerateImageButton: React.FC = () => {
   return (
     <div className="generate-image-btn-wrapper">
       <button
-        className="generate-image-btn"
+        className={`generate-image-btn ${showSuccess ? 'generate-image-success' : ''}`}
         onClick={handleClick}
         disabled={loading || !currentSessionId}
-        aria-label="Generate Image"
-        title="Generate Image"
+        title="生成图片"
       >
         {loading ? (
-          <svg className="generate-image-spinner" width="22" height="22" viewBox="0 0 50 50">
-            <circle
-              className="generate-image-spinner-circle"
-              cx="25" cy="25" r="12" fill="none" stroke="#fff" strokeWidth="4" strokeDasharray="90 60" strokeLinecap="round"
-            />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="generate-image-spinner">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v2" />
           </svg>
-        ) : showCheck ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2ecc40" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 10.8 17 4 11" />
+        ) : showSuccess ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
           </svg>
         ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M16 4l4 4-12 12H4v-4L16 4z"/>
-            <path d="M15 9l-1 1"/>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
           </svg>
         )}
       </button>

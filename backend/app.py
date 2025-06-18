@@ -112,6 +112,9 @@ class GenerateTitleRequest(BaseModel):
 class UpdateToolsEnabledRequest(BaseModel):
     enabled: bool
 
+class UpdateTTSEnabledRequest(BaseModel):
+    enabled: bool
+
 class GenerateImageRequest(BaseModel):
     session_id: str
 
@@ -475,6 +478,22 @@ async def update_tools_enabled(request: UpdateToolsEnabledRequest):
         import traceback
         print(traceback.format_exc())  # 打印详细堆栈
         raise HTTPException(status_code=500, detail=f"更新工具状态失败: {str(e)}")
+
+@app.post("/api/chat/tts-enabled", response_model=dict)
+async def update_tts_enabled(request: UpdateTTSEnabledRequest):
+    """更新TTS引擎的enabled状态"""
+    try:
+        print(f"[DEBUG] /api/chat/tts-enabled received enabled: {request.enabled} (type: {type(request.enabled)})")
+        tts_engine: BaseTTS = app.state.tts_engine
+        tts_engine.enabled = request.enabled
+        return {
+            "success": True,
+            "tts_enabled": request.enabled
+        }
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"更新TTS状态失败: {str(e)}")
 
 @app.post("/api/generate-image", response_model=dict)
 async def generate_image_endpoint(request: GenerateImageRequest):

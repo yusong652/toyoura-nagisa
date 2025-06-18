@@ -71,4 +71,6 @@ export interface ChatContextType extends ChatState {
   toolsEnabled: boolean;
   updateToolsEnabled: (enabled: boolean) => Promise<void>;
   generateImage: (sessionId: string) => Promise<{ success: boolean; image_path?: string; error?: string }>;
+  ttsEnabled: boolean;
+  updateTtsEnabled: (enabled: boolean) => Promise<void>;
 } 

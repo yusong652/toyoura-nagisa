@@ -3,6 +3,7 @@ import { useChat } from '../contexts/ChatContext'
 import MessageItem from './MessageItem.tsx'
 import './ChatBox.css'
 import GenerateImageButton from './GenerateImageButton'
+import TTSControl from './TTSControl'
 
 const ChatBox: React.FC = () => {
   const { messages, sessions, currentSessionId, refreshTitle } = useChat()
@@ -129,8 +130,10 @@ const ChatBox: React.FC = () => {
           {/* Add scroll anchor element that will always be at the bottom */}
           <div className="scroll-anchor"></div>
         </div>
-        {/* Generate Image Button (absolute in chatbox-container) */}
-        <GenerateImageButton />
+        <div className="chatbox-controls">
+          <TTSControl />
+          <GenerateImageButton />
+        </div>
         {/* 添加固定的底部阴影 */}
         <div className="chatbox-bottom-shadow"></div>
       </div>

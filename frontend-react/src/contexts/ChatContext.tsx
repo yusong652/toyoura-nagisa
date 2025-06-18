@@ -36,6 +36,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   } | null>(null);
   // 添加工具开关状态
   const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
 
   // 添加更新工具状态的函数
   const updateToolsEnabled = useCallback(async (enabled: boolean) => {
@@ -58,6 +59,29 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('更新工具状态失败:', error);
+      throw error;
+    }
+  }, []);
+
+  // 更新 TTS 状态
+  const updateTtsEnabled = useCallback(async (enabled: boolean) => {
+    try {
+      const response = await fetch('/api/chat/tts-enabled', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update TTS status');
+      }
+
+      const data = await response.json();
+      setTtsEnabled(data.tts_enabled);
+    } catch (error) {
+      console.error('Error updating TTS status:', error);
       throw error;
     }
   }, []);
@@ -554,6 +578,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       body: JSON.stringify({
         messageData,
         session_id: currentSessionId || localStorage.getItem('session_id') || "default_session",
+        tts_enabled: ttsEnabled,
       }),
     })
     
@@ -573,7 +598,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
     
     return response
-  }, [currentSessionId, setConnectionStatus, setConnectionError])
+  }, [currentSessionId, setConnectionStatus, setConnectionError, ttsEnabled])
 
   // 处理聊天API响应
   const processStreamResponse = useCallback(async (
@@ -953,7 +978,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId])
+  }, [processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId, ttsEnabled])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -1017,7 +1042,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     connectionStatus, 
     checkConnection, 
     setConnectionStatus, 
-    setConnectionError
+    setConnectionError,
+    ttsEnabled
   ])
 
   const clearChat = useCallback(() => {
@@ -1097,7 +1123,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       toolState,
       toolsEnabled,  // 添加工具开关状态
       updateToolsEnabled,  // 添加更新工具状态的函数
-      generateImage // 新增一键生成图片
+      generateImage, // 新增一键生成图片
+      ttsEnabled,
+      updateTtsEnabled,
     }}>
       {children}
     </ChatContext.Provider>

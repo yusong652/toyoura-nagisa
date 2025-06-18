@@ -143,6 +143,10 @@ async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
     if sentence.strip() == '':
         return {'text': sentence, 'audio': None}
     try:
+        # 如果TTS引擎被禁用，只返回文本
+        if not tts_engine.enabled:
+            return {'text': sentence, 'audio': None}
+            
         audio_bytes = await tts_engine.synthesize(sentence)
         audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
         return {'text': sentence, 'audio': audio_b64}
