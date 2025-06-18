@@ -513,8 +513,8 @@ class AnthropicClient(LLMClientBase):
                 if missing_keywords:
                     # 清理原始提示词
                     negative_prompt = negative_prompt.strip().lstrip(",").strip()
-                    # 用逗号连接所有关键词
-                    negative_prompt = ", ".join(missing_keywords) + (", " + negative_prompt if negative_prompt else "")
+                    # 用逗号连接所有关键词，确保没有前导空格
+                    negative_prompt = ", ".join(missing_keywords) + (", " + negative_prompt.lstrip() if negative_prompt else "")
             
             if debug:
                 print("\n[text_to_image] Generated prompts:")
