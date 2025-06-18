@@ -648,10 +648,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               return msg;
             })
           );
+
+          // 如果TTS被禁用，添加一个较短的延迟来模拟打字效果
+          if (!ttsEnabled) {
+            await new Promise(resolve => setTimeout(resolve, nextItem.text.length * 15));
+          }
         }
         
-        // 2. 如果有音频，播放并等待完成
-        if (nextItem.audio) {
+        // 2. 如果有音频且TTS已启用，播放并等待完成
+        if (nextItem.audio && ttsEnabled) {
           audioCount++;
           console.log(`处理音频 #${audioCount}, 等待播放完成...`);
           
@@ -659,7 +664,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           const audioResult = await processAudioData(nextItem.audio, audioCount);
           console.log(`音频 #${audioCount} 播放完成, 结果: ${audioResult}`);
         } else {
-          // 如果只有文本没有音频，添加一个短暂停顿
+          // 如果没有音频或TTS被禁用，添加一个短暂停顿
           await new Promise(resolve => setTimeout(resolve, 10));
         }
       } catch (error) {

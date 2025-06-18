@@ -12,7 +12,7 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
-  const { sender, text, files, streaming, isLoading, status, timestamp, id, toolState } = message
+  const { sender, text, files, streaming, isLoading, status, id, toolState } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const textRef = useRef(text)
@@ -244,14 +244,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                           alt={file.name} 
                           className="file-image" 
                           onClick={(e) => {
-                            e.stopPropagation(); // 阻止事件冒泡
+                            e.stopPropagation();
                             handleImageClick(file.data);
                           }}
                         />
                       ) : (
                         <div className="file-info">
-                          <span className="file-icon">📄</span>
                           <span className="file-name">{file.name}</span>
+                          <span className="file-size">{(file.data.length / 1024).toFixed(1)} KB</span>
                         </div>
                       )}
                     </div>
@@ -259,12 +259,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                 </div>
               )}
             </div>
-            
-            {!streaming && !isLoading && (
-              <div className="message-time">
-                {formatTime(timestamp)}
-              </div>
-            )}
           </div>
         ) : (
           <div className="message-content">
@@ -289,7 +283,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           </div>
         )}
         
-        {/* 显示消息状态 */}
         {renderMessageStatus()}
         
         {/* 删除按钮 - 仅在消息被选中时显示 */}
@@ -303,7 +296,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
       </div>
       {previewImage && (
         <ImagePreview
-          open={!!previewImage}
+          open={true}
           onClose={() => setPreviewImage(null)}
           imageUrl={previewImage}
         />
