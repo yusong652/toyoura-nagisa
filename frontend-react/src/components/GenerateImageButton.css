@@ -37,6 +37,17 @@
   stroke: currentColor;
 }
 
+/* 成功状态样式 - 保持圆形按钮外观 */
+.generate-image-btn.success {
+  color: var(--success-color, #2ecc40);
+  background: rgba(46, 204, 64, 0.1);
+  border: 1px solid var(--success-color, #2ecc40);
+}
+
+.generate-image-btn.success:hover {
+  background: rgba(46, 204, 64, 0.2);
+}
+
 .generate-image-success, .generate-image-error {
   margin-top: 10px;
   padding: 6px 16px;

@@ -28,7 +28,7 @@ const GenerateImageButton: React.FC = () => {
   return (
     <div className="generate-image-btn-wrapper">
       <button
-        className={`generate-image-btn ${showSuccess ? 'generate-image-success' : ''}`}
+        className={`generate-image-btn ${showSuccess ? 'success' : ''}`}
         onClick={handleClick}
         disabled={loading || !currentSessionId}
         title="生成图片"
