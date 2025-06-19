@@ -275,6 +275,20 @@ class AnthropicClient(LLMClientBase):
             )
             if tools and len(tools) > 0:
                 kwargs_api["tools"] = tools
+
+            # 检查是否为claude 3.7及以上模型，自动添加thinking参数
+            if (
+                model.startswith("claude-3-7-") or
+                model.startswith("claude-sonnet-4-") or
+                model.startswith("claude-4-") or
+                model.startswith("claude-3-opus-")
+            ):
+                budget_tokens = self.extra_config.get("thinking_budget_tokens", 10000)
+                kwargs_api["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget_tokens
+                }
+
             response = self.anthropic_client.messages.create(**kwargs_api)
             return self._format_llm_response(response)
         except Exception as e:
