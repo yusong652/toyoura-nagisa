@@ -51,9 +51,14 @@ class AnthropicClient(LLMClientBase):
         for msg in messages:
             # 处理 assistant function_call 消息（带 tool_calls 字段，转为 Anthropic 官方格式）
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
-                # 取自然语言内容
-                text_block = {"type": "text", "text": msg.content or "正在调用工具..."}
-                tool_blocks = []
+                # 构造消息块
+                blocks = []
+                # 如果有 thinking 块，添加到最前面
+                if isinstance(msg.content, list):
+                    for item in msg.content:
+                        if isinstance(item, dict) and item.get("type") == "thinking":
+                            blocks.append(item)
+                # 添加工具调用块
                 for call in msg.tool_calls:
                     # 兼容 arguments 为 str 或 dict
                     arguments = call["function"].get("arguments", {})
@@ -62,7 +67,7 @@ class AnthropicClient(LLMClientBase):
                             arguments = json.loads(arguments)
                         except Exception:
                             arguments = {}
-                    tool_blocks.append({
+                    blocks.append({
                         "type": "tool_use",
                         "id": call["id"],
                         "name": call["function"]["name"],
@@ -70,18 +75,26 @@ class AnthropicClient(LLMClientBase):
                     })
                 anthropic_messages.append({
                     "role": "assistant",
-                    "content": [text_block] + tool_blocks
+                    "content": blocks
                 })
                 continue
 
             # 修正：识别 UserToolMessage（工具响应，role 仍为 user，但有 tool_request 字段）
             if isinstance(msg, UserToolMessage) or getattr(msg, "role", None) == "tool":
-                import json
-                json_str = json.dumps(msg.content, ensure_ascii=False)
+                # 如果 content 是字典且包含 is_error 字段，保持原样
+                if isinstance(msg.content, dict) and "is_error" in msg.content:
+                    content = json.dumps(msg.content, ensure_ascii=False)
+                # 如果 content 是字典且包含 text 字段，只使用 text 内容
+                elif isinstance(msg.content, dict) and "text" in msg.content:
+                    content = msg.content["text"]
+                # 其他情况，转为 JSON 字符串
+                else:
+                    content = json.dumps(msg.content, ensure_ascii=False)
+                    
                 tool_result_block = {
                     "type": "tool_result",
                     "tool_use_id": getattr(msg, "tool_call_id", ""),
-                    "content": [{"type": "text", "text": json_str}]
+                    "content": content
                 }
                 anthropic_messages.append({
                     "role": "user",
@@ -288,6 +301,7 @@ class AnthropicClient(LLMClientBase):
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         # 自动获取 tools
         tools = await self.get_function_call_schemas()
+        print(f"tools: {tools}")
         try:
             kwargs_api = dict(
                 model=model,
@@ -313,6 +327,7 @@ class AnthropicClient(LLMClientBase):
                 }
 
             response = self.anthropic_client.messages.create(**kwargs_api)
+            print(f"keyword: {kwargs_api}")
             if self.extra_config.get('debug', False):
                 import pprint; pprint.pprint(response)
             return self._format_llm_response(response)
@@ -600,6 +615,7 @@ class AnthropicClient(LLMClientBase):
                 "input_schema": params
             }
             tools.append(tool_schema)
+        print(f"tools: {tools}")
         return tools
 
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
@@ -610,22 +626,34 @@ class AnthropicClient(LLMClientBase):
         """
         tool_name = function_call["name"]
         tool_args = function_call.get("arguments", {})
+        tool_id = function_call.get("id", "")
         debug = self.extra_config.get('debug', False)
 
         # Special handling for generate_image tool
-        
         if tool_name == "generate_image":
             if not session_id:
                 if debug:
                     print("[text_to_image] Error: No session ID provided for image generation")
-                return "Error: No session ID provided for image generation"
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": "Error: No session ID provided for image generation",
+                    "is_error": True
+                }
 
             # Generate prompts using LLM
             prompt_result = await self.generate_text_to_image_prompt(session_id)
             if not prompt_result:
                 if debug:
                     print("[text_to_image] Error: Failed to generate image prompts")
-                return "Error: Failed to generate image prompts"
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": "Error: Failed to generate image prompts",
+                    "is_error": True
+                }
 
             # Call the internal image generation function
             try:
@@ -636,17 +664,50 @@ class AnthropicClient(LLMClientBase):
                 if not result:
                     if debug:
                         print("[text_to_image] Error: Image generation returned empty result")
-                    return "Error: Image generation failed - empty result"
+                    return {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "name": tool_name,
+                        "content": "Error: Image generation failed - empty result",
+                        "is_error": True
+                    }
                 return result
             except Exception as e:
                 if debug:
                     print(f"[text_to_image] Error during image generation: {str(e)}")
-                return f"Error: Image generation failed - {str(e)}"
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": f"Error: Image generation failed - {str(e)}",
+                    "is_error": True
+                }
 
         # Normal tool handling for other tools
-        async with self.mcp_client as mcp_async_client:
-            result = await mcp_async_client.call_tool(tool_name, tool_args)
-            return extract_text_from_mcp_result(result)
+        try:
+            async with self.mcp_client as mcp_async_client:
+                result = await mcp_async_client.call_tool(tool_name, tool_args)
+                text_result = extract_text_from_mcp_result(result)
+                # Check if the result indicates an error
+                if isinstance(result, dict) and result.get("error"):
+                    return {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "name": tool_name,
+                        "content": text_result,
+                        "is_error": True
+                    }
+                return text_result
+        except Exception as e:
+            if debug:
+                print(f"Error calling tool {tool_name}: {str(e)}")
+            return {
+                "type": "tool_result",
+                "tool_use_id": tool_id,
+                "name": tool_name,
+                "content": f"Error: Tool execution failed - {str(e)}",
+                "is_error": True
+            }
 
     # 工具函数：规范化 tool_result 为 Anthropic 支持的 content block
     def _normalize_tool_content(self, tool_result):
