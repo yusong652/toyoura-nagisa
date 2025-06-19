@@ -8,7 +8,7 @@ from google.genai import types
 from backend.config import get_llm_specific_config
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
-from backend.chat.utils import parse_llm_output, get_latest_two_messages
+from backend.chat.utils import parse_llm_output, get_latest_n_messages
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
@@ -454,7 +454,7 @@ class GeminiClient(LLMClientBase):
         debug = self.extra_config.get('debug', False)
         try:
             system_prompt = get_text_to_image_config().get("system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
-            latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
+            latest_messages = get_latest_n_messages(session_id) if session_id else (None, None)
             if not latest_messages[0] or not latest_messages[1]:
                 if debug:
                     print(f"[text_to_image] Error: Missing conversation context for session {session_id}")

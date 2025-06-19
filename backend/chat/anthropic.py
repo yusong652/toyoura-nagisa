@@ -5,7 +5,7 @@ import httpx
 import json
 from backend.chat.base import LLMClientBase
 from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserToolMessage, UserMessage
-from backend.chat.utils import parse_llm_output, get_latest_two_messages
+from backend.chat.utils import parse_llm_output, get_latest_n_messages
 import anthropic
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
@@ -425,7 +425,7 @@ class AnthropicClient(LLMClientBase):
         
         Args:
             session_id: Optional session ID to get the latest conversation context
-            
+        
         Returns:
             Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
         """
@@ -438,9 +438,11 @@ class AnthropicClient(LLMClientBase):
                     print(f"[text_to_image] Error: {error_msg}")
                 return None
 
+            # 获取n的配置
+            n = get_text_to_image_config().get("context_message_count", 2)
             # 获取最新的对话消息
-            latest_messages = get_latest_two_messages(session_id) if session_id else (None, None)
-            if not latest_messages[0] or not latest_messages[1]:
+            latest_messages = get_latest_n_messages(session_id, n) if session_id else tuple([None]*n)
+            if not any(latest_messages):
                 error_msg = f"Missing conversation context for session {session_id}"
                 if debug:
                     print(f"[text_to_image] Error: {error_msg}")
@@ -448,10 +450,12 @@ class AnthropicClient(LLMClientBase):
             
             # 构造消息序列
             messages = []
-            if latest_messages[0] and latest_messages[1]:
-                # 将对话内容组合成一个专门用于生成提示词的用户消息
-                conversation_text = f"Please generate text to image prompt based on the following conversation:\n\n{latest_messages[0].role}: {latest_messages[0].content}\n{latest_messages[1].role}: {latest_messages[1].content}"
-                messages.append(UserMessage(role="user", content=conversation_text))
+            # 拼接n条消息内容
+            conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
+            for msg in latest_messages:
+                if msg is not None:
+                    conversation_text += f"{msg.role}: {msg.content}\n"
+            messages.append(UserMessage(role="user", content=conversation_text))
             
             # 使用相同的消息格式转换逻辑
             messages_for_llm, _ = self._format_messages_for_anthropic(messages)
@@ -472,7 +476,6 @@ class AnthropicClient(LLMClientBase):
                 messages=messages_for_llm,
                 system=system_prompt,
                 temperature=0.7)
-            
             
             # 添加响应检查
             if not response:

@@ -334,25 +334,41 @@ def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = 
     
     return filepath
 
-def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
+def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], ...]:
     """
-    获取指定会话中最新的两条消息（返回消息对象而非dict）
+    获取指定会话中最新的n条消息（返回消息对象而非dict）
     只返回 user/assistant 消息，过滤掉 image/tool 等其它类型
+    
+    Args:
+        session_id: 会话ID
+        n: 要获取的消息数量，默认为2
+        
+    Returns:
+        Tuple: 包含n个消息对象的元组，如果消息不足n条，用None填充
     """
     history = load_history(session_id)  # 只返回非 image 消息
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
     if not history_msgs:
-        return None, None
+        return tuple([None] * n)
     latest_messages = []
     for msg in reversed(history_msgs):
         if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
             latest_messages.append(msg)
-            if len(latest_messages) == 2:
+            if len(latest_messages) == n:
                 break
-    while len(latest_messages) < 2:
+    while len(latest_messages) < n:
         latest_messages.append(None)
     latest_messages.reverse()
     return tuple(latest_messages)
+
+def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
+    """
+    获取指定会话中最新的两条消息（返回消息对象而非dict）
+    只返回 user/assistant 消息，过滤掉 image/tool 等其它类型
+    
+    Deprecated: 使用 get_latest_n_messages(session_id, 2) 替代
+    """
+    return get_latest_n_messages(session_id, 2)
 
 def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
     session_file = _get_session_file(session_id)
