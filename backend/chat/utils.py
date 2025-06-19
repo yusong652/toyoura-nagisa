@@ -63,6 +63,7 @@ def save_history(session_id: str, current_history: List[BaseMessage]) -> None:
 # 读取指定会话ID的聊天历史
 
 def load_history(session_id: str) -> List[Dict[str, Any]]:
+    """ load history without image """
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
         return []

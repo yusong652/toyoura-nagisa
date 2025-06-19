@@ -49,10 +49,6 @@ class AnthropicClient(LLMClientBase):
         has_image = False
         
         for msg in messages:
-            # 不再跳过 system 消息，因为我们已经不再有 system message
-            # if msg.role == "system":
-            #     continue  # Anthropic 使用单独的 system 参数
-
             # 处理 assistant function_call 消息（带 tool_calls 字段，转为 Anthropic 官方格式）
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
                 # 取自然语言内容
@@ -93,7 +89,7 @@ class AnthropicClient(LLMClientBase):
                 })
                 continue
 
-            # 2. 处理 user/assistant 角色
+            # 处理 user/assistant 角色
             if isinstance(msg.content, list):
                 # 检查是否是 tool_result 块（已是 user+tool_result）
                 if (
@@ -124,11 +120,15 @@ class AnthropicClient(LLMClientBase):
                         "content": [tool_result_block]
                     })
                     continue
-                # 处理多模态内容
+
+                # 处理多模态内容，包括 thinking 和 redacted_thinking 块
                 content = []
                 for c in msg.content:
                     if isinstance(c, dict):
-                        if "type" in c and c["type"] == "text" and "text" in c:
+                        if c.get("type") in ["thinking", "redacted_thinking"]:
+                            # 直接保留 thinking 和 redacted_thinking 块的原始结构
+                            content.append(c)
+                        elif "type" in c and c["type"] == "text" and "text" in c:
                             content.append({
                                 "type": "text",
                                 "text": c["text"] or " "
@@ -216,11 +216,8 @@ class AnthropicClient(LLMClientBase):
         # 检查是否有function call
         if hasattr(response, "content") and response.content:
             tool_calls = []
-            text_content = ""
             for item in response.content:
-                if hasattr(item, "type") and item.type == "text":
-                    text_content = getattr(item, "text", "")
-                elif hasattr(item, "type") and item.type == "tool_use":
+                if hasattr(item, "type") and item.type == "tool_use":
                     function_name = getattr(item, "name", None)
                     arguments = getattr(item, "input", None)
                     tool_call_id = getattr(item, "id", None)
@@ -231,19 +228,45 @@ class AnthropicClient(LLMClientBase):
                     })
             if tool_calls:
                 return LLMResponse(
-                    content=text_content,  # 用真实自然语言内容
+                    content=[{
+                        "type": item.type,
+                        **({
+                            "text": item.text
+                        } if item.type == "text" else {
+                            "name": item.name,
+                            "input": item.input,
+                            "id": item.id
+                        } if item.type == "tool_use" else {
+                            "thinking": item.thinking,
+                            "signature": item.signature
+                        } if item.type == "thinking" else {
+                            "data": item.data
+                        } if item.type == "redacted_thinking" else {})
+                    } for item in response.content],
                     response_type=ResponseType.FUNCTION_CALL,
                     tool_calls=tool_calls
                 )
                 
-        # 普通文本回复
+        # 普通文本回复，提取所有文本块内容
         llm_reply = ""
         for content_item in response.content:
             if hasattr(content_item, "type") and content_item.type == "text":
                 llm_reply += getattr(content_item, "text", "")
         response_text, keyword = parse_llm_output(llm_reply)
+        
+        # 保留原始的结构化内容
         return LLMResponse(
-            content=response_text,
+            content=[{
+                "type": item.type,
+                **({
+                    "text": item.text
+                } if item.type == "text" else {
+                    "thinking": item.thinking,
+                    "signature": item.signature
+                } if item.type == "thinking" else {
+                    "data": item.data
+                } if item.type == "redacted_thinking" else {})
+            } for item in response.content],
             response_type=ResponseType.TEXT,
             keyword=keyword
         )
@@ -290,6 +313,8 @@ class AnthropicClient(LLMClientBase):
                 }
 
             response = self.anthropic_client.messages.create(**kwargs_api)
+            if self.extra_config.get('debug', False):
+                import pprint; pprint.pprint(response)
             return self._format_llm_response(response)
         except Exception as e:
             print(f"Anthropic API error: {e}")

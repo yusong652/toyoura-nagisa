@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
-from backend.chat import LLMClientBase, GPTClient, ChatRequest, ChatResponse, ErrorResponse
+from backend.chat import LLMClientBase, GPTClient, ErrorResponse
 from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, load_all_message_history
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
@@ -35,7 +35,7 @@ from backend.utils.helpers import (
     is_pure_text_assistant,
     generate_title_for_session,
 )
-from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage
+from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage, message_factory_no_thinking
 from backend.nagisa_mcp.fast_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
@@ -382,8 +382,9 @@ async def chat_stream_endpoint(request: Request):
             try:
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
                 # 使用 load_history 获取不含图片消息的最近对话
-                recent_history = load_history(session_id)
-                recent_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in recent_history]
+                recent_history = load_history(session_id) # load history without image
+                # 使用 message_factory_no_thinking 创建历史消息，过滤掉 thinking 块
+                recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
                 recent_messages_length = get_llm_config().get("recent_messages_length", 20)
                 recent_msgs = recent_msgs[-recent_messages_length:]
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):

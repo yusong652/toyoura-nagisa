@@ -9,7 +9,7 @@ from backend.chat.title_generator import generate_conversation_title
 from backend.config import get_llm_config
 from backend.chat.models import message_factory, AssistantMessage, UserToolMessage, UserMessage, AssistantToolMessage, BaseMessage
 from backend.memory import MemoryManager
-from typing import Any
+from typing import Any, List, Dict
 import re
 from backend.utils.text_clean import extract_response_without_think
 
@@ -81,26 +81,40 @@ def process_user_message(parsed_data: dict, session_id: str, history_msgs: list)
     
     return user_msg
 
-def process_ai_text_message(response_text: str, keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
-    """处理AI文本消息，保存历史记录和向量数据库，并返回消息ID和处理后的消息内容"""
+def process_ai_text_message(content: List[Dict[str, Any]], keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
+    """
+    处理AI文本消息，保存历史记录和向量数据库，并返回消息ID和处理后的消息内容。
+    
+    Args:
+        content: 结构化内容列表，每个元素都是一个带有 type 字段的字典
+        keyword: 关键词
+        history_msgs: 历史消息列表
+        session_id: 会话ID
+        
+    Returns:
+        tuple[str, str]: (消息ID, 处理后的消息内容)
+    """
     ai_msg_id = str(uuid.uuid4())
-    # 确保 response_text 不为 None
-    response_text = response_text or ""
-    content = f"{response_text}[[{keyword}]]" if keyword else response_text
+    
+    # 创建助手消息
     ai_msg = AssistantMessage(
-        content=content,
+        content=content,  # 直接使用结构化内容
         id=ai_msg_id
     )
     history_msgs.append(ai_msg)
     save_history(session_id, history_msgs)
 
-    # 用 extract_response_without_think 处理 response_text
-    processed_content = extract_response_without_think(ai_msg.content)
-    # 保存到向量数据库时也只存储去除<thinking>标签后的内容
+    # 提取纯文本内容用于向量数据库存储
+    text_content = ""
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text_content += item.get("text", "") + " "
+    
+    # 保存到向量数据库
     memory_manager.add_conversation_memory(
         user_id="default",
         conversation_id=session_id,
-        content=processed_content.strip(),
+        content=text_content.strip(),
         additional_metadata={
             "message_id": ai_msg_id,
             "timestamp": datetime.now().isoformat(),
@@ -109,7 +123,7 @@ def process_ai_text_message(response_text: str, keyword: str, history_msgs: list
         }
     )
 
-    return ai_msg_id, processed_content
+    return ai_msg_id, text_content.strip()
 
 def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:
     """处理工具调用消息，创建并返回工具调用消息对象（不再追加到 history_msgs）"""

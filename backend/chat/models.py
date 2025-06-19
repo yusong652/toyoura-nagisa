@@ -142,6 +142,78 @@ def message_factory(data: dict) -> BaseMessage:
             return UserMessage(**{k: v for k, v in data.items() if k != 'role'})
 
 # =====================
+# 创建历史记录消息
+# =====================
+def message_factory_no_thinking(data: dict) -> BaseMessage:
+    """
+    message_factory_no_thinking: 创建用于历史记录的消息对象，过滤掉 thinking 和 redacted_thinking 块。
+    这个函数主要用于构造发送给 LLM 的历史消息，以减少不必要的 token 消耗。
+    
+    Args:
+        data: 消息数据字典
+        
+    Returns:
+        BaseMessage: 过滤后的消息对象
+    """
+    # 首先处理工具相关的消息，这些保持不变
+    if data.get('role') == 'tool':
+        if 'tool_call_id' not in data:
+            raise ValueError("Tool response message must have a tool_call_id")
+        return UserToolMessage(
+            tool_call_id=data['tool_call_id'],
+            name=data['name'],
+            content=data['content']
+        )
+    elif data.get('role') == 'image':
+        if 'image_path' not in data:
+            raise ValueError("Image message must have an image_path")
+        return ImageMessage(
+            content=data.get('content', ''),
+            image_path=data['image_path'],
+            id=data.get('id'),
+            timestamp=data.get('timestamp')
+        )
+    elif 'tool_calls' in data:
+        filtered_data = {k: v for k, v in data.items() if k != 'role'}
+        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
+            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
+        return AssistantToolMessage(**filtered_data)
+    
+    # 处理带有结构化内容的消息
+    if isinstance(data.get('content'), list):
+        # 过滤掉 thinking 和 redacted_thinking 块，只保留 text 和其他类型的块
+        filtered_content = []
+        for item in data['content']:
+            if isinstance(item, dict):
+                if item.get('type') not in ['thinking', 'redacted_thinking']:
+                    filtered_content.append(item)
+            else:
+                filtered_content.append(item)
+        
+        # 如果过滤后没有内容，添加一个空的文本块
+        if not filtered_content:
+            filtered_content = [{"type": "text", "text": ""}]
+        
+        # 更新消息数据
+        filtered_data = {k: v for k, v in data.items() if k != 'role'}
+        filtered_data['content'] = filtered_content
+        
+        if data.get('role') == 'assistant':
+            return AssistantMessage(**filtered_data)
+        else:
+            return UserMessage(**filtered_data)
+    
+    # 处理字符串内容的消息
+    role = data.get('role')
+    filtered_data = {k: v for k, v in data.items() if k != 'role'}
+    if role == 'assistant':
+        if isinstance(filtered_data.get('content'), str):
+            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
+        return AssistantMessage(**filtered_data)
+    else:
+        return UserMessage(**filtered_data)
+
+# =====================
 # 兼容原有类型提示
 # =====================
 # Message 只做类型提示，不可实例化
@@ -150,15 +222,6 @@ Message = MessageType
 # =====================
 # 其它模型
 # =====================
-class ChatRequest(BaseModel):
-    messageText: str = Field(..., description="用户输入的最新消息文本")
-    session_id: Optional[str] = Field(None, description="用户会话 ID")
-
-class ChatResponse(BaseModel):
-    response: str = Field(..., description="LLM 生成的回复文本")
-    keyword: str = Field(..., description="情绪/动作关键词")
-    audio_data: str = Field(..., description="TTS 音频的 base64 编码 mp3 数据")
-
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="错误信息")
 
@@ -170,7 +233,7 @@ class ResponseType(str, Enum):
 class LLMResponse:
     def __init__(
         self,
-        content: str,
+        content: List[Dict[str, Any]],  # 只支持结构化内容列表
         response_type: ResponseType,
         keyword: Optional[str] = None,
         function_name: Optional[str] = None,
@@ -179,7 +242,11 @@ class LLMResponse:
         function_call_id: Optional[str] = None,
         tool_calls: Optional[List[Dict[str, Any]]] = None,
     ):
-        self.content = content
+        # 确保 content 总是列表格式
+        if isinstance(content, str):
+            self.content = [{"type": "text", "text": content}]
+        else:
+            self.content = content
         self.response_type = response_type
         self.keyword = keyword
         self.function_name = function_name
@@ -189,6 +256,9 @@ class LLMResponse:
         self.tool_calls = tool_calls or []
 
     def to_dict(self) -> dict:
+        """
+        将 LLMResponse 转换为字典格式。
+        """
         return {
             "content": self.content,
             "response_type": self.response_type,
