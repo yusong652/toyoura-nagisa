@@ -11,9 +11,9 @@ def register_common_tools(mcp: FastMCP):
     # Register only common tools here
 
     @mcp.tool()
-    def get_current_time() -> str:
+    def get_current_time() -> dict:
         """Get the current system time as a formatted string."""
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
     @mcp.tool()
     def get_weather(

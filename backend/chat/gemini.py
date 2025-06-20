@@ -76,21 +76,38 @@ class GeminiClient(LLMClientBase):
             # - assistant function_call消息用model+function_call结构
             # - tool响应用user+function_response结构
             if msg.role == "assistant" and getattr(msg, "tool_calls", None):
-                # function_call消息
+                # function_call消息，可以包含思考过程和工具调用
                 parts = []
+                
+                # 1. 提取思考过程 (thinking)
+                # 这部分作为上下文提供给模型，了解它为何调用工具
+                if isinstance(msg.content, list):
+                    for item in msg.content:
+                        if item.get("type") == "thinking" and item.get("thinking"):
+                            # For thinking parts, we create a Part object where the text is the thought.
+                            # The Gemini API doesn't have a 'thought=True' flag on request Parts.
+                            # The model's own output format (thoughts as text) is the expected input format.
+                            parts.append(types.Part(text=item["thinking"]))
+                        elif item.get("type") == "text" and item.get("text"):
+                            parts.append(types.Part(text=item["text"]))
+                
+                # 3. 添加工具调用 (tool_calls)
                 for tool_call in msg.tool_calls:
                     arguments = tool_call["function"].get("arguments", {})
                     if isinstance(arguments, str):
                         try:
                             arguments = json.loads(arguments)
-                        except Exception:
-                            arguments = {}
+                        except (json.JSONDecodeError, TypeError):
+                            # 如果无法解析，则保留为字符串或空字典
+                            arguments = {"error": "invalid JSON arguments", "raw": arguments}
                     parts.append(types.Part(function_call=types.FunctionCall(
                         name=tool_call["function"]["name"],
                         args=arguments,
-                        id=tool_call.get("id", tool_call["function"]["name"])  # 使用工具调用ID或函数名作为ID
+                        id=tool_call.get("id", tool_call["function"]["name"])
                     )))
-                contents.append({"role": "model", "parts": parts})
+                
+                if parts:
+                    contents.append({"role": "model", "parts": parts})
                 continue
             # 处理工具响应消息
             if isinstance(msg, UserToolMessage):
@@ -137,37 +154,72 @@ class GeminiClient(LLMClientBase):
         Returns:
             LLMResponse object containing the formatted response
         """
-        if hasattr(response, 'candidates') and response.candidates:
-            candidate = response.candidates[0]
-            # 遍历所有 parts，处理所有 function_call
-            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts') and candidate.content.parts:
-                natural_content = ""
-                tool_calls = []
-                for part in candidate.content.parts:
-                    if hasattr(part, 'text') and part.text:
-                        natural_content = part.text  # 记录 function_call 前的自然语言内容
-                    elif hasattr(part, 'function_call') and part.function_call:
-                        tool_calls.append({
-                            'name': part.function_call.name,
-                            'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
-                            'id': part.function_call.id or part.function_call.name  # 使用工具调用ID或函数名
-                        })
-                if tool_calls:
-                    return LLMResponse(
-                        content=natural_content,  # 优先用自然语言内容
-                        response_type=ResponseType.FUNCTION_CALL,
-                        tool_calls=tool_calls
-                    )
-                # 如果没有 function_call，返回文本响应
-                if natural_content:
-                    response_text, keyword = parse_llm_output(natural_content)
-                    return LLMResponse(
-                        content=response_text,
-                        response_type=ResponseType.TEXT,
-                        keyword=keyword
-                    )
+        if not (hasattr(response, 'candidates') and response.candidates):
+            return LLMResponse(content=[{"type": "text", "text": ""}], response_type=ResponseType.ERROR)
+
+        candidate = response.candidates[0]
+        
+        content_list = []
+        tool_calls = []
+        thinking_parts = []
+        text_parts = []
+        
+        # 1. Extract top-level thought (high-level summary)
+        if hasattr(candidate, 'thought') and candidate.thought:
+            thinking_parts.append(candidate.thought)
+            
+        # 2. Iterate through parts, distinguishing between thought and text
+        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+            for part in candidate.content.parts:
+                if hasattr(part, 'function_call') and part.function_call:
+                    tool_calls.append({
+                        'name': part.function_call.name,
+                        'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
+                        'id': part.function_call.id or part.function_call.name
+                    })
+                elif hasattr(part, 'text') and part.text:
+                    # Check if the part is a thought via `getattr(part, 'thought', False)`
+                    if getattr(part, 'thought', False):
+                        thinking_parts.append(part.text)
+                    else:
+                        text_parts.append(part.text)
+
+        # 3. Combine thinking content
+        if thinking_parts:
+            full_thinking_content = "\n".join(thinking_parts).strip()
+            if full_thinking_content:
+                content_list.append({
+                    "type": "thinking",
+                    "thinking": full_thinking_content,
+                })
+        
+        # 4. Combine text content
+        full_text_content = "".join(text_parts).strip()
+        if full_text_content:
+            response_text, _ = parse_llm_output(full_text_content)
+            content_list.append({
+                "type": "text",
+                "text": response_text
+            })
+
+        # 5. Return LLMResponse based on content
+        if tool_calls:
+            return LLMResponse(
+                content=content_list,
+                response_type=ResponseType.FUNCTION_CALL,
+                tool_calls=tool_calls
+            )
+        
+        if content_list:
+            _, keyword = parse_llm_output(full_text_content)
+            return LLMResponse(
+                content=content_list,
+                response_type=ResponseType.TEXT,
+                keyword=keyword
+            )
+            
         return LLMResponse(
-            content="",
+            content=[{"type": "text", "text": "Empty response from model."}],
             response_type=ResponseType.ERROR
         )
 
@@ -176,7 +228,7 @@ class GeminiClient(LLMClientBase):
         print("Payload:")
         import pprint; pprint.pprint({
             "contents": contents,
-            "config": config
+            # "config": config
         })
         print("========== END ==========")
 
@@ -270,6 +322,9 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config
             )
+            if self.extra_config.get('debug', False):
+                print("[Gemini] Raw response:")
+                import pprint; pprint.pprint(response) 
             
             if self.extra_config.get('debug', False):
                 self._print_debug_response(response)

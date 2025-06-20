@@ -226,60 +226,46 @@ class AnthropicClient(LLMClientBase):
         Returns:
             LLMResponse object containing the formatted response
         """
-        # 检查是否有function call
-        if hasattr(response, "content") and response.content:
-            tool_calls = []
-            for item in response.content:
-                if hasattr(item, "type") and item.type == "tool_use":
-                    function_name = getattr(item, "name", None)
-                    arguments = getattr(item, "input", None)
-                    tool_call_id = getattr(item, "id", None)
-                    tool_calls.append({
-                        'name': function_name,
-                        'arguments': arguments,
-                        'id': tool_call_id
-                    })
-            if tool_calls:
-                return LLMResponse(
-                    content=[{
-                        "type": item.type,
-                        **({
-                            "text": item.text
-                        } if item.type == "text" else {
-                            "name": item.name,
-                            "input": item.input,
-                            "id": item.id
-                        } if item.type == "tool_use" else {
-                            "thinking": item.thinking,
-                            "signature": item.signature
-                        } if item.type == "thinking" else {
-                            "data": item.data
-                        } if item.type == "redacted_thinking" else {})
-                    } for item in response.content],
-                    response_type=ResponseType.FUNCTION_CALL,
-                    tool_calls=tool_calls
-                )
-                
-        # 普通文本回复，提取所有文本块内容
+        if not hasattr(response, "content") or not response.content:
+            return LLMResponse(content=[{"type": "text", "text": ""}], response_type=ResponseType.TEXT)
+
+        tool_calls = []
+        llm_content = []
         llm_reply = ""
-        for content_item in response.content:
-            if hasattr(content_item, "type") and content_item.type == "text":
-                llm_reply += getattr(content_item, "text", "")
+
+        for item in response.content:
+            item_dict = {"type": item.type}
+            if item.type == "text":
+                item_dict["text"] = item.text
+                llm_reply += item.text
+            elif item.type == "tool_use":
+                item_dict["name"] = item.name
+                item_dict["input"] = item.input
+                item_dict["id"] = item.id
+                tool_calls.append({
+                    'name': item.name,
+                    'arguments': item.input,
+                    'id': item.id
+                })
+            elif item.type == "thinking":
+                item_dict["thinking"] = item.thinking
+                item_dict["signature"] = item.signature
+            elif item.type == "redacted_thinking":
+                pass
+            
+            llm_content.append(item_dict)
+
+        if tool_calls:
+            return LLMResponse(
+                content=llm_content,
+                response_type=ResponseType.FUNCTION_CALL,
+                tool_calls=tool_calls
+            )
+        
         response_text, keyword = parse_llm_output(llm_reply)
         
-        # 保留原始的结构化内容
         return LLMResponse(
-            content=[{
-                "type": item.type,
-                **({
-                    "text": item.text
-                } if item.type == "text" else {
-                    "thinking": item.thinking,
-                    "signature": item.signature
-                } if item.type == "thinking" else {
-                    "data": item.data
-                } if item.type == "redacted_thinking" else {})
-            } for item in response.content],
+            content=llm_content,
             response_type=ResponseType.TEXT,
             keyword=keyword
         )
