@@ -288,7 +288,7 @@ async def handle_llm_response(
                 else:
                     tool_natural_response = "Image generation failed, please try again."
             else:
-                tool_natural_response = str(tool_result)
+                tool_natural_response = tool_result
 
             # 添加工具响应消息
             tool_response_msg = message_factory({

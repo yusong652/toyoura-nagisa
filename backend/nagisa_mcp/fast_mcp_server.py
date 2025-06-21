@@ -24,11 +24,11 @@ register_common_tools(mcp)
 register_web_search_tools(mcp)
 register_email_tools(mcp)
 register_calendar_tools(mcp)
-# register_coding_tools(mcp)
-# register_text_to_image_tool(mcp)
+register_coding_tools(mcp)
+register_text_to_image_tool(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
-# register_memory_tools(mcp)
+register_memory_tools(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ class GeminiClient(LLMClientBase):
                             # For thinking parts, we create a Part object where the text is the thought.
                             # The Gemini API doesn't have a 'thought=True' flag on request Parts.
                             # The model's own output format (thoughts as text) is the expected input format.
-                            parts.append(types.Part(text=item["thinking"]))
+                            parts.append(types.Part(text=item["thinking"], thought=True))
                         elif item.get("type") == "text" and item.get("text"):
                             parts.append(types.Part(text=item["text"]))
                 
@@ -122,7 +122,7 @@ class GeminiClient(LLMClientBase):
                     response=response_dict
                 ))]
                 contents.append({
-                    "role": "user",
+                    "role": "tool",
                     "parts": parts
                 })
                 continue
@@ -510,9 +510,10 @@ class GeminiClient(LLMClientBase):
         try:
             system_prompt = get_text_to_image_config().get("system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
             latest_messages = get_latest_n_messages(session_id) if session_id else (None, None)
-            if not latest_messages[0] or not latest_messages[1]:
+            if not any(latest_messages):
+                error_msg = f"Missing conversation context for session {session_id}"
                 if debug:
-                    print(f"[text_to_image] Error: Missing conversation context for session {session_id}")
+                    print(f"[text_to_image] Error: {error_msg}")
                 return None
             messages = []
             if latest_messages[0] and latest_messages[1]:

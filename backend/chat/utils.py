@@ -344,20 +344,18 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
         n: 要获取的消息数量，默认为2
         
     Returns:
-        Tuple: 包含n个消息对象的元组，如果消息不足n条，用None填充
+        Tuple: 包含消息对象的元组，如果消息不足n条，返回所有实际消息
     """
     history = load_history(session_id)  # 只返回非 image 消息
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
     if not history_msgs:
-        return tuple([None] * n)
+        return tuple()
     latest_messages = []
     for msg in reversed(history_msgs):
         if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
             latest_messages.append(msg)
             if len(latest_messages) == n:
                 break
-    while len(latest_messages) < n:
-        latest_messages.append(None)
     latest_messages.reverse()
     return tuple(latest_messages)
 
