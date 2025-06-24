@@ -142,6 +142,7 @@ class GPTClient(LLMClientBase):
     async def get_response(
         self,
         messages: List[BaseMessage],
+        session_id: Optional[str] = None,
         **kwargs
     ) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_openai(messages)

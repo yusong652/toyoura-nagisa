@@ -296,7 +296,12 @@ class GeminiClient(LLMClientBase):
         
         return tools
 
-    async def get_response(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:
+    async def get_response(
+        self,
+        messages: List[BaseMessage],
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> 'LLMResponse':
         # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
         tool_schemas = await self.get_function_call_schemas()
 

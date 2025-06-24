@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 from datetime import datetime
 import os
-from .google_auth.google_contacts import build_google_contacts_service
+from backend.nagisa_mcp.tools.google_auth.google_contacts import build_google_contacts_service
 
 class Contact(BaseModel):
     """Contact model for validation"""

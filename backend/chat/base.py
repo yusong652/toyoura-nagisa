@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod # 导入 ABC 和 abstractmethod
 from typing import List, Tuple, Optional, Dict, Any       # 导入类型提示
 from backend.chat.models import Message, LLMResponse, BaseMessage         # 从同目录的 models.py 导入 Message 模型
+from backend.config import get_system_prompt
 
 # 定义一个简单的模型来表示 LLM 的输出（或者直接用 Tuple）
 # from pydantic import BaseModel
@@ -29,12 +30,14 @@ class LLMClientBase(ABC):
     async def get_response(
         self,
         messages: List[BaseMessage],
+        session_id: Optional[str] = None,
         **kwargs
     ) -> Tuple[str, str]:
         """
         异步发送对话历史给 LLM，返回回复文本和关键词。
         Args:
             messages: Message 对象列表，包含历史和最新用户输入。
+            session_id: 可选的会话ID，用于支持会话级别的功能（如工具缓存）。
             kwargs: 其他可选参数（如温度、max_tokens等）。
         Returns:
             (response_text, keyword)
@@ -76,6 +79,7 @@ class LLMClientBase(ABC):
         self.extra_config.update(kwargs)
         if "tools_enabled" in kwargs:
             self.tools_enabled = kwargs["tools_enabled"]
+        self.system_prompt = get_system_prompt(tool_state=self.tools_enabled)
 
     def get_config(self) -> Dict[str, Any]:
         """获取当前所有配置参数。"""

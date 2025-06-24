@@ -3,7 +3,7 @@ from pydantic import Field
 from typing import List, Optional
 from datetime import datetime
 import os
-from .google_auth.google_calendar import build_google_calendar_service
+from backend.nagisa_mcp.tools.google_auth.google_calendar import build_google_calendar_service
 from backend.nagisa_mcp.utils import ensure_future_datetime
 
 # 这里可以扩展更多模型和工具

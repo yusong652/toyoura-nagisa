@@ -1,3 +1,4 @@
+# 内容来自原 common_tools.py 
 from fastmcp import FastMCP
 from datetime import datetime
 import requests

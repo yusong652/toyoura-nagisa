@@ -1,0 +1,1 @@
+from .tool import register_contact_tools 

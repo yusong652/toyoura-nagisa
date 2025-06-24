@@ -7,7 +7,6 @@ from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSoc
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pathlib import Path
-from pydantic import BaseModel
 import uvicorn
 from typing import Optional, Union, List, Dict, Any, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +35,18 @@ from backend.utils.helpers import (
     generate_title_for_session,
 )
 from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage, message_factory_no_thinking
-from backend.nagisa_mcp.fast_mcp_server import mcp
+from backend.chat.models import (
+    NewHistoryRequest,
+    HistorySessionResponse,
+    SwitchSessionRequest,
+    DeleteSessionRequest,
+    DeleteMessageRequest,
+    GenerateTitleRequest,
+    UpdateToolsEnabledRequest,
+    UpdateTTSEnabledRequest,
+    GenerateImageRequest
+)
+from backend.nagisa_mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
@@ -84,39 +94,6 @@ app.add_middleware(
 )
 
 app.include_router(images.router)
-
-# 新增历史记录相关模型
-class NewHistoryRequest(BaseModel):
-    name: Optional[str] = None
-
-class HistorySessionResponse(BaseModel):
-    id: str
-    name: str
-    created_at: str
-    updated_at: str
-
-class SwitchSessionRequest(BaseModel):
-    session_id: str
-
-class DeleteSessionRequest(BaseModel):
-    session_id: str
-
-class DeleteMessageRequest(BaseModel):
-    session_id: str
-    message_id: str
-
-# 添加新的请求模型用于标题生成
-class GenerateTitleRequest(BaseModel):
-    session_id: str
-
-class UpdateToolsEnabledRequest(BaseModel):
-    enabled: bool
-
-class UpdateTTSEnabledRequest(BaseModel):
-    enabled: bool
-
-class GenerateImageRequest(BaseModel):
-    session_id: str
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -175,6 +152,12 @@ async def delete_session(session_id: str):
         # 删除会话历史和元数据
         success = delete_session_data(session_id)
         
+        # 清除对应session的工具缓存
+        llm_client: LLMClientBase = app.state.llm_client
+        if hasattr(llm_client, '_clear_session_tool_cache'):
+            llm_client._clear_session_tool_cache(session_id)
+            print(f"[DEBUG] Cleared tool cache for deleted session: {session_id}")
+        
         # 删除向量数据库中的相关记忆
         memory_manager = MemoryManager()
         memory_manager.delete_conversation_memories(session_id)
@@ -203,6 +186,12 @@ async def switch_session(request: SwitchSessionRequest):
         
         if not session_exists:
             raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
+        
+        # 清除对应session的工具缓存
+        llm_client: LLMClientBase = app.state.llm_client
+        if hasattr(llm_client, '_clear_session_tool_cache'):
+            llm_client._clear_session_tool_cache(request.session_id)
+            print(f"[DEBUG] Cleared tool cache for session: {request.session_id}")
         
         # 加载指定会话的历史记录
         history = load_all_message_history(request.session_id)

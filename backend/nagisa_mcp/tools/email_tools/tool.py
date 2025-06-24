@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 from datetime import datetime
 import os
-from .google_auth.gmail_service import get_gmail_service
+from backend.nagisa_mcp.tools.google_auth.gmail_service import get_gmail_service
 from email.mime.text import MIMEText
 import base64
 

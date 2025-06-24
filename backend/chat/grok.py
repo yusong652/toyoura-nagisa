@@ -118,7 +118,12 @@ class GrokClient(LLMClientBase):
             response_type=ResponseType.ERROR
         )
 
-    async def get_response(self, messages: List[BaseMessage], **kwargs) -> 'LLMResponse':
+    async def get_response(
+        self,
+        messages: List[BaseMessage],
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> 'LLMResponse':
         messages_for_llm, has_image = self._format_messages_for_grok(messages)
         print("\n========== Grok API 请求消息格式 ==========")
         import pprint; pprint.pprint(messages_for_llm)
