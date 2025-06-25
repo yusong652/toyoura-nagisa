@@ -53,7 +53,57 @@ class GeminiClient(LLMClientBase):
         print(f"Gemini Client initialized.")
         # 集成 MCPClient
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
+        
+        # 工具缓存机制
+        self.tool_cache = {}  # 缓存查询到的工具
+        self.meta_tools = set()  # meta tool名称集合
+        self.session_tool_cache = {}  # 按会话ID缓存工具
 
+    def _is_meta_tool(self, tool_name: str) -> bool:
+        """判断是否为meta tool"""
+        return tool_name in {
+            "search_tools_by_keywords",
+            "get_available_tool_categories"
+        }
+
+    def _extract_tools_from_meta_result(self, meta_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """从meta tool结果中提取工具信息"""
+        tools = []
+        if isinstance(meta_result, dict):
+            # 处理search_tools_by_keywords的结果
+            if "tools" in meta_result and isinstance(meta_result["tools"], list):
+                for tool_info in meta_result["tools"]:
+                    if isinstance(tool_info, dict) and "name" in tool_info:
+                        tools.append({
+                            "name": tool_info["name"],
+                            "description": tool_info.get("description", ""),
+                            "category": tool_info.get("category", "general"),
+                            "docstring": tool_info.get("docstring", ""),
+                            "parameters": tool_info.get("parameters", {}),
+                            "tags": tool_info.get("tags", [])
+                        })
+        return tools
+
+    def _cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]):
+        """为会话缓存工具"""
+        if session_id not in self.session_tool_cache:
+            self.session_tool_cache[session_id] = []
+        
+        # 添加新工具，避免重复
+        existing_names = {tool["name"] for tool in self.session_tool_cache[session_id]}
+        for tool in tools:
+            if tool["name"] not in existing_names:
+                self.session_tool_cache[session_id].append(tool)
+                existing_names.add(tool["name"])
+
+    def _get_cached_tools_for_session(self, session_id: str) -> List[Dict[str, Any]]:
+        """获取会话缓存的工具"""
+        return self.session_tool_cache.get(session_id, [])
+
+    def _clear_session_tool_cache(self, session_id: str):
+        """清除会话的工具缓存"""
+        if session_id in self.session_tool_cache:
+            del self.session_tool_cache[session_id]
 
     def map_role(self, role: str) -> str:
         if role == "assistant":
@@ -266,33 +316,98 @@ class GeminiClient(LLMClientBase):
             print(f"Total Tokens: {response.usage_metadata.total_token_count}")
         print("========== END ==========")
 
-    async def get_function_call_schemas(self):
+    async def get_function_call_schemas(self, session_id: Optional[str] = None):
         """
-        获取所有工具的 schema，包括 MCP 工具和 Gemini 内置代码执行工具
-        Returns:
-            List[types.Tool]: 所有可用工具的 schema 列表
+        获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini tools 格式列表
+        只返回 meta tools + cached tools，不返回所有 regular tools。
         """
         if not self.tools_enabled:
             return []
             
-        tools = []
-        # 1. 添加 MCP 工具
+        debug = self.extra_config.get('debug', False)
+        
+        # 获取会话缓存的工具
+        cached_tools = []
+        if session_id:
+            cached_tools = self._get_cached_tools_for_session(session_id)
+            if debug:
+                print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
+        
+        # 获取所有MCP工具
         async with self.mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
+        
+        # 构建工具映射
+        tools_map = {}
+        meta_tools = []
+        
+        for tool in mcp_tools:
+            tool_name = tool.name
+            
+            # 简化参数处理
+            input_schema = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+            if "properties" in input_schema:
+                for prop in input_schema["properties"].values():
+                    if "description" not in prop:
+                        prop["description"] = f"Parameter value"
+                input_schema["required"] = list(input_schema["properties"].keys())
+            if "type" not in input_schema:
+                input_schema["type"] = "object"
+            # Gemini 不允许 additionalProperties 字段
+            input_schema.pop("additionalProperties", None)
+            
+            tool_schema = {
+                "name": tool_name,
+                "description": getattr(tool, "description", tool_name),
+                "parameters": input_schema
+            }
+            
+            tools_map[tool_name] = tool_schema
+            if self._is_meta_tool(tool_name):
+                meta_tools.append(tool_schema)
+        
+        # 构建最终工具列表：meta tools + cached tools
+        final_tools = meta_tools.copy()
+        
+        for cached_tool in cached_tools:
+            tool_name = cached_tool["name"]
+            # 复制参数，避免污染原 dict
+            cached_params = dict(cached_tool.get("parameters", {}))
+            # Gemini 不允许 additionalProperties 字段
+            cached_params.pop("additionalProperties", None)
+            if tool_name in tools_map:
+                final_tools.append(tools_map[tool_name])
+                if debug:
+                    print(f"[DEBUG] Added cached tool: {tool_name}")
+            else:
+                final_tools.append({
+                    "name": tool_name,
+                    "description": cached_tool.get("description", tool_name),
+                    "parameters": {
+                        "type": "object",
+                        "properties": cached_params,
+                        "required": list(cached_params.keys())
+                    }
+                })
+                if debug:
+                    print(f"[DEBUG] Added cached tool with basic schema: {tool_name}")
+        
+        if debug:
+            print(f"[DEBUG] Final tools count: {len(final_tools)} (meta: {len(meta_tools)}, cached: {len(cached_tools)})")
+        
+        # 转换为 Gemini 格式
         function_declarations = [
             {
-                "name": tool.name,
-                "description": getattr(tool, "description", ""),
-                "parameters": (lambda params: (params.update({"required": list(params["properties"].keys())}) if "properties" in params else None, params)[-1])(getattr(tool, "inputSchema", {"type": "object", "properties": {}}))
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": tool.get("parameters", {"type": "object", "properties": {}})
             }
-            for tool in mcp_tools
+            for tool in final_tools
         ]
+        
+        tools = []
         if function_declarations:
             tools.append(types.Tool(function_declarations=function_declarations))
-        
-        # 2. 添加代码执行工具
-        # tools.append(types.Tool(code_execution=types.ToolCodeExecution()))
-        # tools.append(types.Tool(google_search=types.GoogleSearch()))
         
         return tools
 
@@ -303,7 +418,11 @@ class GeminiClient(LLMClientBase):
         **kwargs
     ) -> 'LLMResponse':
         # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
-        tool_schemas = await self.get_function_call_schemas()
+        tool_schemas = await self.get_function_call_schemas(session_id)
+        
+        debug = self.extra_config.get('debug', False)
+        if debug:
+            print(f"[DEBUG] tools from get_function_call_schemas: {len(tool_schemas)} tools")
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = self._format_messages_for_gemini(messages)
@@ -469,37 +588,148 @@ class GeminiClient(LLMClientBase):
 
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
         """
-        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具。
-        对于需要 session_id 的工具（如 generate_image），由后端逻辑传递 session_id，避免 LLM 填写。
-        其余工具直接用 mcp_client 调用。
+        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
         function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
-        session_id: 可选的会话ID，用于需要会话上下文的工具
+        session_id: 可选的会话ID，用于需要会话上下文的工具（如文生图）
         """
         tool_name = function_call["name"]
-        params = function_call.get("arguments", {})
-        # 需要 session_id 的工具
-        tools_need_session = {"generate_image"}
-        if tool_name in tools_need_session:
+        tool_args = function_call.get("arguments", {})
+        tool_id = function_call.get("id", "")
+        debug = self.extra_config.get('debug', False)
+
+        # 处理meta tool调用
+        if self._is_meta_tool(tool_name):
+            if debug:
+                print(f"[DEBUG] Handling meta tool: {tool_name}")
+            
+            try:
+                async with self.mcp_client as mcp_async_client:
+                    result = await mcp_async_client.call_tool(tool_name, tool_args)
+                    text_result = extract_text_from_mcp_result(result)
+                    
+                    # 检查结果是否表示错误
+                    if isinstance(result, dict) and result.get("error"):
+                        return {
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "name": tool_name,
+                            "content": text_result,
+                            "is_error": True
+                        }
+                    
+                    # 如果是search_tools_by_keywords，缓存查询到的工具
+                    if tool_name == "search_tools_by_keywords" and session_id:
+                        try:
+                            # 尝试解析结果为JSON
+                            if isinstance(result, dict):
+                                meta_result = result
+                            else:
+                                meta_result = json.loads(text_result) if isinstance(text_result, str) else {}
+                            
+                            # 提取并缓存工具
+                            extracted_tools = self._extract_tools_from_meta_result(meta_result)
+                            if extracted_tools:
+                                self._cache_tools_for_session(session_id, extracted_tools)
+                                if debug:
+                                    print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
+                                    for tool in extracted_tools:
+                                        print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
+                        except Exception as e:
+                            if debug:
+                                print(f"[DEBUG] Failed to cache tools from meta result: {e}")
+                    
+                    return text_result
+                    
+            except Exception as e:
+                if debug:
+                    print(f"Error calling meta tool {tool_name}: {str(e)}")
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": f"Error: Meta tool execution failed - {str(e)}",
+                    "is_error": True
+                }
+
+        # Special handling for generate_image tool
+        if tool_name == "generate_image":
             if not session_id:
-                return "Error: No session ID provided for this tool."
-            # generate_image 需要先生成 prompt，再调用图片生成
+                if debug:
+                    print("[text_to_image] Error: No session ID provided for image generation")
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": "Error: No session ID provided for image generation",
+                    "is_error": True
+                }
+
+            # Generate prompts using LLM
             prompt_result = await self.generate_text_to_image_prompt(session_id)
             if not prompt_result:
-                return "Error: Failed to generate image prompts."
+                if debug:
+                    print("[text_to_image] Error: Failed to generate image prompts")
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": "Error: Failed to generate image prompts",
+                    "is_error": True
+                }
+
+            # Call the internal image generation function
             try:
                 result = await generate_image_from_description(
                     prompt=prompt_result["text_prompt"],
                     negative_prompt=prompt_result["negative_prompt"]
                 )
                 if not result:
-                    return "Error: Image generation failed - empty result"
+                    if debug:
+                        print("[text_to_image] Error: Image generation returned empty result")
+                    return {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "name": tool_name,
+                        "content": "Error: Image generation failed - empty result",
+                        "is_error": True
+                    }
                 return result
             except Exception as e:
-                return f"Error: Image generation failed - {str(e)}"
-        # 其余工具直接调用
-        async with self.mcp_client as mcp_async_client:
-            result = await mcp_async_client.call_tool(tool_name, params)
-            return extract_text_from_mcp_result(result)
+                if debug:
+                    print(f"[text_to_image] Error during image generation: {str(e)}")
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "name": tool_name,
+                    "content": f"Error: Image generation failed - {str(e)}",
+                    "is_error": True
+                }
+
+        # Normal tool handling for other tools
+        try:
+            async with self.mcp_client as mcp_async_client:
+                result = await mcp_async_client.call_tool(tool_name, tool_args)
+                text_result = extract_text_from_mcp_result(result)
+                # Check if the result indicates an error
+                if isinstance(result, dict) and result.get("error"):
+                    return {
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "name": tool_name,
+                        "content": text_result,
+                        "is_error": True
+                    }
+                return text_result
+        except Exception as e:
+            if debug:
+                print(f"Error calling tool {tool_name}: {str(e)}")
+            return {
+                "type": "tool_result",
+                "tool_use_id": tool_id,
+                "name": tool_name,
+                "content": f"Error: Tool execution failed - {str(e)}",
+                "is_error": True
+            }
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
@@ -514,17 +744,34 @@ class GeminiClient(LLMClientBase):
         debug = self.extra_config.get('debug', False)
         try:
             system_prompt = get_text_to_image_config().get("system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
-            latest_messages = get_latest_n_messages(session_id) if session_id else (None, None)
+            
+            # 获取n的配置
+            n = get_text_to_image_config().get("context_message_count", 2)
+            # 获取最新的对话消息
+            latest_messages = get_latest_n_messages(session_id, n) if session_id else tuple([None]*n)
             if not any(latest_messages):
                 error_msg = f"Missing conversation context for session {session_id}"
                 if debug:
                     print(f"[text_to_image] Error: {error_msg}")
                 return None
+            
+            # 构造消息序列
             messages = []
-            if latest_messages[0] and latest_messages[1]:
-                conversation_text = f"Please generate text to image prompt based on the following conversation:\n\n{latest_messages[0].role}: {latest_messages[0].content}\n{latest_messages[1].role}: {latest_messages[1].content}"
-                messages.append(UserMessage(role="user", content=conversation_text))
+            # 拼接n条消息内容
+            conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
+            for msg in latest_messages:
+                if msg is not None:
+                    conversation_text += f"{msg.role}: {msg.content}\n"
+            messages.append(UserMessage(role="user", content=conversation_text))
+            
+            # 使用相同的消息格式转换逻辑
             contents = self._format_messages_for_gemini(messages)
+            if debug:
+                print("\n[text_to_image] Messages for prompt generation:")
+                import pprint; pprint.pprint(messages)
+                print("[text_to_image] Formatted contents:")
+                pprint.pprint(contents)
+            
             safety_settings = self.safety_settings
             prompt_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -535,10 +782,6 @@ class GeminiClient(LLMClientBase):
             if debug:
                 print("\n[Gemini][text_to_image] System prompt:")
                 print(system_prompt)
-                print("[Gemini][text_to_image] Messages for prompt generation:")
-                import pprint; pprint.pprint(messages)
-                print("[Gemini][text_to_image] Formatted contents:")
-                pprint.pprint(contents)
                 print("[Gemini][text_to_image] Prompt config:")
                 pprint.pprint(prompt_config)
             
@@ -607,3 +850,4 @@ class GeminiClient(LLMClientBase):
             if debug:
                 print(f"[text_to_image] Error during prompt generation: {str(e)}")
             return None
+        

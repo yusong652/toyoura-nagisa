@@ -32,13 +32,14 @@ def register_meta_tools(mcp: FastMCP):
         max_results: int = 5
     ) -> Dict[str, Any]:
         """
-        Meta Tool: Search for relevant tools based on keywords
+        [Meta Tool] Intelligent tool search entry. Use this tool to discover and dynamically load the most relevant tools for your task.
         
-        This is the core meta tool of aiNagisa for intelligent tool selection. When users enable tool mode,
-        the system will call this tool to search for the most relevant tools based on user request keywords.
+        This meta tool performs a semantic search in the tool vector database based on your provided English keywords, and makes the discovered tools available for subsequent use.
+        
+        Please always use clear and concise English keywords for searching.
         
         Args:
-            keywords: Search keywords describing the user's need or task (e.g., "time clock", "weather temperature", "web search", "email send")
+            keywords: English keywords describing the user's intent or required tool (e.g., "weather", "calendar", "web search", "email send")
             max_results: Maximum number of results to return
             
         Returns:
