@@ -5,6 +5,6 @@ if __name__ == "__main__":
     mcp = FastMCP("TestMeta")
     register_meta_tools(mcp)
     tool_obj = mcp.get_tool("search_tools_by_keywords")
-    result = tool_obj.callable("time clock current time", 5)
+    result = tool_obj.callable("draw image", 5)
     print("[TEST] meta_tool.search_tools_by_keywords 返回：")
     print(result) 

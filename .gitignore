@@ -75,4 +75,7 @@ htmlcov/
 
 # Google OAuth credentials and tokens
 backend/nagisa_mcp/tools/google_auth/credentials.json
-backend/nagisa_mcp/tools/google_auth/tokens/ 
+backend/nagisa_mcp/tools/google_auth/tokens/
+
+# Ignore tool vector database
+backend/tool_db/ 

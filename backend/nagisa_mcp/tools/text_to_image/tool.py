@@ -122,8 +122,12 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
 
 async def generate_image() -> str:
     """
-    Generate an image based on the current conversation context.
-    This tool will analyze the conversation and create a beautiful anime-style image.
+    Generate an image or artwork based on the current conversation context.
+
+    This tool analyzes the conversation and creates a beautiful anime-style image or other visual artwork using AI models.
+
+    Keywords: image generation, text to image, AI painting, draw, picture, art creation, visual art, DALL-E, stable diffusion, midjourney, anime, create image, generate picture, illustration, artwork.
+    
     No parameters are needed as it uses the conversation context automatically.
     
     Returns:
@@ -143,7 +147,7 @@ async def generate_image() -> str:
             print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return "Image generation failed, please try again."
 
-def register_text_to_image_tool(mcp: FastMCP):
+def register_text_to_image_tools(mcp: FastMCP):
     """
     Register the text-to-image generation tool with the MCP server.
     

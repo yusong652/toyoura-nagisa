@@ -4,9 +4,10 @@ from typing import List, Dict, Any, Optional
 import os
 import json
 from datetime import datetime
+from backend.config import MEMORY_DB_PATH
 
 class ChromaMemory:
-    def __init__(self, persist_directory: str = "memory_db"):
+    def __init__(self, persist_directory: str = MEMORY_DB_PATH):
         """
         初始化ChromaDB记忆系统
         

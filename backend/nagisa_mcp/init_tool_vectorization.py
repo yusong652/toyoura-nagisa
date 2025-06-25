@@ -40,7 +40,6 @@ def import_and_register_all_tools(mcp):
         'nagisa_mcp.tools.contact_tools.tool',
         'nagisa_mcp.tools.places_tools.tool',
         'nagisa_mcp.tools.memory_tools.tool',
-        'nagisa_mcp.tools.text_to_image.tool',
     ]
     for module_path in tool_module_paths:
         try:
@@ -64,7 +63,7 @@ def main():
             print(f"[INFO] list_tools()返回 {len(tool_infos)} 个工具")
 
             print("[INFO] 初始化ToolVectorizer...")
-            vectorizer = ToolVectorizer("tool_db")
+            vectorizer = ToolVectorizer("backend/tool_db")
 
             print("[INFO] 开始向量化...")
             for tool in tool_infos:

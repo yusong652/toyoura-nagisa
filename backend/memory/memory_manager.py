@@ -2,9 +2,10 @@ from typing import List, Dict, Any, Optional
 from .chroma_memory import ChromaMemory
 import json
 from datetime import datetime
+from backend.config import MEMORY_DB_PATH
 
 class MemoryManager:
-    def __init__(self, persist_directory: str = "memory_db"):
+    def __init__(self, persist_directory: str = MEMORY_DB_PATH):
         """
         初始化记忆管理器
         

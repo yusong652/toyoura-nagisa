@@ -6,9 +6,10 @@ import json
 import hashlib
 from datetime import datetime
 import os
+from backend.config import TOOL_DB_PATH
 
 class ToolVectorizer:
-    def __init__(self, persist_directory: str = "tool_db"):
+    def __init__(self, persist_directory: str = TOOL_DB_PATH):
         """
         初始化工具向量化系统
         

@@ -5,7 +5,7 @@ from nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 if __name__ == "__main__":
     vectorizer = ToolVectorizer("tool_db")
-    query = "time clock current time"
+    query = "image"
     print(f"[TEST] 查询关键词: {query}")
     results = vectorizer.search_tools(query, n_results=5)
     print(f"[TEST] 查到 {len(results)} 个工具：")

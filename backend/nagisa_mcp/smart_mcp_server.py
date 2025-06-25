@@ -5,7 +5,7 @@ from backend.nagisa_mcp.tools.web_search import register_web_search_tools
 from backend.nagisa_mcp.tools.email_tools import register_email_tools
 from backend.nagisa_mcp.tools.calendar import register_calendar_tools
 from backend.nagisa_mcp.tools.coding import register_coding_tools
-from backend.nagisa_mcp.tools.text_to_image import register_text_to_image_tool
+from backend.nagisa_mcp.tools.text_to_image import register_text_to_image_tools
 from backend.nagisa_mcp.tools.contact_tools import register_contact_tools
 from backend.nagisa_mcp.tools.places_tools import register_places_tools
 from backend.nagisa_mcp.tools.memory_tools import register_memory_tools
@@ -29,7 +29,7 @@ register_web_search_tools(mcp)
 register_email_tools(mcp)
 register_calendar_tools(mcp)
 register_coding_tools(mcp)
-register_text_to_image_tool(mcp)
+register_text_to_image_tools(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
 register_memory_tools(mcp)

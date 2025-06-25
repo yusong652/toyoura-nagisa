@@ -7,10 +7,11 @@ from fastmcp import FastMCP
 import json
 import sys
 import os
+from backend.config import TOOL_DB_PATH
+from nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 # Add backend path to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 def register_meta_tools(mcp: FastMCP):
     """Register meta tools to the FastMCP server"""
@@ -22,10 +23,7 @@ def register_meta_tools(mcp: FastMCP):
         """Get the tool vectorizer instance"""
         nonlocal _vectorizer
         if _vectorizer is None:
-            # 递归两级，确保无论从哪里import都能定位到nagisa_mcp/tool_db
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-            db_path = os.path.join(base_dir, "tool_db")
-            _vectorizer = ToolVectorizer(db_path)
+            _vectorizer = ToolVectorizer(TOOL_DB_PATH)
         return _vectorizer
 
     @mcp.tool()

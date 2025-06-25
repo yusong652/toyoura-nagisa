@@ -1,1 +1,1 @@
-from .tool import register_text_to_image_tool, generate_image_from_description
+from .tool import register_text_to_image_tools, generate_image_from_description
