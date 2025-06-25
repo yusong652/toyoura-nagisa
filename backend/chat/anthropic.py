@@ -57,13 +57,29 @@ class AnthropicClient(LLMClientBase):
             if "tools" in meta_result and isinstance(meta_result["tools"], list):
                 for tool_info in meta_result["tools"]:
                     if isinstance(tool_info, dict) and "name" in tool_info:
+                        # 解析 parameters
+                        params = tool_info.get("parameters", {})
+                        if isinstance(params, str):
+                            try:
+                                params = json.loads(params)
+                            except (json.JSONDecodeError, TypeError):
+                                params = {}
+
+                        # 解析 tags
+                        tags = tool_info.get("tags", [])
+                        if isinstance(tags, str):
+                            try:
+                                tags = json.loads(tags)
+                            except (json.JSONDecodeError, TypeError):
+                                tags = []
+
                         tools.append({
                             "name": tool_info["name"],
                             "description": tool_info.get("description", ""),
                             "category": tool_info.get("category", "general"),
                             "docstring": tool_info.get("docstring", ""),
-                            "parameters": tool_info.get("parameters", {}),
-                            "tags": tool_info.get("tags", [])
+                            "parameters": params,
+                            "tags": tags
                         })
         return tools
 
@@ -746,10 +762,14 @@ class AnthropicClient(LLMClientBase):
                     if tool_name == "search_tools_by_keywords" and session_id:
                         try:
                             # 尝试解析结果为JSON
-                            if isinstance(result, dict):
-                                meta_result = result
-                            else:
-                                meta_result = json.loads(text_result) if isinstance(text_result, str) else {}
+                            meta_result = {}
+                            if isinstance(text_result, dict):
+                                meta_result = text_result
+                            elif isinstance(text_result, str):
+                                try:
+                                    meta_result = json.loads(text_result)
+                                except (json.JSONDecodeError, TypeError):
+                                    meta_result = {}
                             
                             # 提取并缓存工具
                             extracted_tools = self._extract_tools_from_meta_result(meta_result)

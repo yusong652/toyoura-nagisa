@@ -74,13 +74,30 @@ class GeminiClient(LLMClientBase):
             if "tools" in meta_result and isinstance(meta_result["tools"], list):
                 for tool_info in meta_result["tools"]:
                     if isinstance(tool_info, dict) and "name" in tool_info:
+                        
+                        # 解析 parameters
+                        params = tool_info.get("parameters", {})
+                        if isinstance(params, str):
+                            try:
+                                params = json.loads(params)
+                            except (json.JSONDecodeError, TypeError):
+                                params = {} # 解析失败则视为空
+                        
+                        # 解析 tags
+                        tags = tool_info.get("tags", [])
+                        if isinstance(tags, str):
+                            try:
+                                tags = json.loads(tags)
+                            except (json.JSONDecodeError, TypeError):
+                                tags = [] # 解析失败则视为空
+
                         tools.append({
                             "name": tool_info["name"],
                             "description": tool_info.get("description", ""),
                             "category": tool_info.get("category", "general"),
                             "docstring": tool_info.get("docstring", ""),
-                            "parameters": tool_info.get("parameters", {}),
-                            "tags": tool_info.get("tags", [])
+                            "parameters": params,
+                            "tags": tags
                         })
         return tools
 
@@ -409,6 +426,20 @@ class GeminiClient(LLMClientBase):
         if function_declarations:
             tools.append(types.Tool(function_declarations=function_declarations))
         
+        if debug:
+            print(f"[DEBUG] tools from get_function_call_schemas: {len(tools)} tools")
+            # 打印tool schemas详情
+            print(f"[DEBUG] Tool schemas for session {session_id}:")
+            for i, tool in enumerate(tools):
+                if hasattr(tool, 'function_declarations'):
+                    for func_decl in tool.function_declarations:
+                        name = getattr(func_decl, 'name', str(func_decl))
+                        desc = getattr(func_decl, 'description', 'No description')
+                        print(f"  {i+1}. {name}: {desc}")
+                else:
+                    print(f"  {i+1}. {tool}")
+            print()
+        
         return tools
 
     async def get_response(
@@ -422,7 +453,11 @@ class GeminiClient(LLMClientBase):
         
         debug = self.extra_config.get('debug', False)
         if debug:
+            print(f"[DEBUG] 当前 session_tool_cache: {self.session_tool_cache}")
             print(f"[DEBUG] tools from get_function_call_schemas: {len(tool_schemas)} tools")
+            print(f"[DEBUG] Tool schemas for session {session_id}:")
+            import pprint; pprint.pprint(tool_schemas)
+            print()
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = self._format_messages_for_gemini(messages)
@@ -621,11 +656,18 @@ class GeminiClient(LLMClientBase):
                     if tool_name == "search_tools_by_keywords" and session_id:
                         try:
                             # 尝试解析结果为JSON
-                            if isinstance(result, dict):
-                                meta_result = result
-                            else:
-                                meta_result = json.loads(text_result) if isinstance(text_result, str) else {}
+                            meta_result = {}
+                            if isinstance(text_result, dict):
+                                meta_result = text_result
+                            elif isinstance(text_result, str):
+                                try:
+                                    meta_result = json.loads(text_result)
+                                except (json.JSONDecodeError, TypeError):
+                                    meta_result = {}
                             
+                            if debug:
+                                print(f"[DEBUG] Meta result for caching: {meta_result}")
+
                             # 提取并缓存工具
                             extracted_tools = self._extract_tools_from_meta_result(meta_result)
                             if extracted_tools:
@@ -634,6 +676,10 @@ class GeminiClient(LLMClientBase):
                                     print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
                                     for tool in extracted_tools:
                                         print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
+                            else:
+                                if debug:
+                                    print(f"[DEBUG] No tools extracted from meta result for session {session_id}")
+
                         except Exception as e:
                             if debug:
                                 print(f"[DEBUG] Failed to cache tools from meta result: {e}")

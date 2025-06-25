@@ -223,7 +223,7 @@ async def handle_llm_response(
     处理 LLM 的响应，包括普通文本回复和工具调用。
     对于文生图工具，会先生成提示词，然后再调用文生图工具。
     """
-    llm_response = await llm_client.get_response(recent_msgs)
+    llm_response = await llm_client.get_response(recent_msgs, session_id=session_id)
     print(f"[DEBUG] llm_response type: {llm_response.response_type}")
     
     if llm_response.response_type == ResponseType.FUNCTION_CALL:
