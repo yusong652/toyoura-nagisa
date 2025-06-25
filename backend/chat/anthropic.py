@@ -855,31 +855,3 @@ class AnthropicClient(LLMClientBase):
                 "content": f"Error: Tool execution failed - {str(e)}",
                 "is_error": True
             }
-
-    # 工具函数：规范化 tool_result 为 Anthropic 支持的 content block
-    def _normalize_tool_content(self, tool_result):
-        content = []
-        if isinstance(tool_result, list):
-            for c in tool_result:
-                if isinstance(c, dict) and "type" in c and c["type"] in ("text", "image"):
-                    content.append(c)
-                elif isinstance(c, dict) and "inline_data" in c:
-                    mime = c["inline_data"].get("mime_type", "image/png")
-                    data = c["inline_data"]["data"]
-                    content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime,
-                            "data": data
-                        }
-                    })
-                elif isinstance(c, dict) and "text" in c:
-                    content.append({"type": "text", "text": str(c["text"])})
-                elif c is not None:
-                    content.append({"type": "text", "text": str(c)})
-        elif tool_result is not None:
-            content = [{"type": "text", "text": str(tool_result)}]
-        else:
-            content = [{"type": "text", "text": ""}]
-        return content
