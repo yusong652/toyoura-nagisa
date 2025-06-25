@@ -13,7 +13,7 @@ def execute_python_script(
     """
     Execute a Python script in the workspace.
     This tool can be used for: running Python scripts, executing code, testing Python programs, etc.
-    Example user queries: "run this script", "execute this Python file", "run my code", "运行这个脚本", "执行这个Python文件".
+    Example user queries: "run this script", "execute this Python file", "run my code".
 
     Args:
         path (str): Path to the Python script to execute.

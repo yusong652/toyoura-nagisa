@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
 import { playMotion } from '../utils/live2d'
+import GeolocationService from '../utils/geolocation'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -976,6 +977,51 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
+    // 处理位置请求事件
+    const handleLocationRequest = async (data: any) => {
+      console.log('收到位置请求:', data);
+      
+      try {
+        // 获取地理位置服务实例
+        const geolocationService = GeolocationService.getInstance();
+        
+        // 确保服务已初始化
+        if (!geolocationService.isServiceInitialized()) {
+          await geolocationService.initialize();
+        }
+        
+        // 获取位置信息
+        const locationData = await geolocationService.requestLocation();
+        
+        if (locationData) {
+          // 添加session_id到位置数据中
+          const locationDataWithSession = {
+            ...locationData,
+            session_id: currentSessionId
+          };
+          
+          // 发送位置信息到后端
+          const response = await fetch('/api/location/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(locationDataWithSession),
+          });
+          
+          if (response.ok) {
+            console.log('位置信息已成功发送到后端，session_id:', currentSessionId);
+          } else {
+            console.warn('位置信息发送失败');
+          }
+        } else {
+          console.warn('无法获取位置信息');
+        }
+      } catch (error) {
+        console.error('处理位置请求时出错:', error);
+      }
+    };
+
     // 处理一行数据
     const processLine = (line: string) => {
       if (line.trim() === '') return;
@@ -995,6 +1041,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           // 处理会话刷新事件
           if (data.type === 'SESSION_REFRESH') {
             handleSessionRefresh(data);
+            return;
+          }
+          
+          // 处理位置请求事件
+          if (data.type === 'LOCATION_REQUEST') {
+            handleLocationRequest(data);
             return;
           }
           

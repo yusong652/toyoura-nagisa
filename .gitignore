@@ -62,6 +62,7 @@ backend/memory_db/
 frontend/node_modules/
 backend/config.py
 workspace/
+backend/location_data/
 
 # Test coverage
 .coverage

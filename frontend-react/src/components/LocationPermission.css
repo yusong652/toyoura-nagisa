@@ -1,0 +1,89 @@
+.location-permission-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--primary-color, #4a90e2);
+  color: white;
+  padding: 12px 20px;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease;
+}
+
+.location-permission-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.location-permission-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.location-permission-text {
+  flex: 1;
+}
+
+.location-permission-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.location-permission-text p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.location-permission-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.location-permission-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.location-permission-button.primary {
+  background-color: white;
+  color: var(--primary-color, #4a90e2);
+}
+
+.location-permission-button.primary:hover {
+  background-color: #f8f9fa;
+}
+
+.location-permission-button.secondary {
+  background-color: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.location-permission-button.secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.location-permission-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+} 

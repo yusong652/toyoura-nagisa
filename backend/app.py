@@ -20,7 +20,7 @@ from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
 from backend.tts.tts_factory import get_tts_engine
-from backend.config import get_llm_config
+from backend.config import get_llm_config, LOCATION_DB_PATH
 import uuid
 from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
 from backend.utils.helpers import (
@@ -52,6 +52,7 @@ import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.routes import images
 from backend.memory.memory_manager import MemoryManager
+from backend.nagisa_mcp.location_manager import get_location_manager
 
 
 # 加载环境变量
@@ -253,6 +254,22 @@ async def handle_llm_response(
                 'action_text': f"I'll use the {tool_call['name']} tool to help you."
             }
             yield f"data: {json.dumps(tool_state)}\n\n"
+
+            # 特殊处理：如果是get_location工具，先向前端发送位置请求
+            if tool_call['name'] == "get_location":
+                # 发送位置请求信号给前端
+                location_request = {
+                    'type': 'LOCATION_REQUEST',
+                    'payload': {
+                        'session_id': session_id,
+                        'tool_call_id': tool_call['id']
+                    }
+                }
+                yield f"data: {json.dumps(location_request)}\n\n"
+                
+                # 等待一段时间让前端处理位置请求
+                # 增加等待时间到10秒，给用户足够时间授权位置权限
+                await asyncio.sleep(10)
 
             # 处理函数调用结果，传入 session_id
             tool_result = await llm_client.handle_function_call(tool_call, session_id)
@@ -508,4 +525,36 @@ async def generate_image_endpoint(request: GenerateImageRequest):
     except Exception as e:
         import traceback
         print(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/location/update")
+async def update_browser_location(request: Request):
+    """接收前端发送的浏览器位置信息"""
+    try:
+        data = await request.json()
+        session_id = data.get("session_id")  # 获取session_id
+        
+        location_data = {
+            "latitude": data.get("latitude"),
+            "longitude": data.get("longitude"),
+            "accuracy": data.get("accuracy"),
+            "timestamp": data.get("timestamp") or int(datetime.now().timestamp()),
+            "source": "browser_geolocation"
+        }
+        
+        # 直接用location_manager
+        location_manager = get_location_manager(LOCATION_DB_PATH)
+        location_manager.set_session_location(
+            session_id=session_id or "global",
+            latitude=location_data["latitude"],
+            longitude=location_data["longitude"],
+            accuracy=location_data.get("accuracy"),
+            source=location_data.get("source", "browser_geolocation"),
+            timestamp=location_data.get("timestamp")
+        )
+        
+        print(f"[DEBUG] Browser location updated for session {session_id}: {location_data}")
+        return {"success": True, "session_id": session_id}
+    except Exception as e:
+        print(f"[ERROR] Failed to update browser location: {e}")
         return {"success": False, "error": str(e)}
