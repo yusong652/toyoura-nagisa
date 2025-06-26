@@ -10,6 +10,8 @@ from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output, get_latest_n_messages
 from fastmcp import Client as MCPClient
+from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
+from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.config import get_models_lab_config, get_text_to_image_config
@@ -20,13 +22,12 @@ class GeminiClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
         """
         初始化 Gemini 客户端。
         Args:
             api_key: Google API key。
             system_prompt: 可选，覆盖初始化时的 system prompt。
-            mcp_client: 可选，用于替换默认的 MCPClient。
         """
         super().__init__(system_prompt, **kwargs)
         self.api_key = api_key
@@ -51,13 +52,39 @@ class GeminiClient(LLMClientBase):
         ]
         
         print(f"Gemini Client initialized.")
-        # 集成 MCPClient
-        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
-        
-        # 工具缓存机制
-        self.tool_cache = {}  # 缓存查询到的工具
-        self.meta_tools = set()  # meta tool名称集合
-        self.session_tool_cache = {}  # 按会话ID缓存工具
+
+        self._mcp_client_source = GLOBAL_MCP
+
+        # 按 chat_session_id 缓存已创建的 MCPClient；None 代表默认/无会话
+        self._mcp_clients: dict[str | None, MCPClient] = {}
+
+        # -------------------------------------------------------------
+        # 工具缓存机制（之前版本已有）
+        # -------------------------------------------------------------
+        # 全局工具缓存，避免重复查询
+        self.tool_cache: Dict[str, Any] = {}
+        # meta tool 名称集合，用于快速判定
+        self.meta_tools: set[str] = set()
+        # 按会话维度的工具缓存：{session_id: List[tool_schema]}
+        self.session_tool_cache: Dict[str, List[Dict[str, Any]]] = {}
+
+
+    def _get_mcp_client(self, session_id: Optional[str] = None) -> MCPClient:
+        """Return (and cache) an MCPClient bound to *session_id*.
+
+        A unique client per chat-session ensures the underlying FastMCP
+        Session stays isolated.  If *self._mcp_client_source* is already an
+        MCPClient, we always reuse that single instance.
+        """
+
+        # If caller injected a ready-made MCPClient, we cannot (and need not)
+        # create more – just return it regardless of session_id.
+        key = session_id or "__default__"
+        client = self._mcp_clients.get(key)
+        if client is None:
+            client = MCPClient(self._mcp_client_source, client_info=Implementation(name=session_id, version="0.1.0"))
+            self._mcp_clients[key] = client
+        return client
 
     def _is_meta_tool(self, tool_name: str) -> bool:
         """判断是否为meta tool"""
@@ -351,7 +378,8 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
         
         # 获取所有MCP工具
-        async with self.mcp_client as mcp_async_client:
+        mcp_client = self._get_mcp_client(session_id)
+        async with mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         
         # 构建工具映射
@@ -509,7 +537,7 @@ class GeminiClient(LLMClientBase):
                 )
             
             return self._format_llm_response(response)
-            
+                
         except Exception as e:
             error_message = f"Gemini API error: {str(e)}"
             print(f"[DEBUG] llm_response type: error")
@@ -638,8 +666,24 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] Handling meta tool: {tool_name}")
             
             try:
-                async with self.mcp_client as mcp_async_client:
-                    result = await mcp_async_client.call_tool(tool_name, tool_args)
+                mcp_client = self._get_mcp_client(session_id)
+                async with mcp_client as mcp_async_client:
+                    # 注入 session_id 到 _meta.client_id，避免暴露在参数中
+                    if session_id:
+                        try:
+                            params = CallToolRequestParams(
+                                name=tool_name,
+                                arguments=tool_args,
+                                **{"_meta": {"client_id": session_id}},
+                            )
+                            call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+                            result: CallToolResult = await mcp_async_client.session.send_request(
+                                call_req,
+                                CallToolResult,
+                            )
+                        except Exception:
+                            result = await mcp_async_client.call_tool(tool_name, tool_args)
+                    
                     text_result = extract_text_from_mcp_result(result)
                     
                     # 检查结果是否表示错误
@@ -753,8 +797,27 @@ class GeminiClient(LLMClientBase):
 
         # Normal tool handling for other tools
         try:
-            async with self.mcp_client as mcp_async_client:
-                result = await mcp_async_client.call_tool(tool_name, tool_args)
+            mcp_client = self._get_mcp_client(session_id)
+
+            async with mcp_client as mcp_async_client:
+                # 注入 session_id 到 _meta.client_id，避免暴露在参数中
+                if session_id:
+                    try:
+                        params = CallToolRequestParams(
+                            name=tool_name,
+                            arguments=tool_args,
+                            **{"_meta": {"client_id": session_id}},
+                        )
+                        call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+                        result: CallToolResult = await mcp_async_client.session.send_request(
+                            call_req,
+                            CallToolResult,
+                        )
+                    except Exception:
+                        result = await mcp_async_client.call_tool(tool_name, tool_args)
+                else:
+                    result = await mcp_async_client.call_tool(tool_name, tool_args)
+
                 text_result = extract_text_from_mcp_result(result)
                 # Check if the result indicates an error
                 if isinstance(result, dict) and result.get("error"):

@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Type, Any
 from backend.chat.base import LLMClientBase
 from backend.chat.gpt import GPTClient
 from backend.chat.gemini import GeminiClient
@@ -29,13 +29,13 @@ def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     """
     _clients[name] = client_class
 
-def get_client(name: Optional[str] = None, mcp_client=None, **kwargs) -> LLMClientBase:
+def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) -> LLMClientBase:
     """
     Get or create an LLM client instance.
     
     Args:
         name: Name of the LLM client to get. If None, uses the configured type.
-        mcp_client: MCP client instance to inject (for in-process tool calls)
+        app: Optional FastAPI app instance for context injection.
         **kwargs: Arguments to pass to the client constructor
         
     Returns:
@@ -63,11 +63,10 @@ def get_client(name: Optional[str] = None, mcp_client=None, **kwargs) -> LLMClie
         # 然后应用特定 LLM 的配置
         **specific_config,
         # 最后应用传入的参数，这些参数会覆盖之前的配置
-        **kwargs
+        **kwargs,
+        # 显式传递 app 实例
+        "app": app
     }
-    
-    if mcp_client is not None:
-        client_kwargs["mcp_client"] = mcp_client
     
     # To avoid creating multiple instances with the same configuration
     config_key = f"{name}:{str(sorted(client_kwargs.items()))}"

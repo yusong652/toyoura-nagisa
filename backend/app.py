@@ -58,20 +58,52 @@ from backend.nagisa_mcp.location_manager import get_location_manager
 # 加载环境变量
 load_dotenv()
 
+# WebSocket 连接管理器
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+
+    async def connect(self, websocket: WebSocket, session_id: str):
+        await websocket.accept()
+        self.active_connections[session_id] = websocket
+        print(f"WebSocket connected for session: {session_id}")
+
+    def disconnect(self, session_id: str):
+        if session_id in self.active_connections:
+            del self.active_connections[session_id]
+            print(f"WebSocket disconnected for session: {session_id}")
+
+    async def send_json(self, session_id: str, data: dict):
+        if session_id in self.active_connections:
+            try:
+                await self.active_connections[session_id].send_json(data)
+                print(f"Sent message to session {session_id}: {data}")
+            except Exception as e:
+                print(f"Failed to send message to session {session_id}: {e}")
+                self.disconnect(session_id)
+        else:
+            print(f"No active WebSocket connection for session: {session_id}")
+
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
 
 # 应用生命周期管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 初始化 WebSocket 连接管理器
+    connection_manager = ConnectionManager()
+    app.state.connection_manager = connection_manager
+
     tts_engine = get_tts_engine()
     await tts_engine.initialize()
     app.state.tts_engine = tts_engine
     print("TTS Engine Initialized.")
     # 初始化 LLM Client，传递 mcp_client 实例
-    llm_client = get_client(mcp_client=mcp_client)
+    llm_client = get_client()
     app.state.llm_client = llm_client
     app.state.mcp = mcp
+    # 将 FastAPI app 实例附加到 mcp 服务器实例上，以便在工具的 context 中访问
+    mcp.app = app
     app.state.mcp_client = mcp_client
     # 启动 MCP SSE server（如需对外暴露）
     mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9000), daemon=True)
@@ -266,10 +298,6 @@ async def handle_llm_response(
                     }
                 }
                 yield f"data: {json.dumps(location_request)}\n\n"
-                
-                # 等待一段时间让前端处理位置请求
-                # 增加等待时间到10秒，给用户足够时间授权位置权限
-                await asyncio.sleep(10)
 
             # 处理函数调用结果，传入 session_id
             tool_result = await llm_client.handle_function_call(tool_call, session_id)
@@ -542,15 +570,11 @@ async def update_browser_location(request: Request):
             "source": "browser_geolocation"
         }
         
-        # 直接用location_manager
-        location_manager = get_location_manager(LOCATION_DB_PATH)
-        location_manager.set_session_location(
+        # 更新位置管理器
+        location_manager = get_location_manager()
+        location_manager.update_location(
             session_id=session_id or "global",
-            latitude=location_data["latitude"],
-            longitude=location_data["longitude"],
-            accuracy=location_data.get("accuracy"),
-            source=location_data.get("source", "browser_geolocation"),
-            timestamp=location_data.get("timestamp")
+            data=location_data
         )
         
         print(f"[DEBUG] Browser location updated for session {session_id}: {location_data}")
@@ -558,3 +582,15 @@ async def update_browser_location(request: Request):
     except Exception as e:
         print(f"[ERROR] Failed to update browser location: {e}")
         return {"success": False, "error": str(e)}
+
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """为每个客户端会话建立 WebSocket 连接。"""
+    connection_manager: ConnectionManager = websocket.app.state.connection_manager
+    await connection_manager.connect(websocket, session_id)
+    try:
+        while True:
+            # 保持连接开放以接收后端推送
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        connection_manager.disconnect(session_id)

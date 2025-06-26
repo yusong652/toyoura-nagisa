@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
@@ -38,6 +38,39 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   // 添加工具开关状态
   const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
+
+  // --- WebSocket connection for server push (e.g., REQUEST_LOCATION) ---
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Establish /ws/{session_id} connection whenever currentSessionId changes
+  useEffect(() => {
+    // Close previous ws if any
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch (_) {}
+      wsRef.current = null;
+    }
+
+    if (!currentSessionId) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${currentSessionId}`);
+    wsRef.current = ws;
+
+    ws.onopen = () => console.log("[WebSocket] connected for session", currentSessionId);
+    ws.onclose = () => console.log("[WebSocket] closed for session", currentSessionId);
+    ws.onerror = (e) => console.error("[WebSocket] error", e);
+
+    // We don't handle incoming messages here because backend currently only sends REQUEST_LOCATION via SSE.
+    // But keeping the socket open allows backend to verify connection_manager presence.
+
+    return () => {
+      try {
+        ws.close();
+      } catch (_) {}
+    };
+  }, [currentSessionId]);
 
   // 添加更新工具状态的函数
   const updateToolsEnabled = useCallback(async (enabled: boolean) => {
