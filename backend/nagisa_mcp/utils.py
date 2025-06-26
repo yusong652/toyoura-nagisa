@@ -29,6 +29,43 @@ def extract_text_from_mcp_result(result):
         if len(structured) == 1:
             return structured[0]
         return structured
+
+    # 1.5 处理 CallToolResult 或类似对象（具有 .content 列表属性）
+    # 该类型出现在 fastmcp 返回结果中，格式为 object(content=[TextContent, ...], isError=bool)
+    if hasattr(result, "content") and isinstance(result.content, list):
+        structured_items = []
+        for item in result.content:
+            # TextContent
+            if hasattr(item, "type") and item.type == "text":
+                structured_items.append(try_json(getattr(item, "text", "")))
+            # ImageContent
+            elif hasattr(item, "type") and item.type == "image":
+                structured_items.append({
+                    "type": "image",
+                    "data": getattr(item, "data", None),
+                    "mime_type": getattr(item, "mimeType", None),
+                })
+            # EmbeddedResource 或其他
+            elif hasattr(item, "type") and item.type == "resource":
+                structured_items.append({
+                    "type": "resource",
+                    "resource": getattr(item, "resource", None),
+                })
+            else:
+                # 尝试直接序列化未知对象
+                structured_items.append(item)
+
+        # 合并单元素简化返回
+        payload = structured_items[0] if len(structured_items) == 1 else structured_items
+
+        # 如果存在 isError 标记，包装为 dict 以便后续判断
+        if getattr(result, "isError", False):
+            return {
+                "is_error": True,
+                "content": payload,
+            }
+        return payload
+
     # 2. 处理单个TextContent对象
     if hasattr(result, "text") and isinstance(result.text, str):
         return try_json(result.text)

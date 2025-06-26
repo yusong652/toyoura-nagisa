@@ -11,6 +11,8 @@ from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.config import get_models_lab_config, get_text_to_image_config
+from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
+from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
 class AnthropicClient(LLMClientBase):
     """
@@ -18,7 +20,7 @@ class AnthropicClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
+    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
         """
         初始化 Anthropic 客户端。
         Args:
@@ -35,7 +37,14 @@ class AnthropicClient(LLMClientBase):
             "anthropic-version": "2023-06-01"
         }
         self.anthropic_client = anthropic.Anthropic(api_key=self.api_key)
-        self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
+       
+        # -------------------------------------------------------------
+        # 会话隔离版 MCPClient 管理（参考 GeminiClient 实现）
+        # -------------------------------------------------------------
+        # _mcp_client_source 用于创建新的 MCPClient；如果用户传入现成的实例则直接复用
+        self._mcp_client_source = GLOBAL_MCP
+        # 按 chat_session_id 缓存 MCPClient，确保 Session 隔离
+        self._mcp_clients: dict[str | None, MCPClient] = {}
         
         # 工具缓存机制
         self.tool_cache = {}  # 缓存查询到的工具
@@ -103,6 +112,29 @@ class AnthropicClient(LLMClientBase):
         """清除会话的工具缓存"""
         if session_id in self.session_tool_cache:
             del self.session_tool_cache[session_id]
+
+    def _get_mcp_client(self, session_id: Optional[str] = None) -> MCPClient:
+        """Return (and cache) an MCPClient bound to *session_id*.
+
+        A unique client per chat-session ensures the underlying FastMCP
+        Session stays isolated.  If *self._mcp_client_source* is already an
+        MCPClient, we always reuse that single instance.
+        """
+
+        # If caller injected a ready-made MCPClient, we cannot (and need not)
+        # create more – just return it regardless of session_id.
+        if isinstance(self._mcp_client_source, MCPClient):
+            return self._mcp_client_source
+
+        key = session_id or "__default__"
+        client = self._mcp_clients.get(key)
+        if client is None:
+            client = MCPClient(
+                self._mcp_client_source,
+                client_info=Implementation(name=session_id, version="0.1.0"),
+            )
+            self._mcp_clients[key] = client
+        return client
 
     def _format_messages_for_anthropic(self, messages: List[BaseMessage]) -> Tuple[List[Dict[str, Any]], bool]:
         """
@@ -662,7 +694,8 @@ class AnthropicClient(LLMClientBase):
                 print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
         
         # 获取所有MCP工具
-        async with self.mcp_client as mcp_async_client:
+        mcp_client = self._get_mcp_client(session_id)
+        async with mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         
         # 构建工具映射
@@ -744,8 +777,24 @@ class AnthropicClient(LLMClientBase):
                 print(f"[DEBUG] Handling meta tool: {tool_name}")
             
             try:
-                async with self.mcp_client as mcp_async_client:
-                    result = await mcp_async_client.call_tool(tool_name, tool_args)
+                mcp_client = self._get_mcp_client(session_id)
+                async with mcp_client as mcp_async_client:
+                    if session_id:
+                        try:
+                            params = CallToolRequestParams(
+                                name=tool_name,
+                                arguments=tool_args,
+                                **{"_meta": {"client_id": session_id}},
+                            )
+                            call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+                            result: CallToolResult = await mcp_async_client.session.send_request(
+                                call_req,
+                                CallToolResult,
+                            )
+                        except Exception:
+                            result = await mcp_async_client.call_tool(tool_name, tool_args)
+                    else:
+                        result = await mcp_async_client.call_tool(tool_name, tool_args)
                     text_result = extract_text_from_mcp_result(result)
                     
                     # 检查结果是否表示错误
@@ -852,8 +901,24 @@ class AnthropicClient(LLMClientBase):
 
         # Normal tool handling for other tools
         try:
-            async with self.mcp_client as mcp_async_client:
-                result = await mcp_async_client.call_tool(tool_name, tool_args)
+            mcp_client = self._get_mcp_client(session_id)
+            async with mcp_client as mcp_async_client:
+                if session_id:
+                    try:
+                        params = CallToolRequestParams(
+                            name=tool_name,
+                            arguments=tool_args,
+                            **{"_meta": {"client_id": session_id}},
+                        )
+                        call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+                        result: CallToolResult = await mcp_async_client.session.send_request(
+                            call_req,
+                            CallToolResult,
+                        )
+                    except Exception:
+                        result = await mcp_async_client.call_tool(tool_name, tool_args)
+                else:
+                    result = await mcp_async_client.call_tool(tool_name, tool_args)
                 text_result = extract_text_from_mcp_result(result)
                 # Check if the result indicates an error
                 if isinstance(result, dict) and result.get("error"):
