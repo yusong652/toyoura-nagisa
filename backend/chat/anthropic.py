@@ -8,9 +8,8 @@ from backend.chat.models import BaseMessage, LLMResponse, ResponseType, UserTool
 from backend.chat.utils import parse_llm_output, get_latest_n_messages
 import anthropic
 from fastmcp import Client as MCPClient
-from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
-from backend.config import get_models_lab_config, get_text_to_image_config
+from backend.config import get_text_to_image_config
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
@@ -845,61 +844,7 @@ class AnthropicClient(LLMClientBase):
                     "is_error": True
                 }
 
-        # Special handling for generate_image tool
-        if tool_name == "generate_image":
-            if not session_id:
-                if debug:
-                    print("[text_to_image] Error: No session ID provided for image generation")
-                return {
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "name": tool_name,
-                    "content": "Error: No session ID provided for image generation",
-                    "is_error": True
-                }
-
-            # Generate prompts using LLM
-            prompt_result = await self.generate_text_to_image_prompt(session_id)
-            if not prompt_result:
-                if debug:
-                    print("[text_to_image] Error: Failed to generate image prompts")
-                return {
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "name": tool_name,
-                    "content": "Error: Failed to generate image prompts",
-                    "is_error": True
-                }
-
-            # Call the internal image generation function
-            try:
-                result = await generate_image_from_description(
-                    prompt=prompt_result["text_prompt"],
-                    negative_prompt=prompt_result["negative_prompt"]
-                )
-                if not result:
-                    if debug:
-                        print("[text_to_image] Error: Image generation returned empty result")
-                    return {
-                        "type": "tool_result",
-                        "tool_use_id": tool_id,
-                        "name": tool_name,
-                        "content": "Error: Image generation failed - empty result",
-                        "is_error": True
-                    }
-                return result
-            except Exception as e:
-                if debug:
-                    print(f"[text_to_image] Error during image generation: {str(e)}")
-                return {
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "name": tool_name,
-                    "content": f"Error: Image generation failed - {str(e)}",
-                    "is_error": True
-                }
-
-        # Normal tool handling for other tools
+        # Normal tool handling for all tools (generate_image is handled via FastMCP with context injection)
         try:
             mcp_client = self._get_mcp_client(session_id)
             async with mcp_client as mcp_async_client:

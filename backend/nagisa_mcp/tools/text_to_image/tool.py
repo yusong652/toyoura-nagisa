@@ -1,6 +1,4 @@
-from fastmcp import FastMCP, Context
-from pydantic import Field
-import requests
+from fastmcp import FastMCP
 import asyncio
 from dotenv import load_dotenv
 import json
@@ -9,6 +7,7 @@ from typing import Optional, Dict, Any, List
 import httpx
 from fastapi import FastAPI
 import traceback
+from fastmcp.server.context import Context  # type: ignore
 
 load_dotenv()
 
@@ -120,32 +119,71 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return None
 
-async def generate_image() -> str:
-    """
-    Generate an image or artwork based on the current conversation context.
+async def generate_image(context: Context) -> dict[str, Any]:
+    """Generate a bespoke illustration that visually represents the current conversation context.
 
-    This tool analyzes the conversation and creates a beautiful anime-style image or other visual artwork using AI models.
+    When to call:
+        • The user explicitly asks to *draw*, *paint*, *create*, or *generate* an image, picture, artwork, concept art, anime-style scene, meme, etc.
+        • The user implicitly requests a visual representation (e.g. "Show me what that looks like").
 
-    Keywords: image generation, text to image, AI painting, draw, picture, art creation, visual art, DALL-E, stable diffusion, midjourney, anime, create image, generate picture, illustration, artwork.
-    
-    No parameters are needed as it uses the conversation context automatically.
-    
+    Behaviour:
+        1. The tool automatically crafts a rich text-to-image prompt from the most recent user/assistant messages.
+        2. It then invokes a high-quality diffusion model to synthesise the image.
+
+    Parameters:
+        (none) – all context is inferred automatically.
+
     Returns:
-        str: A status message indicating the result of image generation:
-            - "The image has been generated and saved to your session." on success
-            - "Image generation failed, please try again." on failure
+        On success the tool responds with a short confirmation string such as
+        "The image has been generated and saved to your session." 
+        On failure it returns a JSON object: { "type": "error", "message": "…" }
     """
+
+    # ------------------------------------------------------------------
+    # 1. Resolve runtime dependencies (session ID, app, llm client)
+    # ------------------------------------------------------------------
+    session_id: str | None = getattr(context, "client_id", None)
+    if not session_id:
+        return {"type": "error", "message": "Session ID is missing (client_id not provided)."}
+
+    # *context.fastmcp* is the FastMCP instance where we attached the FastAPI app
+    fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
+    llm_client = None
+    if fastapi_app is not None and hasattr(fastapi_app.state, "llm_client"):
+        llm_client = fastapi_app.state.llm_client
+
+    if llm_client is None:
+        return {"type": "error", "message": "LLM client is not available from application context."}
+
+    # ------------------------------------------------------------------
+    # 2. Build prompts using the LLM client
+    # ------------------------------------------------------------------
     try:
-        # 获取配置
-        models_lab_config = get_models_lab_config()
-        debug = models_lab_config.get("debug", False)
-        
-        return "The image has been generated and saved to your session."
+        prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
     except Exception as e:
-        if debug:
-            print(f"[text_to_image] Error in generate_image: {str(e)}")
-            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
-        return "Image generation failed, please try again."
+        return {"type": "error", "message": f"Failed to generate prompts: {e}"}
+
+    if not prompt_result or "text_prompt" not in prompt_result:
+        return {"type": "error", "message": "Prompt generation returned empty result."}
+
+    text_prompt = prompt_result["text_prompt"]
+    negative_prompt = prompt_result["negative_prompt"]
+
+    # ------------------------------------------------------------------
+    # 3. Call the ModelsLab text-to-image API
+    # ------------------------------------------------------------------
+    try:
+        image_result = await generate_image_from_description(text_prompt, negative_prompt)
+    except Exception as e:
+        return {"type": "error", "message": f"Image generation failed: {e}"}
+
+    if not image_result or image_result.get("type") != "image_url" or not image_result.get("image_url"):
+        # Propagate detailed message if present
+        if isinstance(image_result, dict) and image_result.get("message"):
+            return {"type": "error", "message": image_result.get("message")}
+        return {"type": "error", "message": "Image generation failed, please try again."}
+
+    return image_result
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
