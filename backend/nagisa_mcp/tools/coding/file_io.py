@@ -151,7 +151,8 @@ def delete_file(
         return {"error": f"Failed to delete file: {str(e)}"}
 
 def register_file_io_tools(mcp):
-    mcp.tool()(list_directory)
-    mcp.tool()(read_file)
-    mcp.tool()(write_file)
-    mcp.tool()(delete_file) 
+    common_kwargs = dict(tags={"coding"}, annotations={"category": "coding"})
+    mcp.tool(**common_kwargs)(list_directory)
+    mcp.tool(**common_kwargs)(read_file)
+    mcp.tool(**common_kwargs)(write_file)
+    mcp.tool(**common_kwargs)(delete_file) 

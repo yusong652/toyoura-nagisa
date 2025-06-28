@@ -19,7 +19,7 @@ def get_user_email():
 def register_calendar_tools(mcp: FastMCP):
     """Register Google Calendar tools to MCP (OAuth2 version)"""
 
-    @mcp.tool()
+    @mcp.tool(tags={"calendar"}, annotations={"category": "calendar"})
     def list_calendar_events(
         max_results: int = Field(10, description="Maximum number of events to retrieve."),
         calendar_id: str = Field('primary', description="Calendar ID to query. Default is 'primary'.")
@@ -59,7 +59,7 @@ def register_calendar_tools(mcp: FastMCP):
         except Exception as e:
             return [{"error": f"Failed to list events: {str(e)}"}]
 
-    @mcp.tool()
+    @mcp.tool(tags={"calendar"}, annotations={"category": "calendar"})
     def create_calendar_event(
         summary: str = Field(..., description="Event summary/title."),
         start: str = Field(..., description="Event start time in RFC3339 format (e.g. 2024-06-06T10:00:00+09:00)."),
@@ -145,7 +145,7 @@ def register_calendar_tools(mcp: FastMCP):
                 'message': f'Failed to create event: {str(e)}'
             }
 
-    @mcp.tool()
+    @mcp.tool(tags={"calendar"}, annotations={"category": "calendar"})
     def delete_calendar_event(
         event_id: str = Field(..., description="ID of the event to delete."),
         calendar_id: str = Field('primary', description="Calendar ID. Default is 'primary'.")
@@ -168,7 +168,7 @@ def register_calendar_tools(mcp: FastMCP):
         except Exception as e:
             return {'status': 'error', 'message': f'Failed to delete event: {str(e)}'}
 
-    @mcp.tool()
+    @mcp.tool(tags={"calendar"}, annotations={"category": "calendar"})
     def update_calendar_event(
         event_id: str = Field(..., description="ID of the event to update."),
         summary: Optional[str] = Field(None, description="New summary/title for the event."),
@@ -206,4 +206,9 @@ def register_calendar_tools(mcp: FastMCP):
                 'message': f"Event updated: {updated.get('htmlLink', '')}"
             }
         except Exception as e:
-            return {'status': 'error', 'message': f'Failed to update event: {str(e)}'} 
+            return {'status': 'error', 'message': f'Failed to update event: {str(e)}'}
+
+    # 可选：为示例添加其他标签
+    extra_tags = {"google"}
+    for func in [list_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event]:
+        func.tags.update(extra_tags) 

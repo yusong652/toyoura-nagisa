@@ -72,5 +72,6 @@ def validate_path_in_workspace(path: str) -> str:
     return abs_path
 
 def register_workspace_tools(mcp):
-    mcp.tool()(get_current_workspace)
-    mcp.tool()(change_workspace) 
+    common_kwargs = dict(tags={"coding"}, annotations={"category": "coding"})
+    mcp.tool(**common_kwargs)(get_current_workspace)
+    mcp.tool(**common_kwargs)(change_workspace) 

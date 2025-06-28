@@ -89,4 +89,4 @@ def execute_python_script(
         sys.stderr = original_stderr
 
 def register_python_executor_tools(mcp):
-    mcp.tool()(execute_python_script) 
+    mcp.tool(tags={"coding"}, annotations={"category": "coding"})(execute_python_script) 

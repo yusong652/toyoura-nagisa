@@ -116,7 +116,9 @@ async def get_webpage_content(url: str) -> dict:
 def register_web_search_tools(mcp):
     """Register web search related tools to MCP."""
 
-    @mcp.tool()
+    common_kwargs_web = dict(tags={"web_search"}, annotations={"category": "web_search"})
+
+    @mcp.tool(**common_kwargs_web)
     def web_search(query: str, max_results: int = 5) -> str:
         """
         Search the web using Google Custom Search API and return a JSON array of results.
@@ -138,7 +140,7 @@ def register_web_search_tools(mcp):
 
         return json.dumps(results, ensure_ascii=False)
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs_web)
     async def get_webpage(url: str) -> str:
         """
         Fetch and return the main content and metadata (such as title, author, date, description, etc.) of a specific web page.

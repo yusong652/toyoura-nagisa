@@ -192,5 +192,5 @@ def register_text_to_image_tools(mcp: FastMCP):
     Args:
         mcp: The FastMCP instance to register the tool with
     """
-    mcp.tool()(generate_image)
+    mcp.tool(tags={"image"}, annotations={"category": "media"})(generate_image)
 
