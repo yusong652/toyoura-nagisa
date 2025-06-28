@@ -302,34 +302,37 @@ async def handle_llm_response(
             # 处理函数调用结果，传入 session_id
             tool_result = await llm_client.handle_function_call(tool_call, session_id)
 
-            # Special handling for generate_image
-            if tool_call['name'] == "generate_image":
-                if isinstance(tool_result, dict) and tool_result.get("type") == "image_url" and tool_result.get("image_url"):
-                    image_url = tool_result["image_url"]
-                    local_path = save_image_from_url(image_url, session_id)
-                    tool_natural_response = "The image has been generated and saved to your session."
-                    # 发送会话刷新信号
-                    refresh_signal = {
-                        'type': 'SESSION_REFRESH',
-                        'payload': {
-                            'session_id': session_id,
-                            'message': 'Image generated, please refresh session'
-                        }
-                    }
-                    yield f"data: {json.dumps(refresh_signal)}\n\n"
-                    # 添加短暂延迟，确保前端有足够时间处理图片消息
-                    await asyncio.sleep(0.5)
-                else:
-                    tool_natural_response = "Image generation failed, please try again."
-            else:
-                tool_natural_response = tool_result
+            # --- Handle generate_image tool specially: save image & notify frontend ---
+            # default pass-through
+            tool_response_content = tool_result
 
-            # 添加工具响应消息
+            if isinstance(tool_result, dict) and tool_result.get("type") == "image_url" and tool_result.get("image_url"):
+                image_url = tool_result["image_url"]
+                # Save to session folder for later retrieval
+                local_path = save_image_from_url(image_url, session_id)
+
+                # Notify frontend to refresh session (so it can display the new image)
+                refresh_signal = {
+                    'type': 'SESSION_REFRESH',
+                    'payload': {
+                        'session_id': session_id,
+                        'message': 'Image generated, please refresh session'
+                    }
+                }
+                yield f"data: {json.dumps(refresh_signal)}\n\n"
+
+                # Mask the raw URL from LLM; provide friendly confirmation instead
+                tool_response_content = "The image has been generated and saved to your session."
+
+                # Allow the frontend some time to handle the signal before continuing
+                await asyncio.sleep(0.5)
+
+            # --- Append tool response message to history ---
             tool_response_msg = message_factory({
                 "role": "tool",
                 "tool_call_id": tool_call['id'],
                 "name": tool_call['name'],
-                "content": tool_natural_response
+                "content": tool_response_content
             })
             print(f"[DEBUG] tool_response_msg: {tool_response_msg.model_dump()}")
             recent_msgs.append(tool_response_msg)

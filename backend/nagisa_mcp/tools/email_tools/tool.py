@@ -29,7 +29,9 @@ class EmailMessage(BaseModel):
 def register_email_tools(mcp: FastMCP):
     """Register Gmail API based email tools to MCP (OAuth2 version)"""
     
-    @mcp.tool()
+    common_kwargs = dict(tags={"email"}, annotations={"category": "email"})
+
+    @mcp.tool(**common_kwargs)
     def get_user_email() -> dict:
         """
         Get the user's email address from environment variables.
@@ -62,7 +64,7 @@ def register_email_tools(mcp: FastMCP):
                 "timestamp": datetime.now().isoformat()
             }
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs)
     def send_email(
         subject: str = Field(..., description="Email subject"),
         body: str = Field(..., description="Email body content"),
@@ -122,7 +124,7 @@ def register_email_tools(mcp: FastMCP):
                 "timestamp": datetime.now().isoformat()
             }
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs)
     def check_emails(
         max_emails: int = Field(5, description="Maximum number of emails to retrieve"),
         unread_only: bool = Field(False, description="Whether to retrieve only unread emails")

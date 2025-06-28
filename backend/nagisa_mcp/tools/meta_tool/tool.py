@@ -26,7 +26,9 @@ def register_meta_tools(mcp: FastMCP):
             _vectorizer = ToolVectorizer(TOOL_DB_PATH)
         return _vectorizer
 
-    @mcp.tool()
+    common_kwargs_meta = dict(tags={"meta"}, annotations={"category": "meta"})
+
+    @mcp.tool(**common_kwargs_meta)
     def search_tools_by_keywords(
         keywords: str,
         max_results: int = 5
@@ -110,7 +112,7 @@ def register_meta_tools(mcp: FastMCP):
                 "status": "error"
             }
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs_meta)
     def get_available_tool_categories() -> Dict[str, Any]:
         """
         Meta Tool: Get all available tool categories

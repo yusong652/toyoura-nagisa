@@ -15,7 +15,9 @@ class Contact(BaseModel):
 def register_contact_tools(mcp: FastMCP):
     """Register Google Contacts API based tools to MCP (OAuth2 version)"""
     
-    @mcp.tool()
+    common_kwargs = dict(tags={"contact"}, annotations={"category": "contact"})
+
+    @mcp.tool(**common_kwargs)
     def list_contacts(
         max_contacts: int = Field(100, description="Maximum number of contacts to retrieve")
     ) -> List[dict]:
@@ -84,7 +86,7 @@ def register_contact_tools(mcp: FastMCP):
                 "timestamp": datetime.now().isoformat()
             }]
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs)
     def search_contacts(
         query: str = Field(..., description="Search query for contacts (name, relationship, email, or phone)"),
         max_results: int = Field(100, description="Maximum number of results to return")

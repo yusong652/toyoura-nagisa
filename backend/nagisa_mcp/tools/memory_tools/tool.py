@@ -8,7 +8,7 @@ memory_manager = MemoryManager()
 def register_memory_tools(mcp: FastMCP):
     """Register memory search tools to MCP"""
     
-    @mcp.tool()
+    @mcp.tool(tags={"memory"}, annotations={"category": "memory"})
     def search_memory(query: str) -> List[Dict[str, Any]]:
         """
         Search through the conversation memory database using semantic similarity.

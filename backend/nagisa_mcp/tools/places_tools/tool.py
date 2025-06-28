@@ -5,6 +5,9 @@ from datetime import datetime
 import os
 import googlemaps
 from backend.config import get_auth_config
+import requests, asyncio
+from fastmcp.server.context import Context
+from backend.nagisa_mcp.location_manager import get_location_manager, LocationData
 
 class Place(BaseModel):
     """Place model for validation"""
@@ -15,6 +18,45 @@ class Place(BaseModel):
     types: List[str] = Field(default_factory=list, description="Types of the place")
     rating: Optional[float] = Field(None, description="Place rating (0-5)")
     user_ratings_total: Optional[int] = Field(None, description="Total number of user ratings")
+
+# 获取位置管理器
+location_manager = get_location_manager()
+
+def _fetch_server_location() -> LocationData | None:
+    """Fallback: geolocate server IP via ip-api.com"""
+    try:
+        resp = requests.get("http://ip-api.com/json", timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("status") == "success":
+            return LocationData(
+                latitude=data["lat"],
+                longitude=data["lon"],
+                source="server_ip_geolocation",
+                city=data.get("city"),
+                country=data.get("country"),
+                region=data.get("regionName"),
+            )
+    except Exception as e:
+        print(f"[_fetch_server_location] error: {e}")
+    return None
+
+def _reverse_geocode(lat: float, lon: float) -> dict[str, str | None]:
+    try:
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {"format": "json", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1}
+        headers = {"User-Agent": "Nagisa-FastMCP/1.0"}
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            addr = resp.json().get("address", {})
+            return {
+                "city": addr.get("city") or addr.get("town") or addr.get("village"),
+                "region": addr.get("state"),
+                "country": addr.get("country"),
+            }
+    except Exception as e:
+        print(f"[_reverse_geocode] failed: {e}")
+    return {"city": None, "region": None, "country": None}
 
 def get_places_client():
     """
@@ -30,7 +72,9 @@ def get_places_client():
 def register_places_tools(mcp: FastMCP):
     """Register Google Places API based tools to MCP"""
     
-    @mcp.tool()
+    common_kwargs_places = dict(tags={"places"}, annotations={"category": "places"})
+
+    @mcp.tool(**common_kwargs_places)
     def search_places(
         query: str = Field(..., description="Search query for places (e.g., 'restaurant', 'Starbucks')"),
         location: str = Field(..., description="Location name or coordinates in 'latitude,longitude' format (e.g., '40.7128,-74.0060')"),
@@ -76,7 +120,7 @@ def register_places_tools(mcp: FastMCP):
                 "timestamp": datetime.now().isoformat()
             }]
 
-    @mcp.tool()
+    @mcp.tool(**common_kwargs_places)
     def get_place_details(
         place_id: str = Field(..., description="Place ID to get details for")
     ) -> dict:
@@ -122,4 +166,48 @@ def register_places_tools(mcp: FastMCP):
             return {
                 "error": f"Failed to get place details: {str(e)}",
                 "timestamp": datetime.now().isoformat()
-            } 
+            }
+
+    # ------------------------------------------------------------------
+    # 位置相关工具
+    # ------------------------------------------------------------------
+
+    @mcp.tool(tags={"places"}, annotations={"category": "location"})
+    async def get_location(context: Context) -> dict:
+        """Return client location with multiple fallbacks (browser → server IP)."""
+        session_id = context.client_id
+        if not session_id:
+            return {"error": "Session ID missing"}
+
+        loc = location_manager.get_session_location(session_id)
+        if loc:
+            return loc.to_dict()
+
+        # request via websocket if possible
+        app = getattr(context.fastmcp, "app", None)
+        if app and hasattr(app.state, "connection_manager"):
+            cm = app.state.connection_manager
+            asyncio.create_task(cm.send_json(session_id, {"type": "REQUEST_LOCATION"}))
+
+        wait, elapsed = 30, 0.5
+        while elapsed < wait:
+            await asyncio.sleep(0.5)
+            elapsed += 0.5
+            loc = location_manager.get_session_location(session_id)
+            if loc:
+                loc_dict = loc.to_dict()
+                if loc.source == "browser_geolocation" and not loc.city:
+                    loc_dict.update(_reverse_geocode(loc.latitude, loc.longitude))
+                return loc_dict
+
+        # global location fallback
+        loc = location_manager.get_global_location()
+        if loc:
+            return loc.to_dict()
+
+        # server IP fallback
+        loc = _fetch_server_location()
+        if loc:
+            return loc.to_dict()
+
+        return {"error": "Location could not be determined."} 

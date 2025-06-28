@@ -40,6 +40,10 @@ def import_and_register_all_tools(mcp):
         'nagisa_mcp.tools.contact_tools.tool',
         'nagisa_mcp.tools.places_tools.tool',
         'nagisa_mcp.tools.memory_tools.tool',
+        'nagisa_mcp.tools.calculator_tool.tool',
+        'nagisa_mcp.tools.weather_tool.tool',
+        'nagisa_mcp.tools.meta_tool.tool',
+        'nagisa_mcp.tools.time_tool.tool'
     ]
     for module_path in tool_module_paths:
         try:
@@ -72,10 +76,35 @@ def main():
                     name = tool.name
                     description = tool.description or ''
                     tags = getattr(tool, 'tags', []) or []
+                    module_name = getattr(tool, 'module', '') or ''
                     category = getattr(tool, 'category', '') or ''
+                    # ---------- 修改: 如果没有提供category，则根据module_name推断 ----------
+                    if not category:
+                        if module_name.startswith('nagisa_mcp.tools.'):
+                            # 取 tools. 后的一级目录作为类别，例如 nagisa_mcp.tools.coding.workspace -> coding
+                            parts = module_name.split('.')
+                            try:
+                                idx = parts.index('tools')
+                                if idx + 1 < len(parts):
+                                    category = parts[idx + 1]
+                            except ValueError:
+                                pass
+                    # 如果仍未获得类别且有tags，则使用首个tag作为类别
+                    if not category:
+                        annotations = getattr(tool, 'annotations', None)
+                        if annotations:
+                            # annotations may be ToolAnnotations or dict
+                            try:
+                                category = annotations.get('category', '')
+                            except AttributeError:
+                                # if ToolAnnotations dataclass
+                                category = getattr(annotations, 'category', '')
+                    if not category and tags:
+                        category = list(tags)[0]
+                    if not category:
+                        category = 'general'
                     parameters = getattr(tool, 'parameters', {}) or {}
                     docstring = getattr(tool, 'docstring', '') or description
-                    module_name = getattr(tool, 'module', '') or ''
                     # func对象无法直接获得，只能存元数据
                     params_str = json.dumps(parameters, ensure_ascii=False, default=str)
                     # 只存元数据，不存func对象
@@ -85,7 +114,7 @@ def main():
                             'function_name': name,
                             'module_name': module_name,
                             'category': category,
-                            'tags': json.dumps(tags),
+                            'tags': json.dumps(list(tags)),
                             'parameters': params_str,
                             'return_type': getattr(tool, 'return_type', ''),
                             'docstring': docstring,

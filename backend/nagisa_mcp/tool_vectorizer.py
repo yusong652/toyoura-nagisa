@@ -17,6 +17,8 @@ class ToolVectorizer:
             persist_directory: 持久化存储目录
         """
         self.persist_directory = persist_directory
+        # Debug: 输出持久化目录，帮助排查路径问题
+        print(f"[ToolVectorizer] Using persist directory: {self.persist_directory}")
         self.client = chromadb.PersistentClient(
             path=persist_directory,
             settings=Settings(
@@ -124,7 +126,7 @@ class ToolVectorizer:
             'function_name': func_info['function_name'],
             'module_name': func_info['module_name'],
             'category': category,
-            'tags': json.dumps(tags),
+            'tags': json.dumps(list(tags)),
             'parameters': json.dumps(func_info['parameters']),
             'return_type': func_info['return_type'],
             'docstring': func_info['docstring'],
@@ -223,20 +225,41 @@ class ToolVectorizer:
     def list_all_categories(self) -> List[str]:
         """列出所有工具类别"""
         results = self.collection.get()
-        categories = set()
-        for metadata in results["metadatas"]:
-            if metadata and "category" in metadata:
-                categories.add(metadata["category"])
-        return list(categories)
+        categories: set[str] = set()
+        # ChromaDB may return metadatas as a list or list of lists depending on the API call.
+        for item in results["metadatas"]:
+            # Ensure we iterate over the actual metadata dicts
+            if isinstance(item, list):
+                iterable = item
+            else:
+                iterable = [item]
+            for metadata in iterable:
+                if metadata and metadata.get("category"):
+                    categories.add(metadata["category"])
+        return sorted(categories)
     
     def list_all_tags(self) -> List[str]:
         """列出所有标签"""
         results = self.collection.get()
-        tags = set()
-        for metadata in results["metadatas"]:
-            if metadata and "tags" in metadata:
-                tags.update(metadata["tags"])
-        return list(tags)
+        tags: set[str] = set()
+        for item in results["metadatas"]:
+            if isinstance(item, list):
+                iterable = item
+            else:
+                iterable = [item]
+            for metadata in iterable:
+                if metadata and metadata.get("tags"):
+                    # tags are stored as JSON strings, so ensure we parse them into a list first
+                    raw_tags = metadata["tags"]
+                    # Accept both list and JSON-encoded strings to be robust
+                    if isinstance(raw_tags, str):
+                        try:
+                            raw_tags = json.loads(raw_tags)
+                        except json.JSONDecodeError:
+                            raw_tags = [raw_tags]
+                    if isinstance(raw_tags, (list, set, tuple)):
+                        tags.update(raw_tags)
+        return sorted(tags)
     
     def delete_tool(self, tool_id: str) -> bool:
         """删除工具"""
@@ -247,4 +270,12 @@ class ToolVectorizer:
             return True
         except Exception as e:
             print(f"Error deleting tool: {e}")
-            return False 
+            return False
+    
+    # ------------------------------------------------------------------
+    # Utility helpers
+    # ------------------------------------------------------------------
+
+    def get_persist_directory(self) -> str:
+        """Return the directory where the ChromaDB collection is persisted."""
+        return self.persist_directory 
