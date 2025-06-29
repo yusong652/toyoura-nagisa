@@ -79,4 +79,7 @@ backend/nagisa_mcp/tools/google_auth/credentials.json
 backend/nagisa_mcp/tools/google_auth/tokens/
 
 # Ignore tool vector database
-backend/tool_db/ 
+backend/tool_db/
+
+# ignore Gemini CLI source
+/_third_party/ 

@@ -33,7 +33,7 @@ def import_and_register_all_tools(mcp):
         'nagisa_mcp.tools.web_search.tool',
         'nagisa_mcp.tools.coding.workspace',
         'nagisa_mcp.tools.coding.python_executor',
-        'nagisa_mcp.tools.coding.file_io',
+        'nagisa_mcp.tools.coding.fs_tools',
         'nagisa_mcp.tools.email_tools.tool',
         'nagisa_mcp.tools.calendar.tool',
         'nagisa_mcp.tools.text_to_image.tool',
