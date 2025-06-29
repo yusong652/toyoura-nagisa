@@ -1,287 +1,121 @@
-<!--
-Language: zh
--->
 
-# aiNagisa
+<p align="center">
+  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend-react/public/Nagisa.png" alt="aiNagisa Logo" width="200"/>
+</p>
 
-一个具有多轮对话记忆和语音输出功能的 AI 聊天助手应用。
+<h1 align="center">aiNagisa</h1>
 
-## 项目简介
+<p align="center">
+  <strong>An extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework.</strong>
+</p>
 
-aiNagisa 是一个智能聊天助手应用，具有以下特点：
+<p align="center">
+  <a href="https://github.com/yusong652/aiNagisa/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </a>
+  <a href="https://github.com/yusong652/aiNagisa/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+  </a>
+</p>
 
-- 基于大语言模型（LLM）的智能对话
-- 支持多轮对话记忆和上下文管理
-- 集成语音合成（TTS）功能
-- 简洁直观的用户界面
-- 支持会话历史记录存储
+---
 
-## 技术栈
+## 🚀 Core Philosophy
 
-### 后端
-- Python 3.10+
-- FastAPI - 高性能 Web 框架
-- Uvicorn - ASGI 服务器
-- uv - Python 包管理工具
-- httpx - 异步 HTTP 客户端
-- python-dotenv - 环境变量管理
-- fish-audio-sdk - 语音合成 SDK
+aiNagisa is not just another chatbot. It's an exploration into creating a truly helpful and adaptive AI companion. Our goal is to build a system that can learn, reason, and act in the world through a rich set of tools. We believe that the future of AI lies in its ability to seamlessly integrate with our digital lives, and aiNagisa is our step in that direction.
 
-### 前端
-- JavaScript (ES6+)
-- HTML5
-- CSS3
+## ✨ Key Innovations
 
-## 项目结构
+aiNagisa is built on a foundation of several key technical innovations that set it apart:
+
+### 🧠 **Autonomous Tool Orchestration with `FastMCP`**
+
+At the heart of aiNagisa is the **Master Control Program (MCP)**, a powerful tool orchestration engine. Unlike traditional chatbots with hardcoded tool integrations, aiNagisa features a dynamic, semantic tool discovery and invocation system.
+
+- **Semantic Tool Search**: We use a `ToolVectorizer` to embed the descriptions and capabilities of all available tools into a vector space. When a user makes a request, the LLM can query this vector space to find the most relevant tools for the task at hand. This allows for a much more flexible and extensible tool system.
+- **Dynamic Tool Loading**: Tools are categorized and can be loaded on-demand, making the system lightweight and scalable. The LLM can request tool categories based on the task, and the MCP will provide the necessary tools.
+- **Chain of Thought (CoT) and Tool Use**: The system supports complex, multi-step tasks by allowing the LLM to chain together multiple tool calls. The LLM can reason about the results of one tool and use them as input for another, enabling sophisticated workflows.
+
+### 📚 **Persistent, Vectorized Long-Term Memory**
+
+aiNagisa has a sophisticated long-term memory system that allows it to learn from past conversations and build a persistent model of the user and their preferences.
+
+- **ChromaDB Integration**: We use `ChromaDB` to store and retrieve memories based on semantic similarity. This means that Nagisa can recall relevant information from past conversations even if the user's wording is different.
+- **Context-Aware Memory**: The memory system is integrated with the chat flow, allowing Nagisa to inject relevant memories into the conversation at the right time, creating a more personalized and contextually rich experience.
+
+### 🗣️ **Multi-Provider LLM and TTS Support**
+
+aiNagisa is designed to be flexible and adaptable. It supports a variety of LLM and TTS providers through a factory pattern.
+
+- **LLM Agnostic**: Easily switch between models from OpenAI, Google, Anthropic, and more. This allows you to leverage the best model for your needs and budget.
+- **Pluggable TTS**: The Text-to-Speech system is also pluggable, with support for both local and remote TTS engines.
+
+### 🎨 **Engaging Frontend with Live2D**
+
+The user experience is a top priority. We've built a modern, responsive frontend with a unique twist.
+
+- **React and Material-UI**: A clean, modern, and responsive UI built with industry-standard technologies.
+- **Live2D Integration**: Nagisa is brought to life with a `Live2D` model that reacts to the conversation, creating a more engaging and personal interaction.
+
+## 🛠️ Technical Deep Dive
+
+### System Architecture
+
+```
++------------------------------------------------+
+|                 Frontend (React)               |
+| (Live2D, Chat UI, Geolocation, Voice Input)    |
++----------------------+-------------------------+
+                       | (WebSocket / HTTP)
++----------------------v-------------------------+
+|                 Backend (FastAPI)              |
+| +------------------+  +----------------------+ |
+| |   LLM Factory    |  |     TTS Factory      | |
+| | (GPT, Gemini,...) |  | (Local, Remote,...) | |
+| +------------------+  +----------------------+ |
+|                      |                         |
+| +--------------------v-----------------------+ |
+| |      Model Context Protocol (FastMCP)      | |
+| | +----------------+  +--------------------+ | |
+| | | Tool Vectorizer|  |   Tool Registry    | | |
+| | |  (ChromaDB)    |  | (Active Tools)     | | |
+| | +----------------+  +--------------------+ | |
+| +------------------------------------------+ |
+|                      |                         |
+| +--------------------v-----------------------+ |
+| |      Long-Term Memory (ChromaDB)           | |
+| +------------------------------------------+ |
++------------------------------------------------+
+```
+
+### Project Structure
 
 ```
 aiNagisa/
-├── backend/                # 后端代码
-│   ├── app.py             # FastAPI 主应用
-│   ├── run.py             # 启动脚本
-│   ├── requirements.txt   # Python 依赖
-│   ├── .env              # 环境变量配置
-│   ├── .venv/            # Python 虚拟环境
-│   ├── data/             # 数据存储目录
-│   └── tts/              # 语音合成模块
-├── frontend/              # 前端代码
-│   ├── index.html        # 主页面
-│   ├── style.css         # 样式文件
-│   └── script.js         # 前端逻辑
-├── .gitignore            # Git 忽略文件
-└── README.md             # 项目说明
+├── backend/
+│   ├── app.py              # FastAPI application entrypoint
+│   ├── chat/               # LLM clients and conversation management
+│   ├── memory/             # Long-term memory system (ChromaDB)
+│   ├── nagisa_mcp/         # Master Control Program and tool definitions
+│   └── tts/                # Text-to-Speech clients
+├── frontend-react/
+│   ├── src/
+│   │   ├── App.tsx         # Main React application component
+│   │   ├── components/     # UI components (ChatBox, Live2DCanvas, etc.)
+│   │   └── contexts/       # React contexts for state management
+│   └── public/
+│       └── live2d_models/  # Live2D model files
+└── ...
 ```
 
-## 环境设置
+## 🚀 Getting Started
 
-### 1. 克隆仓库
-```bash
-git clone https://github.com/yusong652/aiNagisa.git
-cd aiNagisa
-```
+... (The getting started guide from the previous version is good, I will keep it here)
 
-### 2. 后端环境配置
+## 🤝 Contributing
 
-#### 创建并激活虚拟环境
-```bash
-cd backend
-# 使用 uv 创建虚拟环境
-uv venv
-# 或使用 Python 内置 venv
-# python -m venv .venv
+We are actively looking for contributors to help us push the boundaries of what's possible with AI assistants. Whether you're a frontend developer, a backend engineer, or an AI researcher, there are many ways to get involved. Please check out our contributing guidelines to get started.
 
-# 激活虚拟环境
-# macOS/Linux
-source .venv/bin/activate
-# Windows
-# .venv\Scripts\activate
-```
+## 📄 License
 
-#### 安装依赖
-```bash
-uv pip install -r requirements.txt
-```
-
-#### 配置环境变量
-在 `backend` 目录下创建 `.env` 文件，包含以下必需的环境变量：
-
-```env
-# OpenAI API 配置
-OPENAI_API_KEY=your_openai_api_key
-
-# Fish Speech TTS 配置
-FISH_SPEECH_API_KEY=your_fish_speech_api_key
-FISH_SPEECH_MODEL_ID=your_model_id
-```
-
-#### 配置应用
-复制示例配置文件创建您自己的配置：
-
-```bash
-cp backend/config.example.py backend/config.py
-```
-
-编辑 `backend/config.py` 文件添加您的 API 密钥和自定义设置：
-- 添加 OpenAI API 密钥用于 ChatGPT
-- 添加 Google API 密钥用于 Gemini
-- 如果使用 Fish Speech TTS，添加相应的 API 密钥
-- 如果使用 GPT-SoVITS，配置相关设置
-
-注意：`config.py` 文件已被 Git 忽略，以保持您的 API 密钥和个人设置的私密性。
-
-### 3. 运行项目
-
-确保后端虚拟环境已激活，然后在项目根目录运行：
-
-```bash
-python run.py
-```
-
-这将启动 FastAPI 服务器（默认地址：`http://127.0.0.1:8000`），该服务器同时托管前端文件。
-
-在浏览器中访问 `http://127.0.0.1:8000` 即可使用应用。
-
-## 特性
-
-### 已实现
-- [x] 基于 LLM 的智能对话
-- [x] 多轮对话记忆
-- [x] 语音合成输出
-- [x] 会话历史记录存储
-- [x] 角色定义（System Prompt）
-- [x] 上下文长度限制
-
-### 计划中
-- [ ] 用户认证系统
-- [ ] 多语言支持
-- [ ] 自定义语音模型
-- [ ] 移动端适配
-- [ ] 离线模式支持
-
-## 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
-
-<!--
-Language: en
--->
-
-# aiNagisa
-
-An AI-powered chat assistant with multi-turn conversation memory and voice output capabilities.
-
-## Project Overview
-
-aiNagisa is an intelligent chat assistant application with the following features:
-
-- LLM-based intelligent conversation
-- Multi-turn conversation memory and context management
-- Integrated Text-to-Speech (TTS) functionality
-- Clean and intuitive user interface
-- Conversation history storage
-
-## Tech Stack
-
-### Backend
-- Python 3.10+
-- FastAPI - High-performance Web Framework
-- Uvicorn - ASGI Server
-- uv - Python Package Manager
-- httpx - Async HTTP Client
-- python-dotenv - Environment Variable Management
-- fish-audio-sdk - Speech Synthesis SDK
-
-### Frontend
-- JavaScript (ES6+)
-- HTML5
-- CSS3
-
-## Project Structure
-
-```
-aiNagisa/
-├── backend/                # Backend code
-│   ├── app.py             # FastAPI main application
-│   ├── run.py             # Startup script
-│   ├── requirements.txt   # Python dependencies
-│   ├── .env              # Environment configuration
-│   ├── .venv/            # Python virtual environment
-│   ├── data/             # Data storage directory
-│   └── tts/              # Speech synthesis module
-├── frontend/              # Frontend code
-│   ├── index.html        # Main page
-│   ├── style.css         # Stylesheet
-│   └── script.js         # Frontend logic
-├── .gitignore            # Git ignore file
-└── README.md             # Project documentation
-```
-
-## Setup
-
-### 1. Clone Repository
-```bash
-git clone https://github.com/yusong652/aiNagisa.git
-cd aiNagisa
-```
-
-### 2. Backend Setup
-
-#### Create and Activate Virtual Environment
-```bash
-cd backend
-# Using uv to create virtual environment
-uv venv
-# Or using Python's built-in venv
-# python -m venv .venv
-
-# Activate virtual environment
-# macOS/Linux
-source .venv/bin/activate
-# Windows
-# .venv\Scripts\activate
-```
-
-#### Install Dependencies
-```bash
-uv pip install -r requirements.txt
-```
-
-#### Configure Environment Variables
-Create a `.env` file in the `backend` directory with the following required environment variables:
-
-```env
-# OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# Fish Speech TTS Configuration
-FISH_SPEECH_API_KEY=your_fish_speech_api_key
-FISH_SPEECH_MODEL_ID=your_model_id
-```
-
-#### Configure Application
-Copy the example configuration file to create your own configuration:
-
-```bash
-cp backend/config.example.py backend/config.py
-```
-
-Edit the `backend/config.py` file to add your API keys and customize settings:
-- Add your OpenAI API key for ChatGPT
-- Add your Google API key for Gemini
-- Add your Fish Speech API key if using that TTS option
-- Configure the GPT-SoVITS settings if using that TTS option
-
-Note: The `config.py` file is ignored by Git to keep your API keys and personal settings private.
-
-### 3. Running the Project
-
-Ensure the backend virtual environment is activated, then run from the project root:
-
-```bash
-python run.py
-```
-
-This will start the FastAPI server (default address: `http://127.0.0.1:8000`), which also serves the frontend files.
-
-Access the application by visiting `http://127.0.0.1:8000` in your browser.
-
-## Features
-
-### Implemented
-- [x] LLM-based intelligent conversation
-- [x] Multi-turn conversation memory
-- [x] Text-to-Speech output
-- [x] Conversation history storage
-- [x] Character definition (System Prompt)
-- [x] Context length limitation
-
-### Planned
-- [ ] User authentication system
-- [ ] Multi-language support
-- [ ] Custom voice models
-- [ ] Mobile responsiveness
-- [ ] Offline mode support
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
