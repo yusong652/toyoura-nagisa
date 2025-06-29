@@ -18,7 +18,11 @@ from backend.nagisa_mcp.tools.coding import register_coding_tools
 from backend.nagisa_mcp.tools.text_to_image import register_text_to_image_tools
 from backend.nagisa_mcp.tools.contact_tools import register_contact_tools
 from backend.nagisa_mcp.tools.places_tools import register_places_tools
+from backend.nagisa_mcp.tools.location_tool import register_location_tools
 from backend.nagisa_mcp.tools.memory_tools import register_memory_tools
+from backend.nagisa_mcp.tools.weather_tool import register_weather_tools
+from backend.nagisa_mcp.tools.time_tool import register_time_tools
+from backend.nagisa_mcp.tools.calculator_tool import register_calculator_tools
 from backend.nagisa_mcp.tools.meta_tool import register_meta_tools
 
 mcp = FastMCP(
@@ -42,7 +46,11 @@ register_coding_tools(mcp)
 register_text_to_image_tools(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
+register_location_tools(mcp)
 register_memory_tools(mcp)
+register_weather_tools(mcp)
+register_time_tools(mcp)
+register_calculator_tools(mcp)
 register_meta_tools(mcp)  # 注册 meta tools
 
 # 启动服务器

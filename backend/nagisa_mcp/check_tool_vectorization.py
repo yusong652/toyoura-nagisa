@@ -67,9 +67,15 @@ def get_all_tool_modules() -> Dict[str, Dict[str, Any]]:
         },
         'places_tools': {
             'module_path': 'nagisa_mcp.tools.places_tools.tool',
+            'category': 'places',
+            'tags': ['places', 'maps', 'geography'],
+            'description': 'Places and POI search tools'
+        },
+        'location_tools': {
+            'module_path': 'nagisa_mcp.tools.location_tool.tool',
             'category': 'location',
-            'tags': ['places', 'location', 'maps', 'geography'],
-            'description': 'Places and location-based tools'
+            'tags': ['location', 'geolocation', 'coordinates'],
+            'description': 'Location retrieval utilities'
         },
         'memory_tools': {
             'module_path': 'nagisa_mcp.tools.memory_tools.tool',
@@ -143,7 +149,7 @@ def check_module_tools(module_name: str, config: Dict[str, Any]) -> Dict[str, An
         register_functions = [
             'register_web_search_tools', 'register_email_tools', 'register_calendar_tools',
             'register_coding_tools', 'register_text_to_image_tool', 'register_contact_tools',
-            'register_places_tools', 'register_memory_tools', 'register_google_auth_tools'
+            'register_places_tools', 'register_location_tools', 'register_memory_tools', 'register_google_auth_tools'
         ]
         
         for register_func_name in register_functions:

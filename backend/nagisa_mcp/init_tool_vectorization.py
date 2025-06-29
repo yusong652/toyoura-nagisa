@@ -39,6 +39,7 @@ def import_and_register_all_tools(mcp):
         'nagisa_mcp.tools.text_to_image.tool',
         'nagisa_mcp.tools.contact_tools.tool',
         'nagisa_mcp.tools.places_tools.tool',
+        'nagisa_mcp.tools.location_tool.tool',
         'nagisa_mcp.tools.memory_tools.tool',
         'nagisa_mcp.tools.calculator_tool.tool',
         'nagisa_mcp.tools.weather_tool.tool',
