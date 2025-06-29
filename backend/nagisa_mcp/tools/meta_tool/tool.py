@@ -34,43 +34,98 @@ def register_meta_tools(mcp: FastMCP):
         max_results: int = 5
     ) -> Dict[str, Any]:
         """
-        [Meta Tool] Intelligent tool search entry. Use this tool to discover and dynamically load the most relevant tools for your task.
-        
-        This meta tool performs a semantic search in the tool vector database based on your provided English keywords, and makes the discovered tools available for subsequent use.
-        
-        Please always use clear and concise English keywords for searching.
-        
-        Args:
-            keywords: English keywords describing the user's intent or required tool (e.g., "weather", "calendar", "web search", "email send")
-            max_results: Maximum number of results to return
-            
-        Returns:
-            Dict containing information about found tools, format as follows:
+        ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+        ┃  🧠  META TOOL — **Dynamic Tool Discovery & Activation Gateway** ┃
+        ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+        **WHY use this meta-tool?**  
+        Large Language Models (LLMs) cannot assume which helper tools are already
+        loaded.  Before you attempt to call a domain-specific tool, use this
+        function to *discover* and *activate* the most relevant tools for the
+        user's current task.
+
+        **HOW it works**  
+        A semantic search is executed over the tool-vector database.  The
+        database contains embeddings of every available tool's name, tags,
+        description, docstring and parameter schema.  The *top-k* most similar
+        tools are returned **and automatically become callable** in the same
+        conversation turn.
+
+        -------------------------------------------------------------------
+        🔑 **Prompting guidelines (best practice)**
+        -------------------------------------------------------------------
+        1. **Use concise English keywords** – space-separated, no punctuation.  
+           Good ► `"weather current temperature"`  
+           Bad  ► `"Can you tell me the weather?"`
+        2. **Include the *action* and the *domain*.**  
+           e.g. `"email send"`, `"calendar create event"`, `"image generate"`.
+        3. **Optional:** Add location or language specifiers (e.g. `"Tokyo"`,
+           `"français"`) if the task is geo- or locale-sensitive.
+        4. **If unsure what categories exist**, call
+           `get_available_tool_categories()` first.
+
+        -------------------------------------------------------------------
+        🗂 **Current tool categories snapshot** *(non-exhaustive)*
+        -------------------------------------------------------------------
+        • communication   →  email, contacts, calendar
+        • information     →  web-search, wiki
+        • location        →  geolocation services
+        • places          →  POI search, place details
+        • scheduling      →  reminders, events
+        • media           →  text-to-image generation
+        • coding          →  file I/O, code execution
+        • calculation     →  advanced calculator
+        • memory          →  long-term memory read/write
+        • time            →  current time, timezone conversion
+        • weather         →  current weather, forecasts
+        • utilities       →  unit conversion, miscellaneous helpers
+
+        (Categories expand automatically when new tools are registered.)
+
+        -------------------------------------------------------------------
+        ✨ **Response schema**
+        -------------------------------------------------------------------
+        ```json
+        {
+          "tools": [
             {
-                "tools": [
-                    {
-                        "id": "unique tool ID",
-                        "name": "tool function name",
-                        "category": "tool category",
-                        "description": "tool description",
-                        "docstring": "tool docstring",
-                        "parameters": "tool parameter information",
-                        "tags": ["tag1", "tag2"]
-                    }
-                ],
-                "total_found": total number of tools found,
-                "search_query": search query,
-                "status": "success"
+              "id": "<unique-id>",
+              "name": "<function-name>",
+              "category": "<category>",
+              "description": "<short description>",
+              "docstring": "<full docstring>",
+              "parameters": "<parameter JSON schema>",
+              "tags": ["tag1", "tag2", …]
             }
-        
-        Example:
-            User request: "What time is it now?"
-            Call: search_tools_by_keywords("time clock current time")
-            Returns: Information about time-related tools
-            
-            User request: "Search for weather information"
-            Call: search_tools_by_keywords("weather temperature forecast")
-            Returns: Information about weather-related tools
+          ],
+          "total_found": <int>,
+          "search_query": "<echo of your keywords>",
+          "status": "success" | "error"
+        }
+        ```
+
+        -------------------------------------------------------------------
+        💡 **Example usage**
+        -------------------------------------------------------------------
+        1. User asks: *"Book a dinner for 2 tomorrow at 7pm in Osaka."*  
+           LLM first calls:
+           ```python
+           search_tools_by_keywords("restaurant reservation places location")
+           ```
+           Then selects the returned `search_places` and `get_location` tools
+           to accomplish the task.
+
+        2. User asks: *"What will the weather be like this weekend in Paris?"*  
+           ```python
+           search_tools_by_keywords("weather forecast Paris")
+           ```
+           → returns `get_weather_forecast` tool.
+
+        -------------------------------------------------------------------
+        **Parameters**
+        -------------------------------------------------------------------
+        • `keywords` *(str, required)*  – Space-separated English keywords.  
+        • `max_results` *(int, optional, default=5)* – Maximum number of tools to return.
         """
         try:
             vectorizer = get_vectorizer()
