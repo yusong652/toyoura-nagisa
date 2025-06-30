@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/yusong652/aiNagisa#readme",
   "devDependencies": {
-    "@google/gemini-cli": "^0.1.7"
+    "@google/gemini-cli": "^0.1.7",
+    "concurrently": "^9.2.0"
   }
 }

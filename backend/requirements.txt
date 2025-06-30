@@ -57,3 +57,6 @@ googlemaps>=4.10.0
 
 # Vector Database
 chromadb>=0.4.22
+
+# Testing
+pytest>=8.2.0

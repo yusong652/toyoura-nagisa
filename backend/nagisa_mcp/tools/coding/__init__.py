@@ -1,7 +1,25 @@
-# (file_io module deprecated; functionality moved into fs_tools)
-from .workspace import get_current_workspace, change_workspace, validate_path_in_workspace, register_workspace_tools
-from .python_executor import execute_python_script, register_python_executor_tools
-from .fs_tools import register_fs_tools, list_directory, read_many_files as read_files, write_file, delete_file
+# This package has been refactored – individual tools now live in
+# `coding.tools.*`. The imports below provide backward-compatibility for external
+# callers that still rely on the previous public interface (e.g. `from
+# nagisa_mcp.tools.coding import list_directory`).
+
+from .tools import (
+    # Public tool functions
+    list_directory,
+    read_many_files as read_files,
+    write_file,
+    delete_file,
+    get_current_workspace,
+    change_workspace,
+    execute_python_script,
+    validate_path_in_workspace,
+    # Registration helper
+    register_coding_tools as _register_coding_tools_new,
+)
+
+# -----------------------------------------------------------------------------
+# Public re-exports
+# -----------------------------------------------------------------------------
 
 __all__ = [
     'register_coding_tools',
@@ -12,10 +30,13 @@ __all__ = [
     'get_current_workspace',
     'change_workspace',
     'execute_python_script',
+    'validate_path_in_workspace',
 ]
 
+# -----------------------------------------------------------------------------
+# Backwards-compatible registration wrapper
+# -----------------------------------------------------------------------------
+
 def register_coding_tools(mcp):
-    """Aggregate registration of all coding-related tools."""
-    register_fs_tools(mcp)
-    register_workspace_tools(mcp)
-    register_python_executor_tools(mcp)
+    """Aggregate registration of all coding-related tools (new implementation)."""
+    _register_coding_tools_new(mcp)

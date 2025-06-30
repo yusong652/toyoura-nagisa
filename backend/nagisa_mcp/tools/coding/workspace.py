@@ -56,20 +56,21 @@ def change_workspace(path: str = Field(..., description="Workspace path to chang
         "root": DEFAULT_WORKSPACE
     }
 
-def validate_path_in_workspace(path: str) -> str:
+def validate_path_in_workspace(path: str) -> str | None:
+    """Return absolute path if *path* is inside ``DEFAULT_WORKSPACE``.
+
+    Supports both workspace-relative paths **and** absolute paths, so long as the
+    final resolved location is within the workspace root.
     """
-    Validate that a path is within the workspace.
-    
-    Args:
-        path (str): The path to validate.
-    
-    Returns:
-        str: The absolute path if valid, None if invalid.
-    """
+
+    # Absolute path provided → verify containment
+    if os.path.isabs(path):
+        abs_path = os.path.abspath(path)
+        return abs_path if abs_path.startswith(DEFAULT_WORKSPACE) else None
+
+    # Relative path → resolve against workspace root
     abs_path = os.path.abspath(os.path.join(DEFAULT_WORKSPACE, path))
-    if not abs_path.startswith(DEFAULT_WORKSPACE):
-        return None
-    return abs_path
+    return abs_path if abs_path.startswith(DEFAULT_WORKSPACE) else None
 
 def register_workspace_tools(mcp):
     common_kwargs = dict(tags={"coding"}, annotations={"category": "coding"})
