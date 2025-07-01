@@ -29,11 +29,9 @@ def import_and_register_all_tools(mcp):
     自动import所有register_xxx_tools函数并注册到mcp
     """
     tool_module_paths = [
-        'nagisa_mcp.tools.common_tools.tool',
+        # Core tool suites
         'nagisa_mcp.tools.web_search.tool',
-        'nagisa_mcp.tools.coding.workspace',
-        'nagisa_mcp.tools.coding.python_executor',
-        'nagisa_mcp.tools.coding.tools',
+        'nagisa_mcp.tools.coding.tools',  # aggregated coding tools
         'nagisa_mcp.tools.email_tools.tool',
         'nagisa_mcp.tools.calendar.tool',
         'nagisa_mcp.tools.text_to_image.tool',
@@ -44,7 +42,7 @@ def import_and_register_all_tools(mcp):
         'nagisa_mcp.tools.calculator_tool.tool',
         'nagisa_mcp.tools.weather_tool.tool',
         'nagisa_mcp.tools.meta_tool.tool',
-        'nagisa_mcp.tools.time_tool.tool'
+        'nagisa_mcp.tools.time_tool.tool',
     ]
     for module_path in tool_module_paths:
         try:

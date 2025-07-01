@@ -87,23 +87,31 @@ def read_many_files(
 
     files: list[Path] = _expand_globs(workspace_root, patterns)
 
-    if use_default_excludes:
-        excl_set = set(DEFAULT_EXCLUDES)
-    else:
-        excl_set = set()
+    # ------------------------------------------------------------------
+    # Build exclude matchers
+    # ------------------------------------------------------------------
 
+    default_excl_dirs: set[str] = set(DEFAULT_EXCLUDES) if use_default_excludes else set()
+
+    pattern_excludes: set[str] = set()
     if exclude:
-        excl_set.update(exclude)
+        pattern_excludes.update(exclude)
+
+    # Pre-compile glob patterns (Path.match uses the raw pattern each time –
+    # storing them in a list avoids rebuilding the set for every path).
+    compiled_globs = list(pattern_excludes)
 
     def _excluded(p: Path) -> bool:
+        """Return *True* if *p* (absolute) should be excluded."""
+
         rel = p.relative_to(workspace_root)
-        parts = set(rel.parts)
-        if parts & DEFAULT_EXCLUDES:
+
+        # Fast directory-name exclusion (node_modules, .git, …)
+        if any(part in default_excl_dirs for part in rel.parts):
             return True
-        for ex in excl_set:
-            if rel.match(ex):
-                return True
-        return False
+
+        # Glob pattern exclusion
+        return any(rel.match(glob_pat) for glob_pat in compiled_globs)
 
     files = [f for f in files if f.is_file() and not _excluded(f)]
 

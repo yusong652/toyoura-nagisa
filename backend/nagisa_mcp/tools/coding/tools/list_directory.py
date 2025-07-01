@@ -13,18 +13,28 @@ __all__ = ["list_directory", "register_list_directory_tool"]
 def list_directory(
     path: str = Field("", description="Directory path to list contents from (workspace-relative)"),
     show_hidden: bool = Field(False, description="Whether to include hidden .* files"),
-) -> List[Dict[str, Any]]:
-    """Return a serialisable list of entries in *path* inside the workspace."""
+) -> Dict[str, Any]:
+    """Return directory listing in a consistent response wrapper.
+
+    Success::
+        {
+          "status": "success",
+          "items": [ {"name": ..., "type": "file"|"directory", ...}, ... ]
+        }
+
+    Error::
+        {"status": "error", "error": "message"}
+    """
 
     abs_path = validate_path_in_workspace(path)
     if abs_path is None:
-        return [{"error": f"Path is outside of workspace: {path}"}]
+        return {"status": "error", "error": f"Path is outside of workspace: {path}"}
 
     p = Path(abs_path)
     if not p.exists():
-        return [{"error": f"Path does not exist: {path}"}]
+        return {"status": "error", "error": f"Path does not exist: {path}"}
     if not p.is_dir():
-        return [{"error": f"Path is not a directory: {path}"}]
+        return {"status": "error", "error": f"Path is not a directory: {path}"}
 
     items: List[Dict[str, Any]] = []
     for child in p.iterdir():
@@ -38,7 +48,7 @@ def list_directory(
                 "path": str(child),
             }
         )
-    return items
+    return {"status": "success", "items": items}
 
 
 # -----------------------------------------------------------------------------

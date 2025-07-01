@@ -14,7 +14,7 @@ from .tools import (
     execute_python_script,
     validate_path_in_workspace,
     # Registration helper
-    register_coding_tools as _register_coding_tools_new,
+    register_coding_tools,
 )
 
 # -----------------------------------------------------------------------------
@@ -32,11 +32,3 @@ __all__ = [
     'execute_python_script',
     'validate_path_in_workspace',
 ]
-
-# -----------------------------------------------------------------------------
-# Backwards-compatible registration wrapper
-# -----------------------------------------------------------------------------
-
-def register_coding_tools(mcp):
-    """Aggregate registration of all coding-related tools (new implementation)."""
-    _register_coding_tools_new(mcp)

@@ -7,7 +7,6 @@ binary handling.
 
 import base64
 import mimetypes
-import os
 from pathlib import Path
 from typing import Dict, Any, Union, Optional
 
@@ -70,16 +69,8 @@ def read_file(
     if isinstance(limit, FieldInfo):
         limit = None
 
-    # Resolve absolute path
-    if os.path.isabs(path):
-        abs_candidate = path
-        # Verify within workspace (fetch dynamic root)
-        from . import workspace as _ws_mod  # local import to get latest value
-        root = os.path.abspath(_ws_mod.DEFAULT_WORKSPACE)
-        if not abs_candidate.startswith(root):
-            return {"status": "error", "error": f"Path is outside of workspace: {path}"}
-    else:
-        abs_candidate = validate_path_in_workspace(path)
+    # Resolve path (validate absolute or relative)
+    abs_candidate = validate_path_in_workspace(path)
 
     if abs_candidate is None:
         return {"status": "error", "error": f"Path is outside of workspace: {path}"}

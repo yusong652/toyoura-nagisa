@@ -10,7 +10,6 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import asyncio
 from fastmcp import FastMCP
-from backend.nagisa_mcp.tools.common_tools import register_common_tools
 from backend.nagisa_mcp.tools.web_search import register_web_search_tools
 from backend.nagisa_mcp.tools.email_tools import register_email_tools
 from backend.nagisa_mcp.tools.calendar import register_calendar_tools
@@ -38,7 +37,6 @@ mcp = FastMCP(
 print(f"[DEBUG] Smart MCP Server initialized")
 
 # 注册所有工具
-register_common_tools(mcp)
 register_web_search_tools(mcp)
 register_email_tools(mcp)
 register_calendar_tools(mcp)

@@ -20,16 +20,20 @@ def write_file(
 
     abs_path = validate_path_in_workspace(path)
     if abs_path is None:
-        return {"error": f"Path is outside of workspace: {path}"}
+        return {"status": "error", "error": f"Path is outside of workspace: {path}"}
 
+    mode = "a" if append else "w"
     try:
-        mode = "a" if append else "w"
         Path(abs_path).parent.mkdir(parents=True, exist_ok=True)
         with open(abs_path, mode, encoding=encoding) as fh:
             fh.write(content)
         return {"status": "success", "size": Path(abs_path).stat().st_size}
-    except Exception as exc:
-        return {"error": str(exc)}
+    except PermissionError:
+        return {"status": "error", "error": "Permission denied when writing file"}
+    except IsADirectoryError:
+        return {"status": "error", "error": "Specified path is a directory, not a file"}
+    except OSError as exc:
+        return {"status": "error", "error": str(exc)}
 
 
 # -----------------------------------------------------------------------------

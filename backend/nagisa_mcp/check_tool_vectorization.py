@@ -23,12 +23,6 @@ from nagisa_mcp.tool_vectorizer import ToolVectorizer
 def get_all_tool_modules() -> Dict[str, Dict[str, Any]]:
     """获取所有工具模块的配置"""
     return {
-        'common_tools': {
-            'module_path': 'nagisa_mcp.tools.common_tools.tool',
-            'category': 'utilities',
-            'tags': ['time', 'weather', 'location', 'basic'],
-            'description': 'Basic utility functions for time, weather, and location'
-        },
         'web_search': {
             'module_path': 'nagisa_mcp.tools.web_search.tool',
             'category': 'information',
@@ -36,7 +30,7 @@ def get_all_tool_modules() -> Dict[str, Dict[str, Any]]:
             'description': 'Web search and information retrieval tools'
         },
         'coding': {
-            'module_path': 'nagisa_mcp.tools.coding.workspace',
+            'module_path': 'nagisa_mcp.tools.coding.tools',
             'category': 'development',
             'tags': ['code', 'programming', 'file', 'workspace', 'python'],
             'description': 'Coding and development tools'

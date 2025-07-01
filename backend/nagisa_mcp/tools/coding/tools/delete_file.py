@@ -15,19 +15,24 @@ def delete_file(path: str = Field(..., description="File path to delete (workspa
 
     abs_path = validate_path_in_workspace(path)
     if abs_path is None:
-        return {"error": f"Path is outside of workspace: {path}"}
+        return {"status": "error", "error": f"Path is outside of workspace: {path}"}
 
     f = Path(abs_path)
     if not f.exists():
-        return {"error": f"File does not exist: {path}"}
+        return {"status": "error", "error": f"File does not exist: {path}"}
     if not f.is_file():
-        return {"error": f"Path is not a file: {path}"}
+        return {"status": "error", "error": f"Path is not a file: {path}"}
 
     try:
         f.unlink()
         return {"status": "success", "message": f"File deleted: {path}"}
-    except Exception as exc:
-        return {"error": str(exc)}
+    except PermissionError:
+        return {"status": "error", "error": "Permission denied when deleting file"}
+    except IsADirectoryError:
+        # The is_file check above should catch this, but included for completeness
+        return {"status": "error", "error": "Specified path is a directory"}
+    except OSError as exc:
+        return {"status": "error", "error": str(exc)}
 
 
 # -----------------------------------------------------------------------------
