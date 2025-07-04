@@ -2,6 +2,7 @@ import os
 import re
 import httpx
 import json
+import copy
 from typing import List, Tuple, Optional, Dict, Any
 from google import genai
 from google.genai import types
@@ -208,15 +209,35 @@ class GeminiClient(LLMClientBase):
                 if not tool_name:
                     print(f"[WARNING] Tool response missing name: {msg}")
                     continue
-                # 保证 response 字段为 dict
-                response_dict = msg.content if isinstance(msg.content, dict) else {"result": msg.content}
-                parts = [types.Part(function_response=types.FunctionResponse(
-                    name=tool_name,
-                    response=response_dict
-                ))]
+
+                # Check if the content is image data from read_file
+                is_image = isinstance(msg.content, dict) and 'inline_data' in msg.content
+                
+                if is_image:
+                    image_content = msg.content['inline_data']
+                    parts = [
+                        # Part 1: Formal function response confirming execution
+                        types.Part(function_response=types.FunctionResponse(
+                            name=tool_name,
+                            response={'status': 'success', 'content': f'Image file read successfully. Content is in the next part.'}
+                        )),
+                        # Part 2: The actual image data, passed as a dictionary.
+                        types.Part(inline_data={
+                            'mime_type': image_content.get('mime_type', 'image/png'),
+                            'data': image_content['data']
+                        })
+                    ]
+                else:
+                    # Standard handling for other tool responses
+                    response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
+                    parts = [types.Part(function_response=types.FunctionResponse(
+                        name=tool_name,
+                        response=response_dict
+                    ))]
+
                 contents.append({
                     "role": "tool",
-                    "parts": parts
+                    "parts": parts,
                 })
                 continue
             # 普通消息
@@ -316,13 +337,45 @@ class GeminiClient(LLMClientBase):
             response_type=ResponseType.ERROR
         )
 
+    def _censor_payload_for_logging(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Creates a deep copy of the payload and censors large data fields for logging.
+        Handles both dicts (from user messages) and Part objects (from tool responses).
+        """
+        censored_payload = copy.deepcopy(payload)
+        
+        if "contents" in censored_payload:
+            for content in censored_payload.get("contents", []):
+                if isinstance(content, dict) and "parts" in content:
+                    for part in content.get("parts", []):
+                        # Case 1: Part is a dictionary (typically from user messages)
+                        if isinstance(part, dict) and 'inline_data' in part:
+                            inline_data = part.get('inline_data', {})
+                            if isinstance(inline_data, dict) and 'data' in inline_data:
+                                data = inline_data.get('data')
+                                if isinstance(data, str) and len(data) > 200:
+                                    inline_data['data'] = f"{data[:100]}... [truncated {len(data)} chars]"
+                        
+                        # Case 2: Part is a Part object (typically from tool responses)
+                        elif hasattr(part, 'inline_data') and part.inline_data:
+                            inline_data_obj = part.inline_data
+                            if hasattr(inline_data_obj, 'data'):
+                                data = inline_data_obj.data
+                                # The data from the library's Blob object is in bytes
+                                if isinstance(data, bytes) and len(data) > 200:
+                                    inline_data_obj.data = data[:100] + b"... [truncated]"
+        return censored_payload
+
     def _print_debug_request(self, contents, config):
         print("\n========== Gemini API 请求消息格式 ==========")
-        print("Payload:")
-        import pprint; pprint.pprint({
+        payload = {
             "contents": contents,
             # "config": config
-        })
+        }
+        
+        payload_to_print = self._censor_payload_for_logging(payload)
+        import pprint
+        pprint.pprint(payload_to_print)
         print("========== END ==========")
 
     def _print_debug_response(self, response):
@@ -400,6 +453,9 @@ class GeminiClient(LLMClientBase):
             # Gemini 不允许 additionalProperties 字段
             input_schema.pop("additionalProperties", None)
             
+            # 移除 Gemini 不支持的 JSON Schema 关键字（如 exclusiveMinimum）
+            input_schema = self._sanitize_jsonschema(input_schema)
+            
             tool_schema = {
                 "name": tool_name,
                 "description": getattr(tool, "description", tool_name),
@@ -417,8 +473,8 @@ class GeminiClient(LLMClientBase):
             tool_name = cached_tool["name"]
             # 复制参数，避免污染原 dict
             cached_params = dict(cached_tool.get("parameters", {}))
-            # Gemini 不允许 additionalProperties 字段
             cached_params.pop("additionalProperties", None)
+            cached_params = self._sanitize_jsonschema(cached_params)
             if tool_name in tools_map:
                 final_tools.append(tools_map[tool_name])
                 if debug:
@@ -444,7 +500,7 @@ class GeminiClient(LLMClientBase):
             {
                 "name": tool["name"],
                 "description": tool.get("description", ""),
-                "parameters": tool.get("parameters", {"type": "object", "properties": {}})
+                "parameters": self._sanitize_jsonschema(tool.get("parameters", {"type": "object", "properties": {}})),
             }
             for tool in final_tools
         ]
@@ -763,17 +819,20 @@ class GeminiClient(LLMClientBase):
                 else:
                     result = await mcp_async_client.call_tool(tool_name, tool_args)
 
-                text_result = extract_text_from_mcp_result(result)
+                if isinstance(result, dict) and 'llm_content' in result:
+                    content = result['llm_content']
+                else:
+                    content = extract_text_from_mcp_result(result)
                 # Check if the result indicates an error
                 if isinstance(result, dict) and result.get("error"):
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_id,
                         "name": tool_name,
-                        "content": text_result,
+                        "content": content,
                         "is_error": True
                     }
-                return text_result
+                return content
         except Exception as e:
             if debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")
@@ -840,7 +899,7 @@ class GeminiClient(LLMClientBase):
                 pprint.pprint(prompt_config)
             
             response = self.client.models.generate_content(
-                model=self.extra_config.get("model_for_text_to_image", "gemini-2.5-flash-preview-05-20"),
+                model=self.extra_config.get("model_for_text_to_image", "gemini-1.5-pro-latest"),
                 contents=contents,
                 config=prompt_config
             )
@@ -904,4 +963,53 @@ class GeminiClient(LLMClientBase):
             if debug:
                 print(f"[text_to_image] Error during prompt generation: {str(e)}")
             return None
+
+    def _sanitize_jsonschema(self, schema: dict) -> dict:  # pylint: disable=dangerous-default-value
+        """Recursively strip unsupported keys from a JSON schema for Gemini.
+
+        Gemini function-call schema currently supports only a subset of draft-7
+        JSON Schema keywords (type / properties / required / description / enum /
+        items / default / title).  Any additional keys like *exclusiveMinimum* will
+        lead to strict validation errors when instantiating
+        :class:`google.ai.generativeai.types.Tool`.
+
+        This helper keeps only the allowed keys and removes everything else.
+        """
+
+        ALLOWED_KEYS = {
+            "type",
+            "properties",
+            "required",
+            "description",
+            "enum",
+            "items",
+            "default",
+            "title",
+        }
+
+        if not isinstance(schema, dict):
+            return schema
+
+        cleaned: dict = {}
+        for key, value in schema.items():
+            if key not in ALLOWED_KEYS:
+                # Skip unsupported keyword (e.g. exclusiveMinimum, pattern, etc.)
+                continue
+
+            if key == "properties":
+                cleaned["properties"] = {
+                    prop_name: self._sanitize_jsonschema(prop_schema)
+                    for prop_name, prop_schema in value.items()
+                    if isinstance(prop_schema, dict)
+                }
+            elif key == "items":
+                cleaned["items"] = self._sanitize_jsonschema(value)
+            else:
+                cleaned[key] = value
+
+        # If this node represents an *object* and required is missing, infer it
+        if cleaned.get("type") == "object" and "required" not in cleaned and "properties" in cleaned:
+            cleaned["required"] = list(cleaned["properties"].keys())
+
+        return cleaned
         
