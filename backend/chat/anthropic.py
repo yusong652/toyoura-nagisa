@@ -456,7 +456,7 @@ class AnthropicClient(LLMClientBase):
                 "messages": messages_for_llm,
                 "system": system_prompt,
                 "max_tokens": 100,
-                "temperature": 1  # A higher temperature for more creative titles
+                "temperature": 0.7  # A higher temperature for more creative titles
             }
 
             async with httpx.AsyncClient() as client:

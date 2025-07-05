@@ -15,23 +15,84 @@ from .workspace import validate_path_in_workspace
 # -----------------------------------------------------------------------------
 
 def execute_python_script(
-    path: str = Field(..., description="Path to the Python script to execute."),
+    # ------------------------------------------------------------------
+    # PARAMETERS
+    # ------------------------------------------------------------------
+    # We add deliberately verbose *description* strings because these are
+    # surfaced verbatim in the tool schema that the language-model sees.
+    # By spelling out the intent / advantages here we can bias the model
+    # towards selecting *execute_python_script* over the more generic and
+    # potentially unsafe *run_shell_command* when the goal is simply to run
+    # a Python file.
+    path: str = Field(
+        ...,
+        description=(
+            "Workspace-relative **path** to the ``.py`` script you wish to run. "
+            "The path must reside *inside* the coding workspace – absolute or "
+            "relative forms are accepted.  If you need to create the file first, "
+            "use the *write_file* tool, then call this tool to execute it."
+        ),
+    ),
     args: List[str] = Field(
         default_factory=list,
-        description="Command-line arguments to pass to the script (list of strings)",
+        description=(
+            "(Optional) **List** of command-line arguments passed *directly* to the "
+            "Python interpreter – *no shell expansion occurs*.  Provide one "
+            "argument per list element, e.g. ``[\"--epochs\", \"10\"]``."
+        ),
     ),
-    timeout: int = Field(30, description="Maximum execution time in seconds."),
+    timeout: int = Field(
+        30,
+        description=(
+            "Failsafe in **seconds**.  If the script exceeds this runtime the "
+            "process tree is force-terminated and an error is returned."
+        ),
+    ),
 ) -> Dict[str, str]:
-    """Execute *path* in a **sub-process** for better isolation.
+    """The **specialized and safest** tool for executing local `.py` script files.
 
-    Highlights
-    ----------
-    1. Runs script in a separate process using :pymod:`subprocess` – the main
-       server process never executes untrusted code via ``exec``.
-    2. Respects *timeout* (seconds).  An unresponsive or long-running script is
-       force-killed after the allotted time, preventing denial-of-service.
-    3. Standard output / error are captured and returned as strings.
-    4. Exit status determines ``status`` field – ``success`` for ``returncode==0``.
+    Safely execute a Python script in its **own** OS process.
+
+    🤝 *When should I choose this tool?*
+    -----------------------------------
+    • **Most python-only tasks** – training a model, running a data-processing
+      script, unit-testing – should use *execute_python_script* rather than the
+      generic *run_shell_command*.
+    • It is the *recommended* and **safest** pathway because it bypasses the
+      system shell entirely: arguments are passed as a Python list, preventing
+      shell-injection and avoiding the need for escaping quotes / spaces.
+
+    🚧 *When *not* to use it*
+    -------------------------
+    • If you truly need *shell* features (pipes, ``&&``, environment
+      variables, invoking *non-Python* binaries) then fall back to
+      *run_shell_command* – but obtain explicit user consent first because that
+      tool is far less sandboxed.
+
+    Security & Reliability Benefits
+    -------------------------------
+    1. **Process isolation** – the host application never *exec()*s arbitrary
+       code; everything runs in a child process managed by :pymod:`subprocess`.
+    2. **Deterministic timeouts** – hung scripts are killed after ``timeout``
+       seconds, safeguarding service availability.
+    3. **No shell interpolation** – eliminates an entire attack surface of
+       command-injection vulnerabilities.
+
+    Returns
+    -------
+    Dict with keys:
+      status : "success" | "error"
+      output : captured STDOUT
+      error  : captured STDERR or error message
+      exit_code : int – underlying process return-code (0 => success)
+
+    Example
+    -------
+    >>> execute_python_script(
+    ...     path="scripts/train.py",
+    ...     args=["--epochs", "5"],
+    ... )
+    {"status": "success", "output": "…", "error": "", "exit_code": 0}
     """
 
     # ---------------------------------------------------------------------

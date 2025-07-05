@@ -5,12 +5,7 @@ This package hosts individual tool implementations migrated from the legacy
 structure used by Google's gemini-cli project.
 """
 
-from .workspace import (
-    get_current_workspace,
-    change_workspace,
-    validate_path_in_workspace,
-    register_workspace_tools,
-)
+from .workspace import validate_path_in_workspace
 from .python_executor import (
     execute_python_script,
     register_python_executor_tools,
@@ -23,6 +18,7 @@ from .write_file import write_file, register_write_file_tool
 from .list_directory import list_directory, register_list_directory_tool
 from .delete_file import delete_file, register_delete_file_tool
 from .read_file import read_file, register_read_file_tool
+from .shell_command import run_shell_command, register_shell_command_tool
 
 # Backwards-compatibility alias (old name used in some places)
 read_files = read_many_files
@@ -35,9 +31,8 @@ __all__ = [
     "write_file",
     "read_file",
     "delete_file",
-    "get_current_workspace",
-    "change_workspace",
     "execute_python_script",
+    "run_shell_command",
 ]
 
 def register_coding_tools(mcp):
@@ -46,10 +41,11 @@ def register_coding_tools(mcp):
     This helper keeps external code unchanged: instead of registering each tool
     one by one, callers can simply invoke `register_coding_tools(mcp)` once.
     """
-    register_workspace_tools(mcp)
+    # workspace tools removed (stateful cd no longer needed)
     register_python_executor_tools(mcp)
     register_read_many_files_tool(mcp)
     register_write_file_tool(mcp)
     register_list_directory_tool(mcp)
     register_delete_file_tool(mcp)
-    register_read_file_tool(mcp) 
+    register_read_file_tool(mcp)
+    register_shell_command_tool(mcp) 

@@ -83,6 +83,3 @@ backend/tool_db/
 
 # Persona prompt (user-specific)
 backend/chat/persona_prompt.md
-
-# ignore Gemini CLI source
-/_third_party/ 

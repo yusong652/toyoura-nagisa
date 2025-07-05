@@ -9,10 +9,8 @@ from .tools import (
     read_many_files as read_files,
     write_file,
     delete_file,
-    get_current_workspace,
-    change_workspace,
     execute_python_script,
-    validate_path_in_workspace,
+    run_shell_command,
     # Registration helper
     register_coding_tools,
 )
@@ -30,5 +28,5 @@ __all__ = [
     'get_current_workspace',
     'change_workspace',
     'execute_python_script',
-    'validate_path_in_workspace',
+    'run_shell_command',
 ]

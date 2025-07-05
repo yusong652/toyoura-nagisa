@@ -2,7 +2,7 @@ from fastmcp import FastMCP
 import asyncio
 from dotenv import load_dotenv
 import json
-from backend.config import get_models_lab_config
+from backend.config import get_text_to_image_config
 from typing import Optional, Dict, Any, List
 import httpx
 from fastapi import FastAPI
@@ -13,38 +13,29 @@ load_dotenv()
 
 app = FastAPI()
 
-async def generate_image_from_description(prompt: str, negative_prompt: str) -> Optional[Dict[str, Any]]:
+async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Internal function to generate an image using the text-to-image API.
-    This function is called by the wrapper function after getting the prompts.
-    
-    Args:
-        prompt: The text prompt for image generation
-        negative_prompt: The negative prompt for image generation
-        
-    Returns:
-        Optional[Dict[str, Any]]: A dictionary containing the generated image data, or None if generation fails
+    Internal function to generate an image using the ModelsLab API.
     """
     try:
-        if not prompt:
-            return None
-        
-        models_lab_config = get_models_lab_config()
+        models_lab_config = config.get("models_lab", {})
         debug = models_lab_config.get("debug", False)
         if debug:
-            print(f"[text_to_image] Config loaded: {models_lab_config}")
+            print(f"[text_to_image] ModelsLab Config loaded: {models_lab_config}")
+
         payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
         if debug:
             print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
+
         async with httpx.AsyncClient() as client:
             if models_lab_config.get("realtime", False):
                 endpoint = "https://modelslab.com/api/v6/realtime/text2img"
             else:
                 endpoint = "https://modelslab.com/api/v6/images/text2img"
+            
             max_retries = 60
             retry_interval = 4  # seconds
             
-            # 第一次POST发起生成
             response = await client.post(
                 endpoint,
                 headers={"Content-Type": "application/json"},
@@ -54,36 +45,23 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
             if debug:
                 print(f"[text_to_image] Response status: {response.status_code}")
                 print(f"[text_to_image] Response content: {response.text[:100]}...")
+            
             response.raise_for_status()
             result = response.json()
             status = result.get("status")
-            
-            # 无论第一次请求是否成功，都需要进入fetch流程
+
             if status == "success" and "output" in result and result["output"]:
-                return {
-                    "type": "image_url",
-                    "image_url": result["output"][0]
-                }
+                return {"type": "image_url", "image_url": result["output"][0]}
             
-            # 如果是processing状态，进入循环获取结果
             if status == "processing" and result.get("fetch_result") and result.get("id"):
                 fetch_url = result["fetch_result"]
-                request_id = result["id"]
-                fetch_payload = {
-                    "key": models_lab_config.get("key", ""),
-                    "request_id": request_id
-                }
+                fetch_payload = {"key": models_lab_config.get("key", ""), "request_id": result["id"]}
                 
                 for attempt in range(max_retries):
                     if debug:
                         print(f"[text_to_image] Fetching result (attempt {attempt+1}/{max_retries})...")
                     
-                    fetch_resp = await client.post(
-                        fetch_url,
-                        headers={"Content-Type": "application/json"},
-                        data=json.dumps(fetch_payload),
-                        timeout=30.0
-                    )
+                    fetch_resp = await client.post(fetch_url, headers={"Content-Type": "application/json"}, data=json.dumps(fetch_payload), timeout=30.0)
                     fetch_result = fetch_resp.json()
                     fetch_status = fetch_result.get("status")
                     
@@ -91,33 +69,116 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
                         print(f"[text_to_image] Fetch status: {fetch_status}")
                     
                     if fetch_status == "success" and "output" in fetch_result and fetch_result["output"]:
-                        return {
-                            "type": "image_url",
-                            "image_url": fetch_result["output"][0]
-                        }
+                        return {"type": "image_url", "image_url": fetch_result["output"][0]}
                     elif fetch_status == "processing":
                         await asyncio.sleep(retry_interval)
-                        continue
                     else:
+                        error_message = fetch_result.get("messege") or fetch_result.get("message") or "Image generation failed, please try again."
                         if debug:
-                            print(f"[text_to_image] Error or unexpected fetch status: {fetch_status}, message: {fetch_result.get('messeg', fetch_result.get('message', ''))}")
-                        return {
-                            "type": "error",
-                            "message": fetch_result.get("messege") or fetch_result.get("message") or "Image generation failed, please try again."
-                        }
+                            print(f"[text_to_image] Error or unexpected fetch status: {fetch_status}, message: {error_message}")
+                        return {"type": "error", "message": error_message}
                 
                 if debug:
                     print(f"[text_to_image] Max retries ({max_retries}) reached without success")
-                return None
-            else:
-                if debug:
-                    print(f"[text_to_image] Unexpected status or empty output: {status}")
-                return None
+            
+            return {"type": "error", "message": "Image generation failed after processing."}
+            
     except Exception as e:
         if 'debug' in locals() and debug:
             print(f"[text_to_image] Error occurred: {str(e)}")
             print(f"[text_to_image] Traceback: {traceback.format_exc()}")
-        return None
+        return {"type": "error", "message": str(e)}
+
+async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Internal function to generate an image using a Stable Diffusion WebUI API.
+    """
+    try:
+        sd_config = config.get("stable_diffusion_webui", {})
+        debug = sd_config.get("debug", False)
+        server_url = sd_config.get("server_url")
+
+        if not server_url:
+            return {"type": "error", "message": "Stable Diffusion server URL is not configured."}
+        
+        if debug:
+            print(f"[text_to_image] Stable Diffusion Config loaded: {sd_config}")
+
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "steps": sd_config.get("steps", 20),
+            "sampler_name": sd_config.get("sampler_name", "DPM++ 2M Karras"),
+            "width": sd_config.get("width", 1024),
+            "height": sd_config.get("height", 1024),
+            "cfg_scale": sd_config.get("cfg_scale", 7.5),
+            "seed": sd_config.get("seed", -1)
+        }
+        
+        if sd_config.get("sd_model_checkpoint"):
+            payload["override_settings"] = {
+                "sd_model_checkpoint": sd_config.get("sd_model_checkpoint")
+            }
+
+        if debug:
+            print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
+
+        async with httpx.AsyncClient() as client:
+            endpoint = f"{server_url}/sdapi/v1/txt2img"
+            response = await client.post(
+                endpoint,
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=300.0 
+            )
+            if debug:
+                print(f"[text_to_image] Response status: {response.status_code}")
+                # Avoid printing full base64 image
+                # print(f"[text_to_image] Response content: {response.text[:200]}...")
+
+            response.raise_for_status()
+            result = response.json()
+
+            if "images" in result and result["images"]:
+                return {"type": "image_base64", "image": result["images"][0]}
+            else:
+                return {"type": "error", "message": "Image generation failed, no image in response."}
+                
+    except Exception as e:
+        if 'debug' in locals() and debug:
+            print(f"[text_to_image] Error occurred: {str(e)}")
+            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
+        return {"type": "error", "message": str(e)}
+
+
+async def generate_image_from_description(prompt: str, negative_prompt: str) -> Optional[Dict[str, Any]]:
+    """
+    Internal function to generate an image using the configured text-to-image API.
+    This function is a dispatcher that calls the appropriate provider function.
+    
+    Args:
+        prompt: The text prompt for image generation
+        negative_prompt: The negative prompt for image generation
+        
+    Returns:
+        Optional[Dict[str, Any]]: A dictionary containing the generated image data, or None if generation fails
+    """
+    config = get_text_to_image_config()
+    provider = config.get("type")
+    debug = config.get("debug", False)
+    
+    if debug:
+        print(f"[text_to_image] Selected provider: {provider}")
+
+    if provider == "models_lab":
+        return await _generate_with_models_lab(prompt, negative_prompt, config)
+    elif provider == "stable_diffusion_webui":
+        return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
+    else:
+        error_message = f"Unsupported image generation provider: {provider}"
+        if debug:
+            print(f"[text_to_image] {error_message}")
+        return {"type": "error", "message": error_message}
 
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.
@@ -177,13 +238,19 @@ async def generate_image(context: Context) -> dict[str, Any]:
     except Exception as e:
         return {"type": "error", "message": f"Image generation failed: {e}"}
 
-    if not image_result or image_result.get("type") != "image_url" or not image_result.get("image_url"):
-        # Propagate detailed message if present
-        if isinstance(image_result, dict) and image_result.get("message"):
-            return {"type": "error", "message": image_result.get("message")}
+    if not image_result:
         return {"type": "error", "message": "Image generation failed, please try again."}
 
-    return image_result
+    # Propagate detailed message if present
+    if image_result.get("type") == "error":
+        return {"type": "error", "message": image_result.get("message", "An unknown error occurred.")}
+    
+    # Handle successful image generation (URL or Base64)
+    if (image_result.get("type") == "image_url" and image_result.get("image_url")) or \
+       (image_result.get("type") == "image_base64" and image_result.get("image")):
+        return image_result
+
+    return {"type": "error", "message": "Image generation failed with an unexpected result format."}
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
