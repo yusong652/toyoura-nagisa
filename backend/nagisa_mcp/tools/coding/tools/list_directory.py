@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from .workspace import validate_path_in_workspace, WORKSPACE_ROOT
 from ..utils.file_filter import FileFilter
+from ..utils.tool_result import ToolResult
 
 # Optional dependency for .gitignore parsing
 try:
@@ -82,13 +83,23 @@ def list_directory(
     # ------------------------------------------------------------------
     items.sort(key=lambda x: (x["type"] != "directory", x["name"].lower()))
 
-    result: Dict[str, Any] = {"status": "success", "items": items}
+    payload: Dict[str, Any] = {"items": items}
     if file_filter.gitignored:
-        result["git_ignored"] = file_filter.gitignored
-    if respect_git_ignore and file_filter.gitignored == 0 and "PathSpec" in globals() and PathSpec is None:
-        # pathspec missing
-        result["warning"] = "pathspec library not installed – gitignore filtering skipped"
-    return result
+        payload["git_ignored"] = file_filter.gitignored
+
+    extra: Dict[str, Any] = {}
+    if respect_git_ignore and "PathSpec" in globals() and PathSpec is None:
+        extra["warning"] = "pathspec library not installed – gitignore filtering skipped"
+
+    resp = ToolResult(
+        status="success",
+        message=f"Listed {len(items)} item(s).",
+        llm_content=None,
+        data=payload,
+        **extra,
+    )
+
+    return resp.model_dump()
 
 
 # -----------------------------------------------------------------------------
