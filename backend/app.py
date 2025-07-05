@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
 from backend.chat import LLMClientBase, GPTClient, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, load_all_message_history
+from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
 from backend.chat.llm_factory import get_client
@@ -306,26 +306,60 @@ async def handle_llm_response(
             # default pass-through
             tool_response_content = tool_result
 
-            if isinstance(tool_result, dict) and tool_result.get("type") == "image_url" and tool_result.get("image_url"):
-                image_url = tool_result["image_url"]
-                # Save to session folder for later retrieval
-                local_path = save_image_from_url(image_url, session_id)
+            if isinstance(tool_result, dict):
+                if tool_result.get("type") == "image_url" and tool_result.get("image_url"):
+                    image_url = tool_result["image_url"]
+                    # Save to session folder for later retrieval
+                    local_path = save_image_from_url(image_url, session_id)
 
-                # Notify frontend to refresh session (so it can display the new image)
-                refresh_signal = {
-                    'type': 'SESSION_REFRESH',
-                    'payload': {
-                        'session_id': session_id,
-                        'message': 'Image generated, please refresh session'
+                    # Notify frontend to refresh session (so it can display the new image)
+                    refresh_signal = {
+                        'type': 'SESSION_REFRESH',
+                        'payload': {
+                            'session_id': session_id,
+                            'message': 'Image generated, please refresh session'
+                        }
                     }
-                }
-                yield f"data: {json.dumps(refresh_signal)}\n\n"
+                    yield f"data: {json.dumps(refresh_signal)}\n\n"
 
-                # Mask the raw URL from LLM; provide friendly confirmation instead
-                tool_response_content = "The image has been generated and saved to your session."
+                    # Mask the raw URL from LLM; provide friendly confirmation instead
+                    tool_response_content = "The image has been generated and saved to your session."
 
-                # Allow the frontend some time to handle the signal before continuing
-                await asyncio.sleep(0.5)
+                    # Allow the frontend some time to handle the signal before continuing
+                    await asyncio.sleep(0.5)
+                    
+                elif tool_result.get("type") == "image_base64" and tool_result.get("image"):
+                    print(f"[DEBUG] Handling image_base64 result for session {session_id}")
+                    image_base64 = tool_result["image"]
+                    print(f"[DEBUG] Base64 image data length: {len(image_base64)}")
+                    print(f"[DEBUG] Base64 data preview: {image_base64[:100]}...")
+                    
+                    try:
+                        # Save base64 image to session folder for later retrieval
+                        print("[DEBUG] Calling save_image_from_base64...")
+                        local_path = save_image_from_base64(image_base64, session_id)
+                        print(f"[DEBUG] Image saved successfully to: {local_path}")
+
+                        # Notify frontend to refresh session (so it can display the new image)
+                        refresh_signal = {
+                            'type': 'SESSION_REFRESH',
+                            'payload': {
+                                'session_id': session_id,
+                                'message': 'Image generated, please refresh session'
+                            }
+                        }
+                        yield f"data: {json.dumps(refresh_signal)}\n\n"
+
+                        # Mask the raw base64 data from LLM; provide friendly confirmation instead
+                        tool_response_content = "The image has been generated and saved to your session."
+
+                        # Allow the frontend some time to handle the signal before continuing
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        print(f"[ERROR] Failed to save base64 image: {e}")
+                        import traceback
+                        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+                        tool_response_content = f"Failed to save generated image: {str(e)}"
 
             # --- Append tool response message to history ---
             tool_response_msg = message_factory({
@@ -544,14 +578,45 @@ async def generate_image_endpoint(request: GenerateImageRequest):
         if not prompt_result:
             return {"success": False, "error": "Failed to generate image prompts from conversation."}
         # 2. Generate image from description
+        print(f"[DEBUG] Generating image for session {session_id}")
+        print(f"[DEBUG] Text prompt: {prompt_result['text_prompt'][:100]}...")
+        print(f"[DEBUG] Negative prompt: {prompt_result['negative_prompt'][:100]}...")
+        
         image_result = await generate_image_from_description(
             prompt=prompt_result["text_prompt"],
             negative_prompt=prompt_result["negative_prompt"]
         )
-        if not image_result or not image_result.get("image_url"):
+        
+        print(f"[DEBUG] Image generation result type: {type(image_result)}")
+        print(f"[DEBUG] Image generation result keys: {list(image_result.keys()) if isinstance(image_result, dict) else 'Not a dict'}")
+        
+        if not image_result:
+            print("[ERROR] Image generation returned empty result")
             return {"success": False, "error": "Image generation failed."}
-        # 3. Save image to session folder
-        local_path = save_image_from_url(image_result["image_url"], session_id)
+        
+        # 3. Save image to session folder based on result type
+        local_path = None
+        if image_result.get("type") == "image_url" and image_result.get("image_url"):
+            print("[DEBUG] Processing image_url result type")
+            local_path = save_image_from_url(image_result["image_url"], session_id)
+        elif image_result.get("type") == "image_base64" and image_result.get("image"):
+            print("[DEBUG] Processing image_base64 result type")
+            print(f"[DEBUG] Base64 data length: {len(image_result['image'])}")
+            try:
+                local_path = save_image_from_base64(image_result["image"], session_id)
+                print(f"[DEBUG] Successfully saved base64 image to: {local_path}")
+            except Exception as e:
+                print(f"[ERROR] Failed to save base64 image in endpoint: {e}")
+                return {"success": False, "error": f"Failed to save image: {str(e)}"}
+        else:
+            print(f"[ERROR] Unknown image result type: {image_result.get('type')}")
+            print(f"[ERROR] Available keys in result: {list(image_result.keys())}")
+        
+        if not local_path:
+            print("[ERROR] No local path returned from image saving")
+            return {"success": False, "error": "Failed to save generated image."}
+        
+        print(f"[DEBUG] Image successfully processed and saved to: {local_path}")
         return {"success": True, "image_path": local_path}
     except Exception as e:
         import traceback

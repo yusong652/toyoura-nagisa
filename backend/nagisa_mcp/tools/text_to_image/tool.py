@@ -124,7 +124,7 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
             print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
 
         async with httpx.AsyncClient() as client:
-            endpoint = f"{server_url}/sdapi/v1/txt2img"
+            endpoint = f"{server_url}"
             response = await client.post(
                 endpoint,
                 headers={"Content-Type": "application/json"},
@@ -138,10 +138,23 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
 
             response.raise_for_status()
             result = response.json()
+            
+            if debug:
+                print(f"[text_to_image] SD API response keys: {list(result.keys())}")
+                if "images" in result:
+                    print(f"[text_to_image] Number of images returned: {len(result['images'])}")
+                    if result["images"]:
+                        print(f"[text_to_image] First image data length: {len(result['images'][0])}")
+                        print(f"[text_to_image] First image data preview: {result['images'][0][:50]}...")
 
             if "images" in result and result["images"]:
-                return {"type": "image_base64", "image": result["images"][0]}
+                base64_image = result["images"][0]
+                if debug:
+                    print(f"[text_to_image] Returning base64 image, length: {len(base64_image)}")
+                return {"type": "image_base64", "image": base64_image}
             else:
+                if debug:
+                    print(f"[text_to_image] No images in response or empty images list")
                 return {"type": "error", "message": "Image generation failed, no image in response."}
                 
     except Exception as e:
@@ -163,12 +176,22 @@ async def generate_image_from_description(prompt: str, negative_prompt: str) -> 
     Returns:
         Optional[Dict[str, Any]]: A dictionary containing the generated image data, or None if generation fails
     """
+    print(f"[text_to_image] generate_image_from_description called")
+    print(f"[text_to_image] Prompt length: {len(prompt)}")
+    print(f"[text_to_image] Negative prompt length: {len(negative_prompt)}")
+    
     config = get_text_to_image_config()
     provider = config.get("type")
     debug = config.get("debug", False)
     
+    print(f"[text_to_image] Selected provider: {provider}")
+    print(f"[text_to_image] Debug mode: {debug}")
+    print(f"[text_to_image] Config keys: {list(config.keys())}")
+    
     if debug:
-        print(f"[text_to_image] Selected provider: {provider}")
+        print(f"[text_to_image] Full config: {config}")
+        print(f"[text_to_image] Prompt: {prompt}")
+        print(f"[text_to_image] Negative prompt: {negative_prompt}")
 
     if provider == "models_lab":
         return await _generate_with_models_lab(prompt, negative_prompt, config)
@@ -246,9 +269,21 @@ async def generate_image(context: Context) -> dict[str, Any]:
         return {"type": "error", "message": image_result.get("message", "An unknown error occurred.")}
     
     # Handle successful image generation (URL or Base64)
-    if (image_result.get("type") == "image_url" and image_result.get("image_url")) or \
-       (image_result.get("type") == "image_base64" and image_result.get("image")):
+    print(f"[DEBUG] Checking image_result for success...")
+    print(f"[DEBUG] image_result type: {image_result.get('type')}")
+    print(f"[DEBUG] image_result keys: {list(image_result.keys())}")
+    
+    if image_result.get("type") == "image_url" and image_result.get("image_url"):
+        print(f"[DEBUG] Returning image_url result: {image_result['image_url'][:50]}...")
         return image_result
+    elif image_result.get("type") == "image_base64" and image_result.get("image"):
+        print(f"[DEBUG] Returning image_base64 result, data length: {len(image_result['image'])}")
+        return image_result
+    else:
+        print(f"[ERROR] Unexpected image result format:")
+        print(f"[ERROR] Type: {image_result.get('type')}")
+        print(f"[ERROR] Has image_url: {'image_url' in image_result and bool(image_result.get('image_url'))}")
+        print(f"[ERROR] Has image: {'image' in image_result and bool(image_result.get('image'))}")
 
     return {"type": "error", "message": "Image generation failed with an unexpected result format."}
 
