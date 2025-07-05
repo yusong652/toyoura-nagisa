@@ -317,5 +317,5 @@ def _detect_file_type(path: "Path") -> str:
 
 
 def _inline_data(path: "Path", mime_type: str) -> Dict[str, Any]:
-    data = base64.b64encode(path.read_bytes()).decode()
-    return {"inline_data": {"mime_type": mime_type, "data": data}} 
+    data_b64 = base64.b64encode(path.read_bytes()).decode()
+    return {"inline_data": {"mime_type": mime_type, "data": data_b64}} 

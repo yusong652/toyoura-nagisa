@@ -215,6 +215,14 @@ class GeminiClient(LLMClientBase):
                 
                 if is_image:
                     image_content = msg.content['inline_data']
+                    data_field = image_content['data']
+                    if isinstance(data_field, str):
+                        try:
+                            import base64 as _b64
+                            data_field = _b64.b64decode(data_field)
+                        except Exception:
+                            pass  # keep as is if decoding fails
+
                     parts = [
                         # Part 1: Formal function response confirming execution
                         types.Part(function_response=types.FunctionResponse(
@@ -224,7 +232,7 @@ class GeminiClient(LLMClientBase):
                         # Part 2: The actual image data, passed as a dictionary.
                         types.Part(inline_data={
                             'mime_type': image_content.get('mime_type', 'image/png'),
-                            'data': image_content['data']
+                            'data': data_field
                         })
                     ]
                 else:
@@ -361,9 +369,10 @@ class GeminiClient(LLMClientBase):
                             inline_data_obj = part.inline_data
                             if hasattr(inline_data_obj, 'data'):
                                 data = inline_data_obj.data
-                                # The data from the library's Blob object is in bytes
                                 if isinstance(data, bytes) and len(data) > 200:
                                     inline_data_obj.data = data[:100] + b"... [truncated]"
+                                elif isinstance(data, str) and len(data) > 200:
+                                    inline_data_obj.data = f"{data[:100]}... [truncated {len(data)} chars]"
         return censored_payload
 
     def _print_debug_request(self, contents, config):
@@ -715,7 +724,7 @@ class GeminiClient(LLMClientBase):
         tool_id = function_call.get("id", "")
         debug = self.extra_config.get('debug', False)
 
-        # 处理meta tool调用
+        # 1. Meta tool handling (remains the same)
         if self._is_meta_tool(tool_name):
             if debug:
                 print(f"[DEBUG] Handling meta tool: {tool_name}")
@@ -723,7 +732,7 @@ class GeminiClient(LLMClientBase):
             try:
                 mcp_client = self._get_mcp_client(session_id)
                 async with mcp_client as mcp_async_client:
-                    # 注入 session_id 到 _meta.client_id，避免暴露在参数中
+                    # (Existing meta tool logic...)
                     if session_id:
                         try:
                             params = CallToolRequestParams(
@@ -741,7 +750,7 @@ class GeminiClient(LLMClientBase):
                     
                     text_result = extract_text_from_mcp_result(result)
                     
-                    # 检查结果是否表示错误
+                    # Check for error
                     if isinstance(result, dict) and result.get("error"):
                         return {
                             "type": "tool_result",
@@ -751,10 +760,9 @@ class GeminiClient(LLMClientBase):
                             "is_error": True
                         }
                     
-                    # 如果是search_tools_by_keywords，缓存查询到的工具
+                    # Cache meta results
                     if tool_name == "search_tools_by_keywords" and session_id:
                         try:
-                            # 尝试解析结果为JSON
                             meta_result = {}
                             if isinstance(text_result, dict):
                                 meta_result = text_result
@@ -764,20 +772,9 @@ class GeminiClient(LLMClientBase):
                                 except (json.JSONDecodeError, TypeError):
                                     meta_result = {}
                             
-                            if debug:
-                                print(f"[DEBUG] Meta result for caching: {meta_result}")
-
-                            # 提取并缓存工具
                             extracted_tools = self._extract_tools_from_meta_result(meta_result)
                             if extracted_tools:
                                 self._cache_tools_for_session(session_id, extracted_tools)
-                                if debug:
-                                    print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
-                                    for tool in extracted_tools:
-                                        print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
-                            else:
-                                if debug:
-                                    print(f"[DEBUG] No tools extracted from meta result for session {session_id}")
 
                         except Exception as e:
                             if debug:
@@ -796,12 +793,11 @@ class GeminiClient(LLMClientBase):
                     "is_error": True
                 }
 
-        # Normal tool handling for other tools
+        # 2. Refactored normal tool handling
         try:
             mcp_client = self._get_mcp_client(session_id)
-
             async with mcp_client as mcp_async_client:
-                # 注入 session_id 到 _meta.client_id，避免暴露在参数中
+                # Inject session_id if present
                 if session_id:
                     try:
                         params = CallToolRequestParams(
@@ -810,29 +806,38 @@ class GeminiClient(LLMClientBase):
                             **{"_meta": {"client_id": session_id}},
                         )
                         call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
-                        result: CallToolResult = await mcp_async_client.session.send_request(
+                        result_obj = await mcp_async_client.session.send_request(
                             call_req,
                             CallToolResult,
                         )
                     except Exception:
-                        result = await mcp_async_client.call_tool(tool_name, tool_args)
+                        result_obj = await mcp_async_client.call_tool(tool_name, tool_args)
                 else:
-                    result = await mcp_async_client.call_tool(tool_name, tool_args)
+                    result_obj = await mcp_async_client.call_tool(tool_name, tool_args)
 
-                if isinstance(result, dict) and 'llm_content' in result:
-                    content = result['llm_content']
-                else:
-                    content = extract_text_from_mcp_result(result)
-                # Check if the result indicates an error
-                if isinstance(result, dict) and result.get("error"):
+            # Extract the dict from ToolResult.model_dump()
+            tool_output = extract_text_from_mcp_result(result_obj)
+
+            # Default content for LLM is the whole output, for backward compatibility
+            content_for_llm = tool_output
+
+            if isinstance(tool_output, dict):
+                # If it's our standard ToolResult, extract the specific llm_content part
+                if 'llm_content' in tool_output:
+                    content_for_llm = tool_output['llm_content']
+                
+                # Check for error status in the standard ToolResult
+                if tool_output.get("status") == "error":
                     return {
                         "type": "tool_result",
                         "tool_use_id": tool_id,
                         "name": tool_name,
-                        "content": content,
+                        "content": tool_output.get("message", "Tool execution failed."),
                         "is_error": True
                     }
-                return content
+            
+            return content_for_llm
+
         except Exception as e:
             if debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")

@@ -1,4 +1,4 @@
-"""read_file tool — safe file reader with pagination & inline binary support."""
+"""Filesystem tool implementations for coding workspace."""
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,6 +11,7 @@ from pydantic import Field
 from pydantic.fields import FieldInfo
 
 from .workspace import validate_path_in_workspace, WORKSPACE_ROOT as _WS_PATH
+from ..utils.tool_result import ToolResult
 
 
 __all__ = ["read_file", "register_read_file_tool"]
@@ -145,9 +146,15 @@ def _read_text_lines(path: "Path", offset: int | None, limit: int | None) -> Tup
 
 
 def _inline_data(path: "Path", mime_type: str) -> Dict[str, Any]:
-    data = base64.b64encode(path.read_bytes()).decode()
+    """Return inline_data payload with **raw bytes** for Gemini Part.
+
+    The Gemini Python SDK expects ``data`` to be **bytes**, not a base64
+    encoded string (it applies the encoding internally). Using bytes avoids
+    double-encoding and keeps payload size predictable for logging helpers.
+    """
+    data_b64 = base64.b64encode(path.read_bytes()).decode()
     return {
-        "inline_data": {"mime_type": mime_type, "data": data},
+        "inline_data": {"mime_type": mime_type, "data": data_b64},
     }
 
 
@@ -157,31 +164,64 @@ def _inline_data(path: "Path", mime_type: str) -> Dict[str, Any]:
 
 
 def read_file(
-    path: str = Field(..., description="File path to read (workspace-relative or absolute)"),
-    offset: Optional[int] = Field(None, ge=0, description="0-based line offset to start reading from"),
+    path: str = Field(
+        ..., 
+        description="Target file path. Relative paths are resolved inside the workspace; absolute paths must stay within the workspace root.",
+    ),
+    offset: Optional[int] = Field(
+        None,
+        ge=0,
+        description=(
+            "Line offset (0-based) for text files. Allows paginated reads to avoid huge payloads."
+        ),
+    ),
     limit: Optional[int] = Field(
-        None, gt=0, description="Number of lines to read (omit for default max)"
+        None,
+        gt=0,
+        description="Maximum number of text lines to return. Defaults to a safe internal cap if omitted.",
     ),
     force_inline_images: bool = Field(
-        False, 
-        description="Force embedding images as base64 (may consume many tokens). Default: false (returns path info only)"
+        False,
+        description=(
+            "Set to *true* to embed small image/pdf/audio/video files as base64 **inline_data**. "
+            "When *false* (default) only the path is returned so callers can decide whether to fetch separately."
+        ),
     ),
 ) -> Dict[str, Any]:
-    """Read a workspace file with optional line pagination.
+    """read_file – Fetch the contents or preview of a workspace file.
 
-    Returns
-    -------
-    Dict
-        status          : "success" | "error"
-        llm_content     : str | dict – factual payload for LLM history
-        return_display  : str – short user-facing message
-        path            : str – absolute path of the file (success only)
-        content         : str – text content (text files)
-        inline_data     : {mime_type, data} – base64 blob (inline binaries)
-        truncated       : bool – flag when content was clipped (optional)
-        original_line_count : int – total lines in file (optional)
-        lines_shown     : [start, end] – line range returned (optional)
-        error           : str – error details (error only)
+    This tool is designed for conversational agents: it returns **structured JSON**
+    that is easy for large-language models to interpret while remaining compact for
+    user interfaces.
+
+    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+
+        {
+        "status": "success",
+        "message": "Read file: foo/bar.py (truncated)",        # short summary
+        "llm_content": "<string> | {inline_data}",              # content sent to LLM
+        "data": {
+            "path": "/abs/workspace/foo/bar.py",               # absolute path
+            "content": "<text>",                               # present for text files
+            "inline_data": {"mime_type": "image/png", "data": "..."},
+            "truncated": true,                                   # when clipped
+            "original_line_count": 345,                          # when truncated
+            "lines_shown": [1, 200]                              # inclusive 1-based range
+        }
+        }
+
+    Error response::
+
+        {
+        "status": "error",
+        "message": "File does not exist: foo.txt",
+        "error": "File does not exist: foo.txt"
+        }
+
+    The **``llm_content``** field is optimised for inclusion in the assistant's
+    conversation history, whereas **``message``** is a concise UI toast. All extra
+    metadata sits under ``data`` so downstream code can be schema-validated in a
+    single place.
     """
 
     # ------------------------------------------------------------------
@@ -195,21 +235,28 @@ def read_file(
     if isinstance(limit, FieldInfo):
         limit = None
 
+    # Helper shortcuts for consistent results
+    def _error(message: str) -> Dict[str, Any]:
+        return ToolResult(status="error", message=message, error=message).model_dump()
+
+    def _success(message: str, llm_content: Any | None, **data: Any) -> Dict[str, Any]:
+        payload = data or None
+        return ToolResult(
+            status="success",
+            message=message,
+            llm_content=llm_content,
+            data=payload,
+        ).model_dump()
+
     # Validate numeric params
     for name, value in (("offset", offset), ("limit", limit)):
         if value is not None and value < 0:
-            return {
-                "status": "error",
-                "error": f"{name} must be positive, got {value}",
-            }
+            return _error(f"{name} must be positive, got {value}")
 
     # Resolve & validate path
     abs_candidate = validate_path_in_workspace(path)
     if abs_candidate is None:
-        return {
-            "status": "error",
-            "error": f"Path is outside of workspace: {path}",
-        }
+        return _error(f"Path is outside of workspace: {path}")
 
     try:
         from pathlib import Path  # Local import to avoid top-level circular
@@ -217,15 +264,15 @@ def read_file(
         file_path = Path(abs_candidate)
 
         if not file_path.exists():
-            return {"status": "error", "error": f"File does not exist: {path}"}
+            return _error(f"File does not exist: {path}")
         if not file_path.is_file():
-            return {"status": "error", "error": f"Path is not a file: {path}"}
+            return _error(f"Path is not a file: {path}")
 
         # Enforce 20 MiB limit
         if not _file_size_ok(file_path):
             size_mb = file_path.stat().st_size / (1024 * 1024)
             msg = f"File size exceeds the 20 MB limit ({size_mb:.2f} MB)."
-            return {"status": "error", "error": msg}
+            return _error(msg)
 
         file_type = _detect_file_type(file_path)
         rel_display = (
@@ -240,67 +287,47 @@ def read_file(
                     file_path, offset, limit
                 )
                 llm_content = content
-                return_display = "(truncated)" if is_truncated else ""
+                display_msg = f"Read file: {rel_display}{' (truncated)' if is_truncated else ''}"
 
-                result = {
-                    "llm_content": llm_content,
-                    "return_display": return_display,
-                    # Legacy keys ↓
-                    "status": "success",
+                extra: Dict[str, Any] = {
                     "path": str(file_path),
                     "content": content,
                 }
 
                 if is_truncated:
-                    result.update(
+                    extra.update(
                         {
                             "truncated": True,
                             "original_line_count": original_count,
                             "lines_shown": [start_line, end_line],
                         }
                     )
-                return result
+
+                return _success(display_msg, llm_content, **extra)
 
             case "image" | "pdf" | "audio" | "video":
                 # Refuse to inline huge binaries to avoid blowing up the LLM context
                 if file_path.stat().st_size > _INLINE_MAX_BYTES:
-                    return {
-                        "status": "error",
-                        "error": "Binary file too large to inline.",
-                    }
+                    return _error("Binary file too large to inline.")
 
                 mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
                 inline_part = _inline_data(file_path, mime_type)
-                result = {
-                    "llm_content": inline_part,
-                    "return_display": f"Read {file_type} file: {rel_display}",
-                    # Legacy
-                    "status": "success",
-                    "path": str(file_path),
+                return _success(
+                    f"Read {file_type} file: {rel_display}",
+                    llm_content=inline_part,
+                    path=str(file_path),
                     **inline_part,
-                }
-                return result
+                )
 
             case "binary":
                 msg = f"Cannot display content of binary file: {rel_display}"
-                return {
-                    "llm_content": msg,
-                    "return_display": f"Skipped binary file: {rel_display}",
-                    "status": "error",
-                    "error": "binary_file_not_supported",
-                }
+                return _error(msg)
 
             case _:
-                return {
-                    "status": "error",
-                    "error": "Unhandled file type",
-                }
+                return _error("Unhandled file type")
 
     except Exception as exc:  # pylint: disable=broad-except
-        return {
-            "status": "error",
-            "error": str(exc),
-        }
+        return _error(str(exc))
 
 
 # ---------------------------------------------------------------------------
