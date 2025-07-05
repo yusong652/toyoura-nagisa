@@ -36,6 +36,7 @@ google-api-python-client>=2.0.0
 
 # MCP and Utilities
 fastmcp>=2.8.0
+pathspec>=0.12.0
 emoji>=2.0.0
 email-validator>=2.1.0
 
