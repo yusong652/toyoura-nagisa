@@ -5,7 +5,7 @@ This package hosts individual tool implementations migrated from the legacy
 structure used by Google's gemini-cli project.
 """
 
-from .workspace import validate_path_in_workspace
+from ..utils.path_security import validate_path_in_workspace
 from .python_executor import (
     execute_python_script,
     register_python_executor_tools,
@@ -17,6 +17,7 @@ from .read_many_files import (
 from .write_file import write_file, register_write_file_tool
 from .list_directory import list_directory, register_list_directory_tool
 from .delete_file import delete_file, register_delete_file_tool
+from .delete_directory import delete_directory, register_delete_directory_tool
 from .read_file import read_file, register_read_file_tool
 from .shell_command import run_shell_command, register_shell_command_tool
 
@@ -31,6 +32,7 @@ __all__ = [
     "write_file",
     "read_file",
     "delete_file",
+    "delete_directory",
     "execute_python_script",
     "run_shell_command",
 ]
@@ -47,5 +49,6 @@ def register_coding_tools(mcp):
     register_write_file_tool(mcp)
     register_list_directory_tool(mcp)
     register_delete_file_tool(mcp)
+    register_delete_directory_tool(mcp)
     register_read_file_tool(mcp)
     register_shell_command_tool(mcp) 

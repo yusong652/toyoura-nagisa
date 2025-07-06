@@ -10,7 +10,7 @@ from fastmcp import FastMCP  # type: ignore
 from pydantic import Field
 from pydantic.fields import FieldInfo
 
-from .workspace import validate_path_in_workspace, WORKSPACE_ROOT as _WS_PATH
+from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT as _WS_PATH
 from ..utils.tool_result import ToolResult
 
 
@@ -259,8 +259,6 @@ def read_file(
         return _error(f"Path is outside of workspace: {path}")
 
     try:
-        from pathlib import Path  # Local import to avoid top-level circular
-
         file_path = Path(abs_candidate)
 
         if not file_path.exists():
