@@ -114,65 +114,30 @@ def delete_directory(
     permanent: bool = Field(False, description="If True, permanently delete directory. If False (default), move to .trash folder for recovery."),
     deep_count: bool = Field(False, description="If True, recursively count all files/directories. If False (default), only count immediate children for better performance.")
 ) -> Dict[str, Any]:
-    """delete_directory – Safely delete a directory within the workspace (REVERSIBLE by default).
+    """Safely deletes a directory, either by moving it to a .trash folder or permanently.
 
-    This tool safely removes directories from the workspace directory with comprehensive
-    security checks, including symlink safety validation. The default behavior moves 
-    directories to a .trash folder for recovery, making all deletions reversible unless 
-    explicitly requested otherwise. All operations are restricted to the workspace 
-    directory with multi-layer protection against malicious symlinks.
+    ## Core Functionality
+    - **Default Behavior (Safe):** By default, this tool only deletes **empty** directories.
+    - **Recursive Deletion:** To delete a directory that is **not empty**, you MUST set `recursive=True`.
+    - **Trash vs. Permanent:**
+        - By default (`permanent=False`), the directory is moved to a `.trash` folder for recovery.
+        - To **permanently delete** the directory and all its contents (irreversible), you MUST set `permanent=True`.
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is a highly destructive operation, especially with `recursive=True`. Be absolutely certain before using it.
+    - This tool is for **directories only**. To delete a single file, you must use the `delete_file` tool.
+    - Before deleting a non-empty directory, consider using `list_directory` to understand its contents.
 
-        {
-        "status": "success",
-        "message": "Directory moved to trash successfully",    # short summary
-        "llm_content": "Moved directory to trash: project/",  # detailed summary for LLM
-        "data": {
-            "original_path": "/abs/workspace/project/",        # original absolute path
-            "relative_path": "project/",                       # workspace-relative path
-            "was_symlink": false,                              # whether deleted item was a symlink
-            "permanent": false,                                # whether permanently deleted
-            "trash_path": "/abs/workspace/.trash/project_20231201_143022_123/",  # trash location
-            "recoverable": true,                               # whether directory can be recovered
-            "contents": {                                      # directory contents info
-                "files": 15,                                   # number of files deleted
-                "directories": 3,                              # number of subdirectories deleted
-                "count_type": "immediate",                     # "immediate" or "recursive" counting
-                "potentially_large": false                     # whether directory seems large
-            }
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success:** A single `string` confirming the deletion and summarizing its contents.
+        - Example (to trash): `"Moved directory to trash: old_project/ → .trash/old_project_20250708_103000_123/ (files: 15, subdirs: 3)"`
+        - Example (permanent): `"Permanently deleted directory: temp_files/ (files: 5, subdirs: 0)"`
+    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
+        - Example: `"Error: Directory is not empty - use recursive=True to delete non-empty directories"`
 
-        {
-        "status": "error",
-        "message": "Directory is not empty - use recursive=True to delete non-empty directories",
-        "error": "Directory is not empty - use recursive=True to delete non-empty directories"
-        }
-
-    Security Features:
-    - Symlink safety: Prevents deleting symlinks pointing outside workspace
-    - Parent directory safety: Checks all parent directories for unsafe symlinks
-    - Path validation: Ensures all operations stay within workspace boundaries
-    - Type checking: Verifies target is actually a directory (not file)
-    - Safe resolution: Handles broken symlinks and permission issues gracefully
-
-    Reliability Features:
-    - Recoverable deletion: Directories moved to .trash folder by default
-    - Permanent deletion option: Available when explicitly requested
-    - Empty directory check: Prevents accidental deletion of non-empty directories
-    - Clear guidance: Provides specific error messages for different scenarios
-
-    Performance Features:
-    - Smart counting: Default immediate-only counting for fast performance
-    - Optional deep counting: Use deep_count=True for recursive statistics when needed
-    - Large directory detection: Automatically detects potentially large directories
-    - Memory efficient: Avoids expensive operations on large directories by default
-
-    The **``llm_content``** field provides detailed information for the assistant's
-    conversation history, while **``message``** is a concise user-facing summary.
+    You MUST check the response to confirm success or handle the error.
     """
 
     # ------------------------------------------------------------------

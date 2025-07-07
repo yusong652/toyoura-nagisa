@@ -41,52 +41,27 @@ def delete_file(
     path: str = Field(..., description="File path to delete (workspace-relative)"),
     permanent: bool = Field(False, description="If True, permanently delete file. If False (default), move to .trash folder for recovery.")
 ) -> Dict[str, Any]:
-    """delete_file – Safely delete a file within the workspace (REVERSIBLE by default).
+    """Safely deletes a file by either moving it to a .trash folder or deleting it permanently.
 
-    This tool safely removes files from the workspace directory with comprehensive
-    security checks, including symlink safety validation. The default behavior moves 
-    files to a .trash folder for recovery, making all deletions reversible unless 
-    explicitly requested otherwise. All operations are restricted to the workspace 
-    directory with multi-layer protection against malicious symlinks.
+    ## Core Functionality
+    - **Default Behavior (Safe):** By default (`permanent=False`), this tool moves the specified file to a `.trash` directory within the workspace, allowing for recovery.
+    - **Permanent Deletion:** To permanently delete the file (irreversible), you must explicitly set `permanent=True`.
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is a destructive operation. Be certain you want to delete the file before using this tool.
+    - This tool is for **files only**. To delete a directory, you must use the `delete_directory` tool.
+    - For most cases, prefer the default behavior (moving to trash) as a safety measure.
 
-        {
-        "status": "success",
-        "message": "File moved to trash successfully",       # short summary
-        "llm_content": "Moved file to trash: foo/bar.py",   # detailed summary for LLM
-        "data": {
-            "original_path": "/abs/workspace/foo/bar.py",    # original absolute path
-            "relative_path": "foo/bar.py",                   # workspace-relative path
-            "was_symlink": false,                            # whether deleted item was a symlink
-            "permanent": false,                              # whether permanently deleted
-            "trash_path": "/abs/workspace/.trash/bar_20231201_143022_123.py",  # trash location (if not permanent)
-            "recoverable": true                              # whether file can be recovered
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success:** A single `string` confirming the deletion.
+        - Example (to trash): `"Moved file to trash: src/old_code.py → .trash/old_code_20250708_103000_123.py (1024 bytes)"`
+        - Example (permanent): `"Permanently deleted file: assets/temp_image.png (5120 bytes)"`
+    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
+        - Example: `"Error: Path is a directory - use delete_directory tool instead"`
 
-        {
-        "status": "error",
-        "message": "Path is a directory - use delete_directory tool instead",
-        "error": "Path is a directory - use delete_directory tool instead"
-        }
-
-    Security Features:
-    - Symlink safety: Prevents deleting symlinks pointing outside workspace
-    - Parent directory safety: Checks all parent directories for unsafe symlinks
-    - Path validation: Ensures all operations stay within workspace boundaries
-    - Type checking: Verifies target is actually a file (not directory)
-    - Safe resolution: Handles broken symlinks and permission issues gracefully
-
-    Reliability Features:
-    - Recoverable deletion: Files moved to .trash folder by default
-    - Permanent deletion option: Available when explicitly requested
-    - Clear guidance: Directs LLM to appropriate tools for different file types
-
-    The **``llm_content``** field provides detailed information for the assistant's
-    conversation history, while **``message``** is a concise user-facing summary.
+    You MUST check the response to confirm success or handle the error.
     """
 
     # ------------------------------------------------------------------
