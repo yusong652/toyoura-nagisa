@@ -79,71 +79,36 @@ def execute_python_script(
         ),
     ),
 ) -> Dict[str, Any]:
-    """execute_python_script – Secure Python script execution with enterprise-grade protection.
+    """Executes a Python script in a secure, isolated environment and returns its output.
 
-    This tool safely executes Python scripts in isolated subprocess environments with
-    comprehensive security checks, resource limits, and detailed error reporting. All
-    operations are restricted to the workspace directory with multi-layer protection
-    against malicious paths and resource exhaustion.
+    ## Core Functionality
+    - **Path:** The workspace-relative path to the `.py` script to execute.
+    - **Args:** A list of string arguments to pass to the script (e.g., `['--user', 'admin']`).
+    - **Timeout:** Maximum execution time in seconds (default: 30s, max: 300s).
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is your primary tool for running tests, executing build scripts, or running any Python code.
+    - **You must `write_file` first** to create the script before you can execute it.
+    - The script runs in an isolated process. It cannot access or modify the state of the agent.
+    - **Crucially, you must check the `exit_code` in the response to determine if the script itself succeeded or failed.**
 
-        {
-        "status": "success",
-        "message": "Script executed successfully",           # short summary
-        "llm_content": "Script output: Hello World!",       # detailed output for LLM
-        "data": {
-            "script_path": "/abs/workspace/scripts/main.py", # executed script path
-            "working_directory": "/abs/workspace/scripts/",  # execution directory
-            "exit_code": 0,                                  # process exit code
-            "execution_time": 2.5,                          # runtime in seconds
-            "output": {                                      # captured output
-                "stdout": "Hello World!\\nProcessing...",    # standard output
-                "stderr": "",                                # standard error
-                "combined_size": 1024,                       # total output size
-                "stdout_truncated": false,                   # whether truncated
-                "stderr_truncated": false                    # whether truncated
-            },
-            "command": ["python3", "main.py", "--verbose"],  # executed command
-            "limits_applied": {                              # resource limits info
-                "timeout": 30,                               # timeout used
-                "max_output_size": 10485760                  # output size limit
-            }
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success (Tool ran the script):** A `JSON object` containing the execution results.
+        - **Object Schema:** `{"exit_code": int, "stdout": string, "stderr": string}`
+        - **Example (Script Success):**
+          ```json
+          {"exit_code": 0, "stdout": "Process finished successfully.", "stderr": ""}
+          ```
+        - **Example (Script Failure):**
+          ```json
+          {"exit_code": 1, "stdout": "", "stderr": "Traceback (most recent call last):\n  File \"test.py\", line 5, in <module>\n    raise ValueError(\"A sample error\")\nValueError: A sample error"}
+          ```
+    2.  **Error (Tool failed to run):** A single `string` starting with "Error:", explaining the tool-level failure.
+        - Example: `"Error: Script does not exist: run_tests.py"`
 
-        {
-        "status": "error",
-        "message": "Script execution failed with exit code 1",
-        "error": "Script execution failed with exit code 1"
-        }
-
-    Security Features:
-    - Path validation: All paths validated against workspace boundaries
-    - Symlink safety: Prevents executing symlinks pointing outside workspace
-    - Parent directory safety: Checks all parent directories for unsafe symlinks
-    - Process isolation: Scripts run in separate subprocess with no shell access
-    - Command injection prevention: Arguments passed as list, no shell interpolation
-    - Working directory control: Execution restricted to workspace subdirectories
-
-    Performance Features:
-    - Timeout protection: Configurable execution time limits (1-300 seconds)
-    - Output size limits: Large outputs automatically truncated (10MB max)
-    - Memory protection: Captured output size tracking and limits
-    - Process cleanup: Automatic termination of hung processes
-    - Resource monitoring: Detailed execution statistics and timing
-
-    Reliability Features:
-    - Graceful error handling: Comprehensive error categorization and reporting
-    - Detailed logging: Full command, timing, and output information
-    - Exit code tracking: Standard process return code reporting
-    - Environment isolation: Clean execution environment with controlled variables
-    - Timeout handling: Proper process tree termination on timeout
-
-    The **``llm_content``** field provides execution results optimized for the
-    assistant's context, while **``message``** is a concise user summary.
+    You MUST parse the JSON response and check the `exit_code` to determine the outcome.
     """
 
     # ------------------------------------------------------------------
@@ -265,21 +230,21 @@ def execute_python_script(
             if combined_size > _MAX_OUTPUT_SIZE:
                 return _error(f"Script output too large ({combined_size / 1024 / 1024:.1f}MB exceeds {_MAX_OUTPUT_SIZE / 1024 / 1024}MB limit)")
 
-            # Determine status
-            success = result.returncode == 0
-            status_msg = "Script executed successfully" if success else f"Script execution failed with exit code {result.returncode}"
+            # The tool's job is to run the script and report the results.
+            # A non-zero exit code is a script failure, not a tool failure.
+            # We will always return a success response containing the script's results.
             
-            # Build LLM content
-            if success:
-                if stdout_content.strip():
-                    llm_content = f"Script executed successfully. Output: {stdout_content[:500]}{'...' if len(stdout_content) > 500 else ''}"
-                else:
-                    llm_content = "Script executed successfully with no output"
-            else:
-                error_info = stderr_content[:200] if stderr_content else "No error details"
-                llm_content = f"Script failed (exit code {result.returncode}). Error: {error_info}"
+            # Build the structured JSON payload for the LLM, as promised in the docstring.
+            llm_content = {
+                "exit_code": result.returncode,
+                "stdout": stdout_content,
+                "stderr": stderr_content,
+            }
 
-            # Prepare detailed data
+            # Create a human-readable summary message for the UI.
+            status_msg = f"Script finished with exit code {result.returncode} in {execution_time:.2f}s."
+
+            # Prepare the detailed data payload for the UI, which is not sent to the LLM.
             execution_data = {
                 "script_path": script_path,
                 "working_directory": workdir_path,
@@ -299,24 +264,28 @@ def execute_python_script(
                 }
             }
 
-            if success:
-                return _success(status_msg, llm_content, **execution_data)
-            else:
-                # For failed executions, return error with detailed data
-                return ToolResult(
-                    status="error",
-                    message=status_msg,
-                    error=stderr_content if stderr_content else f"Script exited with code {result.returncode}",
-                    data=execution_data
-                ).model_dump()
+            # Return a success response with the structured LLM content.
+            return _success(status_msg, llm_content, **execution_data)
 
         except subprocess.TimeoutExpired as exc:
             execution_time = time.time() - start_time
             
             # Handle timeout with partial output
-            partial_stdout = exc.stdout or ""
-            partial_stderr = exc.stderr or ""
+            partial_stdout, _ = _truncate_output(exc.stdout or "")
+            partial_stderr, _ = _truncate_output(exc.stderr or "")
             
+            # Build the structured JSON payload for the LLM.
+            # A timeout is a script execution result, not a tool failure.
+            llm_content = {
+                "exit_code": -1,  # Convention for timeout
+                "stdout": partial_stdout,
+                "stderr": f"{partial_stderr}\n\n[ERROR] Script execution timed out after {timeout} seconds and was terminated.".strip()
+            }
+
+            # Create a human-readable summary message for the UI.
+            status_msg = f"Script timed out after {timeout}s and was terminated."
+
+            # Prepare the detailed data payload for the UI.
             timeout_data = {
                 "script_path": script_path,
                 "working_directory": workdir_path,
@@ -324,10 +293,10 @@ def execute_python_script(
                 "execution_time": round(execution_time, 3),
                 "output": {
                     "stdout": partial_stdout,
-                    "stderr": partial_stderr,
+                    "stderr": llm_content["stderr"],
                     "combined_size": len(partial_stdout) + len(partial_stderr),
-                    "stdout_truncated": False,
-                    "stderr_truncated": False
+                    "stdout_truncated": len(exc.stdout or "") > _OUTPUT_TRUNCATE_SIZE,
+                    "stderr_truncated": len(exc.stderr or "") > _OUTPUT_TRUNCATE_SIZE,
                 },
                 "command": cmd,
                 "timeout_info": {
@@ -336,12 +305,8 @@ def execute_python_script(
                 }
             }
 
-            return ToolResult(
-                status="error",
-                message=f"Script exceeded timeout of {timeout}s and was terminated",
-                error=f"Script exceeded timeout of {timeout}s and was terminated",
-                data=timeout_data
-            ).model_dump()
+            # Return a success response with the structured LLM content.
+            return _success(status_msg, llm_content, **timeout_data)
 
     except PermissionError:
         return _error("Permission denied when executing script")

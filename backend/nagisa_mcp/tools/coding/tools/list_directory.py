@@ -44,52 +44,35 @@ def list_directory(
         description="Maximum number of items to return. Defaults to 1000, max 5000 for safety."
     ),
 ) -> Dict[str, Any]:
-    """list_directory – List contents of a directory within the workspace.
+    """Lists the contents of a directory, returning a list of files and subdirectories.
 
-    This tool provides a structured, paginated listing of files and directories, with options
-    for filtering hidden files, respecting .gitignore patterns, and applying custom
-    ignore patterns. All operations are restricted to the workspace directory with
-    additional symlink safety checks.
+    ## Core Functionality
+    - Provides a detailed listing of items within a specified `path`.
+    - By default, it respects `.gitignore` and hides hidden files (e.g., `.env`).
+    - Use `show_hidden=True` to include hidden files.
+    - Use `ignore` to provide custom glob patterns for exclusion (e.g., `*.tmp`).
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is your primary tool for exploring the file system and understanding the structure of a project.
+    - Use this tool *before* reading or writing files to confirm their location and names.
+    - For very large directories, the output will be paginated. Use the `offset` and `limit` parameters to view more items. The tool's output will tell you the total number of items.
 
-        {
-        "status": "success",
-        "message": "Listed 15 item(s) (showing 1-15 of 50 total)",  # summary with pagination
-        "llm_content": null,                                        # no special LLM content
-        "data": {
-            "items": [
-                {
-                    "name": "file.py",                              # file/directory name
-                    "type": "file",                                 # "file" or "directory"
-                    "size": 1234,                                   # size in bytes (0 for dirs)
-                    "modified_time": "2023-01-01T12:00:00Z",       # ISO timestamp
-                    "path": "/abs/workspace/file.py",              # absolute path
-                    "is_symlink": false                             # whether item is a symlink
-                },
-                ...
-            ],
-            "total_items": 50,                                      # total available items
-            "showing_range": [1, 15],                               # 1-based range shown
-            "truncated": true,                                      # whether more items exist
-            "git_ignored": ["*.pyc", "build/"],                    # patterns that filtered items
-            "unsafe_symlinks": 2                                    # count of excluded unsafe symlinks
-        },
-        "warning": "pathspec library not installed..."             # optional warnings
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success:** A `JSON array` (list) of objects, where each object represents a file or directory.
+        - **Object Schema:** `{"name": string, "type": "file"|"directory", "size": int, "modified_time": "ISO_8601_string"}`
+        - **Example:**
+          ```json
+          [
+            {"name": "src", "type": "directory", "size": 4096, "modified_time": "2025-07-08T10:30:00Z"},
+            {"name": "README.md", "type": "file", "size": 1536, "modified_time": "2025-07-08T10:35:00Z"}
+          ]
+          ```
+    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
+        - Example: `"Error: Path is not a directory: README.md"`
 
-        {
-        "status": "error",
-        "message": "Path does not exist: nonexistent/",
-        "error": "Path does not exist: nonexistent/"
-        }
-
-    The **``data.items``** array contains detailed information about each safe file and
-    directory, sorted with directories first, then alphabetically by name. Pagination
-    prevents OOM issues with large directories, and symlink safety checks prevent
-    access to external sensitive data.
+    You MUST parse the JSON array to inspect the directory contents.
     """
 
     # ------------------------------------------------------------------
@@ -189,9 +172,7 @@ def list_directory(
                     "size": stat.st_size if child.is_file() else 0,
                     "modified_time": datetime.fromtimestamp(
                         stat.st_mtime, tz=timezone.utc
-                    ).isoformat(),
-                    "path": str(child),
-                    "is_symlink": child.is_symlink(),
+                    ).isoformat().replace('+00:00', 'Z'),
                 })
             except (OSError, PermissionError):
                 # Skip items we can't access
@@ -246,7 +227,7 @@ def list_directory(
 
         return _success(
             message,
-            llm_content=None,
+            llm_content=paginated_items,
             **payload,
             **extra,
         )

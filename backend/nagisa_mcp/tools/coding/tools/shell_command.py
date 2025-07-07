@@ -114,86 +114,37 @@ def run_shell_command(
         ),
     ),
 ) -> Dict[str, Any]:
-    """run_shell_command – Secure shell command execution with enterprise-grade protection.
+    """Executes a shell command in a secure, isolated environment and returns its output.
 
-    Execute arbitrary shell commands with comprehensive security checks, resource limits,
-    and detailed output handling. This tool provides full shell capabilities including
-    pipes, redirects, and command chaining, while maintaining safety through multiple
-    protection layers.
+    ## ⚠️ CRITICAL SECURITY WARNING ⚠️
+    This tool executes commands directly on the system shell. Malicious commands can cause irreversible damage. Always verify the safety and correctness of a command before execution.
 
-    ⚠️  **CRITICAL SECURITY WARNING** ⚠️
-    This tool executes commands directly through the system shell with the same
-    privileges as the host process. Malicious commands can cause irreversible
-    damage to the system. Always verify command safety before execution.
+    ## Core Functionality
+    - **Command:** The full shell command string to execute. Supports pipes, redirects, and other shell features.
+    - **Directory:** The workspace-relative directory where the command will be run. Defaults to the workspace root.
+    - **Timeout:** Maximum execution time in seconds (default: 60s, max: 600s).
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is your most powerful tool for interacting with the system, building projects, running tests, and managing files.
+    - **You must check the `exit_code` in the response to determine if the command itself succeeded or failed.** A non-zero exit code indicates a command failure.
 
-        {
-        "status": "success",
-        "message": "Command executed successfully",        # short summary
-        "llm_content": "Command output: Hello World!",    # detailed output for LLM
-        "data": {
-            "command": "echo 'Hello World!'",             # executed command
-            "directory": "/abs/workspace/",               # execution directory
-            "exit_code": 0,                               # process exit code
-            "execution_time": 0.15,                       # runtime in seconds
-            "output": {                                   # captured output
-                "stdout": "Hello World!\\n",              # standard output
-                "stderr": "",                             # standard error
-                "combined_size": 13,                      # total output size
-                "stdout_truncated": false,                # whether truncated
-                "stderr_truncated": false                 # whether truncated
-            },
-            "shell_info": {                               # shell execution info
-                "shell_executable": ["bash", "-c"],      # shell used
-                "platform": "posix"                      # execution platform
-            },
-            "limits_applied": {                           # resource limits info
-                "timeout": 60,                            # timeout used
-                "max_output_size": 10485760               # output size limit
-            }
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success (Tool ran the command):** A `JSON object` containing the execution results.
+        - **Object Schema:** `{"exit_code": int, "stdout": string, "stderr": string}`
+        - **Example (Command Success):**
+          ```json
+          {"exit_code": 0, "stdout": "build/app.js\nbuild/vendor.js\n", "stderr": ""}
+          ```
+        - **Example (Command Failure):**
+          ```json
+          {"exit_code": 127, "stdout": "", "stderr": "bash: npm: command not found"}
+          ```
+    2.  **Error (Tool failed to run):** A single `string` starting with "Error:", explaining the tool-level failure.
+        - Example: `"Error: Working directory is outside of workspace: /etc"`
 
-        {
-        "status": "error",
-        "message": "Command execution failed with exit code 1",
-        "error": "Command execution failed with exit code 1"
-        }
-
-    Security Features:
-    - Path validation: Working directory validated against workspace boundaries
-    - Symlink safety: Prevents execution in directories with unsafe symlinks
-    - Dangerous command detection: Basic protection against destructive patterns
-    - Process isolation: Commands run in separate subprocess environment
-    - Working directory restriction: Execution limited to workspace subdirectories
-    - Resource monitoring: Comprehensive tracking of execution and output
-
-    Performance Features:
-    - Timeout protection: Configurable execution time limits (1-600 seconds)
-    - Output size limits: Large outputs automatically truncated (10MB max)
-    - Memory protection: Captured output size tracking and limits
-    - Process cleanup: Automatic termination of hung processes
-    - Platform optimization: Uses optimal shell for each platform (bash/cmd)
-
-    Reliability Features:
-    - Graceful error handling: Comprehensive error categorization and reporting
-    - Detailed logging: Full command, timing, and output information
-    - Exit code tracking: Standard process return code reporting
-    - Signal handling: Proper process termination and signal reporting
-    - Timeout handling: Clean process tree termination on timeout
-
-    Shell Features:
-    - Full shell syntax: Supports pipes, redirects, variables, subshells
-    - Command chaining: Logical operators (&&, ||, ;) fully supported  
-    - Environment access: Commands can read/modify environment variables
-    - Process spawning: Can launch additional processes and tools
-    - File operations: Complete filesystem access within workspace
-
-    The **``llm_content``** field provides execution results optimized for the
-    assistant's context, while **``message``** is a concise user summary.
+    You MUST parse the JSON response and check the `exit_code` to determine the outcome.
     """
 
     # ------------------------------------------------------------------
@@ -288,21 +239,21 @@ def run_shell_command(
             if combined_size > _MAX_OUTPUT_SIZE:
                 return _error(f"Command output too large ({combined_size / 1024 / 1024:.1f}MB exceeds {_MAX_OUTPUT_SIZE / 1024 / 1024}MB limit)")
 
-            # Determine status
-            success = result.returncode == 0
-            status_msg = "Command executed successfully" if success else f"Command execution failed with exit code {result.returncode}"
-            
-            # Build LLM content
-            if success:
-                if stdout_content.strip():
-                    llm_content = f"Command executed successfully. Output: {stdout_content[:500]}{'...' if len(stdout_content) > 500 else ''}"
-                else:
-                    llm_content = "Command executed successfully with no output"
-            else:
-                error_info = stderr_content[:200] if stderr_content else "No error details"
-                llm_content = f"Command failed (exit code {result.returncode}). Error: {error_info}"
+            # The tool's job is to run the command and report the results.
+            # A non-zero exit code is a command failure, not a tool failure.
+            # We will always return a success response containing the command's results.
 
-            # Prepare detailed data
+            # Build the structured JSON payload for the LLM, as promised in the docstring.
+            llm_content = {
+                "exit_code": result.returncode,
+                "stdout": stdout_content,
+                "stderr": stderr_content,
+            }
+
+            # Create a human-readable summary message for the UI.
+            status_msg = f"Command finished with exit code {result.returncode} in {execution_time:.2f}s."
+
+            # Prepare the detailed data payload for the UI, which is not sent to the LLM.
             execution_data = {
                 "command": command,
                 "directory": exec_dir,
@@ -325,24 +276,28 @@ def run_shell_command(
                 }
             }
 
-            if success:
-                return _success(status_msg, llm_content, **execution_data)
-            else:
-                # For failed executions, return error with detailed data
-                return ToolResult(
-                    status="error",
-                    message=status_msg,
-                    error=stderr_content if stderr_content else f"Command exited with code {result.returncode}",
-                    data=execution_data
-                ).model_dump()
+            # Return a success response with the structured LLM content.
+            return _success(status_msg, llm_content, **execution_data)
 
         except subprocess.TimeoutExpired as exc:
             execution_time = time.time() - start_time
             
             # Handle timeout with partial output
-            partial_stdout = exc.stdout or ""
-            partial_stderr = exc.stderr or ""
-            
+            partial_stdout, _ = _truncate_output(exc.stdout or "")
+            partial_stderr, _ = _truncate_output(exc.stderr or "")
+
+            # Build the structured JSON payload for the LLM.
+            # A timeout is a command execution result, not a tool failure.
+            llm_content = {
+                "exit_code": -1,  # Convention for timeout
+                "stdout": partial_stdout,
+                "stderr": f"{partial_stderr}\n\n[ERROR] Command execution timed out after {timeout} seconds and was terminated.".strip()
+            }
+
+            # Create a human-readable summary message for the UI.
+            status_msg = f"Command timed out after {timeout}s and was terminated."
+
+            # Prepare the detailed data payload for the UI.
             timeout_data = {
                 "command": command,
                 "directory": exec_dir,
@@ -350,10 +305,10 @@ def run_shell_command(
                 "execution_time": round(execution_time, 3),
                 "output": {
                     "stdout": partial_stdout,
-                    "stderr": partial_stderr,
+                    "stderr": llm_content["stderr"],
                     "combined_size": len(partial_stdout) + len(partial_stderr),
-                    "stdout_truncated": False,
-                    "stderr_truncated": False
+                    "stdout_truncated": len(exc.stdout or "") > _OUTPUT_TRUNCATE_SIZE,
+                    "stderr_truncated": len(exc.stderr or "") > _OUTPUT_TRUNCATE_SIZE,
                 },
                 "shell_info": {
                     "shell_executable": shell_exe,
@@ -365,12 +320,8 @@ def run_shell_command(
                 }
             }
 
-            return ToolResult(
-                status="error",
-                message=f"Command exceeded timeout of {timeout}s and was terminated",
-                error=f"Command exceeded timeout of {timeout}s and was terminated",
-                data=timeout_data
-            ).model_dump()
+            # Return a success response with the structured LLM content.
+            return _success(status_msg, llm_content, **timeout_data)
 
     except PermissionError:
         return _error("Permission denied when executing command")
