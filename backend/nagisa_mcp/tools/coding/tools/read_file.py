@@ -188,40 +188,25 @@ def read_file(
         ),
     ),
 ) -> Dict[str, Any]:
-    """read_file – Fetch the contents or preview of a workspace file.
+    """Inspects a file's content, returning it as a string or a structured multimodal object.
 
-    This tool is designed for conversational agents: it returns **structured JSON**
-    that is easy for large-language models to interpret while remaining compact for
-    user interfaces.
+    ## Core Functionality
+    - **Text Files (.py, .md, .txt, etc.):** Returns the raw text content as a **string**. If the file is large, the string will be prefixed with a truncation notice (e.g., `[File content truncated: showing lines 1-2000 of 5000 total lines...]`).
+    - **Binary Files (images, PDFs, etc.):** Only processes these if `force_inline_images=True`. Returns a **JSON object** with the file's base64-encoded data, structured for multimodal use: `{"inline_data": {"mime_type": "image/png", "data": "<base64_data>"}}`.
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is your primary tool for understanding the contents of a specific file.
+    - **For large files, do not read the whole thing at once.** First, read the beginning of the file (without `offset`) to assess its structure. Then, use the `offset` and `limit` parameters to read subsequent chunks as needed.
+    - To discover files before reading them, use the `list_directory` tool.
 
-        {
-        "status": "success",
-        "message": "Read file: foo/bar.py (truncated)",        # short summary
-        "llm_content": "<string> | {inline_data}",              # content sent to LLM
-        "data": {
-            "path": "/abs/workspace/foo/bar.py",               # absolute path
-            "content": "<text>",                               # present for text files
-            "inline_data": {"mime_type": "image/png", "data": "..."},
-            "truncated": true,                                   # when clipped
-            "original_line_count": 345,                          # when truncated
-            "lines_shown": [1, 200]                              # inclusive 1-based range
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following three things:
 
-    Error response::
+    1.  **Success (Text File):** A single `string` containing the file's content.
+    2.  **Success (Binary File):** A `JSON object` with the schema: `{"inline_data": {"mime_type": string, "data": string}}`.
+    3.  **Error:** A single `string` starting with "Error:", explaining what went wrong (e.g., "Error: File does not exist: nonexistent.txt").
 
-        {
-        "status": "error",
-        "message": "File does not exist: foo.txt",
-        "error": "File does not exist: foo.txt"
-        }
-
-    The **``llm_content``** field is optimised for inclusion in the assistant's
-    conversation history, whereas **``message``** is a concise UI toast. All extra
-    metadata sits under ``data`` so downstream code can be schema-validated in a
-    single place.
+    You MUST check the format of the return value to know how to proceed.
     """
 
     # ------------------------------------------------------------------

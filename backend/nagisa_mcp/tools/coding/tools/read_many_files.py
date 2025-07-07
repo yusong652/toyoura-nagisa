@@ -188,75 +188,29 @@ def read_many_files(
         description="Force inline embedding of small image/pdf/audio/video files as base64.",
     ),
 ) -> Dict[str, Any]:
-    """read_many_files – Bulk read multiple text files with enterprise-grade security and performance.
+    """Reads multiple files using glob patterns and returns their contents in a single dictionary.
 
-    This tool efficiently reads multiple files matching glob patterns or specific paths,
-    with comprehensive security checks, performance limits, and intelligent handling of
-    different file types. All operations are restricted to the workspace directory with
-    multi-layer protection against malicious paths and resource exhaustion.
+    ## Core Functionality
+    - Use glob patterns (e.g., `src/**/*.py`, `docs/*.md`) to specify which files to read.
+    - The tool returns a single **JSON object** (dictionary) where keys are the file paths and values are their contents.
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Content Types in Return Value
+    - **Text Files:** The value for each text file is a **string** of its content.
+    - **Binary Files (images, PDFs, etc.):** If you explicitly include them in `paths` or `include` AND set `force_inline_assets=True`, their value will be a **JSON object**: `{"inline_data": {"mime_type": "image/png", "data": "<base64_data>"}}`. Otherwise, they are skipped.
 
-        {
-        "status": "success",
-        "message": "Read 15 files successfully (2 skipped)",  # short summary
-        "llm_content": "Read 15 files: src/main.py, src/utils.py...",  # detailed content for LLM
-        "data": {
-            "files": {                                        # file path → content mapping
-                "src/main.py": "#!/usr/bin/env python...",    # text file content
-                "docs/logo.png": {                            # binary file inline data
-                    "inline_data": {"mime_type": "image/png", "data": "iVBORw0KGgo..."}
-                }
-            },
-                         "statistics": {                                   # read operation stats
-                 "files_read": 15,                             # successfully read files
-                 "files_skipped": 2,                           # skipped files
-                 "files_processed": 20,                        # total files examined
-                 "total_bytes": 45231,                         # total content size
-                 "largest_file": "src/main.py (15.2 KB)"      # largest file info
-             },
-            "skipped": {                                      # skipped files with reasons
-                "node_modules/package.json": "excluded_directory",
-                "image.jpg": "asset_not_explicit"
-            },
-            "limits_applied": {                               # performance limits info
-                "max_files": 100,
-                "max_total_size": 52428800,
-                "stopped_early": false
-            }
-        }
-        }
+    ## Strategic Usage
+    - This is the most efficient tool for getting a broad overview of a project or fetching multiple related files at once.
+    - Be specific with your glob patterns to avoid hitting the `max_files` or `max_total_size` limits, which would result in a partial or failed read. Use the `exclude` parameter for more precision.
+    - This tool is for reading content. To see what files exist first, use `list_directory`.
 
-    Error response::
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-        {
-        "status": "error",
-        "message": "No files matched the given patterns",
-        "error": "No files matched the given patterns"
-        }
+    1.  **Success:** A `JSON object` mapping file paths to their content.
+        - Example: `{"src/main.py": "import os...", "README.md": "# Project Title..."}`
+    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong (e.g., "Error: No files matched the given patterns").
 
-    Security Features:
-    - Path validation: All paths validated against workspace boundaries
-    - Symlink safety: Prevents reading symlinks pointing outside workspace
-    - Parent directory safety: Checks all parent directories for unsafe symlinks
-    - File size limits: Individual file size protection (default 20MB max)
-    - Resource limits: Total memory and file count protection
-
-    Performance Features:
-    - Smart exclusions: Automatically excludes common large directories
-    - Batch limits: Configurable maximum files per operation
-    - Memory protection: Total size limits prevent memory exhaustion
-    - Early termination: Stops reading when limits are reached
-    - Progress tracking: Detailed statistics for monitoring
-
-    Reliability Features:
-    - Graceful degradation: Continues processing even if some files fail
-    - Detailed error reporting: Per-file error tracking with specific reasons
-    - Content type detection: Intelligent handling of text vs binary files
-    - Encoding safety: Robust text decoding with error replacement
-
-    The **``llm_content``** field provides structured information optimized for
-    the assistant's context, while **``message``** is a concise user summary.
+    You MUST parse the JSON object to access the file contents.
     """
 
     # ------------------------------------------------------------------
@@ -462,21 +416,16 @@ def read_many_files(
         if files_read == 0:
             return _error("No files could be read successfully")
 
-        # Build summary for LLM
-        file_list = list(files.keys())
-        preview_files = file_list[:5]
-        file_preview = ", ".join(preview_files)
-        if len(file_list) > 5:
-            file_preview += f", ... (+{len(file_list) - 5} more)"
+        # The `llm_content` sent to the model should be the actual file data, not a summary.
+        # This aligns the tool's behavior with its SOTA docstring.
+        llm_content = files
 
-        llm_content = f"Read {files_read} files{f' ({files_skipped} skipped)' if files_skipped else ''}: {file_preview}"
-
-        # Build response message
+        # Build a concise summary message for the user interface.
         message = f"Read {files_read} files successfully"
         if files_skipped:
             message += f" ({files_skipped} skipped)"
 
-        # Prepare detailed statistics
+        # Prepare detailed statistics for the backend/UI.
         statistics = {
             "files_read": files_read,
             "files_skipped": files_skipped,
@@ -491,6 +440,7 @@ def read_many_files(
             "stopped_early": stopped_early
         }
 
+        # The full response_data is for the UI, not the LLM.
         response_data = {
             "files": files,
             "statistics": statistics,

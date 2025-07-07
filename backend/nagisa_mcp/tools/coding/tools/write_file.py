@@ -35,44 +35,29 @@ def write_file(
     encoding: str = Field("utf-8", description="File encoding"),
     append: bool = Field(False, description="Append instead of overwrite"),
 ) -> Dict[str, Any]:
-    """write_file – Write text content to a file within the workspace.
+    """Creates, overwrites, or appends to a text file in the workspace.
 
-    This tool creates or overwrites files with the provided content, with options
-    for appending to existing files and specifying encoding. All operations are
-    restricted to the workspace directory with comprehensive security checks,
-    including symlink safety validation and file size limits.
+    ## Core Functionality
+    - **Path:** Specify the file's location with `path`. If the file doesn't exist, it will be created. Parent directories are also created automatically if they don't exist.
+    - **Content:** Provide the text content to be written in the `content` parameter.
+    - **Mode:**
+        - By default, this tool **overwrites** the entire file.
+        - To **append** content to the end of an existing file, set `append=True`.
 
-    Successful response (``ToolResult.model_dump()``) – **keys of interest**::
+    ## Strategic Usage
+    - This is your primary tool for saving new code, documents, or modifying existing ones.
+    - **To modify a file:** You must first use `read_file` to get its current content, modify that content in your context, and then use this `write_file` tool to save the complete, updated content back to the file.
+    - This tool is for **text content only**. Do not attempt to write binary data.
 
-        {
-        "status": "success",
-        "message": "File written successfully",                # short summary
-        "llm_content": "Wrote 1234 bytes to foo/bar.py",      # detailed summary for LLM
-        "data": {
-            "path": "/abs/workspace/foo/bar.py",               # absolute path
-            "size": 1234,                                      # file size in bytes
-            "mode": "write",                                   # operation mode
-            "encoding": "utf-8",                               # file encoding used
-            "content_size": 1200                               # content size in bytes
-        }
-        }
+    ## Return Value (What you will receive)
+    The output you get back from this tool will be one of the following two things:
 
-    Error response::
+    1.  **Success:** A single `string` confirming the successful write operation.
+        - Example: `"Successfully wrote 512 bytes to src/app.js"`
+    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
+        - Example: `"Error: Permission denied when writing file"`
 
-        {
-        "status": "error",
-        "message": "Content exceeds maximum size limit (20 MB)",
-        "error": "Content exceeds maximum size limit (20 MB)"
-        }
-
-    Security Features:
-    - Symlink safety: Prevents writing to symlinks pointing outside workspace
-    - Size limits: Prevents disk exhaustion with 20 MB content limit
-    - Path validation: Ensures all operations stay within workspace boundaries
-    - Disk space: Clear error reporting for insufficient disk space (ENOSPC)
-
-    The **``llm_content``** field provides detailed information for the assistant's
-    conversation history, while **``message``** is a concise user-facing summary.
+    You MUST check the response to confirm success or handle the error.
     """
 
     # ------------------------------------------------------------------
@@ -151,11 +136,8 @@ def write_file(
         rel_display = abs_p.relative_to(WORKSPACE_ROOT)
         
         # Prepare response content
-        operation_mode = "append" if append else "write"
-        llm_content = (
-            f"Wrote {len(content)} characters to {rel_display} "
-            f"(mode={operation_mode}, encoding={encoding}, final_size={size} bytes)"
-        )
+        operation_mode = "appended to" if append else "wrote to"
+        llm_content = f"Successfully {operation_mode} {rel_display} ({estimated_bytes} bytes written)."
         
         # Use debug mode setting from config
         display_msg = llm_content if get_tools_config().debug_mode else "File written successfully"
