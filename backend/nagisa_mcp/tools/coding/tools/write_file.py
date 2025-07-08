@@ -177,5 +177,9 @@ def write_file(
 # -----------------------------------------------------------------------------
 
 def register_write_file_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the write_file tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "write", "file", "create"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "write", "file", "create"]}
+    )
     mcp.tool(**common)(write_file) 

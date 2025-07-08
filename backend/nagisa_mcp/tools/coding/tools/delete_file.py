@@ -182,5 +182,9 @@ def delete_file(
 # -----------------------------------------------------------------------------
 
 def register_delete_file_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the delete_file tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "delete", "file"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "delete", "file"]}
+    )
     mcp.tool(**common)(delete_file) 

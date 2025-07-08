@@ -66,7 +66,7 @@ def main():
             print(f"[INFO] list_tools()返回 {len(tool_infos)} 个工具")
 
             print("[INFO] 初始化ToolVectorizer...")
-            vectorizer = ToolVectorizer("backend/tool_db")
+            vectorizer = ToolVectorizer("tool_db")
 
             print("[INFO] 开始向量化...")
             for tool in tool_infos:
@@ -74,9 +74,26 @@ def main():
                     # tool是Tool对象，直接访问属性
                     name = tool.name
                     description = tool.description or ''
-                    tags = getattr(tool, 'tags', []) or []
                     module_name = getattr(tool, 'module', '') or ''
-                    category = getattr(tool, 'category', '') or ''
+                    
+                    # 获取annotations并从中提取tags和category
+                    annotations = getattr(tool, 'annotations', None)
+                    tags = []
+                    category = ''
+                    
+                    if annotations:
+                        # ToolAnnotations是Pydantic BaseModel，直接使用属性访问
+                        category = getattr(annotations, 'category', '')
+                        tags = getattr(annotations, 'tags', []) or []
+                        
+                        # 如果没有获取到，尝试从model_extra获取（Pydantic的额外字段）
+                        if not category or not tags:
+                            model_extra = getattr(annotations, 'model_extra', {})
+                            if not category:
+                                category = model_extra.get('category', '')
+                            if not tags:
+                                tags = model_extra.get('tags', []) or []
+                    
                     # ---------- 修改: 如果没有提供category，则根据module_name推断 ----------
                     if not category:
                         if module_name.startswith('nagisa_mcp.tools.'):
@@ -88,16 +105,6 @@ def main():
                                     category = parts[idx + 1]
                             except ValueError:
                                 pass
-                    # 如果仍未获得类别且有tags，则使用首个tag作为类别
-                    if not category:
-                        annotations = getattr(tool, 'annotations', None)
-                        if annotations:
-                            # annotations may be ToolAnnotations or dict
-                            try:
-                                category = annotations.get('category', '')
-                            except AttributeError:
-                                # if ToolAnnotations dataclass
-                                category = getattr(annotations, 'category', '')
                     if not category and tags:
                         category = list(tags)[0]
                     if not category:

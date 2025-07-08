@@ -245,5 +245,9 @@ def list_directory(
 # -----------------------------------------------------------------------------
 
 def register_list_directory_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the list_directory tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "list", "directory", "exploration"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "list", "directory", "exploration"]}
+    )
     mcp.tool(**common)(list_directory) 

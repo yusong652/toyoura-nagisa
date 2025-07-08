@@ -289,10 +289,13 @@ async def generate_image(context: Context) -> dict[str, Any]:
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
-    Register the text-to-image generation tool with the MCP server.
+    Register the text-to-image generation tool with proper tags synchronization.
     
     Args:
         mcp: The FastMCP instance to register the tool with
     """
-    mcp.tool(tags={"image"}, annotations={"category": "media"})(generate_image)
+    mcp.tool(
+        tags={"image", "generation", "ai", "creative", "media"}, 
+        annotations={"category": "media", "tags": ["image", "generation", "ai", "creative", "media"]}
+    )(generate_image)
 

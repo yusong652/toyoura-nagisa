@@ -27,9 +27,12 @@ class EmailMessage(BaseModel):
 
 
 def register_email_tools(mcp: FastMCP):
-    """Register Gmail API based email tools to MCP (OAuth2 version)"""
+    """Register Gmail API based email tools with proper tags synchronization."""
     
-    common_kwargs = dict(tags={"email"}, annotations={"category": "email"})
+    common_kwargs = dict(
+        tags={"email", "gmail", "google", "messaging", "communication"}, 
+        annotations={"category": "email", "tags": ["email", "gmail", "google", "messaging", "communication"]}
+    )
 
     @mcp.tool(**common_kwargs)
     def get_user_email() -> dict:

@@ -5,9 +5,12 @@ import requests
 
 
 def register_weather_tools(mcp: FastMCP):
-    """Register weather related tools."""
+    """Register weather related tools with proper tags synchronization."""
 
-    @mcp.tool(tags={"weather"}, annotations={"category": "weather"})
+    @mcp.tool(
+        tags={"weather", "forecast", "openweather", "climate", "temperature"}, 
+        annotations={"category": "weather", "tags": ["weather", "forecast", "openweather", "climate", "temperature"]}
+    )
     def get_weather(
         city: str = Field(..., description="City name in English, e.g. 'London'"),
         forecast_days: int = Field(0, ge=0, le=5, description="Number of days forecast (0-5). 0 for current only")

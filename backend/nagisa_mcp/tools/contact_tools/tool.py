@@ -13,9 +13,12 @@ class Contact(BaseModel):
     phones: List[str] = Field(default_factory=list, description="List of contact's phone numbers")
 
 def register_contact_tools(mcp: FastMCP):
-    """Register Google Contacts API based tools to MCP (OAuth2 version)"""
+    """Register Google Contacts API based tools with proper tags synchronization."""
     
-    common_kwargs = dict(tags={"contact"}, annotations={"category": "contact"})
+    common_kwargs = dict(
+        tags={"contact", "google", "people", "search", "directory"}, 
+        annotations={"category": "contact", "tags": ["contact", "google", "people", "search", "directory"]}
+    )
 
     @mcp.tool(**common_kwargs)
     def list_contacts(

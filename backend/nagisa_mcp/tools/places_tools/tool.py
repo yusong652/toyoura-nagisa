@@ -28,9 +28,12 @@ def get_places_client():
     return googlemaps.Client(key=api_key)
 
 def register_places_tools(mcp: FastMCP):
-    """Register Google Places API based tools to MCP"""
+    """Register Google Places API based tools with proper tags synchronization."""
     
-    common_kwargs_places = dict(tags={"places"}, annotations={"category": "places"})
+    common_kwargs_places = dict(
+        tags={"places", "google", "maps", "location", "search"}, 
+        annotations={"category": "places", "tags": ["places", "google", "maps", "location", "search"]}
+    )
 
     @mcp.tool(**common_kwargs_places)
     def search_places(

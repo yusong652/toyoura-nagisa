@@ -51,9 +51,12 @@ def _reverse_geocode(lat: float, lon: float) -> Dict[str, str | None]:
 
 
 def register_location_tools(mcp: FastMCP):
-    """Register location-related tools to MCP server."""
+    """Register location-related tools with proper tags synchronization."""
 
-    common_kwargs_location = dict(tags={"location"}, annotations={"category": "location"})
+    common_kwargs_location = dict(
+        tags={"location", "geolocation", "geography", "coordinates", "position"}, 
+        annotations={"category": "location", "tags": ["location", "geolocation", "geography", "coordinates", "position"]}
+    )
 
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:

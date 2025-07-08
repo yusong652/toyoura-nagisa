@@ -319,5 +319,9 @@ def read_file(
 
 
 def register_read_file_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the read_file tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "read", "file", "content"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "file", "content"]}
+    )
     mcp.tool(**common)(read_file) 

@@ -56,18 +56,18 @@ def validate_path_in_workspace(path: Union[str, Path]) -> str | None:
         >>> validate_path_in_workspace("../../../etc/passwd")
         None  # Path traversal attempt blocked
     """
-    # Strip leading slashes to treat "/foo" as "foo" (relative to workspace)
-    # This prevents misinterpreting user-supplied "absolute" paths.
-    safe_path = str(path).lstrip('/')
-    p = Path(safe_path).expanduser()
+    p = Path(str(path)).expanduser()
 
     if not p.is_absolute():
+        # Relative paths are resolved against WORKSPACE_ROOT
         p = (WORKSPACE_ROOT / p).resolve()
     else:
+        # Absolute paths are used as-is (after resolving)
         p = p.resolve()
 
     try:
-        p.relative_to(WORKSPACE_ROOT)
+        # Check if the resolved path is within workspace
+        p.relative_to(WORKSPACE_ROOT.resolve())
     except ValueError:
         return None
     return str(p)

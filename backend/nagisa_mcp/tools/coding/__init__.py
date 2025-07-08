@@ -6,11 +6,14 @@
 from .tools import (
     # Public tool functions
     list_directory,
-    read_many_files as read_files,
+    read_many_files,
     write_file,
     delete_file,
     execute_python_script,
     run_shell_command,
+    glob,
+    grep,
+    replace,
     # Registration helper
     register_coding_tools,
 )
@@ -22,11 +25,14 @@ from .tools import (
 __all__ = [
     'register_coding_tools',
     'list_directory',
-    'read_files',
+    'read_many_files',
     'write_file',
     'delete_file',
     'get_current_workspace',
     'change_workspace',
     'execute_python_script',
     'run_shell_command',
+    'glob',
+    'grep',
+    'replace',
 ]

@@ -318,5 +318,9 @@ def execute_python_script(
 # -----------------------------------------------------------------------------
 
 def register_python_executor_tools(mcp: FastMCP):
-    common = dict(tags={"coding"}, annotations={"category": "coding"})
+    """Register the execute_python_script tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "execution", "python", "script", "runtime"}, 
+        annotations={"category": "coding", "tags": ["coding", "execution", "python", "script", "runtime"]}
+    )
     mcp.tool(**common)(execute_python_script) 

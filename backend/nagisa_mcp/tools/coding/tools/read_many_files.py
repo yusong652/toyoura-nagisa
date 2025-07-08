@@ -18,6 +18,7 @@ from ..utils.path_security import (
 )
 from ..utils.tool_result import ToolResult
 from .config import get_tools_config
+from .constants import DEFAULT_EXCLUDE_PATTERNS as DEFAULT_EXCLUDES
 
 __all__ = ["read_many_files", "register_read_many_files_tool"]
 
@@ -34,24 +35,6 @@ _INLINE_MAX_BYTES = 512 * 1024  # 512 KiB for inline binary data
 # Performance protection limits
 _MAX_FILES_DEFAULT = 100  # Maximum files to read in one operation
 _MAX_TOTAL_SIZE_DEFAULT = 50 * 1024 * 1024  # 50 MiB total data limit
-
-# Default exclusions for common large/irrelevant directories
-DEFAULT_EXCLUDES = {
-    "node_modules",
-    ".git",
-    ".idea",
-    ".vscode",
-    "dist",
-    "build",
-    "coverage",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    "target",
-    "venv",
-    ".env",
-    ".cache",
-}
 
 # -----------------------------------------------------------------------------
 # Helper utilities (consistent with read_file.py)
@@ -460,5 +443,9 @@ def read_many_files(
 # -----------------------------------------------------------------------------
 
 def register_read_many_files_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the read_many_files tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "read", "multiple", "batch"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "multiple", "batch"]}
+    )
     mcp.tool(**common)(read_many_files) 

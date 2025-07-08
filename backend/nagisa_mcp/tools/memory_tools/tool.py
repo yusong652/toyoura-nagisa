@@ -6,9 +6,12 @@ from backend.memory import MemoryManager
 memory_manager = MemoryManager()
 
 def register_memory_tools(mcp: FastMCP):
-    """Register memory search tools to MCP"""
+    """Register memory search tools with proper tags synchronization."""
     
-    @mcp.tool(tags={"memory"}, annotations={"category": "memory"})
+    @mcp.tool(
+        tags={"memory", "search", "semantic", "conversation", "history"}, 
+        annotations={"category": "memory", "tags": ["memory", "search", "semantic", "conversation", "history"]}
+    )
     def search_memory(query: str) -> List[Dict[str, Any]]:
         """
         Search through the conversation memory database using semantic similarity.

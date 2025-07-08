@@ -61,9 +61,12 @@ def _safe_eval(expr: str) -> float:
 # ------------------------------------------------------------------
 
 def register_calculator_tools(mcp: FastMCP):
-    """Register calculator utility tools with FastMCP."""
+    """Register calculator utility tools with proper tags synchronization."""
 
-    common_kwargs = dict(tags={"calculator"}, annotations={"category": "calculator"})
+    common_kwargs = dict(
+        tags={"calculator", "math", "arithmetic", "computation"}, 
+        annotations={"category": "calculator", "tags": ["calculator", "math", "arithmetic", "computation"]}
+    )
 
     @mcp.tool(**common_kwargs)
     def calculate(expression: str = Field(..., description="Arithmetic expression to evaluate")) -> str:

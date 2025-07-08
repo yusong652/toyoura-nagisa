@@ -14,7 +14,7 @@ from nagisa_mcp.tool_vectorizer import ToolVectorizer
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 def register_meta_tools(mcp: FastMCP):
-    """Register meta tools to the FastMCP server"""
+    """Register meta tools with proper tags synchronization."""
     
     # Global tool vectorizer instance
     _vectorizer: Optional[ToolVectorizer] = None
@@ -26,7 +26,10 @@ def register_meta_tools(mcp: FastMCP):
             _vectorizer = ToolVectorizer(TOOL_DB_PATH)
         return _vectorizer
 
-    common_kwargs_meta = dict(tags={"meta"}, annotations={"category": "meta"})
+    common_kwargs_meta = dict(
+        tags={"meta", "discovery", "search", "tools", "vectorization"}, 
+        annotations={"category": "meta", "tags": ["meta", "discovery", "search", "tools", "vectorization"]}
+    )
 
     @mcp.tool(**common_kwargs_meta)
     def search_tools_by_keywords(

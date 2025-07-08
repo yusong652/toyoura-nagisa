@@ -114,9 +114,12 @@ async def get_webpage_content(url: str) -> dict:
         }
 
 def register_web_search_tools(mcp):
-    """Register web search related tools to MCP."""
+    """Register web search related tools with proper tags synchronization."""
 
-    common_kwargs_web = dict(tags={"web_search"}, annotations={"category": "web_search"})
+    common_kwargs_web = dict(
+        tags={"web_search", "google", "search", "internet", "content"}, 
+        annotations={"category": "web_search", "tags": ["web_search", "google", "search", "internet", "content"]}
+    )
 
     @mcp.tool(**common_kwargs_web)
     def web_search(query: str, max_results: int = 5) -> str:

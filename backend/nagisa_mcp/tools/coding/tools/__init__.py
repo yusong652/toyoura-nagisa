@@ -20,21 +20,24 @@ from .delete_file import delete_file, register_delete_file_tool
 from .delete_directory import delete_directory, register_delete_directory_tool
 from .read_file import read_file, register_read_file_tool
 from .shell_command import run_shell_command, register_shell_command_tool
-
-# Backwards-compatibility alias (old name used in some places)
-read_files = read_many_files
+from .glob import glob, register_glob_tool
+from .grep import grep, register_grep_tool
+from .replace import replace, register_replace_tool
+from . import constants
 
 __all__ = [
     "register_coding_tools",
     "list_directory",
     "read_many_files",
-    "read_files",
     "write_file",
     "read_file",
     "delete_file",
     "delete_directory",
     "execute_python_script",
     "run_shell_command",
+    "glob",
+    "grep",
+    "replace",
 ]
 
 def register_coding_tools(mcp):
@@ -51,4 +54,7 @@ def register_coding_tools(mcp):
     register_delete_file_tool(mcp)
     register_delete_directory_tool(mcp)
     register_read_file_tool(mcp)
-    register_shell_command_tool(mcp) 
+    register_shell_command_tool(mcp)
+    register_glob_tool(mcp)
+    register_grep_tool(mcp)
+    register_replace_tool(mcp) 

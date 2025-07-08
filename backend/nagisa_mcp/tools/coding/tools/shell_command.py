@@ -333,5 +333,9 @@ def run_shell_command(
 # -----------------------------------------------------------------------------
 
 def register_shell_command_tool(mcp: FastMCP):
-    common = dict(tags={"shell", "coding"}, annotations={"category": "coding"})
+    """Register the run_shell_command tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "execution", "shell", "command", "system"}, 
+        annotations={"category": "coding", "tags": ["coding", "execution", "shell", "command", "system"]}
+    )
     mcp.tool(**common)(run_shell_command) 

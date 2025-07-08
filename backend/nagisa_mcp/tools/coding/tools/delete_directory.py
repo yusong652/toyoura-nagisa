@@ -286,5 +286,9 @@ def delete_directory(
 # -----------------------------------------------------------------------------
 
 def register_delete_directory_tool(mcp: FastMCP):
-    common = dict(tags={"filesystem", "coding"}, annotations={"category": "coding"})
+    """Register the delete_directory tool with proper tags synchronization."""
+    common = dict(
+        tags={"coding", "filesystem", "delete", "directory"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "delete", "directory"]}
+    )
     mcp.tool(**common)(delete_directory) 
