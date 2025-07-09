@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import re
 import subprocess
 import shutil
+import logging
 from datetime import datetime
 
 from pydantic import Field
@@ -36,6 +37,9 @@ from .constants import (
 )
 
 __all__ = ["grep", "register_grep_tool"]
+
+# Setup logger for this module
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 # Constants specific to content search
@@ -124,62 +128,81 @@ def _truncate_line(line: str, max_length: int = MAX_LINE_LENGTH) -> str:
         return line
     return line[:max_length-3] + "..."
 
+
+
 def _try_git_grep(
     pattern: str, 
-    search_dir: Path, 
+    search_path: Path,  # This is the sandboxed search directory
     include_pattern: Optional[str] = None,
-    case_sensitive: bool = True
+    case_sensitive: bool = True,
+    respect_git_ignore: bool = True,
+    single_file: Optional[Path] = None
 ) -> Optional[List[FileSearchResult]]:
-    """Try to use git grep for searching (fastest option)."""
+    """
+    Elegantly and safely performs a sandboxed git grep with SOTA-level robustness.
+    """
     try:
-        # Check if git is available
         if not shutil.which('git'):
             return None
             
-        # Check if we're in a git repository
-        git_check = subprocess.run(
-            ['git', 'rev-parse', '--git-dir'],
-            cwd=search_dir,
-            capture_output=True,
-            timeout=5,
-            text=True
+        git_root_result = subprocess.run(
+            ['git', 'rev-parse', '--show-toplevel'],
+            cwd=search_path, capture_output=True, text=True, timeout=5
         )
-        if git_check.returncode != 0:
+        if git_root_result.returncode != 0:
             return None
-            
-        # Build git grep command
+        git_root = Path(git_root_result.stdout.strip())
+
+        # --- Pathspec Calculation with Enhanced Security ---
+        try:
+            resolved_git_root = git_root.resolve()
+            if single_file:
+                pathspec = single_file.resolve().relative_to(resolved_git_root)
+            else:
+                pathspec = search_path.resolve().relative_to(resolved_git_root)
+                if include_pattern:
+                    pathspec = pathspec / include_pattern
+        except ValueError:
+            return None # Path is outside git repo, fail safely.
+
+        # --- Linear Command Construction ---
         cmd = ['git', 'grep', '--untracked', '-n', '-E']
-        if not case_sensitive:
-            cmd.append('-i')  # Add ignore-case flag only if case insensitive
+        if not case_sensitive: cmd.append('-i')
+        if not respect_git_ignore: cmd.append('--no-exclude-standard')
         cmd.append(pattern)
-        
-        if include_pattern:
-            cmd.extend(['--', include_pattern])
+        cmd.extend(['--', str(pathspec)])
             
-        # Execute git grep
         result = subprocess.run(
-            cmd,
-            cwd=search_dir,
-            capture_output=True,
-            timeout=SEARCH_TIMEOUT_SECONDS,
-            text=True
+            cmd, cwd=git_root, capture_output=True, text=True, timeout=SEARCH_TIMEOUT_SECONDS
         )
         
-        if result.returncode == 1:  # No matches found
-            return []
-        elif result.returncode != 0:  # Error occurred
-            return None
+        # Handle grep's standard exit codes
+        if result.returncode == 1: return []  # No matches found (normal)
+        if result.returncode > 1: return None  # Actual error occurred
             
-        return _parse_grep_output(result.stdout, search_dir)
+        return _parse_grep_output(result.stdout, git_root, single_file)
         
-    except Exception:
+    # --- SOTA-LEVEL EXCEPTION HANDLING ---
+    except subprocess.TimeoutExpired:
+        # Explicitly handle timeouts
+        logger.warning("git grep command timed out.")
+        return None
+    except (subprocess.CalledProcessError, ValueError, OSError, PermissionError) as e:
+        # Handle other known, specific errors
+        logger.warning(f"git grep failed with an error: {e}")
+        return None
+    except Exception as e:
+        # Catch-all for truly unexpected errors
+        logger.error(f"An unexpected error occurred in _try_git_grep: {e}", exc_info=True)
         return None
 
 def _try_system_grep(
     pattern: str, 
-    search_dir: Path, 
+    search_path: Path, 
     include_pattern: Optional[str] = None,
-    case_sensitive: bool = True
+    case_sensitive: bool = True,
+    respect_git_ignore: bool = True,
+    single_file: Optional[Path] = None
 ) -> Optional[List[FileSearchResult]]:
     """Try to use system grep for searching."""
     try:
@@ -188,23 +211,37 @@ def _try_system_grep(
             return None
             
         # Build grep command
-        cmd = ['grep', '-r', '-n', '-E']
-        if not case_sensitive:
-            cmd.append('-i')  # Add ignore-case flag only if case insensitive
-        
-        # Add common exclusions
-        for exclude_dir in ['.git', 'node_modules', '__pycache__', '.cache']:
-            cmd.extend(['--exclude-dir', exclude_dir])
+        if single_file:
+            # Search single file
+            cmd = ['grep', '-n', '-E']
+            if not case_sensitive:
+                cmd.append('-i')  # Add ignore-case flag only if case insensitive
+            cmd.extend([pattern, str(single_file)])
+        else:
+            # Search directory recursively
+            cmd = ['grep', '-r', '-n', '-E']
+            if not case_sensitive:
+                cmd.append('-i')  # Add ignore-case flag only if case insensitive
             
-        if include_pattern:
-            cmd.extend(['--include', include_pattern])
-            
-        cmd.extend([pattern, '.'])
+            # Add exclusions based on respect_git_ignore
+            if respect_git_ignore:
+                # Add common exclusions when respecting git ignore
+                for exclude_dir in ['.git', 'node_modules', '__pycache__', '.cache', 'dist', 'build']:
+                    cmd.extend(['--exclude-dir', exclude_dir])
+            else:
+                # Only exclude .git when not respecting git ignore 
+                cmd.extend(['--exclude-dir', '.git'])
+                
+            if include_pattern:
+                cmd.extend(['--include', include_pattern])
+                
+            cmd.extend([pattern, '.'])
         
-        # Execute system grep
+        # Execute system grep with proper working directory
+        working_dir = search_path if search_path.is_dir() else search_path.parent
         result = subprocess.run(
             cmd,
-            cwd=search_dir,
+            cwd=working_dir if not single_file else None,
             capture_output=True,
             timeout=SEARCH_TIMEOUT_SECONDS,
             text=True
@@ -215,48 +252,54 @@ def _try_system_grep(
         elif result.returncode != 0:  # Error occurred
             return None
             
-        return _parse_grep_output(result.stdout, search_dir)
+        return _parse_grep_output(result.stdout, working_dir, single_file)
         
     except Exception:
         return None
 
-def _parse_grep_output(output: str, base_dir: Path) -> List[FileSearchResult]:
-    """Parse grep output format: filepath:line_number:line_content"""
+def _parse_grep_output(output: str, base_dir: Path, single_file: Optional[Path] = None) -> List[FileSearchResult]:
+    """
+    Parse grep output and normalize all paths to be relative to WORKSPACE_ROOT.
+    This version uses a more robust, canonical path resolution strategy.
+    """
     file_results = {}
-    
+    resolved_workspace_root = WORKSPACE_ROOT.resolve()
+
     for line in output.strip().split('\n'):
-        if not line.strip():
-            continue
-            
-        # Parse grep output format
+        if not line.strip(): continue
         parts = line.split(':', 2)
-        if len(parts) < 3:
-            continue
-            
+        if len(parts) < 3: continue
         file_path_str, line_num_str, line_content = parts
         
         try:
             line_number = int(line_num_str)
         except ValueError:
             continue
+
+        # --- SOTA-LEVEL CANONICAL PATH NORMALIZATION ---
+        try:
+            # Step 1: Always construct a definitive absolute path.
+            # If the output path is already absolute, Path() handles it.
+            # If it's relative, it's joined with the command's execution directory (base_dir).
+            abs_path = (base_dir / file_path_str).resolve()
             
-        # Normalize file path
-        file_path = str(Path(file_path_str).relative_to(base_dir)) if base_dir else file_path_str
-        
-        # Create match object
+            # Step 2: Always make it relative to the single source of truth.
+            file_path = str(abs_path.relative_to(resolved_workspace_root))
+        except (ValueError, FileNotFoundError):
+            # If path resolution fails for any reason, fallback gracefully.
+            file_path = file_path_str
+        # --- END OF NORMALIZATION ---
+
         match = SearchMatch(line_number, _truncate_line(line_content))
         
-        # Group by file
         if file_path not in file_results:
             file_results[file_path] = []
         file_results[file_path].append(match)
     
-    # Convert to FileSearchResult objects
+    # ... (rest of the function is the same) ...
     results = []
     for file_path, matches in file_results.items():
-        # Sort matches by line number
         matches.sort(key=lambda m: m.line_number)
-        # Limit matches per file
         matches = matches[:MAX_MATCHES_PER_FILE]
         results.append(FileSearchResult(file_path, matches))
     
@@ -264,11 +307,12 @@ def _parse_grep_output(output: str, base_dir: Path) -> List[FileSearchResult]:
 
 def _fallback_python_search(
     pattern: str,
-    search_dir: Path,
+    search_path: Path,
     include_pattern: Optional[str] = None,
     respect_git_ignore: bool = True,
     use_default_excludes: bool = True,
-    case_sensitive: bool = True
+    case_sensitive: bool = True,
+    single_file: Optional[Path] = None
 ) -> List[FileSearchResult]:
     """Python fallback implementation for text searching."""
     try:
@@ -280,57 +324,52 @@ def _fallback_python_search(
     except re.error as e:
         raise ValueError(f"Invalid regular expression: {e}")
     
-    # Build file filter
-    file_filter = FileFilter(
-        workspace_root=WORKSPACE_ROOT,
-        show_hidden=False,
-        ignore_patterns=None,
-        respect_git_ignore=respect_git_ignore,
-    )
-    
-    # Build exclusion patterns
-    exclusion_patterns = set()
-    if use_default_excludes:
-        exclusion_patterns.update(DEFAULT_EXCLUDE_PATTERNS)
-    
-    # Find files to search
-    if include_pattern:
-        # Use glob pattern if provided
-        file_paths = list(search_dir.glob(include_pattern))
-    else:
-        # Search all text files
-        file_paths = list(search_dir.rglob('*'))
-    
-    # Filter and search files
     results = []
-    total_matches = 0
-    files_searched = 0
     
-    for file_path in file_paths:
-        if files_searched >= MAX_SEARCH_FILES:
-            break
-            
-        if total_matches >= MAX_TOTAL_MATCHES:
-            break
-            
-        try:
-            # Basic file checks
-            if not file_path.is_file():
+    if single_file:
+        # Search single file
+        if _can_search_file(single_file):
+            matches = _search_file_content(single_file, regex, WORKSPACE_ROOT)
+            if matches:
+                try:
+                    rel_path = str(single_file.relative_to(WORKSPACE_ROOT))
+                except ValueError:
+                    rel_path = str(single_file)
+                results.append(FileSearchResult(rel_path, matches[:MAX_MATCHES_PER_FILE]))
+    else:
+        # Search directory
+        search_dir = search_path
+        
+        # Build file filter
+        file_filter = FileFilter(
+            workspace_root=WORKSPACE_ROOT,
+            show_hidden=False,
+            ignore_patterns=None,
+            respect_git_ignore=respect_git_ignore,
+        )
+        
+        # Find files to search
+        if include_pattern:
+            # Use glob pattern if provided
+            file_paths = list(search_dir.glob(include_pattern))
+        else:
+            # Search all text files
+            file_paths = list(search_dir.rglob('*'))
+        
+        # Filter and search files
+        total_matches = 0
+        files_searched = 0
+        
+        for file_path in file_paths:
+            if files_searched >= MAX_SEARCH_FILES:
+                break
+                
+            if total_matches >= MAX_TOTAL_MATCHES:
+                break
+                
+            if not _can_search_file(file_path):
                 continue
                 
-            if _is_file_too_large(file_path):
-                continue
-                
-            if not _is_text_file(file_path):
-                continue
-                
-            # Security checks
-            if file_path.is_symlink() and not is_safe_symlink(file_path):
-                continue
-                
-            if not check_parent_symlinks(file_path):
-                continue
-            
             # Apply file filters
             if not file_filter.include(file_path):
                 continue
@@ -347,12 +386,32 @@ def _fallback_python_search(
                 total_matches += len(matches)
                 
             files_searched += 1
-            
-        except Exception:
-            # Skip files that can't be processed
-            continue
     
     return results
+
+def _can_search_file(file_path: Path) -> bool:
+    """Check if a file can be searched (exists, is file, not too large, is text, safe)."""
+    try:
+        # Basic file checks
+        if not file_path.is_file():
+            return False
+            
+        if _is_file_too_large(file_path):
+            return False
+            
+        if not _is_text_file(file_path):
+            return False
+            
+        # Security checks
+        if file_path.is_symlink() and not is_safe_symlink(file_path):
+            return False
+            
+        if not check_parent_symlinks(file_path):
+            return False
+            
+        return True
+    except Exception:
+        return False
 
 def _search_file_content(file_path: Path, regex: re.Pattern, base_dir: Path) -> List[SearchMatch]:
     """Search for pattern within a single file."""
@@ -414,11 +473,11 @@ def grep(
     ),
     path: Optional[str] = Field(
         None,
-        description="Directory to search within (workspace-relative). If None, searches entire workspace.",
+        description="File or directory to search within (workspace-relative). If a file is provided, searches only that file. If a directory is provided, searches all files within it. If None, searches entire workspace.",
     ),
     include: Optional[str] = Field(
         None,
-        description="Glob pattern to filter which files are searched (e.g., '*.py', '*.{js,ts}', 'src/**'). If omitted, searches all text files.",
+        description="Glob pattern to filter which files are searched (e.g., '*.py', '*.{js,ts}', 'src/**'). Only applies to directory searches. If omitted, searches all text files.",
     ),
     case_sensitive: bool = Field(
         False,
@@ -444,13 +503,19 @@ def grep(
     ## Core Functionality
     - Searches for regular expression patterns within text file contents
     - Returns **matching lines with line numbers** - does NOT return full file contents
+    - Supports both single file and directory search modes
     - Supports advanced filtering by file patterns and directory exclusions
     - Designed for code search and content discovery, not file listing or full content reading
+
+    ## Flexible Path Support
+    - **File search**: Pass a specific file path to search only that file (e.g., `path='src/main.py'`)
+    - **Directory search**: Pass a directory path to search all files within it (e.g., `path='src'`)
+    - **Workspace search**: Omit path to search the entire workspace
 
     ## Strategic Usage
     - Use this tool to **find code patterns** like function definitions, imports, or specific logic
     - Perfect for codebase exploration: `'class\\s+\\w+'` to find class definitions
-    - Combine with include patterns: `include='*.py'` to search only Python files
+    - Combine with include patterns: `include='*.py'` to search only Python files (directory mode)
     - Use after `glob` to search within specific file sets
 
     ## Pattern Examples
@@ -483,7 +548,8 @@ def grep(
         "total_files_with_matches": 2,
         "total_matches": 5,
         "files_searched": 45,
-        "search_strategy": "git_grep"
+        "search_strategy": "git_grep",
+        "search_mode": "directory"
       },
       "search_info": {
         "pattern": "def\\s+\\w+",
@@ -548,20 +614,49 @@ def grep(
     if not validate_path_in_workspace("."):
         return _error("Cannot access workspace directory")
 
-    # Determine search directory
+    # ------------------------------------------------------------------
+    # Intelligent path resolution: support both files and directories
+    # ------------------------------------------------------------------
+    
+    search_path = WORKSPACE_ROOT
+    single_file = None
+    search_mode = "workspace"
+    
     if path:
         search_abs_path = validate_path_in_workspace(path)
         if search_abs_path is None:
             return _error(f"Search path is outside workspace: {path}")
         
-        search_dir = Path(search_abs_path)
-        if not search_dir.exists():
+        search_path = Path(search_abs_path)
+        if not search_path.exists():
             return _error(f"Search path does not exist: {path}")
-        if not search_dir.is_dir():
-            return _error(f"Search path is not a directory: {path}")
-    else:
-        search_dir = WORKSPACE_ROOT
+        
+        if search_path.is_file():
+            # Single file mode
+            single_file = search_path
+            search_mode = "file"
+            # For single file, we still need a directory for git operations
+            search_path = search_path.parent
+            
+            # Validate single file can be searched
+            if not _can_search_file(single_file):
+                if _is_file_too_large(single_file):
+                    return _error(f"File is too large to search (>{MAX_FILE_SIZE_FOR_SEARCH // (1024*1024)}MB): {path}")
+                elif not _is_text_file(single_file):
+                    return _error(f"File appears to be binary and cannot be searched: {path}")
+                else:
+                    return _error(f"File cannot be searched (permissions or encoding issue): {path}")
+                    
+        elif search_path.is_dir():
+            # Directory mode
+            search_mode = "directory"
+        else:
+            return _error(f"Search path is neither a file nor a directory: {path}")
 
+    # For single file mode, ignore include pattern with a warning
+    if single_file and include:
+        include = None  # Silently ignore include pattern for single files
+    
     # ------------------------------------------------------------------
     # Execute search with multiple strategies (fast -> fallback)
     # ------------------------------------------------------------------
@@ -572,13 +667,17 @@ def grep(
         files_searched = 0
         
         # Strategy 1: Try git grep (fastest)
-        search_results = _try_git_grep(pattern, search_dir, include, case_sensitive)
+        search_results = _try_git_grep(
+            pattern, search_path, include, case_sensitive, respect_git_ignore, single_file
+        )
         if search_results is not None:
             strategy_used = "git_grep"
 
         # Strategy 2: Try system grep (second fastest)
         if search_results is None:
-            search_results = _try_system_grep(pattern, search_dir, include, case_sensitive)
+            search_results = _try_system_grep(
+                pattern, search_path, include, case_sensitive, respect_git_ignore, single_file
+            )
             if search_results is not None:
                 strategy_used = "system_grep"
 
@@ -586,20 +685,27 @@ def grep(
         if search_results is None:
             search_results = _fallback_python_search(
                 pattern, 
-                search_dir, 
+                search_path, 
                 include, 
                 respect_git_ignore, 
                 use_default_excludes,
-                case_sensitive
+                case_sensitive,
+                single_file
             )
             strategy_used = "python_fallback"
             # Estimate files searched for Python fallback
-            files_searched = min(MAX_SEARCH_FILES, len(list(search_dir.rglob('*'))))
+            if single_file:
+                files_searched = 1
+            else:
+                files_searched = min(MAX_SEARCH_FILES, len(list(search_path.rglob('*'))))
 
         if not search_results:
-            search_path_display = str(search_dir.relative_to(WORKSPACE_ROOT)) if search_dir != WORKSPACE_ROOT else "."
-            include_info = f" (include: {include})" if include else ""
-            return _error(f"No matches found for pattern '{pattern}' in path '{search_path_display}'{include_info}")
+            if single_file:
+                return _error(f"No matches found for pattern '{pattern}' in file '{path}'")
+            else:
+                search_path_display = str(search_path.relative_to(WORKSPACE_ROOT)) if search_path != WORKSPACE_ROOT else "."
+                include_info = f" (include: {include})" if include else ""
+                return _error(f"No matches found for pattern '{pattern}' in path '{search_path_display}'{include_info}")
 
         # Apply max_matches limit across all files
         total_matches = 0
@@ -631,17 +737,19 @@ def grep(
             "total_matches": total_matches,
             "files_searched": files_searched if files_searched > 0 else len(limited_results),
             "search_strategy": strategy_used,
+            "search_mode": search_mode,
             "search_limited": total_matches >= max_matches,
         }
 
         # Create detailed search info for transparency
         search_info = {
             "pattern": pattern,
-            "search_path": str(search_dir.relative_to(WORKSPACE_ROOT)) if search_dir != WORKSPACE_ROOT else ".",
+            "search_path": path if path else ".",
             "include": include,
             "case_sensitive": case_sensitive,
             "respect_git_ignore": respect_git_ignore,
             "max_matches": max_matches,
+            "search_mode": search_mode,
         }
 
         # Build user-facing message
@@ -649,7 +757,11 @@ def grep(
         files_word = "file" if files_count == 1 else "files"
         matches_word = "match" if total_matches == 1 else "matches"
         
-        message = f"Found {total_matches} {matches_word} in {files_count} {files_word}"
+        if search_mode == "file":
+            message = f"Found {total_matches} {matches_word} in file '{path}'"
+        else:
+            message = f"Found {total_matches} {matches_word} in {files_count} {files_word}"
+            
         if summary["search_limited"]:
             message += f" (limited to {max_matches})"
 
@@ -678,7 +790,7 @@ def grep(
 def register_grep_tool(mcp: FastMCP):
     """Register the grep tool with proper tags synchronization."""
     common = dict(
-        tags={"coding", "filesystem", "search", "content", "regex"}, 
-        annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "content", "regex"]}
+        tags={"coding", "filesystem", "search", "content", "regex", "grep"}, 
+        annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "content", "regex", "grep"]}
     )
     mcp.tool(**common)(grep) 
