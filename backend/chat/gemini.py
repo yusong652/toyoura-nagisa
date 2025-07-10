@@ -475,17 +475,24 @@ class GeminiClient(LLMClientBase):
             if self._is_meta_tool(tool_name):
                 meta_tools.append(tool_schema)
         
-        # 构建最终工具列表：meta tools + cached tools
+        # 构建最终工具列表：meta tools + cached tools（避免重复）
         final_tools = meta_tools.copy()
+        added_tool_names = {tool["name"] for tool in meta_tools}  # 追踪已添加的工具名
         
         for cached_tool in cached_tools:
             tool_name = cached_tool["name"]
+            if tool_name in added_tool_names:
+                if debug:
+                    print(f"[DEBUG] Skipped duplicate cached tool: {tool_name}")
+                continue  # 跳过已经添加的工具
+                
             # 复制参数，避免污染原 dict
             cached_params = dict(cached_tool.get("parameters", {}))
             cached_params.pop("additionalProperties", None)
             cached_params = self._sanitize_jsonschema(cached_params)
             if tool_name in tools_map:
                 final_tools.append(tools_map[tool_name])
+                added_tool_names.add(tool_name)
                 if debug:
                     print(f"[DEBUG] Added cached tool: {tool_name}")
             else:
@@ -498,6 +505,7 @@ class GeminiClient(LLMClientBase):
                         "required": list(cached_params.keys())
                     }
                 })
+                added_tool_names.add(tool_name)
                 if debug:
                     print(f"[DEBUG] Added cached tool with basic schema: {tool_name}")
         

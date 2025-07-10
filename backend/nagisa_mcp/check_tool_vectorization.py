@@ -4,19 +4,20 @@
 """
 
 import sys
-import os
 import inspect
 import importlib
 from typing import List, Dict, Any
 from pathlib import Path
 
-# 添加backend路径到sys.path
-backend_path = os.path.join(os.path.dirname(__file__))
-sys.path.insert(0, backend_path)
+# 使用 pathlib 优雅处理路径
+_CURRENT_FILE = Path(__file__)
+_NAGISA_MCP_DIR = _CURRENT_FILE.parent  # nagisa_mcp目录
+_BACKEND_DIR = _NAGISA_MCP_DIR.parent   # backend目录  
+_PROJECT_ROOT = _BACKEND_DIR.parent     # 项目根目录
 
-# 添加项目根目录到sys.path
-project_root = os.path.dirname(backend_path)
-sys.path.insert(0, project_root)
+# 添加必要路径到 sys.path
+sys.path.insert(0, str(_BACKEND_DIR))
+sys.path.insert(0, str(_PROJECT_ROOT))
 
 from nagisa_mcp.tool_vectorizer import ToolVectorizer
 

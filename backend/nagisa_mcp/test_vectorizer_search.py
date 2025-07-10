@@ -1,10 +1,18 @@
 import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from pathlib import Path
+
+# 使用 pathlib 优雅处理路径  
+_CURRENT_FILE = Path(__file__)
+_NAGISA_MCP_DIR = _CURRENT_FILE.parent
+_BACKEND_DIR = _NAGISA_MCP_DIR.parent
+
+# 添加backend路径到 sys.path
+sys.path.insert(0, str(_BACKEND_DIR))
+
 from nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 if __name__ == "__main__":
-    vectorizer = ToolVectorizer("tool_db")
+    vectorizer = ToolVectorizer()  # 使用默认配置路径
     query = "image"
     print(f"[TEST] 查询关键词: {query}")
     results = vectorizer.search_tools(query, n_results=5)

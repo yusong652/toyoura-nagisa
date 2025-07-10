@@ -356,13 +356,18 @@ class GPTClient(LLMClientBase):
                 meta_tools.append(tool_schema)
 
         final_tools: List[Dict[str, Any]] = meta_tools.copy()
+        added_tool_names = {tool["function"]["name"] for tool in meta_tools}  # 追踪已添加的工具名
 
-        # Add cached tools
+        # Add cached tools (避免重复)
         if session_id:
             for cached_tool in self._get_cached_tools_for_session(session_id):
                 name = cached_tool["name"]
+                if name in added_tool_names:
+                    continue  # 跳过已经添加的工具
+                    
                 if name in tools_map:
                     final_tools.append(tools_map[name])
+                    added_tool_names.add(name)
                 else:
                     # Construct minimal schema if not in current MCP list
                     params_cached = dict(cached_tool.get("parameters", {}))
@@ -381,6 +386,7 @@ class GPTClient(LLMClientBase):
                             },
                         }
                     )
+                    added_tool_names.add(name)
 
         return final_tools
 

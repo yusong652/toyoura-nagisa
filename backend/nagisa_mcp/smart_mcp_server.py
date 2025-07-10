@@ -1,13 +1,14 @@
 from pathlib import Path
 import sys
 
-# 计算项目根目录：<proj_root>/backend/nagisa_mcp/smart_mcp_server.py
-# 向上两级到 <proj_root>
-ROOT_DIR = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT_DIR))
+# 使用 pathlib 优雅处理路径
+_CURRENT_FILE = Path(__file__)
+_NAGISA_MCP_DIR = _CURRENT_FILE.parent     # nagisa_mcp目录
+_BACKEND_DIR = _NAGISA_MCP_DIR.parent      # backend目录
+_PROJECT_ROOT = _BACKEND_DIR.parent        # 项目根目录
 
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# 添加必要路径到 sys.path
+sys.path.insert(0, str(_PROJECT_ROOT))
 import asyncio
 from fastmcp import FastMCP
 from backend.nagisa_mcp.tools.web_search import register_web_search_tools

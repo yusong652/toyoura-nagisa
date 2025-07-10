@@ -15,12 +15,18 @@ import inspect
 import json
 from typing import List, Dict, Any
 import asyncio
+from pathlib import Path
 from fastmcp import FastMCP, Client
 
-# 添加backend和根目录到sys.path
-backend_path = os.path.dirname(os.path.dirname(__file__))  # 回到backend目录
-sys.path.insert(0, backend_path)
-sys.path.insert(0, os.path.dirname(backend_path))
+# 使用 pathlib 优雅处理路径
+_CURRENT_FILE = Path(__file__)
+_NAGISA_MCP_DIR = _CURRENT_FILE.parent  # nagisa_mcp目录
+_BACKEND_DIR = _NAGISA_MCP_DIR.parent   # backend目录
+_PROJECT_ROOT = _BACKEND_DIR.parent     # 项目根目录
+
+# 添加必要路径到 sys.path
+sys.path.insert(0, str(_BACKEND_DIR))
+sys.path.insert(0, str(_PROJECT_ROOT))
 
 from nagisa_mcp.tool_vectorizer import ToolVectorizer
 
@@ -66,7 +72,7 @@ def main():
             print(f"[INFO] list_tools()返回 {len(tool_infos)} 个工具")
 
             print("[INFO] 初始化ToolVectorizer...")
-            vectorizer = ToolVectorizer("tool_db")
+            vectorizer = ToolVectorizer()  # 使用默认配置路径（backend/tool_db）
 
             print("[INFO] 开始向量化...")
             for tool in tool_infos:
