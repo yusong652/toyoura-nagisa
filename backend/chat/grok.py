@@ -8,21 +8,22 @@ from backend.chat.models import Message, LLMResponse, ResponseType, UserToolMess
 from backend.chat.utils import parse_llm_output
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
+from backend.config import get_system_prompt
 
 class GrokClient(LLMClientBase):
     """
     Grok 客户端实现（基于 OpenAI SDK）。
     """
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
-        super().__init__(system_prompt, **kwargs)
+    def __init__(self, api_key: str, mcp_client=None, **kwargs):
+        super().__init__(**kwargs)
         self.api_key = api_key
         self.client = OpenAI(api_key=self.api_key, base_url="https://api.x.ai/v1")
         print(f"GrokClient (OpenAI SDK) initialized.")
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
 
-    def _format_messages_for_grok(self, messages: List[BaseMessage], system_prompt: Optional[str] = None) -> Tuple[list, bool]:
+    def _format_messages_for_grok(self, messages: List[BaseMessage], system_prompt: str) -> Tuple[list, bool]:
         messages_for_llm = [
-            {"role": "system", "content": system_prompt if system_prompt is not None else self.system_prompt}
+            {"role": "system", "content": system_prompt}
         ]
         has_image = False
         for msg in messages:
@@ -124,12 +125,17 @@ class GrokClient(LLMClientBase):
         session_id: Optional[str] = None,
         **kwargs
     ) -> 'LLMResponse':
-        messages_for_llm, has_image = self._format_messages_for_grok(messages)
+        tools = await self.get_function_call_schemas()
+        tools_enabled = bool(tools)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+
+        messages_for_llm, has_image = self._format_messages_for_grok(messages, system_prompt)
+        
         print("\n========== Grok API 请求消息格式 ==========")
         import pprint; pprint.pprint(messages_for_llm)
         print("========== END ==========")
         model = self.extra_config.get("model", "grok-3")
-        tools = await self.get_function_call_schemas()
+
         try:
             response = self.client.chat.completions.create(
                 model=model,

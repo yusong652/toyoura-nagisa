@@ -9,25 +9,24 @@ from backend.chat.utils import parse_llm_output, get_latest_n_messages
 import anthropic
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
-from backend.config import get_text_to_image_config
+from backend.config import get_text_to_image_config, get_llm_specific_config, get_system_prompt
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from fastmcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
 class AnthropicClient(LLMClientBase):
     """
-    Anthropic 客户端实现。
+    Anthropic Claude 客户端实现。
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, **kwargs):
         """
         初始化 Anthropic 客户端。
         Args:
             api_key: Anthropic API key。
-            system_prompt: 可选，覆盖初始化时的 system prompt。
             mcp_client: 可选，用于 in-process tool calls via app.state.mcp
         """
-        super().__init__(system_prompt, **kwargs)
+        super().__init__(**kwargs)
         self.api_key = api_key
         self.base_url = "https://api.anthropic.com/v1"
         self.headers = {
@@ -386,13 +385,16 @@ class AnthropicClient(LLMClientBase):
         model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
         # 自动获取 tools，传递session_id以支持动态工具选择
         tools = await self.get_function_call_schemas(session_id)
+        tools_enabled = bool(tools)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
         print(f"[DEBUG] tools from get_function_call_schemas: {tools}")
         try:
             kwargs_api = dict(
                 model=model,
                 max_tokens=self.extra_config.get("max_tokens", 1024),
                 messages=anthropic_messages,
-                system=self.system_prompt,
+                system=system_prompt,
                 temperature=self.extra_config.get("temperature", 0.7),
             )
             if tools and len(tools) > 0:

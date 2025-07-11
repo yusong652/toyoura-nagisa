@@ -17,14 +17,12 @@ class LLMClientBase(ABC):
     统一 LLM 客户端接口，便于多模型扩展和主流程解耦。
     """
 
-    def __init__(self, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, **kwargs):
         """
-        可选初始化方法，支持传递 system_prompt 及其他参数。
-        子类可根据需要扩展。
+        可选初始化方法，支持传递其他参数。
         """
-        self.system_prompt = system_prompt or ""
         self.extra_config = kwargs
-        self.tools_enabled = kwargs.get("tools_enabled", False)  # 默认关闭工具
+        self.tools_enabled = kwargs.get("tools_enabled", True)  # 默认开启工具
 
     @abstractmethod
     async def get_response(
@@ -66,20 +64,11 @@ class LLMClientBase(ABC):
         """
         pass
 
-    def set_system_prompt(self, prompt: str):
-        """动态设置/更新 system prompt。"""
-        self.system_prompt = prompt
-
-    def get_system_prompt(self) -> str:
-        """获取当前 system prompt。"""
-        return self.system_prompt
-
     def update_config(self, **kwargs):
         """动态更新额外配置参数。"""
         self.extra_config.update(kwargs)
         if "tools_enabled" in kwargs:
             self.tools_enabled = kwargs["tools_enabled"]
-        self.system_prompt = get_system_prompt(tool_state=self.tools_enabled)
 
     def get_config(self) -> Dict[str, Any]:
         """获取当前所有配置参数。"""

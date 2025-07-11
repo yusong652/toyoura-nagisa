@@ -11,6 +11,7 @@ from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 import random
 import string
+from backend.config import get_system_prompt
 
 class MistralClient(LLMClientBase):
     """
@@ -18,15 +19,14 @@ class MistralClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, mcp_client=None, **kwargs):
+    def __init__(self, api_key: str, mcp_client=None, **kwargs):
         """
         初始化 Mistral 客户端。
         Args:
             api_key: Mistral API key。
-            system_prompt: 可选，覆盖初始化时的 system prompt。
             mcp_client: 可选，用于 in-process tool calls via app.state.mcp
         """
-        super().__init__(system_prompt, **kwargs)
+        super().__init__(**kwargs)
         self.api_key = api_key
         self.base_url = "https://api.mistral.ai/v1"
         self.headers = {
@@ -37,11 +37,11 @@ class MistralClient(LLMClientBase):
         self.mcp_client = mcp_client if mcp_client is not None else MCPClient("nagisa_mcp/fast_mcp_server.py")
         print(f"MistralClient initialized.")
 
-    def _format_messages_for_mistral(self, messages: List[BaseMessage], system_prompt: Optional[str] = None) -> Tuple[List[Dict[str, Any]], bool]:
+    def _format_messages_for_mistral(self, messages: List[BaseMessage], system_prompt: str) -> Tuple[List[Dict[str, Any]], bool]:
         messages_for_llm = [
             {"role": "system", "content": [{
                 "type": "text",
-                "text": system_prompt if system_prompt is not None else self.system_prompt
+                "text": system_prompt
             }]}
         ]
         has_image = False
@@ -191,7 +191,12 @@ class MistralClient(LLMClientBase):
         session_id: Optional[str] = None,
         **kwargs
     ) -> 'LLMResponse':
-        messages_for_llm, has_image = self._format_messages_for_mistral(messages)
+        # 自动获取 tools
+        tools = await self.get_function_call_schemas()
+        tools_enabled = bool(tools)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
+        messages_for_llm, has_image = self._format_messages_for_mistral(messages, system_prompt)
         
         # 根据配置决定是否打印调试信息
         if self.extra_config.get('debug', False):
@@ -200,8 +205,6 @@ class MistralClient(LLMClientBase):
             print("========== END ==========")
             
         model = self.extra_config.get("model", "mistral-large-latest")
-        # 自动获取 tools
-        tools = await self.get_function_call_schemas()
         
         try:
             response = await self.mistral_client.chat.complete_async(
@@ -236,8 +239,8 @@ class MistralClient(LLMClientBase):
             title_generation_system_prompt: Optional custom system prompt for title generation
         """
         try:
-            # 优先用title_generation_system_prompt，否则用self.system_prompt
-            system_prompt = title_generation_system_prompt if title_generation_system_prompt is not None else self.system_prompt
+            # 优先用title_generation_system_prompt，否则用默认
+            system_prompt = title_generation_system_prompt or "You are a professional dialogue title generation assistant. Please generate a concise title (5-15 characters) based on the dialogue content provided. The title should accurately summarize the main theme or intent of the conversation. You must place the title within <title></title> tags, and do not output any other content besides these tags and the title itself."
             # 构造消息序列，最后一条为user
             messages = [
                 first_user_message,

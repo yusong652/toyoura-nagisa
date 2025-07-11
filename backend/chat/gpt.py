@@ -10,8 +10,8 @@ from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from openai import OpenAI
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
-from backend.config import get_text_to_image_config
+from fastmcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from backend.config import get_text_to_image_config, get_llm_specific_config, get_system_prompt
 
 class GPTClient(LLMClientBase):
     """
@@ -19,15 +19,14 @@ class GPTClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, **kwargs):
         """
         初始化 GPT 客户端。
         Args:
             api_key: OpenAI API key。
-            system_prompt: 可选，覆盖初始化时的 system prompt。
             mcp_client: 可选，MCPClient实例，用于直接调用MCP工具。
         """
-        super().__init__(system_prompt, **kwargs)
+        super().__init__(**kwargs)
         self.api_key = api_key
         self.base_url = "https://api.openai.com/v1"
         self.headers = {
@@ -222,6 +221,10 @@ class GPTClient(LLMClientBase):
         session_id: Optional[str] = None,
         **kwargs
     ) -> 'LLMResponse':
+        tools = await self.get_function_call_schemas(session_id)
+        tools_enabled = bool(tools)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
         # --- build system prompt with optional CoT instruction ---
         enable_cot = self.extra_config.get("enable_cot", False)
         if enable_cot:
@@ -230,9 +233,9 @@ class GPTClient(LLMClientBase):
                 "This section will be removed before the answer is shown to the user. After the tag, provide "
                 "the final answer for the user. Never reveal or reference these tags." 
             )
-            combined_system_prompt = f"{cot_prompt}\n\n{self.system_prompt}"
+            combined_system_prompt = f"{cot_prompt}\n\n{system_prompt}"
         else:
-            combined_system_prompt = self.system_prompt
+            combined_system_prompt = system_prompt
 
         messages_for_llm, has_image = self._format_messages_for_openai(messages, system_prompt=combined_system_prompt)
         
@@ -243,8 +246,6 @@ class GPTClient(LLMClientBase):
             print("========== END ==========")
             
         model = self.extra_config.get("model", "gpt-4-turbo-preview")
-        # 自动获取 tools
-        tools = await self.get_function_call_schemas(session_id)
         
         payload = {
             "model": model,

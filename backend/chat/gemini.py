@@ -6,13 +6,13 @@ import copy
 from typing import List, Tuple, Optional, Dict, Any
 from google import genai
 from google.genai import types
-from backend.config import get_llm_specific_config
+from backend.config import get_llm_specific_config, get_system_prompt
 from backend.chat.base import LLMClientBase
 from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
 from backend.chat.utils import parse_llm_output, get_latest_n_messages
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from fastmcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.config import get_text_to_image_config
 
@@ -22,14 +22,13 @@ class GeminiClient(LLMClientBase):
     继承自 LLMClientBase，实现具体的 API 调用逻辑。
     """
     
-    def __init__(self, api_key: str, system_prompt: Optional[str] = None, **kwargs):
+    def __init__(self, api_key: str, **kwargs):
         """
         初始化 Gemini 客户端。
         Args:
             api_key: Google API key。
-            system_prompt: 可选，覆盖初始化时的 system prompt。
         """
-        super().__init__(system_prompt, **kwargs)
+        super().__init__(**kwargs)
         self.api_key = api_key
         self.client = genai.Client(api_key=self.api_key)
         self.safety_settings = [
@@ -551,6 +550,9 @@ class GeminiClient(LLMClientBase):
         # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
         tool_schemas = await self.get_function_call_schemas(session_id)
         
+        tools_enabled = bool(tool_schemas)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
         debug = self.extra_config.get('debug', False)
         if debug:
             print(f"[DEBUG] 当前 session_tool_cache: {self.session_tool_cache}")
@@ -562,7 +564,7 @@ class GeminiClient(LLMClientBase):
         # 2. 构造 Gemini API payload，注册 tools
         contents = self._format_messages_for_gemini(messages)
         config_kwargs = dict(
-            system_instruction=self.system_prompt,
+            system_instruction=system_prompt,
             safety_settings=self.safety_settings,
             temperature=self.extra_config.get('temperature', 2.0),
             max_output_tokens=self.extra_config.get('max_output_tokens', 4096),
