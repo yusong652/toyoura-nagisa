@@ -13,71 +13,6 @@ load_dotenv()
 
 app = FastAPI()
 
-def detect_model_type(model_checkpoint: str, config: Dict[str, Any]) -> str:
-    """
-    智能检测模型类型
-    Args:
-        model_checkpoint: 模型检查点名称
-        config: SD WebUI 配置
-    Returns:
-        模型类型字符串 (sd15, illustrious, sdxl)
-    """
-    model_type = config.get("model_type", "auto")
-    
-    # 如果手动指定了模型类型，直接返回
-    if model_type and model_type != "auto":
-        return model_type
-    
-    # 自动检测模型类型
-    model_name = model_checkpoint.lower()
-    
-    # Illustrious 模型检测
-    if any(keyword in model_name for keyword in ["illustrious", "illust", "noob"]):
-        return "illustrious"
-    
-    # SDXL 模型检测
-    if any(keyword in model_name for keyword in ["sdxl", "xl", "pony"]):
-        return "sdxl"
-    
-    # SD1.5 模型检测
-    if any(keyword in model_name for keyword in ["sd15", "v1-5", "1.5", "realistic"]):
-        return "sd15"
-    
-    # 默认返回 illustrious（作为现代模型的默认选择）
-    return "illustrious"
-
-def apply_model_preset(config: Dict[str, Any], model_type: str) -> Dict[str, Any]:
-    """
-    应用模型预设配置
-    Args:
-        config: 原始配置
-        model_type: 模型类型
-    Returns:
-        应用预设后的配置
-    """
-    presets = config.get("model_presets", {})
-    if model_type not in presets:
-        print(f"[text_to_image] Warning: No preset found for model type '{model_type}', using default config")
-        return config
-    
-    preset = presets[model_type]
-    updated_config = config.copy()
-    
-    # 应用预设配置
-    for key, value in preset.items():
-        # 对于宽高，只有在使用默认值时才应用预设
-        if key in ["width", "height"]:
-            default_size = 1024  # 默认尺寸
-            if config.get(key) == default_size:
-                updated_config[key] = value
-                print(f"[text_to_image] Applied preset {key}: {value}")
-        else:
-            updated_config[key] = value
-    
-    print(f"[text_to_image] Applied '{model_type}' preset configuration")
-    print(f"[text_to_image] Final resolution: {updated_config.get('width')}x{updated_config.get('height')}")
-    return updated_config
-
 async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Internal function to generate an image using the ModelsLab API.
@@ -166,24 +101,19 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
         if not server_url:
             return {"type": "error", "message": "Stable Diffusion server URL is not configured."}
         
-        # 智能检测模型类型并应用预设
-        model_checkpoint = sd_config.get("sd_model_checkpoint", "")
-        model_type = detect_model_type(model_checkpoint, sd_config)
-        sd_config = apply_model_preset(sd_config, model_type)
+        # 1. 获取模型类型和预设
+        model_type = sd_config.get("model_type", "illustrious")
+        model_preset = sd_config.get("model_presets", {}).get(model_type, {})
         
         if debug:
-            print(f"[text_to_image] Detected model type: {model_type}")
-            print(f"[text_to_image] Using model checkpoint: {model_checkpoint}")
-            print(f"[text_to_image] Applied Stable Diffusion Config: {sd_config}")
+            print(f"[text_to_image] Using model type: {model_type}")
+            print(f"[text_to_image] Using model preset: {json.dumps(model_preset, indent=2)}")
 
+        # 2. 准备基础 payload
         payload = {
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "steps": sd_config.get("steps", 25),
-            "sampler_name": sd_config.get("sampler_name", "DPM++ 2M Karras"),
-            "width": sd_config.get("width", 1024),
-            "height": sd_config.get("height", 1024),
-            "cfg_scale": sd_config.get("cfg_scale", 6.0),
             "seed": sd_config.get("seed", -1),
             "enable_hr": sd_config.get("enable_hr", False),
             "hr_scale": sd_config.get("hr_scale", 2.0),
@@ -191,14 +121,17 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
             "denoising_strength": sd_config.get("denoising_strength", 0.5),
         }
         
-        # 构建 override_settings，只包含非空值
+        # 3. 应用模型预设，预设中的值会覆盖基础 payload
+        payload.update(model_preset)
+
+        # 4. 构建 override_settings，并从 payload 中移除相应键
         override_settings = {}
-        if sd_config.get("sd_model_checkpoint"):
-            override_settings["sd_model_checkpoint"] = sd_config.get("sd_model_checkpoint")
-        if sd_config.get("sd_vae"):
-            override_settings["sd_vae"] = sd_config.get("sd_vae")
-        if sd_config.get("clip_skip"):
-            override_settings["CLIP_stop_at_last_layers"] = sd_config.get("clip_skip")
+        if "sd_model_checkpoint" in payload:
+            override_settings["sd_model_checkpoint"] = payload.pop("sd_model_checkpoint")
+        if "sd_vae" in payload:
+            override_settings["sd_vae"] = payload.pop("sd_vae")
+        if "clip_skip" in payload:
+            override_settings["CLIP_stop_at_last_layers"] = payload.pop("clip_skip")
             
         if override_settings:
             payload["override_settings"] = override_settings
