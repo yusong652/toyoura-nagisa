@@ -1,25 +1,24 @@
 import os
 import re
-import httpx
 import json
 import copy
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Optional, Dict, Any
+
 from google import genai
 from google.genai import types
-from backend.config import get_llm_specific_config, get_system_prompt
+
+from backend.config import get_llm_specific_config, get_system_prompt, get_text_to_image_config
 from backend.chat.base import LLMClientBase
-from backend.chat.models import Message, ResponseType, LLMResponse, UserToolMessage, BaseMessage, UserMessage
+from backend.chat.models import BaseMessage, UserMessage, UserToolMessage, LLMResponse, ResponseType
 from backend.chat.utils import parse_llm_output, get_latest_n_messages
 from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from fastmcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
-from backend.config import get_text_to_image_config
 
 class GeminiClient(LLMClientBase):
     """
-    Google Gemini 客户端实现。
-    继承自 LLMClientBase，实现具体的 API 调用逻辑。
+    Google Gemini client implementation using the new google-genai SDK.
     """
     
     def __init__(self, api_key: str, **kwargs):
@@ -29,28 +28,27 @@ class GeminiClient(LLMClientBase):
             api_key: Google API key。
         """
         super().__init__(**kwargs)
-        self.api_key = api_key
-        self.client = genai.Client(api_key=self.api_key)
+        self.client = genai.Client(api_key=api_key)
         self.safety_settings = [
-            types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold=types.HarmBlockThreshold.BLOCK_NONE
-            ),
-            types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold=types.HarmBlockThreshold.BLOCK_NONE
-            ),
-            types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold=types.HarmBlockThreshold.BLOCK_NONE
-            ),
-            types.SafetySetting(
-                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold=types.HarmBlockThreshold.BLOCK_NONE
-            )
+            {
+                "category": types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                "threshold": types.HarmBlockThreshold.BLOCK_NONE
+            },
+            {
+                "category": types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                "threshold": types.HarmBlockThreshold.BLOCK_NONE
+            },
+            {
+                "category": types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                "threshold": types.HarmBlockThreshold.BLOCK_NONE
+            },
+            {
+                "category": types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                "threshold": types.HarmBlockThreshold.BLOCK_NONE
+            }
         ]
         
-        print(f"Gemini Client initialized.")
+        print(f"Gemini Client initialized with model: {self.extra_config.get('model', 'gemini-1.5-flash-latest')}")
 
         self._mcp_client_source = GLOBAL_MCP
 
@@ -568,7 +566,7 @@ class GeminiClient(LLMClientBase):
             safety_settings=self.safety_settings,
             temperature=self.extra_config.get('temperature', 2.0),
             max_output_tokens=self.extra_config.get('max_output_tokens', 4096),
-            tools=tool_schemas
+            tools=tool_schemas,
         )
         if self.extra_config.get('model', "").startswith("gemini-2.5"):
             config_kwargs["thinking_config"] = types.ThinkingConfig(include_thoughts=True)
@@ -578,10 +576,11 @@ class GeminiClient(LLMClientBase):
             self._print_debug_request(contents, config)
 
         try:
+            # For GenerativeModel, we call generate_content directly on the model instance
             response = self.client.models.generate_content(
                 model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
                 contents=contents,
-                config=config
+                config=config,
             )
             if self.extra_config.get('debug', False):
                 print("[Gemini] Raw response:")
@@ -1027,4 +1026,4 @@ class GeminiClient(LLMClientBase):
             cleaned["required"] = list(cleaned["properties"].keys())
 
         return cleaned
-        
+

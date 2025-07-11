@@ -6,7 +6,6 @@ import shutil
 from typing import List, Dict, Any, AsyncGenerator, Tuple, Optional
 import asyncio
 from datetime import datetime
-from backend.config import get_prompt_config
 import requests
 from backend.chat.models import ImageMessage, BaseMessage
 from backend.chat.models import message_factory
@@ -15,6 +14,8 @@ import base64
 # 聊天历史相关工具
 HISTORY_BASE_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
+
+_allowed_keywords_cache: Optional[List[str]] = None
 
 def _get_session_dir(session_id: str) -> str:
     return os.path.join(HISTORY_BASE_DIR, session_id)
@@ -191,6 +192,33 @@ async def stream_response(response_text: str, chunk_size: int = 3) -> AsyncGener
         yield chunk
         await asyncio.sleep(0.1)  # 控制输出速度 
 
+def get_allowed_keywords_from_prompt_file() -> List[str]:
+    """
+    从 prompt 文件中解析允许的关键词列表。
+    结果会被缓存。
+    """
+    global _allowed_keywords_cache
+    if _allowed_keywords_cache is not None:
+        return _allowed_keywords_cache
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "expression_prompt.md")
+    keywords = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        matches = re.findall(r'\[\[(\w+)\]\]', content)
+        if matches:
+            keywords = [keyword.lower() for keyword in matches]
+        else:
+            print(f"警告: 在 {file_path} 中没有找到关键词。")
+    except FileNotFoundError:
+        print(f"错误: 关键词文件 '{file_path}' 未找到。")
+    
+    _allowed_keywords_cache = keywords
+    return _allowed_keywords_cache
+
 def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
     """
     解析 LLM 的输出，提取回复文本和关键词。
@@ -199,8 +227,7 @@ def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
     Returns:
         (response_text, keyword) 元组
     """
-    config = get_prompt_config()
-    allowed_keywords = config["allowed_keywords"]
+    allowed_keywords = get_allowed_keywords_from_prompt_file()
     
     keyword = "neutral"  # Default keyword
     response_text = llm_full_response.strip()

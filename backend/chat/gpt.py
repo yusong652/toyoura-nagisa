@@ -10,7 +10,7 @@ from fastmcp import Client as MCPClient
 from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from openai import OpenAI
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from fastmcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 from backend.config import get_text_to_image_config, get_llm_specific_config, get_system_prompt
 
 class GPTClient(LLMClientBase):
