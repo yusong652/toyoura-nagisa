@@ -60,6 +60,8 @@ backend/tts/data/
 backend/prompts/
 backend/memory_db/
 frontend/node_modules/
+# Configuration files with sensitive information
+backend/config/
 backend/config.py
 workspace/
 backend/location_data/

@@ -870,7 +870,7 @@ class GeminiClient(LLMClientBase):
         """
         debug = self.extra_config.get('debug', False)
         try:
-            system_prompt = get_text_to_image_config().get("system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
+            system_prompt = get_text_to_image_config().get("text_to_image_system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
             
             # 获取n的配置
             n = get_text_to_image_config().get("context_message_count", 2)

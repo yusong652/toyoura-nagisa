@@ -360,6 +360,11 @@ async def handle_llm_response(
                         import traceback
                         print(f"[ERROR] Traceback: {traceback.format_exc()}")
                         tool_response_content = f"Failed to save generated image: {str(e)}"
+                        
+                elif tool_result.get("type") == "error":
+                    error_message = tool_result.get("message", "Unknown error occurred during image generation")
+                    print(f"[ERROR] Image generation tool returned error: {error_message}")
+                    tool_response_content = f"Image generation failed: {error_message}"
 
             # --- Append tool response message to history ---
             tool_response_msg = message_factory({
@@ -594,7 +599,13 @@ async def generate_image_endpoint(request: GenerateImageRequest):
             print("[ERROR] Image generation returned empty result")
             return {"success": False, "error": "Image generation failed."}
         
-        # 3. Save image to session folder based on result type
+        # 3. Check for error type first
+        if image_result.get("type") == "error":
+            error_message = image_result.get("message", "Unknown error occurred during image generation")
+            print(f"[ERROR] Image generation failed: {error_message}")
+            return {"success": False, "error": error_message}
+        
+        # 4. Save image to session folder based on result type
         local_path = None
         if image_result.get("type") == "image_url" and image_result.get("image_url"):
             print("[DEBUG] Processing image_url result type")
@@ -611,6 +622,7 @@ async def generate_image_endpoint(request: GenerateImageRequest):
         else:
             print(f"[ERROR] Unknown image result type: {image_result.get('type')}")
             print(f"[ERROR] Available keys in result: {list(image_result.keys())}")
+            return {"success": False, "error": f"Unknown result type: {image_result.get('type')}"}
         
         if not local_path:
             print("[ERROR] No local path returned from image saving")

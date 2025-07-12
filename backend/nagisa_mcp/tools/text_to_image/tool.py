@@ -2,12 +2,13 @@ from fastmcp import FastMCP
 import asyncio
 from dotenv import load_dotenv
 import json
-from backend.config import get_text_to_image_config
+import logging
+import traceback
 from typing import Optional, Dict, Any, List
 import httpx
 from fastapi import FastAPI
-import traceback
 from fastmcp.server.context import Context  # type: ignore
+from backend.config import get_text_to_image_config
 
 load_dotenv()
 
@@ -178,44 +179,59 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
         return {"type": "error", "message": str(e)}
 
 
-async def generate_image_from_description(prompt: str, negative_prompt: str) -> Optional[Dict[str, Any]]:
+async def generate_image_from_description(prompt: str, negative_prompt: str):
     """
-    Internal function to generate an image using the configured text-to-image API.
-    This function is a dispatcher that calls the appropriate provider function.
+    Generate image from description.
     
     Args:
-        prompt: The text prompt for image generation
-        negative_prompt: The negative prompt for image generation
-        
+        prompt: Image generation prompt
+        negative_prompt: Negative prompt for generation
+    
     Returns:
-        Optional[Dict[str, Any]]: A dictionary containing the generated image data, or None if generation fails
+        Dict with image generation result
     """
-    print(f"[text_to_image] generate_image_from_description called")
-    print(f"[text_to_image] Prompt length: {len(prompt)}")
-    print(f"[text_to_image] Negative prompt length: {len(negative_prompt)}")
-    
-    config = get_text_to_image_config()
-    provider = config.get("type")
-    debug = config.get("debug", False)
-    
-    print(f"[text_to_image] Selected provider: {provider}")
-    print(f"[text_to_image] Debug mode: {debug}")
-    print(f"[text_to_image] Config keys: {list(config.keys())}")
-    
-    if debug:
-        print(f"[text_to_image] Full config: {config}")
-        print(f"[text_to_image] Prompt: {prompt}")
-        print(f"[text_to_image] Negative prompt: {negative_prompt}")
-
-    if provider == "models_lab":
-        return await _generate_with_models_lab(prompt, negative_prompt, config)
-    elif provider == "stable_diffusion_webui":
-        return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
-    else:
-        error_message = f"Unsupported image generation provider: {provider}"
-        if debug:
-            print(f"[text_to_image] {error_message}")
-        return {"type": "error", "message": error_message}
+    try:
+        print(f"[text_to_image] 开始生成图像")
+        print(f"[text_to_image] 正面提示词: {prompt}")
+        print(f"[text_to_image] 负面提示词: {negative_prompt}")
+        
+        # 获取配置
+        config = get_text_to_image_config()
+        provider = config.get("provider")
+        debug = config.get("debug", False)
+        
+        print(f"[text_to_image] 配置信息:")
+        print(f"[text_to_image] - provider: {provider}")
+        print(f"[text_to_image] - debug: {debug}")
+        
+        # 添加环境变量检查
+        import os
+        print(f"[text_to_image] 环境变量检查:")
+        print(f"[text_to_image] - STABLE_DIFFUSION_WEBUI_URL: {os.environ.get('STABLE_DIFFUSION_WEBUI_URL', 'NOT_SET')}")
+        
+        # 如果是 stable_diffusion_webui，显示详细配置
+        if provider == "stable_diffusion_webui":
+            sd_config = config.get("stable_diffusion_webui", {})
+            print(f"[text_to_image] Stable Diffusion WebUI 配置:")
+            print(f"[text_to_image] - server_url: {sd_config.get('server_url', 'NOT_SET')}")
+            print(f"[text_to_image] - debug: {sd_config.get('debug', False)}")
+            print(f"[text_to_image] - 完整配置keys: {list(sd_config.keys())}")
+        
+        if provider == "models_lab":
+            return await _generate_with_models_lab(prompt, negative_prompt, config)
+        elif provider == "stable_diffusion_webui":
+            return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
+        else:
+            error_message = f"Unsupported image generation provider: {provider}"
+            if debug:
+                print(f"[text_to_image] {error_message}")
+            return {"type": "error", "message": error_message}
+            
+    except Exception as e:
+        if 'debug' in locals() and debug:
+            print(f"[text_to_image] Error occurred: {str(e)}")
+            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
+        return {"type": "error", "message": str(e)}
 
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.

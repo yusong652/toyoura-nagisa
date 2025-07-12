@@ -518,7 +518,7 @@ class AnthropicClient(LLMClientBase):
         """
         debug = self.extra_config.get('debug', False)
         try:
-            system_prompt = get_text_to_image_config().get("system_prompt", "")
+            system_prompt = get_text_to_image_config().get("text_to_image_system_prompt", "")
             if not system_prompt:
                 error_msg = "Empty system prompt for text-to-image generation"
                 if debug:
