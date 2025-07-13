@@ -1,14 +1,21 @@
-"""delete_file tool (split from coding.fs_tools)."""
+"""delete_file tool - safe file deletion with trash recovery.
+
+This tool provides atomic file deletion functionality, focusing exclusively on 
+removing files with comprehensive safety checks and recovery options. It supports
+both permanent deletion and safe trash-based recovery.
+
+Modeled after gemini-cli's file management tools for consistency and interoperability.
+"""
 
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from ..utils.path_security import (
     WORKSPACE_ROOT, 
     validate_path_in_workspace, 
@@ -41,7 +48,7 @@ def delete_file(
     path: str = Field(..., description="File path to delete (workspace-relative)"),
     permanent: bool = Field(False, description="If True, permanently delete file. If False (default), move to .trash folder for recovery.")
 ) -> Dict[str, Any]:
-    """Safely deletes a file by either moving it to a .trash folder or deleting it permanently.
+    """Safely deletes a file, either by moving it to a .trash folder or permanently.
 
     ## Core Functionality
     - **Default Behavior (Safe):** By default (`permanent=False`), this tool moves the specified file to a `.trash` directory within the workspace, allowing for recovery.
@@ -52,16 +59,39 @@ def delete_file(
     - This tool is for **files only**. To delete a directory, you must use the `delete_directory` tool.
     - For most cases, prefer the default behavior (moving to trash) as a safety measure.
 
-    ## Return Value (What you will receive)
-    The output you get back from this tool will be one of the following two things:
+    ## Return Value
+    Returns a JSON object with the following structure:
+    
+    ```json
+    {
+      "operation": {
+        "type": "delete_file",
+        "path": "target_file.py",
+        "permanent": false,
+        "recoverable": true,
+        "was_symlink": false
+      },
+      "file_info": {
+        "size_bytes": 1024,
+        "file_type": "text",
+        "extension": ".py"
+      },
+      "trash_info": {
+        "trash_path": ".trash/target_file_20250708_103000_123.py",
+        "original_path": "target_file.py",
+        "timestamp": "2025-07-08T10:30:00.123"
+      },
+      "summary": {
+        "operation_type": "move_to_trash",
+        "success": true
+      }
+    }
+    ```
 
-    1.  **Success:** A single `string` confirming the deletion.
-        - Example (to trash): `"Moved file to trash: src/old_code.py → .trash/old_code_20250708_103000_123.py (1024 bytes)"`
-        - Example (permanent): `"Permanently deleted file: assets/temp_image.png (5120 bytes)"`
-    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
-        - Example: `"Error: Path is a directory - use delete_directory tool instead"`
-
-    You MUST check the response to confirm success or handle the error.
+    The `operation` object contains details about the deletion operation.
+    The `file_info` object provides information about the deleted file.
+    The `trash_info` object is only present when `permanent=false`.
+    The `summary` object provides a high-level overview of the operation.
     """
 
     # ------------------------------------------------------------------
@@ -82,13 +112,12 @@ def delete_file(
     def _error(message: str) -> Dict[str, Any]:
         return ToolResult(status="error", message=message, error=message).model_dump()
 
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        payload = data or None
+    def _success(message: str, llm_content: Dict[str, Any], **data: Any) -> Dict[str, Any]:
         return ToolResult(
             status="success",
             message=message,
             llm_content=llm_content,
-            data=payload,
+            data=data,
         ).model_dump()
 
     # Validate path security
@@ -122,6 +151,22 @@ def delete_file(
         # Record file information before deletion
         was_symlink = f.is_symlink()
         original_size = f.stat().st_size
+        file_extension = f.suffix.lower()
+        
+        # Determine file type for better categorization
+        file_type = "binary"
+        if file_extension in {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'}:
+            file_type = "text"
+        elif file_extension in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff', '.tga'}:
+            file_type = "image"
+        elif file_extension in {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}:
+            file_type = "audio"
+        elif file_extension in {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'}:
+            file_type = "video"
+        elif file_extension in {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'}:
+            file_type = "document"
+        elif file_extension in {'.zip', '.tar', '.gz', '.bz2', '.7z', '.rar'}:
+            file_type = "archive"
         
         # Prepare response data
         rel_display = f.relative_to(WORKSPACE_ROOT) if str(f).startswith(str(WORKSPACE_ROOT)) else Path(path)
@@ -130,7 +175,25 @@ def delete_file(
             # Permanent deletion
             f.unlink()
             
-            llm_content = f"Permanently deleted file: {rel_display} ({original_size} bytes)"
+            # Build structured LLM content
+            llm_content = {
+                "operation": {
+                    "type": "delete_file",
+                    "path": str(rel_display),
+                    "permanent": True,
+                    "recoverable": False,
+                    "was_symlink": was_symlink
+                },
+                "file_info": {
+                    "size_bytes": original_size,
+                    "file_type": file_type,
+                    "extension": file_extension
+                },
+                "summary": {
+                    "operation_type": "permanent_deletion",
+                    "success": True
+                }
+            }
             
             return _success(
                 "File permanently deleted",
@@ -146,11 +209,35 @@ def delete_file(
             trash_folder = _ensure_trash_folder()
             trash_filename = _generate_trash_filename(f)
             trash_path = trash_folder / trash_filename
+            timestamp = datetime.now().isoformat()
             
             # Move file to trash
             shutil.move(str(f), str(trash_path))
             
-            llm_content = f"Moved file to trash: {rel_display} → .trash/{trash_filename} ({original_size} bytes)"
+            # Build structured LLM content
+            llm_content = {
+                "operation": {
+                    "type": "delete_file",
+                    "path": str(rel_display),
+                    "permanent": False,
+                    "recoverable": True,
+                    "was_symlink": was_symlink
+                },
+                "file_info": {
+                    "size_bytes": original_size,
+                    "file_type": file_type,
+                    "extension": file_extension
+                },
+                "trash_info": {
+                    "trash_path": str(trash_path.relative_to(WORKSPACE_ROOT)),
+                    "original_path": str(rel_display),
+                    "timestamp": timestamp
+                },
+                "summary": {
+                    "operation_type": "move_to_trash",
+                    "success": True
+                }
+            }
             
             return _success(
                 "File moved to trash successfully",

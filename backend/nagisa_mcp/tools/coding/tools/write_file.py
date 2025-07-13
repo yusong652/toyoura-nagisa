@@ -1,20 +1,23 @@
-"""Filesystem helper tools — *write_file* implementation.
+"""write_file tool - atomic text file creation and modification.
 
-This module exposes a single FastMCP-compatible tool that writes UTF-8 text
-files inside the workspace directory. The only public symbol meant to be
-registered is :pyfunc:`write_file`.
+This tool provides atomic file writing functionality, focusing exclusively on 
+creating and modifying text files with comprehensive safety checks and encoding support.
+It supports both overwrite and append modes with automatic directory creation.
+
+Modeled after gemini-cli's file management tools for consistency and interoperability.
 """
 
 import errno
 from pathlib import Path
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from .config import get_tools_config
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from ..utils.path_security import (
     WORKSPACE_ROOT, 
     validate_path_in_workspace, 
@@ -49,15 +52,42 @@ def write_file(
     - **To modify a file:** You must first use `read_file` to get its current content, modify that content in your context, and then use this `write_file` tool to save the complete, updated content back to the file.
     - This tool is for **text content only**. Do not attempt to write binary data.
 
-    ## Return Value (What you will receive)
-    The output you get back from this tool will be one of the following two things:
+    ## Return Value
+    Returns a JSON object with the following structure:
+    
+    ```json
+    {
+      "operation": {
+        "type": "write_file",
+        "path": "src/app.js",
+        "mode": "overwrite",
+        "encoding": "utf-8",
+        "file_created": true
+      },
+      "content_info": {
+        "size_bytes": 512,
+        "size_chars": 256,
+        "lines": 15,
+        "encoding": "utf-8"
+      },
+      "file_info": {
+        "file_type": "text",
+        "extension": ".js",
+        "exists": true,
+        "modified_time": "2025-07-08T10:30:00.123"
+      },
+      "summary": {
+        "operation_type": "file_write",
+        "success": true,
+        "parent_dirs_created": 2
+      }
+    }
+    ```
 
-    1.  **Success:** A single `string` confirming the successful write operation.
-        - Example: `"Successfully wrote 512 bytes to src/app.js"`
-    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
-        - Example: `"Error: Permission denied when writing file"`
-
-    You MUST check the response to confirm success or handle the error.
+    The `operation` object contains details about the write operation.
+    The `content_info` object provides information about the written content.
+    The `file_info` object provides information about the target file.
+    The `summary` object provides a high-level overview of the operation.
     """
 
     # ------------------------------------------------------------------
@@ -74,13 +104,12 @@ def write_file(
     def _error(message: str) -> Dict[str, Any]:
         return ToolResult(status="error", message=message, error=message).model_dump()
 
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        payload = data or None
+    def _success(message: str, llm_content: Dict[str, Any], **data: Any) -> Dict[str, Any]:
         return ToolResult(
             status="success",
             message=message,
             llm_content=llm_content,
-            data=payload,
+            data=data,
         ).model_dump()
 
     # Validate path security
@@ -107,8 +136,11 @@ def write_file(
     try:
         abs_p = Path(abs_path)
         
+        # Check if file already exists
+        file_existed = abs_p.exists()
+        
         # Symlink security checks
-        if abs_p.exists():
+        if file_existed:
             # Check if target file itself is an unsafe symlink
             if abs_p.is_symlink() and not is_safe_symlink(abs_p):
                 return _error("Cannot write to symlink pointing outside workspace")
@@ -116,6 +148,17 @@ def write_file(
         # Check if any parent directory is an unsafe symlink
         if not check_parent_symlinks(abs_p):
             return _error("Cannot write to path with parent symlink pointing outside workspace")
+        
+        # Count parent directories that need to be created
+        parent_dirs_created = 0
+        if not abs_p.parent.exists():
+            # Count how many parent directories will be created
+            current = abs_p.parent
+            while not current.exists():
+                parent_dirs_created += 1
+                current = current.parent
+                if current == WORKSPACE_ROOT:
+                    break
         
         # Create parent directories if they don't exist
         abs_p.parent.mkdir(parents=True, exist_ok=True)
@@ -131,25 +174,74 @@ def write_file(
         with abs_p.open(mode, encoding=encoding) as fh:
             fh.write(content)
 
-        # Get file statistics
-        size = abs_p.stat().st_size
+        # Get file statistics and metadata
+        stat = abs_p.stat()
+        size_bytes = stat.st_size
+        modified_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
+        
+        # Determine file type based on extension
+        file_extension = abs_p.suffix.lower()
+        file_type = "text"
+        if file_extension in {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'}:
+            file_type = "text"
+        elif file_extension in {'.log', '.out', '.err'}:
+            file_type = "log"
+        elif file_extension in {'.md', '.rst', '.txt'}:
+            file_type = "documentation"
+        else:
+            file_type = "text"
+        
+        # Count lines in content
+        lines_count = content.count('\n') + (1 if content and not content.endswith('\n') else 0)
+        
+        # Prepare response data
         rel_display = abs_p.relative_to(WORKSPACE_ROOT)
         
-        # Prepare response content
-        operation_mode = "appended to" if append else "wrote to"
-        llm_content = f"Successfully {operation_mode} {rel_display} ({estimated_bytes} bytes written)."
+        # Build structured LLM content
+        llm_content = {
+            "operation": {
+                "type": "write_file",
+                "path": str(rel_display),
+                "mode": "append" if append else "overwrite",
+                "encoding": encoding,
+                "file_created": not file_existed
+            },
+            "content_info": {
+                "size_bytes": size_bytes,
+                "size_chars": content_size_chars,
+                "lines": lines_count,
+                "encoding": encoding
+            },
+            "file_info": {
+                "file_type": file_type,
+                "extension": file_extension,
+                "exists": True,
+                "modified_time": modified_time
+            },
+            "summary": {
+                "operation_type": "file_write",
+                "success": True,
+                "parent_dirs_created": parent_dirs_created
+            }
+        }
         
-        # Use debug mode setting from config
-        display_msg = llm_content if get_tools_config().debug_mode else "File written successfully"
+        # Use debug mode setting from config for display message
+        if get_tools_config().debug_mode:
+            operation_mode = "appended to" if append else "wrote to"
+            display_msg = f"Successfully {operation_mode} {rel_display} ({size_bytes} bytes written)"
+        else:
+            display_msg = "File written successfully"
 
         return _success(
             display_msg,
             llm_content,
             path=str(abs_p),
-            size=size,
-            mode=operation_mode,
+            size=size_bytes,
+            mode="append" if append else "overwrite",
             encoding=encoding,
             content_size=estimated_bytes,
+            file_created=not file_existed,
+            parent_dirs_created=parent_dirs_created,
         )
 
     except PermissionError:

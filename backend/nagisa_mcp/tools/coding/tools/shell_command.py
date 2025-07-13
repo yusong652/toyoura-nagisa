@@ -18,7 +18,7 @@ from ..utils.path_security import (
     is_safe_symlink, 
     check_parent_symlinks
 )
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from .config import get_tools_config
 
 __all__ = ["run_shell_command", "register_shell_command_tool"]

@@ -8,7 +8,7 @@ from fastmcp import FastMCP  # type: ignore
 from datetime import datetime, timezone
 
 from ..utils.file_filter import FileFilter
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from ..utils.path_security import WORKSPACE_ROOT, validate_path_in_workspace, is_safe_symlink
 
 # Optional dependency for .gitignore parsing

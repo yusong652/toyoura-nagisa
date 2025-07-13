@@ -11,7 +11,7 @@ from pydantic import Field
 from pydantic.fields import FieldInfo
 
 from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT as _WS_PATH
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 
 
 __all__ = ["read_file", "register_read_file_tool"]

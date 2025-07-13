@@ -1,14 +1,21 @@
-"""delete_directory tool - safe directory deletion with trash recovery."""
+"""delete_directory tool - safe directory deletion with trash recovery.
+
+This tool provides atomic directory deletion functionality, focusing exclusively on 
+removing directories with comprehensive safety checks and recovery options. It supports
+both permanent deletion and safe trash-based recovery.
+
+Modeled after gemini-cli's file management tools for consistency and interoperability.
+"""
 
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from ..utils.path_security import (
     WORKSPACE_ROOT, 
     validate_path_in_workspace, 
@@ -128,16 +135,41 @@ def delete_directory(
     - This tool is for **directories only**. To delete a single file, you must use the `delete_file` tool.
     - Before deleting a non-empty directory, consider using `list_directory` to understand its contents.
 
-    ## Return Value (What you will receive)
-    The output you get back from this tool will be one of the following two things:
+    ## Return Value
+    Returns a JSON object with the following structure:
+    
+    ```json
+    {
+      "operation": {
+        "type": "delete_directory",
+        "path": "target_directory/",
+        "permanent": false,
+        "recoverable": true,
+        "was_symlink": false
+      },
+      "contents": {
+        "files": 15,
+        "directories": 3,
+        "count_type": "immediate",
+        "potentially_large": false
+      },
+      "trash_info": {
+        "trash_path": ".trash/target_directory_20250708_103000_123/",
+        "original_path": "target_directory/",
+        "timestamp": "2025-07-08T10:30:00.123"
+      },
+      "summary": {
+        "operation_type": "move_to_trash",
+        "total_items": 18,
+        "success": true
+      }
+    }
+    ```
 
-    1.  **Success:** A single `string` confirming the deletion and summarizing its contents.
-        - Example (to trash): `"Moved directory to trash: old_project/ → .trash/old_project_20250708_103000_123/ (files: 15, subdirs: 3)"`
-        - Example (permanent): `"Permanently deleted directory: temp_files/ (files: 5, subdirs: 0)"`
-    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong.
-        - Example: `"Error: Directory is not empty - use recursive=True to delete non-empty directories"`
-
-    You MUST check the response to confirm success or handle the error.
+    The `operation` object contains details about the deletion operation.
+    The `contents` object provides information about what was deleted.
+    The `trash_info` object is only present when `permanent=false`.
+    The `summary` object provides a high-level overview of the operation.
     """
 
     # ------------------------------------------------------------------
@@ -162,13 +194,12 @@ def delete_directory(
     def _error(message: str) -> Dict[str, Any]:
         return ToolResult(status="error", message=message, error=message).model_dump()
 
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        payload = data or None
+    def _success(message: str, llm_content: Dict[str, Any], **data: Any) -> Dict[str, Any]:
         return ToolResult(
             status="success",
             message=message,
             llm_content=llm_content,
-            data=payload,
+            data=data,
         ).model_dump()
 
     # Validate path security
@@ -228,10 +259,22 @@ def delete_directory(
             else:
                 shutil.rmtree(str(d))
             
-            # Build content info for LLM
-            count_desc = f"files: {contents_info['files']}, subdirs: {contents_info['directories']} ({contents_info['count_type']} count)"
-            hint_text = f" - {contents_info['hint']}" if contents_info.get('hint') else ""
-            llm_content = f"Permanently deleted directory: {rel_display}/ ({count_desc}){hint_text}"
+            # Build structured LLM content
+            llm_content = {
+                "operation": {
+                    "type": "delete_directory",
+                    "path": str(rel_display),
+                    "permanent": True,
+                    "recoverable": False,
+                    "was_symlink": was_symlink
+                },
+                "contents": contents_info,
+                "summary": {
+                    "operation_type": "permanent_deletion",
+                    "total_items": contents_info["files"] + contents_info["directories"],
+                    "success": True
+                }
+            }
             
             return _success(
                 "Directory permanently deleted",
@@ -248,14 +291,32 @@ def delete_directory(
             trash_folder = _ensure_trash_folder()
             trash_dirname = _generate_trash_dirname(d)
             trash_path = trash_folder / trash_dirname
+            timestamp = datetime.now().isoformat()
             
             # Move directory to trash
             shutil.move(str(d), str(trash_path))
             
-            # Build content info for LLM
-            count_desc = f"files: {contents_info['files']}, subdirs: {contents_info['directories']} ({contents_info['count_type']} count)"
-            hint_text = f" - {contents_info['hint']}" if contents_info.get('hint') else ""
-            llm_content = f"Moved directory to trash: {rel_display}/ → .trash/{trash_dirname}/ ({count_desc}){hint_text}"
+            # Build structured LLM content
+            llm_content = {
+                "operation": {
+                    "type": "delete_directory",
+                    "path": str(rel_display),
+                    "permanent": False,
+                    "recoverable": True,
+                    "was_symlink": was_symlink
+                },
+                "contents": contents_info,
+                "trash_info": {
+                    "trash_path": str(trash_path.relative_to(WORKSPACE_ROOT)),
+                    "original_path": str(rel_display),
+                    "timestamp": timestamp
+                },
+                "summary": {
+                    "operation_type": "move_to_trash",
+                    "total_items": contents_info["files"] + contents_info["directories"],
+                    "success": True
+                }
+            }
             
             return _success(
                 "Directory moved to trash successfully",

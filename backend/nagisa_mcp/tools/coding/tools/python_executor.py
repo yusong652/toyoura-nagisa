@@ -13,7 +13,7 @@ from ..utils.path_security import (
     is_safe_symlink, 
     check_parent_symlinks
 )
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 
 __all__ = ["execute_python_script", "register_python_executor_tools"]
 

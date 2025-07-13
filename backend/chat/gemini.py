@@ -873,7 +873,7 @@ class GeminiClient(LLMClientBase):
             system_prompt = get_text_to_image_config().get("text_to_image_system_prompt", "You are a professional prompt engineer. Please generate a detailed and creative text-to-image prompt based on the following conversation. The prompt should be suitable for high-quality image generation.")
             
             # 获取n的配置
-            n = get_text_to_image_config().get("context_message_count", 2)
+            n = get_text_to_image_config().get("context_message_count", 4)
             # 获取最新的对话消息
             latest_messages = get_latest_n_messages(session_id, n) if session_id else tuple([None]*n)
             if not any(latest_messages):

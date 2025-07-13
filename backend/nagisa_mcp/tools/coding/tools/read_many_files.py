@@ -16,7 +16,7 @@ from ..utils.path_security import (
     is_safe_symlink, 
     check_parent_symlinks
 )
-from ..utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 from .config import get_tools_config
 from .constants import DEFAULT_EXCLUDE_PATTERNS as DEFAULT_EXCLUDES
 

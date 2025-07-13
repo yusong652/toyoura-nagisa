@@ -8,7 +8,7 @@ import json
 import sys
 import os
 from backend.config import TOOL_DB_PATH
-from nagisa_mcp.tool_vectorizer import ToolVectorizer
+from ...tool_vectorizer import ToolVectorizer
 
 # Add backend path to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))

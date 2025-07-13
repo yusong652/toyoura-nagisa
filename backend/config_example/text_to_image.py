@@ -33,9 +33,6 @@ class ModelsLabConfig(BaseSettings):
         extra='ignore'
     )
     
-
-
-
 class ModelPreset(BaseSettings):
     """模型预设配置"""
     
