@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
-    { name = "HanyuSong", email = "hanyus@umich.edu" }
+    { name = "yusong", email = "yusong.han.652@gmail.com" }
 ]
 dependencies = [
     "fastapi>=0.115.12",
@@ -62,11 +62,12 @@ dependencies = [
     "mcp>=1.8.0",
     "mistralai>=0.5.1",
     "pydantic-settings>=2.10.1",
+    "psutil>=7.0.0"
 ]
 
 [project.urls]
-Homepage = "https://github.com/hanyus/aiNagisa"
-"Bug Tracker" = "https://github.com/hanyus/aiNagisa/issues"
+Homepage = "https://github.com/yusong652/aiNagisa"
+"Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend"]

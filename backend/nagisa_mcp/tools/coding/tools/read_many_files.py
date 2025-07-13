@@ -177,23 +177,55 @@ def read_many_files(
     - Use glob patterns (e.g., `src/**/*.py`, `docs/*.md`) to specify which files to read.
     - The tool returns a single **JSON object** (dictionary) where keys are the file paths and values are their contents.
 
-    ## Content Types in Return Value
-    - **Text Files:** The value for each text file is a **string** of its content.
-    - **Binary Files (images, PDFs, etc.):** If you explicitly include them in `paths` or `include` AND set `force_inline_assets=True`, their value will be a **JSON object**: `{"inline_data": {"mime_type": "image/png", "data": "<base64_data>"}}`. Otherwise, they are skipped.
+    ## Return Value
+    **For LLM:** Returns structured data with consistent format across all coding tools.
+    
+    **Structure:**
+    ```json
+    {
+      "operation": {
+        "type": "read_many_files",
+        "patterns": ["src/**/*.py", "README.md"],
+        "files_processed": 25,
+        "files_read": 20,
+        "files_skipped": 5,
+        "stopped_early": false
+      },
+      "files_info": {
+        "total_files": 20,
+        "total_bytes": 51200,
+        "largest_file": "src/main.py (15.2 KB)",
+        "file_types": ["text", "image"]
+      },
+      "content": {
+        "files": {
+          "src/main.py": "import os...",
+          "README.md": "# Project Title...",
+          "logo.png": {"inline_data": {"mime_type": "image/png", "data": "iVBORw0KGg..."}}
+        },
+        "format": "mixed"
+      },
+      "summary": {
+        "operation_type": "read_many_files",
+        "success": true
+      }
+    }
+    ```
+    
+    **Optional Sections:**
+    - `limits_info`: Present when limits are hit or approached
+    - `skip_info`: Present when files were skipped with reasons
+    
+    **Content Access:**
+    Access file contents via `content.files[path]` where:
+    - **Text Files:** Value is a string of file content
+    - **Binary Files:** Value is `{"inline_data": {"mime_type": "...", "data": "base64..."}}`
 
     ## Strategic Usage
-    - This is the most efficient tool for getting a broad overview of a project or fetching multiple related files at once.
-    - Be specific with your glob patterns to avoid hitting the `max_files` or `max_total_size` limits, which would result in a partial or failed read. Use the `exclude` parameter for more precision.
-    - This tool is for reading content. To see what files exist first, use `list_directory`.
-
-    ## Return Value (What you will receive)
-    The output you get back from this tool will be one of the following two things:
-
-    1.  **Success:** A `JSON object` mapping file paths to their content.
-        - Example: `{"src/main.py": "import os...", "README.md": "# Project Title..."}`
-    2.  **Error:** A single `string` starting with "Error:", explaining what went wrong (e.g., "Error: No files matched the given patterns").
-
-    You MUST parse the JSON object to access the file contents.
+    - Most efficient tool for project overview or fetching multiple related files
+    - Use specific glob patterns to avoid hitting limits
+    - Check `limits_info` and `skip_info` for optimization insights
+    - Use `list_directory` first to see what files exist
     """
 
     # ------------------------------------------------------------------
@@ -399,9 +431,50 @@ def read_many_files(
         if files_read == 0:
             return _error("No files could be read successfully")
 
-        # The `llm_content` sent to the model should be the actual file data, not a summary.
-        # This aligns the tool's behavior with its SOTA docstring.
-        llm_content = files
+        # Build structured LLM content for consistency across tools
+        llm_content = {
+            "operation": {
+                "type": "read_many_files",
+                "patterns": all_patterns,
+                "files_processed": files_processed,
+                "files_read": files_read,
+                "files_skipped": files_skipped,
+                "stopped_early": stopped_early
+            },
+            "files_info": {
+                "total_files": files_read,
+                "total_bytes": total_bytes,
+                "largest_file": largest_file if largest_file else "N/A",
+                "file_types": list(set(_detect_file_type(WORKSPACE_ROOT / path) for path in files.keys()))
+            },
+            "content": {
+                "files": files,
+                "format": "mixed"  # Can contain both text and inline_data
+            },
+            "summary": {
+                "operation_type": "read_many_files",
+                "success": True
+            }
+        }
+        
+        # Add limits information if relevant
+        if stopped_early or files_skipped > 0:
+            llm_content["limits_info"] = {
+                "max_files": max_files,
+                "max_total_size": max_total_size,
+                "max_bytes_per_file": max_bytes_per_file,
+                "stopped_early": stopped_early,
+                "hit_file_limit": len(files) >= max_files,
+                "hit_size_limit": total_bytes >= max_total_size * 0.9  # Close to limit
+            }
+        
+        # Add skip information if files were skipped
+        if skipped:
+            llm_content["skip_info"] = {
+                "skipped_count": files_skipped,
+                "skip_reasons": list(set(skipped.values())),
+                "examples": dict(list(skipped.items())[:5])  # Show first 5 examples
+            }
 
         # Build a concise summary message for the user interface.
         message = f"Read {files_read} files successfully"

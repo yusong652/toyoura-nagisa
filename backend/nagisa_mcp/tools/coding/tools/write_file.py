@@ -60,34 +60,25 @@ def write_file(
       "operation": {
         "type": "write_file",
         "path": "src/app.js",
-        "mode": "overwrite",
-        "encoding": "utf-8",
-        "file_created": true
+        "mode": "overwrite"
       },
-      "content_info": {
-        "size_bytes": 512,
-        "size_chars": 256,
-        "lines": 15,
-        "encoding": "utf-8"
+      "result": {
+        "file_created": true,
+        "bytes_written": 512,
+        "lines_written": 15
       },
       "file_info": {
         "file_type": "text",
         "extension": ".js",
-        "exists": true,
-        "modified_time": "2025-07-08T10:30:00.123"
-      },
-      "summary": {
-        "operation_type": "file_write",
-        "success": true,
-        "parent_dirs_created": 2
+        "encoding": "utf-8"
       }
     }
     ```
 
-    The `operation` object contains details about the write operation.
-    The `content_info` object provides information about the written content.
-    The `file_info` object provides information about the target file.
-    The `summary` object provides a high-level overview of the operation.
+    **Key Sections:**
+    - **`operation`**: Contains operation type, file path, and write mode
+    - **`result`**: Write operation results including file creation status and content size
+    - **`file_info`**: File metadata including type and encoding
     """
 
     # ------------------------------------------------------------------
@@ -197,31 +188,24 @@ def write_file(
         # Prepare response data
         rel_display = abs_p.relative_to(WORKSPACE_ROOT)
         
-        # Build structured LLM content
+        # Build structured LLM content following unified standard
+        from datetime import datetime
+        
         llm_content = {
             "operation": {
                 "type": "write_file",
                 "path": str(rel_display),
-                "mode": "append" if append else "overwrite",
-                "encoding": encoding,
-                "file_created": not file_existed
+                "mode": "append" if append else "overwrite"
             },
-            "content_info": {
-                "size_bytes": size_bytes,
-                "size_chars": content_size_chars,
-                "lines": lines_count,
-                "encoding": encoding
+            "result": {
+                "file_created": not file_existed,
+                "bytes_written": size_bytes,
+                "lines_written": lines_count
             },
             "file_info": {
                 "file_type": file_type,
                 "extension": file_extension,
-                "exists": True,
-                "modified_time": modified_time
-            },
-            "summary": {
-                "operation_type": "file_write",
-                "success": True,
-                "parent_dirs_created": parent_dirs_created
+                "encoding": encoding
             }
         }
         

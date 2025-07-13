@@ -275,33 +275,35 @@ def glob(
     
     ```json
     {
-      "files": [
-        {
-          "path": "src/main.py",
-          "absolute_path": "/workspace/src/main.py", 
-          "size": 1024,
-          "modified_time": "2024-01-15T10:30:00",
-          "modified_timestamp": 1705315800.0
-        }
-      ],
-      "summary": {
+      "operation": {
+        "type": "glob",
+        "pattern": "**/*.py",
+        "search_path": "src"
+      },
+      "result": {
+        "files": [
+          {
+            "path": "src/main.py",
+            "absolute_path": "/workspace/src/main.py", 
+            "size": 1024,
+            "modified_time": "2024-01-15T10:30:00",
+            "modified_timestamp": 1705315800.0
+          }
+        ],
         "total_found": 1,
-        "total_skipped": 5,
-        "skipped_breakdown": {"gitignored": 3, "hidden_files": 2},
         "search_limited": false
       },
-      "search_info": {
-        "pattern": "**/*.py",
-        "search_path": "src",
-        "case_sensitive": false,
-        "exclude_patterns": ["**/test_*.py"]
+      "skipped_files": {
+        "total": 5,
+        "reasons": {"gitignored": 3, "hidden_files": 2}
       }
     }
     ```
 
-    The `files` array contains detailed metadata for each matching file.
-    Use `summary` to understand what was filtered out.
-    Use `search_info` to see exactly what search parameters were applied.
+    **Key Sections:**
+    - **`operation`**: Contains search pattern and parameters
+    - **`result`**: Matching files and search statistics
+    - **`skipped_files`**: Information about excluded files (only present if files were skipped)
     """
 
     # ------------------------------------------------------------------
@@ -482,13 +484,28 @@ def glob(
         if summary["search_limited"]:
             message += f" (limited to {max_files})"
 
-        # CRITICAL FIX: LLM content must match the docstring structure
-        # Return the complete JSON structure as described in the docstring
+        # Build structured LLM content following unified standard
+        from datetime import datetime
+        
         llm_content = {
-            "files": file_info_list,
-            "summary": summary,
-            "search_info": search_info,
+            "operation": {
+                "type": "glob",
+                "pattern": pattern,
+                "search_path": str(search_dir.relative_to(WORKSPACE_ROOT)) if search_dir != WORKSPACE_ROOT else "."
+            },
+            "result": {
+                "files": file_info_list,
+                "total_found": total_found,
+                "search_limited": summary["search_limited"]
+            }
         }
+
+        # Add skip information only if significant
+        if total_skipped > 0:
+            llm_content["skipped_files"] = {
+                "total": total_skipped,
+                "reasons": {k: v for k, v in skipped_files.items() if v > 0}
+            }
 
         return _success(
             message,

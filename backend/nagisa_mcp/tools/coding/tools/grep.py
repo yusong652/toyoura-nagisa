@@ -530,40 +530,37 @@ def grep(
     
     ```json
     {
-      "files": [
-        {
-          "file_path": "src/main.py",
-          "match_count": 3,
-          "matches": [
-            {
-              "line_number": 15,
-              "line_content": "def main_function():",
-              "match_start": 0,
-              "match_end": 8
-            }
-          ]
-        }
-      ],
-      "summary": {
-        "total_files_with_matches": 2,
-        "total_matches": 5,
-        "files_searched": 45,
-        "search_strategy": "git_grep",
-        "search_mode": "directory"
-      },
-      "search_info": {
+      "operation": {
+        "type": "grep",
         "pattern": "def\\s+\\w+",
         "search_path": "src",
-        "include": "*.py",
-        "case_sensitive": false,
-        "max_matches": 500
+        "search_mode": "directory"
+      },
+      "result": {
+        "files": [
+          {
+            "file_path": "src/main.py",
+            "match_count": 3,
+            "matches": [
+              {
+                "line_number": 15,
+                "line_content": "def main_function():",
+                "match_start": 0,
+                "match_end": 8
+              }
+            ]
+          }
+        ],
+        "total_matches": 5,
+        "total_files_with_matches": 2,
+        "search_limited": false
       }
     }
     ```
 
-    The `files` array contains detailed match information for each file.
-    Use `summary` to understand search coverage and performance.
-    Use `search_info` to see exactly what search parameters were applied.
+    **Key Sections:**
+    - **`operation`**: Contains search pattern and parameters
+    - **`result`**: Matching files and search statistics, with detailed match information including line numbers and content
     """
 
     # ------------------------------------------------------------------
@@ -765,11 +762,22 @@ def grep(
         if summary["search_limited"]:
             message += f" (limited to {max_matches})"
 
-        # CRITICAL: LLM content must match the docstring structure exactly
+        # Build structured LLM content following unified standard
+        from datetime import datetime
+        
         llm_content = {
-            "files": files_data,
-            "summary": summary,
-            "search_info": search_info,
+            "operation": {
+                "type": "grep",
+                "pattern": pattern,
+                "search_path": path if path else ".",
+                "search_mode": search_mode
+            },
+            "result": {
+                "files": files_data,
+                "total_matches": total_matches,
+                "total_files_with_matches": len(files_data),
+                "search_limited": summary["search_limited"]
+            }
         }
 
         return _success(

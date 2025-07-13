@@ -133,6 +133,19 @@ def _detect_potential_issues(content: str, old_string: str) -> list[str]:
     
     return issues
 
+def _get_file_type(path: Path) -> str:
+    """Determine file type based on extension."""
+    ext = path.suffix.lower()
+    
+    if ext in {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', '.json', '.xml', '.yaml', '.yml'}:
+        return "text"
+    elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'}:
+        return "image"
+    elif ext in {'.pdf', '.doc', '.docx'}:
+        return "document"
+    else:
+        return "unknown"
+
 # -----------------------------------------------------------------------------
 # Main implementation
 # -----------------------------------------------------------------------------
@@ -140,104 +153,105 @@ def _detect_potential_issues(content: str, old_string: str) -> list[str]:
 def replace(
     file_path: str = Field(
         ...,
-        description="The absolute path to the file to modify. Must start with '/' and be within the workspace.",
+        description="Absolute path to the file to modify. Must be within workspace.",
     ),
     old_string: str = Field(
         ...,
-        description="The exact literal text to replace. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. For multiple replacements, specify expected_replacements parameter. Must match exactly or the tool will fail.",
+        description="Exact text to replace. For single replacements, include 3+ lines of context before/after target. Must match exactly including whitespace.",
     ),
     new_string: str = Field(
         ...,
-        description="The exact literal text to replace old_string with. Provide the EXACT text with proper whitespace, indentation, and formatting. Ensure the resulting code is correct and idiomatic.",
+        description="Exact replacement text. Provide precise text with correct whitespace and formatting.",
     ),
     expected_replacements: int = Field(
         1,
         ge=1,
         le=MAX_EXPECTED_REPLACEMENTS,
-        description="Number of replacements expected. Defaults to 1. Use when you want to replace multiple occurrences. Tool will fail if actual count doesn't match.",
+        description="Expected number of replacements. Tool fails if actual count differs.",
     ),
 ) -> Dict[str, Any]:
-    """Replace exact text within a file with precise targeting and validation.
+    """Replace exact text within files with precise targeting and comprehensive validation.
 
     ## Core Functionality
-    - Replaces specific text content within files using exact string matching
-    - Supports both single and multiple occurrence replacements
-    - Can create new files when old_string is empty
-    - Requires precise context for reliable targeting
+    - Replaces specific text content using exact string matching
+    - Supports single and multiple occurrence replacements
+    - Creates new files when old_string is empty
+    - Provides detailed diff and validation feedback
 
-    ## Strategic Usage  
-    - **ALWAYS use read_file first** to examine current content before editing
-    - Include sufficient context (3+ lines before/after target) for single replacements
-    - Use exact literal text - avoid escaping unless absolutely necessary
-    - Verify file paths are absolute and within workspace
+    ## Strategic Usage
+    - **Always use read_file first** to examine content before editing
+    - Include sufficient context (3+ lines) for single replacements
+    - Use exact literal text - match whitespace/indentation precisely
+    - Verify paths are absolute and within workspace
 
-    ## Replacement Examples
+    ## Return Value
+    **For LLM:** Returns structured editing results with comprehensive metadata.
+    
+    **Structure:**
+    ```json
+    {
+      "operation": {
+        "type": "replace",
+        "file_path": "/workspace/src/main.py",
+        "replacements_made": 1,
+        "expected_replacements": 1,
+        "is_new_file": false,
+        "timestamp": "2025-01-08T10:30:00.123"
+      },
+      "edit_result": {
+        "success": true,
+        "content_changed": true,
+        "size_change_bytes": 12,
+        "line_change_count": 2
+      },
+      "file_info": {
+        "size_bytes": 1024,
+        "file_type": "text",
+        "extension": ".py",
+        "encoding": "utf-8"
+      },
+      "diff_info": {
+        "has_diff": true,
+        "diff_preview": "--- original\\n+++ modified\\n@@ -1,3 +1,3 @@\\n...",
+        "diff_size": 156
+      },
+      "validation_info": {
+        "context_validated": true,
+        "string_lengths": {"old": 156, "new": 168},
+        "warnings": [],
+        "issues_detected": []
+      },
+      "summary": {
+        "operation_type": "text_replacement",
+        "success": true
+      }
+    }
+    ```
+
+    ## Examples
     ```python
     # Single replacement with context
     replace(
         file_path="/workspace/src/main.py",
-        old_string=\"\"\"def old_function():
-    # This is the old implementation
-    return "old"
-    
-def another_function():\"\"\",
-        new_string=\"\"\"def new_function():
-    # This is the new implementation  
-    return "new"
-    
-def another_function():\"\"\"
+        old_string="def old_function():\\n    return 'old'\\n\\ndef another_function():",
+        new_string="def new_function():\\n    return 'new'\\n\\ndef another_function():"
     )
     
     # Multiple replacements
     replace(
         file_path="/workspace/config.py",
         old_string="DEBUG = True",
-        new_string="DEBUG = False", 
+        new_string="DEBUG = False",
         expected_replacements=3
     )
-    
-    # Create new file
-    replace(
-        file_path="/workspace/new_file.py",
-        old_string="",
-        new_string="# New file content\\nprint('Hello, World!')"
-    )
-    ```
-
-    ## Return Value
-    Returns a JSON object with the following structure:
-    
-    ```json
-    {
-      "edit_result": {
-        "file_path": "/workspace/src/main.py",
-        "replacements_made": 1,
-        "is_new_file": false,
-        "file_size_bytes": 1024,
-        "diff_preview": "--- original\\n+++ modified\\n@@ -1,3 +1,3 @@\\n..."
-      },
-      "operation_info": {
-        "old_string_length": 156,
-        "new_string_length": 168,
-        "expected_replacements": 1,
-        "validation_warnings": []
-      }
-    }
     ```
 
     ## Critical Requirements
     1. **file_path** must be absolute and within workspace
     2. **old_string** must match exactly (whitespace, indentation, newlines)
-    3. **new_string** must be the exact replacement text
-    4. For single replacements: include 3+ lines of context around target
-    5. **expected_replacements** must match actual occurrence count
-
-    ## Error Prevention
-    - Read file content with read_file before editing
-    - Copy-paste exact text from file content (don't retype)
-    - Match indentation and whitespace precisely
-    - Use empty old_string only for new file creation
-    - Verify paths are absolute and within workspace boundaries
+    3. **new_string** must be exact replacement text
+    4. **expected_replacements** must match actual occurrence count
+    5. Use empty old_string only for new file creation
     """
 
     # ------------------------------------------------------------------
@@ -314,12 +328,14 @@ def another_function():\"\"\"
         # Read current content or prepare for new file creation
         current_content = None
         is_new_file = False
+        original_size = 0
 
         if target_file.exists():
             try:
                 with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT, errors='replace') as f:
                     current_content = f.read()
                 current_content = _normalize_line_endings(current_content)
+                original_size = len(current_content.encode(TEXT_CHARSET_DEFAULT))
             except Exception as e:
                 return _error(f"Cannot read file: {e}")
         else:
@@ -328,6 +344,7 @@ def another_function():\"\"\"
                 # Creating new file
                 is_new_file = True
                 current_content = ""
+                original_size = 0
             else:
                 return _error("File not found. Use empty old_string to create a new file.")
 
@@ -386,58 +403,111 @@ def another_function():\"\"\"
         except Exception as e:
             return _error(f"Failed to write file: {e}")
 
+        # Calculate file changes
+        new_size = len(new_content.encode(TEXT_CHARSET_DEFAULT))
+        size_change = new_size - original_size
+        
+        # Count line changes
+        original_lines = (current_content or "").count('\n')
+        new_lines = new_content.count('\n')
+        line_change_count = new_lines - original_lines
+
         # Generate diff for display (if not a new file)
         diff_preview = ""
-        if not is_new_file:
+        has_diff = False
+        if not is_new_file and current_content != new_content:
             diff_preview = _generate_diff(
                 current_content or "", 
                 new_content, 
                 target_file.name
             )
+            has_diff = True
 
         # Detect potential issues for warnings
         warnings = _detect_potential_issues(current_content or "", old_string)
 
-        # Get file size
-        file_size = target_file.stat().st_size
-
+        # Get file metadata
+        file_type = _get_file_type(target_file)
+        file_extension = target_file.suffix.lower()
+        
         # ------------------------------------------------------------------
-        # Build SOTA-level response structure
+        # Build SOTA-level response structure (consistent with other tools)
         # ------------------------------------------------------------------
 
-        edit_result = {
-            "file_path": str(target_file),
-            "replacements_made": replacements_made,
-            "is_new_file": is_new_file,
-            "file_size_bytes": file_size,
-            "diff_preview": diff_preview[:2000] + "..." if len(diff_preview) > 2000 else diff_preview,
+        # Current timestamp for operation tracking
+        timestamp = datetime.now().isoformat()
+
+        # Build structured LLM content matching other tools' patterns
+        llm_content = {
+            "operation": {
+                "type": "replace",
+                "file_path": str(target_file.relative_to(WORKSPACE_ROOT)),
+                "replacements_made": replacements_made,
+                "expected_replacements": expected_replacements,
+                "is_new_file": is_new_file,
+                "timestamp": timestamp
+            },
+            "edit_result": {
+                "success": True,
+                "content_changed": is_new_file or (current_content != new_content),
+                "size_change_bytes": size_change,
+                "line_change_count": line_change_count
+            },
+            "file_info": {
+                "size_bytes": new_size,
+                "file_type": file_type,
+                "extension": file_extension,
+                "encoding": TEXT_CHARSET_DEFAULT
+            },
+            "diff_info": {
+                "has_diff": has_diff,
+                "diff_preview": diff_preview[:1000] + "..." if len(diff_preview) > 1000 else diff_preview,
+                "diff_size": len(diff_preview)
+            },
+            "validation_info": {
+                "context_validated": expected_replacements == 1,
+                "string_lengths": {
+                    "old": len(old_string),
+                    "new": len(new_string)
+                },
+                "warnings": warnings,
+                "issues_detected": []
+            },
+            "summary": {
+                "operation_type": "new_file_creation" if is_new_file else "text_replacement",
+                "success": True
+            }
         }
 
-        operation_info = {
-            "old_string_length": len(old_string),
-            "new_string_length": len(new_string),
-            "expected_replacements": expected_replacements,
-            "validation_warnings": warnings,
-        }
+        # Add conditional sections based on operation type
+        if not is_new_file:
+            llm_content["diff_info"]["lines_added"] = max(0, line_change_count)
+            llm_content["diff_info"]["lines_removed"] = max(0, -line_change_count)
 
         # Build user-facing message
         if is_new_file:
-            message = f"Created new file: {target_file.name} ({file_size} bytes)"
+            message = f"Created new file: {target_file.name} ({new_size} bytes)"
         else:
             replacements_word = "replacement" if replacements_made == 1 else "replacements"
-            message = f"Successfully modified {target_file.name}: {replacements_made} {replacements_word} made"
+            size_info = f"{'+' if size_change >= 0 else ''}{size_change} bytes"
+            message = f"Successfully modified {target_file.name}: {replacements_made} {replacements_word} made ({size_info})"
 
-        # LLM content matches docstring structure exactly
-        llm_content = {
-            "edit_result": edit_result,
-            "operation_info": operation_info,
+        # Additional data for backend/UI
+        response_data = {
+            "file_path": str(target_file),
+            "relative_path": str(target_file.relative_to(WORKSPACE_ROOT)),
+            "is_new_file": is_new_file,
+            "replacements_made": replacements_made,
+            "size_change": size_change,
+            "line_change_count": line_change_count,
+            "diff_preview": diff_preview,
+            "warnings": warnings,
         }
 
         return _success(
             message,
             llm_content,
-            edit_result=edit_result,
-            operation_info=operation_info,
+            **response_data,
         )
 
     except Exception as exc:
