@@ -153,6 +153,7 @@ def get_llm_config() -> Dict[str, Any]:
     config = {
         "type": settings.type,
         "debug": settings.debug,
+        "recent_messages_length": getattr(settings, "recent_messages_length", 20),
         "chatgpt": {},
         "gemini": {},
         "anthropic": {}

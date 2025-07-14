@@ -4,6 +4,21 @@ This tool provides atomic file reading functionality, focusing exclusively on re
 and analyzing file contents with comprehensive metadata, security controls, and 
 intelligent content processing. It supports text, binary, and multimodal content.
 
+Key Features:
+- Text file reading with encoding detection and intelligent truncation
+- Binary/multimodal file support with base64 encoding for LLM APIs  
+- Comprehensive metadata analysis (language detection, complexity scoring)
+- Enterprise-grade security (path validation, symlink checks)
+- Performance monitoring and optimization insights
+- Structured output format compatible with all LLM clients
+
+Multimodal Support:
+For binary files (images, documents, audio, video), the tool automatically:
+1. Detects file type based on extension and content
+2. Reads and encodes binary data as base64
+3. Returns structured inline_data format: {"inline_data": {"mime_type": str, "data": str}}
+4. Enables LLM clients to create appropriate multimodal message parts
+
 Modeled after gemini-cli's file reading capabilities for consistency and interoperability.
 """
 
@@ -232,7 +247,7 @@ class ReadPerformance:
 @dataclass
 class ProcessingResult:
     """Processing result with metadata."""
-    content: str
+    content: Union[str, Dict[str, Any]]  # 可以是文本内容或结构化的inline_data
     content_format: ContentFormat
     truncated: bool
     truncation_reason: Optional[str]
@@ -650,20 +665,28 @@ def _read_text_content(
             lines_shown=(0, 0),
         )
 
-def _read_binary_content(file_path: Path, force_inline: bool = False) -> ProcessingResult:
-    """Read and process binary content."""
-    file_size = file_path.stat().st_size
+def _read_binary_content(file_path: Path) -> ProcessingResult:
+    """Read and process binary content for multimodal LLM consumption.
     
-    if not force_inline:
-        return ProcessingResult(
-            content=f"Binary file: {file_path.name} ({file_size} bytes)",
-            content_format=ContentFormat.METADATA,
-            truncated=False,
-            truncation_reason=None,
-            original_size=file_size,
-            processed_size=0,
-            lines_shown=(0, 0),
-        )
+    For binary files (images, documents, audio, video), this function:
+    1. Reads the raw binary data 
+    2. Encodes it as base64
+    3. Returns structured inline_data format compatible with LLM multimodal APIs
+    
+    Args:
+        file_path: Path to the binary file to read
+        
+    Returns:
+        ProcessingResult with:
+        - content: Dict with inline_data structure: {"inline_data": {"mime_type": str, "data": str}}
+        - content_format: ContentFormat.INLINE_DATA
+        - Other metadata about the processing
+        
+    The returned structure is specifically designed for LLM APIs that support
+    multimodal content (images, etc.) and will be processed by the client
+    to create appropriate message parts.
+    """
+    file_size = file_path.stat().st_size
     
     if file_size > INLINE_MAX_BYTES:
         return ProcessingResult(
@@ -683,6 +706,7 @@ def _read_binary_content(file_path: Path, force_inline: bool = False) -> Process
         mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
         base64_data = base64.b64encode(binary_data).decode('ascii')
         
+        # 直接返回结构化的inline_data，而不是字符串化
         inline_data = {
             "inline_data": {
                 "mime_type": mime_type,
@@ -691,7 +715,7 @@ def _read_binary_content(file_path: Path, force_inline: bool = False) -> Process
         }
         
         return ProcessingResult(
-            content=str(inline_data),
+            content=inline_data,  # 修复：保持字典结构
             content_format=ContentFormat.INLINE_DATA,
             truncated=False,
             truncation_reason=None,
@@ -716,7 +740,6 @@ def _read_file_safely(
     read_mode: ReadMode = ReadMode.FULL,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
-    force_inline: bool = False,
 ) -> ReadResult:
     """Read file with comprehensive analysis and safety checks."""
     start_time = time.time()
@@ -746,11 +769,11 @@ def _read_file_safely(
         
     elif file_type in [FileType.IMAGE, FileType.DOCUMENT, FileType.AUDIO, FileType.VIDEO]:
         content = ""
-        processing_result = _read_binary_content(file_path, force_inline)
+        processing_result = _read_binary_content(file_path)
         
     else:  # BINARY or UNKNOWN
         content = ""
-        processing_result = _read_binary_content(file_path, force_inline)
+        processing_result = _read_binary_content(file_path)
     
     read_time = time.time() - read_start
     
@@ -810,10 +833,6 @@ def read_file(
         None,
         description="Maximum number of lines to read for text files. Defaults to 5000.",
     ),
-    force_inline: bool = Field(
-        False,
-        description="Force inline embedding of binary files as base64 data (up to 1MB).",
-    ),
     analyze_content: bool = Field(
         True,
         description="Whether to perform detailed content analysis (language detection, complexity scoring, etc.).",
@@ -857,9 +876,34 @@ def read_file(
     }
     ```
     
-    **Optional Sections:**
-    - `truncation_info`: Present when content is truncated
-    - `performance_info`: Present when read is slow
+    **For Binary/Multimodal Files (images, documents, etc.):**
+    ```json
+    {
+      "operation": {
+        "type": "read_file",
+        "path": "logo.png",
+        "read_mode": "full",
+        "truncated": false,
+        "content_format": "inline_data"
+      },
+      "file_info": {
+        "size_bytes": 2048,
+        "file_type": "image",
+        "extension": ".png",
+        "line_count": 0,
+        "encoding": null
+      },
+      "content": {
+        "data": {"inline_data": {"mime_type": "image/png", "data": "iVBORw0KGgo..."}},
+        "format": "inline_data",
+        "lines_shown": [0, 0]
+      },
+      "summary": {
+        "operation_type": "read_file",
+        "success": true
+      }
+    }
+    ```
     
     **Detailed Metadata** (available in data payload for UI/system use):
     - File metadata (size, permissions, timestamps)
@@ -869,10 +913,12 @@ def read_file(
     
     ## Core Functionality
     Reads files with intelligent content processing, comprehensive metadata analysis, and performance monitoring.
+    Supports both text files and binary/multimodal content (images, documents, audio, video) for LLM consumption.
 
     ## Strategic Usage
     Use this tool to **read and analyze files** with rich metadata and intelligent processing.
     Use **read_mode** to control how much content is read.
+    Binary files are automatically encoded as base64 inline_data for multimodal LLM APIs.
 
     ## Reading Modes
     - **Full**: Complete file content (default, respects limits)
@@ -895,8 +941,6 @@ def read_file(
         offset = None
     if isinstance(limit, FieldInfo):
         limit = None
-    if isinstance(force_inline, FieldInfo):
-        force_inline = False
     if isinstance(analyze_content, FieldInfo):
         analyze_content = True
     if isinstance(include_metadata, FieldInfo):
@@ -966,7 +1010,6 @@ def read_file(
             read_mode=read_mode,
             offset=offset,
             limit=limit,
-            force_inline=force_inline,
         )
 
         # Build user-facing message
@@ -1014,22 +1057,6 @@ def read_file(
                 "success": True
             }
         }
-        
-        # Add read-specific metadata if available
-        if result.processing_result.truncated:
-            llm_content["truncation_info"] = {
-                "reason": result.processing_result.truncation_reason,
-                "original_size": result.processing_result.original_size,
-                "processed_size": result.processing_result.processed_size
-            }
-        
-        # Add performance information for optimization insights
-        if result.performance.is_slow:
-            llm_content["performance_info"] = {
-                "read_time": result.performance.read_time,
-                "total_time": result.performance.total_time,
-                "is_slow": result.performance.is_slow
-            }
 
         return _success(
             message,

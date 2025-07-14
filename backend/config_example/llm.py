@@ -86,7 +86,7 @@ class LLMSettings(BaseSettings):
     # 当前使用的LLM类型
     type: Literal["chatgpt", "gemini", "anthropic"] = Field(default="gemini", description="当前使用的LLM类型")
     debug: bool = Field(default=False, description="是否开启调试模式")
-    
+    recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context (recent 消息条数)")
     # 各个LLM的配置 - 使用动态实例化以支持fail fast
     model_config = SettingsConfigDict(
         env_file='.env',

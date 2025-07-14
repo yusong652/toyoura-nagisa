@@ -151,9 +151,49 @@ class GeminiClient(LLMClientBase):
             return "model"
         return "user"
 
+    def _process_inline_data(self, inline_data: Dict[str, Any]) -> Optional[types.Blob]:
+        """
+        处理 inline_data，将 base64 字符串转换为 Gemini API 需要的 Blob 格式。
+        
+        Args:
+            inline_data: 包含 mime_type 和 data 的字典
+            
+        Returns:
+            types.Blob 对象，如果处理失败则返回 None
+        """
+        try:
+            data_field = inline_data['data']
+            mime_type = inline_data.get('mime_type', 'image/png')
+            
+            # 如果数据是字符串（base64），解码为字节
+            if isinstance(data_field, str):
+                import base64 as _b64
+                data_field = _b64.b64decode(data_field)
+            
+            # 确保数据是字节格式
+            if not isinstance(data_field, bytes):
+                print(f"[WARNING] Invalid data format: expected bytes, got {type(data_field)}")
+                return None
+            
+            return types.Blob(mime_type=mime_type, data=data_field)
+            
+        except Exception as e:
+            print(f"[WARNING] Failed to process inline_data: {e}")
+            return None
+
     def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
-        Format messages into Gemini API compatible format.
+        Format messages into Gemini API compatible format with enhanced multimodal support.
+        
+        Handles:
+        - Text messages with thinking blocks
+        - Function calls and tool responses  
+        - Multimodal content (images, documents) from tool outputs
+        - Standard inline_data format and structured tool results
+        
+        For tool responses containing multimodal content, creates separate Parts:
+        1. Image/document Part with decoded binary data
+        2. Function response Part with status information
         
         Args:
             messages: List of BaseMessage objects to format
@@ -206,60 +246,73 @@ class GeminiClient(LLMClientBase):
                 if not tool_name:
                     print(f"[WARNING] Tool response missing name: {msg}")
                     continue
-
-                # Check if the content is image data from read_file
-                is_image = isinstance(msg.content, dict) and 'inline_data' in msg.content
                 
-                if is_image:
-                    image_content = msg.content['inline_data']
-                    data_field = image_content['data']
-                    if isinstance(data_field, str):
-                        try:
-                            import base64 as _b64
-                            data_field = _b64.b64decode(data_field)
-                        except Exception:
-                            pass  # keep as is if decoding fails
-
-                    parts = [
-                        # Part 1: Formal function response confirming execution
-                        types.Part(function_response=types.FunctionResponse(
+                # 优化的多模态内容检测逻辑
+                is_image = False
+                inline_data = None
+                
+                if isinstance(msg.content, dict):
+                    # 检查标准化格式: content.data.inline_data
+                    if (msg.content.get("content", {}).get("format") == "inline_data" and 
+                        isinstance(msg.content.get("content", {}).get("data"), dict) and
+                        "inline_data" in msg.content["content"]["data"]):
+                        is_image = True
+                        inline_data = msg.content["content"]["data"]["inline_data"]
+                    # 检查直接格式: content.inline_data (兼容性)
+                    elif 'inline_data' in msg.content:
+                        is_image = True
+                        inline_data = msg.content['inline_data']
+                
+                if is_image and inline_data:
+                    data_field = inline_data['data']
+                    mime_type = inline_data.get('mime_type', 'image/png')
+                    try:
+                        import base64
+                        image_bytes = base64.b64decode(data_field)
+                        parts = [
+                            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                            types.Part(function_response=types.FunctionResponse(
+                                name=tool_name,
+                                response={'status': 'success', 'content': 'Image file read successfully.'}
+                            ))
+                        ]
+                    except Exception as e:
+                        print(f"[WARNING] Failed to decode inline_data in tool response: {e}")
+                        parts = [types.Part(function_response=types.FunctionResponse(
                             name=tool_name,
-                            response={'status': 'success', 'content': f'Image file read successfully. Content is in the next part.'}
-                        )),
-                        # Part 2: The actual image data, passed as a dictionary.
-                        types.Part(inline_data={
-                            'mime_type': image_content.get('mime_type', 'image/png'),
-                            'data': data_field
-                        })
-                    ]
+                            response={'status': 'error', 'content': 'Failed to decode image data'}
+                        ))]
+                    contents.append({"role": "user", "parts": parts})
+                    continue
                 else:
-                    # Standard handling for other tool responses
                     response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
                     parts = [types.Part(function_response=types.FunctionResponse(
                         name=tool_name,
                         response=response_dict
                     ))]
-
-                contents.append({
-                    "role": "tool",
-                    "parts": parts,
-                })
+                contents.append({"role": "user", "parts": parts})
                 continue
             # 普通消息
             parts = []
             if isinstance(msg.content, list):
                 for item in msg.content:
+                    # 1. 先处理图片内容
+                    if "inline_data" in item:
+                        inline_data = item["inline_data"]
+                        data_field = inline_data["data"]
+                        mime_type = inline_data.get("mime_type", "image/png")
+                        try:
+                            import base64
+                            image_bytes = base64.b64decode(data_field)
+                            parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+                        except Exception as e:
+                            print(f"[WARNING] Failed to decode inline_data: {e}")
+                            continue
+                    # 2. 再处理文本内容
                     if "text" in item:
-                        parts.append({"text": item['text']})
-                    elif "inline_data" in item:
-                        parts.append({
-                            "inline_data": {
-                                "mime_type": item['inline_data'].get('mime_type', 'image/png'),
-                                "data": item['inline_data']['data']
-                            }
-                        })
+                        parts.append(types.Part(text=item["text"]))
             else:
-                parts.append({"text": msg.content})
+                parts.append(types.Part(text=str(msg.content)))
             mapped_role = self.map_role(msg.role)
             contents.append({"role": mapped_role, "parts": parts})
         return contents
@@ -669,16 +722,15 @@ class GeminiClient(LLMClientBase):
                 if isinstance(msg.content, list):
                     for item in msg.content:
                         if "text" in item:
-                            parts.append({"text": item['text']})
+                            parts.append(types.Part(text=item['text']))
                         elif "inline_data" in item:
-                            parts.append({
-                                "inline_data": {
-                                    "mime_type": item['inline_data'].get('mime_type', 'image/png'),
-                                    "data": item['inline_data']['data']
-                                }
-                            })
+                            # 使用统一的 inline_data 处理方法
+                            blob = self._process_inline_data(item['inline_data'])
+                            if blob:
+                                parts.append(types.Part(inline_data=blob))
                 else:
-                    parts.append({"text": msg.content})
+                    # 处理字符串内容
+                    parts.append(types.Part(text=str(msg.content)))
                 # 使用 map_role 函数转换角色名称
                 mapped_role = self.map_role(msg.role)
                 contents.append({"role": mapped_role, "parts": parts})
