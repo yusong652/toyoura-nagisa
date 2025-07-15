@@ -98,9 +98,18 @@ class ToolManager:
         """
         tools = []
         if isinstance(meta_result, dict):
-            # 处理search_tools_by_keywords的结果
-            if "tools" in meta_result and isinstance(meta_result["tools"], list):
-                for tool_info in meta_result["tools"]:
+            # 处理search_tools_by_keywords的结果 - 工具信息在data字段中
+            tools_data = None
+            
+            # 首先检查data字段中的tools（标准ToolResult格式）
+            if "data" in meta_result and isinstance(meta_result["data"], dict):
+                tools_data = meta_result["data"].get("tools", [])
+            # 兼容性：也检查顶层的tools字段（旧格式）
+            elif "tools" in meta_result and isinstance(meta_result["tools"], list):
+                tools_data = meta_result["tools"]
+            
+            if tools_data and isinstance(tools_data, list):
+                for tool_info in tools_data:
                     if isinstance(tool_info, dict) and "name" in tool_info:
                         
                         # 解析 parameters
@@ -261,6 +270,8 @@ class ToolManager:
             cached_tools = self.get_cached_tools_for_session(session_id)
             if debug:
                 print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
+                for tool in cached_tools:
+                    print(f"[DEBUG] Cached tool available: {tool['name']} ({tool.get('category', 'unknown')})")
         
         # 获取所有MCP工具
         mcp_client = self.get_mcp_client(session_id)
@@ -432,13 +443,27 @@ class ToolManager:
                                 except (json.JSONDecodeError, TypeError):
                                     meta_result = {}
                             
+                            if debug:
+                                print(f"[DEBUG] Meta tool result structure: {list(meta_result.keys()) if isinstance(meta_result, dict) else type(meta_result)}")
+                                if isinstance(meta_result, dict) and "data" in meta_result:
+                                    print(f"[DEBUG] Data field keys: {list(meta_result['data'].keys()) if isinstance(meta_result['data'], dict) else type(meta_result['data'])}")
+                            
                             extracted_tools = self.extract_tools_from_meta_result(meta_result)
                             if extracted_tools:
                                 self.cache_tools_for_session(session_id, extracted_tools)
+                                if debug:
+                                    print(f"[DEBUG] Successfully cached {len(extracted_tools)} tools for session {session_id}")
+                                    for tool in extracted_tools:
+                                        print(f"[DEBUG] Cached tool: {tool['name']} ({tool['category']})")
+                            else:
+                                if debug:
+                                    print(f"[DEBUG] No tools extracted from meta result for caching")
 
                         except Exception as e:
                             if debug:
                                 print(f"[DEBUG] Failed to cache tools from meta result: {e}")
+                                import traceback
+                                print(f"[DEBUG] Traceback: {traceback.format_exc()}")
                     
                     return content_for_llm
                     

@@ -39,7 +39,9 @@ class MemoryManager:
         }
         
         if additional_metadata:
-            metadata.update(additional_metadata)
+            # 过滤掉None值，因为ChromaDB不接受None作为metadata值
+            filtered_metadata = {k: v for k, v in additional_metadata.items() if v is not None}
+            metadata.update(filtered_metadata)
             
         return self.memory.store_memory(content, metadata)
     

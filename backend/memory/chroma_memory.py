@@ -45,6 +45,9 @@ class ChromaMemory:
         """
         if metadata is None:
             metadata = {}
+        else:
+            # 过滤掉None值，因为ChromaDB不接受None作为metadata值
+            metadata = {k: v for k, v in metadata.items() if v is not None}
             
         if timestamp is None:
             timestamp = datetime.now().isoformat()
@@ -136,10 +139,13 @@ class ChromaMemory:
                 )
             
             if metadata is not None:
-                self.collection.update(
-                    ids=[memory_id],
-                    metadatas=[metadata]
-                )
+                # 过滤掉None值，因为ChromaDB不接受None作为metadata值
+                filtered_metadata = {k: v for k, v in metadata.items() if v is not None}
+                if filtered_metadata:  # 只在有有效metadata时才更新
+                    self.collection.update(
+                        ids=[memory_id],
+                        metadatas=[filtered_metadata]
+                    )
                 
             return True
         except Exception as e:

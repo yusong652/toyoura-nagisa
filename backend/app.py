@@ -58,6 +58,10 @@ from backend.nagisa_mcp.location_manager import get_location_manager
 # 加载环境变量
 load_dotenv()
 
+# 全局防重复机制
+ACTIVE_REQUESTS: Dict[str, str] = {}  # session_id -> request_id
+ACTIVE_REQUESTS_LOCK = asyncio.Lock()
+
 # WebSocket 连接管理器
 class ConnectionManager:
     def __init__(self):
@@ -252,193 +256,226 @@ async def handle_llm_response(
     tts_engine: BaseTTS
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理 LLM 的响应，包括普通文本回复和工具调用。
-    对于文生图工具，会先生成提示词，然后再调用文生图工具。
-    """
-    llm_response = await llm_client.get_response(recent_msgs, session_id=session_id)
-    print(f"[DEBUG] llm_response type: {llm_response.response_type}")
+    SOTA Enhanced LLM Response Handler - Zero Duplication for Gemini API
     
-    if llm_response.response_type == ResponseType.FUNCTION_CALL:
-        # 创建包含所有工具调用的消息
-        tool_calls_msg = message_factory({
-            "role": "assistant",
-            "content": llm_response.content,
-            "tool_calls": [
-                {
-                    "id": tool_call['id'],
-                    "type": "function",
-                    "function": {
-                        "name": tool_call['name'],
-                        "arguments": json.dumps(tool_call['arguments'])
-                    }
-                }
-                for tool_call in llm_response.tool_calls
-            ]
-        })
-        recent_msgs.append(tool_calls_msg)
+    专为Gemini API设计的响应处理器，确保：
+    1. 单一控制流，零重复调用
+    2. 原子性操作，完整状态管理
+    3. 强力防重复机制
+    4. 最优化的前端通信
+    """
+    # 生成唯一请求ID
+    import uuid
+    request_id = f"REQ_{str(uuid.uuid4())[:8]}"
+    
+    print(f"[REQUEST {request_id}] Starting LLM response handling")
+    print(f"[REQUEST {request_id}] Session: {session_id}, Messages: {len(recent_msgs)}")
+    
+    # 防重复机制 - 检查是否有同会话的活跃请求
+    async with ACTIVE_REQUESTS_LOCK:
+        if session_id in ACTIVE_REQUESTS:
+            existing_request = ACTIVE_REQUESTS[session_id]
+            error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
+            print(f"[REQUEST {request_id}] BLOCKED: {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            return
         
-        # 处理所有工具调用
-        for tool_call in llm_response.tool_calls:
-            # 发送工具使用开始状态
-            tool_state = {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': tool_call['name'],
-                'action_text': f"I'll use the {tool_call['name']} tool to help you."
-            }
-            yield f"data: {json.dumps(tool_state)}\n\n"
-
-            # 特殊处理：如果是get_location工具，先向前端发送位置请求
-            if tool_call['name'] == "get_location":
-                # 发送位置请求信号给前端
-                location_request = {
-                    'type': 'LOCATION_REQUEST',
-                    'payload': {
-                        'session_id': session_id,
-                        'tool_call_id': tool_call['id']
-                    }
-                }
-                yield f"data: {json.dumps(location_request)}\n\n"
-
-            # 处理函数调用结果，传入 session_id
-            tool_result = await llm_client.handle_function_call(tool_call, session_id)
-
-            # --- Handle generate_image tool specially: save image & notify frontend ---
-            # default pass-through
-            tool_response_content = tool_result
-
-            if isinstance(tool_result, dict):
-                if tool_result.get("type") == "image_url" and tool_result.get("image_url"):
-                    image_url = tool_result["image_url"]
-                    # Save to session folder for later retrieval
-                    local_path = save_image_from_url(image_url, session_id)
-
-                    # Notify frontend to refresh session (so it can display the new image)
-                    refresh_signal = {
-                        'type': 'SESSION_REFRESH',
-                        'payload': {
-                            'session_id': session_id,
-                            'message': 'Image generated, please refresh session'
-                        }
-                    }
-                    yield f"data: {json.dumps(refresh_signal)}\n\n"
-
-                    # Mask the raw URL from LLM; provide friendly confirmation instead
-                    tool_response_content = "The image has been generated and saved to your session."
-
-                    # Allow the frontend some time to handle the signal before continuing
-                    await asyncio.sleep(0.5)
-                    
-                elif tool_result.get("type") == "image_base64" and tool_result.get("image"):
-                    print(f"[DEBUG] Handling image_base64 result for session {session_id}")
-                    image_base64 = tool_result["image"]
-                    print(f"[DEBUG] Base64 image data length: {len(image_base64)}")
-                    print(f"[DEBUG] Base64 data preview: {image_base64[:100]}...")
-                    
-                    try:
-                        # Save base64 image to session folder for later retrieval
-                        print("[DEBUG] Calling save_image_from_base64...")
-                        local_path = save_image_from_base64(image_base64, session_id)
-                        print(f"[DEBUG] Image saved successfully to: {local_path}")
-
-                        # Notify frontend to refresh session (so it can display the new image)
-                        refresh_signal = {
-                            'type': 'SESSION_REFRESH',
-                            'payload': {
-                                'session_id': session_id,
-                                'message': 'Image generated, please refresh session'
-                            }
-                        }
-                        yield f"data: {json.dumps(refresh_signal)}\n\n"
-
-                        # Mask the raw base64 data from LLM; provide friendly confirmation instead
-                        tool_response_content = "The image has been generated and saved to your session."
-
-                        # Allow the frontend some time to handle the signal before continuing
-                        await asyncio.sleep(0.5)
-                    except Exception as e:
-                        print(f"[ERROR] Failed to save base64 image: {e}")
-                        import traceback
-                        print(f"[ERROR] Traceback: {traceback.format_exc()}")
-                        tool_response_content = f"Failed to save generated image: {str(e)}"
-                        
-                elif tool_result.get("type") == "error":
-                    error_message = tool_result.get("message", "Unknown error occurred during image generation")
-                    print(f"[ERROR] Image generation tool returned error: {error_message}")
-                    tool_response_content = f"Image generation failed: {error_message}"
-
-            # --- Append tool response message to history ---
-            tool_response_msg = message_factory({
-                "role": "tool",
-                "tool_call_id": tool_call['id'],
-                "name": tool_call['name'],
-                "content": tool_response_content
-            })
-            print(f"[DEBUG] tool_response_msg: {tool_response_msg.model_dump()}")
-            recent_msgs.append(tool_response_msg)
-
-        # 所有工具调用完成后，获取最终响应
-        async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
-            yield chunk
-        return
+        # 注册当前请求
+        ACTIVE_REQUESTS[session_id] = request_id
+        print(f"[REQUEST {request_id}] Registered as active request for session {session_id}")
+    
+    try:
+        # 验证LLM客户端类型 - 只支持GeminiClient
+        if type(llm_client).__name__ != 'GeminiClient':
+            error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Only GeminiClient supported."
+            print(f"[REQUEST {request_id}] ERROR: {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            return
         
-    elif llm_response.response_type == ResponseType.TEXT:
-        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        # 使用新的消息处理器处理AI文本消息，使用原始的history_msgs而不是recent_msgs
-        loaded_history = load_all_message_history(session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-        ai_msg_id, processed_content = process_ai_text_message(
-            llm_response.content,
-            llm_response.keyword,
-            history_msgs,
-            session_id
+        if not hasattr(llm_client, 'execute_tool_calling_sequence'):
+            error_msg = "GeminiClient missing execute_tool_calling_sequence method"
+            print(f"[REQUEST {request_id}] ERROR: {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            return
+        
+        print(f"[REQUEST {request_id}] Executing Gemini tool calling sequence")
+        
+        # 执行SOTA工具调用序列 - 保证零重复
+        final_message, execution_metadata = await llm_client.execute_tool_calling_sequence(
+            recent_msgs, 
+            session_id=session_id,
+            max_iterations=10
         )
-        # 发送消息ID
-        yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
-        # 发送关键词
-        if llm_response.keyword:
-            yield f"data: {json.dumps({'keyword': llm_response.keyword})}\n\n"
-        # 新增：表情/颜文字占位处理
-        text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(processed_content)
-        # 分句用占位符文本
-        sentences = split_text_by_punctuations(text_with_placeholders)
-        for sentence in sentences:
-            tts_text = clean_text_for_tts(sentence)
-            tts_result = await process_tts_sentence(tts_text, tts_engine)
-            if tts_result:
-                tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)  # 确保占位符能正确匹配
-                yield f"data: {json.dumps(tts_result)}\n\n"
-        # ------ 标题生成判断逻辑移动到这里 ------
-        try:
-            loaded_history = load_all_message_history(session_id)
-            history_msgs_after = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-            if should_generate_title(session_id, history_msgs_after):
-                new_title = await generate_title_for_session(session_id, llm_client)
-                if new_title:
-                    update_success = update_session_title(session_id, new_title)
-                    if update_success:
-                        title_update_data = {
-                            'type': 'TITLE_UPDATE',
-                            'payload': {
-                                'session_id': session_id,
-                                'title': new_title
-                            }
-                        }
-                        yield f"data: {json.dumps(title_update_data)}\n\n"
-        except Exception as e:
-            print(f"Title generation failed: {str(e)}")
-            # 在流式响应中，我们只记录错误而不抛出异常
-            error_data = {
-                'type': 'error',
-                'error': f"Title generation failed: {str(e)}"
+        
+        execution_id = execution_metadata.get('execution_id', 'unknown')
+        print(f"[REQUEST {request_id}] Sequence completed. Execution ID: {execution_id}")
+        
+        # 处理工具调用通知
+        tool_calls_executed = execution_metadata.get('tool_calls_executed', 0)
+        if tool_calls_executed > 0:
+            # 发送工具使用通知
+            tool_notification = {
+                'type': 'NAGISA_IS_USING_TOOL',
+                'tool_name': 'gemini_tools',
+                'action_text': f"I used {tool_calls_executed} tools to help you."
             }
-            yield f"data: {json.dumps(error_data)}\n\n"
-    elif llm_response.response_type == ResponseType.ERROR:
+            yield f"data: {json.dumps(tool_notification)}\n\n"
+            
+            # 短暂延迟以便前端处理
+            await asyncio.sleep(0.3)
+        
+        # 发送工具使用结束信号
+        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+        
+        # 处理最终响应内容
+        async for chunk in _process_final_response(
+            final_message, session_id, tts_engine, request_id
+        ):
+            yield chunk
+        
+        # 处理标题生成
+        async for chunk in _handle_title_generation(session_id, llm_client, request_id):
+            yield chunk
+        
+        print(f"[REQUEST {request_id}] Response handling completed successfully")
+        
+    except Exception as e:
+        print(f"[REQUEST {request_id}] CRITICAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {
             'type': 'error',
-            'error': llm_response.content
+            'error': f"LLM response processing failed: {str(e)}"
         }
         yield f"data: {json.dumps(error_data)}\n\n"
+        raise e
+    
+    finally:
+        # 清理活跃请求记录
+        async with ACTIVE_REQUESTS_LOCK:
+            if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
+                del ACTIVE_REQUESTS[session_id]
+                print(f"[REQUEST {request_id}] Cleaned up active request for session {session_id}")
+            else:
+                print(f"[REQUEST {request_id}] WARNING: Session {session_id} not found in active requests during cleanup")
+
+async def _process_final_response(
+    final_message: BaseMessage,
+    session_id: str,
+    tts_engine: BaseTTS,
+    request_id: str
+):
+    """
+    处理最终响应消息 - 原子性操作
+    """
+    print(f"[REQUEST {request_id}] Processing final response")
+    
+    if not hasattr(final_message, 'content'):
+        print(f"[REQUEST {request_id}] No content in final message")
+        return
+    
+    content = final_message.content
+    
+    # 提取文本内容
+    text_content = ""
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict) and item.get('type') == 'text':
+                text_content += item.get('text', '')
+    else:
+        text_content = str(content)
+    
+    if not text_content.strip():
+        print(f"[REQUEST {request_id}] No text content to process")
+        return
+    
+    print(f"[REQUEST {request_id}] Processing text content: {text_content[:100]}...")
+    
+    # 处理AI文本消息
+    loaded_history = load_all_message_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+    
+    ai_msg_id, processed_content = process_ai_text_message(
+        content,
+        getattr(final_message, 'keyword', None),
+        history_msgs,
+        session_id
+    )
+    
+    # 发送消息ID
+    yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
+    
+    # 发送关键词
+    if hasattr(final_message, 'keyword') and final_message.keyword:
+        yield f"data: {json.dumps({'keyword': final_message.keyword})}\n\n"
+    
+    # 处理TTS
+    async for chunk in _process_tts_content(processed_content, tts_engine, request_id):
+        yield chunk
+
+async def _process_tts_content(
+    content: str,
+    tts_engine: BaseTTS,
+    request_id: str
+):
+    """
+    处理TTS内容 - 原子性操作
+    """
+    print(f"[REQUEST {request_id}] Processing TTS content")
+    
+    # 处理表情和颜文字
+    text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
+    
+    # 分句处理
+    sentences = split_text_by_punctuations(text_with_placeholders)
+    
+    for i, sentence in enumerate(sentences):
+        tts_text = clean_text_for_tts(sentence)
+        tts_result = await process_tts_sentence(tts_text, tts_engine)
+        
+        if tts_result:
+            tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)
+            yield f"data: {json.dumps(tts_result)}\n\n"
+            print(f"[REQUEST {request_id}] Sent TTS chunk {i+1}/{len(sentences)}")
+
+async def _handle_title_generation(
+    session_id: str,
+    llm_client: LLMClientBase,
+    request_id: str
+):
+    """
+    处理标题生成 - 原子性操作
+    """
+    try:
+        print(f"[REQUEST {request_id}] Checking title generation eligibility")
+        
+        loaded_history = load_all_message_history(session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+        
+        if should_generate_title(session_id, history_msgs):
+            print(f"[REQUEST {request_id}] Generating title")
+            
+            new_title = await generate_title_for_session(session_id, llm_client)
+            if new_title:
+                update_success = update_session_title(session_id, new_title)
+                if update_success:
+                    title_update_data = {
+                        'type': 'TITLE_UPDATE',
+                        'payload': {
+                            'session_id': session_id,
+                            'title': new_title
+                        }
+                    }
+                    yield f"data: {json.dumps(title_update_data)}\n\n"
+                    print(f"[REQUEST {request_id}] Title generated: {new_title}")
+        else:
+            print(f"[REQUEST {request_id}] Title generation not needed")
+            
+    except Exception as e:
+        print(f"[REQUEST {request_id}] Title generation failed: {e}")
+        # 不抛出异常，标题生成失败不应影响主流程
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):
@@ -454,6 +491,11 @@ async def chat_stream_endpoint(request: Request):
     tts_engine: BaseTTS = request.app.state.tts_engine
     try:
         async def generate():
+            # Generate unique request ID for debugging
+            import uuid
+            request_id = str(uuid.uuid4())[:8]
+            print(f"[DEBUG] API Request {request_id} started - Session: {session_id}")
+            
             yield f"data: {json.dumps({'status': 'sent'})}\n\n"
             try:
                 yield f"data: {json.dumps({'status': 'read'})}\n\n"
@@ -463,9 +505,13 @@ async def chat_stream_endpoint(request: Request):
                 recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
                 recent_messages_length = get_llm_config().get("recent_messages_length", 20)
                 recent_msgs = recent_msgs[-recent_messages_length:]
+                
+                print(f"[DEBUG] API Request {request_id} - Calling handle_llm_response")
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
+                print(f"[DEBUG] API Request {request_id} - handle_llm_response completed")
             except Exception as e:
+                print(f"[ERROR] API Request {request_id} - Exception in generate(): {e}")
                 yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
                 error_data = {
                     'type': 'error',

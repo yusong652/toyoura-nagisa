@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from google import genai
 from google.genai import types
@@ -8,6 +8,7 @@ from backend.config import get_llm_specific_config, get_system_prompt
 from backend.chat.base import LLMClientBase
 from backend.chat.models import BaseMessage, LLMResponse, ResponseType
 from .config import get_gemini_client_config, GeminiClientConfig
+from .context_manager import GeminiContextManager
 from .debug import GeminiDebugger
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
@@ -16,19 +17,29 @@ from .content_generators import TitleGenerator, ImagePromptGenerator
 
 class GeminiClient(LLMClientBase):
     """
-    Google Gemini client implementation using the new google-genai SDK.
+    Enhanced Google Gemini client with original context preservation support.
     
-    Refactored for better code organization with separated concerns:
-    - GeminiDebugger: handles debug output
-    - MessageFormatter: handles message formatting
-    - ResponseProcessor: handles response processing
-    - ToolManager: handles tool management
-    - Content Generators: handle specialized content generation
+    This implementation provides dual-mode operation:
+    1. Legacy mode: Traditional response processing for backward compatibility
+    2. Context-preservation mode: Maintains original API response format for tool calling
+    
+    Key Features:
+    - Original response preservation during tool calling sequences
+    - Thinking chain and validation field integrity
+    - Advanced dual-mode response processing
+    - Comprehensive tool management and execution
+    - Full backward compatibility
+    
+    Components:
+    - GeminiContextManager: Manages dual-track context (working + storage)
+    - ResponseProcessor: Enhanced dual-mode response processing
+    - ToolManager: Advanced MCP tool integration
+    - Content Generators: Specialized content generation utilities
     """
     
     def __init__(self, api_key: str, **kwargs):
         """
-        Initialize Gemini client with component-based architecture.
+        Initialize enhanced Gemini client with context preservation capabilities.
         
         Args:
             api_key: Google API key
@@ -56,7 +67,7 @@ class GeminiClient(LLMClientBase):
         
         self.gemini_config = get_gemini_client_config(**config_overrides)
         
-        print(f"Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
+        print(f"Enhanced Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
         # Initialize component managers
         self.tool_manager = ToolManager(tools_enabled=self.tools_enabled)
@@ -65,9 +76,14 @@ class GeminiClient(LLMClientBase):
         self.response_processor = ResponseProcessor()
         self.title_generator = TitleGenerator()
         self.image_prompt_generator = ImagePromptGenerator()
+        
+        # Remove global context manager to prevent state pollution
+        # Each tool calling sequence will create its own context manager
+        # self.context_manager = GeminiContextManager()  # REMOVED
 
 
-    # Backward compatibility: delegate to component managers
+    # ========== BACKWARD COMPATIBILITY METHODS ==========
+    
     def _get_mcp_client(self, session_id: Optional[str] = None):
         """Backward compatibility method - delegates to ToolManager."""
         return self.tool_manager.get_mcp_client(session_id)
@@ -117,6 +133,12 @@ class GeminiClient(LLMClientBase):
         """Backward compatibility method - delegates to ToolManager."""
         return self.tool_manager.sanitize_jsonschema(schema)
 
+    def convert_mcp_schema_to_gemini(self, schema: dict) -> dict:
+        """Backward compatibility method - delegates to ToolManager."""
+        return self.tool_manager.convert_mcp_schema_to_gemini(schema)
+
+    # ========== CORE API METHODS ==========
+
     async def get_function_call_schemas(self, session_id: Optional[str] = None):
         """
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini tools 格式列表
@@ -125,12 +147,305 @@ class GeminiClient(LLMClientBase):
         debug = self.gemini_config.debug
         return await self.tool_manager.get_function_call_schemas(session_id, debug)
 
+    async def call_api_with_context(
+        self, 
+        context_contents: List[Dict[str, Any]], 
+        session_id: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Direct API call using context contents in original Gemini format.
+        
+        This method preserves the original API response format completely,
+        ensuring no information loss during tool calling sequences.
+        
+        Args:
+            context_contents: Pre-formatted Gemini API context contents
+            session_id: Optional session ID for tool schema retrieval
+            **kwargs: Additional parameters for API configuration
+            
+        Returns:
+            Raw Gemini API response object with all original fields preserved
+            
+        Raises:
+            Exception: If API call fails or returns invalid response
+        """
+        # Get tool schemas for the session
+        tool_schemas = await self.get_function_call_schemas(session_id)
+        tools_enabled = bool(tool_schemas)
+        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
+        debug = self.gemini_config.debug
+        
+        # Build API configuration
+        config_kwargs = self.gemini_config.get_generation_config_kwargs(
+            system_prompt=system_prompt,
+            tool_schemas=tool_schemas
+        )
+        
+        # Apply any kwargs overrides
+        config_kwargs.update(kwargs)
+        config = types.GenerateContentConfig(**config_kwargs)
+
+        if debug:
+            print(f"[DEBUG] API call with {len(context_contents)} context items")
+            GeminiDebugger.print_debug_request(context_contents, config)
+
+        try:
+            # Direct API call with preserved context
+            response = self.client.models.generate_content(
+                model=self.gemini_config.model_settings.model,
+                contents=context_contents,
+                config=config,
+            )
+            
+            # Validate response structure
+            if hasattr(response, 'error'):
+                error_message = f"Gemini API error: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
+                raise Exception(error_message)
+            
+            if not hasattr(response, 'candidates') or not response.candidates:
+                raise Exception("Gemini API returned empty response")
+            
+            if debug:
+                print(f"[DEBUG] API call successful, response received")
+                GeminiDebugger.print_debug_response(response)
+            
+            return response
+                
+        except Exception as e:
+            error_message = f"Gemini API call failed: {str(e)}"
+            if debug:
+                print(f"[DEBUG] {error_message}")
+            raise Exception(error_message)
+
+    async def execute_tool_calling_sequence(
+        self,
+        messages: List[BaseMessage],
+        session_id: Optional[str] = None,
+        max_iterations: int = 10,
+        **kwargs
+    ) -> Tuple[BaseMessage, Dict[str, Any]]:
+        """
+        SOTA Enhanced Tool Calling Sequence - Zero Duplication Guarantee
+        
+        专为Gemini API设计的零重复工具调用序列，采用状态机模式确保：
+        1. 单一控制流，无分支重复
+        2. 原子性操作，状态完全隔离
+        3. 强力防重复机制
+        4. 完整的生命周期管理
+        
+        Args:
+            messages: Input message history
+            session_id: Session ID for tool and context management
+            max_iterations: Maximum number of tool calling iterations
+            **kwargs: Additional API configuration parameters
+            
+        Returns:
+            Tuple of (final_storage_message, execution_metadata)
+        """
+        # === INITIALIZATION PHASE ===
+        execution_id = self._generate_execution_id()
+        debug = self.gemini_config.debug
+        
+        if debug:
+            print(f"[EXECUTION {execution_id}] Starting SOTA tool calling sequence")
+            print(f"[EXECUTION {execution_id}] Session: {session_id}, Input messages: {len(messages)}")
+        
+        # 创建独立的上下文管理器 - 确保状态隔离
+        context_manager = GeminiContextManager()
+        context_manager.initialize_from_messages(messages)
+        
+        # 执行元数据 - 完整追踪
+        metadata = {
+            'execution_id': execution_id,
+            'session_id': session_id,
+            'start_time': self._get_timestamp(),
+            'end_time': None,
+            'iterations': 0,
+            'api_calls': 0,
+            'tool_calls_executed': 0,
+            'thinking_preserved': False,
+            'status': 'running'
+        }
+        
+        try:
+            # === EXECUTION PHASE ===
+            final_response = await self._execute_tool_calling_loop(
+                context_manager, session_id, max_iterations, metadata, debug
+            )
+            
+            # === FINALIZATION PHASE ===
+            metadata['status'] = 'completed'
+            metadata['end_time'] = self._get_timestamp()
+            
+            # 提取思维内容
+            thinking_content = ResponseProcessor.extract_thinking_content(final_response)
+            metadata['thinking_preserved'] = thinking_content is not None
+            
+            if debug:
+                duration = metadata['end_time'] - metadata['start_time']
+                print(f"[EXECUTION {execution_id}] Sequence completed successfully in {duration:.2f}s")
+                print(f"[EXECUTION {execution_id}] Final metadata: {metadata}")
+            
+            # 创建最终存储消息
+            final_message = context_manager.finalize_and_get_storage_message(final_response)
+            
+            return final_message, metadata
+            
+        except Exception as e:
+            metadata['status'] = 'failed'
+            metadata['error'] = str(e)
+            metadata['end_time'] = self._get_timestamp()
+            
+            if debug:
+                print(f"[EXECUTION {execution_id}] Sequence failed: {e}")
+                
+            raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
+    
+    async def _execute_tool_calling_loop(
+        self,
+        context_manager: GeminiContextManager,
+        session_id: Optional[str],
+        max_iterations: int,
+        metadata: Dict[str, Any],
+        debug: bool
+    ) -> Any:
+        """
+        核心工具调用循环 - 状态机实现
+        """
+        execution_id = metadata['execution_id']
+        
+        # 获取初始响应
+        working_contents = context_manager.get_working_contents()
+        current_response = await self.call_api_with_context(
+            working_contents, session_id=session_id
+        )
+        metadata['api_calls'] += 1
+        
+        if debug:
+            print(f"[EXECUTION {execution_id}] Initial API call completed")
+        
+        # 工具调用状态机
+        iteration = 0
+        while iteration < max_iterations:
+            metadata['iterations'] = iteration + 1
+            
+            # 状态检查：是否需要继续工具调用
+            if not ResponseProcessor.should_continue_tool_calling(current_response):
+                if debug:
+                    print(f"[EXECUTION {execution_id}] No tool calls detected, sequence complete")
+                break
+            
+            if debug:
+                print(f"[EXECUTION {execution_id}] Iteration {iteration + 1} starting")
+            
+            # 添加当前响应到上下文
+            context_manager.add_raw_response(current_response)
+            
+            # 提取并执行工具调用
+            tool_calls = ResponseProcessor.extract_tool_calls(current_response)
+            if debug:
+                print(f"[EXECUTION {execution_id}] Executing {len(tool_calls)} tool calls")
+            
+            # 批量执行工具调用
+            for tool_call in tool_calls:
+                metadata['tool_calls_executed'] += 1
+                
+                if debug:
+                    print(f"[EXECUTION {execution_id}] Executing tool: {tool_call['name']}")
+                
+                # 执行单个工具调用
+                tool_result = await self._execute_single_tool_call(
+                    tool_call, session_id, execution_id, debug
+                )
+                
+                # 添加工具响应到上下文
+                context_manager.add_tool_response(
+                    tool_call['name'],
+                    tool_call['id'],
+                    tool_result
+                )
+            
+            # 获取下一轮响应
+            working_contents = context_manager.get_working_contents()
+            current_response = await self.call_api_with_context(
+                working_contents, session_id=session_id
+            )
+            metadata['api_calls'] += 1
+            
+            if debug:
+                print(f"[EXECUTION {execution_id}] Iteration {iteration + 1} completed")
+            
+            iteration += 1
+        
+        # 检查是否达到最大迭代次数
+        if iteration >= max_iterations:
+            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
+        
+        return current_response
+    
+    async def _execute_single_tool_call(
+        self,
+        tool_call: Dict[str, Any],
+        session_id: Optional[str],
+        execution_id: str,
+        debug: bool
+    ) -> Any:
+        """
+        执行单个工具调用 - 原子性操作
+        """
+        try:
+            result = await self.tool_manager.handle_function_call(
+                tool_call, session_id, debug
+            )
+            
+            if debug:
+                print(f"[EXECUTION {execution_id}] Tool {tool_call['name']} executed successfully")
+            
+            return result
+            
+        except Exception as e:
+            error_result = f"Tool execution failed: {str(e)}"
+            
+            if debug:
+                print(f"[EXECUTION {execution_id}] Tool {tool_call['name']} failed: {e}")
+            
+            return error_result
+    
+    def _generate_execution_id(self) -> str:
+        """生成唯一执行ID"""
+        import uuid
+        return f"EXE_{str(uuid.uuid4())[:8]}"
+    
+    def _get_timestamp(self) -> float:
+        """获取时间戳"""
+        import time
+        return time.time()
+
     async def get_response(
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
         **kwargs
     ) -> 'LLMResponse':
+        """
+        [LEGACY] Get response using traditional processing mode.
+        
+        This method maintains full backward compatibility while serving as
+        a bridge to the enhanced context preservation features.
+        
+        For new implementations requiring tool calling with context preservation,
+        consider using execute_tool_calling_sequence() instead.
+        
+        Args:
+            messages: Input message history
+            session_id: Optional session ID for tool management
+            **kwargs: Additional configuration parameters
+            
+        Returns:
+            LLMResponse object in traditional format
+        """
         # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
         tool_schemas = await self.get_function_call_schemas(session_id)
         
@@ -204,6 +519,8 @@ class GeminiClient(LLMClientBase):
                 response_type=ResponseType.ERROR
             )
 
+    # ========== SPECIALIZED CONTENT GENERATION ==========
+
     async def generate_title_from_messages(
         self,
         first_user_message: BaseMessage,
@@ -222,10 +539,6 @@ class GeminiClient(LLMClientBase):
         return TitleGenerator.generate_title_from_messages(
             self.client, first_user_message, first_assistant_message, title_generation_system_prompt
         )
-
-    def convert_mcp_schema_to_gemini(self, schema: dict) -> dict:
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.convert_mcp_schema_to_gemini(schema)
 
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
         """
