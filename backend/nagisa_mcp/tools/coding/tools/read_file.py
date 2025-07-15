@@ -1,23 +1,32 @@
-"""read_file tool – secure file reading with enterprise-grade content analysis and processing.
+"""Comprehensive file reader for coding workflows with extended multimodal support.
 
-This tool provides atomic file reading functionality, focusing exclusively on reading 
-and analyzing file contents with comprehensive metadata, security controls, and 
-intelligent content processing. It supports text, binary, and multimodal content.
+This tool provides intelligent file reading functionality optimized for code files and text documents,
+with comprehensive metadata analysis, security controls, and performance monitoring. It also supports
+binary files (images, documents, audio, video) for multimodal contexts.
 
-Key Features:
-- Text file reading with encoding detection and intelligent truncation
-- Binary/multimodal file support with base64 encoding for LLM APIs  
-- Comprehensive metadata analysis (language detection, complexity scoring)
-- Enterprise-grade security (path validation, symlink checks)
+**Primary Focus:**
+- Code files (.py, .js, .ts, .java, etc.) with language detection and complexity analysis
+- Configuration files (.json, .yaml, .toml, etc.) with structured parsing
+- Documentation files (.md, .txt, .rst, etc.) with content analysis
+- Text files with intelligent encoding detection and truncation
+
+**Extended Support:**
+- Binary files (images, documents, audio, video) processed as separate multimodal Parts
+- Automatic file type detection and appropriate handling
+- Base64 encoding for LLM multimodal consumption (separate from text content)
+
+**Key Features:**
+- Intelligent file type detection and encoding
+- Comprehensive metadata analysis (language, complexity, security)
 - Performance monitoring and optimization insights
+- Security validation and size limits
 - Structured output format compatible with all LLM clients
 
-Multimodal Support:
-For binary files (images, documents, audio, video), the tool automatically:
-1. Detects file type based on extension and content
-2. Reads and encodes binary data as base64
-3. Returns structured inline_data format: {"inline_data": {"mime_type": str, "data": str}}
-4. Enables LLM clients to create appropriate multimodal message parts
+**Security & Performance:**
+- Path validation and symlink security checks
+- File size limits (50MB max, 1MB inline)
+- Performance thresholds and warnings
+- Enterprise-grade security controls
 
 Modeled after gemini-cli's file reading capabilities for consistency and interoperability.
 """
@@ -842,92 +851,58 @@ def read_file(
         description="Whether to include comprehensive file metadata in the response.",
     ),
 ) -> Dict[str, Any]:
-    """Read files with comprehensive analysis, intelligent processing, and enterprise-grade metadata.
+    """Read and analyze files with comprehensive metadata and intelligent processing.
     
-    ## Return Value
-    **For LLM:** Returns structured data with consistent format across all coding tools.
+    **Primary Use:** Read code files, configuration files, and text documents with detailed analysis.
+    **Extended Support:** Also handles images, documents, audio, and video files for multimodal contexts.
     
-    **Structure:**
+    **File Type Detection:**
+    - Text files (.py, .js, .md, .txt, etc.) → text content with encoding detection
+    - Binary files (images, documents, audio, video) → metadata in llm_content, base64 in separate Parts
+    
+    **Return Structure for Text Files:**
     ```json
     {
-      "operation": {
-        "type": "read_file",
-        "path": "example.py",
-        "read_mode": "full",
-        "truncated": false,
-        "content_format": "text"
-      },
-      "file_info": {
-        "size_bytes": 1024,
-        "file_type": "text",
-        "extension": ".py",
-        "line_count": 30,
-        "encoding": "utf-8"
-      },
+      "operation": {"type": "read_file", "path": "example.py", "content_format": "text"},
+      "file_info": {"size_bytes": 1024, "file_type": "text", "extension": ".py"},
       "content": {
-        "data": "def hello_world():\n    print('Hello, World!')\n    return 'success'",
+        "data": "def hello_world():\n    print('Hello, World!')",
         "format": "text",
         "lines_shown": [1, 30]
       },
-      "summary": {
-        "operation_type": "read_file",
-        "success": true
-      }
+      "summary": {"operation_type": "read_file", "success": true}
     }
     ```
     
-    **For Binary/Multimodal Files (images, documents, etc.):**
+    **Return Structure for Binary Files:**
     ```json
     {
-      "operation": {
-        "type": "read_file",
-        "path": "logo.png",
-        "read_mode": "full",
-        "truncated": false,
-        "content_format": "inline_data"
-      },
-      "file_info": {
-        "size_bytes": 2048,
-        "file_type": "image",
-        "extension": ".png",
-        "line_count": 0,
-        "encoding": null
-      },
+      "operation": {"type": "read_file", "path": "image.png", "content_format": "inline_data"},
+      "file_info": {"size_bytes": 2048, "file_type": "image", "extension": ".png"},
       "content": {
-        "data": {"inline_data": {"mime_type": "image/png", "data": "iVBORw0KGgo..."}},
+        "data": {"file_type": "binary", "mime_type": "image/png", "size_bytes": 2048, "multimodal_available": true},
         "format": "inline_data",
         "lines_shown": [0, 0]
       },
-      "summary": {
-        "operation_type": "read_file",
-        "success": true
-      }
+      "summary": {"operation_type": "read_file", "success": true}
     }
     ```
     
-    **Detailed Metadata** (available in data payload for UI/system use):
-    - File metadata (size, permissions, timestamps)
-    - Content analysis (language, complexity, encoding)
-    - Performance metrics (read time, processing speed)
-    - Processing details (truncation, line ranges)
+    **Multimodal Files:** Binary files (images, documents, etc.) return metadata in llm_content
+    and base64 data as separate multimodal Parts in the LLM response. The tool automatically
+    detects file type and handles encoding appropriately.
     
-    ## Core Functionality
-    Reads files with intelligent content processing, comprehensive metadata analysis, and performance monitoring.
-    Supports both text files and binary/multimodal content (images, documents, audio, video) for LLM consumption.
-
-    ## Strategic Usage
-    Use this tool to **read and analyze files** with rich metadata and intelligent processing.
-    Use **read_mode** to control how much content is read.
-    Binary files are automatically encoded as base64 inline_data for multimodal LLM APIs.
-
-    ## Reading Modes
-    - **Full**: Complete file content (default, respects limits)
-    - **Preview**: First 100 lines only for quick inspection
+    **Strategic Usage:**
+    - Use for **code files and text documents** with rich metadata analysis
+    - Use for **binary files** when you need multimodal content in the conversation
+    - Use `read_mode` to control content amount (full/preview/paginated)
+    - Returns structured metadata for all file types
+    
+    **Reading Modes:**
+    - **Full**: Complete file content (default)
+    - **Preview**: First 100 lines for quick inspection
     - **Paginated**: Use offset/limit for large files
-    - **Metadata Only**: File analysis without content reading
-
-    Use `summary` for quick overview, `content_analysis` for detailed file information, and `performance` for optimization insights.
-
+    - **Metadata Only**: File analysis without content
     """
 
     # ------------------------------------------------------------------
@@ -1032,6 +1007,20 @@ def read_file(
         # Build structured LLM content for consistency across tools
         rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
         
+        # Handle content based on file type
+        if result.processing_result.content_format == ContentFormat.INLINE_DATA:
+            # For binary files, don't include base64 data in llm_content
+            # The base64 data will be handled as separate multimodal Parts
+            content_data = {
+                "file_type": "binary",
+                "mime_type": result.content_analysis.mime_type,
+                "size_bytes": result.file_metadata.size,
+                "multimodal_available": True
+            }
+        else:
+            # For text files, include the actual content
+            content_data = result.processing_result.content
+        
         llm_content = {
             "operation": {
                 "type": "read_file",
@@ -1048,7 +1037,7 @@ def read_file(
                 "encoding": result.content_analysis.encoding
             },
             "content": {
-                "data": result.processing_result.content,
+                "data": content_data,
                 "format": result.processing_result.content_format.value,
                 "lines_shown": result.processing_result.lines_shown
             },

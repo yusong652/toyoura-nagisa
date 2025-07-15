@@ -427,49 +427,296 @@ class GeminiClient(LLMClientBase):
 
     def _print_debug_request(self, contents, config):
         print("\n========== Gemini API 请求消息格式 ==========")
+        
+        # 使用model_dump()获取config的字典表示
+        config_dict = config.model_dump()
+        
+        # 创建简化的config用于调试
+        debug_config = self._create_debug_config(config_dict)
+        
         payload = {
             "contents": contents,
-            # "config": config
+            "config": debug_config
         }
         
         payload_to_print = self._censor_payload_for_logging(payload)
-        import pprint
-        pprint.pprint(payload_to_print)
+        
+        # 使用简化的payload打印，避免过长的description影响调试
+        print("\n📝 Simplified Payload (truncated descriptions):")
+        self._print_simplified_payload(payload_to_print, max_desc_length=50)
         print("========== END ==========")
 
     def _print_debug_response(self, response):
-        print("\n========== Gemini API 响应详情 ==========")
+        """
+        打印完整的LLM response用于调试，包括所有candidates和详细内容。
+        """
+        print("\n========== Gemini API 响应格式 ==========")
+        print("🔍 Full LLM Response Structure:")
+        
+        # 打印response基本信息
+        print(f"Response type: {type(response).__name__}")
+        
+        # 检查并打印error信息（如果有）
+        if hasattr(response, 'error') and response.error:
+            print(f"❌ Error: {response.error}")
+            
+        # 检查并打印candidates
         if hasattr(response, 'candidates') and response.candidates:
-            candidate = response.candidates[0]
-            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                for part in candidate.content.parts:
-                    if not getattr(part, 'text', None):
-                        continue
-                    if getattr(part, 'thought', False):
-                        print("\n## **Thoughts summary:**")
-                        print(part.text)
-                        print()
+            print(f"📋 Candidates count: {len(response.candidates)}")
+            
+            for i, candidate in enumerate(response.candidates):
+                print(f"\n--- Candidate {i+1} ---")
+                
+                # 打印candidate基本信息
+                if hasattr(candidate, 'index'):
+                    print(f"  Index: {candidate.index}")
+                if hasattr(candidate, 'finish_reason'):
+                    print(f"  Finish reason: {candidate.finish_reason}")
+                
+                # 打印top-level thought（如果有）
+                if hasattr(candidate, 'thought') and candidate.thought:
+                    thought_preview = candidate.thought[:100] + "..." if len(candidate.thought) > 100 else candidate.thought
+                    print(f"  💭 Top-level thought: {repr(thought_preview)}")
+                
+                # 打印content和parts
+                if hasattr(candidate, 'content') and candidate.content:
+                    content = candidate.content
+                    print(f"  📝 Content type: {type(content).__name__}")
+                    
+                    if hasattr(content, 'parts') and content.parts:
+                        print(f"  🧩 Parts count: {len(content.parts)}")
+                        
+                        for j, part in enumerate(content.parts):
+                            print(f"    Part {j+1}: {type(part).__name__}")
+                            
+                            # 检查text content
+                            if hasattr(part, 'text') and part.text:
+                                text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
+                                is_thought = getattr(part, 'thought', False)
+                                thought_indicator = " (THOUGHT)" if is_thought else ""
+                                print(f"      📄 Text{thought_indicator}: {repr(text_preview)}")
+                            
+                            # 检查function call
+                            if hasattr(part, 'function_call') and part.function_call:
+                                func_call = part.function_call
+                                print(f"      🔧 Function call:")
+                                print(f"        Name: {func_call.name}")
+                                if hasattr(func_call, 'id'):
+                                    print(f"        ID: {func_call.id}")
+                                if hasattr(func_call, 'args') and func_call.args:
+                                    print(f"        Args: {func_call.args}")
+                                elif hasattr(func_call, 'arguments') and func_call.arguments:
+                                    print(f"        Arguments: {func_call.arguments}")
+                            
+                            # 检查其他part类型
+                            if not (hasattr(part, 'text') or hasattr(part, 'function_call')):
+                                # 使用JSON格式显示part的所有属性
+                                try:
+                                    import json
+                                    part_dict = {}
+                                    for attr in dir(part):
+                                        if not attr.startswith('_'):
+                                            try:
+                                                value = getattr(part, attr)
+                                                if not callable(value):
+                                                    part_dict[attr] = str(value) if value is not None else None
+                                            except:
+                                                pass
+                                    part_json = json.dumps(part_dict, indent=6, ensure_ascii=False, default=str)
+                                    print(f"      🔍 Part attributes: {part_json}")
+                                except:
+                                    print(f"      🔍 Part attributes: {part}")
+                else:
+                    print(f"  ❌ No content found in candidate")
+        else:
+            print("❌ No candidates found in response")
+        
+        # 打印response的其他属性
+        print(f"\n🔍 Response attributes:")
+        try:
+            import json
+            response_attrs = {}
+            # 需要跳过的Pydantic内部属性和其他已处理的属性
+            skip_attrs = {
+                'candidates', 'error', 'model_computed_fields', 'model_fields', 
+                'model_config', 'model_fields_set', 'model_extra', 'model_dump',
+                'model_dump_json', 'model_copy', 'model_validate', 'model_validate_json'
+            }
+            
+            for attr in dir(response):
+                if (not attr.startswith('_') and 
+                    attr not in skip_attrs and 
+                    not attr.startswith('model_')):
+                    try:
+                        value = getattr(response, attr)
+                        if not callable(value):
+                            response_attrs[attr] = str(value) if value is not None else None
+                    except Exception:
+                        # 跳过无法访问的属性
+                        pass
+                        
+            if response_attrs:
+                attrs_json = json.dumps(response_attrs, indent=2, ensure_ascii=False, default=str)
+                print(attrs_json)
+            else:
+                print("No additional attributes found")
+        except Exception as e:
+            print(f"Failed to extract response attributes: {e}")
+        
+        print("========== END RESPONSE ==========")
+
+    def _create_debug_config(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a debug-friendly version of the config by truncating long fields.
+        """
+        debug_config = {}
+        
+        for key, value in config_dict.items():
+            if key == "system_instruction":
+                # Truncate system instruction
+                if isinstance(value, str):
+                    debug_config[key] = self._truncate_text_for_debug(value, max_length=200, field_name="system_instruction")
+                else:
+                    debug_config[key] = value
+            elif key == "tools":
+                # Process tools array to truncate descriptions
+                if isinstance(value, list):
+                    debug_config[key] = self._process_tools_for_debug(value)
+                else:
+                    debug_config[key] = value
+            else:
+                # Keep other fields as-is
+                debug_config[key] = value
+        
+        return debug_config
+
+    def _process_tools_for_debug(self, tools: list) -> list:
+        """
+        Process tools array to truncate long descriptions for debug output.
+        """
+        processed_tools = []
+        
+        for tool in tools:
+            if isinstance(tool, dict):
+                processed_tool = tool.copy()
+                
+                # Process function_declarations if present
+                if 'function_declarations' in processed_tool and isinstance(processed_tool['function_declarations'], list):
+                    processed_declarations = []
+                    
+                    for func_decl in processed_tool['function_declarations']:
+                        if isinstance(func_decl, dict):
+                            processed_decl = func_decl.copy()
+                            
+                            # Truncate description
+                            if 'description' in processed_decl and isinstance(processed_decl['description'], str):
+                                original_desc = processed_decl['description']
+                                processed_decl['description'] = self._truncate_text_for_debug(
+                                    original_desc, 
+                                    max_length=100, 
+                                    field_name=f"function '{func_decl.get('name', 'unknown')}' description"
+                                )
+                            
+                            # Process parameters if they contain descriptions
+                            if 'parameters' in processed_decl and isinstance(processed_decl['parameters'], dict):
+                                processed_decl['parameters'] = self._process_parameters_for_debug(processed_decl['parameters'])
+                            
+                            processed_declarations.append(processed_decl)
+                        else:
+                            processed_declarations.append(func_decl)
+                    
+                    processed_tool['function_declarations'] = processed_declarations
+                
+                processed_tools.append(processed_tool)
+            else:
+                # If tool is not a dict (might be a Pydantic model), convert to string representation
+                processed_tools.append(f"<{type(tool).__name__} object>")
+        
+        return processed_tools
+
+    def _process_parameters_for_debug(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process parameters dict to truncate descriptions in properties.
+        """
+        processed_params = parameters.copy()
+        
+        if 'properties' in processed_params and isinstance(processed_params['properties'], dict):
+            processed_properties = {}
+            
+            for prop_name, prop_value in processed_params['properties'].items():
+                if isinstance(prop_value, dict):
+                    processed_prop = prop_value.copy()
+                    
+                    # Truncate description in property
+                    if 'description' in processed_prop and isinstance(processed_prop['description'], str):
+                        original_desc = processed_prop['description']
+                        processed_prop['description'] = self._truncate_text_for_debug(
+                            original_desc,
+                            max_length=80,
+                            field_name=f"parameter '{prop_name}' description"
+                        )
+                    
+                    processed_properties[prop_name] = processed_prop
+                else:
+                    processed_properties[prop_name] = prop_value
+            
+            processed_params['properties'] = processed_properties
+        
+        return processed_params
+
+    def _truncate_text_for_debug(self, text: str, max_length: int = 100, field_name: str = "text") -> str:
+        """
+        Truncate text for debug output with informative truncation message.
+        Converts multiline text to single line for better readability.
+        """
+        if len(text) <= max_length:
+            # Still convert to single line even if no truncation needed
+            return ' '.join(text.split())
+        
+        # Convert multiline to single line by replacing newlines with spaces
+        single_line_text = ' '.join(text.split())
+        
+        # Extract key information from the beginning
+        truncated = single_line_text[:max_length-20] + f"... [truncated {field_name}: {len(text)} chars total]"
+        return truncated
+
+    def _print_simplified_payload(self, payload: Dict[str, Any], max_desc_length: int = 60):
+        """
+        打印简化的payload，使用JSON格式确保单行显示，避免pprint的自动换行。
+        现在payload已经在_create_debug_config中被预处理过，这里主要做最终的格式化输出。
+        """
+        # 由于payload已经在_create_debug_config中被预处理，
+        # 这里只需要处理一些可能遗漏的递归结构
+        def final_cleanup(obj):
+            """最终清理，确保没有遗漏的长字段"""
+            if isinstance(obj, dict):
+                result = {}
+                for key, value in obj.items():
+                    if isinstance(value, str) and len(value) > 300:
+                        # 对任何仍然过长的字符串进行最终截断
+                        result[key] = self._truncate_text_for_debug(value, max_length=100, field_name=f"field '{key}'")
+                    elif isinstance(value, (dict, list)):
+                        result[key] = final_cleanup(value)
                     else:
-                        print("\n## **Answer:**")
-                        print(part.text)
-                        print()
-                    # 代码相关内容依然保留
-                    if hasattr(part, 'executable_code') and part.executable_code:
-                        print("\n可执行代码:")
-                        print(f"```python\n{part.executable_code.code}\n```")
-                        print("---")
-                    if hasattr(part, 'code_execution_result') and part.code_execution_result:
-                        print("\n代码执行结果:")
-                        print(f"```{part.code_execution_result.output}\n```")
-                        print("---")
-        # 打印 token 使用情况
-        if hasattr(response, 'usage_metadata'):
-            print("\nToken 使用情况:")
-            print(f"Prompt Tokens: {response.usage_metadata.prompt_token_count}")
-            print(f"Thoughts Tokens: {getattr(response.usage_metadata, 'thoughts_token_count', '-')}")
-            print(f"Output Tokens: {getattr(response.usage_metadata, 'candidates_token_count', '-')}")
-            print(f"Total Tokens: {response.usage_metadata.total_token_count}")
-        print("========== END ==========")
+                        result[key] = value
+                return result
+            elif isinstance(obj, list):
+                return [final_cleanup(item) for item in obj]
+            else:
+                return obj
+        
+        cleaned_payload = final_cleanup(payload)
+        
+        # 使用JSON dumps代替pprint，确保description等字段单行显示
+        import json
+        try:
+            # 使用indent=2进行美观格式化，但避免pprint的自动文本换行
+            json_output = json.dumps(cleaned_payload, indent=2, ensure_ascii=False, default=str)
+            print(json_output)
+        except (TypeError, ValueError) as e:
+            # 如果JSON序列化失败，回退到基本字符串表示
+            print(f"Debug payload (JSON serialization failed: {e}):")
+            print(str(cleaned_payload))
 
     async def get_function_call_schemas(self, session_id: Optional[str] = None):
         """
@@ -576,20 +823,6 @@ class GeminiClient(LLMClientBase):
         if function_declarations:
             tools.append(types.Tool(function_declarations=function_declarations))
         
-        if debug:
-            print(f"[DEBUG] tools from get_function_call_schemas: {len(tools)} tools")
-            # 打印tool schemas详情
-            print(f"[DEBUG] Tool schemas for session {session_id}:")
-            for i, tool in enumerate(tools):
-                if hasattr(tool, 'function_declarations'):
-                    for func_decl in tool.function_declarations:
-                        name = getattr(func_decl, 'name', str(func_decl))
-                        desc = getattr(func_decl, 'description', 'No description')
-                        print(f"  {i+1}. {name}: {desc}")
-                else:
-                    print(f"  {i+1}. {tool}")
-            print()
-        
         return tools
 
     async def get_response(
@@ -605,12 +838,6 @@ class GeminiClient(LLMClientBase):
         system_prompt = get_system_prompt(tools_enabled=tools_enabled)
         
         debug = self.extra_config.get('debug', False)
-        if debug:
-            print(f"[DEBUG] 当前 session_tool_cache: {self.session_tool_cache}")
-            print(f"[DEBUG] tools from get_function_call_schemas: {len(tool_schemas)} tools")
-            print(f"[DEBUG] Tool schemas for session {session_id}:")
-            import pprint; pprint.pprint(tool_schemas)
-            print()
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = self._format_messages_for_gemini(messages)
@@ -635,12 +862,6 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=config,
             )
-            if self.extra_config.get('debug', False):
-                print("[Gemini] Raw response:")
-                import pprint; pprint.pprint(response) 
-            
-            if self.extra_config.get('debug', False):
-                self._print_debug_response(response)
             
             # 检查响应中是否有错误
             if hasattr(response, 'error'):
@@ -661,6 +882,10 @@ class GeminiClient(LLMClientBase):
                     content=error_message,
                     response_type=ResponseType.ERROR
                 )
+            
+            # Debug输出完整的LLM response
+            if debug:
+                self._print_debug_response(response)
             
             return self._format_llm_response(response)
                 
@@ -821,6 +1046,23 @@ class GeminiClient(LLMClientBase):
                             "is_error": True
                         }
                     
+                    # Extract llm_content for meta tools (same as normal tools)
+                    content_for_llm = text_result
+                    if isinstance(text_result, dict):
+                        # If it's our standard ToolResult, extract the specific llm_content part
+                        if 'llm_content' in text_result:
+                            content_for_llm = text_result['llm_content']
+                        
+                        # Check for error status in the standard ToolResult
+                        if text_result.get("status") == "error":
+                            return {
+                                "type": "tool_result",
+                                "tool_use_id": tool_id,
+                                "name": tool_name,
+                                "content": text_result.get("message", "Tool execution failed."),
+                                "is_error": True
+                            }
+                    
                     # Cache meta results
                     if tool_name == "search_tools_by_keywords" and session_id:
                         try:
@@ -841,7 +1083,7 @@ class GeminiClient(LLMClientBase):
                             if debug:
                                 print(f"[DEBUG] Failed to cache tools from meta result: {e}")
                     
-                    return text_result
+                    return content_for_llm
                     
             except Exception as e:
                 if debug:
@@ -969,9 +1211,7 @@ class GeminiClient(LLMClientBase):
                 contents=contents,
                 config=prompt_config
             )
-            if debug:
-                print("[Gemini][text_to_image] Raw response:")
-                pprint.pprint(response)
+
             if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
                 prompt_text = response.candidates[0].content.parts[0].text
                 text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
@@ -1078,4 +1318,8 @@ class GeminiClient(LLMClientBase):
             cleaned["required"] = list(cleaned["properties"].keys())
 
         return cleaned
+
+
+
+
 
