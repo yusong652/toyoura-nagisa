@@ -219,7 +219,7 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] {error_message}")
             raise Exception(error_message)
 
-    async def execute_tool_calling_sequence(
+    async def get_enhanced_response(
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
@@ -227,18 +227,21 @@ class GeminiClient(LLMClientBase):
         **kwargs
     ) -> Tuple[BaseMessage, Dict[str, Any]]:
         """
-        SOTA Enhanced Tool Calling Sequence - Zero Duplication Guarantee
+        Enhanced LLM Response Handler - Universal Request Processor
         
-        专为Gemini API设计的零重复工具调用序列，采用状态机模式确保：
-        1. 单一控制流，无分支重复
-        2. 原子性操作，状态完全隔离
-        3. 强力防重复机制
-        4. 完整的生命周期管理
+        专为Gemini API设计的统一响应处理器，采用状态机模式支持：
+        1. 普通文本对话处理
+        2. 智能工具调用序列
+        3. 完整的生命周期管理
+        4. 详细的执行元数据
+        
+        此方法能够处理所有类型的LLM请求，自动检测是否需要工具调用，
+        并在需要时执行完整的多轮工具调用序列。
         
         Args:
             messages: Input message history
             session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations
+            max_iterations: Maximum number of tool calling iterations (for tool calls)
             **kwargs: Additional API configuration parameters
             
         Returns:
@@ -419,8 +422,8 @@ class GeminiClient(LLMClientBase):
         This method maintains full backward compatibility while serving as
         a bridge to the enhanced context preservation features.
         
-        For new implementations requiring tool calling with context preservation,
-        consider using execute_tool_calling_sequence() instead.
+        For new implementations requiring enhanced response handling with
+        automatic tool calling support, consider using get_enhanced_response() instead.
         
         Args:
             messages: Input message history

@@ -290,15 +290,15 @@ async def handle_llm_response(
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
-        if not hasattr(llm_client, 'execute_tool_calling_sequence'):
-            error_msg = "GeminiClient missing execute_tool_calling_sequence method"
+        if not hasattr(llm_client, 'get_enhanced_response'):
+            error_msg = "GeminiClient missing get_enhanced_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
 
         
-        # 执行SOTA工具调用序列 - 保证零重复
-        final_message, execution_metadata = await llm_client.execute_tool_calling_sequence(
+        # 执行增强响应处理 - 支持普通对话和工具调用
+        final_message, execution_metadata = await llm_client.get_enhanced_response(
             recent_msgs, 
             session_id=session_id,
             max_iterations=10

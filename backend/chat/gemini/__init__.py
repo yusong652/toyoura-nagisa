@@ -29,7 +29,7 @@ Enhanced Architecture:
 Usage Patterns:
 1. Legacy mode: `client.get_response(messages)` - Traditional processing
 2. Context-preservation mode: `client.get_response_with_context_preservation(messages)` - Raw response + context manager
-3. Complete tool calling: `client.execute_tool_calling_sequence(messages)` - Full workflow with metadata
+3. Enhanced mode: `client.get_enhanced_response(messages)` - Universal handler for all request types with metadata
 """
 
 from .client import GeminiClient
