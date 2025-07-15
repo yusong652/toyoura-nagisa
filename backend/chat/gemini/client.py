@@ -7,6 +7,7 @@ from google.genai import types
 from backend.config import get_llm_specific_config, get_system_prompt
 from backend.chat.base import LLMClientBase
 from backend.chat.models import BaseMessage, LLMResponse, ResponseType
+from .config import get_gemini_client_config, GeminiClientConfig
 from .debug import GeminiDebugger
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
@@ -35,26 +36,27 @@ class GeminiClient(LLMClientBase):
         """
         super().__init__(**kwargs)
         self.client = genai.Client(api_key=api_key)
-        self.safety_settings = [
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                "threshold": types.HarmBlockThreshold.BLOCK_NONE
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                "threshold": types.HarmBlockThreshold.BLOCK_NONE
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                "threshold": types.HarmBlockThreshold.BLOCK_NONE
-            },
-            {
-                "category": types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                "threshold": types.HarmBlockThreshold.BLOCK_NONE
-            }
-        ]
         
-        print(f"Gemini Client initialized with model: {self.extra_config.get('model', 'gemini-1.5-flash-latest')}")
+        # Initialize Gemini-specific configuration
+        config_overrides = {}
+        
+        # 从 extra_config 中提取相关配置进行覆盖
+        if 'model' in self.extra_config:
+            config_overrides['model_settings'] = {'model': self.extra_config['model']}
+        if 'temperature' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
+        if 'max_output_tokens' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['max_output_tokens'] = self.extra_config['max_output_tokens']
+        if 'debug' in self.extra_config:
+            config_overrides['debug'] = self.extra_config['debug']
+        
+        self.gemini_config = get_gemini_client_config(**config_overrides)
+        
+        print(f"Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
         # Initialize component managers
         self.tool_manager = ToolManager(tools_enabled=self.tools_enabled)
@@ -120,7 +122,7 @@ class GeminiClient(LLMClientBase):
         获取所有 MCP 工具的 schema，供 LLM function call 注册用，返回 Gemini tools 格式列表
         只返回 meta tools + cached tools，不返回所有 regular tools。
         """
-        debug = self.extra_config.get('debug', False)
+        debug = self.gemini_config.debug
         return await self.tool_manager.get_function_call_schemas(session_id, debug)
 
     async def get_response(
@@ -135,19 +137,14 @@ class GeminiClient(LLMClientBase):
         tools_enabled = bool(tool_schemas)
         system_prompt = get_system_prompt(tools_enabled=tools_enabled)
         
-        debug = self.extra_config.get('debug', False)
+        debug = self.gemini_config.debug
 
         # 2. 构造 Gemini API payload，注册 tools
         contents = MessageFormatter.format_messages_for_gemini(messages)
-        config_kwargs = dict(
-            system_instruction=system_prompt,
-            safety_settings=self.safety_settings,
-            temperature=self.extra_config.get('temperature', 2.0),
-            max_output_tokens=self.extra_config.get('max_output_tokens', 4096),
-            tools=tool_schemas,
+        config_kwargs = self.gemini_config.get_generation_config_kwargs(
+            system_prompt=system_prompt,
+            tool_schemas=tool_schemas
         )
-        if self.extra_config.get('model', "").startswith("gemini-2.5"):
-            config_kwargs["thinking_config"] = types.ThinkingConfig(include_thoughts=True)
         config = types.GenerateContentConfig(**config_kwargs)
 
         if debug:
@@ -156,7 +153,7 @@ class GeminiClient(LLMClientBase):
         try:
             # For GenerativeModel, we call generate_content directly on the model instance
             response = self.client.models.generate_content(
-                model=self.extra_config.get('model', "gemini-2.0-flash-lite"),
+                model=self.gemini_config.model_settings.model,
                 contents=contents,
                 config=config,
             )
@@ -236,7 +233,7 @@ class GeminiClient(LLMClientBase):
         function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
         session_id: 可选的会话ID，用于需要会话上下文的工具（如文生图）
         """
-        debug = self.extra_config.get('debug', False)
+        debug = self.gemini_config.debug
         return await self.tool_manager.handle_function_call(function_call, session_id, debug)
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
@@ -249,5 +246,5 @@ class GeminiClient(LLMClientBase):
         Returns:
             Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
         """
-        debug = self.extra_config.get('debug', False)
+        debug = self.gemini_config.debug
         return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug) 
