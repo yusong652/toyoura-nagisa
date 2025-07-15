@@ -268,37 +268,34 @@ async def handle_llm_response(
     import uuid
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
     
-    print(f"[REQUEST {request_id}] Starting LLM response handling")
-    print(f"[REQUEST {request_id}] Session: {session_id}, Messages: {len(recent_msgs)}")
+
     
     # 防重复机制 - 检查是否有同会话的活跃请求
     async with ACTIVE_REQUESTS_LOCK:
         if session_id in ACTIVE_REQUESTS:
             existing_request = ACTIVE_REQUESTS[session_id]
             error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
-            print(f"[REQUEST {request_id}] BLOCKED: {error_msg}")
+
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
         # 注册当前请求
         ACTIVE_REQUESTS[session_id] = request_id
-        print(f"[REQUEST {request_id}] Registered as active request for session {session_id}")
+
     
     try:
         # 验证LLM客户端类型 - 只支持GeminiClient
         if type(llm_client).__name__ != 'GeminiClient':
             error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Only GeminiClient supported."
-            print(f"[REQUEST {request_id}] ERROR: {error_msg}")
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
         if not hasattr(llm_client, 'execute_tool_calling_sequence'):
             error_msg = "GeminiClient missing execute_tool_calling_sequence method"
-            print(f"[REQUEST {request_id}] ERROR: {error_msg}")
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
-        print(f"[REQUEST {request_id}] Executing Gemini tool calling sequence")
+
         
         # 执行SOTA工具调用序列 - 保证零重复
         final_message, execution_metadata = await llm_client.execute_tool_calling_sequence(
@@ -307,8 +304,6 @@ async def handle_llm_response(
             max_iterations=10
         )
         
-        execution_id = execution_metadata.get('execution_id', 'unknown')
-        print(f"[REQUEST {request_id}] Sequence completed. Execution ID: {execution_id}")
         
         # 处理工具调用通知
         tool_calls_executed = execution_metadata.get('tool_calls_executed', 0)
@@ -337,10 +332,10 @@ async def handle_llm_response(
         async for chunk in _handle_title_generation(session_id, llm_client, request_id):
             yield chunk
         
-        print(f"[REQUEST {request_id}] Response handling completed successfully")
+
         
     except Exception as e:
-        print(f"[REQUEST {request_id}] CRITICAL ERROR: {e}")
+
         import traceback
         traceback.print_exc()
         
@@ -357,9 +352,7 @@ async def handle_llm_response(
         async with ACTIVE_REQUESTS_LOCK:
             if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
                 del ACTIVE_REQUESTS[session_id]
-                print(f"[REQUEST {request_id}] Cleaned up active request for session {session_id}")
-            else:
-                print(f"[REQUEST {request_id}] WARNING: Session {session_id} not found in active requests during cleanup")
+
 
 async def _process_final_response(
     final_message: BaseMessage,
@@ -370,10 +363,9 @@ async def _process_final_response(
     """
     处理最终响应消息 - 原子性操作
     """
-    print(f"[REQUEST {request_id}] Processing final response")
+
     
     if not hasattr(final_message, 'content'):
-        print(f"[REQUEST {request_id}] No content in final message")
         return
     
     content = final_message.content
@@ -388,10 +380,9 @@ async def _process_final_response(
         text_content = str(content)
     
     if not text_content.strip():
-        print(f"[REQUEST {request_id}] No text content to process")
         return
     
-    print(f"[REQUEST {request_id}] Processing text content: {text_content[:100]}...")
+
     
     # 处理AI文本消息
     loaded_history = load_all_message_history(session_id)
@@ -423,7 +414,6 @@ async def _process_tts_content(
     """
     处理TTS内容 - 原子性操作
     """
-    print(f"[REQUEST {request_id}] Processing TTS content")
     
     # 处理表情和颜文字
     text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
@@ -438,7 +428,6 @@ async def _process_tts_content(
         if tts_result:
             tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)
             yield f"data: {json.dumps(tts_result)}\n\n"
-            print(f"[REQUEST {request_id}] Sent TTS chunk {i+1}/{len(sentences)}")
 
 async def _handle_title_generation(
     session_id: str,
@@ -449,13 +438,11 @@ async def _handle_title_generation(
     处理标题生成 - 原子性操作
     """
     try:
-        print(f"[REQUEST {request_id}] Checking title generation eligibility")
         
         loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
         
         if should_generate_title(session_id, history_msgs):
-            print(f"[REQUEST {request_id}] Generating title")
             
             new_title = await generate_title_for_session(session_id, llm_client)
             if new_title:
@@ -469,13 +456,10 @@ async def _handle_title_generation(
                         }
                     }
                     yield f"data: {json.dumps(title_update_data)}\n\n"
-                    print(f"[REQUEST {request_id}] Title generated: {new_title}")
-        else:
-            print(f"[REQUEST {request_id}] Title generation not needed")
             
     except Exception as e:
-        print(f"[REQUEST {request_id}] Title generation failed: {e}")
         # 不抛出异常，标题生成失败不应影响主流程
+        pass
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):

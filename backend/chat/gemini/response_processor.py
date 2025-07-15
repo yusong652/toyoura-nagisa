@@ -13,6 +13,7 @@ during multi-turn tool calling while ensuring proper storage format compatibilit
 
 from typing import List, Dict, Any, Optional, Tuple, Union
 from backend.chat.models import LLMResponse, ResponseType, BaseMessage, message_factory
+from .constants import PYDANTIC_METADATA_ATTRS
 from backend.chat.utils import parse_llm_output
 
 
@@ -122,8 +123,11 @@ class ResponseProcessor:
             
             # Validation fields detection
             validation_fields = []
+            
             for attr in dir(candidate):
-                if not attr.startswith('_') and hasattr(candidate, attr):
+                if (not attr.startswith('_') and 
+                    attr not in PYDANTIC_METADATA_ATTRS and 
+                    hasattr(candidate, attr)):
                     try:
                         value = getattr(candidate, attr)
                         if not callable(value) and attr not in ['content', 'parts']:
@@ -221,8 +225,11 @@ class ResponseProcessor:
                     
                     # Extract metadata for context preservation
                     metadata = {}
+                    
                     for attr in dir(func_call):
-                        if not attr.startswith('_') and attr not in ['name', 'args', 'arguments', 'id']:
+                        if (not attr.startswith('_') and 
+                            attr not in ['name', 'args', 'arguments', 'id'] and
+                            attr not in PYDANTIC_METADATA_ATTRS):
                             try:
                                 value = getattr(func_call, attr)
                                 if not callable(value):
@@ -359,7 +366,9 @@ class ResponseProcessor:
                 
                 # Extract candidate-level validation fields
                 for attr in dir(candidate):
-                    if not attr.startswith('_') and attr not in ['content']:
+                    if (not attr.startswith('_') and 
+                        attr not in ['content'] and 
+                        attr not in PYDANTIC_METADATA_ATTRS):
                         try:
                             value = getattr(candidate, attr)
                             if not callable(value):
@@ -370,8 +379,11 @@ class ResponseProcessor:
                 # Extract content metadata
                 if hasattr(candidate, 'content'):
                     content = candidate.content
+                    
                     for attr in dir(content):
-                        if not attr.startswith('_') and attr not in ['parts']:
+                        if (not attr.startswith('_') and 
+                            attr not in ['parts'] and
+                            attr not in PYDANTIC_METADATA_ATTRS):
                             try:
                                 value = getattr(content, attr)
                                 if not callable(value):
@@ -383,8 +395,11 @@ class ResponseProcessor:
                     if hasattr(content, 'parts'):
                         for i, part in enumerate(content.parts):
                             part_meta = {'index': i, 'type': type(part).__name__}
+                            
                             for attr in dir(part):
-                                if not attr.startswith('_') and attr not in ['text', 'function_call']:
+                                if (not attr.startswith('_') and 
+                                    attr not in ['text', 'function_call'] and
+                                    attr not in PYDANTIC_METADATA_ATTRS):
                                     try:
                                         value = getattr(part, attr)
                                         if not callable(value):

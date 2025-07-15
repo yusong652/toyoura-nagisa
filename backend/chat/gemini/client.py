@@ -248,9 +248,7 @@ class GeminiClient(LLMClientBase):
         execution_id = self._generate_execution_id()
         debug = self.gemini_config.debug
         
-        if debug:
-            print(f"[EXECUTION {execution_id}] Starting SOTA tool calling sequence")
-            print(f"[EXECUTION {execution_id}] Session: {session_id}, Input messages: {len(messages)}")
+
         
         # 创建独立的上下文管理器 - 确保状态隔离
         context_manager = GeminiContextManager()
@@ -283,10 +281,7 @@ class GeminiClient(LLMClientBase):
             thinking_content = ResponseProcessor.extract_thinking_content(final_response)
             metadata['thinking_preserved'] = thinking_content is not None
             
-            if debug:
-                duration = metadata['end_time'] - metadata['start_time']
-                print(f"[EXECUTION {execution_id}] Sequence completed successfully in {duration:.2f}s")
-                print(f"[EXECUTION {execution_id}] Final metadata: {metadata}")
+
             
             # 创建最终存储消息
             final_message = context_manager.finalize_and_get_storage_message(final_response)
@@ -298,8 +293,7 @@ class GeminiClient(LLMClientBase):
             metadata['error'] = str(e)
             metadata['end_time'] = self._get_timestamp()
             
-            if debug:
-                print(f"[EXECUTION {execution_id}] Sequence failed: {e}")
+
                 
             raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
     
@@ -323,8 +317,7 @@ class GeminiClient(LLMClientBase):
         )
         metadata['api_calls'] += 1
         
-        if debug:
-            print(f"[EXECUTION {execution_id}] Initial API call completed")
+
         
         # 工具调用状态机
         iteration = 0
@@ -333,27 +326,21 @@ class GeminiClient(LLMClientBase):
             
             # 状态检查：是否需要继续工具调用
             if not ResponseProcessor.should_continue_tool_calling(current_response):
-                if debug:
-                    print(f"[EXECUTION {execution_id}] No tool calls detected, sequence complete")
                 break
             
-            if debug:
-                print(f"[EXECUTION {execution_id}] Iteration {iteration + 1} starting")
+
             
             # 添加当前响应到上下文
             context_manager.add_raw_response(current_response)
             
             # 提取并执行工具调用
             tool_calls = ResponseProcessor.extract_tool_calls(current_response)
-            if debug:
-                print(f"[EXECUTION {execution_id}] Executing {len(tool_calls)} tool calls")
             
             # 批量执行工具调用
             for tool_call in tool_calls:
                 metadata['tool_calls_executed'] += 1
                 
-                if debug:
-                    print(f"[EXECUTION {execution_id}] Executing tool: {tool_call['name']}")
+
                 
                 # 执行单个工具调用
                 tool_result = await self._execute_single_tool_call(
@@ -374,8 +361,7 @@ class GeminiClient(LLMClientBase):
             )
             metadata['api_calls'] += 1
             
-            if debug:
-                print(f"[EXECUTION {execution_id}] Iteration {iteration + 1} completed")
+
             
             iteration += 1
         
@@ -400,16 +386,14 @@ class GeminiClient(LLMClientBase):
                 tool_call, session_id, debug
             )
             
-            if debug:
-                print(f"[EXECUTION {execution_id}] Tool {tool_call['name']} executed successfully")
+
             
             return result
             
         except Exception as e:
             error_result = f"Tool execution failed: {str(e)}"
             
-            if debug:
-                print(f"[EXECUTION {execution_id}] Tool {tool_call['name']} failed: {e}")
+
             
             return error_result
     
