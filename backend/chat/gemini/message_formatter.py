@@ -5,12 +5,11 @@ Handles conversion between internal message formats and Gemini API compatible fo
 including multimodal content processing and role mapping.
 """
 
-import json
 import base64
 from typing import List, Dict, Any, Optional
 from google.genai import types
 
-from backend.chat.models import BaseMessage, ToolResultMessage
+from backend.chat.models import BaseMessage
 
 
 class MessageFormatter:
@@ -18,10 +17,12 @@ class MessageFormatter:
     Handles message formatting for Gemini API interactions.
     
     This class provides methods for:
-    - Converting internal message formats to Gemini API format
-    - Processing multimodal content (images, documents)
-    - Handling tool calls and responses
+    - Converting history messages to Gemini API format
+    - Processing multimodal content (images, documents) in user messages
     - Role mapping between formats
+    
+    Optimized for historical message processing only - working context
+    is handled directly in context manager without formatting.
     """
 
     @staticmethod
@@ -72,20 +73,18 @@ class MessageFormatter:
     @staticmethod
     def format_messages_for_gemini(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
-        Format messages into Gemini API compatible format with enhanced multimodal support.
+        Format history messages for Gemini API initialization.
         
-        Handles:
-        - Text messages with thinking blocks
-        - Function calls and tool responses  
-        - Multimodal content (images, documents) from tool outputs
-        - Standard inline_data format and structured tool results
+        Optimized for historical message processing - only handles message types 
+        that actually appear in stored conversation history:
+        - User messages (text + optional multimodal content)  
+        - Assistant final responses (text only)
         
-        For tool responses containing multimodal content, creates separate Parts:
-        1. Image/document Part with decoded binary data
-        2. Function response Part with status information
+        REMOVED (not in history):
+        - Tool calls, tool responses, thinking blocks, intermediate states
         
         Args:
-            messages: List of BaseMessage objects to format
+            messages: List of BaseMessage objects from conversation history
             
         Returns:
             List of formatted message dictionaries for Gemini API
@@ -93,117 +92,16 @@ class MessageFormatter:
         contents = []
         
         for msg in messages:
-            print(f"[DEBUG] MessageFormatter: Processing message type: {type(msg)}, role: {getattr(msg, 'role', 'no_role')}")
-            
-            # Gemini function call标准：
-            # - assistant function_call消息用model+function_call结构
-            # - tool响应用user+function_response结构
-            if msg.role == "assistant" and getattr(msg, "tool_calls", None):
-                # function_call消息，可以包含思考过程和工具调用
-                parts = []
-                
-                # 1. 提取思考过程 (thinking)
-                # 这部分作为上下文提供给模型，了解它为何调用工具
-                if isinstance(msg.content, list):
-                    for item in msg.content:
-                        if item.get("type") == "thinking" and item.get("thinking"):
-                            # For thinking parts, we create a Part object where the text is the thought.
-                            # The Gemini API doesn't have a 'thought=True' flag on request Parts.
-                            # The model's own output format (thoughts as text) is the expected input format.
-                            parts.append(types.Part(text=item["thinking"], thought=True))
-                        elif item.get("type") == "text" and item.get("text"):
-                            parts.append(types.Part(text=item["text"]))
-                
-                # 3. 添加工具调用 (tool_calls)
-                for tool_call in msg.tool_calls:
-                    arguments = tool_call["function"].get("arguments", {})
-                    if isinstance(arguments, str):
-                        try:
-                            arguments = json.loads(arguments)
-                        except (json.JSONDecodeError, TypeError):
-                            # 如果无法解析，则保留为字符串或空字典
-                            arguments = {"error": "invalid JSON arguments", "raw": arguments}
-                    parts.append(types.Part(function_call=types.FunctionCall(
-                        name=tool_call["function"]["name"],
-                        args=arguments,
-                        id=tool_call.get("id", tool_call["function"]["name"])
-                    )))
-                
-                if parts:
-                    contents.append({"role": "model", "parts": parts})
-                continue
-            
-            # 处理工具响应消息
-            if isinstance(msg, ToolResultMessage):
-                print(f"[DEBUG] MessageFormatter: Detected ToolResultMessage with name: {getattr(msg, 'name', 'no_name')}")
-                tool_name = msg.name
-                if not tool_name:
-                    print(f"[WARNING] Tool response missing name: {msg}")
-                    continue
-                
-                # 优化的多模态内容检测逻辑
-                is_image = False
-                inline_data = None
-                
-                if isinstance(msg.content, dict):
-                    print(f"[DEBUG] MessageFormatter: Processing ToolResultMessage with content keys: {list(msg.content.keys())}")
-                    
-                    # 检查标准化格式: content.data.inline_data
-                    if (msg.content.get("content", {}).get("format") == "inline_data" and 
-                        isinstance(msg.content.get("content", {}).get("data"), dict) and
-                        "inline_data" in msg.content["content"]["data"]):
-                        is_image = True
-                        inline_data = msg.content["content"]["data"]["inline_data"]
-                        print(f"[DEBUG] MessageFormatter: Detected nested inline_data format")
-                    # 检查直接格式: content.inline_data (兼容性)
-                    elif 'inline_data' in msg.content:
-                        is_image = True
-                        inline_data = msg.content['inline_data']
-                        print(f"[DEBUG] MessageFormatter: Detected direct inline_data format")
-                    else:
-                        print(f"[DEBUG] MessageFormatter: No inline_data detected in content")
-                
-                print(f"[DEBUG] MessageFormatter: is_image={is_image}, inline_data_present={inline_data is not None}")
-                
-                if is_image and inline_data:
-                    data_field = inline_data['data']
-                    mime_type = inline_data.get('mime_type', 'image/png')
-                    try:
-                        image_bytes = base64.b64decode(data_field)
-                        # Create both image part and function response part
-                        parts = [
-                            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                            types.Part(function_response=types.FunctionResponse(
-                                name=tool_name,
-                                response={'status': 'success', 'content': 'Binary file processed as multimodal content.'}
-                            ))
-                        ]
-                    except Exception as e:
-                        print(f"[WARNING] Failed to decode inline_data in tool response: {e}")
-                        # Fallback to function response only
-                        response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
-                        parts = [types.Part(function_response=types.FunctionResponse(
-                            name=tool_name,
-                            response={'status': 'error', 'content': 'Failed to decode image data'}
-                        ))]
-                    contents.append({"role": "user", "parts": parts})
-                    continue
-                else:
-                    # Standard function response without multimodal content
-                    response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
-                    parts = [types.Part(function_response=types.FunctionResponse(
-                        name=tool_name,
-                        response=response_dict
-                    ))]
-                contents.append({"role": "user", "parts": parts})
-                continue
-
-            # 普通消息
             parts = []
+            
+            # Handle message content based on format
             if isinstance(msg.content, list):
+                # Multi-part message (text + optional multimodal content)
                 for item in msg.content:
-                    # 1. 先处理图片内容
-                    if "inline_data" in item:
+                    if "text" in item and item["text"]:
+                        parts.append(types.Part(text=item["text"]))
+                    elif "inline_data" in item:
+                        # Process multimodal content (images, documents)
                         inline_data = item["inline_data"]
                         data_field = inline_data["data"]
                         mime_type = inline_data.get("mime_type", "image/png")
@@ -211,14 +109,13 @@ class MessageFormatter:
                             image_bytes = base64.b64decode(data_field)
                             parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
                         except Exception as e:
-                            print(f"[WARNING] Failed to decode inline_data: {e}")
+                            print(f"[WARNING] Failed to decode inline_data in history message: {e}")
                             continue
-                    # 2. 再处理文本内容
-                    if "text" in item:
-                        parts.append(types.Part(text=item["text"]))
             else:
+                # Simple text message
                 parts.append(types.Part(text=str(msg.content)))
             
+            # Map role and add to contents
             mapped_role = MessageFormatter.map_role(msg.role)
             contents.append({"role": mapped_role, "parts": parts})
         
