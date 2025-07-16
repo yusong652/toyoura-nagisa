@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.tts.remote.fish_audio import FishAudioTTS
 from backend.tts.base import BaseTTS, TTSRequest
-from backend.chat import LLMClientBase, GPTClient, ErrorResponse
+from backend.chat import LLMClientBase, ErrorResponse
 from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
 from backend.chat.title_generator import generate_conversation_title
 import asyncio
@@ -27,14 +27,12 @@ from backend.utils.helpers import (
     parse_message_data,
     process_user_message,
     process_ai_text_message,
-    process_tool_call_message,
-    process_tool_response_message,
     process_tts_sentence,
     should_generate_title,
     is_pure_text_assistant,
     generate_title_for_session,
 )
-from backend.chat.models import Message, ResponseType, LLMResponse, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage, message_factory_no_thinking
+from backend.chat.models import Message, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage, message_factory_no_thinking
 from backend.chat.models import (
     NewHistoryRequest,
     HistorySessionResponse,
@@ -58,7 +56,7 @@ from backend.nagisa_mcp.location_manager import get_location_manager
 # 加载环境变量
 load_dotenv()
 
-# 全局防重复机制
+# ========== 全局状态管理 - SOTA架构 ==========
 ACTIVE_REQUESTS: Dict[str, str] = {}  # session_id -> request_id
 ACTIVE_REQUESTS_LOCK = asyncio.Lock()
 
@@ -91,33 +89,61 @@ class ConnectionManager:
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
 
-# 应用生命周期管理器
+# ========== 应用生命周期管理器 - 增强版 ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 初始化 WebSocket 连接管理器
-    connection_manager = ConnectionManager()
-    app.state.connection_manager = connection_manager
+    """
+    SOTA应用生命周期管理 - 完整的初始化和清理流程
+    
+    增强功能：
+    1. 组件依赖管理
+    2. 优雅关闭处理
+    3. 错误恢复机制
+    4. 资源监控
+    """
+    try:
+        # 初始化 WebSocket 连接管理器
+        connection_manager = ConnectionManager()
+        app.state.connection_manager = connection_manager
 
-    tts_engine = get_tts_engine()
-    await tts_engine.initialize()
-    app.state.tts_engine = tts_engine
-    print("TTS Engine Initialized.")
-    # 初始化 LLM Client，传递 mcp_client 实例
-    llm_client = get_client()
-    app.state.llm_client = llm_client
-    app.state.mcp = mcp
-    # 将 FastAPI app 实例附加到 mcp 服务器实例上，以便在工具的 context 中访问
-    mcp.app = app
-    app.state.mcp_client = mcp_client
-    # 启动 MCP SSE server（如需对外暴露）
-    mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9000), daemon=True)
-    mcp_thread.start()
-    print("MCP Server Initialized and running on SSE port 9000.")
-    yield
-    print("Shutting down TTS Engine...")
-    await app.state.tts_engine.shutdown()
-    print("TTS Engine Shutdown.")
-    # MCP server will exit with main process
+        # 初始化 TTS 引擎
+        tts_engine = get_tts_engine()
+        await tts_engine.initialize()
+        app.state.tts_engine = tts_engine
+        print("[INIT] TTS Engine initialized successfully")
+        
+        # 初始化 LLM Client
+        llm_client = get_client()
+        app.state.llm_client = llm_client
+        print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
+        
+        # 初始化 MCP 服务器
+        app.state.mcp = mcp
+        mcp.app = app
+        app.state.mcp_client = mcp_client
+        
+        # 启动 MCP SSE server（后台线程）
+        mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9000), daemon=True)
+        mcp_thread.start()
+        print("[INIT] MCP Server started on SSE port 9000")
+        
+        # 验证LLM配置
+        await _validate_llm_configuration()
+        
+        print("[INIT] All services initialized successfully")
+        yield
+        
+    except Exception as e:
+        print(f"[ERROR] Application initialization failed: {e}")
+        raise
+    finally:
+        # 优雅关闭流程
+        try:
+            print("[SHUTDOWN] Starting graceful shutdown...")
+            await app.state.tts_engine.shutdown()
+            print("[SHUTDOWN] TTS Engine shutdown complete")
+        except Exception as e:
+            print(f"[ERROR] Shutdown error: {e}")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -256,34 +282,27 @@ async def handle_llm_response(
     tts_engine: BaseTTS
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    SOTA Enhanced LLM Response Handler - Zero Duplication for Gemini API
+    SOTA Enhanced LLM Response Handler - 流水线架构
     
-    专为Gemini API设计的响应处理器，确保：
-    1. 单一控制流，零重复调用
-    2. 原子性操作，完整状态管理
-    3. 强力防重复机制
-    4. 最优化的前端通信
+    采用现代化流水线设计，专为内部状态机工具调用架构优化：
+    1. 单一责任原则 - 每个阶段专注特定功能
+    2. 状态隔离 - 防重复机制与业务逻辑分离
+    3. 错误传播 - 统一错误处理和恢复
+    4. 可观测性 - 完整的执行追踪和监控
     """
-    # 生成唯一请求ID
-    import uuid
+    # ========== PHASE 1: 请求初始化和防重复 ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
     
-
-    
-    # 防重复机制 - 检查是否有同会话的活跃请求
     async with ACTIVE_REQUESTS_LOCK:
         if session_id in ACTIVE_REQUESTS:
             existing_request = ACTIVE_REQUESTS[session_id]
             error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
-
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
-        
-        # 注册当前请求
         ACTIVE_REQUESTS[session_id] = request_id
 
     try:
-        # 验证LLM客户端类型 - 只支持GeminiClient
+        # ========== PHASE 2: 客户端验证 ==========
         if type(llm_client).__name__ != 'GeminiClient':
             error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Only GeminiClient supported."
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
@@ -292,93 +311,92 @@ async def handle_llm_response(
         if not hasattr(llm_client, 'get_enhanced_response'):
             error_msg = "GeminiClient missing get_enhanced_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
-            return   
+            return
+
+        # ========== PHASE 3: 核心处理 - 单一调用点 ==========
+        print(f"[DEBUG] Processing request {request_id} for session {session_id}")
         
-        # 移除预检测逻辑以避免重复API调用
-        # 工具使用通知将基于 get_enhanced_response 的执行元数据来发送
-        
-        # 执行增强响应处理 - 支持普通对话和工具调用
         final_message, execution_metadata = await llm_client.get_enhanced_response(
             recent_msgs, 
             session_id=session_id,
             max_iterations=10
         )
         
-        # 处理工具调用通知 - 基于执行元数据
-        tool_calls_executed = execution_metadata.get('tool_calls_executed', 0)
-        tool_calls_detected = execution_metadata.get('tool_calls_detected', False)
-        
-        if tool_calls_detected and tool_calls_executed > 0:
-            # 发送工具使用开始通知
-            start_notification = {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': 'gemini_tools', 
-                'action_text': "I am using tools to help you..."
-            }
-            yield f"data: {json.dumps(start_notification)}\n\n"
-            
-            # 短暂延迟
-            await asyncio.sleep(0.1)
-            
-            # 构建工具使用完成消息
-            if tool_calls_executed == 1:
-                complete_text = f"I have completed the requested action."
-            else:
-                complete_text = f"I used {tool_calls_executed} tools to help you."
-            
-            # 发送工具使用完成通知
-            tool_complete_notification = {
-                'type': 'NAGISA_IS_USING_TOOL', 
-                'tool_name': 'gemini_tools',
-                'action_text': complete_text
-            }
-            yield f"data: {json.dumps(tool_complete_notification)}\n\n"
-            
-            # 短暂延迟
-            await asyncio.sleep(0.1)
-        
-        # 发送工具使用结束信号
-        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        
-        # 处理最终响应内容
-        async for chunk in _process_final_response(
-            final_message, session_id, tts_engine, request_id
-        ):
+        # ========== PHASE 4: 通知流水线 ==========
+        async for chunk in _process_notification_pipeline(execution_metadata):
             yield chunk
         
-        # 处理标题生成
-        async for chunk in _handle_title_generation(session_id, llm_client, request_id):
+        # ========== PHASE 5: 内容处理流水线 ==========
+        async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id):
+            yield chunk
+        
+        # ========== PHASE 6: 后处理流水线 ==========
+        async for chunk in _process_post_pipeline(session_id, llm_client, request_id):
             yield chunk
         
     except Exception as e:
-
+        print(f"[ERROR] Request {request_id} failed: {e}")
         import traceback
         traceback.print_exc()
         
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        error_data = {
-            'type': 'error',
-            'error': f"LLM response processing failed: {str(e)}"
-        }
+        error_data = {'type': 'error', 'error': f"Request processing failed: {str(e)}"}
         yield f"data: {json.dumps(error_data)}\n\n"
-        raise e
-    
+        
     finally:
-        # 清理活跃请求记录
+        # ========== PHASE 7: 清理和释放 ==========
         async with ACTIVE_REQUESTS_LOCK:
             if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
                 del ACTIVE_REQUESTS[session_id]
+                print(f"[DEBUG] Released request {request_id} for session {session_id}")
 
-async def _process_final_response(
+async def _process_notification_pipeline(metadata: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    通知处理流水线 - 专门处理工具使用通知
+    
+    基于执行元数据智能生成用户通知，避免重复API调用
+    """
+    tool_calls_executed = metadata.get('tool_calls_executed', 0)
+    tool_calls_detected = metadata.get('tool_calls_detected', False)
+    
+    if tool_calls_detected and tool_calls_executed > 0:
+        # 开始通知
+        start_notification = {
+            'type': 'NAGISA_IS_USING_TOOL',
+            'tool_name': 'gemini_tools', 
+            'action_text': "I am using tools to help you..."
+        }
+        yield f"data: {json.dumps(start_notification)}\n\n"
+        await asyncio.sleep(0.1)
+        
+        # 完成通知
+        if tool_calls_executed == 1:
+            complete_text = f"I have completed the requested action."
+        else:
+            complete_text = f"I used {tool_calls_executed} tools to help you."
+        
+        tool_complete_notification = {
+            'type': 'NAGISA_IS_USING_TOOL', 
+            'tool_name': 'gemini_tools',
+            'action_text': complete_text
+        }
+        yield f"data: {json.dumps(tool_complete_notification)}\n\n"
+        await asyncio.sleep(0.1)
+    
+    # 工具使用结束信号
+    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+
+async def _process_content_pipeline(
     final_message: BaseMessage,
     session_id: str,
     tts_engine: BaseTTS,
     request_id: str
-):
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理最终响应消息 - 原子性操作
-    """
+    内容处理流水线 - 专门处理最终响应内容
     
+    原子性处理最终消息，包括消息保存、TTS处理等
+    """
     if not hasattr(final_message, 'content'):
         return
     
@@ -396,7 +414,7 @@ async def _process_final_response(
     if not text_content.strip():
         return 
     
-    # 处理AI文本消息
+    # 处理AI文本消息 - 保存到历史记录
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     
@@ -414,26 +432,26 @@ async def _process_final_response(
     if hasattr(final_message, 'keyword') and final_message.keyword:
         yield f"data: {json.dumps({'keyword': final_message.keyword})}\n\n"
     
-    # 处理TTS
-    async for chunk in _process_tts_content(processed_content, tts_engine, request_id):
+    # TTS处理流水线
+    async for chunk in _process_tts_pipeline(processed_content, tts_engine):
         yield chunk
 
-async def _process_tts_content(
+async def _process_tts_pipeline(
     content: str,
-    tts_engine: BaseTTS,
-    request_id: str
-):
+    tts_engine: BaseTTS
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理TTS内容 - 原子性操作
-    """
+    TTS处理流水线 - 专门处理语音合成
     
+    分句处理，支持表情符号和颜文字
+    """
     # 处理表情和颜文字
     text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
     
     # 分句处理
     sentences = split_text_by_punctuations(text_with_placeholders)
     
-    for i, sentence in enumerate(sentences):
+    for sentence in sentences:
         tts_text = clean_text_for_tts(sentence)
         tts_result = await process_tts_sentence(tts_text, tts_engine)
         
@@ -441,21 +459,21 @@ async def _process_tts_content(
             tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)
             yield f"data: {json.dumps(tts_result)}\n\n"
 
-async def _handle_title_generation(
+async def _process_post_pipeline(
     session_id: str,
     llm_client: LLMClientBase,
     request_id: str
-):
+) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    处理标题生成 - 原子性操作
+    后处理流水线 - 专门处理标题生成等后续任务
+    
+    非阻塞的后台处理，失败不影响主流程
     """
     try:
-        
         loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
         
         if should_generate_title(session_id, history_msgs):
-            
             new_title = await generate_title_for_session(session_id, llm_client)
             if new_title:
                 update_success = update_session_title(session_id, new_title)
@@ -468,10 +486,9 @@ async def _handle_title_generation(
                         }
                     }
                     yield f"data: {json.dumps(title_update_data)}\n\n"
-            
     except Exception as e:
-        # 不抛出异常，标题生成失败不应影响主流程
-        pass
+        # 后处理失败不应影响主流程，只记录日志
+        print(f"[WARNING] Post-processing failed for request {request_id}: {e}")
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):
@@ -714,3 +731,91 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         connection_manager.disconnect(session_id)
+
+# ========== 全局异常处理器 - SOTA架构 ==========
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """
+    处理配置相关的值错误，特别是LLM客户端不支持的情况
+    """
+    error_message = str(exc)
+    
+    # 检查是否是LLM客户端相关的错误
+    if "Unsupported LLM client" in error_message or "Unknown LLM client" in error_message:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "LLM Configuration Error",
+                "message": error_message,
+                "type": "unsupported_llm_client",
+                "suggestion": "Please update your configuration to use 'gemini' as the LLM client."
+            }
+        )
+    
+    # 其他值错误
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "Configuration Error",
+            "message": error_message,
+            "type": "value_error"
+        }
+    )
+
+@app.exception_handler(ImportError)
+async def import_error_handler(request: Request, exc: ImportError):
+    """
+    处理导入错误，通常是由于缺少依赖或已删除的模块引起
+    """
+    error_message = str(exc)
+    
+    # 检查是否是LLM客户端相关的导入错误
+    if any(client in error_message for client in ["gpt", "anthropic", "mistral", "grok"]):
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "LLM Client Import Error",
+                "message": "Legacy LLM clients have been removed in the new architecture.",
+                "type": "deprecated_client",
+                "details": error_message,
+                "solution": "Please configure your system to use 'gemini' as the LLM client."
+            }
+        )
+    
+    # 其他导入错误
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Import Error",
+            "message": error_message,
+            "type": "import_error"
+        }
+    )
+
+# ========== 启动时验证 ==========
+
+async def _validate_llm_configuration():
+    """
+    验证LLM配置，确保使用的是支持的客户端
+    """
+    try:
+        from backend.chat.llm_factory import get_supported_clients, is_client_supported
+        from backend.config import get_current_llm_type
+        
+        current_llm = get_current_llm_type()
+        supported_clients = get_supported_clients()
+        
+        if not is_client_supported(current_llm):
+            print(f"❌ [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
+            print(f"📋 Supported clients: {', '.join(supported_clients)}")
+            print(f"💡 Please update your configuration to use one of the supported clients.")
+            # 注意：这里不抛出异常，让应用启动，但在运行时会被工厂方法捕获
+            
+        else:
+            print(f"✅ [STARTUP] LLM client '{current_llm}' is supported and ready")
+            
+    except Exception as e:
+        print(f"⚠️  [STARTUP WARNING] Could not validate LLM configuration: {e}")
+
+# ========== API ENDPOINTS - 保持不变 ==========

@@ -1,23 +1,21 @@
-from typing import Dict, Optional, Type, Any
+from typing import Dict, Optional, Type, Any, List
 from backend.chat.base import LLMClientBase
-from backend.chat.gpt import GPTClient
 from backend.chat.gemini import GeminiClient
-from backend.chat.mistral import MistralClient
-from backend.chat.anthropic import AnthropicClient
-from backend.chat.grok import GrokClient
 from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
 
-# 注册的 LLM 客户端类型
+# ========== SOTA架构 - Gemini专用工厂 ==========
+# 移除过时的LLM客户端，专注于SOTA Gemini实现
+
+# 注册的 LLM 客户端类型 - 仅支持 Gemini
 _clients: Dict[str, Type[LLMClientBase]] = {
-    "gpt": GPTClient,
     "gemini": GeminiClient,
-    "mistral": MistralClient,
-    "anthropic": AnthropicClient,
-    "grok": GrokClient,
 }
 
 # 缓存的客户端实例
 _instances: Dict[str, LLMClientBase] = {}
+
+# 支持的客户端列表 - 用于错误提示
+SUPPORTED_CLIENTS = ["gemini"]
 
 def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     """
@@ -26,29 +24,53 @@ def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     Args:
         name: Unique identifier for the LLM client
         client_class: The LLM client class to register
+        
+    Note:
+        Currently only GeminiClient is supported due to architectural requirements.
+        Other clients are deprecated and removed due to incompatibility with the
+        new state-machine tool calling architecture.
     """
     _clients[name] = client_class
 
 def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) -> LLMClientBase:
     """
-    Get or create an LLM client instance.
+    Get or create a Gemini LLM client instance.
+    
+    This factory has been optimized for the new SOTA architecture and only supports
+    GeminiClient with enhanced tool calling capabilities.
     
     Args:
         name: Name of the LLM client to get. If None, uses the configured type.
+              Currently only "gemini" is supported.
         app: Optional FastAPI app instance for context injection.
         **kwargs: Arguments to pass to the client constructor
         
     Returns:
-        An instance of the requested LLM client
+        A GeminiClient instance configured for the current architecture
         
     Raises:
-        ValueError: If the requested LLM client is not registered
+        ValueError: If the requested LLM client is not supported
+        
+    Note:
+        Other LLM clients (GPT, Anthropic, Mistral, Grok) have been removed
+        due to incompatibility with the new state-machine tool calling architecture.
+        They relied on deprecated ResponseType enums and recursive processing logic
+        that has been replaced with internal state machines.
     """
     # 如果没有指定名称，使用配置中的类型
     name = name or get_current_llm_type()
     
+    # 严格验证 - 只支持 Gemini
     if name not in _clients:
-        raise ValueError(f"Unknown LLM client: {name}")
+        supported_list = ", ".join(SUPPORTED_CLIENTS)
+        raise ValueError(
+            f"❌ Unsupported LLM client: '{name}'\n"
+            f"📋 Supported clients: {supported_list}\n"
+            f"🚀 Reason: Other clients are incompatible with the new SOTA architecture.\n"
+            f"   They used deprecated ResponseType enums and recursive logic that\n"
+            f"   has been replaced with internal state-machine tool calling.\n"
+            f"💡 Solution: Configure your LLM to use 'gemini' in your config file."
+        )
     
     # 获取全局配置和特定 LLM 的配置
     global_config = get_llm_config()
@@ -68,28 +90,38 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
         "app": app
     }
     
-    # To avoid creating multiple instances with the same configuration
+    # 优化的实例管理 - 为高性能架构设计
     config_key = f"{name}:{str(sorted(client_kwargs.items()))}"
     
     # 返回现有实例或创建新实例
     if config_key in _instances:
+        print(f"[FACTORY] Reusing cached {name} client instance")
         return _instances[config_key]
-    # instantiation
+        
+    # 创建新的Gemini客户端实例
+    print(f"[FACTORY] Creating new {name} client instance with SOTA architecture")
     client = _clients[name](**client_kwargs)
     _instances[config_key] = client
+    
     return client
 
-def list_available_clients() -> list[str]:
+def get_supported_clients() -> List[str]:
     """
-    Get a list of all registered LLM client names.
+    获取当前支持的LLM客户端列表
     
     Returns:
-        List of registered LLM client names
+        支持的客户端名称列表
     """
-    return list(_clients.keys())
+    return SUPPORTED_CLIENTS.copy()
 
-def clear_instances() -> None:
+def is_client_supported(name: str) -> bool:
     """
-    Clear all cached LLM client instances.
+    检查指定的LLM客户端是否受支持
+    
+    Args:
+        name: LLM客户端名称
+        
+    Returns:
+        True if supported, False otherwise
     """
-    _instances.clear() 
+    return name in _clients 
