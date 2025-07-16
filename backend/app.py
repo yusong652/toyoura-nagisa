@@ -505,7 +505,6 @@ async def chat_stream_endpoint(request: Request):
     try:
         async def generate():
             # Generate unique request ID for debugging
-            import uuid
             request_id = str(uuid.uuid4())[:8]
             print(f"[DEBUG] API Request {request_id} started - Session: {session_id}")
             

@@ -7,7 +7,7 @@ from backend.chat.utils import get_all_sessions, update_session_title, save_hist
 from backend.tts.base import BaseTTS
 from backend.chat.title_generator import generate_conversation_title
 from backend.config import get_llm_config
-from backend.chat.models import message_factory, AssistantMessage, UserToolMessage, UserMessage, AssistantToolMessage, BaseMessage
+from backend.chat.models import message_factory, AssistantMessage, UserMessage, BaseMessage
 from backend.memory import MemoryManager
 from typing import Any, List, Dict
 import re
@@ -125,30 +125,9 @@ def process_ai_text_message(content: List[Dict[str, Any]], keyword: str, history
 
     return ai_msg_id, text_content.strip()
 
-def process_tool_call_message(tool_call: dict) -> AssistantToolMessage:
-    """处理工具调用消息，创建并返回工具调用消息对象（不再追加到 history_msgs）"""
-    function_call_msg = AssistantToolMessage(
-        content="",
-        id=tool_call['id'],
-        tool_calls=[{
-            "id": tool_call['id'],
-            "type": "function",
-            "function": {
-                "name": tool_call['name'],
-                "arguments": json.dumps(tool_call['arguments'], ensure_ascii=False) if not isinstance(tool_call['arguments'], str) else tool_call['arguments']
-            }
-        }]
-    )
-    return function_call_msg
-
-def process_tool_response_message(tool_call: dict, tool_result: Any) -> UserToolMessage:
-    """处理工具响应消息，创建并返回工具响应消息对象（不再追加到 history_msgs）"""
-    tool_msg = UserToolMessage(
-        tool_request=tool_call,
-        content=str(tool_result),
-        id=tool_call['id']
-    )
-    return tool_msg
+# 移除过时的工具处理函数 - 现在工具调用在LLM客户端内部处理
+# def process_tool_call_message() - REMOVED (过时 - 为旧递归架构设计)
+# def process_tool_response_message() - REMOVED (过时 - 为旧递归架构设计)
 
 async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
     """处理单个句子的TTS合成"""

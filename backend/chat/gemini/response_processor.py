@@ -12,7 +12,7 @@ during multi-turn tool calling while ensuring proper storage format compatibilit
 """
 
 from typing import List, Dict, Any, Optional, Tuple, Union
-from backend.chat.models import LLMResponse, ResponseType, BaseMessage, message_factory
+from backend.chat.models import LLMResponse, BaseMessage, message_factory
 from .constants import PYDANTIC_METADATA_ATTRS
 from backend.chat.utils import parse_llm_output
 
@@ -82,7 +82,7 @@ class ResponseProcessor:
                 'tool_call_count': int,
                 'thinking_parts_count': int,
                 'text_parts_count': int,
-                'response_type': ResponseType,
+                'is_error': bool,
                 'validation_fields': List[str],
                 'error_info': Optional[Dict]
             }
@@ -96,7 +96,7 @@ class ResponseProcessor:
             'tool_call_count': 0,
             'thinking_parts_count': 0,
             'text_parts_count': 0,
-            'response_type': ResponseType.ERROR,
+            'is_error': True,  # Default to error until proven otherwise
             'validation_fields': [],
             'error_info': None
         }
@@ -120,6 +120,7 @@ class ResponseProcessor:
                 return analysis
                 
             analysis['has_content'] = True
+            analysis['is_error'] = False  # Valid response structure
             
             # Validation fields detection
             validation_fields = []
@@ -136,17 +137,17 @@ class ResponseProcessor:
                         pass
             analysis['validation_fields'] = validation_fields
             
-            # Top-level thinking analysis
-            if hasattr(candidate, 'thought') and candidate.thought:
-                analysis['has_thinking'] = True
-                analysis['thinking_parts_count'] += 1
-            
             # Parts analysis
-            for part in candidate.content.parts:
+            parts = candidate.content.parts if hasattr(candidate.content, 'parts') else []
+            
+            for part in parts:
+                # Tool call detection
                 if hasattr(part, 'function_call') and part.function_call:
                     analysis['has_tool_calls'] = True
                     analysis['tool_call_count'] += 1
-                elif hasattr(part, 'text') and part.text:
+                
+                # Text content analysis
+                if hasattr(part, 'text') and part.text:
                     if getattr(part, 'thought', False):
                         analysis['has_thinking'] = True
                         analysis['thinking_parts_count'] += 1
@@ -154,30 +155,21 @@ class ResponseProcessor:
                         analysis['has_text'] = True
                         analysis['text_parts_count'] += 1
             
-            # Determine response type
-            if analysis['has_tool_calls']:
-                analysis['response_type'] = ResponseType.FUNCTION_CALL
-            elif analysis['has_text'] or analysis['has_thinking']:
-                analysis['response_type'] = ResponseType.TEXT
-            else:
-                analysis['response_type'] = ResponseType.ERROR
-                analysis['error_info'] = {'type': 'no_content', 'message': 'No text or tool calls found'}
+            # Top-level thinking detection
+            if hasattr(candidate, 'thought') and candidate.thought:
+                analysis['has_thinking'] = True
+                analysis['thinking_parts_count'] += 1
                 
         except Exception as e:
-            analysis['error_info'] = {
-                'type': 'analysis_exception',
-                'message': f'Error during response analysis: {str(e)}'
-            }
+            analysis['error_info'] = {'type': 'analysis_error', 'message': str(e)}
+            analysis['is_error'] = True
             
         return analysis
 
     @staticmethod
     def should_continue_tool_calling(response) -> bool:
         """
-        Determine if response contains tool calls requiring continuation.
-        
-        This method provides fast, optimized detection of tool calling requirements
-        without full response processing overhead.
+        Determine if tool calling should continue based on response analysis.
         
         Args:
             response: Raw Gemini API response object
@@ -186,22 +178,21 @@ class ResponseProcessor:
             True if tool calling should continue, False otherwise
         """
         analysis = ResponseProcessor.analyze_response_state(response)
-        return analysis['has_tool_calls'] and analysis['tool_call_count'] > 0
+        return analysis['has_tool_calls'] and not analysis['is_error']
 
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
         """
-        Extract tool call information from raw response.
+        Extract tool calls from raw Gemini API response with enhanced context preservation.
         
-        Optimized for context preservation mode - extracts tool calls
-        while maintaining all original metadata and validation fields.
+        This method extracts all tool call information while preserving metadata
+        for context management during multi-turn tool calling sequences.
         
         Args:
             response: Raw Gemini API response object
             
         Returns:
-            List of tool call dictionaries with format:
-            [{'name': str, 'arguments': dict, 'id': str, 'metadata': dict}]
+            List of tool call dictionaries with comprehensive metadata
         """
         tool_calls = []
         
@@ -277,20 +268,15 @@ class ResponseProcessor:
             llm_response = ResponseProcessor._process_response_for_storage(response, keyword)
             
             # Convert to message format
-            if llm_response.response_type == ResponseType.ERROR:
+            if llm_response.is_error:
                 raise ValueError(f"Cannot format error response for storage: {llm_response.content}")
             
-            # 构建消息数据，根据响应类型决定是否包含tool_calls
+            # 构建消息数据
             message_data = {
                 "role": "assistant",
                 "content": llm_response.content,
                 "keyword": keyword or llm_response.keyword,
             }
-            
-            # 只有当响应类型是FUNCTION_CALL且有工具调用时才添加tool_calls
-            if (llm_response.response_type == ResponseType.FUNCTION_CALL and 
-                llm_response.tool_calls and len(llm_response.tool_calls) > 0):
-                message_data["tool_calls"] = llm_response.tool_calls
             
             storage_message = message_factory(message_data)
             
@@ -374,81 +360,6 @@ class ResponseProcessor:
             return ""
 
     @staticmethod
-    def get_response_validation_info(response) -> Dict[str, Any]:
-        """
-        Extract validation information crucial for context preservation.
-        
-        This method captures validation fields that are essential for
-        maintaining response integrity during tool calling sequences.
-        
-        Args:
-            response: Raw Gemini API response object
-            
-        Returns:
-            Dictionary containing validation information
-        """
-        validation_info = {
-            'candidate_count': 0,
-            'validation_fields': {},
-            'content_metadata': {},
-            'part_metadata': []
-        }
-        
-        try:
-            if hasattr(response, 'candidates') and response.candidates:
-                validation_info['candidate_count'] = len(response.candidates)
-                candidate = response.candidates[0]
-                
-                # Extract candidate-level validation fields
-                for attr in dir(candidate):
-                    if (not attr.startswith('_') and 
-                        attr not in ['content'] and 
-                        attr not in PYDANTIC_METADATA_ATTRS):
-                        try:
-                            value = getattr(candidate, attr)
-                            if not callable(value):
-                                validation_info['validation_fields'][attr] = str(value)
-                        except:
-                            pass
-                
-                # Extract content metadata
-                if hasattr(candidate, 'content'):
-                    content = candidate.content
-                    
-                    for attr in dir(content):
-                        if (not attr.startswith('_') and 
-                            attr not in ['parts'] and
-                            attr not in PYDANTIC_METADATA_ATTRS):
-                            try:
-                                value = getattr(content, attr)
-                                if not callable(value):
-                                    validation_info['content_metadata'][attr] = str(value)
-                            except:
-                                pass
-                    
-                    # Extract part-level metadata
-                    if hasattr(content, 'parts'):
-                        for i, part in enumerate(content.parts):
-                            part_meta = {'index': i, 'type': type(part).__name__}
-                            
-                            for attr in dir(part):
-                                if (not attr.startswith('_') and 
-                                    attr not in ['text', 'function_call'] and
-                                    attr not in PYDANTIC_METADATA_ATTRS):
-                                    try:
-                                        value = getattr(part, attr)
-                                        if not callable(value):
-                                            part_meta[attr] = str(value)
-                                    except:
-                                        pass
-                            validation_info['part_metadata'].append(part_meta)
-                            
-        except Exception as e:
-            validation_info['error'] = str(e)
-            
-        return validation_info
-
-    @staticmethod
     def _process_response_for_storage(response, keyword: Optional[str] = None) -> LLMResponse:
         """
         Internal method for processing responses in storage mode.
@@ -464,16 +375,18 @@ class ResponseProcessor:
             LLMResponse object formatted for storage
         """
         # Validate response structure
-        if not (hasattr(response, 'candidates') and response.candidates):
+        analysis = ResponseProcessor.analyze_response_state(response)
+        
+        if analysis['is_error']:
+            error_message = analysis.get('error_info', {}).get('message', 'Unknown error')
             return LLMResponse(
-                content=[{"type": "text", "text": ""}], 
-                response_type=ResponseType.ERROR
+                content=error_message,
+                error=error_message
             )
 
         candidate = response.candidates[0]
         
         content_list = []
-        tool_calls = []
         thinking_parts = []
         text_parts = []
         
@@ -484,14 +397,7 @@ class ResponseProcessor:
         # Process parts
         if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
-                if hasattr(part, 'function_call') and part.function_call:
-                    # Extract tool call information
-                    tool_calls.append({
-                        'name': part.function_call.name,
-                        'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
-                        'id': part.function_call.id or part.function_call.name
-                    })
-                elif hasattr(part, 'text') and part.text:
+                if hasattr(part, 'text') and part.text:
                     # Categorize text content
                     if getattr(part, 'thought', False):
                         thinking_parts.append(part.text)
@@ -519,23 +425,14 @@ class ResponseProcessor:
             if not keyword:
                 keyword = extracted_keyword
 
-        # Determine response type and create LLMResponse
-        if tool_calls:
-            return LLMResponse(
-                content=content_list,
-                response_type=ResponseType.FUNCTION_CALL,
-                tool_calls=tool_calls,
-                keyword=keyword
-            )
-        
+        # Create simplified LLMResponse
         if content_list:
             return LLMResponse(
                 content=content_list,
-                response_type=ResponseType.TEXT,
                 keyword=keyword
             )
             
         return LLMResponse(
             content=[{"type": "text", "text": "Empty response from model."}],
-            response_type=ResponseType.ERROR
+            keyword=keyword
         ) 

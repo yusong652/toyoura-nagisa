@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field # 导入 Pydantic 的 BaseModel 和 Field
 from typing import List, Optional, Dict, Any, Union, Literal # 导入类型提示和 Literal 以及 Union
 from datetime import datetime # 导入 datetime 模块
-from enum import Enum
 import json
 from backend.utils.text_clean import extract_response_without_think
 
@@ -220,55 +219,51 @@ def message_factory_no_thinking(data: dict) -> BaseMessage:
 Message = MessageType
 
 # =====================
-# 其它模型
+# 简化的响应模型 - SOTA版本
 # =====================
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="错误信息")
 
-class ResponseType(str, Enum):
-    TEXT = "text"
-    FUNCTION_CALL = "function_call"
-    ERROR = "error"
-
 class LLMResponse:
+    """
+    简化的LLM响应类 - 专为新架构设计
+    
+    由于工具调用现在在LLM客户端内部处理，这个类只需要处理最终的文本响应。
+    移除了所有过时的工具调用相关字段和ResponseType依赖。
+    """
     def __init__(
         self,
-        content: List[Dict[str, Any]],  # 只支持结构化内容列表
-        response_type: ResponseType,
+        content: Union[str, List[Dict[str, Any]]],
         keyword: Optional[str] = None,
-        function_name: Optional[str] = None,
-        function_args: Optional[Dict[str, Any]] = None,
-        function_result: Optional[Any] = None,
-        function_call_id: Optional[str] = None,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        error: Optional[str] = None,
     ):
         # 确保 content 总是列表格式
         if isinstance(content, str):
-            self.content = [{"type": "text", "text": content}]
+            if error:
+                # 错误情况下，content可能是错误信息字符串
+                self.content = [{"type": "text", "text": content}]
+                self.is_error = True
+            else:
+                self.content = [{"type": "text", "text": content}]
+                self.is_error = False
         else:
             self.content = content
-        self.response_type = response_type
+            self.is_error = bool(error)
+        
         self.keyword = keyword
-        self.function_name = function_name
-        self.function_args = function_args
-        self.function_result = function_result
-        self.function_call_id = function_call_id
-        self.tool_calls = tool_calls or []
+        self.error = error
 
     def to_dict(self) -> dict:
         """
         将 LLMResponse 转换为字典格式。
         """
-        return {
+        result = {
             "content": self.content,
-            "response_type": self.response_type,
             "keyword": self.keyword,
-            "function_name": self.function_name,
-            "function_args": self.function_args,
-            "function_result": self.function_result,
-            "function_call_id": self.function_call_id,
-            "tool_calls": self.tool_calls,
         }
+        if self.is_error:
+            result["error"] = self.error
+        return result
 
 # =====================
 # API 请求和响应模型
