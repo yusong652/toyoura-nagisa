@@ -266,6 +266,7 @@ class GeminiClient(LLMClientBase):
             'iterations': 0,
             'api_calls': 0,
             'tool_calls_executed': 0,
+            'tool_calls_detected': False,  # 新增：是否检测到工具调用
             'thinking_preserved': False,
             'status': 'running'
         }
@@ -330,6 +331,10 @@ class GeminiClient(LLMClientBase):
             # 状态检查：是否需要继续工具调用
             if not ResponseProcessor.should_continue_tool_calling(current_response):
                 break
+            
+            # 首次检测到工具调用时设置标志
+            if not metadata['tool_calls_detected']:
+                metadata['tool_calls_detected'] = True
             
 
             
@@ -548,3 +553,5 @@ class GeminiClient(LLMClientBase):
         """
         debug = self.gemini_config.debug
         return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug) 
+
+ 

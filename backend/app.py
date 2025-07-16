@@ -282,7 +282,6 @@ async def handle_llm_response(
         # 注册当前请求
         ACTIVE_REQUESTS[session_id] = request_id
 
-    
     try:
         # 验证LLM客户端类型 - 只支持GeminiClient
         if type(llm_client).__name__ != 'GeminiClient':
@@ -293,9 +292,10 @@ async def handle_llm_response(
         if not hasattr(llm_client, 'get_enhanced_response'):
             error_msg = "GeminiClient missing get_enhanced_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
-            return
+            return   
         
-
+        # 移除预检测逻辑以避免重复API调用
+        # 工具使用通知将基于 get_enhanced_response 的执行元数据来发送
         
         # 执行增强响应处理 - 支持普通对话和工具调用
         final_message, execution_metadata = await llm_client.get_enhanced_response(
@@ -304,20 +304,38 @@ async def handle_llm_response(
             max_iterations=10
         )
         
-        
-        # 处理工具调用通知
+        # 处理工具调用通知 - 基于执行元数据
         tool_calls_executed = execution_metadata.get('tool_calls_executed', 0)
-        if tool_calls_executed > 0:
-            # 发送工具使用通知
-            tool_notification = {
+        tool_calls_detected = execution_metadata.get('tool_calls_detected', False)
+        
+        if tool_calls_detected and tool_calls_executed > 0:
+            # 发送工具使用开始通知
+            start_notification = {
                 'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': 'gemini_tools',
-                'action_text': f"I used {tool_calls_executed} tools to help you."
+                'tool_name': 'gemini_tools', 
+                'action_text': "I am using tools to help you..."
             }
-            yield f"data: {json.dumps(tool_notification)}\n\n"
+            yield f"data: {json.dumps(start_notification)}\n\n"
             
-            # 短暂延迟以便前端处理
-            await asyncio.sleep(0.3)
+            # 短暂延迟
+            await asyncio.sleep(0.1)
+            
+            # 构建工具使用完成消息
+            if tool_calls_executed == 1:
+                complete_text = f"I have completed the requested action."
+            else:
+                complete_text = f"I used {tool_calls_executed} tools to help you."
+            
+            # 发送工具使用完成通知
+            tool_complete_notification = {
+                'type': 'NAGISA_IS_USING_TOOL', 
+                'tool_name': 'gemini_tools',
+                'action_text': complete_text
+            }
+            yield f"data: {json.dumps(tool_complete_notification)}\n\n"
+            
+            # 短暂延迟
+            await asyncio.sleep(0.1)
         
         # 发送工具使用结束信号
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
@@ -331,8 +349,6 @@ async def handle_llm_response(
         # 处理标题生成
         async for chunk in _handle_title_generation(session_id, llm_client, request_id):
             yield chunk
-        
-
         
     except Exception as e:
 
@@ -353,7 +369,6 @@ async def handle_llm_response(
             if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
                 del ACTIVE_REQUESTS[session_id]
 
-
 async def _process_final_response(
     final_message: BaseMessage,
     session_id: str,
@@ -363,7 +378,6 @@ async def _process_final_response(
     """
     处理最终响应消息 - 原子性操作
     """
-
     
     if not hasattr(final_message, 'content'):
         return
@@ -380,9 +394,7 @@ async def _process_final_response(
         text_content = str(content)
     
     if not text_content.strip():
-        return
-    
-
+        return 
     
     # 处理AI文本消息
     loaded_history = load_all_message_history(session_id)
@@ -490,10 +502,8 @@ async def chat_stream_endpoint(request: Request):
                 recent_messages_length = get_llm_config().get("recent_messages_length", 20)
                 recent_msgs = recent_msgs[-recent_messages_length:]
                 
-                print(f"[DEBUG] API Request {request_id} - Calling handle_llm_response")
                 async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
                     yield chunk
-                print(f"[DEBUG] API Request {request_id} - handle_llm_response completed")
             except Exception as e:
                 print(f"[ERROR] API Request {request_id} - Exception in generate(): {e}")
                 yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"

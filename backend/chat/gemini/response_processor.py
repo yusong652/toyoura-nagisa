@@ -339,6 +339,41 @@ class ResponseProcessor:
             return None
 
     @staticmethod
+    def extract_text_content(response) -> str:
+        """
+        Extract text content from raw Gemini API response.
+        
+        This method extracts only the text parts (not thinking parts) from
+        the response, which can be used for tool usage notifications.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            Extracted text content as string, empty if no text found
+        """
+        try:
+            if not (hasattr(response, 'candidates') and response.candidates and 
+                    hasattr(response.candidates[0], 'content')):
+                return ""
+            
+            candidate = response.candidates[0]
+            text_parts = []
+            
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                for part in candidate.content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        # Only extract non-thinking text parts
+                        if not getattr(part, 'thought', False):
+                            text_parts.append(part.text)
+            
+            return "".join(text_parts).strip()
+            
+        except Exception as e:
+            print(f"[WARNING] Error extracting text content: {e}")
+            return ""
+
+    @staticmethod
     def get_response_validation_info(response) -> Dict[str, Any]:
         """
         Extract validation information crucial for context preservation.

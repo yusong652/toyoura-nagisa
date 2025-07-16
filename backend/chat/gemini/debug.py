@@ -263,39 +263,43 @@ class GeminiDebugger:
     @staticmethod
     def _process_parameters_for_debug(parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process parameters dict to truncate descriptions in properties.
+        Process parameters dict to only keep properties field for debug output.
         
         Args:
             parameters: Parameters dictionary from tool schema
             
         Returns:
-            Processed parameters with truncated descriptions
+            Processed parameters with only properties field containing descriptions
         """
-        processed_params = parameters.copy()
-        
-        if 'properties' in processed_params and isinstance(processed_params['properties'], dict):
+        # Only keep properties field from parameters
+        if 'properties' in parameters and isinstance(parameters['properties'], dict):
             processed_properties = {}
             
-            for prop_name, prop_value in processed_params['properties'].items():
+            for prop_name, prop_value in parameters['properties'].items():
                 if isinstance(prop_value, dict):
-                    processed_prop = prop_value.copy()
-                    
-                    # Truncate description in property
-                    if 'description' in processed_prop and isinstance(processed_prop['description'], str):
-                        original_desc = processed_prop['description']
-                        processed_prop['description'] = GeminiDebugger._truncate_text_for_debug(
-                            original_desc,
-                            max_length=80,
-                            field_name=f"parameter '{prop_name}' description"
-                        )
-                    
-                    processed_properties[prop_name] = processed_prop
+                    # Only keep description field for debug output
+                    if 'description' in prop_value and isinstance(prop_value['description'], str):
+                        original_desc = prop_value['description']
+                        processed_properties[prop_name] = {
+                            'description': GeminiDebugger._truncate_text_for_debug(
+                                original_desc,
+                                max_length=80,
+                                field_name=f"parameter '{prop_name}' description"
+                            )
+                        }
+                    else:
+                        # If no description, still create entry but with placeholder
+                        processed_properties[prop_name] = {
+                            'description': '<no description>'
+                        }
                 else:
+                    # If property value is not a dict, keep as-is
                     processed_properties[prop_name] = prop_value
             
-            processed_params['properties'] = processed_properties
-        
-        return processed_params
+            return {'properties': processed_properties}
+        else:
+            # If no properties found, return empty properties
+            return {'properties': {}}
 
     @staticmethod
     def _truncate_text_for_debug(text: str, max_length: int = 100, field_name: str = "text") -> str:
