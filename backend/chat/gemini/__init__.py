@@ -27,9 +27,9 @@ Enhanced Architecture:
 - Complete integration of GeminiContextManager and dual-mode ResponseProcessor
 
 Usage Patterns:
-1. Legacy mode: `client.get_response(messages)` - Traditional processing
-2. Context-preservation mode: `client.get_response_with_context_preservation(messages)` - Raw response + context manager
-3. Enhanced mode: `client.get_enhanced_response(messages)` - Universal handler for all request types with metadata
+1. Primary interface: `client.get_enhanced_response(messages)` - Universal handler for all request types with metadata
+2. Direct API access: `client.call_api_with_context(contents)` - Low-level API calls with context preservation  
+3. Specialized features: `client.generate_title_from_messages()`, `client.generate_text_to_image_prompt()`
 """
 
 from .client import GeminiClient

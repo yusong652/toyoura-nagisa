@@ -19,9 +19,9 @@ class LLMClientBase(ABC):
     
     此基类定义了统一的LLM客户端接口，专为以下特性优化：
     - 内部状态机工具调用
-    - 简化的响应模型（移除ResponseType依赖）
-    - 增强的元数据支持
+    - 增强响应处理与元数据支持
     - 会话级别的功能支持
+    - 完整的生命周期管理
     """
 
     def __init__(self, **kwargs):
@@ -35,29 +35,39 @@ class LLMClientBase(ABC):
         self.tools_enabled = kwargs.get("tools_enabled", True)  # 默认开启工具
 
     @abstractmethod
-    async def get_response(
+    async def get_enhanced_response(
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
         **kwargs
-    ) -> LLMResponse:
+    ) -> Tuple[BaseMessage, Dict[str, Any]]:
         """
-        [核心接口] 异步获取LLM响应
+        [核心接口] 获取增强响应，包含详细元数据
         
-        此方法应该返回一个LLMResponse对象，包含处理后的响应内容。
-        对于支持工具调用的客户端，应该在内部处理所有工具调用逻辑。
+        专为SOTA架构设计的统一响应处理器，采用状态机模式支持：
+        1. 普通文本对话处理
+        2. 智能工具调用序列
+        3. 完整的生命周期管理
+        4. 详细的执行元数据
+        
+        此方法能够处理所有类型的LLM请求，自动检测是否需要工具调用，
+        并在需要时执行完整的多轮工具调用序列。
         
         Args:
-            messages: Message 对象列表，包含历史和最新用户输入
-            session_id: 可选的会话ID，用于支持会话级别的功能（如工具缓存）
-            **kwargs: 其他可选参数（如温度、max_tokens等）
+            messages: 输入消息列表
+            session_id: 会话ID，用于工具和上下文管理
+            **kwargs: 额外参数（如max_iterations、temperature等）
             
         Returns:
-            LLMResponse: 包含响应内容和元数据的响应对象
+            Tuple[BaseMessage, Dict[str, Any]]: (最终消息, 执行元数据)
             
         Note:
-            对于新的SOTA架构，工具调用应该在客户端内部通过状态机处理，
-            不应该依赖API层的递归逻辑。
+            执行元数据应包含：
+            - execution_id: 执行ID
+            - iterations: 迭代次数
+            - tool_calls_executed: 工具调用次数
+            - status: 执行状态
+            - 其他性能和调试信息
         """
         pass
 
@@ -74,33 +84,7 @@ class LLMClientBase(ABC):
             # 同时更新 extra_config
             self.extra_config[key] = value
 
-    # ========== 可选扩展接口 ==========
-    
-    async def get_enhanced_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        **kwargs
-    ) -> Tuple[BaseMessage, Dict[str, Any]]:
-        """
-        [可选接口] 获取增强响应，包含详细元数据
-        
-        此方法为支持高级功能的客户端提供，返回最终消息和执行元数据。
-        
-        Args:
-            messages: 输入消息列表
-            session_id: 会话ID
-            **kwargs: 额外参数
-            
-        Returns:
-            Tuple[BaseMessage, Dict[str, Any]]: (最终消息, 执行元数据)
-            
-        Raises:
-            NotImplementedError: 如果客户端不支持此功能
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support enhanced response mode"
-        )
+    # ========== 专用内容生成接口 ==========
 
     async def generate_title_from_messages(
         self,
@@ -145,3 +129,6 @@ class LLMClientBase(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support image prompt generation"
         )
+
+    # Note: Removed deprecated get_response() method.
+    # All implementations should use get_enhanced_response() as the primary interface.

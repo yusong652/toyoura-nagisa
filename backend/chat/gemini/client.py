@@ -6,7 +6,7 @@ from google.genai import types
 
 from backend.config import get_llm_specific_config, get_system_prompt
 from backend.chat.base import LLMClientBase
-from backend.chat.models import BaseMessage, LLMResponse, ResponseType
+from backend.chat.models import BaseMessage, LLMResponse
 from .config import get_gemini_client_config, GeminiClientConfig
 from .context_manager import GeminiContextManager
 from .debug import GeminiDebugger
@@ -415,101 +415,9 @@ class GeminiClient(LLMClientBase):
         import time
         return time.time()
 
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        **kwargs
-    ) -> 'LLMResponse':
-        """
-        [LEGACY] Get response using traditional processing mode.
-        
-        This method maintains full backward compatibility while serving as
-        a bridge to the enhanced context preservation features.
-        
-        For new implementations requiring enhanced response handling with
-        automatic tool calling support, consider using get_enhanced_response() instead.
-        
-        Args:
-            messages: Input message history
-            session_id: Optional session ID for tool management
-            **kwargs: Additional configuration parameters
-            
-        Returns:
-            LLMResponse object in traditional format
-        """
-        # 1. 获取所有工具 schemas（包括 MCP 工具和代码执行工具）
-        tool_schemas = await self.get_function_call_schemas(session_id)
-        
-        tools_enabled = bool(tool_schemas)
-        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-        
-        debug = self.gemini_config.debug
-
-        # 2. 构造 Gemini API payload，注册 tools
-        contents = MessageFormatter.format_messages_for_gemini(messages)
-        config_kwargs = self.gemini_config.get_generation_config_kwargs(
-            system_prompt=system_prompt,
-            tool_schemas=tool_schemas
-        )
-        config = types.GenerateContentConfig(**config_kwargs)
-
-        if debug:
-            GeminiDebugger.print_debug_request(contents, config)
-
-        try:
-            # For GenerativeModel, we call generate_content directly on the model instance
-            response = self.client.models.generate_content(
-                model=self.gemini_config.model_settings.model,
-                contents=contents,
-                config=config,
-            )
-            
-            # 检查响应中是否有错误
-            if hasattr(response, 'error'):
-                error_message = f"Gemini API error: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
-                print(f"[DEBUG] llm_response type: error")
-                print(f"[DEBUG] {error_message}")
-                return LLMResponse(
-                    content=error_message,
-                    response_type=ResponseType.ERROR
-                )
-            
-            # 检查响应是否为空
-            if not hasattr(response, 'candidates') or not response.candidates:
-                error_message = "Gemini API returned empty response"
-                print(f"[DEBUG] llm_response type: error")
-                print(f"[DEBUG] {error_message}")
-                return LLMResponse(
-                    content=error_message,
-                    response_type=ResponseType.ERROR
-                )
-            
-            # Debug输出完整的LLM response
-            if debug:
-                GeminiDebugger.print_debug_response(response)
-            
-            return ResponseProcessor.format_llm_response(response)
-                
-        except Exception as e:
-            error_message = f"Gemini API error: {str(e)}"
-            print(f"[DEBUG] llm_response type: error")
-            print(f"[DEBUG] {error_message}")
-            if hasattr(e, 'status_code'):
-                error_message += f" (Status code: {e.status_code})"
-            if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                try:
-                    import json
-                    error_details = json.loads(e.response.text)
-                    if 'error' in error_details:
-                        error_message += f"\nDetails: {error_details['error'].get('message', str(error_details))}"
-                except:
-                    error_message += f"\nRaw error: {e.response.text}"
-            
-            return LLMResponse(
-                content=error_message,
-                response_type=ResponseType.ERROR
-            )
+    # Note: get_response() method has been removed as it was deprecated.
+    # The base class now provides a default implementation that calls
+    # get_enhanced_response() for backward compatibility.
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 

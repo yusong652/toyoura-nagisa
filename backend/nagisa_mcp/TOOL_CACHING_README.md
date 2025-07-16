@@ -83,15 +83,15 @@ if tool_name == "search_tools_by_keywords" and session_id:
 
 ### LLM客户端接口
 
-所有LLM客户端的 `get_response()` 方法现在接受 `session_id` 参数：
+GeminiClient 的 `get_enhanced_response()` 方法接受 `session_id` 参数：
 
 ```python
-async def get_response(
+async def get_enhanced_response(
     self,
     messages: List[BaseMessage],
     session_id: Optional[str] = None,
     **kwargs
-) -> 'LLMResponse':
+) -> Tuple[BaseMessage, Dict[str, Any]]:
 ```
 
 ### 工具Schema获取
@@ -108,10 +108,11 @@ async def get_function_call_schemas(self, session_id: Optional[str] = None):
 
 ```python
 # 创建客户端
-client = AnthropicClient(api_key="your_key", tools_enabled=True)
+from backend.chat.llm_factory import get_client
+client = get_client()  # 自动创建GeminiClient
 
 # 发送消息（会自动处理工具缓存）
-response = await client.get_response(messages, session_id="session_123")
+final_message, metadata = await client.get_enhanced_response(messages, session_id="session_123")
 ```
 
 ### 2. 手动缓存工具
