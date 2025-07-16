@@ -82,7 +82,7 @@ class ToolManager:
             True if the tool is a meta tool
         """
         return tool_name in {
-            "search_tools_by_keywords",
+            "search_tools",
             "get_available_tool_categories"
         }
 
@@ -98,7 +98,7 @@ class ToolManager:
         """
         tools = []
         if isinstance(meta_result, dict):
-            # 处理search_tools_by_keywords的结果 - 工具信息在data字段中
+            # 处理search_tools的结果 - 工具信息在data字段中
             tools_data = None
             
             # 首先检查data字段中的tools（标准ToolResult格式）
@@ -432,7 +432,7 @@ class ToolManager:
                             }
                     
                     # Cache meta results
-                    if tool_name == "search_tools_by_keywords" and session_id:
+                    if tool_name == "search_tools" and session_id:
                         try:
                             meta_result = {}
                             if isinstance(text_result, dict):

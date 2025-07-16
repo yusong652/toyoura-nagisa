@@ -35,7 +35,7 @@ def register_meta_tools(mcp: FastMCP):
     )
 
     @mcp.tool(**common_kwargs_meta)
-    def search_tools_by_keywords(
+    def search_tools(
         keywords: str = Field(
             ...,
             description="Space-separated English keywords for semantic tool search (e.g., 'weather forecast', 'email send', 'calendar create')."
@@ -87,13 +87,13 @@ def register_meta_tools(mcp: FastMCP):
         ## Examples
         ```python
         # Find weather tools
-        search_tools_by_keywords("weather forecast Paris")
+        search_tools("weather forecast Paris")
         
         # Find coding tools
-        search_tools_by_keywords("file edit replace")
+        search_tools("file edit replace")
         
         # Find communication tools
-        search_tools_by_keywords("email send calendar")
+        search_tools("email send calendar")
         ```
         """
         try:
@@ -174,7 +174,7 @@ def register_meta_tools(mcp: FastMCP):
         - Helps LLM understand available tool scope and capabilities
 
         ## Strategic Usage
-        - Use before `search_tools_by_keywords()` to understand available domains
+        - Use before `search_tools()` to understand available domains
         - Helps formulate better search keywords based on available categories
         - Provides context for tool selection strategy
 
@@ -206,7 +206,7 @@ def register_meta_tools(mcp: FastMCP):
         
         # Use categories to guide tool search
         if "weather" in categories["result"]["categories_available"]:
-            search_tools_by_keywords("weather forecast")
+            search_tools("weather forecast")
         ```
         """
         try:
