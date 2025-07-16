@@ -85,6 +85,64 @@ class GeminiContextManager:
         
         return raw_content
     
+    def _create_multimodal_parts(self, tool_name: str, result: Dict[str, Any]) -> List[Any]:
+        """
+        创建多模态内容的 Parts
+        
+        Args:
+            result: 工具执行结果
+            tool_name: 工具名称
+            
+        Returns:
+            包含多模态内容的 Parts 列表
+        """
+        parts = []
+        
+        # 检查并处理 inline_data（多模态内容）
+        if isinstance(result, dict) and 'inline_data' in result:
+            inline_data = result['inline_data']
+            
+            # 使用统一的 inline_data 处理方法，保持架构一致性
+            blob = MessageFormatter.process_inline_data(inline_data)
+            if blob:
+                parts.append(types.Part(inline_data=blob))
+                print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
+            else:
+                print(f"[WARNING] Failed to process inline_data for {tool_name}")
+        
+        return parts
+    
+    def _create_function_response_part(self, tool_name: str, result: Any) -> types.Part:
+        """
+        创建函数响应 Part
+        
+        Args:
+            tool_name: 工具名称
+            result: 工具执行结果
+            
+        Returns:
+            函数响应的 Part 对象
+        """
+        # 处理不同类型的工具结果
+        if isinstance(result, dict):
+            response_dict = result.copy()
+        elif isinstance(result, str):
+            response_dict = {"result": result}
+        else:
+            response_dict = {"result": str(result)}
+        
+        # 对于多模态内容，排除大的 inline_data 避免重复
+        if 'inline_data' in response_dict:
+            response_dict = {k: v for k, v in response_dict.items() if k != 'inline_data'}
+            response_dict['multimodal_content'] = 'Processed as separate image Part'
+        
+        function_response = types.FunctionResponse(
+            name=tool_name,
+            response=response_dict
+        )
+        
+        return types.Part(function_response=function_response)
+    
     def add_tool_response(self, tool_name: str, tool_call_id: str, result: Any) -> Dict[str, Any]:
         """
         添加工具响应到工作上下文
@@ -97,54 +155,15 @@ class GeminiContextManager:
         Returns:
             添加到上下文的工具响应内容
         """
-        # 处理不同类型的工具结果
-        if isinstance(result, dict):
-            response_dict = result
-        elif isinstance(result, str):
-            response_dict = {"result": result}
-        else:
-            response_dict = {"result": str(result)}
-        
-        # **CRITICAL FIX**: Handle inline_data in tool results for multimodal content
         parts = []
         
-        # Check if the result contains inline_data (from tools like read_file for images)
-        if (isinstance(result, dict) and 'inline_data' in result):
-            inline_data = result['inline_data']
-            
-            try:
-                # Import base64 for decoding
-                import base64
-                
-                # Decode the base64 image data
-                data_field = inline_data['data']
-                mime_type = inline_data.get('mime_type', 'image/png')
-                
-                if isinstance(data_field, str):
-                    image_bytes = base64.b64decode(data_field)
-                    
-                    # Create image Part with decoded bytes
-                    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                    parts.append(image_part)
-                    
-                    print(f"[DEBUG] Created multimodal Part for {tool_name}: {mime_type}, {len(image_bytes)} bytes")
-                    
-            except Exception as e:
-                print(f"[WARNING] Failed to create image Part for {tool_name}: {e}")
+        # 创建多模态内容 Parts（如果存在）
+        multimodal_parts = self._create_multimodal_parts(tool_name, result)
+        parts.extend(multimodal_parts)
         
-        # Create function response Part (always needed)
-        # For multimodal content, exclude the large inline_data from the response to avoid duplication
-        clean_response_dict = response_dict.copy()
-        if 'inline_data' in clean_response_dict:
-            # Remove the large base64 data and keep only metadata
-            clean_response_dict = {k: v for k, v in clean_response_dict.items() if k != 'inline_data'}
-            clean_response_dict['multimodal_content'] = 'Processed as separate image Part'
-        
-        function_response = types.FunctionResponse(
-            name=tool_name,
-            response=clean_response_dict
-        )
-        parts.append(types.Part(function_response=function_response))
+        # 创建函数响应 Part
+        function_part = self._create_function_response_part(tool_name, result)
+        parts.append(function_part)
         
         # 构建工作上下文内容
         working_content = {

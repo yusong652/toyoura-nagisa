@@ -101,16 +101,10 @@ class MessageFormatter:
                     if "text" in item and item["text"]:
                         parts.append(types.Part(text=item["text"]))
                     elif "inline_data" in item:
-                        # Process multimodal content (images, documents)
-                        inline_data = item["inline_data"]
-                        data_field = inline_data["data"]
-                        mime_type = inline_data.get("mime_type", "image/png")
-                        try:
-                            image_bytes = base64.b64decode(data_field)
-                            parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
-                        except Exception as e:
-                            print(f"[WARNING] Failed to decode inline_data in history message: {e}")
-                            continue
+                        # 使用统一的 inline_data 处理方法，保持架构一致性
+                        blob = MessageFormatter.process_inline_data(item['inline_data'])
+                        if blob:
+                            parts.append(types.Part(inline_data=blob))
             else:
                 # Simple text message
                 parts.append(types.Part(text=str(msg.content)))
