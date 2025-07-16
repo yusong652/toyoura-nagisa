@@ -85,3 +85,9 @@ backend/tool_db/
 
 # Persona prompt (user-specific)
 backend/chat/persona_prompt.md
+
+# Legacy LLM clients (deprecated, replaced by gemini client)
+backend/chat/anthropic.py
+backend/chat/gpt.py
+backend/chat/grok.py
+backend/chat/mistral.py
