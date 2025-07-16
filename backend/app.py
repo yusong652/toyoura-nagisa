@@ -32,7 +32,7 @@ from backend.utils.helpers import (
     is_pure_text_assistant,
     generate_title_for_session,
 )
-from backend.chat.models import Message, UserMessage, AssistantMessage, message_factory, UserToolMessage, BaseMessage, message_factory_no_thinking
+from backend.chat.models import Message, UserMessage, AssistantMessage, message_factory, ToolResultMessage, BaseMessage, message_factory_no_thinking
 from backend.chat.models import (
     NewHistoryRequest,
     HistorySessionResponse,

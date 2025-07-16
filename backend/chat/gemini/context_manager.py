@@ -12,7 +12,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
-from backend.chat.models import BaseMessage, UserToolMessage, AssistantMessage, message_factory
+from backend.chat.models import BaseMessage, ToolResultMessage, AssistantMessage, message_factory
 from .message_formatter import MessageFormatter
 
 
@@ -121,7 +121,7 @@ class GeminiContextManager:
         self.working_contents.append(working_content)
         
         # 创建对应的存储格式消息
-        storage_message = UserToolMessage(
+        storage_message = ToolResultMessage(
             tool_call_id=tool_call_id,
             name=tool_name,
             content=result

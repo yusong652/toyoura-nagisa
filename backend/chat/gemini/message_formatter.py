@@ -10,7 +10,7 @@ import base64
 from typing import List, Dict, Any, Optional
 from google.genai import types
 
-from backend.chat.models import BaseMessage, UserToolMessage
+from backend.chat.models import BaseMessage, ToolResultMessage
 
 
 class MessageFormatter:
@@ -131,7 +131,7 @@ class MessageFormatter:
                 continue
 
             # 处理工具响应消息
-            if isinstance(msg, UserToolMessage):
+            if isinstance(msg, ToolResultMessage):
                 tool_name = msg.name
                 if not tool_name:
                     print(f"[WARNING] Tool response missing name: {msg}")

@@ -47,10 +47,10 @@ class AssistantToolMessage(BaseMessage):
 # =====================
 # 工具调用结果消息（工具响应，回复 AssistantToolMessage）
 # =====================
-class UserToolMessage(BaseMessage):
+class ToolResultMessage(BaseMessage):
     """
     工具调用的结果消息（tool result），用于回复 AssistantToolMessage。
-    注意：虽然 role 是 'user'，但这不是用户输入，而是工具的响应。
+    这是工具执行后返回的结果消息。
     """
     tool_call_id: str  # 确保这是必需的字段
     name: str
@@ -73,7 +73,7 @@ class ImageMessage(BaseModel):
 # =====================
 # 类型提示用 Union
 # =====================
-MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, UserToolMessage, ImageMessage]
+MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, ToolResultMessage, ImageMessage]
 
 # =====================
 # 消息工厂函数
@@ -86,7 +86,7 @@ def message_factory(data: dict) -> BaseMessage:
     if data.get('role') == 'tool':
         if 'tool_call_id' not in data:
             raise ValueError("Tool response message must have a tool_call_id")
-        return UserToolMessage(
+        return ToolResultMessage(
             tool_call_id=data['tool_call_id'],
             name=data['name'],
             content=data['content']
@@ -158,7 +158,7 @@ def message_factory_no_thinking(data: dict) -> BaseMessage:
     if data.get('role') == 'tool':
         if 'tool_call_id' not in data:
             raise ValueError("Tool response message must have a tool_call_id")
-        return UserToolMessage(
+        return ToolResultMessage(
             tool_call_id=data['tool_call_id'],
             name=data['name'],
             content=data['content']
