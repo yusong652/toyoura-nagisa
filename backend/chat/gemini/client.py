@@ -250,9 +250,7 @@ class GeminiClient(LLMClientBase):
         # === INITIALIZATION PHASE ===
         execution_id = self._generate_execution_id()
         debug = self.gemini_config.debug
-        
 
-        
         # 创建独立的上下文管理器 - 确保状态隔离
         context_manager = GeminiContextManager()
         context_manager.initialize_from_messages(messages)
@@ -296,9 +294,7 @@ class GeminiClient(LLMClientBase):
             metadata['status'] = 'failed'
             metadata['error'] = str(e)
             metadata['end_time'] = self._get_timestamp()
-            
-
-                
+        
             raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
     
     async def _execute_tool_calling_loop(
@@ -320,9 +316,7 @@ class GeminiClient(LLMClientBase):
             working_contents, session_id=session_id
         )
         metadata['api_calls'] += 1
-        
-
-        
+    
         # 工具调用状态机
         iteration = 0
         while iteration < max_iterations:
@@ -335,9 +329,7 @@ class GeminiClient(LLMClientBase):
             # 首次检测到工具调用时设置标志
             if not metadata['tool_calls_detected']:
                 metadata['tool_calls_detected'] = True
-            
-
-            
+       
             # 添加当前响应到上下文
             context_manager.add_raw_response(current_response)
             
@@ -347,9 +339,7 @@ class GeminiClient(LLMClientBase):
             # 批量执行工具调用
             for tool_call in tool_calls:
                 metadata['tool_calls_executed'] += 1
-                
-
-                
+          
                 # 执行单个工具调用
                 tool_result = await self._execute_single_tool_call(
                     tool_call, session_id, execution_id, debug
@@ -368,9 +358,7 @@ class GeminiClient(LLMClientBase):
                 working_contents, session_id=session_id
             )
             metadata['api_calls'] += 1
-            
-
-            
+       
             iteration += 1
         
         # 检查是否达到最大迭代次数
@@ -393,16 +381,12 @@ class GeminiClient(LLMClientBase):
             result = await self.tool_manager.handle_function_call(
                 tool_call, session_id, debug
             )
-            
-
-            
+        
             return result
             
         except Exception as e:
             error_result = f"Tool execution failed: {str(e)}"
-            
-
-            
+        
             return error_result
     
     def _generate_execution_id(self) -> str:
@@ -461,5 +445,3 @@ class GeminiClient(LLMClientBase):
         """
         debug = self.gemini_config.debug
         return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug) 
-
- 
