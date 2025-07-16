@@ -99,14 +99,31 @@ class GeminiDebugger:
                         for j, part in enumerate(content.parts):
                             print(f"    Part {j+1}: {type(part).__name__}")
                             
-                            # 检查text content
+                            # 🔍 打印part的完整属性信息
+                            part_attributes = {}
+                            special_fields = ['text', 'function_call', 'function_response', 'thought_signature', 'thought', 'inline_data']
+                            
+                            for attr in dir(part):
+                                if not attr.startswith('_') and not attr.startswith('model_'):
+                                    try:
+                                        value = getattr(part, attr)
+                                        if not callable(value) and value is not None:
+                                            part_attributes[attr] = value
+                                    except:
+                                        pass
+                            
+                            # 详细打印已知的特殊字段
                             if hasattr(part, 'text') and part.text:
                                 text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
-                                is_thought = getattr(part, 'thought', False)
-                                thought_indicator = " (THOUGHT)" if is_thought else ""
-                                print(f"      📄 Text{thought_indicator}: {repr(text_preview)}")
+                                print(f"      📄 Text: {repr(text_preview)}")
                             
-                            # 检查function call
+                            if hasattr(part, 'thought_signature') and part.thought_signature:
+                                print(f"      🧠 Thought Signature: {repr(part.thought_signature)}")
+                            
+                            if hasattr(part, 'thought') and part.thought:
+                                print(f"      💭 Is Thought Content: {part.thought}")
+                                # 注意：思维内容实际在 part.text 中，part.thought 只是布尔标识符
+                            
                             if hasattr(part, 'function_call') and part.function_call:
                                 func_call = part.function_call
                                 print(f"      🔧 Function call:")
@@ -118,23 +135,33 @@ class GeminiDebugger:
                                 elif hasattr(func_call, 'arguments') and func_call.arguments:
                                     print(f"        Arguments: {func_call.arguments}")
                             
-                            # 检查其他part类型
-                            if not (hasattr(part, 'text') or hasattr(part, 'function_call')):
-                                # 使用JSON格式显示part的所有属性
-                                try:
-                                    part_dict = {}
-                                    for attr in dir(part):
-                                        if not attr.startswith('_'):
-                                            try:
-                                                value = getattr(part, attr)
-                                                if not callable(value):
-                                                    part_dict[attr] = str(value) if value is not None else None
-                                            except:
-                                                pass
-                                    part_json = json.dumps(part_dict, indent=6, ensure_ascii=False, default=str)
-                                    print(f"      🔍 Part attributes: {part_json}")
-                                except:
-                                    print(f"      🔍 Part attributes: {part}")
+                            if hasattr(part, 'function_response') and part.function_response:
+                                func_resp = part.function_response
+                                print(f"      🔄 Function response:")
+                                print(f"        Name: {func_resp.name}")
+                                if hasattr(func_resp, 'response'):
+                                    print(f"        Response: {func_resp.response}")
+                            
+                            if hasattr(part, 'inline_data') and part.inline_data:
+                                print(f"      📎 Inline data: {type(part.inline_data).__name__}")
+                            
+                            # 打印所有属性的完整JSON（用于调试）
+                            try:
+                                serializable_attrs = {}
+                                for key, value in part_attributes.items():
+                                    try:
+                                        # 尝试序列化，如果失败则转为字符串
+                                        json.dumps(value)
+                                        serializable_attrs[key] = value
+                                    except:
+                                        serializable_attrs[key] = str(value) if value is not None else None
+                                
+                                if serializable_attrs:
+                                    part_json = json.dumps(serializable_attrs, indent=8, ensure_ascii=False, default=str)
+                                    print(f"      🔍 完整Part属性: {part_json}")
+                            except Exception as e:
+                                print(f"      ❌ Part属性序列化失败: {e}")
+                                print(f"      🔍 Part原始信息: {part}")
                 else:
                     print(f"  ❌ No content found in candidate")
         else:
@@ -362,6 +389,50 @@ class GeminiDebugger:
         return censored_payload
 
     @staticmethod
+    def _convert_object_to_dict(obj) -> Any:
+        """
+        将对象转换为字典格式，解决混合格式序列化问题
+        
+        Args:
+            obj: 需要转换的对象
+            
+        Returns:
+            转换后的字典或原始值
+        """
+        # 如果是基本类型，直接返回
+        if obj is None or isinstance(obj, (str, int, float, bool, list, dict)):
+            return obj
+        
+        # 尝试转换为字典格式
+        try:
+            result = {}
+            
+            # 提取对象的有效属性
+            for attr in dir(obj):
+                if (not attr.startswith('_') and 
+                    not attr.startswith('model_') and
+                    not callable(getattr(obj, attr))):
+                    try:
+                        value = getattr(obj, attr)
+                        if value is not None:
+                            # 递归处理嵌套对象
+                            if isinstance(value, list):
+                                result[attr] = [GeminiDebugger._convert_object_to_dict(item) for item in value]
+                            elif hasattr(value, '__dict__') or hasattr(value, '__slots__'):
+                                result[attr] = GeminiDebugger._convert_object_to_dict(value)
+                            else:
+                                result[attr] = value
+                    except Exception:
+                        # 如果无法访问属性，跳过
+                        pass
+            
+            return result if result else str(obj)
+            
+        except Exception:
+            # 如果转换失败，返回字符串表示
+            return str(obj)
+
+    @staticmethod
     def _print_simplified_payload(payload: Dict[str, Any], max_desc_length: int = 60) -> None:
         """
         Print simplified payload using JSON format for better readability.
@@ -373,7 +444,7 @@ class GeminiDebugger:
         # 由于payload已经在_create_debug_config中被预处理，
         # 这里只需要处理一些可能遗漏的递归结构
         def final_cleanup(obj):
-            """最终清理，确保没有遗漏的长字段"""
+            """最终清理，确保没有遗漏的长字段，并统一对象格式"""
             if isinstance(obj, dict):
                 result = {}
                 for key, value in obj.items():
@@ -390,7 +461,8 @@ class GeminiDebugger:
             elif isinstance(obj, list):
                 return [final_cleanup(item) for item in obj]
             else:
-                return obj
+                # 🚀 修复：将对象转换为字典格式，避免混合序列化问题
+                return GeminiDebugger._convert_object_to_dict(obj)
         
         cleaned_payload = final_cleanup(payload)
         

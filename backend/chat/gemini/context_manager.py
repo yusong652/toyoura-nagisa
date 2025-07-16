@@ -58,11 +58,8 @@ class GeminiContextManager:
         """
         添加原始 Gemini API 响应到工作上下文
         
-        这是核心方法，确保原始响应格式完整保留，包括：
-        - 思维链内容 (thinking)
-        - 验证字段 (如 thought_signature)
-        - 工具调用信息
-        - 所有原始API字段
+        按照官方最佳实践，直接使用 candidate.content 而不是重构，
+        确保完整保留所有原始字段，包括思维链、验证字段等。
         
         Args:
             response: 原始 Gemini API 响应对象
@@ -76,21 +73,9 @@ class GeminiContextManager:
         
         candidate = response.candidates[0]
         
-        # 构建完整的原始内容，保持所有字段
-        raw_content = {
-            "role": "model",
-            "parts": []
-        }
-        
-        # 保留完整的parts列表，包括思维、文本和工具调用
-        if hasattr(candidate.content, 'parts'):
-            # 直接使用原始parts，确保没有信息丢失
-            raw_content["parts"] = candidate.content.parts
-        
-        # 如果有顶层思维内容，也要保留
-        if hasattr(candidate, 'thought') and candidate.thought:
-            # 注意：顶层thought通常已经包含在parts中，这里做额外记录
-            raw_content["_top_level_thought"] = candidate.thought
+        # ✅ 官方最佳实践：直接使用 candidate.content，不重构任何内容
+        # 这确保了完整保留所有原始字段，包括思维链、验证字段等
+        raw_content = candidate.content
         
         # 添加到工作上下文
         self.working_contents.append(raw_content)
@@ -252,11 +237,25 @@ class GeminiContextManager:
             return []
         
         latest_content = self.working_contents[-1]
-        if latest_content.get("role") != "model":
+        
+        # 安全地检查 role，支持对象和字典两种格式
+        content_role = None
+        if hasattr(latest_content, 'role'):
+            content_role = latest_content.role
+        elif isinstance(latest_content, dict) and 'role' in latest_content:
+            content_role = latest_content['role']
+        
+        if content_role != "model":
             return []
         
         tool_calls = []
-        parts = latest_content.get("parts", [])
+        
+        # 安全地获取 parts，支持对象和字典两种格式
+        parts = []
+        if hasattr(latest_content, 'parts'):
+            parts = latest_content.parts
+        elif isinstance(latest_content, dict) and 'parts' in latest_content:
+            parts = latest_content['parts']
         
         for part in parts:
             if hasattr(part, 'function_call') and part.function_call:
@@ -278,18 +277,3 @@ class GeminiContextManager:
         """
         tool_calls = self.extract_tool_calls_from_latest_response()
         return len(tool_calls) > 0
-    
-    def get_context_summary(self) -> Dict[str, Any]:
-        """
-        获取上下文状态摘要，用于调试和监控
-        
-        Returns:
-            包含上下文状态信息的字典
-        """
-        return {
-            "working_contents_count": len(self.working_contents),
-            "storage_messages_count": len(self.storage_messages),
-            "pending_tool_calls": len(self._tool_call_sequence),
-            "last_role": self.working_contents[-1]["role"] if self.working_contents else None,
-            "has_tool_calls": self.should_continue_tool_calling()
-        } 
