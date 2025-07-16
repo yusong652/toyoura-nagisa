@@ -507,10 +507,6 @@ class ToolManager:
             content_for_llm = tool_output
 
             if isinstance(tool_output, dict):
-                # If it's our standard ToolResult, extract the specific llm_content part
-                if 'llm_content' in tool_output:
-                    content_for_llm = tool_output['llm_content']
-                
                 # Check for error status in the standard ToolResult
                 if tool_output.get("status") == "error":
                     return {
@@ -520,6 +516,47 @@ class ToolManager:
                         "content": tool_output.get("message", "Tool execution failed."),
                         "is_error": True
                     }
+                
+                # **CRITICAL FIX**: Check for inline_data in the tool result
+                # If the tool result contains inline_data (multimodal content), we need to
+                # preserve the complete structure instead of just returning llm_content
+                has_inline_data = False
+                inline_data_content = None
+                
+                # Check if there's inline_data in the processing_result
+                if ('data' in tool_output and 
+                    isinstance(tool_output['data'], dict) and
+                    'processing_result' in tool_output['data'] and
+                    isinstance(tool_output['data']['processing_result'], dict)):
+                    
+                    processing_result = tool_output['data']['processing_result']
+                    if (processing_result.get('content_format') == 'inline_data' and
+                        'content' in processing_result and
+                        isinstance(processing_result['content'], dict) and
+                        'inline_data' in processing_result['content']):
+                        
+                        has_inline_data = True
+                        inline_data_content = processing_result['content']
+                        
+                        if debug:
+                            print(f"[DEBUG] Detected inline_data in {tool_name} result")
+                            print(f"[DEBUG] Inline data mime_type: {inline_data_content['inline_data'].get('mime_type', 'unknown')}")
+                            data_size = len(inline_data_content['inline_data'].get('data', ''))
+                            print(f"[DEBUG] Inline data size: {data_size} chars")
+
+                # If tool has inline_data, return the structured format that includes both
+                # llm_content for text display and the inline_data for multimodal processing
+                if has_inline_data:
+                    return {
+                        # Include llm_content for text information
+                        **tool_output.get('llm_content', {}),
+                        # Include the inline_data structure
+                        'inline_data': inline_data_content['inline_data']
+                    }
+                
+                # If it's our standard ToolResult without inline_data, extract the llm_content part
+                if 'llm_content' in tool_output:
+                    content_for_llm = tool_output['llm_content']
             
             return content_for_llm
 

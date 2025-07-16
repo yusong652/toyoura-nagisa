@@ -91,7 +91,10 @@ class MessageFormatter:
             List of formatted message dictionaries for Gemini API
         """
         contents = []
+        
         for msg in messages:
+            print(f"[DEBUG] MessageFormatter: Processing message type: {type(msg)}, role: {getattr(msg, 'role', 'no_role')}")
+            
             # Gemini function call标准：
             # - assistant function_call消息用model+function_call结构
             # - tool响应用user+function_response结构
@@ -129,9 +132,10 @@ class MessageFormatter:
                 if parts:
                     contents.append({"role": "model", "parts": parts})
                 continue
-
+            
             # 处理工具响应消息
             if isinstance(msg, ToolResultMessage):
+                print(f"[DEBUG] MessageFormatter: Detected ToolResultMessage with name: {getattr(msg, 'name', 'no_name')}")
                 tool_name = msg.name
                 if not tool_name:
                     print(f"[WARNING] Tool response missing name: {msg}")
@@ -142,31 +146,42 @@ class MessageFormatter:
                 inline_data = None
                 
                 if isinstance(msg.content, dict):
+                    print(f"[DEBUG] MessageFormatter: Processing ToolResultMessage with content keys: {list(msg.content.keys())}")
+                    
                     # 检查标准化格式: content.data.inline_data
                     if (msg.content.get("content", {}).get("format") == "inline_data" and 
                         isinstance(msg.content.get("content", {}).get("data"), dict) and
                         "inline_data" in msg.content["content"]["data"]):
                         is_image = True
                         inline_data = msg.content["content"]["data"]["inline_data"]
+                        print(f"[DEBUG] MessageFormatter: Detected nested inline_data format")
                     # 检查直接格式: content.inline_data (兼容性)
                     elif 'inline_data' in msg.content:
                         is_image = True
                         inline_data = msg.content['inline_data']
+                        print(f"[DEBUG] MessageFormatter: Detected direct inline_data format")
+                    else:
+                        print(f"[DEBUG] MessageFormatter: No inline_data detected in content")
+                
+                print(f"[DEBUG] MessageFormatter: is_image={is_image}, inline_data_present={inline_data is not None}")
                 
                 if is_image and inline_data:
                     data_field = inline_data['data']
                     mime_type = inline_data.get('mime_type', 'image/png')
                     try:
                         image_bytes = base64.b64decode(data_field)
+                        # Create both image part and function response part
                         parts = [
                             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                             types.Part(function_response=types.FunctionResponse(
                                 name=tool_name,
-                                response={'status': 'success', 'content': 'Image file read successfully.'}
+                                response={'status': 'success', 'content': 'Binary file processed as multimodal content.'}
                             ))
                         ]
                     except Exception as e:
                         print(f"[WARNING] Failed to decode inline_data in tool response: {e}")
+                        # Fallback to function response only
+                        response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
                         parts = [types.Part(function_response=types.FunctionResponse(
                             name=tool_name,
                             response={'status': 'error', 'content': 'Failed to decode image data'}
@@ -174,6 +189,7 @@ class MessageFormatter:
                     contents.append({"role": "user", "parts": parts})
                     continue
                 else:
+                    # Standard function response without multimodal content
                     response_dict = msg.content if isinstance(msg.content, dict) else {"result": str(msg.content)}
                     parts = [types.Part(function_response=types.FunctionResponse(
                         name=tool_name,
