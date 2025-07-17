@@ -77,8 +77,8 @@ def register_meta_tools(mcp: FastMCP):
             "search_limited": false
           },
           "summary": {
-            "discovery_success": true,
-            "tools_activated": 2
+            "operation_type": "tool_discovery",
+            "success": true
           }
         }
         ```
@@ -144,8 +144,8 @@ def register_meta_tools(mcp: FastMCP):
                     "guidance": guidance_message if guidance_message else None
                 },
                 "summary": {
-                    "discovery_success": True,
-                    "tools_activated": len(formatted_tools)
+                    "operation_type": "tool_discovery",
+                    "success": True
                 }
             }
             
@@ -209,8 +209,8 @@ def register_meta_tools(mcp: FastMCP):
             "categories_available": ["coding", "communication", "information", "weather"]
           },
           "summary": {
-            "discovery_success": true,
-            "categories_available": 4
+            "operation_type": "category_discovery",
+            "success": true
           }
         }
         ```
@@ -262,7 +262,8 @@ def register_meta_tools(mcp: FastMCP):
                     "category_count": len(categories)
                 },
                 "summary": {
-                    "discovery_success": True
+                    "operation_type": "category_discovery",
+                    "success": True
                 }
             }
             
