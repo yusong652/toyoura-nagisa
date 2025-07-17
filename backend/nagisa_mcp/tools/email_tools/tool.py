@@ -70,7 +70,6 @@ def register_email_tools(mcp: FastMCP):
         }
         ```
 
-
         """
         try:
             user_email = os.getenv("USER_GMAIL_ADDRESS")
