@@ -7,6 +7,7 @@ import asyncio
 import requests
 from timezonefinder import TimezoneFinder
 from fastmcp.server.context import Context  # type: ignore
+from pydantic import Field
 
 from backend.nagisa_mcp.utils.tool_result import ToolResult
 from backend.nagisa_mcp.utils.location_utils import get_user_location
@@ -46,7 +47,6 @@ def _success(formatted_time: str, timezone_name: str, additional_formats: dict, 
             "result": {
                 "current_time": formatted_time,
                 "timezone": timezone_name,
-                "formats": additional_formats,
                 "location_source": location_info.get("source") if location_info else "manual_override"
             },
             "summary": summary
@@ -76,11 +76,11 @@ def register_time_tools(mcp: FastMCP):
         tags={"time", "datetime", "utilities", "system", "clock", "timezone", "location"}, 
         annotations={"category": "utilities", "tags": ["time", "datetime", "utilities", "system", "clock", "timezone", "location"]}
     )
-    async def get_current_time(context: Context, timezone: Optional[str] = None) -> dict:
+    async def get_current_time(context: Context, timezone: Optional[str] = Field(default=None, description="Optional timezone override")) -> dict:
         """Retrieve the current system time with automatic timezone detection from user location.
 
         Core Functionality:
-        Automatically detects user's timezone from browser geolocation, providing current date and time information in multiple useful formats. Falls back to Tokyo timezone if location detection fails or explicit timezone is specified. Supports timezone conversion and includes both human-readable formats and machine-readable timestamps.
+        Provides current date and time with intelligent timezone handling. Automatically detects user's timezone from browser location for personalized time display, or accepts manual timezone specification for custom requirements. Supports both automatic detection and manual override modes.
 
         Return Value:
         Success response:
@@ -89,15 +89,6 @@ def register_time_tools(mcp: FastMCP):
             "result": {
                 "current_time": "2024-01-15 14:30:00",
                 "timezone": "America/New_York",
-                "formats": {
-                    "iso_format": "2024-01-15T14:30:00-05:00",
-                    "timestamp": 1705340200,
-                    "human_readable": "Monday, January 15, 2024 at 02:30:00 PM",
-                    "date_only": "2024-01-15",
-                    "time_only": "14:30:00",
-                    "utc_iso": "2024-01-15T19:30:00Z",
-                    "timezone_offset": "-0500"
-                },
                 "location_source": "browser_geolocation"
             },
             "summary": "Current time: 2024-01-15 14:30:00 (America/New_York) - browser_geolocation location"
@@ -170,27 +161,10 @@ def register_time_tools(mcp: FastMCP):
                 except:
                     pass
 
-            # Generate multiple time formats
+            # Generate primary time format
             primary_format = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            
-            additional_formats = {
-                "iso_format": current_time.isoformat(),
-                "timestamp": int(current_time.timestamp()),
-                "human_readable": current_time.strftime("%A, %B %d, %Y at %I:%M:%S %p"),
-                "date_only": current_time.strftime("%Y-%m-%d"),
-                "time_only": current_time.strftime("%H:%M:%S"),
-                "utc_iso": datetime.utcnow().isoformat() + "Z"
-            }
-            
-            # Add timezone offset if available
-            try:
-                offset = current_time.strftime("%z")
-                if offset:
-                    additional_formats["timezone_offset"] = offset
-            except:
-                pass
 
-            return _success(primary_format, timezone_name, additional_formats, location_info)
+            return _success(primary_format, timezone_name, {}, location_info)
             
         except Exception as e:
             return _error("Time retrieval failed", str(e)) 
