@@ -9,7 +9,7 @@ from timezonefinder import TimezoneFinder
 from fastmcp.server.context import Context  # type: ignore
 
 from backend.nagisa_mcp.utils.tool_result import ToolResult
-from backend.nagisa_mcp.location_manager import get_location_manager
+from backend.nagisa_mcp.utils.location_utils import get_user_location
 
 
 def _error(message: str, error_details: Optional[str] = None) -> dict:
@@ -63,83 +63,7 @@ def _success(formatted_time: str, timezone_name: str, additional_formats: dict, 
 def register_time_tools(mcp: FastMCP):
     """Register time related utilities with proper tags synchronization."""
 
-    # Get location manager instance
-    location_manager = get_location_manager()
     tf = TimezoneFinder()
-
-    def _fetch_server_location():
-        """Fallback: geolocate server IP via ip-api.com"""
-        try:
-            resp = requests.get("http://ip-api.com/json", timeout=5)
-            resp.raise_for_status()
-            data = resp.json()
-            if data.get("status") == "success":
-                return {
-                    "latitude": data["lat"],
-                    "longitude": data["lon"],
-                    "city": data.get("city"),
-                    "country": data.get("country"),
-                    "source": "server_ip"
-                }
-        except Exception:
-            pass
-        return None
-
-    async def _get_user_location(context: Context):
-        """Get user location from various sources with fallback strategy"""
-        try:
-            session_id = getattr(context, 'client_id', None)
-            if not session_id:
-                return None
-
-            # Try session location first
-            loc = location_manager.get_session_location(session_id)
-            if loc:
-                return {
-                    "latitude": loc.latitude,
-                    "longitude": loc.longitude,
-                    "city": loc.city,
-                    "country": loc.country,
-                    "source": "cached_session"
-                }
-
-            # Request fresh location from browser
-            app = getattr(context.fastmcp, "app", None)
-            if app and hasattr(app.state, "connection_manager"):
-                cm = app.state.connection_manager
-                asyncio.create_task(cm.send_json(session_id, {"type": "REQUEST_LOCATION"}))
-
-                # Wait for browser response (shorter wait for time tool)
-                wait_time, elapsed = 10, 0.5
-                while elapsed < wait_time:
-                    await asyncio.sleep(0.5)
-                    elapsed += 0.5
-                    loc = location_manager.get_session_location(session_id)
-                    if loc:
-                        return {
-                            "latitude": loc.latitude,
-                            "longitude": loc.longitude,
-                            "city": loc.city,
-                            "country": loc.country,
-                            "source": "browser_geolocation"
-                        }
-
-            # Fallback to global location
-            loc = location_manager.get_global_location()
-            if loc:
-                return {
-                    "latitude": loc.latitude,
-                    "longitude": loc.longitude,
-                    "city": loc.city,
-                    "country": loc.country,
-                    "source": "global_cache"
-                }
-
-            # Final fallback to server IP
-            return _fetch_server_location()
-
-        except Exception:
-            return None
 
     def _get_timezone_from_location(latitude: float, longitude: float) -> Optional[str]:
         """Convert latitude/longitude to timezone string"""
@@ -208,7 +132,7 @@ def register_time_tools(mcp: FastMCP):
 
             # If no timezone specified, try to detect from user location
             if not timezone:
-                location_info = await _get_user_location(context)
+                location_info = await get_user_location(context, wait_time=10)
                 if location_info and location_info.get("latitude") and location_info.get("longitude"):
                     detected_tz = _get_timezone_from_location(
                         location_info["latitude"], 

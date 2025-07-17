@@ -10,6 +10,7 @@ from fastmcp.server.context import Context
 
 from backend.nagisa_mcp.location_manager import get_location_manager, LocationData
 from backend.nagisa_mcp.utils.tool_result import ToolResult
+from backend.nagisa_mcp.utils.location_utils import get_user_location, _reverse_geocode_full
 
 __all__ = ["register_location_tools"]
 
@@ -54,24 +55,6 @@ def register_location_tools(mcp: FastMCP):
         except Exception:
             pass
         return None
-
-    def _reverse_geocode(lat: float, lon: float) -> Dict[str, str | None]:
-        """Use OpenStreetMap Nominatim to reverse-geocode coordinates"""
-        try:
-            url = "https://nominatim.openstreetmap.org/reverse"
-            params = {"format": "json", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1}
-            headers = {"User-Agent": "Nagisa-FastMCP/1.0"}
-            resp = requests.get(url, params=params, headers=headers, timeout=5)
-            if resp.status_code == 200:
-                addr = resp.json().get("address", {})
-                return {
-                    "city": addr.get("city") or addr.get("town") or addr.get("village"),
-                    "region": addr.get("state"),
-                    "country": addr.get("country"),
-                }
-        except Exception:
-            pass
-        return {"city": None, "region": None, "country": None}
 
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
@@ -138,7 +121,7 @@ def register_location_tools(mcp: FastMCP):
                 if loc:
                     # Enhance with reverse geocoding if needed
                     if loc.source == "browser_geolocation" and not loc.city:
-                        geocode_data = _reverse_geocode(loc.latitude, loc.longitude)
+                        geocode_data = _reverse_geocode_full(loc.latitude, loc.longitude)
                         loc.city = geocode_data.get("city")
                         loc.region = geocode_data.get("region")
                         loc.country = geocode_data.get("country")
