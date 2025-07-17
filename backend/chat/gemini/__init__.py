@@ -27,7 +27,7 @@ Enhanced Architecture:
 - Complete integration of GeminiContextManager and dual-mode ResponseProcessor
 
 Usage Patterns:
-1. Primary interface: `client.get_enhanced_response(messages)` - Universal handler for all request types with metadata
+1. Primary interface: `client.get_response(messages)` - Real-time streaming handler with instant tool notifications
 2. Direct API access: `client.call_api_with_context(contents)` - Low-level API calls with context preservation  
 3. Specialized features: `client.generate_title_from_messages()`, `client.generate_text_to_image_prompt()`
 """

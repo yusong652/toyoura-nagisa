@@ -219,46 +219,10 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] {error_message}")
             raise Exception(error_message)
 
-    async def get_enhanced_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        max_iterations: int = 10,
-        **kwargs
-    ) -> Tuple[BaseMessage, Dict[str, Any]]:
-        """
-        Enhanced LLM Response Handler - Universal Request Processor
-        
-        向后兼容实现 - 内部调用流式方法并返回最终结果
-        
-        专为Gemini API设计的统一响应处理器，采用状态机模式支持：
-        1. 普通文本对话处理
-        2. 智能工具调用序列
-        3. 完整的生命周期管理
-        4. 详细的执行元数据
-        
-        此方法能够处理所有类型的LLM请求，自动检测是否需要工具调用，
-        并在需要时执行完整的多轮工具调用序列。
-        
-        Args:
-            messages: Input message history
-            session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations (for tool calls)
-            **kwargs: Additional API configuration parameters
-            
-        Returns:
-            Tuple of (final_storage_message, execution_metadata)
-        """
-        # 调用流式方法，但只等待最终结果，忽略中间通知
-        async for item in self.get_streaming_enhanced_response(
-            messages, session_id, max_iterations, **kwargs
-        ):
-            if isinstance(item, tuple):
-                # 最终结果: (final_message, execution_metadata)
-                return item
-        
-        # 如果没有收到最终结果，抛出异常
-        raise Exception("No final result received from streaming response")
+    # 注意：get_enhanced_response方法已被移除
+    # 现在统一使用get_response作为核心接口
+    # 这样避免了冗余的包装器逻辑，提高了架构的一致性
+    
     # 注意：旧的_execute_tool_calling_loop和_execute_single_tool_call方法已被移除
     # 工具调用逻辑现在由_streaming_tool_calling_loop方法处理，支持实时通知
     
@@ -271,10 +235,6 @@ class GeminiClient(LLMClientBase):
         """获取时间戳"""
         import time
         return time.time()
-
-    # Note: get_response() method has been removed as it was deprecated.
-    # The base class now provides a default implementation that calls
-    # get_enhanced_response() for backward compatibility.
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
@@ -319,7 +279,7 @@ class GeminiClient(LLMClientBase):
         debug = self.gemini_config.debug
         return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug) 
 
-    async def get_streaming_enhanced_response(
+    async def get_response(
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
@@ -327,7 +287,7 @@ class GeminiClient(LLMClientBase):
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
         """
-        SOTA流式工具调用处理器 - 实时通知架构
+        SOTA流式LLM响应处理器 - 实时通知架构
         
         专为实时工具调用通知设计的流式处理器，采用事件驱动模式：
         1. 实时yield工具调用开始/进行/完成通知

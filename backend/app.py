@@ -309,8 +309,8 @@ async def handle_llm_response(
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
-        if not hasattr(llm_client, 'get_streaming_enhanced_response'):
-            error_msg = "GeminiClient missing get_streaming_enhanced_response method"
+        if not hasattr(llm_client, 'get_response'):
+            error_msg = "GeminiClient missing get_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
 
@@ -321,7 +321,7 @@ async def handle_llm_response(
         execution_metadata = None
         
         # 使用新的流式方法 - 实时获取工具调用通知
-        async for item in llm_client.get_streaming_enhanced_response(
+        async for item in llm_client.get_response(
             recent_msgs, 
             session_id=session_id,
             max_iterations=10
@@ -364,7 +364,7 @@ async def handle_llm_response(
                 print(f"[DEBUG] Released streaming request {request_id} for session {session_id}")
 
 # 注意：_process_notification_pipeline函数已被移除
-# 通知逻辑现在由LLM client层的get_streaming_enhanced_response方法实时处理
+# 通知逻辑现在由LLM client层的get_response方法实时处理
 # 这样可以实现真正的即时工具调用通知，而不是事后批量通知
 
 async def _process_content_pipeline(
