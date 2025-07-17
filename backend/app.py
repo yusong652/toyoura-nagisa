@@ -282,13 +282,14 @@ async def handle_llm_response(
     tts_engine: BaseTTS
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    SOTA Enhanced LLM Response Handler - 流水线架构
+    SOTA Enhanced LLM Response Handler - 实时流式架构
     
-    采用现代化流水线设计，专为内部状态机工具调用架构优化：
-    1. 单一责任原则 - 每个阶段专注特定功能
-    2. 状态隔离 - 防重复机制与业务逻辑分离
-    3. 错误传播 - 统一错误处理和恢复
-    4. 可观测性 - 完整的执行追踪和监控
+    采用现代化实时流式设计，专为即时工具调用通知优化：
+    1. 实时工具调用通知 - 工具执行过程中即时推送状态
+    2. 流式响应处理 - 保持原有TTS和内容处理逻辑
+    3. 状态隔离 - 防重复机制与业务逻辑分离
+    4. 错误传播 - 统一错误处理和恢复
+    5. 可观测性 - 完整的执行追踪和监控
     """
     # ========== PHASE 1: 请求初始化和防重复 ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
@@ -308,83 +309,63 @@ async def handle_llm_response(
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
-        if not hasattr(llm_client, 'get_enhanced_response'):
-            error_msg = "GeminiClient missing get_enhanced_response method"
+        if not hasattr(llm_client, 'get_streaming_enhanced_response'):
+            error_msg = "GeminiClient missing get_streaming_enhanced_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
 
-        # ========== PHASE 3: 核心处理 - 单一调用点 ==========
-        print(f"[DEBUG] Processing request {request_id} for session {session_id}")
+        # ========== PHASE 3: 流式处理 - 实时工具调用通知 ==========
+        print(f"[DEBUG] Processing streaming request {request_id} for session {session_id}")
         
-        final_message, execution_metadata = await llm_client.get_enhanced_response(
+        final_message = None
+        execution_metadata = None
+        
+        # 使用新的流式方法 - 实时获取工具调用通知
+        async for item in llm_client.get_streaming_enhanced_response(
             recent_msgs, 
             session_id=session_id,
             max_iterations=10
-        )
+        ):
+            if isinstance(item, tuple):
+                # 最终结果: (final_message, execution_metadata)
+                final_message, execution_metadata = item
+                break
+            elif isinstance(item, dict):
+                # 实时通知: 工具调用状态更新
+                yield f"data: {json.dumps(item)}\n\n"
+                # 添加小延迟以确保通知按顺序处理
+                await asyncio.sleep(0.05)
         
-        # ========== PHASE 4: 通知流水线 ==========
-        async for chunk in _process_notification_pipeline(execution_metadata):
-            yield chunk
+        # ========== PHASE 4: 内容处理流水线 ==========
+        if final_message:
+            async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id):
+                yield chunk
         
-        # ========== PHASE 5: 内容处理流水线 ==========
-        async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id):
-            yield chunk
-        
-        # ========== PHASE 6: 后处理流水线 ==========
-        async for chunk in _process_post_pipeline(session_id, llm_client, request_id):
-            yield chunk
+        # ========== PHASE 5: 后处理流水线 ==========
+        if execution_metadata:
+            async for chunk in _process_post_pipeline(session_id, llm_client, request_id):
+                yield chunk
         
     except Exception as e:
-        print(f"[ERROR] Request {request_id} failed: {e}")
+        print(f"[ERROR] Streaming request {request_id} failed: {e}")
         import traceback
         traceback.print_exc()
         
+        # 确保工具使用结束信号被发送
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {'type': 'error', 'error': f"Request processing failed: {str(e)}"}
         yield f"data: {json.dumps(error_data)}\n\n"
         
     finally:
-        # ========== PHASE 7: 清理和释放 ==========
+        # ========== PHASE 6: 清理和释放 ==========
         async with ACTIVE_REQUESTS_LOCK:
             if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
                 del ACTIVE_REQUESTS[session_id]
-                print(f"[DEBUG] Released request {request_id} for session {session_id}")
+                print(f"[DEBUG] Released streaming request {request_id} for session {session_id}")
 
-async def _process_notification_pipeline(metadata: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    通知处理流水线 - 专门处理工具使用通知
-    
-    基于执行元数据智能生成用户通知，避免重复API调用
-    """
-    tool_calls_executed = metadata.get('tool_calls_executed', 0)
-    tool_calls_detected = metadata.get('tool_calls_detected', False)
-    
-    if tool_calls_detected and tool_calls_executed > 0:
-        # 开始通知
-        start_notification = {
-            'type': 'NAGISA_IS_USING_TOOL',
-            'tool_name': 'gemini_tools', 
-            'action_text': "I am using tools to help you..."
-        }
-        yield f"data: {json.dumps(start_notification)}\n\n"
-        await asyncio.sleep(0.1)
-        
-        # 完成通知
-        if tool_calls_executed == 1:
-            complete_text = f"I have completed the requested action."
-        else:
-            complete_text = f"I used {tool_calls_executed} tools to help you."
-        
-        tool_complete_notification = {
-            'type': 'NAGISA_IS_USING_TOOL', 
-            'tool_name': 'gemini_tools',
-            'action_text': complete_text
-        }
-        yield f"data: {json.dumps(tool_complete_notification)}\n\n"
-        await asyncio.sleep(0.1)
-    
-    # 工具使用结束信号
-    yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
+# 注意：_process_notification_pipeline函数已被移除
+# 通知逻辑现在由LLM client层的get_streaming_enhanced_response方法实时处理
+# 这样可以实现真正的即时工具调用通知，而不是事后批量通知
 
 async def _process_content_pipeline(
     final_message: BaseMessage,

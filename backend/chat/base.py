@@ -1,8 +1,9 @@
 # backend/chat/base.py
 
+import os
 from abc import ABC, abstractmethod # 导入 ABC 和 abstractmethod
-from typing import List, Tuple, Optional, Dict, Any       # 导入类型提示
-from backend.chat.models import Message, LLMResponse, BaseMessage         # 从同目录的 models.py 导入 Message 模型
+from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union # 导入类型提示
+from backend.chat.models import BaseMessage, LLMResponse         # 从同目录的 models.py 导入 Message 模型
 from backend.config import get_system_prompt
 
 # 定义一个简单的模型来表示 LLM 的输出（或者直接用 Tuple）
@@ -13,26 +14,56 @@ from backend.config import get_system_prompt
 
 class LLMClientBase(ABC):
     """
-    Abstract Base Class for Large Language Model clients.
-    
-    SOTA架构抽象基类 - 为新的状态机工具调用架构设计
-    
-    此基类定义了统一的LLM客户端接口，专为以下特性优化：
-    - 内部状态机工具调用
-    - 增强响应处理与元数据支持
-    - 会话级别的功能支持
-    - 完整的生命周期管理
+    LLM客户端的基础类，定义了所有LLM客户端需要实现的接口
     """
-
-    def __init__(self, **kwargs):
+    
+    def __init__(self, tools_enabled: bool = True, extra_config: Dict[str, Any] = None):
         """
-        初始化LLM客户端基类
+        初始化LLM客户端基础类
         
         Args:
-            **kwargs: 客户端配置参数
+            tools_enabled: 是否启用工具调用功能
+            extra_config: 额外的配置参数
         """
-        self.extra_config = kwargs
-        self.tools_enabled = kwargs.get("tools_enabled", True)  # 默认开启工具
+        self.tools_enabled = tools_enabled
+        self.extra_config = extra_config or {}
+
+    @abstractmethod
+    async def get_streaming_enhanced_response(
+        self,
+        messages: List[BaseMessage],
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
+        """
+        [新核心接口] 流式获取增强响应，实时yield工具调用通知和最终结果
+        
+        专为实时工具调用通知设计的SOTA架构，采用流式状态机模式：
+        1. 实时yield工具调用开始/完成通知
+        2. 实时yield工具执行进度
+        3. 最终yield完整响应和元数据
+        4. 完整的错误处理和恢复
+        
+        此方法解决了传统get_enhanced_response无法实时通知的问题，
+        让前端能够实时感知工具调用状态。
+        
+        Args:
+            messages: 输入消息列表
+            session_id: 会话ID，用于工具和上下文管理
+            **kwargs: 额外参数（如max_iterations、temperature等）
+            
+        Yields:
+            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
+            - Dict[str, Any]: 中间通知 (type: 'tool_notification', 'tool_start', 'tool_complete' 等)
+            - Tuple[BaseMessage, Dict[str, Any]]: 最终结果 (final_message, execution_metadata)
+            
+        Note:
+            通知格式示例：
+            - 工具开始: {'type': 'tool_start', 'tool_name': 'search', 'action_text': '正在搜索...'}
+            - 工具完成: {'type': 'tool_complete', 'tool_name': 'search', 'result_summary': '找到3个结果'}
+            - 最终结果: (final_message, {'execution_id': '...', 'tool_calls_executed': 3, ...})
+        """
+        pass
 
     @abstractmethod
     async def get_enhanced_response(

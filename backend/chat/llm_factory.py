@@ -76,19 +76,32 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     global_config = get_llm_config()
     specific_config = get_llm_specific_config(name)
     
-    # 合并配置和参数
-    client_kwargs = {
-        # 首先应用全局配置中的通用参数
-        "system_prompt": global_config.get("system_prompt") or get_system_prompt(),
+    # 合并配置和参数 - 正确处理必需参数和可选参数
+    extra_config = {
         "recent_messages_length": global_config.get("recent_messages_length", 20),
         "debug": global_config.get("debug", False),
-        # 然后应用特定 LLM 的配置
+        # 合并特定LLM配置
         **specific_config,
-        # 最后应用传入的参数，这些参数会覆盖之前的配置
-        **kwargs,
-        # 显式传递 app 实例
-        "app": app
+        # 合并传入的kwargs
+        **kwargs
     }
+    
+    # 提取必需的构造函数参数（如API key）
+    client_kwargs = {
+        "tools_enabled": global_config.get("tools_enabled", True),
+        "extra_config": {}
+    }
+    
+    # 将特定LLM的必需参数从extra_config中提取出来
+    if name == "gemini" and "api_key" in extra_config:
+        client_kwargs["api_key"] = extra_config.pop("api_key")
+    
+    # 将剩余配置放入extra_config
+    client_kwargs["extra_config"] = extra_config
+    
+    # 如果app实例被传递，将其添加到extra_config中
+    if app:
+        client_kwargs["extra_config"]["app"] = app
     
     # 优化的实例管理 - 为高性能架构设计
     config_key = f"{name}:{str(sorted(client_kwargs.items()))}"
