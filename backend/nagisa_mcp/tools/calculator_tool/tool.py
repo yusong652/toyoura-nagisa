@@ -124,12 +124,9 @@ def _safe_eval(expr: str) -> float:
 # -----------------------------------------------------------------------------
 
 def calculate(expression: str = Field(..., description="Mathematical expression to evaluate (supports +, -, *, /, %, **, parentheses, unary +/-)")) -> dict[str, Any]:
-    """Evaluate mathematical expressions with safe arithmetic computation and intelligent result formatting.
+    """Evaluate mathematical expressions with safe arithmetic computation.
     
-    ## Return Value
-    **For LLM:** Returns structured data with consistent format across all calculation tools.
-    
-    **Structure:**
+    Return Value:
     ```json
     {
       "operation": {
@@ -151,29 +148,6 @@ def calculate(expression: str = Field(..., description="Mathematical expression 
       }
     }
     ```
-    
-    **Optional Sections:**
-    - `error`: Present when calculation fails with error details
-    - `warnings`: Present when expression has potential issues
-    
-    ## Core Functionality
-    Evaluates mathematical expressions with enterprise-grade safety controls and intelligent result formatting.
-
-    ## Strategic Usage
-    Use this tool to **perform arithmetic calculations** with proper error handling and result formatting.
-    Perfect for mathematical computations in data processing, financial calculations, or general arithmetic needs.
-    
-    ## Supported Operations
-    - **Basic arithmetic**: `+`, `-`, `*`, `/`, `%` (modulo)
-    - **Exponentiation**: `**` (power)
-    - **Parentheses**: `()` for grouping operations
-    - **Unary operators**: `+`, `-` (positive/negative)
-    
-    ## Safety Features
-    - **Expression validation**: Prevents code injection attacks
-    - **Division by zero protection**: Graceful error handling
-    - **Result formatting**: Automatic integer/float formatting
-    - **Input sanitization**: Safe evaluation with AST parsing
     """
     
     def _error(message: str, error_details: Optional[str] = None, expr: str = "") -> dict[str, Any]:
