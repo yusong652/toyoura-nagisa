@@ -113,6 +113,25 @@ class CalendarEvent:
             "updated": self.updated,
             "html_link": self.html_link,
         }
+    
+    def to_llm_dict(self) -> Dict[str, Any]:
+        """Convert to simplified dictionary for LLM consumption."""
+        result = {
+            "id": self.id,
+            "summary": self.summary,
+            "start": self.start,
+            "end": self.end,
+        }
+        
+        # Only include optional fields if they have values
+        if self.location:
+            result["location"] = self.location
+        if self.description:
+            result["description"] = self.description
+        if self.html_link:
+            result["html_link"] = self.html_link
+            
+        return result
 
 @dataclass
 class CalendarOperationResult:
@@ -350,18 +369,14 @@ def register_calendar_tools(mcp: FastMCP):
                 "start": "2024-06-06T10:00:00+09:00",
                 "end": "2024-06-06T11:00:00+09:00",
                 "location": "Conference Room A",
-                "status": "confirmed"
+                "html_link": "https://calendar.google.com/event?eid=..."
               }
             ],
-            "total_events": 5,
-            "execution_time": 1.23,
-            "success": true
+            "total_events": 5
           },
           "summary": {
             "operation_type": "list_events",
             "success": true,
-            "total_events": 5,
-            "performance_category": "fast",
             "has_warnings": false
           }
         }
@@ -373,8 +388,7 @@ def register_calendar_tools(mcp: FastMCP):
         ## Strategic Usage
         Use this tool to **query calendar events** with time-based filtering and rich metadata.
         
-        Access results through the structured response: `result.events` for event list,
-        `result.total_events` for count, `summary.success` for operation status.
+
         """
         
         # Helper functions for consistent results
@@ -454,12 +468,14 @@ def register_calendar_tools(mcp: FastMCP):
                     }
                 },
                 "result": {
-                    "events": [event.to_dict() for event in result.events],
-                    "total_events": result.total_events,
-                    "execution_time": result.execution_time,
-                    "success": result.success
+                    "events": [event.to_llm_dict() for event in result.events],
+                    "total_events": result.total_events
                 },
-                "summary": result.get_summary()
+                "summary": {
+                    "operation_type": "list_events",
+                    "success": result.success,
+                    "has_warnings": len(result.warnings) > 0
+                }
             }
             
             # Add warnings if any
@@ -511,15 +527,13 @@ def register_calendar_tools(mcp: FastMCP):
               "summary": "Team Meeting",
               "start": "2024-06-06T10:00:00+09:00",
               "end": "2024-06-06T11:00:00+09:00",
+              "location": "Conference Room A",
               "html_link": "https://calendar.google.com/event?eid=..."
-            },
-            "success": true,
-            "execution_time": 0.85
+            }
           },
           "summary": {
             "operation_type": "create_event",
             "success": true,
-            "performance_category": "fast",
             "has_warnings": false
           }
         }
@@ -534,8 +548,6 @@ def register_calendar_tools(mcp: FastMCP):
         **Important:** If the user input does not specify a year, the system will automatically
         calculate the next upcoming occurrence of that date in the future.
         
-        Access results through the structured response: `result.event` for created event,
-        `result.success` for operation status, `summary.has_warnings` for validation issues.
         """
         
         # Helper functions for consistent results
@@ -637,11 +649,13 @@ def register_calendar_tools(mcp: FastMCP):
                     }
                 },
                 "result": {
-                    "event": result.events[0].to_dict() if result.events else None,
-                    "success": result.success,
-                    "execution_time": result.execution_time
+                    "event": result.events[0].to_llm_dict() if result.events else None
                 },
-                "summary": result.get_summary()
+                "summary": {
+                    "operation_type": "create_event",
+                    "success": result.success,
+                    "has_warnings": len(result.warnings) > 0
+                }
             }
             
             # Add warnings if any
@@ -700,14 +714,11 @@ def register_calendar_tools(mcp: FastMCP):
               "end": "2024-06-06T11:00:00+09:00",
               "location": "New Conference Room",
               "html_link": "https://calendar.google.com/event?eid=..."
-            },
-            "success": true,
-            "execution_time": 0.92
+            }
           },
           "summary": {
             "operation_type": "update_event",
             "success": true,
-            "performance_category": "fast",
             "has_warnings": false
           }
         }
@@ -720,9 +731,7 @@ def register_calendar_tools(mcp: FastMCP):
         Use this tool to **modify calendar events** with selective field updates and validation.
         
         **Note:** Only provide the fields you want to update. Omitted fields will remain unchanged.
-        
-        Access results through the structured response: `result.event` for updated event,
-        `result.success` for operation status, `summary.has_warnings` for validation issues.
+
         """
         
         # Helper functions for consistent results
@@ -838,11 +847,13 @@ def register_calendar_tools(mcp: FastMCP):
                     "updates": updates
                 },
                 "result": {
-                    "event": result.events[0].to_dict() if result.events else None,
-                    "success": result.success,
-                    "execution_time": result.execution_time
+                    "event": result.events[0].to_llm_dict() if result.events else None
                 },
-                "summary": result.get_summary()
+                "summary": {
+                    "operation_type": "update_event",
+                    "success": result.success,
+                    "has_warnings": len(result.warnings) > 0
+                }
             }
             
             # Add warnings if any
@@ -881,14 +892,11 @@ def register_calendar_tools(mcp: FastMCP):
             "calendar_id": "primary"
           },
           "result": {
-            "success": true,
-            "execution_time": 0.67,
             "deleted_event_id": "event_id_123"
           },
           "summary": {
             "operation_type": "delete_event",
             "success": true,
-            "performance_category": "fast",
             "has_warnings": false
           }
         }
@@ -901,9 +909,7 @@ def register_calendar_tools(mcp: FastMCP):
         Use this tool to **remove calendar events** with proper validation and confirmation.
         
         **Warning:** This operation is permanent and cannot be undone through the API.
-        
-        Access results through the structured response: `result.success` for operation status,
-        `result.deleted_event_id` for confirmation, `summary.performance_category` for timing.
+
         """
         
         # Helper functions for consistent results
@@ -956,11 +962,13 @@ def register_calendar_tools(mcp: FastMCP):
                     "calendar_id": calendar_id
                 },
                 "result": {
-                    "success": result.success,
-                    "execution_time": result.execution_time,
                     "deleted_event_id": event_id if result.success else None
                 },
-                "summary": result.get_summary()
+                "summary": {
+                    "operation_type": "delete_event",
+                    "success": result.success,
+                    "has_warnings": len(result.warnings) > 0
+                }
             }
             
             # Add warnings if any
