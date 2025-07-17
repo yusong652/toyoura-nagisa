@@ -57,8 +57,7 @@ def register_email_tools(mcp: FastMCP):
         ```json
         {
           "operation": {
-            "type": "get_user_email",
-            "timestamp": "2025-01-08T10:30:00.123"
+            "type": "get_user_email"
           },
           "result": {
             "user_email": "user@example.com",
@@ -71,21 +70,16 @@ def register_email_tools(mcp: FastMCP):
         }
         ```
 
-        ## Strategic Usage
-        Use this tool to **verify email configuration** before sending emails or setting up communication workflows.
+
         """
         try:
             user_email = os.getenv("USER_GMAIL_ADDRESS")
             if not user_email:
                 return _error("USER_GMAIL_ADDRESS environment variable not set")
             
-            # Build structured response
-            timestamp = datetime.now().isoformat()
-            
             llm_content = {
                 "operation": {
-                    "type": "get_user_email",
-                    "timestamp": timestamp
+                    "type": "get_user_email"
                 },
                 "result": {
                     "user_email": user_email,
@@ -137,13 +131,11 @@ def register_email_tools(mcp: FastMCP):
             "subject": "Meeting Reminder",
             "recipients": ["user@example.com"],
             "cc_count": 0,
-            "bcc_count": 0,
-            "timestamp": "2025-01-08T10:30:00.123"
+            "bcc_count": 0
           },
           "result": {
             "gmail_id": "18c1a2b3d4e5f6g7",
-            "delivery_status": "sent",
-            "total_recipients": 1
+            "delivery_status": "sent"
           },
           "summary": {
             "operation_type": "send_email",
@@ -152,8 +144,7 @@ def register_email_tools(mcp: FastMCP):
         }
         ```
 
-        ## Strategic Usage
-        Use this tool to **send emails** for communication, notifications, or automated messaging workflows.
+
         """
         try:
             sender = os.getenv("AI_GMAIL_ADDRESS")
@@ -184,8 +175,6 @@ def register_email_tools(mcp: FastMCP):
             msg_body = {'raw': raw}
             sent = service.users().messages().send(userId='me', body=msg_body).execute()
             
-            # Build structured response
-            timestamp = datetime.now().isoformat()
             gmail_id = sent.get('id')
             
             llm_content = {
@@ -195,13 +184,11 @@ def register_email_tools(mcp: FastMCP):
                     "subject": subject,
                     "recipients": to,
                     "cc_count": len(cc) if cc else 0,
-                    "bcc_count": len(bcc) if bcc else 0,
-                    "timestamp": timestamp
+                    "bcc_count": len(bcc) if bcc else 0
                 },
                 "result": {
                     "gmail_id": gmail_id,
-                    "delivery_status": "sent",
-                    "total_recipients": len(to) + (len(cc) if cc else 0) + (len(bcc) if bcc else 0)
+                    "delivery_status": "sent"
                 },
                 "summary": {
                     "operation_type": "send_email",
@@ -247,8 +234,7 @@ def register_email_tools(mcp: FastMCP):
             "type": "check_emails",
             "max_emails": 5,
             "unread_only": false,
-            "account": "ai@example.com",
-            "timestamp": "2025-01-08T10:30:00.123"
+            "account": "ai@example.com"
           },
           "result": {
             "emails": [
@@ -270,8 +256,7 @@ def register_email_tools(mcp: FastMCP):
         }
         ```
 
-        ## Strategic Usage
-        Use this tool to **check incoming emails** for monitoring communication, processing messages, or email-based workflows.
+
         """
         try:
             user_email = os.getenv("AI_GMAIL_ADDRESS")
@@ -318,16 +303,12 @@ def register_email_tools(mcp: FastMCP):
             unread_results = service.users().messages().list(userId='me', q='is:unread').execute()
             unread_count = len(unread_results.get('messages', []))
             
-            # Build structured response
-            timestamp = datetime.now().isoformat()
-            
             llm_content = {
                 "operation": {
                     "type": "check_emails",
                     "max_emails": max_emails,
                     "unread_only": unread_only,
                     "account": user_email,
-                    "timestamp": timestamp
                 },
                 "result": {
                     "emails": email_list,
