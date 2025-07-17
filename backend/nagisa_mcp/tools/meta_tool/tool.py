@@ -73,16 +73,18 @@ def register_meta_tools(mcp: FastMCP):
             "timestamp": "2025-01-08T10:30:00.123"
           },
           "result": {
-            "total_found": 1,
-            "search_limited": false,
-            "categories_found": ["weather"]
+            "tools_found": ["weather_forecast", "get_weather"],
+            "search_limited": false
           },
           "summary": {
             "discovery_success": true,
-            "tools_activated": 1
+            "tools_activated": 2
           }
         }
         ```
+
+        **Optional Fields:**
+        - `result.guidance`: Present only when `search_limited` is true, provides optimization suggestions
 
         ## Examples
         ```python
@@ -121,6 +123,14 @@ def register_meta_tools(mcp: FastMCP):
             # Build structured response following unified standard
             timestamp = datetime.now().isoformat()
             
+            # Extract tool names for better LLM understanding
+            tools_found = [tool.get("name", "unknown") for tool in formatted_tools]
+            
+            # Prepare guidance for search limits
+            guidance_message = ""
+            if len(formatted_tools) >= max_results:
+                guidance_message = f"Search limited to {max_results} results. Consider increasing max_results parameter (up to 20) to find more tools."
+            
             llm_content = {
                 "operation": {
                     "type": "tool_discovery",
@@ -129,9 +139,9 @@ def register_meta_tools(mcp: FastMCP):
                     "timestamp": timestamp
                 },
                 "result": {
-                    "total_found": len(formatted_tools),
+                    "tools_found": tools_found,
                     "search_limited": len(formatted_tools) >= max_results,
-                    "categories_found": list(set(tool.get("category", "general") for tool in formatted_tools))
+                    "guidance": guidance_message if guidance_message else None
                 },
                 "summary": {
                     "discovery_success": True,
@@ -139,7 +149,13 @@ def register_meta_tools(mcp: FastMCP):
                 }
             }
             
+            # Clean up None values
+            if not llm_content["result"]["guidance"]:
+                del llm_content["result"]["guidance"]
+            
             message = f"Found {len(formatted_tools)} relevant tools for '{keywords}'"
+            if len(formatted_tools) >= max_results:
+                message += f" (limited to {max_results}; increase max_results to find more)"
             
             return ToolResult(
                 status="success",
@@ -147,7 +163,7 @@ def register_meta_tools(mcp: FastMCP):
                 llm_content=llm_content,
                 data={
                     "tools": formatted_tools,
-                    "total_found": len(formatted_tools),
+                    "tools_found": tools_found,
                     "search_query": keywords
                 }
             ).model_dump()
@@ -159,7 +175,7 @@ def register_meta_tools(mcp: FastMCP):
                 error=str(e),
                 data={
                     "tools": [],
-                    "total_found": 0,
+                    "tools_found": [],
                     "search_query": keywords
                 }
             ).model_dump()
@@ -242,12 +258,11 @@ def register_meta_tools(mcp: FastMCP):
                     "timestamp": timestamp
                 },
                 "result": {
-                    "total_categories": len(categories),
-                    "categories_available": categories
+                    "categories_available": categories,
+                    "category_count": len(categories)
                 },
                 "summary": {
-                    "discovery_success": True,
-                    "categories_available": len(categories)
+                    "discovery_success": True
                 }
             }
             
@@ -259,7 +274,7 @@ def register_meta_tools(mcp: FastMCP):
                 llm_content=llm_content,
                 data={
                     "categories": categories,
-                    "total_categories": len(categories),
+                    "category_count": len(categories),
                     "category_details": available_details
                 }
             ).model_dump()
@@ -271,7 +286,7 @@ def register_meta_tools(mcp: FastMCP):
                 error=str(e),
                 data={
                     "categories": [],
-                    "total_categories": 0,
+                    "category_count": 0,
                     "category_details": {}
                 }
             ).model_dump() 
