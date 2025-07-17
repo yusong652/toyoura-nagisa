@@ -9,10 +9,49 @@ import httpx
 from fastapi import FastAPI
 from fastmcp.server.context import Context  # type: ignore
 from backend.config import get_text_to_image_config
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 
 load_dotenv()
 
 app = FastAPI()
+
+def _error(message: str, error_details: Optional[str] = None) -> dict:
+    """Create standardized error response."""
+    data = {"error": message}
+    if error_details:
+        data["details"] = error_details
+    
+    return ToolResult(
+        status="error",
+        message=f"Image generation failed: {message}",
+        llm_content={
+            "operation": "generate_image",
+            "result": "failed",
+            "summary": f"Unable to generate image: {message}"
+        },
+        data=data
+    ).model_dump()
+
+def _success(provider: str, image_type: str, generation_time: Optional[str] = None) -> dict:
+    """Create standardized success response."""
+    message_parts = [f"Successfully generated image using {provider}"]
+    if generation_time:
+        message_parts.append(f"in {generation_time}")
+    
+    return ToolResult(
+        status="success", 
+        message=f"Image generated successfully using {provider}",
+        llm_content={
+            "operation": "generate_image",
+            "result": "success",
+            "summary": " ".join(message_parts) + f" (format: {image_type})"
+        },
+        data={
+            "provider": provider,
+            "image_type": image_type,
+            "generation_time": generation_time
+        }
+    ).model_dump()
 
 async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -21,12 +60,8 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
     try:
         models_lab_config = config.get("models_lab", {})
         debug = models_lab_config.get("debug", False)
-        if debug:
-            print(f"[text_to_image] ModelsLab Config loaded: {models_lab_config}")
 
         payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
-        if debug:
-            print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False)}")
 
         async with httpx.AsyncClient() as client:
             if models_lab_config.get("realtime", False):
@@ -43,9 +78,6 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
                 data=json.dumps(payload),
                 timeout=120.0
             )
-            if debug:
-                print(f"[text_to_image] Response status: {response.status_code}")
-                print(f"[text_to_image] Response content: {response.text[:100]}...")
             
             response.raise_for_status()
             result = response.json()
@@ -59,15 +91,9 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
                 fetch_payload = {"key": models_lab_config.get("key", ""), "request_id": result["id"]}
                 
                 for attempt in range(max_retries):
-                    if debug:
-                        print(f"[text_to_image] Fetching result (attempt {attempt+1}/{max_retries})...")
-                    
                     fetch_resp = await client.post(fetch_url, headers={"Content-Type": "application/json"}, data=json.dumps(fetch_payload), timeout=30.0)
                     fetch_result = fetch_resp.json()
                     fetch_status = fetch_result.get("status")
-                    
-                    if debug:
-                        print(f"[text_to_image] Fetch status: {fetch_status}")
                     
                     if fetch_status == "success" and "output" in fetch_result and fetch_result["output"]:
                         return {"type": "image_url", "image_url": fetch_result["output"][0]}
@@ -75,19 +101,13 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
                         await asyncio.sleep(retry_interval)
                     else:
                         error_message = fetch_result.get("messege") or fetch_result.get("message") or "Image generation failed, please try again."
-                        if debug:
-                            print(f"[text_to_image] Error or unexpected fetch status: {fetch_status}, message: {error_message}")
                         return {"type": "error", "message": error_message}
                 
-                if debug:
-                    print(f"[text_to_image] Max retries ({max_retries}) reached without success")
+                return {"type": "error", "message": "Image generation timed out after processing."}
             
             return {"type": "error", "message": "Image generation failed after processing."}
             
     except Exception as e:
-        if 'debug' in locals() and debug:
-            print(f"[text_to_image] Error occurred: {str(e)}")
-            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return {"type": "error", "message": str(e)}
 
 async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -96,21 +116,16 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
     """
     try:
         sd_config = config.get("stable_diffusion_webui", {})
-        debug = sd_config.get("debug", False)
         server_url = sd_config.get("server_url")
 
         if not server_url:
             return {"type": "error", "message": "Stable Diffusion server URL is not configured."}
         
-        # 1. 获取模型类型和预设
+        # Get model type and preset
         model_type = sd_config.get("model_type", "illustrious")
         model_preset = sd_config.get("model_presets", {}).get(model_type, {})
-        
-        if debug:
-            print(f"[text_to_image] Using model type: {model_type}")
-            print(f"[text_to_image] Using model preset: {json.dumps(model_preset, indent=2)}")
 
-        # 2. 准备基础 payload
+        # Prepare base payload
         payload = {
             "prompt": prompt,
             "negative_prompt": negative_prompt,
@@ -122,10 +137,10 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
             "denoising_strength": sd_config.get("denoising_strength", 0.5),
         }
         
-        # 3. 应用模型预设，预设中的值会覆盖基础 payload
+        # Apply model preset, values from preset will override base payload
         payload.update(model_preset)
 
-        # 4. 构建 override_settings，并从 payload 中移除相应键
+        # Build override_settings and remove corresponding keys from payload
         override_settings = {}
         if "sd_model_checkpoint" in payload:
             override_settings["sd_model_checkpoint"] = payload.pop("sd_model_checkpoint")
@@ -137,9 +152,6 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
         if override_settings:
             payload["override_settings"] = override_settings
 
-        if debug:
-            print(f"[text_to_image] Request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
-
         async with httpx.AsyncClient() as client:
             endpoint = f"{server_url}"
             response = await client.post(
@@ -148,34 +160,17 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
                 data=json.dumps(payload),
                 timeout=300.0 
             )
-            if debug:
-                print(f"[text_to_image] Response status: {response.status_code}")
 
             response.raise_for_status()
             result = response.json()
-            
-            if debug:
-                print(f"[text_to_image] SD API response keys: {list(result.keys())}")
-                if "images" in result:
-                    print(f"[text_to_image] Number of images returned: {len(result['images'])}")
-                    if result["images"]:
-                        print(f"[text_to_image] First image data length: {len(result['images'][0])}")
-                        print(f"[text_to_image] Model type used: {model_type}")
 
             if "images" in result and result["images"]:
                 base64_image = result["images"][0]
-                if debug:
-                    print(f"[text_to_image] Returning base64 image, length: {len(base64_image)}")
                 return {"type": "image_base64", "image": base64_image}
             else:
-                if debug:
-                    print(f"[text_to_image] No images in response or empty images list")
                 return {"type": "error", "message": "Image generation failed, no image in response."}
                 
     except Exception as e:
-        if 'debug' in locals() and debug:
-            print(f"[text_to_image] Error occurred: {str(e)}")
-            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return {"type": "error", "message": str(e)}
 
 
@@ -191,131 +186,110 @@ async def generate_image_from_description(prompt: str, negative_prompt: str):
         Dict with image generation result
     """
     try:
-        print(f"[text_to_image] 开始生成图像")
-        print(f"[text_to_image] 正面提示词: {prompt}")
-        print(f"[text_to_image] 负面提示词: {negative_prompt}")
-        
-        # 获取配置
+        # Get configuration
         config = get_text_to_image_config()
         provider = config.get("provider")
-        debug = config.get("debug", False)
-        
-        print(f"[text_to_image] 配置信息:")
-        print(f"[text_to_image] - provider: {provider}")
-        print(f"[text_to_image] - debug: {debug}")
-        
-        # 添加环境变量检查
-        import os
-        print(f"[text_to_image] 环境变量检查:")
-        print(f"[text_to_image] - STABLE_DIFFUSION_WEBUI_URL: {os.environ.get('STABLE_DIFFUSION_WEBUI_URL', 'NOT_SET')}")
-        
-        # 如果是 stable_diffusion_webui，显示详细配置
-        if provider == "stable_diffusion_webui":
-            sd_config = config.get("stable_diffusion_webui", {})
-            print(f"[text_to_image] Stable Diffusion WebUI 配置:")
-            print(f"[text_to_image] - server_url: {sd_config.get('server_url', 'NOT_SET')}")
-            print(f"[text_to_image] - debug: {sd_config.get('debug', False)}")
-            print(f"[text_to_image] - 完整配置keys: {list(sd_config.keys())}")
         
         if provider == "models_lab":
             return await _generate_with_models_lab(prompt, negative_prompt, config)
         elif provider == "stable_diffusion_webui":
             return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
         else:
-            error_message = f"Unsupported image generation provider: {provider}"
-            if debug:
-                print(f"[text_to_image] {error_message}")
-            return {"type": "error", "message": error_message}
+            return {"type": "error", "message": f"Unsupported image generation provider: {provider}"}
             
     except Exception as e:
-        if 'debug' in locals() and debug:
-            print(f"[text_to_image] Error occurred: {str(e)}")
-            print(f"[text_to_image] Traceback: {traceback.format_exc()}")
         return {"type": "error", "message": str(e)}
 
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.
 
-    When to call:
-        • The user explicitly asks to *draw*, *paint*, *create*, or *generate* an image, picture, artwork, concept art, anime-style scene, meme, etc.
-        • The user implicitly requests a visual representation (e.g. "Show me what that looks like").
+    Core Functionality:
+    Automatically analyzes the current conversation context to create compelling visual content. The tool extracts themes, subjects, and artistic requirements from recent messages, then crafts optimized text-to-image prompts to generate high-quality illustrations using configured AI image generation services (ModelsLab or Stable Diffusion WebUI).
 
-    Behaviour:
-        1. The tool automatically crafts a rich text-to-image prompt from the most recent user/assistant messages.
-        2. It then invokes a high-quality diffusion model to synthesise the image.
+    Return Value:
+    Success response:
+    {
+        "operation": "generate_image", 
+        "result": "success",
+        "summary": "Successfully generated image using [provider] in [time] (format: [type])"
+    }
+    
+    Error response:
+    {
+        "operation": "generate_image",
+        "result": "failed", 
+        "summary": "Unable to generate image: [error_reason]"
+    }
 
-    Parameters:
-        (none) – all context is inferred automatically.
-
-    Returns:
-        On success the tool responds with a short confirmation string such as
-        "The image has been generated and saved to your session." 
-        On failure it returns a JSON object: { "type": "error", "message": "…" }
+    Strategic Usage:
+    • Invoke when users explicitly request visual content ("draw", "create image", "generate artwork")
+    • Use for illustrating concepts, scenes, or ideas discussed in conversation
+    • Excellent for creative projects, visual brainstorming, and artistic expression
+    • Automatically handles prompt engineering - no manual prompt crafting needed
+    • Supports both cloud-based and local image generation backends
     """
+    import time
+    start_time = time.time()
 
-    # ------------------------------------------------------------------
-    # 1. Resolve runtime dependencies (session ID, app, llm client)
-    # ------------------------------------------------------------------
+    # Resolve runtime dependencies (session ID, app, llm client)
     session_id: str | None = getattr(context, "client_id", None)
     if not session_id:
-        return {"type": "error", "message": "Session ID is missing (client_id not provided)."}
+        return _error("Session ID is missing", "client_id not provided in context")
 
-    # *context.fastmcp* is the FastMCP instance where we attached the FastAPI app
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
     llm_client = None
     if fastapi_app is not None and hasattr(fastapi_app.state, "llm_client"):
         llm_client = fastapi_app.state.llm_client
 
     if llm_client is None:
-        return {"type": "error", "message": "LLM client is not available from application context."}
+        return _error("LLM client unavailable", "Cannot access LLM client from application context")
 
-    # ------------------------------------------------------------------
-    # 2. Build prompts using the LLM client
-    # ------------------------------------------------------------------
+    # Build prompts using the LLM client
     try:
         prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
     except Exception as e:
-        return {"type": "error", "message": f"Failed to generate prompts: {e}"}
+        return _error("Prompt generation failed", str(e))
 
     if not prompt_result or "text_prompt" not in prompt_result:
-        return {"type": "error", "message": "Prompt generation returned empty result."}
+        return _error("Empty prompt result", "Prompt generation returned no usable content")
 
     text_prompt = prompt_result["text_prompt"]
     negative_prompt = prompt_result["negative_prompt"]
 
-    # ------------------------------------------------------------------
-    # 3. Call the ModelsLab text-to-image API
-    # ------------------------------------------------------------------
+    # Generate image using configured provider
     try:
         image_result = await generate_image_from_description(text_prompt, negative_prompt)
     except Exception as e:
-        return {"type": "error", "message": f"Image generation failed: {e}"}
+        return _error("Image generation failed", str(e))
 
     if not image_result:
-        return {"type": "error", "message": "Image generation failed, please try again."}
+        return _error("No image result", "Image generation returned empty result")
 
-    # Propagate detailed message if present
+    # Handle error response
     if image_result.get("type") == "error":
-        return {"type": "error", "message": image_result.get("message", "An unknown error occurred.")}
+        return _error(image_result.get("message", "Unknown error occurred"))
     
-    # Handle successful image generation (URL or Base64)
-    print(f"[DEBUG] Checking image_result for success...")
-    print(f"[DEBUG] image_result type: {image_result.get('type')}")
-    print(f"[DEBUG] image_result keys: {list(image_result.keys())}")
+    # Calculate generation time
+    generation_time = f"{time.time() - start_time:.1f}s"
     
+    # Get provider from config for success message
+    try:
+        config = get_text_to_image_config()
+        provider = config.get("provider", "unknown")
+    except:
+        provider = "unknown"
+    
+    # Handle successful image generation
     if image_result.get("type") == "image_url" and image_result.get("image_url"):
-        print(f"[DEBUG] Returning image_url result: {image_result['image_url'][:50]}...")
-        return image_result
+        success_response = _success(provider, "URL-based image", generation_time)
+        success_response["image_url"] = image_result["image_url"]
+        return success_response
     elif image_result.get("type") == "image_base64" and image_result.get("image"):
-        print(f"[DEBUG] Returning image_base64 result, data length: {len(image_result['image'])}")
-        return image_result
+        success_response = _success(provider, "Base64 image", generation_time)
+        success_response["image_base64"] = image_result["image"]
+        return success_response
     else:
-        print(f"[ERROR] Unexpected image result format:")
-        print(f"[ERROR] Type: {image_result.get('type')}")
-        print(f"[ERROR] Has image_url: {'image_url' in image_result and bool(image_result.get('image_url'))}")
-        print(f"[ERROR] Has image: {'image' in image_result and bool(image_result.get('image'))}")
-
-    return {"type": "error", "message": "Image generation failed with an unexpected result format."}
+        return _error("Unexpected result format", f"Got type: {image_result.get('type')}")
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
