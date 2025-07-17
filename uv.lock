@@ -54,6 +54,7 @@ dependencies = [
     { name = "sniffio" },
     { name = "soundfile" },
     { name = "starlette" },
+    { name = "timezonefinder" },
     { name = "torch" },
     { name = "torchaudio" },
     { name = "trafilatura" },
@@ -114,6 +115,7 @@ requires-dist = [
     { name = "sniffio", specifier = ">=1.3.1" },
     { name = "soundfile", specifier = ">=0.12.1" },
     { name = "starlette", specifier = ">=0.46.2" },
+    { name = "timezonefinder", specifier = ">=6.2.0" },
     { name = "torch", specifier = ">=2.0.0" },
     { name = "torchaudio", specifier = ">=2.0.0" },
     { name = "trafilatura", specifier = ">=1.6.1" },
@@ -1014,6 +1016,38 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515 },
+]
+
+[[package]]
+name = "h3"
+version = "4.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/32/0d/ea8cee946cf07ad116f7c484e2f8e0bcb5c7509f7eccd594902bca95a979/h3-4.3.0.tar.gz", hash = "sha256:b9d35dfa97e7f4b4c9c9f1564f22a44565694ac1ca96469a08170869e7d0ce0a", size = 167844 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/91/4e2148c3f0726234d91df4651c31c2c236256cfd32ba988c7cca654baed1/h3-4.3.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:15bf255188d5fdd4b33cd24ed3952fbf8161575a42dcba2730a4530ef0f057fa", size = 859220 },
+    { url = "https://files.pythonhosted.org/packages/a9/0b/e10f56711e852bab7ef1872af9273ae26bef0fa8d3a4ae1faeebd58adc9b/h3-4.3.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:d45005bb56a9d70ab420bda6096c579e4246038f8b0553394b2b82aa474f2d1c", size = 802298 },
+    { url = "https://files.pythonhosted.org/packages/77/b3/fe6495b294fea9419eda078ca1f9d32565e966c74023db660e8e38e272a0/h3-4.3.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:67c3a8d883b7b233b30a372f85434f48cba3b42b926598a835a73512a0a3d958", size = 944172 },
+    { url = "https://files.pythonhosted.org/packages/53/4d/4915d7b49492e4875ec3349a394e5d66af0426ae4a5846e5bee9f5b43f47/h3-4.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1e5d2180c1391db507473a6877c2df036de396d88212e90d7d0f6c73b33901d3", size = 984957 },
+    { url = "https://files.pythonhosted.org/packages/d7/58/e3494fffaed455de207e7b356e4c732151df5d519f8485d181d6910b1e76/h3-4.3.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:7de13e47ea3e3a3fc06c50def371050227ecfb1ccf0c8923c2b8bd8acba27355", size = 1029229 },
+    { url = "https://files.pythonhosted.org/packages/9f/66/337e40000ac56cf0257bba7a06cfd73b501b7bc108b2cfa248d5efcbfbad/h3-4.3.0-cp310-cp310-win_amd64.whl", hash = "sha256:67c82019afb5b0b214f50502a141bdb4e9b72dfffe5ed63fdd7630119edee123", size = 780396 },
+    { url = "https://files.pythonhosted.org/packages/3d/f8/fd7c6b0a25b643d43cc330f9b458850753df502cf6fdd19433394f5df93d/h3-4.3.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:689cb238becb5f5af3631934e54cb8c7782c60af8fa9daf7e2cd972235b88c6a", size = 859074 },
+    { url = "https://files.pythonhosted.org/packages/1a/ba/c2c70c17c50ff0510d346a1853d7c64f843a94fdc86e8c6a465d5a763ead/h3-4.3.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:69dc186712c6adeb500b1aaec875493c742fbddb7b9b40d02016769a991732d1", size = 800930 },
+    { url = "https://files.pythonhosted.org/packages/c7/bc/a086d336ff93bfd826f803ceded190a8f9805e72f59ab7e078ccb3f9042b/h3-4.3.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7f870c0c90fd6657b51d8b1501142e9bee0787437be9486251a0e86e2d1513c1", size = 945189 },
+    { url = "https://files.pythonhosted.org/packages/1c/83/8cb9838fffcc120d9713a5959e0baf79c335ec50ce23b3a267060b44bda7/h3-4.3.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:56862fa893903b966840a4aff27e19be2ee62b80e7e67d93dbd805ab719195bc", size = 985815 },
+    { url = "https://files.pythonhosted.org/packages/3c/a3/3b67fce68519c9021a4b8f34a33d1e68d8e34a7758aa9e79e78612c3f07c/h3-4.3.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:0f6b8432a104dacf21a2a06bb5dd60e2b63375b544d4964d7e4980543d8285da", size = 1030088 },
+    { url = "https://files.pythonhosted.org/packages/dd/aa/c8c4ccc5788b858e101d90f73b664095b3e0dec7039a56773c5396228317/h3-4.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:a9c18bec33c300485452f3ed46a5165d27b186cfb15ee36fb7252228483c84b9", size = 781212 },
+    { url = "https://files.pythonhosted.org/packages/fc/f3/ae5cc2f0e92e3829efbc394a553974b5e4d40d80b92707ddca3e74bac600/h3-4.3.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:a647d9635633ca243d8c24c990a9e37e3b294781fd6a47a0f5dfe9a1dec0dd13", size = 865455 },
+    { url = "https://files.pythonhosted.org/packages/29/67/780c144c159f29752890fd8bf1c0f2bc77d976387cefa62cfed855dab27e/h3-4.3.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6adba5b249792d8f01abd9e410439a2912a4e900073cfcc2d32297f2ec803db0", size = 798453 },
+    { url = "https://files.pythonhosted.org/packages/dd/86/91ce659e92940145c775c4b0af92377834318d104984b3d3d3565a61bed8/h3-4.3.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:69ceab01438558ab2b5a90a2a30cf9e1627a4a8b6923ad8ec51a9e2dfa2ad0e8", size = 925304 },
+    { url = "https://files.pythonhosted.org/packages/e6/7f/cab66f692dd3c8e26ee59626b2683894d40c15d7bda26d152dff7c4ebd0c/h3-4.3.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e8a7d63ee5213f43dea80b79821fa7e07d9377260bc352201cac5c954017ea99", size = 968357 },
+    { url = "https://files.pythonhosted.org/packages/39/4b/35b06ec47556a175c01b67e00264a2f0e32d310d447d0500282dffa59ed7/h3-4.3.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6409d7d9c7c3a888359c5012aa7eedfe909da230e0f109d6a80ab973c0a2bf73", size = 1016721 },
+    { url = "https://files.pythonhosted.org/packages/0f/d9/afd3230e9a3c1534df138db5e2cba3f67743aeb8f1349d41008e1eee48b8/h3-4.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:24ad4e247388bb7f5afece4fb5f901b1168c4b2f0417b3459bae5c4939939327", size = 785108 },
+    { url = "https://files.pythonhosted.org/packages/65/db/cb1aff97ec5a6156753cbeb4bab36e582a4b4b86b742db8b4d580d3cd3d5/h3-4.3.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:ee2d2ab17c10172b265876b4655094c530251cae24f03cf0d2f339aca5ee603f", size = 858139 },
+    { url = "https://files.pythonhosted.org/packages/c0/92/e75ad4fb321e6e4ac6e2e25259b9377aa2950e3a3c5a4e644aecca3ea61d/h3-4.3.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:902e92c06bb2c08a6a551d5ca6a69a5deae2a9802263ae54455a803c3fb1766c", size = 792473 },
+    { url = "https://files.pythonhosted.org/packages/3d/2e/2d2c5ed975f108fc5cf95f2590d5f12423c20a34f47b0b55c1d9fc2f7b2a/h3-4.3.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c61761f524d7b42872f085dfcafc6466b7ff2ef0fc4c4626b336448e8fffca3a", size = 919628 },
+    { url = "https://files.pythonhosted.org/packages/09/16/3b6fc7f59c5965b4318b6d0b797fda9940cfe5473fd567a6607de6ec8aba/h3-4.3.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1fe4c11a1b512ef64cc155c84977fa41bdc8f059d0db3c411da854805b08ad59", size = 965868 },
+    { url = "https://files.pythonhosted.org/packages/59/bb/2d43980a0d265335dc6cb6f771b5ce680ee89b489337d29a221edacf03e0/h3-4.3.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:e46ac17a7dc520ba7e5b5698bf39f3123e68e2c834398711a93a42ab3ec46d60", size = 1014094 },
+    { url = "https://files.pythonhosted.org/packages/25/42/08b74adfde7a314d22453e6cc70855a2efc05f07dc9a43a94208aeb26d13/h3-4.3.0-cp313-cp313-win_amd64.whl", hash = "sha256:02df69a61c59d06b8516c85d9cf4f6bb2efc8e8b526000ac46b16328540d0952", size = 781423 },
 ]
 
 [[package]]
@@ -3124,6 +3158,32 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165 },
+]
+
+[[package]]
+name = "timezonefinder"
+version = "6.5.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+    { name = "h3" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/4d/8694391d6b014bc49f8fd2eb8c05c94526b36fba8dc76d439f3d51948e46/timezonefinder-6.5.9.tar.gz", hash = "sha256:0d84c792a499fd098a35c701c3e3293423ba8d45c81b3eecd7c7cb72c7f1f415", size = 51435008 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/d0/e24bdd01bfda4f66fac30e58a339d1d733718000b517c93ebfa792f946c0/timezonefinder-6.5.9-cp310-cp310-manylinux_2_17_x86_64.manylinux_2_5_x86_64.manylinux1_x86_64.manylinux2014_x86_64.whl", hash = "sha256:52d5a4a8fc96990f72d9d3d48297e789217f67689d3178c9ff8ea3ab57125e3b", size = 51443226 },
+    { url = "https://files.pythonhosted.org/packages/73/7d/e359a0a7ee74da7576211b9d0479d4aaf63964b48f88a599f523d7bcdf68/timezonefinder-6.5.9-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cfc9cc75a39b7997c1e616481d559831e3e4a1c0cde66f20c9168ab3d45e0fa6", size = 51444381 },
+    { url = "https://files.pythonhosted.org/packages/68/6a/321f849a41ac598981dfded6b9e2c0741b0406e6b5aa54f475058f156af4/timezonefinder-6.5.9-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:7a84ad5afb02ca1b536481cee05a8f2d5d7dd4818f73cd780acd03aa3cc033c9", size = 51445162 },
+    { url = "https://files.pythonhosted.org/packages/0e/24/6b10ae9aae25871d6776c78b77322632b023f4d5a49d9c657f268a2ec568/timezonefinder-6.5.9-cp311-cp311-manylinux_2_17_x86_64.manylinux_2_5_x86_64.manylinux1_x86_64.manylinux2014_x86_64.whl", hash = "sha256:643535f76436b13216ed1c3b69c6ed8f793253810916ca6bef3b8e0cf3084fef", size = 51443229 },
+    { url = "https://files.pythonhosted.org/packages/c5/a6/41f3e81f5a3ec3f8373be5fe6f10e14bc7f009dabae08c8a0908bd5b7fa1/timezonefinder-6.5.9-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:23465a74af9fdb17c139c40e1dd3a46db284befb822fc454a03ad9516f0c502a", size = 51444375 },
+    { url = "https://files.pythonhosted.org/packages/c8/15/89b0d616e4b6d92198a61019e7347a565a52b37ba3eed59178be00dcb8ab/timezonefinder-6.5.9-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:4fa18e4b3f3ac1469bc50031700bc9696477cbf40953bdcbdec7bef20f3200d0", size = 51445199 },
+    { url = "https://files.pythonhosted.org/packages/c9/aa/57fb0cb5b739a12ce6fc401b9d1e5d0b2ee092449c1d3ae14aa815409062/timezonefinder-6.5.9-cp312-cp312-manylinux_2_17_x86_64.manylinux_2_5_x86_64.manylinux1_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e9a0caf638f43b6dd9980731d1424500c7a6a5048db808aad7032560df5c663", size = 51443482 },
+    { url = "https://files.pythonhosted.org/packages/70/de/c96b04236e9aa7902f4e416c5989fd019efb0e09e69f40cedb1e6e7bcd26/timezonefinder-6.5.9-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9039919be603809b98f3d2b6a4ed33110ac7cc6bbd507959531401c91f3469fb", size = 51444624 },
+    { url = "https://files.pythonhosted.org/packages/2b/b9/c8a05e55096deea0b789d649da9729312ab1d97e3c52b0f0254c18f94cc7/timezonefinder-6.5.9-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:c5347c4a73b40af4867a2946a5172ec68b644e7036888b9b5a0e568499bfc0f3", size = 51445521 },
+    { url = "https://files.pythonhosted.org/packages/53/6c/498b3f453b15d7ecf2ecf54a8f1cc7fbd1d3c3eed86a5182081ebc17b180/timezonefinder-6.5.9-cp313-cp313-manylinux_2_17_x86_64.manylinux_2_5_x86_64.manylinux1_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a7d1f30b550c24598459643285ef0f5469524ad7a32dd854199e7a2a463600ff", size = 51443403 },
+    { url = "https://files.pythonhosted.org/packages/4e/5a/dfcd510203ccaf01099394850df7ee3733afffa57bfca3499b7f39484edf/timezonefinder-6.5.9-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bfb175d470e6f6abbeb13bd3a638bb1a0aa4124e1a93d040e5d933cf69076c60", size = 51444549 },
+    { url = "https://files.pythonhosted.org/packages/8b/16/6ae92a93dd703c0485e4c0a76e28bc829f9c7eba548a1b2e17fb3342e4c3/timezonefinder-6.5.9-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:4f36877ad3a988f329cbd3f04f7cadc56dce073ad4a7bda7397f46ac2a61f9a4", size = 51445432 },
 ]
 
 [[package]]
