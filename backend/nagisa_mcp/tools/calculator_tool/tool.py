@@ -131,15 +131,13 @@ def calculate(expression: str = Field(..., description="Mathematical expression 
     {
       "operation": {
         "type": "calculate",
-        "expression": "2 + 3 * 4",
-        "result": "14",
-        "result_type": "integer"
+        "expression": "2 + 3 * 4"
       },
       "result": {
         "value": "14",
         "original_expression": "2 + 3 * 4",
-        "calculation_successful": true,
-        "formatted_display": "2 + 3 * 4 = 14"
+        "formatted_display": "2 + 3 * 4 = 14",
+        "result_type": "integer"
       },
       "summary": {
         "operation_type": "calculate",
@@ -163,55 +161,58 @@ def calculate(expression: str = Field(..., description="Mathematical expression 
         elif "Numerical overflow" in message:
             error_type = "numerical_overflow"
         
+        # Build structured content
+        structured_content = {
+            "operation": {
+                "type": "calculate",
+                "expression": expr
+            },
+            "result": {
+                "error_type": error_type,
+                "error_message": error_details or message
+            },
+            "summary": {
+                "operation_type": "calculate",
+                "success": False
+            }
+        }
+        
         return ToolResult(
             status="error",
             message=message,
-            llm_content=f"Calculator error: {message}",
+            llm_content=structured_content,
             error=error_details or message,
-            data={
-                "operation": {
-                    "type": "calculate",
-                    "expression": expr,
-                    "error": error_details or message
-                },
-                "result": {
-                    "calculation_successful": False,
-                    "error_type": error_type,
-                    "error_message": error_details or message
-                },
-                "summary": {
-                    "operation_type": "calculate",
-                    "success": False
-                }
-            }
+            data=structured_content
         ).model_dump()
     
     def _success(result: str, original_expr: str) -> dict[str, Any]:
         """Generate standardized success response."""
         result_type = "integer" if "." not in result else "float"
+        
+        # Build structured content
+        structured_content = {
+            "operation": {
+                "type": "calculate",
+                "expression": original_expr
+            },
+            "result": {
+                "value": result,
+                "original_expression": original_expr,
+                "formatted_display": f"{original_expr} = {result}",
+                "result_type": result_type
+            },
+            "summary": {
+                "operation_type": "calculate",
+                "success": True,
+                "result_type": result_type
+            }
+        }
+        
         return ToolResult(
             status="success", 
             message=f"Calculated: {original_expr} = {result}",
-            llm_content=f"```\n{original_expr} = {result}\n```",
-            data={
-                "operation": {
-                    "type": "calculate",
-                    "expression": original_expr,
-                    "result": result,
-                    "result_type": result_type
-                },
-                "result": {
-                    "value": result,
-                    "original_expression": original_expr,
-                    "calculation_successful": True,
-                    "formatted_display": f"{original_expr} = {result}"
-                },
-                "summary": {
-                    "operation_type": "calculate",
-                    "success": True,
-                    "result_type": result_type
-                }
-            }
+            llm_content=structured_content,
+            data=structured_content
         ).model_dump()
     
     # Input validation
