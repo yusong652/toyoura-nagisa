@@ -1,9 +1,15 @@
+"""
+Contact Tools Module - Google Contacts integration for directory access
+"""
+
+from typing import List, Dict, Any, Optional
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
 from datetime import datetime
 import os
+
 from backend.nagisa_mcp.tools.google_auth.google_contacts import build_google_contacts_service
+from backend.nagisa_mcp.utils.tool_result import ToolResult
 
 class Contact(BaseModel):
     """Contact model for validation"""
@@ -20,42 +26,82 @@ def register_contact_tools(mcp: FastMCP):
         annotations={"category": "contact", "tags": ["contact", "google", "people", "search", "directory"]}
     )
 
+    # Helper functions for consistent responses
+    def _error(message: str) -> Dict[str, Any]:
+        return ToolResult(status="error", message=message, error=message).model_dump()
+
+    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+        return ToolResult(
+            status="success",
+            message=message,
+            llm_content=llm_content,
+            data=data,
+        ).model_dump()
+
     @mcp.tool(**common_kwargs)
     def list_contacts(
-        max_contacts: int = Field(100, description="Maximum number of contacts to retrieve")
-    ) -> List[dict]:
-        """
-            Retrieve contacts from Google Contacts API using OAuth2 authentication.
+        max_contacts: int = Field(100, ge=1, le=500, description="Maximum number of contacts to retrieve (1-500).")
+    ) -> Dict[str, Any]:
+        """Retrieve contacts from Google Contacts API using OAuth2 authentication.
 
-            The account is determined by the AI_GMAIL_ADDRESS environment variable.
+        ## Core Functionality
+        - Fetches contacts from Google Contacts via People API
+        - Returns structured contact data with names, emails, and phone numbers
+        - Uses OAuth2 authentication from AI_GMAIL_ADDRESS environment
 
-        Args:
-                max_contacts (int): Maximum number of contacts to retrieve. Default is 100.
+        ## Return Value
+        **For LLM:** Returns structured data with consistent format across all communication tools.
+        
+        **Structure:**
+        ```json
+        {
+          "operation": {
+            "type": "list_contacts",
+            "max_contacts": 100,
+            "account": "user@example.com",
+            "timestamp": "2025-01-08T10:30:00.123"
+          },
+          "result": {
+            "contacts": [
+              {
+                "id": "people/c1234567890",
+                "name": "John Doe",
+                "emails": ["john@example.com"],
+                "phones": ["+1-555-0123"]
+              }
+            ],
+            "total_contacts": 25,
+            "contacts_with_email": 20,
+            "contacts_with_phone": 18
+          },
+          "summary": {
+            "operation_type": "list_contacts",
+            "success": true
+          }
+        }
+        ```
 
-        Returns:
-                List[dict]: A list of contact dictionaries. Each dictionary contains:
-                    - id (str): Contact's unique identifier
-                    - name (str): Contact's display name
-                    - emails (List[str]): List of contact's email addresses
-                    - phones (List[str]): List of contact's phone numbers
-                If an error occurs, returns a list with a single dictionary containing:
-                    - error (str): Error message
-                    - timestamp (str): ISO format timestamp
+        ## Strategic Usage
+        Use this tool to **access your contact directory** for email composition, communication, or contact management tasks.
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")
             if not nagisa_email:
-                return [{"error": "AI_GMAIL_ADDRESS environment variable not set", "timestamp": datetime.now().isoformat()}]
+                return _error("AI_GMAIL_ADDRESS environment variable not set")
             
             service = build_google_contacts_service(nagisa_email)
+            
             # Get the list of connections (contacts)
             results = service.people().connections().list(
                 resourceName='people/me',
-                        pageSize=max_contacts,
+                pageSize=max_contacts,
                 personFields='names,emailAddresses,phoneNumbers'
             ).execute()
         
             contacts = []
+            contacts_with_email = 0
+            contacts_with_phone = 0
+            
             if 'connections' in results:
                 for person in results['connections']:
                     contact = {
@@ -75,54 +121,110 @@ def register_contact_tools(mcp: FastMCP):
                     # Extract email addresses
                     if 'emailAddresses' in person:
                         contact['emails'] = [email['value'] for email in person['emailAddresses']]
+                        if contact['emails']:
+                            contacts_with_email += 1
                     
                     # Extract phone numbers
                     if 'phoneNumbers' in person:
                         contact['phones'] = [phone['value'] for phone in person['phoneNumbers']]
+                        if contact['phones']:
+                            contacts_with_phone += 1
                     
                     contacts.append(contact)
-                return contacts
+            
+            # Build structured response
+            timestamp = datetime.now().isoformat()
+            
+            llm_content = {
+                "operation": {
+                    "type": "list_contacts",
+                    "max_contacts": max_contacts,
+                    "account": nagisa_email,
+                    "timestamp": timestamp
+                },
+                "result": {
+                    "contacts": contacts,
+                    "total_contacts": len(contacts),
+                    "contacts_with_email": contacts_with_email,
+                    "contacts_with_phone": contacts_with_phone
+                },
+                "summary": {
+                    "operation_type": "list_contacts",
+                    "success": True
+                }
+            }
+            
+            message = f"Retrieved {len(contacts)} contacts from {nagisa_email}"
+            
+            return _success(
+                message,
+                llm_content,
+                contacts=contacts,
+                total_contacts=len(contacts),
+                account=nagisa_email
+            )
         
         except Exception as e:
-            return [{
-                "error": f"Failed to retrieve contacts: {str(e)}",
-                "timestamp": datetime.now().isoformat()
-            }]
+            return _error(f"Failed to retrieve contacts: {str(e)}")
 
     @mcp.tool(**common_kwargs)
     def search_contacts(
-        query: str = Field(..., description="Search query for contacts (name, relationship, email, or phone)"),
-        max_results: int = Field(100, description="Maximum number of results to return")
-    ) -> List[dict]:
-        """
-            Search contacts in Google Contacts API using OAuth2 authentication.
+        query: str = Field(..., description="Search query for contacts (name, email, or phone number)."),
+        max_results: int = Field(100, ge=1, le=500, description="Maximum number of results to return (1-500).")
+    ) -> Dict[str, Any]:
+        """Search contacts in Google Contacts API using OAuth2 authentication.
 
-            The account is determined by the AI_GMAIL_ADDRESS environment variable.
+        ## Core Functionality
+        - Searches contacts using Google People API search functionality
+        - Matches against names, emails, and phone numbers
+        - Returns filtered contact data with relevance-based ordering
 
-        Args:
-                query (str): Search query for contacts (name, relationship, email, or phone).
-                max_results (int): Maximum number of results to return. Default is 100.
+        ## Return Value
+        **For LLM:** Returns structured data with consistent format across all communication tools.
+        
+        **Structure:**
+        ```json
+        {
+          "operation": {
+            "type": "search_contacts",
+            "query": "john",
+            "max_results": 100,
+            "account": "user@example.com",
+            "timestamp": "2025-01-08T10:30:00.123"
+          },
+          "result": {
+            "contacts": [
+              {
+                "id": "people/c1234567890",
+                "name": "John Doe",
+                "emails": ["john@example.com"],
+                "phones": ["+1-555-0123"]
+              }
+            ],
+            "total_matches": 3,
+            "search_limited": false
+          },
+          "summary": {
+            "operation_type": "search_contacts",
+            "success": true
+          }
+        }
+        ```
 
-        Returns:
-                List[dict]: A list of matching contact dictionaries. Each dictionary contains:
-                    - id (str): Contact's unique identifier
-                    - name (str): Contact's display name
-                    - emails (List[str]): List of contact's email addresses
-                    - phones (List[str]): List of contact's phone numbers
-                If an error occurs, returns a list with a single dictionary containing:
-                    - error (str): Error message
-                    - timestamp (str): ISO format timestamp
+        ## Strategic Usage
+        Use this tool to **find specific contacts** when you need to send emails, make calls, or reference contact information in communications.
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")
             if not nagisa_email:
-                return [{"error": "AI_GMAIL_ADDRESS environment variable not set", "timestamp": datetime.now().isoformat()}]
+                return _error("AI_GMAIL_ADDRESS environment variable not set")
             
             service = build_google_contacts_service(nagisa_email)
+            
             # Search for contacts
             results = service.people().searchContacts(
                 query=query,
-                        pageSize=max_results,
+                pageSize=max_results,
                 readMask='names,emailAddresses,phoneNumbers'
             ).execute()
             
@@ -153,10 +255,38 @@ def register_contact_tools(mcp: FastMCP):
                         contact['phones'] = [phone['value'] for phone in person['phoneNumbers']]
                     
                     contacts.append(contact)
-            return contacts 
+            
+            # Build structured response
+            timestamp = datetime.now().isoformat()
+            
+            llm_content = {
+                "operation": {
+                    "type": "search_contacts",
+                    "query": query,
+                    "max_results": max_results,
+                    "account": nagisa_email,
+                    "timestamp": timestamp
+                },
+                "result": {
+                    "contacts": contacts,
+                    "total_matches": len(contacts),
+                    "search_limited": len(contacts) >= max_results
+                },
+                "summary": {
+                    "operation_type": "search_contacts",
+                    "success": True
+                }
+            }
+            
+            message = f"Found {len(contacts)} contacts matching '{query}'"
+            
+            return _success(
+                message,
+                llm_content,
+                contacts=contacts,
+                total_matches=len(contacts),
+                search_query=query
+            )
         
         except Exception as e:
-            return [{
-                "error": f"Failed to search contacts: {str(e)}",
-                "timestamp": datetime.now().isoformat()
-            }] 
+            return _error(f"Failed to search contacts: {str(e)}") 
