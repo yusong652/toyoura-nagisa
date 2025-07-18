@@ -11,7 +11,7 @@ _PROJECT_ROOT = _BACKEND_DIR.parent        # 项目根目录
 sys.path.insert(0, str(_PROJECT_ROOT))
 import asyncio
 from fastmcp import FastMCP
-from backend.nagisa_mcp.tools.web_search import register_web_search_tools
+from backend.nagisa_mcp.tools.builtin import register_builtin_tools
 from backend.nagisa_mcp.tools.email_tools import register_email_tools
 from backend.nagisa_mcp.tools.calendar import register_calendar_tools
 from backend.nagisa_mcp.tools.coding import register_coding_tools
@@ -38,7 +38,7 @@ mcp = FastMCP(
 print(f"[DEBUG] Smart MCP Server initialized")
 
 # 注册所有工具
-register_web_search_tools(mcp)
+register_builtin_tools(mcp)
 register_email_tools(mcp)
 register_calendar_tools(mcp)
 register_coding_tools(mcp)

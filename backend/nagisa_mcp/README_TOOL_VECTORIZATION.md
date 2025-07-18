@@ -83,12 +83,12 @@ tools = vectorizer.search_tools("example tool", n_results=5)
 **配置示例:**
 ```python
 tool_modules = {
-    'web_search': {
-        'module_path': 'backend.nagisa_mcp.tools.web_search',
-        'register_function': 'register_web_search_tools',
+    'builtin': {
+        'module_path': 'backend.nagisa_mcp.tools.builtin',
+        'register_function': 'register_builtin_tools',
         'category': 'information',
-        'tags': ['search', 'web', 'information'],
-        'description': 'Web search and information retrieval tools'
+        'tags': ['search', 'web', 'information', 'builtin'],
+        'description': 'Built-in tools including web search and information retrieval'
     }
 }
 ```

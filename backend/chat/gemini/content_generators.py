@@ -6,7 +6,7 @@ based on conversation context. Separates content generation concerns from the ma
 """
 
 import re
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from google.genai import types
 from backend.chat.models import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
@@ -113,6 +113,177 @@ class TitleGenerator:
             return None
 
 
+class WebSearchGenerator:
+    """
+    Handles web search using Gemini API with google_search tool.
+    
+    Performs web searches using Google Search via the Gemini API using the
+    modern google_search tool. Returns structured results with proper error
+    handling and debugging support.
+    """
+
+    @staticmethod
+    def perform_web_search(
+        client,  # Gemini client instance
+        query: str,
+        debug: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Perform a web search using Google Search via the Gemini API.
+        
+        Uses the modern google_search tool. The model will automatically
+        decide whether to perform a search based on the query requirements.
+        
+        Args:
+            client: Gemini client instance for API calls
+            query: The search query to find information on the web
+            debug: Enable debug output
+            
+        Returns:
+            Dictionary containing search results or error information
+        """
+        try:
+            if debug:
+                print(f"[WebSearch] Performing search for query: {query}")
+            
+            # Configure the Gemini model with the web search tool
+            # Use google_search tool as per 2025 API requirements
+            web_search_system_prompt = (
+                "You are a professional web search assistant. Your task is to search for and synthesize "
+                "information from the web to provide comprehensive, accurate, and up-to-date answers. "
+                "When searching:\n"
+                "1. Use the search tool to find relevant and current information\n"
+                "2. Analyze multiple sources for accuracy and reliability\n"
+                "3. Synthesize information into a coherent, well-structured response\n"
+                "4. Prioritize recent and authoritative sources\n"
+                "5. Clearly indicate when information is uncertain or requires verification\n"
+                "6. Provide context and explain complex topics clearly\n"
+                "Focus on delivering factual, helpful information that directly addresses the user's query."
+            )
+            
+            search_config = types.GenerateContentConfig(
+                system_instruction=web_search_system_prompt,
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.1,
+                max_output_tokens=4096
+            )
+            
+            # Create user message with search query
+            user_message = UserMessage(role="user", content=query)
+            
+            # Format message using MessageFormatter
+            contents = MessageFormatter.format_messages_for_gemini([user_message])
+            
+            if debug:
+                print(f"[WebSearch] Formatted contents for API call:")
+                import pprint
+                pprint.pprint(contents)
+            
+            # Call the model with the query
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=search_config
+            )
+            
+            if debug:
+                print(f"[WebSearch] Raw API response received")
+                # Debug: Print response structure
+                if hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    print(f"[WebSearch] Candidate attributes: {dir(candidate)}")
+                    if hasattr(candidate, 'grounding_metadata'):
+                        print(f"[WebSearch] Grounding metadata found")
+                        gm = candidate.grounding_metadata
+                        print(f"[WebSearch] Grounding metadata attributes: {dir(gm)}")
+                    else:
+                        print(f"[WebSearch] No grounding_metadata found")
+            
+            # Check for tool calls
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                
+                # Extract grounding metadata for sources
+                grounding_metadata = getattr(candidate, 'grounding_metadata', None)
+                sources = []
+                if grounding_metadata:
+                    grounding_chunks = getattr(grounding_metadata, 'grounding_chunks', [])
+                    
+                    # Process grounding chunks according to official API structure
+                    for i, chunk in enumerate(grounding_chunks):
+                        if hasattr(chunk, 'web'):
+                            web_info = chunk.web
+                            # Extract more comprehensive information
+                            source_data = {
+                                'url': getattr(web_info, 'uri', ''),
+                                'title': getattr(web_info, 'title', ''),
+                                'snippet': getattr(web_info, 'text', ''),
+                                'index': i
+                            }
+                            
+                            # Try to get additional metadata if available
+                            if hasattr(web_info, 'snippet'):
+                                source_data['snippet'] = web_info.snippet
+                            
+                            sources.append(source_data)
+                            
+                            if debug:
+                                print(f"[WebSearch] Source {i+1}: {source_data['title']}")
+                                print(f"[WebSearch]   URL: {source_data['url']}")
+                                print(f"[WebSearch]   Snippet: {source_data['snippet'][:100]}...")
+                                
+                        elif hasattr(chunk, 'uri'):  # Fallback for older format
+                            source_data = {
+                                'url': chunk.uri,
+                                'title': getattr(chunk, 'title', ''),
+                                'snippet': getattr(chunk, 'text', ''),
+                                'index': i
+                            }
+                            sources.append(source_data)
+                            
+                            if debug:
+                                print(f"[WebSearch] Source {i+1} (fallback): {source_data['title']}")
+                                
+                # Also try to extract citation/grounding support information
+                if grounding_metadata and hasattr(grounding_metadata, 'grounding_supports'):
+                    grounding_supports = grounding_metadata.grounding_supports
+                    if debug:
+                        print(f"[WebSearch] Found {len(grounding_supports)} grounding supports")
+                        for j, support in enumerate(grounding_supports):
+                            if hasattr(support, 'grounding_chunk_indices'):
+                                chunk_indices = support.grounding_chunk_indices
+                                print(f"[WebSearch] Support {j+1} references chunks: {chunk_indices}")
+                
+                # Extract response text
+                response_text = ""
+                if hasattr(candidate, 'content') and candidate.content.parts:
+                    response_text = candidate.content.parts[0].text
+                
+                # Build structured result
+                result = {
+                    "query": query,
+                    "response_text": response_text,
+                    "sources": sources,
+                    "total_sources": len(sources)
+                }
+                
+                if debug:
+                    print(f"[WebSearch] Extracted {len(sources)} sources")
+                    print(f"[WebSearch] Response text length: {len(response_text)}")
+                
+                return result
+            else:
+                if debug:
+                    print("[WebSearch] No candidates found in response")
+                return {"error": "No search results found", "query": query}
+                
+        except Exception as e:
+            error_msg = f"An error occurred during web search: {str(e)}"
+            if debug:
+                print(f"[WebSearch] Error: {error_msg}")
+            return {"error": error_msg, "query": query}
+
+
 class ImagePromptGenerator:
     """
     Handles text-to-image prompt generation using Gemini API.
@@ -193,8 +364,8 @@ class ImagePromptGenerator:
                         "threshold": types.HarmBlockThreshold.BLOCK_NONE
                     }
                 ],
-                temperature=1.0,
-                max_output_tokens=1024
+                temperature=2.0,
+                max_output_tokens=4096
             )
             
             if debug:

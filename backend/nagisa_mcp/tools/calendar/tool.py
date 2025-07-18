@@ -44,6 +44,10 @@ CALENDAR_BATCH_TIMEOUT = 60     # seconds for batch operations
 PERFORMANCE_SLOW_THRESHOLD = 2.0  # seconds
 PERFORMANCE_LARGE_THRESHOLD = 5.0  # seconds
 
+# Time validation thresholds
+PAST_TIME_WARNING_THRESHOLD = 24 * 60 * 60  # 24 hours in seconds - warn if event is more than 24 hours in the past
+IMMEDIATE_PAST_WARNING_THRESHOLD = 60  # 60 seconds - warn if event is in the immediate past
+
 # -----------------------------------------------------------------------------
 # Enums for type safety
 # -----------------------------------------------------------------------------
@@ -205,6 +209,21 @@ def get_user_email() -> str:
         raise ValueError("USER_GMAIL_ADDRESS environment variable not set")
     return user_email
 
+def _validate_time_past_warning(dt: datetime, time_label: str) -> Optional[str]:
+    """Validate if datetime is in the past and return appropriate warning message."""
+    now = datetime.now(dt.tzinfo)
+    time_diff = (now - dt).total_seconds()
+    
+    if time_diff > 0:  # Past time
+        if time_diff > PAST_TIME_WARNING_THRESHOLD:
+            return f"Warning: {time_label} time is in the past ({time_diff/3600:.1f} hours ago). Event will be scheduled for the next occurrence."
+        elif time_diff > IMMEDIATE_PAST_WARNING_THRESHOLD:
+            return f"Warning: {time_label} time is in the recent past ({time_diff/60:.1f} minutes ago). Event will be scheduled for the next occurrence."
+        else:
+            return f"Warning: {time_label} time is in the immediate past ({time_diff:.0f} seconds ago). Event will be scheduled for the next occurrence."
+    
+    return None
+
 def _validate_event_data(
     summary: str,
     start: Optional[str] = None,
@@ -227,16 +246,22 @@ def _validate_event_data(
     if description and len(description) > MAX_EVENT_DESCRIPTION_LENGTH:
         warnings.append(f"Event description exceeds recommended length ({MAX_EVENT_DESCRIPTION_LENGTH} chars)")
     
-    # Validate time format if provided
+    # Validate time format and check for past times
     if start:
         try:
-            datetime.fromisoformat(start.replace('Z', '+00:00'))
+            start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            past_warning = _validate_time_past_warning(start_dt, "start")
+            if past_warning:
+                warnings.append(past_warning)
         except ValueError:
             warnings.append("Invalid start time format. Please use RFC3339 format")
     
     if end:
         try:
-            datetime.fromisoformat(end.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            past_warning = _validate_time_past_warning(end_dt, "end")
+            if past_warning:
+                warnings.append(past_warning)
         except ValueError:
             warnings.append("Invalid end time format. Please use RFC3339 format")
     
@@ -354,12 +379,7 @@ def register_calendar_tools(mcp: FastMCP):
         {
           "operation": {
             "type": "list_events",
-            "calendar_id": "primary",
-            "max_results": 10,
-            "time_range": {
-              "start": "2024-01-01T00:00:00Z",
-              "end": "2024-12-31T23:59:59Z"
-            }
+            "max_results": 10
           },
           "result": {
             "events": [
@@ -460,12 +480,7 @@ def register_calendar_tools(mcp: FastMCP):
             llm_content = {
                 "operation": {
                     "type": "list_events",
-                    "calendar_id": calendar_id,
-                    "max_results": max_results,
-                    "time_range": {
-                        "start": time_min,
-                        "end": time_max
-                    }
+                    "max_results": max_results
                 },
                 "result": {
                     "events": [event.to_llm_dict() for event in result.events],
@@ -477,6 +492,13 @@ def register_calendar_tools(mcp: FastMCP):
                     "has_warnings": len(result.warnings) > 0
                 }
             }
+            
+            # Add time range only if specified
+            if time_min or time_max:
+                llm_content["operation"]["time_range"] = {
+                    "start": time_min,
+                    "end": time_max
+                }
             
             # Add warnings if any
             if result.warnings:
@@ -512,14 +534,7 @@ def register_calendar_tools(mcp: FastMCP):
         ```json
         {
           "operation": {
-            "type": "create_event",
-            "calendar_id": "primary",
-            "event_data": {
-              "summary": "Team Meeting",
-              "start": "2024-06-06T10:00:00+09:00",
-              "end": "2024-06-06T11:00:00+09:00",
-              "location": "Conference Room A"
-            }
+            "type": "create_event"
           },
           "result": {
             "event": {
@@ -545,8 +560,13 @@ def register_calendar_tools(mcp: FastMCP):
         ## Strategic Usage
         Use this tool to **create calendar events** with intelligent date handling and validation.
         
-        **Important:** If the user input does not specify a year, the system will automatically
-        calculate the next upcoming occurrence of that date in the future.
+        **Important:** 
+        - If the user input does not specify a year, the system will automatically
+          calculate the next upcoming occurrence of that date in the future.
+        - If the provided time is in the past, the system will automatically schedule
+          the event for the next occurrence and provide detailed warnings to the LLM.
+        - Time validation includes warnings for events scheduled in the past (immediate,
+          recent, or distant past) with automatic correction to future times.
         
         """
         
@@ -592,10 +612,34 @@ def register_calendar_tools(mcp: FastMCP):
             if start_dt >= end_dt:
                 return _error("Start time must be before end time")
             
-            # Auto-correct to future time
+            # Check for past times and auto-correct to future time
             now = datetime.now(start_dt.tzinfo)
+            original_start = start_dt
+            original_end = end_dt
+            
+            # Auto-correct to future time
             start_dt = ensure_future_datetime(start_dt, now)
             end_dt = ensure_future_datetime(end_dt, now)
+            
+            # Add warnings for time corrections
+            if start_dt != original_start:
+                time_diff = (now - original_start).total_seconds()
+                if time_diff > PAST_TIME_WARNING_THRESHOLD:
+                    warnings.append(f"Start time was {time_diff/3600:.1f} hours in the past. Automatically scheduled for next occurrence.")
+                elif time_diff > IMMEDIATE_PAST_WARNING_THRESHOLD:
+                    warnings.append(f"Start time was {time_diff/60:.1f} minutes in the past. Automatically scheduled for next occurrence.")
+                else:
+                    warnings.append(f"Start time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
+            
+            if end_dt != original_end:
+                time_diff = (now - original_end).total_seconds()
+                if time_diff > PAST_TIME_WARNING_THRESHOLD:
+                    warnings.append(f"End time was {time_diff/3600:.1f} hours in the past. Automatically scheduled for next occurrence.")
+                elif time_diff > IMMEDIATE_PAST_WARNING_THRESHOLD:
+                    warnings.append(f"End time was {time_diff/60:.1f} minutes in the past. Automatically scheduled for next occurrence.")
+                else:
+                    warnings.append(f"End time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
+            
             start = start_dt.isoformat()
             end = end_dt.isoformat()
             
@@ -638,15 +682,7 @@ def register_calendar_tools(mcp: FastMCP):
             # Build structured LLM content
             llm_content = {
                 "operation": {
-                    "type": "create_event",
-                    "calendar_id": calendar_id,
-                    "event_data": {
-                        "summary": summary,
-                        "start": start,
-                        "end": end,
-                        "location": location,
-                        "description": description
-                    }
+                    "type": "create_event"
                 },
                 "result": {
                     "event": result.events[0].to_llm_dict() if result.events else None
@@ -698,13 +734,7 @@ def register_calendar_tools(mcp: FastMCP):
         ```json
         {
           "operation": {
-            "type": "update_event",
-            "event_id": "event_id_123",
-            "calendar_id": "primary",
-            "updates": {
-              "summary": "Updated Team Meeting",
-              "location": "New Conference Room"
-            }
+            "type": "update_event"
           },
           "result": {
             "event": {
@@ -730,7 +760,11 @@ def register_calendar_tools(mcp: FastMCP):
         ## Strategic Usage
         Use this tool to **modify calendar events** with selective field updates and validation.
         
-        **Note:** Only provide the fields you want to update. Omitted fields will remain unchanged.
+        **Note:** 
+        - Only provide the fields you want to update. Omitted fields will remain unchanged.
+        - If updated times are in the past, the system will automatically schedule
+          the event for the next occurrence and provide detailed warnings to the LLM.
+        - Time validation includes warnings for events scheduled in the past with automatic correction.
 
         """
         
@@ -790,6 +824,58 @@ def register_calendar_tools(mcp: FastMCP):
         )
 
         try:
+            # Validate and process time updates if provided
+            if start is not None or end is not None:
+                # Parse and validate time updates
+                if start is not None:
+                    try:
+                        start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                        # Check for past time and auto-correct
+                        now = datetime.now(start_dt.tzinfo)
+                        original_start = start_dt
+                        start_dt = ensure_future_datetime(start_dt, now)
+                        
+                        if start_dt != original_start:
+                            time_diff = (now - original_start).total_seconds()
+                            if time_diff > PAST_TIME_WARNING_THRESHOLD:
+                                warnings.append(f"Updated start time was {time_diff/3600:.1f} hours in the past. Automatically scheduled for next occurrence.")
+                            elif time_diff > IMMEDIATE_PAST_WARNING_THRESHOLD:
+                                warnings.append(f"Updated start time was {time_diff/60:.1f} minutes in the past. Automatically scheduled for next occurrence.")
+                            else:
+                                warnings.append(f"Updated start time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
+                        
+                        start = start_dt.isoformat()
+                    except ValueError as e:
+                        return _error(f"Invalid start time format: {str(e)}. Please use RFC3339 format")
+                
+                if end is not None:
+                    try:
+                        end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                        # Check for past time and auto-correct
+                        now = datetime.now(end_dt.tzinfo)
+                        original_end = end_dt
+                        end_dt = ensure_future_datetime(end_dt, now)
+                        
+                        if end_dt != original_end:
+                            time_diff = (now - original_end).total_seconds()
+                            if time_diff > PAST_TIME_WARNING_THRESHOLD:
+                                warnings.append(f"Updated end time was {time_diff/3600:.1f} hours in the past. Automatically scheduled for next occurrence.")
+                            elif time_diff > IMMEDIATE_PAST_WARNING_THRESHOLD:
+                                warnings.append(f"Updated end time was {time_diff/60:.1f} minutes in the past. Automatically scheduled for next occurrence.")
+                            else:
+                                warnings.append(f"Updated end time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
+                        
+                        end = end_dt.isoformat()
+                    except ValueError as e:
+                        return _error(f"Invalid end time format: {str(e)}. Please use RFC3339 format")
+                
+                # Validate time order if both times are provided
+                if start is not None and end is not None:
+                    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                    if start_dt >= end_dt:
+                        return _error("Start time must be before end time")
+            
             # Get user email and build service
             user_email = get_user_email()
             service = build_google_calendar_service(user_email)
@@ -841,10 +927,7 @@ def register_calendar_tools(mcp: FastMCP):
             # Build structured LLM content
             llm_content = {
                 "operation": {
-                    "type": "update_event",
-                    "event_id": event_id,
-                    "calendar_id": calendar_id,
-                    "updates": updates
+                    "type": "update_event"
                 },
                 "result": {
                     "event": result.events[0].to_llm_dict() if result.events else None
@@ -887,9 +970,7 @@ def register_calendar_tools(mcp: FastMCP):
         ```json
         {
           "operation": {
-            "type": "delete_event",
-            "event_id": "event_id_123",
-            "calendar_id": "primary"
+            "type": "delete_event"
           },
           "result": {
             "deleted_event_id": "event_id_123"
@@ -957,9 +1038,7 @@ def register_calendar_tools(mcp: FastMCP):
             # Build structured LLM content
             llm_content = {
                 "operation": {
-                    "type": "delete_event",
-                    "event_id": event_id,
-                    "calendar_id": calendar_id
+                    "type": "delete_event"
                 },
                 "result": {
                     "deleted_event_id": event_id if result.success else None

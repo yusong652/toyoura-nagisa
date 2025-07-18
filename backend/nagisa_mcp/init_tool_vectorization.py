@@ -28,7 +28,7 @@ _PROJECT_ROOT = _BACKEND_DIR.parent     # 项目根目录
 sys.path.insert(0, str(_BACKEND_DIR))
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from nagisa_mcp.tool_vectorizer import ToolVectorizer
+from backend.nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 def import_and_register_all_tools(mcp):
     """
@@ -36,7 +36,7 @@ def import_and_register_all_tools(mcp):
     """
     tool_module_paths = [
         # Core tool suites
-        'nagisa_mcp.tools.web_search.tool',
+        'nagisa_mcp.tools.builtin',  # builtin tools including web search
         'nagisa_mcp.tools.coding.tools',  # aggregated coding tools
         'nagisa_mcp.tools.email_tools.tool',
         'nagisa_mcp.tools.calendar.tool',

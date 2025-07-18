@@ -13,7 +13,7 @@ from .debug import GeminiDebugger
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
 from .tool_manager import ToolManager
-from .content_generators import TitleGenerator, ImagePromptGenerator
+from .content_generators import TitleGenerator, ImagePromptGenerator, WebSearchGenerator
 
 class GeminiClient(LLMClientBase):
     """
@@ -76,6 +76,7 @@ class GeminiClient(LLMClientBase):
         self.response_processor = ResponseProcessor()
         self.title_generator = TitleGenerator()
         self.image_prompt_generator = ImagePromptGenerator()
+        self.web_search_generator = WebSearchGenerator()
         
         # Remove global context manager to prevent state pollution
         # Each tool calling sequence will create its own context manager
@@ -277,7 +278,23 @@ class GeminiClient(LLMClientBase):
             Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
         """
         debug = self.gemini_config.debug
-        return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug) 
+        return ImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug)
+
+    async def perform_web_search(self, query: str) -> Dict[str, Any]:
+        """
+        Perform a web search using Google Search via the Gemini API.
+        
+        This method uses the project's unified client configuration and provides
+        comprehensive error handling and debugging support.
+        
+        Args:
+            query: The search query to find information on the web
+            
+        Returns:
+            Dictionary containing search results with sources and metadata
+        """
+        debug = self.gemini_config.debug
+        return WebSearchGenerator.perform_web_search(self.client, query, debug) 
 
     async def get_response(
         self,

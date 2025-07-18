@@ -19,16 +19,16 @@ _PROJECT_ROOT = _BACKEND_DIR.parent     # 项目根目录
 sys.path.insert(0, str(_BACKEND_DIR))
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from nagisa_mcp.tool_vectorizer import ToolVectorizer
+from backend.nagisa_mcp.tool_vectorizer import ToolVectorizer
 
 def get_all_tool_modules() -> Dict[str, Dict[str, Any]]:
     """获取所有工具模块的配置"""
     return {
-        'web_search': {
-            'module_path': 'nagisa_mcp.tools.web_search.tool',
+        'builtin': {
+            'module_path': 'nagisa_mcp.tools.builtin',
             'category': 'information',
-            'tags': ['search', 'web', 'information', 'lookup'],
-            'description': 'Web search and information retrieval tools'
+            'tags': ['search', 'web', 'information', 'lookup', 'builtin'],
+            'description': 'Built-in tools including web search and information retrieval'
         },
         'coding': {
             'module_path': 'nagisa_mcp.tools.coding.tools',
@@ -116,7 +116,7 @@ def check_module_tools(module_name: str, config: Dict[str, Any]) -> Dict[str, An
                 sig = inspect.signature(obj)
                 if len(sig.parameters) > 0:
                     # 跳过一些明显不是工具的函数
-                    if name in ['Field', 'load_dotenv', 'build', 'register_web_search_tools', 
+                    if name in ['Field', 'load_dotenv', 'build', 'register_builtin_tools', 
                                'register_email_tools', 'register_calendar_tools', 
                                'register_coding_tools', 'register_text_to_image_tool',
                                'register_contact_tools', 'register_places_tools', 
@@ -142,7 +142,7 @@ def check_module_tools(module_name: str, config: Dict[str, Any]) -> Dict[str, An
         
         # 2. 查找注册函数内部的工具函数
         register_functions = [
-            'register_web_search_tools', 'register_email_tools', 'register_calendar_tools',
+            'register_builtin_tools', 'register_email_tools', 'register_calendar_tools',
             'register_coding_tools', 'register_text_to_image_tool', 'register_contact_tools',
             'register_places_tools', 'register_location_tools', 'register_memory_tools', 'register_google_auth_tools'
         ]
