@@ -126,26 +126,10 @@ def _safe_eval(expr: str) -> float:
 def calculate(expression: str = Field(..., description="Mathematical expression to evaluate (supports +, -, *, /, %, **, parentheses, unary +/-)")) -> dict[str, Any]:
     """Evaluate mathematical expressions with safe arithmetic computation.
     
-    Return Value:
-    ```json
-    {
-      "operation": {
-        "type": "calculate",
-        "expression": "2 + 3 * 4"
-      },
-      "result": {
-        "value": "14",
-        "original_expression": "2 + 3 * 4",
-        "formatted_display": "2 + 3 * 4 = 14",
-        "result_type": "integer"
-      },
-      "summary": {
-        "operation_type": "calculate",
-        "success": true,
-        "result_type": "integer"
-      }
-    }
-    ```
+    Returns structured result with calculated value, expression details, and operation status.
+    Supports basic arithmetic operations with secure AST-based parsing.
+    
+    Example: calculate("2 + 3 * 4") returns 14
     """
     
     def _error(message: str, error_details: Optional[str] = None, expr: str = "") -> dict[str, Any]:

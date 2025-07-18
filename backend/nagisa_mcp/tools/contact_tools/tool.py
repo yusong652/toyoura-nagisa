@@ -43,46 +43,9 @@ def register_contact_tools(mcp: FastMCP):
         max_contacts: int = Field(100, ge=1, le=500, description="Maximum number of contacts to retrieve (1-500).")
     ) -> Dict[str, Any]:
         """Retrieve contacts from Google Contacts API using OAuth2 authentication.
-
-        ## Core Functionality
-        - Fetches contacts from Google Contacts via People API
-        - Returns structured contact data with names, emails, and phone numbers
-        - Uses OAuth2 authentication from AI_GMAIL_ADDRESS environment
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all communication tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "list_contacts",
-            "max_contacts": 100,
-            "account": "user@example.com",
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "contacts": [
-              {
-                "id": "people/c1234567890",
-                "name": "John Doe",
-                "emails": ["john@example.com"],
-                "phones": ["+1-555-0123"]
-              }
-            ],
-            "total_contacts": 25,
-            "contacts_with_email": 20,
-            "contacts_with_phone": 18
-          },
-          "summary": {
-            "operation_type": "list_contacts",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **access your contact directory** for email composition, communication, or contact management tasks.
+        Fetches contacts via People API and returns structured contact data with names, emails, and phone numbers.
+        Uses OAuth2 authentication from AI_GMAIL_ADDRESS environment variable.
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")
@@ -173,46 +136,9 @@ def register_contact_tools(mcp: FastMCP):
         max_results: int = Field(100, ge=1, le=500, description="Maximum number of results to return (1-500).")
     ) -> Dict[str, Any]:
         """Search contacts in Google Contacts API using OAuth2 authentication.
-
-        ## Core Functionality
-        - Searches contacts using Google People API search functionality
-        - Matches against names, emails, and phone numbers
-        - Returns filtered contact data with relevance-based ordering
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all communication tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "search_contacts",
-            "query": "john",
-            "max_results": 100,
-            "account": "user@example.com",
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "contacts": [
-              {
-                "id": "people/c1234567890",
-                "name": "John Doe",
-                "emails": ["john@example.com"],
-                "phones": ["+1-555-0123"]
-              }
-            ],
-            "total_matches": 3,
-            "search_limited": false
-          },
-          "summary": {
-            "operation_type": "search_contacts",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **find specific contacts** when you need to send emails, make calls, or reference contact information in communications.
+        Searches contacts using Google People API search functionality. Matches against names,
+        emails, and phone numbers with relevance-based ordering.
         """
         try:
             nagisa_email = os.getenv("AI_GMAIL_ADDRESS")

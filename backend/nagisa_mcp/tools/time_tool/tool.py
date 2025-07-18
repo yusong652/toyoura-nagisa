@@ -75,25 +75,9 @@ def register_time_tools(mcp: FastMCP):
         annotations={"category": "utilities", "tags": ["time", "datetime", "utilities", "system", "clock", "timezone", "location"]}
     )
     async def get_current_time(context: Context) -> dict:
-        """Retrieve the current system time with automatic timezone detection from user location.
-
-        Core Functionality:
-        Provides current date and time by automatically detecting user's timezone from browser location. Delivers personalized time information without requiring manual configuration, ensuring users always get relevant local time data.
-
-        Return Value:
-        Success response:
-        {
-            "operation": "get_current_time",
-            "result": {
-                "current_time": "2024-01-15 14:30:00",
-                "timezone": "America/New_York",
-                "location_source": "browser_geolocation"
-            },
-            "summary": {
-                "operation_type": "get_current_time",
-                "success": true
-            }
-        }
+        """Retrieve current time with automatic timezone detection from user location.
+        
+        Auto-detects timezone from browser geolocation. Falls back to Asia/Tokyo if location detection fails.
         """
         try:
             location_info = None

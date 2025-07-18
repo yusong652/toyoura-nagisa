@@ -56,50 +56,9 @@ def register_places_tools(mcp: FastMCP):
         max_results: int = Field(5, ge=1, le=20, description="Maximum number of results to return (1-20).")
     ) -> Dict[str, Any]:
         """Search for places using Google Places API with location-based filtering.
-
-        ## Core Functionality
-        - Searches for places using Google Places API
-        - Filters results by location and radius
-        - Returns place information with coordinates and basic details
-        - Supports various place types (restaurants, shops, services, etc.)
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all location tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "search_places",
-            "query": "restaurant",
-            "location": "40.7128,-74.0060",
-            "radius": 5000,
-            "max_results": 5,
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "places": [
-              {
-                "place_id": "ChIJd8BlQ2BZwokRAFUEcm_qrcA",
-                "name": "Central Park Restaurant",
-                "address": "123 Park Ave, New York, NY 10001",
-                "location": {"lat": 40.7128, "lng": -74.0060},
-                "rating": 4.5,
-                "types": ["restaurant", "food"]
-              }
-            ],
-            "total_found": 3,
-            "search_limited": false
-          },
-          "summary": {
-            "operation_type": "search_places",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **find nearby places** for recommendations, navigation, or location-based services.
+        Searches for places by query and filters results by location and radius. Returns place information
+        with coordinates, ratings, and basic details. Supports various place types.
         """
         try:
             # Validate location format
@@ -180,50 +139,9 @@ def register_places_tools(mcp: FastMCP):
         place_id: str = Field(..., description="Google Places API place ID to get detailed information for.")
     ) -> Dict[str, Any]:
         """Get comprehensive information about a specific place using its Place ID.
-
-        ## Core Functionality
-        - Retrieves detailed place information from Google Places API
-        - Includes reviews, editorial summaries, and comprehensive metadata
-        - Provides contact information and operational details
-        - Returns structured data suitable for detailed place analysis
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all location tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "get_place_details",
-            "place_id": "ChIJd8BlQ2BZwokRAFUEcm_qrcA",
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "place_details": {
-              "place_id": "ChIJd8BlQ2BZwokRAFUEcm_qrcA",
-              "name": "Central Park Restaurant",
-              "address": "123 Park Ave, New York, NY 10001",
-              "location": {"lat": 40.7128, "lng": -74.0060},
-              "editorial_summary": "Popular restaurant with great views...",
-              "reviews": [
-                {
-                  "author_name": "John Doe",
-                  "rating": 5,
-                  "text": "Excellent food and service..."
-                }
-              ],
-              "review_count": 3
-            }
-          },
-          "summary": {
-            "operation_type": "get_place_details",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **get detailed place information** for comprehensive recommendations, reviews analysis, or detailed location context.
+        Retrieves detailed place information from Google Places API including reviews, editorial summaries,
+        and comprehensive metadata. Returns structured data suitable for detailed place analysis.
         """
         try:
             if not place_id or not place_id.strip():

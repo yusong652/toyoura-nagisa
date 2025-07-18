@@ -38,47 +38,9 @@ def register_memory_tools(mcp: FastMCP):
         max_results: int = Field(5, ge=1, le=20, description="Maximum number of memory results to return (1-20).")
     ) -> Dict[str, Any]:
         """Search conversation memory using semantic similarity for context retrieval.
-
-        ## Core Functionality
-        - Searches long-term conversation memory database using semantic similarity
-        - Returns relevant historical context from previous conversations
-        - Provides relevance scoring for memory importance ranking
-        - Supports natural language queries for flexible memory access
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all memory tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "search_memory",
-            "query": "user preferences about coffee",
-            "max_results": 5,
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "memories": [
-              {
-                "content": "User prefers dark roast coffee in the morning",
-                "relevance_score": 0.85,
-                "timestamp": "2025-01-05T09:30:00.000",
-                "conversation_id": "conv_123",
-                "type": "preference"
-              }
-            ],
-            "total_found": 3,
-            "search_limited": false
-          },
-          "summary": {
-            "operation_type": "search_memory",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **retrieve historical context** for maintaining conversation continuity, understanding user preferences, or referencing past discussions.
+        Searches long-term conversation memory database and returns relevant historical context
+        with relevance scoring. Supports natural language queries for flexible memory access.
         """
         try:
             if not query or not query.strip():

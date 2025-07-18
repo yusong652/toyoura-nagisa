@@ -59,42 +59,9 @@ def register_location_tools(mcp: FastMCP):
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
         """Get current location information with intelligent fallback strategies.
-
-        ## Core Functionality
-        - Attempts to get precise browser geolocation from client
-        - Falls back to cached session or global location data
-        - Uses server IP geolocation as final fallback
-        - Returns coordinates with city/region/country details
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all location tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "get_location",
-            "session_id": "abc123",
-            "location_source": "browser_geolocation",
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "latitude": 37.7749,
-            "longitude": -122.4194,
-            "city": "San Francisco",
-            "region": "California", 
-            "country": "United States",
-            "accuracy": "high"
-          },
-          "summary": {
-            "operation_type": "get_location",
-            "success": true
-          }
-        }
-        ```
-
-        ## Strategic Usage
-        Use this tool to **get location context** for weather, local services, timezone-aware scheduling, or location-based recommendations.
+        Attempts to get precise browser geolocation from client, falls back to cached session or global
+        location data, and uses server IP geolocation as final fallback. Returns coordinates with city/region/country details.
         """
         try:
             session_id = context.client_id

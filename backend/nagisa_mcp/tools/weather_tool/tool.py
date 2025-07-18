@@ -65,50 +65,9 @@ def register_weather_tools(mcp: FastMCP):
         forecast_days: int = Field(0, ge=0, le=5, description="Number of days forecast (0-5). 0 for current only")
     ) -> dict:
         """Fetch current weather or forecast with automatic location detection.
-
-        Core Functionality:
-        Retrieves weather information from OpenWeatherMap API with intelligent location detection. Automatically determines user's city from browser geolocation when no city is specified, providing personalized weather data. Supports both current weather conditions and multi-day forecasts with temperature ranges and weather descriptions.
-
-        Return Value:
-        Success response:
-        {
-            "operation": "get_weather",
-            "result": {
-                "city": "New York",
-                "weather_data": {
-                    "current": {
-                        "temperature": 22.5,
-                        "description": "scattered clouds",
-                        "humidity": 65,
-                        "wind_speed": 3.2
-                    }
-                },
-                "location_source": "browser_geolocation"
-            },
-            "summary": "Weather for New York (browser_geolocation location)"
-        }
-
-        Error response:
-        {
-            "operation": "get_weather",
-            "result": {
-                "error": "API key not configured",
-                "details": "OPEN_WEATHER_API_KEY not set in environment"
-            },
-            "summary": "Unable to retrieve weather: API key not configured"
-        }
-
-        Strategic Usage:
-        • Essential for weather-aware scheduling and outdoor activity planning
-        • Automatically detects user's location for personalized weather information
-        • Provides current conditions and multi-day forecasts for travel planning
-        • Use for climate-aware recommendations and local service suggestions
-        • Supports manual city specification for travel or location-specific queries
-        • Integrates with location services for seamless user experience
-
-        Args:
-            city: Optional city name. If not provided, will auto-detect from user location
-            forecast_days: Number of days to forecast (0-5). 0 returns current weather only
+        
+        Retrieves weather from OpenWeatherMap API. Auto-detects user location when city is not specified.
+        Supports current conditions and multi-day forecasts with temperature, humidity, and wind data.
         """
         API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
         if not API_KEY:

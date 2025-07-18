@@ -364,51 +364,10 @@ def register_calendar_tools(mcp: FastMCP):
             description="Upper bound (exclusive) for events to filter by. RFC3339 format (e.g., '2024-12-31T23:59:59Z').",
         ),
     ) -> Dict[str, Any]:
-        """
-        List upcoming events from Google Calendar with comprehensive filtering and metadata.
+        """List upcoming events from Google Calendar with comprehensive filtering and metadata.
         
-        This tool provides atomic calendar listing functionality, focusing exclusively on
-        retrieving and organizing calendar events with rich metadata. It supports time-based
-        filtering, pagination, and detailed event information.
-        
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all calendar tools.
-        
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "list_events",
-            "max_results": 10
-          },
-          "result": {
-            "events": [
-              {
-                "id": "event_id_123",
-                "summary": "Team Meeting",
-                "start": "2024-06-06T10:00:00+09:00",
-                "end": "2024-06-06T11:00:00+09:00",
-                "location": "Conference Room A",
-                "html_link": "https://calendar.google.com/event?eid=..."
-              }
-            ],
-            "total_events": 5
-          },
-          "summary": {
-            "operation_type": "list_events",
-            "success": true,
-            "has_warnings": false
-          }
-        }
-        ```
-        
-        ## Core Functionality
-        Lists calendar events with comprehensive filtering, sorting, and metadata analysis.
-        
-        ## Strategic Usage
-        Use this tool to **query calendar events** with time-based filtering and rich metadata.
-        
-
+        Returns structured event data with time-based filtering support.
+        Supports pagination and detailed event information including location and links.
         """
         
         # Helper functions for consistent results
@@ -520,54 +479,12 @@ def register_calendar_tools(mcp: FastMCP):
         description: Optional[str] = Field(None, description="Event description or notes."),
         calendar_id: str = Field('primary', description="Calendar ID to add event to. Use 'primary' for main calendar."),
     ) -> Dict[str, Any]:
-        """
-        Create a new event in Google Calendar with comprehensive validation and metadata.
+        """Create a new event in Google Calendar with comprehensive validation and metadata.
         
-        This tool provides atomic event creation functionality, focusing exclusively on
-        creating calendar events with rich validation, automatic future date correction,
-        and comprehensive metadata tracking.
+        Returns structured event data with automatic future date correction.
+        Automatically schedules past times for next occurrence with detailed warnings.
         
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all calendar tools.
-        
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "create_event"
-          },
-          "result": {
-            "event": {
-              "id": "event_id_123",
-              "summary": "Team Meeting",
-              "start": "2024-06-06T10:00:00+09:00",
-              "end": "2024-06-06T11:00:00+09:00",
-              "location": "Conference Room A",
-              "html_link": "https://calendar.google.com/event?eid=..."
-            }
-          },
-          "summary": {
-            "operation_type": "create_event",
-            "success": true,
-            "has_warnings": false
-          }
-        }
-        ```
-        
-        ## Core Functionality
-        Creates calendar events with automatic future date correction and comprehensive validation.
-        
-        ## Strategic Usage
-        Use this tool to **create calendar events** with intelligent date handling and validation.
-        
-        **Important:** 
-        - If the user input does not specify a year, the system will automatically
-          calculate the next upcoming occurrence of that date in the future.
-        - If the provided time is in the past, the system will automatically schedule
-          the event for the next occurrence and provide detailed warnings to the LLM.
-        - Time validation includes warnings for events scheduled in the past (immediate,
-          recent, or distant past) with automatic correction to future times.
-        
+        Example: create_calendar_event("Team Meeting", "2024-06-06T10:00:00+09:00", "2024-06-06T11:00:00+09:00")
         """
         
         # Helper functions for consistent results
@@ -720,52 +637,11 @@ def register_calendar_tools(mcp: FastMCP):
         description: Optional[str] = Field(None, description="New event description."),
         calendar_id: str = Field('primary', description="Calendar ID containing the event."),
     ) -> Dict[str, Any]:
-        """
-        Update an existing event in Google Calendar with comprehensive validation.
+        """Update an existing event in Google Calendar with comprehensive validation.
         
-        This tool provides atomic event update functionality, focusing exclusively on
-        modifying calendar events with rich validation, partial updates support,
-        and comprehensive metadata tracking.
-        
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all calendar tools.
-        
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "update_event"
-          },
-          "result": {
-            "event": {
-              "id": "event_id_123",
-              "summary": "Updated Team Meeting",
-              "start": "2024-06-06T10:00:00+09:00",
-              "end": "2024-06-06T11:00:00+09:00",
-              "location": "New Conference Room",
-              "html_link": "https://calendar.google.com/event?eid=..."
-            }
-          },
-          "summary": {
-            "operation_type": "update_event",
-            "success": true,
-            "has_warnings": false
-          }
-        }
-        ```
-        
-        ## Core Functionality
-        Updates calendar events with partial field updates and comprehensive validation.
-        
-        ## Strategic Usage
-        Use this tool to **modify calendar events** with selective field updates and validation.
-        
-        **Note:** 
-        - Only provide the fields you want to update. Omitted fields will remain unchanged.
-        - If updated times are in the past, the system will automatically schedule
-          the event for the next occurrence and provide detailed warnings to the LLM.
-        - Time validation includes warnings for events scheduled in the past with automatic correction.
-
+        Returns structured event data with partial field updates support.
+        Only provide fields you want to update - omitted fields remain unchanged.
+        Automatically corrects past times to next occurrence with warnings.
         """
         
         # Helper functions for consistent results
@@ -956,41 +832,10 @@ def register_calendar_tools(mcp: FastMCP):
         event_id: str = Field(..., description="ID of the event to delete."),
         calendar_id: str = Field('primary', description="Calendar ID containing the event."),
     ) -> Dict[str, Any]:
-        """
-        Delete an event from Google Calendar with comprehensive validation and metadata.
+        """Delete an event from Google Calendar with comprehensive validation and metadata.
         
-        This tool provides atomic event deletion functionality, focusing exclusively on
-        removing calendar events with comprehensive validation, confirmation tracking,
-        and detailed operation metadata.
-        
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all calendar tools.
-        
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "delete_event"
-          },
-          "result": {
-            "deleted_event_id": "event_id_123"
-          },
-          "summary": {
-            "operation_type": "delete_event",
-            "success": true,
-            "has_warnings": false
-          }
-        }
-        ```
-        
-        ## Core Functionality
-        Deletes calendar events with comprehensive validation and operation tracking.
-        
-        ## Strategic Usage
-        Use this tool to **remove calendar events** with proper validation and confirmation.
-        
-        **Warning:** This operation is permanent and cannot be undone through the API.
-
+        Returns structured deletion confirmation with operation tracking.
+        Warning: This operation is permanent and cannot be undone through the API.
         """
         
         # Helper functions for consistent results

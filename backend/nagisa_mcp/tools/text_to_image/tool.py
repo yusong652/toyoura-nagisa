@@ -32,22 +32,21 @@ def _error(message: str, error_details: Optional[str] = None) -> dict:
         data=data
     ).model_dump()
 
-def _success(provider: str, image_type: str, generation_time: Optional[str] = None) -> dict:
+def _success(image_type: str, generation_time: Optional[str] = None) -> dict:
     """Create standardized success response."""
-    message_parts = [f"Successfully generated image using {provider}"]
+    message_parts = ["Successfully generated image"]
     if generation_time:
         message_parts.append(f"in {generation_time}")
     
     return ToolResult(
         status="success", 
-        message=f"Image generated successfully using {provider}",
+        message="Image generated successfully",
         llm_content={
             "operation": "generate_image",
             "result": "success",
-            "summary": " ".join(message_parts) + f" (format: {image_type})"
+            "summary": " ".join(message_parts)
         },
         data={
-            "provider": provider,
             "image_type": image_type,
             "generation_time": generation_time
         }
@@ -175,16 +174,7 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
 
 
 async def generate_image_from_description(prompt: str, negative_prompt: str):
-    """
-    Generate image from description.
-    
-    Args:
-        prompt: Image generation prompt
-        negative_prompt: Negative prompt for generation
-    
-    Returns:
-        Dict with image generation result
-    """
+    """Generate image from text prompts using configured image generation service."""
     try:
         # Get configuration
         config = get_text_to_image_config()
@@ -202,31 +192,9 @@ async def generate_image_from_description(prompt: str, negative_prompt: str):
 
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.
-
-    Core Functionality:
-    Automatically analyzes the current conversation context to create compelling visual content. The tool extracts themes, subjects, and artistic requirements from recent messages, then crafts optimized text-to-image prompts to generate high-quality illustrations using configured AI image generation services (ModelsLab or Stable Diffusion WebUI).
-
-    Return Value:
-    Success response:
-    {
-        "operation": "generate_image", 
-        "result": "success",
-        "summary": "Successfully generated image using [provider] in [time] (format: [type])"
-    }
     
-    Error response:
-    {
-        "operation": "generate_image",
-        "result": "failed", 
-        "summary": "Unable to generate image: [error_reason]"
-    }
-
-    Strategic Usage:
-    • Invoke when users explicitly request visual content ("draw", "create image", "generate artwork")
-    • Use for illustrating concepts, scenes, or ideas discussed in conversation
-    • Excellent for creative projects, visual brainstorming, and artistic expression
-    • Automatically handles prompt engineering - no manual prompt crafting needed
-    • Supports both cloud-based and local image generation backends
+    Automatically analyzes recent conversation messages to create compelling visual content.
+    Extracts themes and artistic requirements from the discussion to generate contextually relevant images.
     """
     import time
     start_time = time.time()
@@ -272,20 +240,13 @@ async def generate_image(context: Context) -> dict[str, Any]:
     # Calculate generation time
     generation_time = f"{time.time() - start_time:.1f}s"
     
-    # Get provider from config for success message
-    try:
-        config = get_text_to_image_config()
-        provider = config.get("provider", "unknown")
-    except:
-        provider = "unknown"
-    
     # Handle successful image generation
     if image_result.get("type") == "image_url" and image_result.get("image_url"):
-        success_response = _success(provider, "URL-based image", generation_time)
+        success_response = _success("image", generation_time)
         success_response["image_url"] = image_result["image_url"]
         return success_response
     elif image_result.get("type") == "image_base64" and image_result.get("image"):
-        success_response = _success(provider, "Base64 image", generation_time)
+        success_response = _success("image", generation_time)
         success_response["image_base64"] = image_result["image"]
         return success_response
     else:

@@ -44,32 +44,9 @@ def register_email_tools(mcp: FastMCP):
     @mcp.tool(**common_kwargs)
     def get_user_email() -> Dict[str, Any]:
         """Get the configured user email address from environment variables.
-
-        ## Core Functionality
-        - Retrieves user email from USER_GMAIL_ADDRESS environment variable
-        - Validates email configuration for communication setup
-        - Returns structured configuration information
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all communication tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "get_user_email"
-          },
-          "result": {
-            "user_email": "user@example.com",
-            "email_configured": true
-          },
-          "summary": {
-            "operation_type": "get_user_email",
-            "success": true
-          }
-        }
-        ```
-
+        Retrieves user email from USER_GMAIL_ADDRESS environment variable and validates
+        email configuration for communication setup.
         """
         try:
             user_email = os.getenv("USER_GMAIL_ADDRESS")
@@ -111,39 +88,9 @@ def register_email_tools(mcp: FastMCP):
         bcc: Optional[List[str]] = Field(None, description="List of BCC email addresses.")
     ) -> Dict[str, Any]:
         """Send an email using Gmail API with OAuth2 authentication.
-
-        ## Core Functionality
-        - Sends emails via Gmail API using AI_GMAIL_ADDRESS as sender
-        - Supports TO, CC, and BCC recipients
-        - Defaults to USER_GMAIL_ADDRESS if no recipients specified
-        - Returns delivery confirmation with Gmail message ID
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all communication tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "send_email",
-            "sender": "ai@example.com",
-            "subject": "Meeting Reminder",
-            "recipients": ["user@example.com"],
-            "cc_count": 0,
-            "bcc_count": 0
-          },
-          "result": {
-            "gmail_id": "18c1a2b3d4e5f6g7",
-            "delivery_status": "sent"
-          },
-          "summary": {
-            "operation_type": "send_email",
-            "success": true
-          }
-        }
-        ```
-
-
+        Sends emails via Gmail API using AI_GMAIL_ADDRESS as sender. Supports TO, CC, and BCC recipients.
+        Defaults to USER_GMAIL_ADDRESS if no recipients specified. Returns delivery confirmation with Gmail message ID.
         """
         try:
             sender = os.getenv("AI_GMAIL_ADDRESS")
@@ -216,46 +163,9 @@ def register_email_tools(mcp: FastMCP):
         unread_only: bool = Field(False, description="Whether to retrieve only unread emails.")
     ) -> Dict[str, Any]:
         """Retrieve emails from Gmail using OAuth2 authentication.
-
-        ## Core Functionality
-        - Fetches emails from Gmail API using AI_GMAIL_ADDRESS account
-        - Supports filtering for unread emails only
-        - Returns email metadata and truncated body content
-        - Provides email statistics and status information
-
-        ## Return Value
-        **For LLM:** Returns structured data with consistent format across all communication tools.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "check_emails",
-            "max_emails": 5,
-            "unread_only": false,
-            "account": "ai@example.com"
-          },
-          "result": {
-            "emails": [
-              {
-                "subject": "Meeting Reminder",
-                "from": "user@example.com",
-                "date": "Thu, 7 Jan 2025 14:30:00 +0000",
-                "body": "Don't forget about our meeting..."
-              }
-            ],
-            "total_emails": 3,
-            "unread_count": 1,
-            "emails_limited": false
-          },
-          "summary": {
-            "operation_type": "check_emails",
-            "success": true
-          }
-        }
-        ```
-
-
+        Fetches emails from Gmail API using AI_GMAIL_ADDRESS account. Supports filtering for unread emails only.
+        Returns email metadata and truncated body content with email statistics.
         """
         try:
             user_email = os.getenv("AI_GMAIL_ADDRESS")
