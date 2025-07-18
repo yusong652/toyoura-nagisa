@@ -48,50 +48,10 @@ def delete_file(
     path: str = Field(..., description="File path to delete (workspace-relative)"),
     permanent: bool = Field(False, description="If True, permanently delete file. If False (default), move to .trash folder for recovery.")
 ) -> Dict[str, Any]:
-    """Safely deletes a file, either by moving it to a .trash folder or permanently.
-
-    ## Core Functionality
-    - **Default Behavior (Safe):** By default (`permanent=False`), this tool moves the specified file to a `.trash` directory within the workspace, allowing for recovery.
-    - **Permanent Deletion:** To permanently delete the file (irreversible), you must explicitly set `permanent=True`.
-
-    ## Strategic Usage
-    - This is a destructive operation. Be certain you want to delete the file before using this tool.
-    - This tool is for **files only**. To delete a directory, you must use the `delete_directory` tool.
-    - For most cases, prefer the default behavior (moving to trash) as a safety measure.
-
-    ## Return Value
-    Returns a JSON object with the following structure:
+    """Delete files safely with trash recovery option.
     
-    ```json
-    {
-      "operation": {
-        "type": "delete_file",
-        "path": "target_file.py",
-        "permanent": false,
-        "recoverable": true,
-        "was_symlink": false
-      },
-      "file_info": {
-        "size_bytes": 1024,
-        "file_type": "text",
-        "extension": ".py"
-      },
-      "trash_info": {
-        "trash_path": ".trash/target_file_20250708_103000_123.py",
-        "original_path": "target_file.py",
-        "timestamp": "2025-07-08T10:30:00.123"
-      },
-      "summary": {
-        "operation_type": "move_to_trash",
-        "success": true
-      }
-    }
-    ```
-
-    The `operation` object contains details about the deletion operation.
-    The `file_info` object provides information about the deleted file.
-    The `trash_info` object is only present when `permanent=false`.
-    The `summary` object provides a high-level overview of the operation.
+    Default behavior moves to .trash folder - use permanent=True for irreversible deletion.
+    Files only - use delete_directory tool for directories.
     """
 
     # ------------------------------------------------------------------
@@ -155,17 +115,26 @@ def delete_file(
         
         # Determine file type for better categorization
         file_type = "binary"
-        if file_extension in {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'}:
+        text_extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', 
+                          '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', 
+                          '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd'}
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff', '.tga'}
+        audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}
+        video_extensions = {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'}
+        document_extensions = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'}
+        archive_extensions = {'.zip', '.tar', '.gz', '.bz2', '.7z', '.rar'}
+        
+        if file_extension in text_extensions:
             file_type = "text"
-        elif file_extension in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff', '.tga'}:
+        elif file_extension in image_extensions:
             file_type = "image"
-        elif file_extension in {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}:
+        elif file_extension in audio_extensions:
             file_type = "audio"
-        elif file_extension in {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'}:
+        elif file_extension in video_extensions:
             file_type = "video"
-        elif file_extension in {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'}:
+        elif file_extension in document_extensions:
             file_type = "document"
-        elif file_extension in {'.zip', '.tar', '.gz', '.bz2', '.7z', '.rar'}:
+        elif file_extension in archive_extensions:
             file_type = "archive"
         
         # Prepare response data

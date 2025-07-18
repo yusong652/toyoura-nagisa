@@ -121,55 +121,10 @@ def delete_directory(
     permanent: bool = Field(False, description="If True, permanently delete directory. If False (default), move to .trash folder for recovery."),
     deep_count: bool = Field(False, description="If True, recursively count all files/directories. If False (default), only count immediate children for better performance.")
 ) -> Dict[str, Any]:
-    """Safely deletes a directory, either by moving it to a .trash folder or permanently.
-
-    ## Core Functionality
-    - **Default Behavior (Safe):** By default, this tool only deletes **empty** directories.
-    - **Recursive Deletion:** To delete a directory that is **not empty**, you MUST set `recursive=True`.
-    - **Trash vs. Permanent:**
-        - By default (`permanent=False`), the directory is moved to a `.trash` folder for recovery.
-        - To **permanently delete** the directory and all its contents (irreversible), you MUST set `permanent=True`.
-
-    ## Strategic Usage
-    - This is a highly destructive operation, especially with `recursive=True`. Be absolutely certain before using it.
-    - This tool is for **directories only**. To delete a single file, you must use the `delete_file` tool.
-    - Before deleting a non-empty directory, consider using `list_directory` to understand its contents.
-
-    ## Return Value
-    Returns a JSON object with the following structure:
+    """Delete directories safely with trash recovery option.
     
-    ```json
-    {
-      "operation": {
-        "type": "delete_directory",
-        "path": "target_directory/",
-        "permanent": false,
-        "recoverable": true,
-        "was_symlink": false
-      },
-      "contents": {
-        "files": 15,
-        "directories": 3,
-        "count_type": "immediate",
-        "potentially_large": false
-      },
-      "trash_info": {
-        "trash_path": ".trash/target_directory_20250708_103000_123/",
-        "original_path": "target_directory/",
-        "timestamp": "2025-07-08T10:30:00.123"
-      },
-      "summary": {
-        "operation_type": "move_to_trash",
-        "total_items": 18,
-        "success": true
-      }
-    }
-    ```
-
-    The `operation` object contains details about the deletion operation.
-    The `contents` object provides information about what was deleted.
-    The `trash_info` object is only present when `permanent=false`.
-    The `summary` object provides a high-level overview of the operation.
+    By default only deletes empty directories - use recursive=True for non-empty.
+    Default behavior moves to .trash folder - use permanent=True for irreversible deletion.
     """
 
     # ------------------------------------------------------------------

@@ -498,69 +498,10 @@ def grep(
         description="Maximum total number of matches to return across all files.",
     ),
 ) -> Dict[str, Any]:
-    """Search for regex patterns within file contents and return matching lines with context.
-
-    ## Core Functionality
-    - Searches for regular expression patterns within text file contents
-    - Returns **matching lines with line numbers** - does NOT return full file contents
-    - Supports both single file and directory search modes
-    - Supports advanced filtering by file patterns and directory exclusions
-    - Designed for code search and content discovery, not file listing or full content reading
-
-    ## Flexible Path Support
-    - **File search**: Pass a specific file path to search only that file (e.g., `path='src/main.py'`)
-    - **Directory search**: Pass a directory path to search all files within it (e.g., `path='src'`)
-    - **Workspace search**: Omit path to search the entire workspace
-
-    ## Strategic Usage
-    - Use this tool to **find code patterns** like function definitions, imports, or specific logic
-    - Perfect for codebase exploration: `'class\\s+\\w+'` to find class definitions
-    - Combine with include patterns: `include='*.py'` to search only Python files (directory mode)
-    - Use after `glob` to search within specific file sets
-
-    ## Pattern Examples
-    - `'function\\s+\\w+'` - Function definitions
-    - `'import.*from'` - Import statements  
-    - `'TODO|FIXME'` - Code comments with tasks
-    - `'def\\s+test_\\w+'` - Test function definitions
-    - `'class\\s+\\w+\\('` - Class definitions with inheritance
-
-    ## Return Value
-    Returns a JSON object with the following structure:
+    """Search for regex patterns within file contents, returning matching lines with line numbers.
     
-    ```json
-    {
-      "operation": {
-        "type": "grep",
-        "pattern": "def\\s+\\w+",
-        "search_path": "src",
-        "search_mode": "directory"
-      },
-      "result": {
-        "files": [
-          {
-            "file_path": "src/main.py",
-            "match_count": 3,
-            "matches": [
-              {
-                "line_number": 15,
-                "line_content": "def main_function():",
-                "match_start": 0,
-                "match_end": 8
-              }
-            ]
-          }
-        ],
-        "total_matches": 5,
-        "total_files_with_matches": 2,
-        "search_limited": false
-      }
-    }
-    ```
-
-    **Key Sections:**
-    - **`operation`**: Contains search pattern and parameters
-    - **`result`**: Matching files and search statistics, with detailed match information including line numbers and content
+    Supports single file, directory, or workspace search modes.
+    Returns matching lines only - does NOT return full file contents.
     """
 
     # ------------------------------------------------------------------

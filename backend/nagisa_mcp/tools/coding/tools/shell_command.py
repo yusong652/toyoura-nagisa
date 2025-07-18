@@ -612,100 +612,100 @@ def _execute_command_safely(
 def run_shell_command(
     command: str = Field(
         ...,
-        description="Complete shell command string to execute (e.g., 'ls -la | grep .py > output.txt').",
+        description="Shell command to execute. Examples: 'ls -la', 'python test.py', 'npm install', 'git status'. Use complete command strings with pipes, redirects, etc.",
     ),
     execution_mode: ExecutionMode = Field(
         ExecutionMode.NORMAL,
-        description="Execution mode: 'quick' (10s, 256MB), 'normal' (60s, 512MB), 'long' (300s, 1GB), 'intensive' (600s, 2GB), 'custom'.",
+        description="Choose execution profile based on expected command behavior:\n- 'quick': Fast commands (10s, 256MB) - file listings, simple queries\n- 'normal': Standard commands (60s, 512MB) - builds, tests, git operations\n- 'long': Extended commands (300s, 1GB) - complex builds, large file operations\n- 'intensive': Heavy commands (600s, 2GB) - compilation, system operations\n- 'custom': Specify your own timeout/memory limits",
     ),
     timeout: Optional[int] = Field(
         None,
-        description="Custom timeout in seconds (1-600). Only used with 'custom' execution mode.",
+        description="Custom timeout in seconds (1-600). Required only when execution_mode='custom'. Choose based on expected command duration.",
     ),
     memory_limit_mb: Optional[int] = Field(
         None,
-        description="Custom memory limit in MB (1-2048). Only used with 'custom' execution mode.",
+        description="Custom memory limit in MB (1-2048). Required only when execution_mode='custom'. Choose based on expected memory usage.",
     ),
     working_directory: Optional[str] = Field(
         None,
-        description="Working directory for command execution (workspace-relative). Defaults to workspace root.",
+        description="Directory to run command in (relative to workspace root). Examples: 'src', 'frontend', 'backend/tests'. Defaults to workspace root if not specified.",
     ),
     environment: Optional[Dict[str, str]] = Field(
         None,
-        description="Additional environment variables to set for the command execution.",
+        description="Environment variables to set. Examples: {'NODE_ENV': 'test'}, {'DEBUG': '1'}. Useful for configuring build tools and applications.",
     ),
     allow_dangerous: bool = Field(
         False,
-        description="Allow execution of potentially dangerous commands. Use with extreme caution.",
+        description="Override safety checks for potentially risky commands. Only set to True if you understand the risks and need to run system-modifying commands.",
     ),
     capture_output: bool = Field(
         True,
-        description="Whether to capture stdout/stderr. WARNING: Setting to False makes LLM 'blind' to command execution - use only for long-running commands where output is not needed.",
+        description="Capture command output for analysis. Keep True unless running interactive or daemon processes where output capture would interfere.",
     ),
     analyze_security: bool = Field(
         True,
-        description="Whether to perform security analysis of the command before execution.",
+        description="Perform security analysis before execution. Recommended to keep True for safety unless you're confident about command safety.",
     ),
 ) -> Dict[str, Any]:
-    """Execute shell commands with comprehensive monitoring, security analysis, and resource management.
+    """Execute shell commands with monitoring, security analysis, and resource management.
     
-    ## Return Value
-    **For LLM:** Returns structured data with consistent format across all coding tools.
+    ## When to Use This Tool
+    Use this tool whenever you need to run shell commands, including:
+    - Running builds and tests (`npm run build`, `pytest`, `make test`)
+    - File operations (`ls`, `find`, `grep`, `cat`)
+    - Git operations (`git status`, `git add`, `git commit`)
+    - Package management (`pip install`, `npm install`, `cargo build`)
+    - System queries (`ps`, `df`, `which`, `uname`)
+    - Development tasks (`python script.py`, `node app.js`)
     
-    **Structure:**
-    ```json
-    {
-      "operation": {
-        "type": "shell_command",
-        "command": "ls -la",
-        "execution_mode": "normal",
-        "working_directory": ".",
-        "timeout_occurred": false,
-        "killed_by_signal": false
-      },
-      "result": {
-        "exit_code": 0,
-        "stdout": "Command output here...",
-        "stderr": "Error messages here...",
-        "success": true,
-        "execution_time": 2.34,
-        "peak_memory_mb": 45.2
-      },
-      "summary": {
-        "operation_type": "shell_command",
-        "success": true,
-        "execution_category": "lightweight",
-        "security_score": 0.9,
-        "has_warnings": false
-      }
-    }
+    ## Quick Start Guide
+    Most common usage patterns:
+    ```python
+    # Simple command - use defaults
+    run_shell_command(command="ls -la")
+    
+    # Build command - use 'long' mode for extended operations
+    run_shell_command(command="npm run build", execution_mode="long")
+    
+    # Command in specific directory
+    run_shell_command(command="python test.py", working_directory="backend/tests")
+    
+    # Risky command - override safety checks
+    run_shell_command(command="rm -rf temp/", allow_dangerous=True)
     ```
     
-    **Optional Sections:**
-    - `warnings`: Present when security warnings are detected
-    - `truncation_info`: Present when output is truncated
+    ## Understanding Results
+    Key fields to check:
+    - `result.success`: True if command succeeded (exit code 0)
+    - `result.exit_code`: Command exit code (0 = success, non-zero = error)
+    - `result.stdout`: Command output text
+    - `result.stderr`: Error messages and warnings
+    - `summary.execution_category`: Performance classification
+    - `warnings`: Security concerns (if any)
     
-    **Detailed Metadata** (available in data payload for UI/system use):
-    - Complete resource usage statistics
-    - Full security analysis with patterns and recommendations
-    - Execution metadata and environment details
-    - Performance metrics and monitoring data
+    ## Return Format
+    Returns structured data with three main sections:
+    - `operation`: What was executed and how
+    - `result`: Command output and execution details
+    - `summary`: Quick overview of success/failure and characteristics
     
-    ## Core Functionality
-    Executes shell commands with real-time resource monitoring, security analysis, and enterprise-grade controls.
-
-    ## Strategic Usage
-    Use this tool to **run shell commands** with comprehensive monitoring and security.
-
     ## Execution Modes
-    - **Quick**: 10s, 256MB - simple file operations and queries
-    - **Normal**: 60s, 512MB - standard build and test operations
-    - **Long**: 300s, 1GB - complex builds and data processing
-    - **Intensive**: 600s, 2GB - heavy compilation and system operations
-    - **Custom**: specify your own timeout and memory limits
-
-    Use `result.exit_code` to determine command success, `result.stdout/stderr` for output, and `summary` for quick overview.
-
+    Choose based on expected command behavior:
+    - **quick**: Fast commands like `ls`, `cat`, `which` (10s, 256MB)
+    - **normal**: Standard commands like `git`, `npm test` (60s, 512MB) 
+    - **long**: Extended operations like `npm install`, `make` (300s, 1GB)
+    - **intensive**: Heavy tasks like compilation (600s, 2GB)
+    - **custom**: Specify your own limits
+    
+    ## Security Features
+    - Automatic analysis of potentially dangerous commands
+    - Workspace-only execution (cannot escape project directory)
+    - Resource monitoring and limits
+    - Safe environment variable handling
+    - Command pattern recognition
+    
+    The tool automatically prevents dangerous operations unless explicitly allowed.
+    
     """
 
     # ------------------------------------------------------------------
@@ -731,8 +731,11 @@ def run_shell_command(
         analyze_security = True
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, suggestion: str = None) -> Dict[str, Any]:
+        error_msg = message
+        if suggestion:
+            error_msg += f" Suggestion: {suggestion}"
+        return ToolResult(status="error", message=error_msg, error=message).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
         return ToolResult(
@@ -744,18 +747,27 @@ def run_shell_command(
 
     # Validate command
     if not command or not command.strip():
-        return _error("Command cannot be empty")
+        return _error("Command cannot be empty", "Provide a shell command to execute, e.g., 'ls -la' or 'python script.py'")
 
     # Validate execution mode and set resource limits
     if execution_mode == ExecutionMode.CUSTOM:
         if timeout is None or memory_limit_mb is None:
-            return _error("timeout and memory_limit_mb must be specified for custom execution mode")
+            return _error(
+                "timeout and memory_limit_mb must be specified for custom execution mode",
+                "Provide both timeout (e.g., 120) and memory_limit_mb (e.g., 512) parameters, or use a predefined execution_mode like 'normal'"
+            )
         
         if not (MIN_TIMEOUT <= timeout <= MAX_TIMEOUT):
-            return _error(f"timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds")
+            return _error(
+                f"timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds",
+                f"Use a timeout between {MIN_TIMEOUT}-{MAX_TIMEOUT} seconds, or choose 'normal' (60s), 'long' (300s), or 'intensive' (600s) execution mode"
+            )
         
         if not (1 <= memory_limit_mb <= 2048):
-            return _error("memory_limit_mb must be between 1 and 2048 MB")
+            return _error(
+                "memory_limit_mb must be between 1 and 2048 MB",
+                "Use memory_limit_mb between 1-2048 MB, or choose 'normal' (512MB), 'long' (1GB), or 'intensive' (2GB) execution mode"
+            )
         
         actual_timeout = timeout
         actual_memory_limit = memory_limit_mb
@@ -763,10 +775,13 @@ def run_shell_command(
         limits = EXECUTION_CATEGORIES[execution_mode.value]
         actual_timeout = limits["timeout"]
         actual_memory_limit = limits["memory_mb"]
+    
+    # Store limits for potential use in monitoring
+    _ = actual_memory_limit  # Acknowledge variable is set but not used in current implementation
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error("Cannot access workspace directory")
+        return _error("Cannot access workspace directory", "Ensure you're running from within a valid workspace directory")
 
     # ------------------------------------------------------------------
     # Path validation and security checks
@@ -776,19 +791,28 @@ def run_shell_command(
     if working_directory:
         abs_workdir = validate_path_in_workspace(working_directory)
         if abs_workdir is None:
-            return _error(f"Working directory is outside workspace: {working_directory}")
+            return _error(
+                f"Working directory is outside workspace: {working_directory}",
+                "Use a path relative to the workspace root, e.g., 'src', 'backend', or 'frontend/tests'"
+            )
         
         work_dir = Path(abs_workdir)
         if not work_dir.exists():
-            return _error(f"Working directory does not exist: {working_directory}")
+            return _error(
+                f"Working directory does not exist: {working_directory}",
+                "Check the path spelling or create the directory first using mkdir command"
+            )
         if not work_dir.is_dir():
-            return _error(f"Working directory is not a directory: {working_directory}")
+            return _error(
+                f"Working directory is not a directory: {working_directory}",
+                "Specify a directory path, not a file path"
+            )
         
         # Security checks for working directory
         if work_dir.is_symlink() and not is_safe_symlink(work_dir):
-            return _error("Cannot use unsafe working directory symlink")
+            return _error("Cannot use unsafe working directory symlink", "Use a regular directory path instead of a symlink")
         if not check_parent_symlinks(work_dir):
-            return _error("Cannot use working directory with unsafe parent symlinks")
+            return _error("Cannot use working directory with unsafe parent symlinks", "Use a directory path without symlinks in the parent chain")
     else:
         work_dir = Path(str(WORKSPACE_ROOT))
 
@@ -799,10 +823,16 @@ def run_shell_command(
         # Check for dangerous commands if not explicitly allowed
         if not allow_dangerous:
             if security_analysis.command_category == CommandCategory.DANGEROUS:
-                return _error(f"Dangerous command detected: {', '.join(security_analysis.dangerous_patterns)}. Use allow_dangerous=True to override.")
+                return _error(
+                    f"Dangerous command detected: {', '.join(security_analysis.dangerous_patterns)}",
+                    "Set allow_dangerous=True to override safety checks, or use a safer alternative command"
+                )
             
             if security_analysis.security_score < 0.3:
-                return _error(f"Command security score too low ({security_analysis.security_score:.2f}). Use allow_dangerous=True to override.")
+                return _error(
+                    f"Command security score too low ({security_analysis.security_score:.2f})",
+                    "Set allow_dangerous=True to override, or modify the command to be safer"
+                )
 
     # ------------------------------------------------------------------
     # Command execution
@@ -827,28 +857,29 @@ def run_shell_command(
 
         # Build user-facing message
         if result.success:
-            message = f"Success (exit code {result.exit_code}, {result.resource_usage.execution_time:.1f}s, {result.resource_usage.peak_memory_mb:.1f}MB peak memory, security score {result.security_analysis.security_score:.1f})"
+            message = f"Command executed successfully (exit code {result.exit_code}, {result.resource_usage.execution_time:.1f}s, {result.resource_usage.peak_memory_mb:.1f}MB peak memory)"
         elif result.timeout_occurred:
-            message = f"Timeout (killed after {actual_timeout}s, {result.resource_usage.peak_memory_mb:.1f}MB peak memory). Command was terminated"
+            message = f"Command timed out after {actual_timeout}s ({result.resource_usage.peak_memory_mb:.1f}MB peak memory). Consider using a longer execution mode or optimizing the command"
         elif result.killed_by_signal:
-            message = f"Killed (exit code {result.exit_code}, {result.resource_usage.execution_time:.1f}s, signal termination). Process was forcibly stopped"
+            message = f"Command was forcibly terminated (exit code {result.exit_code}, {result.resource_usage.execution_time:.1f}s). Process consumed too many resources or was unresponsive"
         else:
-            message = f"Failure (exit code {result.exit_code}, {result.resource_usage.execution_time:.1f}s). Stderr may have details"
+            message = f"Command failed with exit code {result.exit_code} ({result.resource_usage.execution_time:.1f}s). Check stderr output for error details"
 
         # Add warnings indicator if any security issues
         if result.security_analysis.warnings:
-            message += f" - {len(result.security_analysis.warnings)} security warning(s)"
+            message += f" Note: {len(result.security_analysis.warnings)} security warning(s) detected"
         
         # Add resource limit warnings
         if result.resource_usage.memory_exceeded or result.resource_usage.cpu_exceeded:
-            warnings = []
+            resource_warnings = []
             if result.resource_usage.memory_exceeded:
-                warnings.append("memory limit exceeded")
+                resource_warnings.append("memory limit exceeded")
             if result.resource_usage.cpu_exceeded:
-                warnings.append("CPU limit exceeded")
-            message += f" - {', '.join(warnings)}"
+                resource_warnings.append("CPU limit exceeded")
+            message += f" Warning: {', '.join(resource_warnings)} - consider using 'intensive' execution mode"
 
         # Build structured LLM content following unified standard
+        # Focus on the most relevant information for LLM decision-making
         llm_content = {
             "operation": {
                 "type": "shell_command",
@@ -875,16 +906,34 @@ def run_shell_command(
             }
         }
         
-        # Add warnings only if they exist
+        # Add interpretation hints for LLM
+        if not result.success:
+            llm_content["interpretation"] = {
+                "likely_cause": "Command error" if result.exit_code != 0 else "Timeout or resource limit",
+                "next_steps": "Check stderr for error details" if result.output.stderr else "Review command syntax and requirements"
+            }
+        
+        # Add performance guidance for LLM
+        if result.resource_usage.execution_time > 30:
+            llm_content["performance_note"] = "Long execution time - consider optimization or using 'long' execution mode"
+        elif result.resource_usage.peak_memory_mb > 500:
+            llm_content["performance_note"] = "High memory usage - consider using 'intensive' execution mode for similar commands"
+        
+        # Add warnings only if they exist - prioritize most important ones
         if result.security_analysis.warnings:
-            llm_content["warnings"] = result.security_analysis.warnings[:3]  # Limit to first 3 warnings
+            llm_content["warnings"] = {
+                "count": len(result.security_analysis.warnings),
+                "top_warnings": result.security_analysis.warnings[:3],  # Limit to first 3 warnings
+                "security_advice": "Consider using safer alternatives or review command necessity"
+            }
         
         # Add truncation info if output was truncated
         if result.output.stdout_truncated or result.output.stderr_truncated:
             llm_content["truncation_info"] = {
                 "stdout_truncated": result.output.stdout_truncated,
                 "stderr_truncated": result.output.stderr_truncated,
-                "combined_size": result.output.combined_size
+                "combined_size": result.output.combined_size,
+                "note": "Full output available in detailed data section"
             }
 
         return _success(
@@ -894,16 +943,24 @@ def run_shell_command(
         )
 
     except Exception as exc:
-        return _error(f"Unexpected error during command execution: {exc}")
+        return _error(
+            f"Unexpected error during command execution: {exc}",
+            "Check command syntax and ensure required dependencies are installed"
+        )
 
 # -----------------------------------------------------------------------------
 # Registration helper
 # -----------------------------------------------------------------------------
 
 def register_shell_command_tool(mcp: FastMCP):
-    """Register the run_shell_command tool with proper tags synchronization."""
+    """Register the run_shell_command tool with proper tags and metadata."""
     common = dict(
         tags={"coding", "execution", "shell", "command", "system", "monitoring", "security"}, 
-        annotations={"category": "coding", "tags": ["coding", "execution", "shell", "command", "system", "monitoring", "security"]}
+        annotations={
+            "category": "coding", 
+            "tags": ["coding", "execution", "shell", "command", "system", "monitoring", "security"],
+            "primary_use": "Execute shell commands with comprehensive monitoring",
+            "prompt_optimization": "Enhanced for LLM interaction with clear guidance and structured outputs"
+        }
     )
     mcp.tool(**common)(run_shell_command) 

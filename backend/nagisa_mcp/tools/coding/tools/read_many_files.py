@@ -172,60 +172,9 @@ def read_many_files(
     ),
 ) -> Dict[str, Any]:
     """Reads multiple files using glob patterns and returns their contents in a single dictionary.
-
-    ## Core Functionality
-    - Use glob patterns (e.g., `src/**/*.py`, `docs/*.md`) to specify which files to read.
-    - The tool returns a single **JSON object** (dictionary) where keys are the file paths and values are their contents.
-
-    ## Return Value
-    **For LLM:** Returns structured data with consistent format across all coding tools.
     
-    **Structure:**
-    ```json
-    {
-      "operation": {
-        "type": "read_many_files",
-        "patterns": ["src/**/*.py", "README.md"],
-        "files_processed": 25,
-        "files_read": 20,
-        "files_skipped": 5,
-        "stopped_early": false
-      },
-      "files_info": {
-        "total_files": 20,
-        "total_bytes": 51200,
-        "largest_file": "src/main.py (15.2 KB)",
-        "file_types": ["text", "image"]
-      },
-      "content": {
-        "files": {
-          "src/main.py": "import os...",
-          "README.md": "# Project Title...",
-          "logo.png": {"inline_data": {"mime_type": "image/png", "data": "iVBORw0KGg..."}}
-        },
-        "format": "mixed"
-      },
-      "summary": {
-        "operation_type": "read_many_files",
-        "success": true
-      }
-    }
-    ```
-    
-    **Optional Sections:**
-    - `limits_info`: Present when limits are hit or approached
-    - `skip_info`: Present when files were skipped with reasons
-    
-    **Content Access:**
-    Access file contents via `content.files[path]` where:
-    - **Text Files:** Value is a string of file content
-    - **Binary Files:** Value is `{"inline_data": {"mime_type": "...", "data": "base64..."}}`
-
-    ## Strategic Usage
-    - Most efficient tool for project overview or fetching multiple related files
-    - Use specific glob patterns to avoid hitting limits
-    - Check `limits_info` and `skip_info` for optimization insights
-    - Use `list_directory` first to see what files exist
+    Returns structured data with file contents - text files as strings, binary files as base64.
+    Use glob patterns to specify files efficiently with built-in performance protection.
     """
 
     # ------------------------------------------------------------------

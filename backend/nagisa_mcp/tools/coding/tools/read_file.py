@@ -853,56 +853,8 @@ def read_file(
 ) -> Dict[str, Any]:
     """Read and analyze files with comprehensive metadata and intelligent processing.
     
-    **Primary Use:** Read code files, configuration files, and text documents with detailed analysis.
-    **Extended Support:** Also handles images, documents, audio, and video files for multimodal contexts.
-    
-    **File Type Detection:**
-    - Text files (.py, .js, .md, .txt, etc.) → text content with encoding detection
-    - Binary files (images, documents, audio, video) → metadata in llm_content, base64 in separate Parts
-    
-    **Return Structure for Text Files:**
-    ```json
-    {
-      "operation": {"type": "read_file", "path": "example.py", "content_format": "text"},
-      "file_info": {"size_bytes": 1024, "file_type": "text", "extension": ".py"},
-      "content": {
-        "data": "def hello_world():\n    print('Hello, World!')",
-        "format": "text",
-        "lines_shown": [1, 30]
-      },
-      "summary": {"operation_type": "read_file", "success": true}
-    }
-    ```
-    
-    **Return Structure for Binary Files:**
-    ```json
-    {
-      "operation": {"type": "read_file", "path": "image.png", "content_format": "inline_data"},
-      "file_info": {"size_bytes": 2048, "file_type": "image", "extension": ".png"},
-      "content": {
-        "data": {"file_type": "binary", "mime_type": "image/png", "size_bytes": 2048, "multimodal_available": true},
-        "format": "inline_data",
-        "lines_shown": [0, 0]
-      },
-      "summary": {"operation_type": "read_file", "success": true}
-    }
-    ```
-    
-    **Multimodal Files:** Binary files (images, documents, etc.) return metadata in llm_content
-    and base64 data as separate multimodal Parts in the LLM response. The tool automatically
-    detects file type and handles encoding appropriately.
-    
-    **Strategic Usage:**
-    - Use for **code files and text documents** with rich metadata analysis
-    - Use for **binary files** when you need multimodal content in the conversation
-    - Use `read_mode` to control content amount (full/preview/paginated)
-    - Returns structured metadata for all file types
-    
-    **Reading Modes:**
-    - **Full**: Complete file content (default)
-    - **Preview**: First 100 lines for quick inspection
-    - **Paginated**: Use offset/limit for large files
-    - **Metadata Only**: File analysis without content
+    Handles text files with encoding detection and binary files with multimodal support.
+    Returns structured content with rich metadata analysis and performance monitoring.
     """
 
     # ------------------------------------------------------------------

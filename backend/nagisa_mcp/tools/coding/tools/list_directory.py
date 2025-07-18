@@ -524,75 +524,10 @@ def list_directory(
         description="Starting position for pagination (0-based index).",
     ),
 ) -> Dict[str, Any]:
-    """List directory contents with advanced filtering, sorting, and rich metadata.
-
-    ## Core Functionality
-    Lists directory contents with detailed metadata (size, type, permissions, timestamps).
-    Supports filtering by type/recency, multiple sorting options, and built-in pagination.
-    Respects .gitignore patterns and security constraints.
-
-    ## Strategic Usage
-    Use this tool to **explore project structure** and understand codebase organization.
-    Perfect for **discovery workflows**: find specific file types, recent changes, or large files.
-    Use before reading files to confirm their location and properties.
-
-    ## Key Features
-    - **Filtering**: `filter_by='files'` (files only), `'text'` (source code), `'recent'` (last 24h), `'executables'`, `'hidden'`
-    - **Sorting**: `sort_by='size'` + `sort_reverse=True` (largest first), `'modified'` (newest first), `'extension'` (by type)
-    - **Pagination**: `max_items=100` + `offset=0` for chunked reads of large directories
-    - **Customization**: `ignore_patterns=['*.pyc']`, `include_metadata=False` for lightweight listing
-
-    ## Return Value
-    Returns a comprehensive JSON object with the following structure:
+    """List directory contents with detailed metadata, filtering, sorting, and pagination.
     
-    ```json
-    {
-      "operation": {
-        "type": "list_directory",
-        "path": "src",
-        "filter_by": "all",
-        "sort_by": "name"
-      },
-      "result": {
-        "items": [
-          {
-            "name": "main.py",
-            "path": "src/main.py",
-            "type": "file",
-            "size": 2048,
-            "size_category": "small",
-            "modified_time": "2024-01-15T10:30:00Z",
-            "extension": ".py",
-            "is_hidden": false,
-            "is_text": true,
-            "permissions": "644"
-          }
-        ],
-        "showing_count": 25,
-        "total_available": 25,
-        "has_more": false
-      },
-      "summary": {
-        "total_items": 25,
-        "by_type": {"file": 20, "directory": 5},
-        "by_size_category": {"small": 15, "medium": 3, "large": 2},
-        "by_extension": {".py": 8, ".md": 4, ".json": 2},
-        "total_size": 1048576,
-        "text_files": 18,
-        "binary_files": 2
-      },
-      "skipped_items": {
-        "total": 3,
-        "reasons": {"permission_denied": 2, "broken_symlink": 1}
-      }
-    }
-    ```
-
-    **Key Sections:**
-    - **`operation`**: Contains operation type and key parameters
-    - **`result`**: Core directory listing data with items and pagination info
-    - **`summary`**: Statistical breakdown of directory contents
-    - **`skipped_items`**: Information about inaccessible items (only present if items were skipped)
+    Returns file/directory information with rich metadata - does NOT read file contents.
+    Use for project structure exploration and file discovery workflows.
     """
 
     # ------------------------------------------------------------------
@@ -763,7 +698,6 @@ def list_directory(
                 message += f" - {total_skipped} items skipped"
 
         # Build structured LLM content following unified standard
-        from datetime import datetime
         
         llm_content = {
             "operation": {

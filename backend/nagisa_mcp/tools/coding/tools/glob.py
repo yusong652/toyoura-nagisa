@@ -251,59 +251,10 @@ def glob(
         description="Maximum number of files to return (performance protection).",
     ),
 ) -> Dict[str, Any]:
-    """Find files matching a glob pattern and return their paths with metadata.
-
-    ## Core Functionality
-    - Uses glob patterns (e.g., `src/**/*.py`, `*.md`) to find matching files.
-    - Returns **file paths only** - does NOT read file contents.
-    - Supports advanced filtering, sorting, and exclusion patterns.
-    - Designed for file discovery and exploration, not content retrieval.
-
-    ## Strategic Usage
-    - Use this tool to **discover** files before reading them with `read_file` or `read_many_files`.
-    - Perfect for exploring project structure: `**/*.py` to find all Python files.
-    - Use exclusions to filter out unwanted files: `exclude=['**/test_*.py']`.
-
-    ## Glob Pattern Examples
-    - `*.py` - All Python files in root directory
-    - `**/*.py` - All Python files recursively  
-    - `src/**/*.ts` - All TypeScript files under src/
-    - `**/test_*.py` - Test files anywhere in the project
-
-    ## Return Value
-    Returns a JSON object with the following structure:
+    """Find files matching glob patterns with advanced filtering and metadata.
     
-    ```json
-    {
-      "operation": {
-        "type": "glob",
-        "pattern": "**/*.py",
-        "search_path": "src"
-      },
-      "result": {
-        "files": [
-          {
-            "path": "src/main.py",
-            "absolute_path": "/workspace/src/main.py", 
-            "size": 1024,
-            "modified_time": "2024-01-15T10:30:00",
-            "modified_timestamp": 1705315800.0
-          }
-        ],
-        "total_found": 1,
-        "search_limited": false
-      },
-      "skipped_files": {
-        "total": 5,
-        "reasons": {"gitignored": 3, "hidden_files": 2}
-      }
-    }
-    ```
-
-    **Key Sections:**
-    - **`operation`**: Contains search pattern and parameters
-    - **`result`**: Matching files and search statistics
-    - **`skipped_files`**: Information about excluded files (only present if files were skipped)
+    Returns file paths and metadata only - does NOT read file contents.
+    Use for file discovery before reading with read_file or read_many_files.
     """
 
     # ------------------------------------------------------------------

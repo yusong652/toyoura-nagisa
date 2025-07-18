@@ -153,105 +153,61 @@ def _get_file_type(path: Path) -> str:
 def replace(
     file_path: str = Field(
         ...,
-        description="Absolute path to the file to modify. Must be within workspace.",
+        description="File path relative to workspace root to modify. Examples: 'src/app.py', 'config/settings.json'. Use read_file first to examine content.",
     ),
     old_string: str = Field(
         ...,
-        description="Exact text to replace. For single replacements, include 3+ lines of context before/after target. Must match exactly including whitespace.",
+        description="Exact text to find and replace. Include surrounding context (3+ lines) for single replacements. Must match exactly including whitespace, indentation, and line endings.",
     ),
     new_string: str = Field(
         ...,
-        description="Exact replacement text. Provide precise text with correct whitespace and formatting.",
+        description="Exact replacement text. Maintain proper indentation and formatting. Use empty string to delete text.",
     ),
     expected_replacements: int = Field(
         1,
         ge=1,
         le=MAX_EXPECTED_REPLACEMENTS,
-        description="Expected number of replacements. Tool fails if actual count differs.",
+        description="Expected number of replacements (1 for single edits, >1 for multiple). Tool validates actual count matches expected.",
     ),
 ) -> Dict[str, Any]:
-    """Replace exact text within files with precise targeting and comprehensive validation.
-
-    ## Core Functionality
-    - Replaces specific text content using exact string matching
-    - Supports single and multiple occurrence replacements
-    - Creates new files when old_string is empty
-    - Provides detailed diff and validation feedback
-
-    ## Strategic Usage
-    - **Always use read_file first** to examine content before editing
-    - Include sufficient context (3+ lines) for single replacements
-    - Use exact literal text - match whitespace/indentation precisely
-    - Verify paths are absolute and within workspace
-
-    ## Return Value
-    **For LLM:** Returns structured editing results with comprehensive metadata.
+    """Make precise text edits within existing files using exact string matching.
     
-    **Structure:**
-    ```json
-    {
-      "operation": {
-        "type": "replace",
-        "file_path": "/workspace/src/main.py",
-        "replacements_made": 1,
-        "expected_replacements": 1,
-        "is_new_file": false,
-        "timestamp": "2025-01-08T10:30:00.123"
-      },
-      "edit_result": {
-        "success": true,
-        "content_changed": true,
-        "size_change_bytes": 12,
-        "line_change_count": 2
-      },
-      "file_info": {
-        "size_bytes": 1024,
-        "file_type": "text",
-        "extension": ".py",
-        "encoding": "utf-8"
-      },
-      "diff_info": {
-        "has_diff": true,
-        "diff_preview": "--- original\\n+++ modified\\n@@ -1,3 +1,3 @@\\n...",
-        "diff_size": 156
-      },
-      "validation_info": {
-        "context_validated": true,
-        "string_lengths": {"old": 156, "new": 168},
-        "warnings": [],
-        "issues_detected": []
-      },
-      "summary": {
-        "operation_type": "text_replacement",
-        "success": true
-      }
-    }
-    ```
-
-    ## Examples
+    ## When to Use vs write_file Tool
+    - **Use replace for**: Precise edits, fixing bugs, updating specific lines/sections
+    - **Use write_file for**: Creating new files, completely rewriting files, appending content
+    
+    ## Core Functionality
+    - **Exact string matching**: Finds and replaces text exactly as specified
+    - **Context validation**: Requires surrounding context for single replacements
+    - **Diff generation**: Shows exactly what changed
+    - **Validation feedback**: Confirms expected number of replacements
+    
+    ## Key Usage Patterns
     ```python
-    # Single replacement with context
+    # Fix a specific function (include context)
     replace(
-        file_path="/workspace/src/main.py",
-        old_string="def old_function():\\n    return 'old'\\n\\ndef another_function():",
-        new_string="def new_function():\\n    return 'new'\\n\\ndef another_function():"
+        file_path="src/app.py",
+        old_string="def old_function():\n    return 'old'",
+        new_string="def new_function():\n    return 'new'"
     )
     
-    # Multiple replacements
+    # Replace multiple occurrences
     replace(
-        file_path="/workspace/config.py",
-        old_string="DEBUG = True",
-        new_string="DEBUG = False",
+        file_path="config.json",
+        old_string="localhost",
+        new_string="production-server",
         expected_replacements=3
     )
     ```
-
-    ## Critical Requirements
-    1. **file_path** must be absolute and within workspace
-    2. **old_string** must match exactly (whitespace, indentation, newlines)
-    3. **new_string** must be exact replacement text
-    4. **expected_replacements** must match actual occurrence count
-    5. Use empty old_string only for new file creation
+    
+    ## Important Notes
+    - **Always use read_file first** to examine current content and identify exact text to replace
+    - **Include context**: For single replacements, include 3+ lines before/after target
+    - **Exact matching**: Whitespace, indentation, and line endings must match exactly
+    - **File size limit**: Maximum 5MB files for editing
+    
+    Returns structured data with diff preview and replacement details.
+    
     """
 
     # ------------------------------------------------------------------
@@ -269,8 +225,11 @@ def replace(
         expected_replacements = 1
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, suggestion: str = None) -> Dict[str, Any]:
+        error_msg = message
+        if suggestion:
+            error_msg += f" Suggestion: {suggestion}"
+        return ToolResult(status="error", message=error_msg, error=message).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
         return ToolResult(
@@ -282,38 +241,65 @@ def replace(
 
     # Validate inputs
     if not file_path or not file_path.strip():
-        return _error("file_path is required and cannot be empty")
+        return _error(
+            "file_path is required and cannot be empty",
+            "Provide a file path relative to workspace root, e.g., 'src/app.py'"
+        )
 
     if not Path(file_path).is_absolute():
-        return _error(f"file_path must be absolute: {file_path}")
+        return _error(
+            f"file_path must be absolute: {file_path}",
+            "Use paths relative to workspace root, e.g., 'src/app.py' instead of '/full/path/src/app.py'"
+        )
 
     if len(old_string) > MAX_OLD_STRING_LENGTH:
-        return _error(f"old_string too long: {len(old_string)} chars (max: {MAX_OLD_STRING_LENGTH})")
+        return _error(
+            f"old_string too long: {len(old_string)} chars (max: {MAX_OLD_STRING_LENGTH})",
+            "Break down the replacement into smaller chunks or use write_file for large content changes"
+        )
 
     if len(new_string) > MAX_NEW_STRING_LENGTH:
-        return _error(f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})")
+        return _error(
+            f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})",
+            "Break down the replacement into smaller chunks or use write_file for large content changes"
+        )
 
     if expected_replacements < 1 or expected_replacements > MAX_EXPECTED_REPLACEMENTS:
-        return _error(f"expected_replacements must be between 1 and {MAX_EXPECTED_REPLACEMENTS}")
+        return _error(
+            f"expected_replacements must be between 1 and {MAX_EXPECTED_REPLACEMENTS}",
+            "Use 1 for single replacements, or higher numbers for multiple occurrences"
+        )
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error("Cannot access workspace directory")
+        return _error(
+            "Cannot access workspace directory",
+            "Ensure you're running from within a valid workspace directory"
+        )
 
     # Validate file path is within workspace
     validated_path = validate_path_in_workspace(file_path)
     if validated_path is None:
-        return _error(f"File path is outside workspace: {file_path}")
+        return _error(
+            f"File path is outside workspace: {file_path}",
+            "Use paths relative to workspace root, e.g., 'src/app.py', 'config/settings.json'"
+        )
 
     target_file = Path(validated_path)
 
     # Security checks for existing files
     if target_file.exists():
         if target_file.is_symlink() and not is_safe_symlink(target_file):
-            return _error(f"Unsafe symlink detected: {file_path}")
+            return _error(
+                f"Unsafe symlink detected: {file_path}",
+                "Use a regular file path instead of a symlink pointing outside workspace"
+            )
 
         if not check_parent_symlinks(target_file):
-            return _error(f"Unsafe parent symlinks detected: {file_path}")
+            return _error(
+                f"Unsafe parent symlinks detected: {file_path}",
+                "Use a file path without parent symlinks pointing outside workspace"
+            )
 
     # ------------------------------------------------------------------
     # File validation and content analysis
@@ -337,7 +323,10 @@ def replace(
                 current_content = _normalize_line_endings(current_content)
                 original_size = len(current_content.encode(TEXT_CHARSET_DEFAULT))
             except Exception as e:
-                return _error(f"Cannot read file: {e}")
+                return _error(
+                    f"Cannot read file: {e}",
+                    "Check file permissions and ensure the file is a readable text file"
+                )
         else:
             # File doesn't exist
             if old_string == "":
@@ -346,7 +335,10 @@ def replace(
                 current_content = ""
                 original_size = 0
             else:
-                return _error("File not found. Use empty old_string to create a new file.")
+                return _error(
+                    "File not found. Use empty old_string to create a new file.",
+                    "To create a new file, use old_string='' and provide the content in new_string"
+                )
 
         # ------------------------------------------------------------------
         # Replacement logic and validation
@@ -359,23 +351,24 @@ def replace(
         else:
             # Editing existing file
             if old_string == "":
-                return _error("Cannot use empty old_string with existing file. Use non-empty old_string or delete the file first.")
+                return _error(
+                    "Cannot use empty old_string with existing file. Use non-empty old_string or delete the file first.",
+                    "To edit existing files, provide the exact text to replace in old_string"
+                )
 
             # Count occurrences
             actual_occurrences = _count_occurrences(current_content, old_string)
 
             if actual_occurrences == 0:
                 return _error(
-                    f"Failed to edit: old_string not found in file. "
-                    f"Ensure exact match including whitespace, indentation, and context. "
-                    f"Use read_file tool to verify current content."
+                    "Failed to edit: old_string not found in file",
+                    "Use read_file first to examine exact content, then ensure old_string matches exactly including whitespace and indentation"
                 )
 
             if actual_occurrences != expected_replacements:
                 return _error(
-                    f"Failed to edit: expected {expected_replacements} occurrences "
-                    f"but found {actual_occurrences}. "
-                    f"Adjust expected_replacements or refine old_string for precise targeting."
+                    f"Failed to edit: expected {expected_replacements} occurrences but found {actual_occurrences}",
+                    f"Set expected_replacements={actual_occurrences} or refine old_string to match exactly {expected_replacements} occurrences"
                 )
 
             # Validate context requirements for single replacements
@@ -383,7 +376,10 @@ def replace(
                 current_content, old_string, expected_replacements
             )
             if not context_valid:
-                return _error(context_error)
+                return _error(
+                    context_error,
+                    "Include 3+ lines of context before and after the target text for single replacements"
+                )
 
             # Apply replacement
             new_content = _apply_replacement(current_content, old_string, new_string)
@@ -401,7 +397,10 @@ def replace(
             with target_file.open('w', encoding=TEXT_CHARSET_DEFAULT) as f:
                 f.write(new_content)
         except Exception as e:
-            return _error(f"Failed to write file: {e}")
+            return _error(
+                f"Failed to write file: {e}",
+                "Check file permissions and disk space, or try a different file path"
+            )
 
         # Calculate file changes
         new_size = len(new_content.encode(TEXT_CHARSET_DEFAULT))
@@ -511,7 +510,10 @@ def replace(
         )
 
     except Exception as exc:
-        return _error(f"Unexpected error during file editing: {exc}")
+        return _error(
+            f"Unexpected error during file editing: {exc}",
+            "Verify the file path is correct and the content is valid text"
+        )
 
 # -----------------------------------------------------------------------------
 # Registration helper

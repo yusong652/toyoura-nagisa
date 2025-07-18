@@ -589,65 +589,8 @@ def execute_python_script(
 ) -> Dict[str, Any]:
     """Execute Python scripts with comprehensive monitoring, security analysis, and resource management.
     
-    ## Return Value
-    **For LLM:** Returns structured data with consistent format across all coding tools.
-    
-    **Structure:**
-    ```json
-    {
-      "operation": {
-        "type": "python_executor",
-        "script_path": "scripts/data_processor.py",
-        "execution_mode": "normal",
-        "args": ["--input", "data.csv"],
-        "working_directory": "scripts",
-        "timeout_occurred": false,
-        "killed_by_signal": false
-      },
-      "result": {
-        "exit_code": 0,
-        "stdout": "Processing complete. Processed 1000 records.\n",
-        "stderr": "",
-        "success": true,
-        "execution_time": 2.34,
-        "peak_memory_mb": 45.2,
-        "output_size": 1024
-      },
-      "summary": {
-        "operation_type": "python_executor",
-        "success": true,
-        "execution_category": "lightweight",
-        "security_score": 0.7,
-        "has_warnings": true
-      }
-    }
-    ```
-    
-    **Optional Sections:**
-    - `warnings`: Present when security warnings are detected
-    - `resource_limits`: Present when resource limits are exceeded
-    
-    **Detailed Metadata** (available in data payload for UI/system use):
-    - Complete resource usage statistics
-    - Full security analysis with detailed import categorization and warnings
-    - Execution metadata and environment details
-    - Performance metrics and monitoring data
-    
-    ## Core Functionality
-    Executes Python scripts with real-time resource monitoring, security analysis, and enterprise-grade controls.
-
-    ## Strategic Usage
-    Use this tool to **run Python scripts** with comprehensive monitoring and security.
-
-    ## Execution Modes
-    - **Quick**: 10s, 256MB - simple scripts and tests
-    - **Normal**: 30s, 512MB - standard operations
-    - **Long**: 300s, 1GB - data processing and analysis
-    - **Intensive**: 600s, 2GB - ML training and heavy computation
-    - **Custom**: specify your own timeout and memory limits
-
-    Access execution results through the structured response: `result.success` for status, `result.stdout/stderr` for output, `summary.security_score` for safety assessment.
-
+    Returns execution results with stdout/stderr, resource usage, and security analysis.
+    Use for running Python scripts with enterprise-grade controls and monitoring.
     """
 
     # ------------------------------------------------------------------
@@ -703,11 +646,11 @@ def execute_python_script(
             return _error("memory_limit_mb must be between 1 and 2048 MB")
         
         actual_timeout = timeout
-        actual_memory_limit = memory_limit_mb
+        # actual_memory_limit = memory_limit_mb  # Not used in current implementation
     else:
         limits = EXECUTION_CATEGORIES[execution_mode.value]
         actual_timeout = limits["timeout"]
-        actual_memory_limit = limits["memory_mb"]
+        # actual_memory_limit = limits["memory_mb"]  # Not used in current implementation
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
