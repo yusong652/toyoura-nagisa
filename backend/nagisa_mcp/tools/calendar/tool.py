@@ -96,7 +96,6 @@ class CalendarEvent:
     description: Optional[str] = None
     status: EventStatus = EventStatus.CONFIRMED
     visibility: EventVisibility = EventVisibility.DEFAULT
-    calendar_id: str = "primary"
     created: Optional[str] = None
     updated: Optional[str] = None
     html_link: Optional[str] = None
@@ -112,7 +111,6 @@ class CalendarEvent:
             "description": self.description,
             "status": self.status.value,
             "visibility": self.visibility.value,
-            "calendar_id": self.calendar_id,
             "created": self.created,
             "updated": self.updated,
             "html_link": self.html_link,
@@ -143,7 +141,6 @@ class CalendarOperationResult:
     operation_type: CalendarOperationType
     success: bool
     events: List[CalendarEvent]
-    calendar_id: str
     execution_time: float
     total_events: int
     error_message: Optional[str] = None
@@ -172,7 +169,6 @@ class CalendarOperationResult:
             "performance_category": self.performance_category,
             "execution_time": self.execution_time,
             "has_warnings": len(self.warnings) > 0,
-            "calendar_id": self.calendar_id,
         }
     
     def to_dict(self) -> Dict[str, Any]:
@@ -180,7 +176,6 @@ class CalendarOperationResult:
         return {
             "operation_metadata": {
                 "operation_type": self.operation_type.value,
-                "calendar_id": self.calendar_id,
                 "execution_time": self.execution_time,
                 "performance_category": self.performance_category,
                 "success": self.success,
@@ -267,7 +262,7 @@ def _validate_event_data(
     
     return warnings
 
-def _parse_calendar_event(event_data: Dict[str, Any], calendar_id: str) -> CalendarEvent:
+def _parse_calendar_event(event_data: Dict[str, Any]) -> CalendarEvent:
     """Parse Google Calendar API event data into CalendarEvent object."""
     return CalendarEvent(
         id=event_data['id'],
@@ -278,7 +273,6 @@ def _parse_calendar_event(event_data: Dict[str, Any], calendar_id: str) -> Calen
         description=event_data.get('description'),
         status=EventStatus(event_data.get('status', 'confirmed')),
         visibility=EventVisibility(event_data.get('visibility', 'default')),
-        calendar_id=calendar_id,
         created=event_data.get('created'),
         updated=event_data.get('updated'),
         html_link=event_data.get('htmlLink'),
@@ -287,7 +281,6 @@ def _parse_calendar_event(event_data: Dict[str, Any], calendar_id: str) -> Calen
 def _execute_calendar_operation(
     operation_type: CalendarOperationType,
     operation_func,
-    calendar_id: str = "primary",
     **kwargs
 ) -> CalendarOperationResult:
     """Execute a calendar operation with error handling and timing."""
@@ -299,23 +292,21 @@ def _execute_calendar_operation(
         
         # Parse result based on operation type
         if operation_type == CalendarOperationType.LIST_EVENTS:
-            events = [_parse_calendar_event(event, calendar_id) for event in result.get('items', [])]
+            events = [_parse_calendar_event(event) for event in result.get('items', [])]
             return CalendarOperationResult(
                 operation_type=operation_type,
                 success=True,
                 events=events,
-                calendar_id=calendar_id,
                 execution_time=execution_time,
                 total_events=len(events),
             )
         else:
             # Single event operations
-            event = _parse_calendar_event(result, calendar_id) if result else None
+            event = _parse_calendar_event(result) if result else None
             return CalendarOperationResult(
                 operation_type=operation_type,
                 success=True,
                 events=[event] if event else [],
-                calendar_id=calendar_id,
                 execution_time=execution_time,
                 total_events=1 if event else 0,
             )
@@ -326,7 +317,6 @@ def _execute_calendar_operation(
             operation_type=operation_type,
             success=False,
             events=[],
-            calendar_id=calendar_id,
             execution_time=execution_time,
             total_events=0,
             error_message=str(e),
@@ -350,10 +340,6 @@ def register_calendar_tools(mcp: FastMCP):
             ge=1,
             le=MAX_EVENTS_HARD_LIMIT,
             description="Maximum number of events to retrieve (1-100).",
-        ),
-        calendar_id: str = Field(
-            'primary',
-            description="Calendar ID to query. Use 'primary' for main calendar.",
         ),
         time_min: Optional[str] = Field(
             None,
@@ -385,8 +371,6 @@ def register_calendar_tools(mcp: FastMCP):
         # Parameter validation and normalization
         if isinstance(max_results, FieldInfo):
             max_results = DEFAULT_MAX_EVENTS
-        if isinstance(calendar_id, FieldInfo):
-            calendar_id = 'primary'
         if isinstance(time_min, FieldInfo):
             time_min = None
         if isinstance(time_max, FieldInfo):
@@ -403,7 +387,7 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Prepare query parameters
             query_params = {
-                'calendarId': calendar_id,
+                'calendarId': 'primary',
                 'maxResults': max_results,
                 'singleEvents': True,
                 'orderBy': 'startTime'
@@ -413,7 +397,7 @@ def register_calendar_tools(mcp: FastMCP):
             if time_min:
                 query_params['timeMin'] = time_min
             else:
-                query_params['timeMin'] = datetime.utcnow().isoformat() + 'Z'
+                query_params['timeMin'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
             
             if time_max:
                 query_params['timeMax'] = time_max
@@ -425,13 +409,12 @@ def register_calendar_tools(mcp: FastMCP):
             result = _execute_calendar_operation(
                 CalendarOperationType.LIST_EVENTS,
                 list_operation,
-                calendar_id=calendar_id,
             )
             
             # Build user-facing message
             if result.success:
                 events_word = "event" if result.total_events == 1 else "events"
-                message = f"Retrieved {result.total_events} {events_word} from {calendar_id} ({result.execution_time:.2f}s)"
+                message = f"Retrieved {result.total_events} {events_word} from primary calendar ({result.execution_time:.2f}s)"
             else:
                 message = f"Failed to retrieve events: {result.error_message}"
             
@@ -477,7 +460,6 @@ def register_calendar_tools(mcp: FastMCP):
         end: str = Field(..., description="Event end time in RFC3339 format (e.g., '2024-06-06T11:00:00+09:00')."),
         location: Optional[str] = Field(None, description="Event location (e.g., 'Conference Room A', '123 Main St')."),
         description: Optional[str] = Field(None, description="Event description or notes."),
-        calendar_id: str = Field('primary', description="Calendar ID to add event to. Use 'primary' for main calendar."),
     ) -> Dict[str, Any]:
         """Create a new event in Google Calendar with comprehensive validation and metadata.
         
@@ -504,8 +486,6 @@ def register_calendar_tools(mcp: FastMCP):
             location = None
         if isinstance(description, FieldInfo):
             description = None
-        if isinstance(calendar_id, FieldInfo):
-            calendar_id = 'primary'
 
         # Validate event data
         warnings = _validate_event_data(summary, start, end, location, description)
@@ -578,12 +558,11 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Execute calendar operation
             def create_operation():
-                return service.events().insert(calendarId=calendar_id, body=event_data).execute()
+                return service.events().insert(calendarId='primary', body=event_data).execute()
             
             result = _execute_calendar_operation(
                 CalendarOperationType.CREATE_EVENT,
                 create_operation,
-                calendar_id=calendar_id,
             )
             
             # Add validation warnings
@@ -592,7 +571,7 @@ def register_calendar_tools(mcp: FastMCP):
             # Build user-facing message
             if result.success:
                 created_event = result.events[0]
-                message = f"Created event '{created_event.summary}' in {calendar_id} ({result.execution_time:.2f}s)"
+                message = f"Created event '{created_event.summary}' in primary calendar ({result.execution_time:.2f}s)"
             else:
                 message = f"Failed to create event: {result.error_message}"
             
@@ -621,7 +600,7 @@ def register_calendar_tools(mcp: FastMCP):
             return _error(str(e))
         except Exception as e:
             if 'Not Found' in str(e):
-                return _error(f"Calendar not found: {calendar_id}")
+                return _error("Primary calendar not found")
             elif 'Invalid Value' in str(e):
                 return _error(f"Invalid event data: {str(e)}")
             else:
@@ -635,7 +614,6 @@ def register_calendar_tools(mcp: FastMCP):
         end: Optional[str] = Field(None, description="New end time in RFC3339 format."),
         location: Optional[str] = Field(None, description="New event location."),
         description: Optional[str] = Field(None, description="New event description."),
-        calendar_id: str = Field('primary', description="Calendar ID containing the event."),
     ) -> Dict[str, Any]:
         """Update an existing event in Google Calendar with comprehensive validation.
         
@@ -667,8 +645,6 @@ def register_calendar_tools(mcp: FastMCP):
             location = None
         if isinstance(description, FieldInfo):
             description = None
-        if isinstance(calendar_id, FieldInfo):
-            calendar_id = 'primary'
 
         # Validate required fields
         if not event_id or not event_id.strip():
@@ -758,7 +734,7 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Get existing event
             existing_event = service.events().get(
-                calendarId=calendar_id,
+                calendarId='primary',
                 eventId=event_id
             ).execute()
             
@@ -777,7 +753,7 @@ def register_calendar_tools(mcp: FastMCP):
             # Execute calendar operation
             def update_operation():
                 return service.events().update(
-                    calendarId=calendar_id,
+                    calendarId='primary',
                     eventId=event_id,
                     body=existing_event
                 ).execute()
@@ -785,7 +761,6 @@ def register_calendar_tools(mcp: FastMCP):
             result = _execute_calendar_operation(
                 CalendarOperationType.UPDATE_EVENT,
                 update_operation,
-                calendar_id=calendar_id,
             )
             
             # Add validation warnings
@@ -823,14 +798,13 @@ def register_calendar_tools(mcp: FastMCP):
             
         except Exception as e:
             if 'Not Found' in str(e):
-                return _error(f"Event or calendar not found: {event_id} in {calendar_id}")
+                return _error(f"Event not found: {event_id} in primary calendar")
             else:
                 return _error(f"Unexpected error updating event: {str(e)}")
 
     @mcp.tool(tags=common_tags, annotations=common_annotations)
     def delete_calendar_event(
         event_id: str = Field(..., description="ID of the event to delete."),
-        calendar_id: str = Field('primary', description="Calendar ID containing the event."),
     ) -> Dict[str, Any]:
         """Delete an event from Google Calendar with comprehensive validation and metadata.
         
@@ -851,8 +825,6 @@ def register_calendar_tools(mcp: FastMCP):
             ).model_dump()
 
         # Parameter validation and normalization
-        if isinstance(calendar_id, FieldInfo):
-            calendar_id = 'primary'
 
         # Validate required fields
         if not event_id or not event_id.strip():
@@ -865,18 +837,17 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Execute calendar operation
             def delete_operation():
-                service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+                service.events().delete(calendarId='primary', eventId=event_id).execute()
                 return {}  # Delete returns empty response on success
             
             result = _execute_calendar_operation(
                 CalendarOperationType.DELETE_EVENT,
                 delete_operation,
-                calendar_id=calendar_id,
             )
             
             # Build user-facing message
             if result.success:
-                message = f"Deleted event {event_id} from {calendar_id} ({result.execution_time:.2f}s)"
+                message = f"Deleted event {event_id} from primary calendar ({result.execution_time:.2f}s)"
             else:
                 message = f"Failed to delete event: {result.error_message}"
             
@@ -903,6 +874,6 @@ def register_calendar_tools(mcp: FastMCP):
             
         except Exception as e:
             if 'Not Found' in str(e):
-                return _error(f"Event not found: {event_id} in {calendar_id}")
+                return _error(f"Event not found: {event_id} in primary calendar")
             else:
                 return _error(f"Unexpected error deleting event: {str(e)}") 
