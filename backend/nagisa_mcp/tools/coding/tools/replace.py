@@ -9,7 +9,6 @@ Modeled after gemini-cli's replace tool for consistency and interoperability.
 
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
-import re
 import difflib
 from datetime import datetime
 
@@ -25,7 +24,6 @@ from ..utils.path_security import (
 )
 from backend.nagisa_mcp.utils.tool_result import ToolResult
 from .constants import (
-    MAX_FILE_SIZE_FOR_EDIT,
     TEXT_CHARSET_DEFAULT,
 )
 
@@ -121,7 +119,7 @@ def _validate_context_requirement(content: str, old_string: str, expected_replac
     
     return True, None
 
-def _detect_potential_issues(content: str, old_string: str) -> list[str]:
+def _detect_potential_issues(old_string: str) -> list[str]:
     """Detect potential issues with the replacement."""
     issues = []
     
@@ -399,7 +397,7 @@ def replace(
             has_diff = True
 
         # Detect potential issues for warnings
-        warnings = _detect_potential_issues(current_content or "", old_string)
+        warnings = _detect_potential_issues(old_string)
 
         # Get file metadata
         file_type = _get_file_type(target_file)
