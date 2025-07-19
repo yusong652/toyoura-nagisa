@@ -100,16 +100,24 @@ def _generate_diff(original: str, modified: str, filename: str = "file") -> str:
     return ''.join(diff)
 
 def _validate_context_requirement(content: str, old_string: str, expected_replacements: int) -> Tuple[bool, Optional[str]]:
-    """Validate that old_string has sufficient context for single replacements."""
+    """Validate that old_string has sufficient context for ambiguous single replacements."""
     if expected_replacements != 1:
         return True, None  # Context validation only for single replacements
         
     if not old_string:
         return True, None  # Empty string is valid for file creation
+    
+    # Skip context requirement for short, unique strings
+    if len(old_string.strip()) <= 50:  # Short strings likely unique
+        return True, None
         
-    lines = old_string.split('\n')
-    if len(lines) < MIN_CONTEXT_LINES * 2 + 1:  # Before + target + after
-        return False, f"For single replacements, old_string should include at least {MIN_CONTEXT_LINES} lines of context before and after the target text"
+    # Check if replacement might be ambiguous
+    actual_occurrences = _count_occurrences(content, old_string)
+    if actual_occurrences > 1:
+        # Multiple occurrences require context for precision
+        lines = old_string.split('\n')
+        if len(lines) < MIN_CONTEXT_LINES:
+            return False, f"Multiple occurrences found ({actual_occurrences}). Include more context (3+ lines) to ensure precise replacement"
     
     return True, None
 
@@ -153,61 +161,35 @@ def _get_file_type(path: Path) -> str:
 def replace(
     file_path: str = Field(
         ...,
-        description="File path relative to workspace root to modify. Examples: 'src/app.py', 'config/settings.json'. Use read_file first to examine content.",
+        description="Relative path to file (e.g., 'src/app.py'). Use read_file first.",
     ),
     old_string: str = Field(
         ...,
-        description="Exact text to find and replace. Include surrounding context (3+ lines) for single replacements. Must match exactly including whitespace, indentation, and line endings.",
+        description="Exact text to replace. Include context if multiple matches exist.",
     ),
     new_string: str = Field(
         ...,
-        description="Exact replacement text. Maintain proper indentation and formatting. Use empty string to delete text.",
+        description="Replacement text. Empty string deletes text.",
     ),
     expected_replacements: int = Field(
         1,
         ge=1,
         le=MAX_EXPECTED_REPLACEMENTS,
-        description="Expected number of replacements (1 for single edits, >1 for multiple). Tool validates actual count matches expected.",
+        description="Expected replacement count (validates accuracy).",
     ),
 ) -> Dict[str, Any]:
-    """Make precise text edits within existing files using exact string matching.
-    
-    ## When to Use vs write_file Tool
-    - **Use replace for**: Precise edits, fixing bugs, updating specific lines/sections
-    - **Use write_file for**: Creating new files, completely rewriting files, appending content
-    
-    ## Core Functionality
-    - **Exact string matching**: Finds and replaces text exactly as specified
-    - **Context validation**: Requires surrounding context for single replacements
-    - **Diff generation**: Shows exactly what changed
-    - **Validation feedback**: Confirms expected number of replacements
-    
-    ## Key Usage Patterns
-    ```python
-    # Fix a specific function (include context)
-    replace(
-        file_path="src/app.py",
-        old_string="def old_function():\n    return 'old'",
-        new_string="def new_function():\n    return 'new'"
-    )
-    
-    # Replace multiple occurrences
-    replace(
-        file_path="config.json",
-        old_string="localhost",
-        new_string="production-server",
-        expected_replacements=3
-    )
-    ```
-    
-    ## Important Notes
-    - **Always use read_file first** to examine current content and identify exact text to replace
-    - **Include context**: For single replacements, include 3+ lines before/after target
-    - **Exact matching**: Whitespace, indentation, and line endings must match exactly
-    - **File size limit**: Maximum 5MB files for editing
-    
-    Returns structured data with diff preview and replacement details.
-    
+    """Make precise text replacements in files using exact string matching.
+
+    Use replace for: targeted edits, bug fixes, specific line changes
+    Use write_file for: new files, complete rewrites, large content changes
+
+    Requirements:
+    - Use read_file first to examine content
+    - Include context only if multiple matches exist
+    - Exact whitespace/indentation matching required
+    - Max file size: 5MB
+
+    Returns structured data with diff preview and operation details.
     """
 
     # ------------------------------------------------------------------
@@ -244,12 +226,6 @@ def replace(
         return _error(
             "file_path is required and cannot be empty",
             "Provide a file path relative to workspace root, e.g., 'src/app.py'"
-        )
-
-    if not Path(file_path).is_absolute():
-        return _error(
-            f"file_path must be absolute: {file_path}",
-            "Use paths relative to workspace root, e.g., 'src/app.py' instead of '/full/path/src/app.py'"
         )
 
     if len(old_string) > MAX_OLD_STRING_LENGTH:
