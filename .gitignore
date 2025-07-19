@@ -63,6 +63,9 @@ frontend/node_modules/
 # Configuration files with sensitive information
 backend/config/
 backend/config.py
+
+# Local model configurations with HPC SSH credentials
+backend/chat/local/config.py
 workspace/
 backend/location_data/
 
