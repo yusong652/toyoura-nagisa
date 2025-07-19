@@ -484,7 +484,7 @@ def register_calendar_tools(mcp: FastMCP):
         Returns structured event data with automatic future date correction.
         Automatically schedules past times for next occurrence with detailed warnings.
         
-        Example: create_calendar_event("Team Meeting", "2024-06-06T10:00:00+09:00", "2024-06-06T11:00:00+09:00")
+        Example: create_calendar_event("Team Meeting", "2025-07-07T19:00:00+09:00", "2025-07-07T11:20:00+09:00")
         """
         
         # Helper functions for consistent results
