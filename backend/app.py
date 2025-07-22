@@ -304,7 +304,8 @@ async def handle_llm_response(
 
     try:
         # ========== PHASE 2: 客户端验证 ==========
-        supported_clients = ['GeminiClient', 'LocalLLMClient']
+        # 支持所有已实现的LLM客户端
+        supported_clients = ['GeminiClient', 'LocalLLMClient', 'AnthropicClient', 'GPTClient']
         if type(llm_client).__name__ not in supported_clients:
             error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"

@@ -17,22 +17,18 @@ from .content_generators import TitleGenerator, ImagePromptGenerator, WebSearchG
 
 class GeminiClient(LLMClientBase):
     """
-    Enhanced Google Gemini client with original context preservation support.
-    
-    This implementation provides dual-mode operation:
-    1. Legacy mode: Traditional response processing for backward compatibility
-    2. Context-preservation mode: Maintains original API response format for tool calling
+    Enhanced Google Gemini client with streaming tool calling support.
     
     Key Features:
     - Original response preservation during tool calling sequences
     - Thinking chain and validation field integrity
-    - Advanced dual-mode response processing
+    - Real-time streaming tool call notifications
     - Comprehensive tool management and execution
-    - Full backward compatibility
+    - Modular component architecture
     
     Components:
     - GeminiContextManager: Manages dual-track context (working + storage)
-    - ResponseProcessor: Enhanced dual-mode response processing
+    - ResponseProcessor: Enhanced response processing with tool call extraction
     - ToolManager: Advanced MCP tool integration
     - Content Generators: Specialized content generation utilities
     """
@@ -69,74 +65,8 @@ class GeminiClient(LLMClientBase):
         
         print(f"Enhanced Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
-        # Initialize component managers
+        # Initialize component managers with unified architecture
         self.tool_manager = ToolManager(tools_enabled=self.tools_enabled)
-        self.debugger = GeminiDebugger()
-        self.message_formatter = MessageFormatter()
-        self.response_processor = ResponseProcessor()
-        self.title_generator = TitleGenerator()
-        self.image_prompt_generator = ImagePromptGenerator()
-        self.web_search_generator = WebSearchGenerator()
-        
-        # Remove global context manager to prevent state pollution
-        # Each tool calling sequence will create its own context manager
-        # self.context_manager = GeminiContextManager()  # REMOVED
-
-
-    # ========== BACKWARD COMPATIBILITY METHODS ==========
-    
-    def _get_mcp_client(self, session_id: Optional[str] = None):
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.get_mcp_client(session_id)
-    
-    def _is_meta_tool(self, tool_name: str) -> bool:
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.is_meta_tool(tool_name)
-    
-    def _cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]):
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.cache_tools_for_session(session_id, tools)
-    
-    def _get_cached_tools_for_session(self, session_id: str) -> List[Dict[str, Any]]:
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.get_cached_tools_for_session(session_id)
-    
-    def _clear_session_tool_cache(self, session_id: str):
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.clear_session_tool_cache(session_id)
-
-    def map_role(self, role: str) -> str:
-        """Backward compatibility method - delegates to MessageFormatter."""
-        return MessageFormatter.map_role(role)
-
-    def _process_inline_data(self, inline_data: Dict[str, Any]) -> Optional[types.Blob]:
-        """Backward compatibility method - delegates to MessageFormatter."""
-        return MessageFormatter.process_inline_data(inline_data)
-
-    def _format_messages_for_gemini(self, messages: List[BaseMessage]) -> List[Dict[str, Any]]:
-        """Backward compatibility method - delegates to MessageFormatter."""
-        return MessageFormatter.format_messages_for_gemini(messages)
-
-    def _format_llm_response(self, response) -> LLMResponse:
-        """Backward compatibility method - delegates to ResponseProcessor."""
-        return ResponseProcessor.format_llm_response(response)
-
-    # Backward compatibility: delegate debug methods to GeminiDebugger
-    def _print_debug_request(self, contents, config):
-        """Backward compatibility method - delegates to GeminiDebugger."""
-        return GeminiDebugger.print_debug_request(contents, config)
-    
-    def _print_debug_response(self, response):
-        """Backward compatibility method - delegates to GeminiDebugger."""
-        return GeminiDebugger.print_debug_response(response)
-    
-    def _sanitize_jsonschema(self, schema: dict) -> dict:
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.sanitize_jsonschema(schema)
-
-    def convert_mcp_schema_to_gemini(self, schema: dict) -> dict:
-        """Backward compatibility method - delegates to ToolManager."""
-        return self.tool_manager.convert_mcp_schema_to_gemini(schema)
 
     # ========== CORE API METHODS ==========
 
@@ -147,6 +77,10 @@ class GeminiClient(LLMClientBase):
         """
         debug = self.gemini_config.debug
         return await self.tool_manager.get_function_call_schemas(session_id, debug)
+
+    def _clear_session_tool_cache(self, session_id: str):
+        """清除会话的工具缓存"""
+        self.tool_manager.clear_session_tool_cache(session_id)
 
     async def call_api_with_context(
         self, 
@@ -349,7 +283,7 @@ class GeminiClient(LLMClientBase):
             # === EXECUTION PHASE - 流式工具调用循环 ===
             final_response = None
             async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug
+                context_manager, session_id, max_iterations, metadata, debug, **kwargs
             ):
                 if isinstance(item, dict):
                     # 中间通知 - 直接yield给API层
@@ -391,7 +325,8 @@ class GeminiClient(LLMClientBase):
         session_id: Optional[str],
         max_iterations: int,
         metadata: Dict[str, Any],
-        debug: bool
+        debug: bool,
+        **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
         """
         流式工具调用循环 - 核心实时通知引擎
@@ -406,7 +341,7 @@ class GeminiClient(LLMClientBase):
         # 获取初始响应
         working_contents = context_manager.get_working_contents()
         current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id
+            working_contents, session_id=session_id, **kwargs
         )
         metadata['api_calls'] += 1
         
@@ -467,7 +402,7 @@ class GeminiClient(LLMClientBase):
             # 获取下一轮响应
             working_contents = context_manager.get_working_contents()
             current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id
+                working_contents, session_id=session_id, **kwargs
             )
             metadata['api_calls'] += 1
             

@@ -3,17 +3,22 @@ from typing import Dict, Optional, Type, Any, List
 from backend.chat.base import LLMClientBase
 from backend.chat.gemini import GeminiClient
 from backend.chat.local.local_llm_client import LocalLLMClient
+from backend.chat.anthropic import AnthropicClient
+from backend.chat.gpt import GPTClient
 from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config
 
 logger = logging.getLogger(__name__)
 
-# ========== SOTA架构 - Gemini专用工厂 ==========
-# 移除过时的LLM客户端，专注于SOTA Gemini实现
+# ========== 多LLM客户端支持架构 ==========
+# 支持多种LLM客户端：Gemini、Anthropic、GPT和本地模型
 
 
-# 注册的 LLM 客户端类型 - 支持 Gemini 和本地模型
+# 注册的 LLM 客户端类型
 _clients: Dict[str, Type[LLMClientBase]] = {
     "gemini": GeminiClient,
+    "anthropic": AnthropicClient,
+    "gpt": GPTClient,
+    "openai": GPTClient,  # Alias for GPT
     "local_llm": LocalLLMClient,
 }
 
@@ -21,7 +26,7 @@ _clients: Dict[str, Type[LLMClientBase]] = {
 _instances: Dict[str, LLMClientBase] = {}
 
 # 支持的客户端列表 - 用于错误提示
-SUPPORTED_CLIENTS = ["gemini", "local_llm", "ollama", "distributed-vllm", "distributed-ollama"]
+SUPPORTED_CLIENTS = ["gemini", "anthropic", "gpt", "local_llm"]
 
 def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     """
@@ -32,9 +37,8 @@ def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
         client_class: The LLM client class to register
         
     Note:
-        Currently only GeminiClient is supported due to architectural requirements.
-        Other clients are deprecated and removed due to incompatibility with the
-        new state-machine tool calling architecture.
+        All major LLM clients are now supported with consistent MCP tool calling architecture.
+        Each client implements the same LLMClientBase interface for compatibility.
     """
     _clients[name] = client_class
 
@@ -42,14 +46,16 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     """
     Get or create an LLM client instance.
     
-    This factory supports both cloud and local model clients:
+    This factory supports multiple cloud and local model clients:
     - gemini: Google Gemini client with enhanced tool calling
+    - anthropic: Anthropic Claude client with function calling
+    - gpt/openai: OpenAI GPT client with function calling
     - local_llm: Local LLM inference server
     - ollama: Lightweight local models with Ollama
     
     Args:
         name: Name of the LLM client to get. If None, uses the configured type.
-              Supported: "gemini", "local_llm", "ollama"
+              Supported: "gemini", "anthropic", "gpt", "openai", "local_llm", "ollama"
         app: Optional FastAPI app instance for context injection.
         **kwargs: Arguments to pass to the client constructor
         
@@ -74,6 +80,8 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
             f"📋 Supported clients: {supported_list}\n"
             f"🚀 Available options:\n"
             f"   - gemini: Cloud-based Gemini API with tool calling\n"
+            f"   - anthropic: Anthropic Claude with function calling\n"
+            f"   - gpt/openai: OpenAI GPT with function calling\n"
             f"   - local_llm: Local LLM inference server\n"
             f"   - ollama: Lightweight local model serving\n"
             f"   - distributed-vllm: Distributed vLLM on HPC cluster\n"
@@ -103,6 +111,10 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     
     # 将特定LLM的必需参数从extra_config中提取出来
     if name == "gemini" and "api_key" in extra_config:
+        client_kwargs["api_key"] = extra_config.pop("api_key")
+    elif name in ["anthropic"] and "api_key" in extra_config:
+        client_kwargs["api_key"] = extra_config.pop("api_key")
+    elif name in ["gpt", "openai"] and "api_key" in extra_config:
         client_kwargs["api_key"] = extra_config.pop("api_key")
     elif name == "local_llm":
         # Local LLM specific parameters

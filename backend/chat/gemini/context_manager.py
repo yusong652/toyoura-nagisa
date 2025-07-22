@@ -13,10 +13,11 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
 from backend.chat.models import BaseMessage, ToolResultMessage, message_factory
+from backend.chat.base_context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 
 
-class GeminiContextManager:
+class GeminiContextManager(BaseContextManager):
     """
     管理 Gemini API 工具调用过程中的双轨制上下文
     
@@ -34,9 +35,9 @@ class GeminiContextManager:
     
     def __init__(self):
         """初始化上下文管理器"""
+        super().__init__()
         self.working_contents: List[Dict[str, Any]] = []  # 原始Gemini API格式上下文
         self.storage_messages: List[BaseMessage] = []     # 标准化存储格式消息
-        self._tool_call_sequence: List[Dict[str, Any]] = []  # 工具调用序列追踪
         
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -52,7 +53,11 @@ class GeminiContextManager:
         self.storage_messages = messages.copy()
         
         # 清空工具调用序列
-        self._tool_call_sequence = []
+        self._tool_call_sequence.clear()
+    
+    def add_response(self, response) -> None:
+        """添加LLM API响应到上下文中 - 基类接口实现"""
+        self.add_raw_response(response)
     
     def add_raw_response(self, response) -> Dict[str, Any]:
         """
@@ -202,6 +207,10 @@ class GeminiContextManager:
         """
         return self.storage_messages
     
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+        """添加工具执行结果到上下文中 - 基类接口实现"""
+        self.add_tool_response(tool_name, tool_call_id, result)
+    
     def finalize_and_get_storage_message(self, final_response, keyword: Optional[str] = None) -> BaseMessage:
         """
         完成工具调用序列，创建最终的存储消息
@@ -254,7 +263,7 @@ class GeminiContextManager:
     
     def clear_tool_call_sequence(self) -> None:
         """清空工具调用序列"""
-        self._tool_call_sequence = []
+        self._tool_call_sequence.clear()
     
     def _record_tool_calls_from_response(self, response) -> None:
         """
