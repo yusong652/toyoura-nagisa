@@ -1,27 +1,27 @@
+import logging
 from typing import Dict, Optional, Type, Any, List
 from backend.chat.base import LLMClientBase
 from backend.chat.gemini import GeminiClient
-from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config, get_system_prompt
+from backend.chat.local.local_llm_client import LocalLLMClient
+from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config
+
+logger = logging.getLogger(__name__)
 
 # ========== SOTA架构 - Gemini专用工厂 ==========
 # 移除过时的LLM客户端，专注于SOTA Gemini实现
 
-# 导入本地客户端
-from backend.chat.local import VLLMClient, OllamaClient
-from backend.chat.local.distributed_client import create_distributed_vllm, create_distributed_ollama
 
 # 注册的 LLM 客户端类型 - 支持 Gemini 和本地模型
 _clients: Dict[str, Type[LLMClientBase]] = {
     "gemini": GeminiClient,
-    "vllm": VLLMClient,
-    "ollama": OllamaClient,
+    "local_llm": LocalLLMClient,
 }
 
 # 缓存的客户端实例
 _instances: Dict[str, LLMClientBase] = {}
 
 # 支持的客户端列表 - 用于错误提示
-SUPPORTED_CLIENTS = ["gemini", "vllm", "ollama", "distributed-vllm", "distributed-ollama"]
+SUPPORTED_CLIENTS = ["gemini", "local_llm", "ollama", "distributed-vllm", "distributed-ollama"]
 
 def register_client(name: str, client_class: Type[LLMClientBase]) -> None:
     """
@@ -44,12 +44,12 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     
     This factory supports both cloud and local model clients:
     - gemini: Google Gemini client with enhanced tool calling
-    - vllm: High-performance local inference with vLLM
+    - local_llm: Local LLM inference server
     - ollama: Lightweight local models with Ollama
     
     Args:
         name: Name of the LLM client to get. If None, uses the configured type.
-              Supported: "gemini", "vllm", "ollama"
+              Supported: "gemini", "local_llm", "ollama"
         app: Optional FastAPI app instance for context injection.
         **kwargs: Arguments to pass to the client constructor
         
@@ -60,15 +60,11 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
         ValueError: If the requested LLM client is not supported
         
     Note:
-        Local clients (vllm, ollama) provide offline inference capabilities
+        Local clients (local_llm, ollama) provide offline inference capabilities
         with automatic service management and health monitoring.
     """
     # 如果没有指定名称，使用配置中的类型
     name = name or get_current_llm_type()
-    
-    # 处理分布式客户端
-    if name.startswith("distributed-"):
-        return _create_distributed_client(name, **kwargs)
     
     # 验证客户端是否支持
     if name not in _clients:
@@ -78,7 +74,7 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
             f"📋 Supported clients: {supported_list}\n"
             f"🚀 Available options:\n"
             f"   - gemini: Cloud-based Gemini API with tool calling\n"
-            f"   - vllm: High-performance local inference server\n"
+            f"   - local_llm: Local LLM inference server\n"
             f"   - ollama: Lightweight local model serving\n"
             f"   - distributed-vllm: Distributed vLLM on HPC cluster\n"
             f"   - distributed-ollama: Distributed Ollama on HPC cluster\n"
@@ -108,12 +104,16 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     # 将特定LLM的必需参数从extra_config中提取出来
     if name == "gemini" and "api_key" in extra_config:
         client_kwargs["api_key"] = extra_config.pop("api_key")
-    elif name == "vllm":
-        # vLLM specific parameters
-        if "model_path" in extra_config:
-            client_kwargs["model_path"] = extra_config.pop("model_path")
-        if "base_url" in extra_config:
-            client_kwargs["base_url"] = extra_config.pop("base_url")
+    elif name == "local_llm":
+        # Local LLM specific parameters
+        if "server_url" in extra_config:
+            client_kwargs["server_url"] = extra_config.pop("server_url")
+        if "api_key" in extra_config:
+            client_kwargs["api_key"] = extra_config.pop("api_key")
+        if "model" in extra_config:
+            client_kwargs["model"] = extra_config.pop("model")
+        if "timeout" in extra_config:
+            client_kwargs["timeout"] = extra_config.pop("timeout")
     elif name == "ollama":
         # Ollama specific parameters
         if "model_name" in extra_config:
@@ -163,69 +163,3 @@ def is_client_supported(name: str) -> bool:
         True if supported, False otherwise
     """
     return name in _clients or name.startswith("distributed-")
-
-def _create_distributed_client(name: str, **kwargs) -> LLMClientBase:
-    """
-    Create distributed client instance.
-    
-    Args:
-        name: Distributed client name (e.g., "distributed-vllm")
-        **kwargs: Configuration parameters
-        
-    Returns:
-        Distributed client instance
-    """
-    # Import here to avoid circular dependency
-    from backend.chat.local.config import get_hpc_config
-    
-    # Get HPC configuration from config file
-    hpc_config = get_hpc_config()
-    
-    # Override with any provided kwargs
-    hpc_config.update(kwargs.get("hpc_config", {}))
-    hpc_config.update({k: v for k, v in kwargs.items() if k.startswith("hpc_") or k in ["host", "username", "ssh_key_path"]})
-    
-    # Map parameter names for compatibility
-    hpc_host = hpc_config.get("host") or kwargs.get("hpc_host")
-    ssh_user = hpc_config.get("username") or kwargs.get("ssh_user") or kwargs.get("username")
-    ssh_key_path = hpc_config.get("ssh_key_path") or kwargs.get("ssh_key_path")
-    
-    # Check if HPC is enabled and configured
-    if not hpc_config.get("enabled", False):
-        logger.warning("HPC is not enabled in configuration. Set enabled=True in HPC config.")
-    
-    # Validate required parameters
-    if not hpc_host or not ssh_user:
-        raise ValueError(
-            f"Missing required HPC configuration:\n"
-            f"  - HPC host: {hpc_host or 'NOT SET'}\n"
-            f"  - SSH user: {ssh_user or 'NOT SET'}\n"
-            f"Please configure these in backend/chat/local/config.py or pass as parameters."
-        )
-    
-    if name == "distributed-vllm":
-        model_path = hpc_config.get("models", {}).get("vllm") or kwargs.get("model_path", "/shared/models/llama-7b")
-        return create_distributed_vllm(
-            hpc_host=hpc_host,
-            ssh_user=ssh_user,
-            model_path=model_path,
-            ssh_key_path=ssh_key_path,
-            session_hours=hpc_config.get("session_duration_hours", 8),
-            base_port=hpc_config.get("tunnel_ports", {}).get("vllm", 8000),
-            local_base_port=hpc_config.get("tunnel_ports", {}).get("local_base", 8000),
-            **{k: v for k, v in kwargs.items() if k not in ["hpc_host", "ssh_user", "ssh_key_path", "model_path"]}
-        )
-    elif name == "distributed-ollama":
-        model_name = hpc_config.get("models", {}).get("ollama") or kwargs.get("model_name", "llama3.2:3b")
-        return create_distributed_ollama(
-            hpc_host=hpc_host,
-            ssh_user=ssh_user,
-            model_name=model_name,
-            ssh_key_path=ssh_key_path,
-            session_hours=hpc_config.get("session_duration_hours", 8),
-            base_port=hpc_config.get("tunnel_ports", {}).get("ollama", 11434),
-            local_base_port=hpc_config.get("tunnel_ports", {}).get("local_base", 8000),
-            **{k: v for k, v in kwargs.items() if k not in ["hpc_host", "ssh_user", "ssh_key_path", "model_name"]}
-        )
-    else:
-        raise ValueError(f"Unknown distributed client: {name}") 

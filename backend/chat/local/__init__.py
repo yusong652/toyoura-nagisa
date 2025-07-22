@@ -2,18 +2,16 @@
 Local Model Framework for aiNagisa
 
 This module provides local model inference capabilities including:
-- vLLM high-performance inference server
-- Ollama lightweight model serving
-- HPC remote GPU acceleration
-- Mixed local/remote routing
+- vLLM client via HTTPS
+- Simple configuration and deployment
 """
 
-from .base_local_client import BaseLocalClient
-from .vllm_client import VLLMClient
-from .ollama_client import OllamaClient
+from .local_llm_client import LocalLLMClient, create_local_llm_client, create_local_llm_client_from_config, get_local_llm_config_dict
 
 __all__ = [
-    "BaseLocalClient",
-    "VLLMClient", 
-    "OllamaClient"
+    "LocalLLMClient",
+    "create_local_llm_client",
+    "create_local_llm_client_from_config",
+    "get_local_llm_config_dict"
 ]
+

@@ -304,13 +304,14 @@ async def handle_llm_response(
 
     try:
         # ========== PHASE 2: 客户端验证 ==========
-        if type(llm_client).__name__ != 'GeminiClient':
-            error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Only GeminiClient supported."
+        supported_clients = ['GeminiClient', 'LocalLLMClient']
+        if type(llm_client).__name__ not in supported_clients:
+            error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
         
         if not hasattr(llm_client, 'get_response'):
-            error_msg = "GeminiClient missing get_response method"
+            error_msg = f"{type(llm_client).__name__} missing get_response method"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
             return
 
@@ -483,6 +484,8 @@ async def chat_stream_endpoint(request: Request):
     user_msg = process_user_message(parsed_data, session_id, history_msgs)
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
+    
+    
     try:
         async def generate():
             # Generate unique request ID for debugging
