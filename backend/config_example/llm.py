@@ -8,8 +8,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ChatGPTConfig(BaseSettings):
-    """ChatGPT配置"""
+class GPTConfig(BaseSettings):
+    """GPT配置"""
     
     # 必需的敏感信息 - 字段名直接匹配环境变量OPENAI_API_KEY
     openai_api_key: str = Field(description="OpenAI API密钥")
@@ -86,7 +86,7 @@ class LLMSettings(BaseSettings):
     """LLM总配置"""
     
     # 当前使用的LLM类型
-    type: Literal["chatgpt", "gemini", "anthropic"] = Field(default="gemini", description="当前使用的LLM类型")
+    type: Literal["gpt", "gemini", "anthropic"] = Field(default="gemini", description="当前使用的LLM类型")
     debug: bool = Field(default=False, description="是否开启调试模式")
     recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context (recent 消息条数)")
     # 各个LLM的配置 - 使用动态实例化以支持fail fast
@@ -98,9 +98,9 @@ class LLMSettings(BaseSettings):
         extra='ignore'
     )
     
-    def get_chatgpt_config(self) -> ChatGPTConfig:
-        """获取ChatGPT配置"""
-        return ChatGPTConfig()
+    def get_gpt_config(self) -> GPTConfig:
+        """获取GPT配置"""
+        return GPTConfig()
     
     def get_gemini_config(self) -> GeminiConfig:
         """获取Gemini配置"""
@@ -112,8 +112,8 @@ class LLMSettings(BaseSettings):
     
     def get_current_llm_config(self):
         """获取当前LLM配置"""
-        if self.type == "chatgpt":
-            return self.get_chatgpt_config()
+        if self.type == "gpt":
+            return self.get_gpt_config()
         elif self.type == "gemini":
             return self.get_gemini_config()
         elif self.type == "anthropic":

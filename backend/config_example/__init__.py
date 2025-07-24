@@ -154,21 +154,21 @@ def get_llm_config() -> Dict[str, Any]:
         "type": settings.type,
         "debug": settings.debug,
         "recent_messages_length": getattr(settings, "recent_messages_length", 20),
-        "chatgpt": {},
+        "gpt": {},
         "gemini": {},
         "anthropic": {}
     }
     
     # 只有当前使用的LLM才包含完整配置，并且会触发验证
-    if settings.type == "chatgpt":
-        chatgpt_config = settings.get_chatgpt_config()  # 这里会触发fail fast验证
-        config["chatgpt"] = {
-            "api_key": chatgpt_config.openai_api_key,
-            "model": chatgpt_config.model,
-            "temperature": chatgpt_config.temperature,
-            "top_p": chatgpt_config.top_p,
-            "top_k": chatgpt_config.top_k,
-            "max_tokens": chatgpt_config.max_tokens,
+    if settings.type == "gpt":
+        gpt_config = settings.get_gpt_config()  # 这里会触发fail fast验证
+        config["gpt"] = {
+            "api_key": gpt_config.openai_api_key,
+            "model": gpt_config.model,
+            "temperature": gpt_config.temperature,
+            "top_p": gpt_config.top_p,
+            "top_k": gpt_config.top_k,
+            "max_tokens": gpt_config.max_tokens,
         }
     elif settings.type == "gemini":
         gemini_config = settings.get_gemini_config()  # 这里会触发fail fast验证

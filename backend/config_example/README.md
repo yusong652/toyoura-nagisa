@@ -46,7 +46,7 @@ python -c "from config import get_llm_config; print('✅ 配置验证成功')"
 ## 📁 文件说明
 
 - `__init__.py` - 主配置入口，提供向后兼容的接口
-- `llm.py` - ChatGPT、Gemini、Anthropic 配置
+- `llm.py` - GPT、Gemini、Anthropic 配置
 - `tts.py` - Fish Audio、GPT-SoVITS 配置  
 - `email.py` - 邮件、认证、搜索配置
 - `text_to_image.py` - Models Lab、Stable Diffusion 配置
