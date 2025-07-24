@@ -8,9 +8,9 @@ from backend.nagisa_mcp.utils.tool_result import ToolResult
 from .web_search_factory import WebSearchToolFactory
 from backend.config import get_llm_specific_config
 
-__all__ = ["google_web_search", "register_google_web_search_tool"]
+__all__ = ["web_search", "register_web_search_tool"]
 
-def google_web_search(
+def web_search(
     query: str = Field(..., description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')"),
     max_uses: int = Field(5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"),
     context: Context = None
@@ -110,10 +110,10 @@ def google_web_search(
             data={"query": query, "max_uses": max_uses}
         ).model_dump()
 
-def register_google_web_search_tool(mcp: FastMCP):
-    """Register the Google Web Search tool with MCP server."""
+def register_web_search_tool(mcp: FastMCP):
+    """Register the Web Search tool with MCP server."""
     common = dict(
-        tags={"builtin", "web_search", "google", "search"},
-        annotations={"category": "builtin", "tags": ["builtin", "web_search", "google", "search"]}
+        tags={"builtin", "web_search", "search"},
+        annotations={"category": "builtin", "tags": ["builtin", "web_search", "search"]}
     )
-    mcp.tool(**common)(google_web_search)
+    mcp.tool(**common)(web_search)

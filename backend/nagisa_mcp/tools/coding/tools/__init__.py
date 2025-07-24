@@ -23,7 +23,7 @@ from .shell_command import run_shell_command, register_shell_command_tool
 from .glob import glob, register_glob_tool
 from .grep import grep, register_grep_tool
 from .replace import replace, register_replace_tool
-from ...builtin.google_web_search import google_web_search, register_google_web_search_tool
+from ...builtin.web_search import web_search, register_web_search_tool
 from . import constants
 
 __all__ = [
@@ -39,7 +39,7 @@ __all__ = [
     "glob",
     "grep",
     "replace",
-    "google_web_search",
+    "web_search",
 ]
 
 def register_coding_tools(mcp):
@@ -60,4 +60,4 @@ def register_coding_tools(mcp):
     register_glob_tool(mcp)
     register_grep_tool(mcp)
     register_replace_tool(mcp)
-    register_google_web_search_tool(mcp) 
+    register_web_search_tool(mcp) 
