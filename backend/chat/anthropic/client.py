@@ -12,7 +12,7 @@ from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.config import get_system_prompt
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
-from .config import AnthropicClientConfig, get_anthropic_config
+from .config import AnthropicClientConfig, get_anthropic_client_config
 from .constants import *
 from .message_formatter import MessageFormatter
 from .content_generators import TitleGenerator, ImagePromptGenerator, AnalysisGenerator
@@ -32,17 +32,38 @@ class AnthropicClient(LLMClientBase):
         初始化 Anthropic 客户端。
         Args:
             api_key: Anthropic API key。
-            mcp_client: 可选，用于 in-process tool calls via app.state.mcp
+            **kwargs: Additional configuration parameters
         """
         super().__init__(**kwargs)
         self.api_key = api_key
-        self.base_url = "https://api.anthropic.com/v1"
-        self.headers = {
-            "Content-Type": "application/json",
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01"
-        }
-        self.anthropic_client = anthropic.Anthropic(api_key=self.api_key)
+        
+        # Initialize Anthropic-specific configuration
+        config_overrides = {}
+        
+        # 从extra_config中提取相关配置进行覆盖
+        if 'model' in self.extra_config:
+            config_overrides['model_settings'] = {'model': self.extra_config['model']}
+        if 'temperature' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['temperature'] = self.extra_config['temperature']
+        if 'max_tokens' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['max_tokens'] = self.extra_config['max_tokens']
+        if 'thinking_budget_tokens' in self.extra_config:
+            if 'model_settings' not in config_overrides:
+                config_overrides['model_settings'] = {}
+            config_overrides['model_settings']['thinking_budget_tokens'] = self.extra_config['thinking_budget_tokens']
+        if 'debug' in self.extra_config:
+            config_overrides['debug'] = self.extra_config['debug']
+        
+        self.anthropic_config = get_anthropic_client_config(**config_overrides)
+        
+        print(f"Enhanced Anthropic Client initialized with model: {self.anthropic_config.model_settings.model}")
+        
+        # 初始化API客户端 - 使用统一的client属性名
+        self.client = anthropic.Anthropic(api_key=self.api_key)
        
         # 初始化统一工具管理器
         self.tool_manager = AnthropicToolManager(
@@ -120,7 +141,7 @@ class AnthropicClient(LLMClientBase):
         """
         
         execution_id = str(uuid.uuid4())[:8]
-        debug = self.extra_config.get('debug', False)
+        debug = self.anthropic_config.debug
         
         # 初始化执行元数据
         metadata = {
@@ -162,34 +183,24 @@ class AnthropicClient(LLMClientBase):
                 tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
                 tools_enabled = bool(tools)
                 system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-                model = self.extra_config.get("model", "claude-3-5-sonnet-20241022")
                 
-                # 构建API参数
-                kwargs_api = dict(
-                    model=model,
-                    max_tokens=self.extra_config.get("max_tokens", 4096),
+                # 使用配置系统构建API参数
+                kwargs_api = self.anthropic_config.get_api_call_kwargs(
+                    system_prompt=system_prompt,
                     messages=anthropic_messages,
-                    system=system_prompt,
-                    temperature=self.extra_config.get("temperature", 0.7),
+                    tools=tools
                 )
-                if tools and len(tools) > 0:
-                    kwargs_api["tools"] = tools
-
-                # 检查是否为claude 3.7及以上模型，自动添加thinking参数
-                if (
-                    model.startswith("claude-3-7-") or
-                    model.startswith("claude-sonnet-4-") or
-                    model.startswith("claude-4-") or
-                    model.startswith("claude-3-opus-")
-                ):
-                    budget_tokens = self.extra_config.get("thinking_budget_tokens", 10000)
-                    kwargs_api["thinking"] = {
-                        "type": "enabled",
-                        "budget_tokens": budget_tokens
-                    }
 
                 if debug:
-                    print(f"[AnthropicClient] API call with {len(tools) if tools else 0} tools")
+                    # Log basic API call information
+                    AnthropicDebugger.log_api_call_info(
+                        tools_count=len(tools) if tools else 0,
+                        model=self.anthropic_config.model_settings.model,
+                        thinking_enabled=self.anthropic_config.model_settings.supports_thinking() and self.anthropic_config.model_settings.enable_thinking
+                    )
+                    
+                    # Print simplified debug payload (similar to Gemini client)
+                    AnthropicDebugger.print_debug_request_payload(kwargs_api)
                 
                 # 发送请求开始通知
                 yield {
@@ -200,7 +211,7 @@ class AnthropicClient(LLMClientBase):
                 
                 # 调用Anthropic API
                 metadata['api_calls'] += 1
-                response = self.anthropic_client.messages.create(**kwargs_api)
+                response = self.client.messages.create(**kwargs_api)
                 
                 # 将响应添加到上下文管理器
                 context_manager.add_response(response)
@@ -423,7 +434,7 @@ class AnthropicClient(LLMClientBase):
             title_generation_system_prompt: Optional custom system prompt for title generation
         """
         return TitleGenerator.generate_title_from_messages(
-            self.anthropic_client,
+            self.client,
             first_user_message,
             first_assistant_message,
             title_generation_system_prompt
@@ -442,8 +453,30 @@ class AnthropicClient(LLMClientBase):
             Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
         """
         return ImagePromptGenerator.generate_text_to_image_prompt(
-            self.anthropic_client,
+            self.client,
             session_id,
-            self.extra_config.get('debug', False)
+            self.anthropic_config.debug
+        )
+
+    async def perform_web_search(self, query: str, max_uses: int = 5) -> Dict[str, Any]:
+        """
+        Perform a web search using the native web search tool via Anthropic API.
+        
+        This method uses the project's unified client configuration and provides
+        comprehensive error handling and debugging support.
+        
+        Args:
+            query: The search query to find information on the web
+            max_uses: Maximum number of search tool uses
+            
+        Returns:
+            Dictionary containing search results with sources and metadata
+        """
+        from .content_generators import WebSearchGenerator
+        return WebSearchGenerator.perform_web_search(
+            self.client, 
+            query, 
+            self.anthropic_config.debug,
+            max_uses
         )
 

@@ -1,27 +1,29 @@
-"""Google Web Search tool using Gemini SDK."""
+"""Universal Web Search tool supporting multiple LLM providers."""
 
 from typing import Dict, Any
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 from backend.nagisa_mcp.utils.tool_result import ToolResult
-from backend.chat.gemini.content_generators import WebSearchGenerator
+from .web_search_factory import WebSearchToolFactory
 from backend.config import get_llm_specific_config
 
 __all__ = ["google_web_search", "register_google_web_search_tool"]
 
 def google_web_search(
     query: str = Field(..., description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')"),
+    max_uses: int = Field(5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"),
     context: Context = None
 ) -> Dict[str, Any]:
     """
-    Search the web for current information using Google Search.
+    Search the web for current information using appropriate LLM provider.
     
-    Retrieves up-to-date information from the web with source citations
-    and comprehensive response text for the given query.
+    Automatically detects the LLM client type (Gemini or Anthropic) and uses
+    the appropriate web search implementation. Retrieves up-to-date information
+    from the web with source citations and comprehensive response text.
     """
     try:
-        # Get Gemini client from FastAPI app state via MCP context
+        # Get LLM client from FastAPI app state via MCP context
         fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
         llm_client = None
         if fastapi_app is not None and hasattr(fastapi_app.state, "llm_client"):
@@ -31,19 +33,27 @@ def google_web_search(
             return ToolResult(
                 status="error",
                 message="LLM client not available",
-                error="Cannot access Gemini client from application context",
-                data={"query": query}
+                error="Cannot access LLM client from application context",
+                data={"query": query, "max_uses": max_uses}
             ).model_dump()
         
-        # Get debug setting from configuration
-        gemini_config = get_llm_specific_config("gemini")
-        debug = gemini_config.get("debug", False)
+        # Auto-detect LLM type
+        try:
+            llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
+        except ValueError as e:
+            return ToolResult(
+                status="error",
+                message=f"Unable to detect LLM type: {str(e)}",
+                error=str(e),
+                data={"query": query, "max_uses": max_uses}
+            ).model_dump()
         
-        # Use WebSearchGenerator to perform search with existing client
-        search_result = WebSearchGenerator.perform_web_search(
-            client=llm_client.client,  # Use the raw Gemini client
+        # Use WebSearchToolFactory to perform search with detected client type
+        search_result = WebSearchToolFactory.perform_web_search(
+            llm_client=llm_client,
+            llm_type=llm_type,
             query=query,
-            debug=debug
+            max_uses=max_uses
         )
         
         # Check if search was successful
@@ -73,11 +83,15 @@ def google_web_search(
             },
             "summary": {
                 "operation_type": "web_search",
+                "llm_type": llm_type,
+                "max_uses": max_uses,
                 "success": True
             }
         }
         
-        message = f"Found {len(sources)} sources for query: '{query}'"
+        # Get LLM type for message
+        llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
+        message = f"Found {len(sources)} sources for query: '{query}' using {llm_type.title()}"
         if response_text:
             message += f" (Response: {len(response_text)} chars)"
         
@@ -93,7 +107,7 @@ def google_web_search(
             status="error",
             message=f"Web search error: {str(e)}",
             error=str(e),
-            data={"query": query}
+            data={"query": query, "max_uses": max_uses}
         ).model_dump()
 
 def register_google_web_search_tool(mcp: FastMCP):

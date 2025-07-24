@@ -44,6 +44,7 @@ class GeminiConfig(BaseSettings):
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K采样")
     max_output_tokens: int = Field(default=8192, alias="maxOutputTokens", ge=1, description="最大输出token数")
+    web_search_max_uses: int = Field(default=5, ge=1, le=20, description="Web搜索工具最大使用次数(注意:Gemini忽略此参数)")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -68,6 +69,7 @@ class AnthropicConfig(BaseSettings):
     max_tokens: int = Field(default=4096, ge=1, description="最大输出token数")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K采样")
+    web_search_max_uses: int = Field(default=5, ge=1, le=20, description="Web搜索工具最大使用次数")
     
     model_config = SettingsConfigDict(
         env_file='.env',

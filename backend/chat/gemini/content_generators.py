@@ -10,7 +10,7 @@ from typing import Optional, Dict, List, Any
 from google.genai import types
 from backend.chat.models import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
-from backend.config import get_text_to_image_config
+from backend.config import get_text_to_image_config, get_llm_specific_config
 from backend.chat.utils import get_latest_n_messages
 
 
@@ -83,8 +83,12 @@ class TitleGenerator:
                 mapped_role = MessageFormatter.map_role(msg.role)
                 contents.append({"role": mapped_role, "parts": parts})
             
+            # Get model from configuration
+            gemini_config = get_llm_specific_config("gemini")
+            model = gemini_config.get("model", "gemini-2.5-flash")
+            
             response = client.models.generate_content(
-                model="gemini-2.5-flash-preview-05-20",
+                model=model,
                 contents=contents,
                 config=title_config
             )
@@ -126,7 +130,8 @@ class WebSearchGenerator:
     def perform_web_search(
         client,  # Gemini client instance
         query: str,
-        debug: bool = False
+        debug: bool = False,
+        max_uses: int = 5
     ) -> Dict[str, Any]:
         """
         Perform a web search using Google Search via the Gemini API.
@@ -161,12 +166,17 @@ class WebSearchGenerator:
                 "Focus on delivering factual, helpful information that directly addresses the user's query."
             )
             
+            # Note: Gemini's google_search tool doesn't support max_uses parameter
+            # The max_uses parameter is accepted for API compatibility but ignored
             search_config = types.GenerateContentConfig(
                 system_instruction=web_search_system_prompt,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
                 temperature=0.1,
                 max_output_tokens=4096
             )
+            
+            if debug and max_uses != 5:
+                print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Create user message with search query
             user_message = UserMessage(role="user", content=query)
@@ -179,9 +189,13 @@ class WebSearchGenerator:
                 import pprint
                 pprint.pprint(contents)
             
+            # Get model from configuration
+            gemini_config = get_llm_specific_config("gemini")
+            model = gemini_config.get("model", "gemini-2.5-flash")
+            
             # Call the model with the query
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=model,
                 contents=contents,
                 config=search_config
             )

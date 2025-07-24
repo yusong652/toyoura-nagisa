@@ -12,7 +12,9 @@ import anthropic
 from backend.chat.models import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
 from backend.config import get_text_to_image_config
+from .config import get_anthropic_client_config
 from backend.chat.utils import get_latest_n_messages
+from .debug import AnthropicDebugger
 
 
 class TitleGenerator:
@@ -59,13 +61,22 @@ class TitleGenerator:
             # 使用MessageFormatter进行消息格式转换
             formatted_messages = MessageFormatter.format_messages_for_anthropic(messages)
             
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                temperature=1.0,
-                system=system_prompt,
+            # Use the new Anthropic configuration system
+            anthropic_config = get_anthropic_client_config()
+            
+            # Build API call parameters using the configuration system
+            api_kwargs = anthropic_config.get_api_call_kwargs(
+                system_prompt=system_prompt,
                 messages=formatted_messages
             )
+            
+            # Override parameters specific to title generation
+            api_kwargs.update({
+                "max_tokens": 1024,
+                "temperature": 1.0
+            })
+            
+            response = client.messages.create(**api_kwargs)
             
             if response.content and len(response.content) > 0:
                 title_response_text = response.content[0].text
@@ -93,37 +104,126 @@ class TitleGenerator:
 
 class WebSearchGenerator:
     """
-    Handles web search using external search APIs.
-    
-    Note: Anthropic Claude doesn't have built-in web search like Gemini,
-    so this would typically integrate with external search APIs or tools.
-    For now, this is a placeholder that could be extended with MCP tools.
+    Handles web search using Anthropic Claude API with web_search_20250305 tool.
+
+    Performs web searches using the native web search capability via the Anthropic API.
+    Returns structured results with proper error handling and debugging support.
     """
 
     @staticmethod
     def perform_web_search(
         client: anthropic.Anthropic,
         query: str,
-        debug: bool = False
+        debug: bool = False,
+        max_uses: int = 5
     ) -> Dict[str, Any]:
         """
-        Perform a web search (placeholder for external tool integration).
+        Perform a web search using the native web search tool via Anthropic API.
+        
+        Uses the web_search_20250305 tool. The model will automatically
+        decide whether to perform a search based on the query requirements.
         
         Args:
             client: Anthropic Claude client instance
-            query: The search query
+            query: The search query to find information on the web
             debug: Enable debug output
+            max_uses: Maximum number of search tool uses (default: 5)
             
         Returns:
             Dictionary containing search results or error information
         """
-        # This would integrate with MCP tools or external search APIs
-        # For now, return a placeholder response
-        return {
-            "query": query,
-            "error": "Web search not implemented yet - requires MCP tool integration",
-            "note": "This would integrate with external search tools via MCP"
-        }
+        try:
+            # Create user message with search query
+            user_message = UserMessage(role="user", content=query)
+            
+            # Format message using MessageFormatter
+            formatted_messages = MessageFormatter.format_messages_for_anthropic([user_message])
+            
+            # Configure web search system prompt
+            web_search_system_prompt = (
+                "You are a professional web search assistant. Your task is to search for and synthesize "
+                "information from the web to provide comprehensive, accurate, and up-to-date answers. "
+                "When searching:\n"
+                "1. Use the web search tool to find relevant and current information\n"
+                "2. Analyze multiple sources for accuracy and reliability\n"
+                "3. Synthesize information into a coherent, well-structured response\n"
+                "4. Prioritize recent and authoritative sources\n"
+                "5. Clearly indicate when information is uncertain or requires verification\n"
+                "6. Provide context and explain complex topics clearly\n"
+                "Focus on delivering factual, helpful information that directly addresses the user's query."
+            )
+            
+            # Use the new Anthropic configuration system
+            anthropic_config = get_anthropic_client_config()
+            
+            # Build API call parameters using the configuration system
+            api_kwargs = anthropic_config.get_api_call_kwargs(
+                system_prompt=web_search_system_prompt,
+                messages=formatted_messages,
+                tools=[{
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": max_uses
+                }]
+            )
+            
+            # Override some parameters specific to web search
+            api_kwargs.update({
+                "max_tokens": 4096,
+                "temperature": 0.1
+            })
+            
+            if debug:
+                # 使用统一的调试工具打印详细的API payload
+                AnthropicDebugger.log_api_payload(api_kwargs, component="WebSearch", detailed=True)
+            
+            # Call the API with web search tool
+            response = client.messages.create(**api_kwargs)
+            
+            if debug:
+                # 使用统一的调试工具打印API响应信息
+                AnthropicDebugger.log_api_response(response)
+            
+            # Extract response text and tool usage information
+            response_text = ""
+            tool_calls = []
+            sources = []
+            
+            if response.content:
+                for content_block in response.content:
+                    if hasattr(content_block, 'text'):
+                        response_text += content_block.text
+                    elif hasattr(content_block, 'type') and content_block.type == 'tool_use':
+                        # Track tool calls for debugging
+                        tool_calls.append({
+                            'tool_name': getattr(content_block, 'name', 'unknown'),
+                            'tool_id': getattr(content_block, 'id', 'unknown'),
+                            'input': getattr(content_block, 'input', {})
+                        })
+                        
+            
+            # Note: Unlike Gemini, Anthropic's web_search_20250305 tool doesn't expose
+            # individual source URLs in the response structure. The search results
+            # are synthesized into the response text directly.
+            
+            # Build structured result
+            result = {
+                "query": query,
+                "response_text": response_text,
+                "sources": sources,  # Empty for Anthropic as sources aren't exposed
+                "total_sources": len(sources),
+                "tool_calls": tool_calls,
+                "note": "Anthropic web search synthesizes results directly into response text"
+            }
+            
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"An error occurred during web search: {str(e)}"
+            if debug:
+                print(f"[WebSearch] Error: {error_msg}")
+            return {"error": error_msg, "query": query}
 
 
 class ImagePromptGenerator:
@@ -329,12 +429,25 @@ class AnalysisGenerator:
                 UserMessage(role="user", content=conversation_text)
             ])
             
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
-                temperature=0.1,  # Lower temperature for consistent analysis
+            # Use the new Anthropic configuration system
+            anthropic_config = get_anthropic_client_config()
+            
+            # Build API call parameters using the configuration system
+            api_kwargs = anthropic_config.get_api_call_kwargs(
+                system_prompt="",  # No system prompt for analysis
                 messages=analysis_messages
             )
+            
+            # Override parameters specific to sentiment analysis
+            api_kwargs.update({
+                "max_tokens": 1024,
+                "temperature": 0.1  # Lower temperature for consistent analysis
+            })
+            
+            # Remove system prompt as we don't need it for this analysis
+            api_kwargs.pop("system", None)
+            
+            response = client.messages.create(**api_kwargs)
             
             if response.content and len(response.content) > 0:
                 analysis_text = response.content[0].text
