@@ -36,27 +36,27 @@ class AppSettings(BaseSettings):
     
     def get_llm_settings(self) -> LLMSettings:
         """获取LLM配置"""
-        return get_llm_settings()
+        return LLMSettings()
     
     def get_tts_settings(self) -> TTSSettings:
         """获取TTS配置"""
-        return get_tts_settings()
+        return TTSSettings()
     
     def get_email_config(self) -> EmailConfig:
         """获取邮件配置"""
-        return get_email_config()
+        return EmailConfig()
     
     def get_auth_config(self) -> AuthConfig:
         """获取认证配置"""
-        return get_auth_config()
+        return AuthConfig()
     
     def get_search_config(self) -> SearchConfig:
         """获取搜索配置"""
-        return get_search_config()
+        return SearchConfig()
     
     def get_text_to_image_settings(self) -> TextToImageSettings:
         """获取文本转图像配置"""
-        return get_text_to_image_settings()
+        return TextToImageSettings()
 
 
 # 全局配置实例 - 每次重新创建以确保最新配置
@@ -179,6 +179,8 @@ def get_llm_config() -> Dict[str, Any]:
             "top_p": gemini_config.top_p,
             "top_k": gemini_config.top_k,
             "maxOutputTokens": gemini_config.max_output_tokens,
+            "web_search_max_uses": gemini_config.web_search_max_uses,
+            "debug": settings.debug,
         }
     elif settings.type == "anthropic":
         anthropic_config = settings.get_anthropic_config()  # 这里会触发fail fast验证
@@ -189,6 +191,8 @@ def get_llm_config() -> Dict[str, Any]:
             "max_tokens": anthropic_config.max_tokens,
             "top_p": anthropic_config.top_p,
             "top_k": anthropic_config.top_k,
+            "web_search_max_uses": anthropic_config.web_search_max_uses,
+            "debug": settings.debug,
         }
     
     return config
@@ -202,8 +206,52 @@ def get_current_llm_type() -> str:
 def get_llm_specific_config(llm_type: str = None) -> Dict[str, Any]:
     """获取特定 LLM 的配置"""
     llm_type = llm_type or get_current_llm_type()
-    llm_config = get_llm_config()
-    return llm_config.get(llm_type, {})
+    settings = get_app_settings().get_llm_settings()
+    
+    # 根据LLM类型获取特定配置
+    if llm_type in ["gpt", "openai"]:
+        config = settings.get_gpt_config()
+        return {
+            "api_key": config.openai_api_key,
+            "model": config.model,
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "top_k": config.top_k,
+            "max_tokens": config.max_tokens,
+        }
+    elif llm_type == "gemini":
+        config = settings.get_gemini_config()
+        return {
+            "api_key": config.google_api_key,
+            "model": config.model,
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "top_k": config.top_k,
+            "maxOutputTokens": config.max_output_tokens,
+        }
+    elif llm_type == "anthropic":
+        config = settings.get_anthropic_config()
+        return {
+            "api_key": config.anthropic_api_key,
+            "model": config.model,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "top_p": config.top_p,
+            "top_k": config.top_k,
+        }
+    elif llm_type == "local_llm":
+        config = settings.get_local_llm_config()
+        return {
+            "server_url": config.server_url,
+            "api_key": config.api_key,
+            "model": config.model,
+            "timeout": config.timeout,
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "max_tokens": config.max_tokens,
+        }
+    else:
+        return {}
 
 
 def get_tts_config() -> Dict[str, Any]:
@@ -262,6 +310,7 @@ def get_auth_config() -> Dict[str, Any]:
     return {
         "client_id": config.client_id,
         "client_secret": config.client_secret,
+        "google_maps_api_key": config.google_maps_api_key,
     }
 
 
