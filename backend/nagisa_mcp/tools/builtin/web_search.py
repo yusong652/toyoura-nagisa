@@ -113,7 +113,7 @@ def web_search(
 def register_web_search_tool(mcp: FastMCP):
     """Register the Web Search tool with MCP server."""
     common = dict(
-        tags={"builtin", "web_search", "search"},
-        annotations={"category": "builtin", "tags": ["builtin", "web_search", "search"]}
+        tags={"builtin", "web_search", "google", "search"},
+        annotations={"category": "builtin", "tags": ["builtin", "web_search", "google", "search"]}
     )
     mcp.tool(**common)(web_search)
