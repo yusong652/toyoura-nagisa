@@ -2,23 +2,48 @@
 Location Tool Module - Geolocation services for position awareness
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastmcp import FastMCP
 import asyncio
 import requests
+import time
+from threading import RLock
 from fastmcp.server.context import Context
 
-from backend.nagisa_mcp.location_manager import get_location_manager, LocationData
+from backend.nagisa_mcp.location_manager import LocationData
 from backend.nagisa_mcp.utils.tool_result import ToolResult
 from backend.nagisa_mcp.utils.location_utils import get_user_location, _reverse_geocode_full
+
+# Temporary location storage for tool calls only
+_temp_locations: Dict[str, LocationData] = {}
+_temp_lock = RLock()
+
+def store_temp_location(session_id: str, location_data: Dict[str, Any]) -> None:
+    """Store location temporarily for current tool call"""
+    with _temp_lock:
+        _temp_locations[session_id] = LocationData(
+            latitude=location_data['latitude'],
+            longitude=location_data['longitude'],
+            accuracy=location_data.get('accuracy'),
+            source="browser_geolocation",
+            session_id=session_id,
+            timestamp=int(time.time())
+        )
+
+def get_temp_location(session_id: str) -> Optional[LocationData]:
+    """Get temporarily stored location"""
+    with _temp_lock:
+        return _temp_locations.get(session_id)
+
+def clear_temp_location(session_id: str) -> None:
+    """Clear temporary location after tool call"""
+    with _temp_lock:
+        _temp_locations.pop(session_id, None)
 
 __all__ = ["register_location_tools"]
 
 def register_location_tools(mcp: FastMCP):
     """Register location-related tools with proper tags synchronization."""
-
-    # Get location manager instance
-    location_manager = get_location_manager()
 
     common_kwargs_location = dict(
         tags={"location", "geolocation", "geography", "coordinates", "position"}, 
@@ -58,48 +83,47 @@ def register_location_tools(mcp: FastMCP):
 
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
-        """Get current location information with intelligent fallback strategies.
+        """Get current location information.
         
-        Attempts to get precise browser geolocation from client, falls back to cached session or global
-        location data, and uses server IP geolocation as final fallback. Returns coordinates with city/region/country details.
+        Requests geolocation from browser client and uses server IP geolocation as fallback.
+        Returns coordinates with city/region/country details.
         """
         try:
             session_id = context.client_id
             if not session_id:
                 return _error("Session ID missing")
 
-            # Try session location first
-            loc = location_manager.get_session_location(session_id)
-            if loc:
-                return _build_location_response(loc, session_id, "cached_session")
-
             # Request fresh location from browser
             app = getattr(context.fastmcp, "app", None)
             if app and hasattr(app.state, "connection_manager"):
                 cm = app.state.connection_manager
-                asyncio.create_task(cm.send_json(session_id, {"type": "REQUEST_LOCATION"}))
-
-            # Wait for browser response
-            wait_time, elapsed = 5, 0.5
-            while elapsed < wait_time:
-                await asyncio.sleep(0.5)
-                elapsed += 0.5
-                loc = location_manager.get_session_location(session_id)
-                if loc:
-                    # Enhance with reverse geocoding if needed
-                    if loc.source == "browser_geolocation" and not loc.city:
-                        geocode_data = _reverse_geocode_full(loc.latitude, loc.longitude)
-                        loc.city = geocode_data.get("city")
-                        loc.region = geocode_data.get("region")
-                        loc.country = geocode_data.get("country")
-                    return _build_location_response(loc, session_id, "browser_geolocation")
-
-            # Fallback to global location
-            loc = location_manager.get_global_location()
-            if loc:
-                return _build_location_response(loc, session_id, "global_cache")
-
-            # Final fallback to server IP
+                await cm.send_json(session_id, {"type": "REQUEST_LOCATION"})
+                
+                # Wait for browser response
+                wait_time = 10
+                elapsed = 0
+                while elapsed < wait_time:
+                    await asyncio.sleep(0.5)
+                    elapsed += 0.5
+                    
+                    # Check for browser response in temporary storage
+                    temp_loc = get_temp_location(session_id)
+                    if temp_loc:
+                        # Enhance with reverse geocoding if needed
+                        if temp_loc.source == "browser_geolocation" and not temp_loc.city:
+                            try:
+                                geocode_data = _reverse_geocode_full(temp_loc.latitude, temp_loc.longitude)
+                                temp_loc.city = geocode_data.get("city")
+                                temp_loc.region = geocode_data.get("region")
+                                temp_loc.country = geocode_data.get("country")
+                            except Exception:
+                                pass
+                        
+                        # Clear temporary storage and return result
+                        clear_temp_location(session_id)
+                        return _build_location_response(temp_loc, session_id, "browser_geolocation")
+                
+            # Fallback to server IP geolocation
             loc = _fetch_server_location()
             if loc:
                 return _build_location_response(loc, session_id, "server_ip_fallback")
@@ -111,12 +135,8 @@ def register_location_tools(mcp: FastMCP):
 
     def _build_location_response(loc: LocationData, session_id: str, source_type: str) -> Dict[str, Any]:
         """Build standardized location response"""
-        from datetime import datetime
-        
-        timestamp = datetime.now().isoformat()
-        
         # Determine accuracy level
-        accuracy = "high" if source_type == "browser_geolocation" else "medium" if source_type in ["cached_session", "global_cache"] else "low"
+        accuracy = "high" if source_type == "browser_geolocation" else "low"
         
         llm_content = {
             "operation": {

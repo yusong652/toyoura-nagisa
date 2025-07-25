@@ -39,6 +39,51 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
 
+  // 处理位置请求的函数
+  const handleLocationRequest = useCallback(async (data: any) => {
+    console.log('收到位置请求:', data);
+    
+    try {
+      // 获取地理位置服务实例
+      const geolocationService = GeolocationService.getInstance();
+      
+      // 确保服务已初始化
+      if (!geolocationService.isServiceInitialized()) {
+        await geolocationService.initialize();
+      }
+      
+      // 获取位置信息
+      const locationData = await geolocationService.requestLocation();
+      
+      if (locationData) {
+        // 添加session_id到位置数据中
+        const locationDataWithSession = {
+          ...locationData,
+          session_id: currentSessionId
+        };
+        
+        // 发送位置信息到后端
+        const response = await fetch('/api/location/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(locationDataWithSession),
+        });
+        
+        if (response.ok) {
+          console.log('位置信息已成功发送到后端，session_id:', currentSessionId);
+        } else {
+          console.warn('位置信息发送失败');
+        }
+      } else {
+        console.warn('无法获取位置信息');
+      }
+    } catch (error) {
+      console.error('处理位置请求时出错:', error);
+    }
+  }, [currentSessionId]);
+
   // --- WebSocket connection for server push (e.g., REQUEST_LOCATION) ---
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -61,16 +106,29 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     ws.onopen = () => console.log("[WebSocket] connected for session", currentSessionId);
     ws.onclose = () => console.log("[WebSocket] closed for session", currentSessionId);
     ws.onerror = (e) => console.error("[WebSocket] error", e);
-
-    // We don't handle incoming messages here because backend currently only sends REQUEST_LOCATION via SSE.
-    // But keeping the socket open allows backend to verify connection_manager presence.
+    
+    // Handle incoming WebSocket messages
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("[WebSocket] received message:", data);
+        
+        // Handle location requests
+        if (data.type === 'REQUEST_LOCATION') {
+          console.log('WebSocket received location request');
+          await handleLocationRequest(data);
+        }
+      } catch (error) {
+        console.error("[WebSocket] failed to parse message:", error);
+      }
+    };
 
     return () => {
       try {
         ws.close();
       } catch (_) {}
     };
-  }, [currentSessionId]);
+  }, [currentSessionId, handleLocationRequest]);
 
   // 添加更新工具状态的函数
   const updateToolsEnabled = useCallback(async (enabled: boolean) => {
@@ -578,23 +636,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     loadSessionOnReconnect();
   }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession]);
 
-  // 添加用户消息到聊天记录
-  const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
-    // 创建用户消息
-    const userMessage: Message = {
-      id: uuidv4(), // 使用前端生成的UUID
-      sender: 'user',
-      text,
-      files,
-      timestamp: Date.now(),
-      status: MessageStatus.SENDING // 初始状态为发送中
-    }
-    
-    // 添加到消息列表
-    setMessages(prev => [...prev, userMessage])
-    
-    return userMessage.id
-  }, [])
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
   const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
@@ -687,7 +728,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     const decoder = new TextDecoder()
     let buffer = ''
-    let currentText = ''
     let currentKeyword: string | null = null
     let audioCount = 0
     let firstResponseReceived = false
@@ -1010,50 +1050,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
-    // 处理位置请求事件
-    const handleLocationRequest = async (data: any) => {
-      console.log('收到位置请求:', data);
-      
-      try {
-        // 获取地理位置服务实例
-        const geolocationService = GeolocationService.getInstance();
-        
-        // 确保服务已初始化
-        if (!geolocationService.isServiceInitialized()) {
-          await geolocationService.initialize();
-        }
-        
-        // 获取位置信息
-        const locationData = await geolocationService.requestLocation();
-        
-        if (locationData) {
-          // 添加session_id到位置数据中
-          const locationDataWithSession = {
-            ...locationData,
-            session_id: currentSessionId
-          };
-          
-          // 发送位置信息到后端
-          const response = await fetch('/api/location/update', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(locationDataWithSession),
-          });
-          
-          if (response.ok) {
-            console.log('位置信息已成功发送到后端，session_id:', currentSessionId);
-          } else {
-            console.warn('位置信息发送失败');
-          }
-        } else {
-          console.warn('无法获取位置信息');
-        }
-      } catch (error) {
-        console.error('处理位置请求时出错:', error);
-      }
-    };
+    // 使用外部定义的位置请求处理函数
 
     // 处理一行数据
     const processLine = (line: string) => {
@@ -1078,7 +1075,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           }
           
           // 处理位置请求事件
-          if (data.type === 'LOCATION_REQUEST') {
+          if (data.type === 'REQUEST_LOCATION') {
             handleLocationRequest(data);
             return;
           }

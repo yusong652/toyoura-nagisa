@@ -50,7 +50,6 @@ import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
 from backend.routes import images
 from backend.memory.memory_manager import MemoryManager
-from backend.nagisa_mcp.location_manager import get_location_manager
 
 
 # 加载环境变量
@@ -681,7 +680,7 @@ async def update_browser_location(request: Request):
     """接收前端发送的浏览器位置信息"""
     try:
         data = await request.json()
-        session_id = data.get("session_id")  # 获取session_id
+        session_id = data.get("session_id")
         
         location_data = {
             "latitude": data.get("latitude"),
@@ -691,17 +690,15 @@ async def update_browser_location(request: Request):
             "source": "browser_geolocation"
         }
         
-        # 更新位置管理器
-        location_manager = get_location_manager()
-        location_manager.update_location(
-            session_id=session_id or "global",
-            data=location_data
-        )
+        # Store in temporary location storage for active tool calls
+        from backend.nagisa_mcp.tools.location_tool.tool import store_temp_location
+        if session_id:
+            store_temp_location(session_id, location_data)
         
-        print(f"[DEBUG] Browser location updated for session {session_id}: {location_data}")
+        print(f"[DEBUG] Browser location stored temporarily for session {session_id}: {location_data}")
         return {"success": True, "session_id": session_id}
     except Exception as e:
-        print(f"[ERROR] Failed to update browser location: {e}")
+        print(f"[ERROR] Failed to process browser location: {e}")
         return {"success": False, "error": str(e)}
 
 @app.websocket("/ws/{session_id}")
