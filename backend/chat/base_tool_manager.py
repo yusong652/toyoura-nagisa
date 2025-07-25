@@ -5,6 +5,7 @@ BaseToolManager - 所有LLM客户端Tool Manager的抽象基类
 定义了所有Tool Manager必须实现的核心方法，确保一致性和可扩展性。
 """
 
+import json
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Set
 from fastmcp import Client as MCPClient
@@ -91,7 +92,6 @@ class BaseToolManager(ABC):
         Returns:
             List: 解析后的工具信息列表
         """
-        import json
         
         tools = []
         if isinstance(meta_result, dict):
@@ -250,9 +250,243 @@ class BaseToolManager(ABC):
         """
         pass
     
-    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False):
+    async def _handle_meta_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, 
+                               session_id: Optional[str] = None, debug: bool = False) -> Any:
         """
-        处理LLM生成的function_call请求，分发到MCP工具
+        处理meta工具调用
+        
+        Args:
+            tool_name: 工具名称
+            tool_args: 工具参数
+            tool_id: 工具调用ID
+            session_id: 可选的会话ID
+            debug: 是否启用调试输出
+            
+        Returns:
+            Any: Meta工具执行结果
+        """
+        
+        if debug:
+            print(f"[DEBUG] Handling meta tool: {tool_name}")
+        
+        try:
+            # 执行meta工具
+            result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
+            text_result = extract_text_from_mcp_result(result)
+            
+            # 检查执行错误
+            if isinstance(result, dict) and result.get("error"):
+                return self._create_error_response(tool_id, tool_name, text_result)
+            
+            # 缓存搜索工具的结果
+            if tool_name in ["search_tools_by_keywords", "search_tools"] and session_id:
+                await self._cache_meta_tool_results(result, text_result, session_id, debug)
+            
+            return text_result
+            
+        except Exception as e:
+            if debug:
+                print(f"Error calling meta tool {tool_name}: {str(e)}")
+            return self._create_error_response(
+                tool_id, tool_name, f"Error: Meta tool execution failed - {str(e)}"
+            )
+    
+    async def _handle_regular_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str,
+                                  session_id: Optional[str] = None, debug: bool = False) -> Any:
+        """
+        处理普通工具调用
+        
+        Args:
+            tool_name: 工具名称
+            tool_args: 工具参数
+            tool_id: 工具调用ID
+            session_id: 可选的会话ID
+            debug: 是否启用调试输出
+            
+        Returns:
+            Any: 工具执行结果
+        """
+        try:
+            # 执行普通工具
+            result_obj = await self._execute_mcp_tool(tool_name, tool_args, session_id)
+            tool_output = extract_text_from_mcp_result(result_obj)
+            
+            # 检查错误状态
+            if isinstance(tool_output, dict) and tool_output.get("status") == "error":
+                return self._create_error_response(
+                    tool_id, tool_name, tool_output.get("message", "Tool execution failed.")
+                )
+            
+            # 处理多媒体内容
+            processed_output = self._process_multimodal_content(tool_output, tool_name, debug)
+            if processed_output is not None:
+                return processed_output
+            
+            # 提取LLM内容（如果存在）
+            if isinstance(tool_output, dict) and 'llm_content' in tool_output:
+                return tool_output['llm_content']
+            
+            return tool_output
+            
+        except Exception as e:
+            if debug:
+                print(f"Error calling tool {tool_name}: {str(e)}")
+            return self._create_error_response(
+                tool_id, tool_name, f"Error: Tool execution failed - {str(e)}"
+            )
+    
+    async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
+                               session_id: Optional[str] = None) -> Any:
+        """
+        执行MCP工具调用的统一方法
+        
+        Args:
+            tool_name: 工具名称
+            tool_args: 工具参数
+            session_id: 可选的会话ID
+            
+        Returns:
+            Any: MCP工具执行结果
+        """
+        mcp_client = self.get_mcp_client(session_id)
+        async with mcp_client as mcp_async_client:
+            if session_id:
+                try:
+                    # 尝试使用带会话ID的调用方式
+                    params = CallToolRequestParams(
+                        name=tool_name,
+                        arguments=tool_args,
+                        **{"_meta": {"client_id": session_id}},
+                    )
+                    call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+                    return await mcp_async_client.session.send_request(call_req, CallToolResult)
+                except Exception:
+                    # 降级到标准调用方式
+                    return await mcp_async_client.call_tool(tool_name, tool_args)
+            else:
+                return await mcp_async_client.call_tool(tool_name, tool_args)
+    
+    async def _cache_meta_tool_results(self, result: Any, text_result: Any, 
+                                      session_id: str, debug: bool = False) -> None:
+        """
+        缓存meta工具的搜索结果
+        
+        Args:
+            result: 原始MCP工具结果
+            text_result: 提取后的文本结果
+            session_id: 会话ID
+            debug: 是否启用调试输出
+        """
+        
+        try:
+            meta_result = {}
+            
+            # 解析不同格式的结果对象
+            if hasattr(result, 'content') and result.content:
+                # MCP CallToolResult对象
+                if hasattr(result.content[0], 'text'):
+                    try:
+                        meta_result = json.loads(result.content[0].text)
+                    except (json.JSONDecodeError, TypeError):
+                        meta_result = {}
+            elif isinstance(result, dict):
+                # 直接的字典结果
+                meta_result = result
+            else:
+                # 从text_result解析（兼容性处理）
+                if isinstance(text_result, dict):
+                    meta_result = text_result
+                elif isinstance(text_result, str):
+                    try:
+                        meta_result = json.loads(text_result)
+                    except (json.JSONDecodeError, TypeError):
+                        meta_result = {}
+            
+            if debug:
+                print(f"[DEBUG] Meta result structure: {type(meta_result)}")
+                if isinstance(meta_result, dict):
+                    print(f"[DEBUG] Meta result keys: {list(meta_result.keys())}")
+            
+            # 提取并缓存工具信息
+            extracted_tools = self.extract_tools_from_meta_result(meta_result)
+            if extracted_tools:
+                self.cache_tools_for_session(session_id, extracted_tools)
+                if debug:
+                    print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
+                    for tool in extracted_tools:
+                        print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
+            else:
+                if debug:
+                    print(f"[DEBUG] No tools extracted from meta result")
+                    
+        except Exception as e:
+            if debug:
+                print(f"[DEBUG] Failed to cache tools from meta result: {e}")
+                import traceback
+                print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+    
+    def _process_multimodal_content(self, tool_output: Any, tool_name: str, debug: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        处理工具输出中的多媒体内容
+        
+        Args:
+            tool_output: 工具输出结果
+            tool_name: 工具名称
+            debug: 是否启用调试输出
+            
+        Returns:
+            Optional[Dict]: 如果检测到多媒体内容，返回处理后的结构；否则返回None
+        """
+        if not isinstance(tool_output, dict):
+            return None
+        
+        # 检查是否包含inline_data
+        if ('data' in tool_output and 
+            isinstance(tool_output['data'], dict) and
+            'processing_result' in tool_output['data'] and
+            isinstance(tool_output['data']['processing_result'], dict)):
+            
+            processing_result = tool_output['data']['processing_result']
+            if (processing_result.get('content_format') == 'inline_data' and
+                'content' in processing_result and
+                isinstance(processing_result['content'], dict) and
+                'inline_data' in processing_result['content']):
+                
+                inline_data_content = processing_result['content']
+                
+                if debug:
+                    print(f"[DEBUG] Detected inline_data in {tool_name} result")
+                
+                return {
+                    **tool_output.get('llm_content', {}),
+                    'inline_data': inline_data_content['inline_data']
+                }
+        
+        return None
+    
+    def _create_error_response(self, tool_id: str, tool_name: str, error_message: str) -> Dict[str, Any]:
+        """
+        创建标准化的错误响应
+        
+        Args:
+            tool_id: 工具调用ID
+            tool_name: 工具名称
+            error_message: 错误消息
+            
+        Returns:
+            Dict: 标准化的错误响应结构
+        """
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "name": tool_name,
+            "content": error_message,
+            "is_error": True
+        }
+    
+    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Any:
+        """
+        处理LLM生成的function_call请求，优雅地分发到对应的工具处理器
         
         Args:
             function_call: 函数调用字典，包含name、arguments等
@@ -262,185 +496,12 @@ class BaseToolManager(ABC):
         Returns:
             Any: 工具执行结果或错误信息
         """
-        import json
-        
         tool_name = function_call["name"]
         tool_args = function_call.get("arguments", {})
         tool_id = function_call.get("id", "")
         
-        # 1. Meta工具处理
+        # 根据工具类型分发到相应的处理器
         if self.is_meta_tool(tool_name):
-            if debug:
-                print(f"[DEBUG] Handling meta tool: {tool_name}")
-            
-            try:
-                mcp_client = self.get_mcp_client(session_id)
-                async with mcp_client as mcp_async_client:
-                    if session_id:
-                        try:
-                            params = CallToolRequestParams(
-                                name=tool_name,
-                                arguments=tool_args,
-                                **{"_meta": {"client_id": session_id}},
-                            )
-                            call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
-                            result: CallToolResult = await mcp_async_client.session.send_request(
-                                call_req,
-                                CallToolResult,
-                            )
-                        except Exception:
-                            result = await mcp_async_client.call_tool(tool_name, tool_args)
-                    else:
-                        result = await mcp_async_client.call_tool(tool_name, tool_args)
-                
-                text_result = extract_text_from_mcp_result(result)
-                
-                # 检查错误
-                if isinstance(result, dict) and result.get("error"):
-                    return {
-                        "type": "tool_result",
-                        "tool_use_id": tool_id,
-                        "name": tool_name,
-                        "content": text_result,
-                        "is_error": True
-                    }
-                
-                # 缓存meta工具结果 - 从完整的result对象中提取，而不是从text_result中
-                if tool_name in ["search_tools_by_keywords", "search_tools"] and session_id:
-                    try:
-                        # 使用完整的result对象进行工具提取
-                        meta_result = {}
-                        
-                        # 处理不同类型的result对象
-                        if hasattr(result, 'content') and result.content:
-                            # MCP CallToolResult对象
-                            if hasattr(result.content[0], 'text'):
-                                try:
-                                    meta_result = json.loads(result.content[0].text)
-                                except (json.JSONDecodeError, TypeError):
-                                    meta_result = {}
-                        elif isinstance(result, dict):
-                            # 直接的字典结果
-                            meta_result = result
-                        else:
-                            # 尝试从text_result解析（兼容性处理）
-                            if isinstance(text_result, dict):
-                                meta_result = text_result
-                            elif isinstance(text_result, str):
-                                try:
-                                    meta_result = json.loads(text_result)
-                                except (json.JSONDecodeError, TypeError):
-                                    meta_result = {}
-                        
-                        if debug:
-                            print(f"[DEBUG] Meta result structure: {type(meta_result)}")
-                            if isinstance(meta_result, dict):
-                                print(f"[DEBUG] Meta result keys: {list(meta_result.keys())}")
-                        
-                        extracted_tools = self.extract_tools_from_meta_result(meta_result)
-                        if extracted_tools:
-                            self.cache_tools_for_session(session_id, extracted_tools)
-                            if debug:
-                                print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
-                                for tool in extracted_tools:
-                                    print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
-                        else:
-                            if debug:
-                                print(f"[DEBUG] No tools extracted from meta result")
-                    except Exception as e:
-                        if debug:
-                            print(f"[DEBUG] Failed to cache tools from meta result: {e}")
-                            import traceback
-                            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-                
-                return text_result
-                
-            except Exception as e:
-                if debug:
-                    print(f"Error calling meta tool {tool_name}: {str(e)}")
-                return {
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "name": tool_name,
-                    "content": f"Error: Meta tool execution failed - {str(e)}",
-                    "is_error": True
-                }
-        
-        # 2. 普通工具处理
-        try:
-            mcp_client = self.get_mcp_client(session_id)
-            async with mcp_client as mcp_async_client:
-                # 注入会话ID（如果存在）
-                if session_id:
-                    try:
-                        params = CallToolRequestParams(
-                            name=tool_name,
-                            arguments=tool_args,
-                            **{"_meta": {"client_id": session_id}},
-                        )
-                        call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
-                        result_obj = await mcp_async_client.session.send_request(
-                            call_req,
-                            CallToolResult,
-                        )
-                    except Exception:
-                        result_obj = await mcp_async_client.call_tool(tool_name, tool_args)
-                else:
-                    result_obj = await mcp_async_client.call_tool(tool_name, tool_args)
-            
-            # 提取工具输出
-            tool_output = extract_text_from_mcp_result(result_obj)
-            
-            # 检查错误状态
-            if isinstance(tool_output, dict):
-                if tool_output.get("status") == "error":
-                    return {
-                        "type": "tool_result",
-                        "tool_use_id": tool_id,
-                        "name": tool_name,
-                        "content": tool_output.get("message", "Tool execution failed."),
-                        "is_error": True
-                    }
-                
-                # 处理multimodal内容（如inline_data）
-                has_inline_data = False
-                if ('data' in tool_output and 
-                    isinstance(tool_output['data'], dict) and
-                    'processing_result' in tool_output['data'] and
-                    isinstance(tool_output['data']['processing_result'], dict)):
-                    
-                    processing_result = tool_output['data']['processing_result']
-                    if (processing_result.get('content_format') == 'inline_data' and
-                        'content' in processing_result and
-                        isinstance(processing_result['content'], dict) and
-                        'inline_data' in processing_result['content']):
-                        
-                        has_inline_data = True
-                        inline_data_content = processing_result['content']
-                        
-                        if debug:
-                            print(f"[DEBUG] Detected inline_data in {tool_name} result")
-                
-                # 如果有inline_data，返回包含多媒体内容的结构
-                if has_inline_data:
-                    return {
-                        **tool_output.get('llm_content', {}),
-                        'inline_data': inline_data_content['inline_data']
-                    }
-                
-                # 提取llm_content（如果有）
-                if 'llm_content' in tool_output:
-                    return tool_output['llm_content']
-            
-            return tool_output
-        
-        except Exception as e:
-            if debug:
-                print(f"Error calling tool {tool_name}: {str(e)}")
-            return {
-                "type": "tool_result",
-                "tool_use_id": tool_id,
-                "name": tool_name,
-                "content": f"Error: Tool execution failed - {str(e)}",
-                "is_error": True
-            }
+            return await self._handle_meta_tool(tool_name, tool_args, tool_id, session_id, debug)
+        else:
+            return await self._handle_regular_tool(tool_name, tool_args, tool_id, session_id, debug)
