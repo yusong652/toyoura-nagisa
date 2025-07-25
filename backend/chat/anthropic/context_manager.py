@@ -146,15 +146,6 @@ class AnthropicContextManager(BaseContextManager):
         
         return tool_calls
     
-    def should_continue_tool_calling(self) -> bool:
-        """
-        判断是否应该继续工具调用循环 - Anthropic client不使用此方法
-        实际使用should_continue_tool_calling_from_response()
-        
-        Returns:
-            bool: 始终返回False，因为client有自己的工具调用逻辑
-        """
-        return False
     
     def should_continue_tool_calling_from_response(self, response) -> bool:
         """

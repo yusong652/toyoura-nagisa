@@ -304,11 +304,3 @@ class GeminiContextManager(BaseContextManager):
         
         return tool_calls
     
-    def should_continue_tool_calling(self) -> bool:
-        """
-        检查是否需要继续工具调用流程
-        
-        Returns:
-            如果需要继续工具调用返回True
-        """
-        return len(self._tool_call_sequence) > 0

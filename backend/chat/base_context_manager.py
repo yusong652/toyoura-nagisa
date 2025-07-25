@@ -87,15 +87,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    @abstractmethod
-    def should_continue_tool_calling(self) -> bool:
-        """
-        判断是否应该继续工具调用循环
-        
-        Returns:
-            bool: 如果需要继续工具调用返回True，否则False
-        """
-        pass
     
     # === 通用辅助方法 ===
     
@@ -136,6 +127,5 @@ class BaseContextManager(ABC):
             'messages_count': self.get_messages_count(),
             'tool_calls_count': self.get_tool_calls_count(),
             'current_iteration': self.get_current_iteration(),
-            'has_pending_tool_calls': self.should_continue_tool_calling(),
             'execution_metadata': self._execution_metadata.copy()
         }
