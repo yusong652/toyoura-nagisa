@@ -87,113 +87,40 @@ class BaseToolManager(ABC):
         从meta工具结果中提取工具信息
         
         Args:
-            meta_result: meta工具执行结果
+            meta_result: meta工具执行结果（标准ToolResult格式）
             
         Returns:
             List: 解析后的工具信息列表
         """
+        if not isinstance(meta_result, dict) or "data" not in meta_result:
+            return []
         
-        tools = []
-        if isinstance(meta_result, dict):
-            # 处理不同格式的meta工具结果
-            tools_data = None
+        data = meta_result["data"]
+        if not isinstance(data, dict) or "tools" not in data:
+            return []
+        
+        tools_data = data["tools"]
+        if not isinstance(tools_data, list):
+            return []
+        
+        processed_tools = []
+        for tool_info in tools_data:
+            if not isinstance(tool_info, dict) or "name" not in tool_info:
+                continue
             
-            # 检查data字段中的tools（标准ToolResult格式）
-            if "data" in meta_result and isinstance(meta_result["data"], dict):
-                tools_data = meta_result["data"].get("tools", [])
-            # 兼容性：也检查顶层的tools字段（旧格式）
-            elif "tools" in meta_result and isinstance(meta_result["tools"], list):
-                tools_data = meta_result["tools"]
-            
-            if tools_data and isinstance(tools_data, list):
-                for tool_info in tools_data:
-                    if isinstance(tool_info, dict) and "name" in tool_info:
-                        # 解析 parameters
-                        params = tool_info.get("parameters", {})
-                        if isinstance(params, str):
-                            try:
-                                params = json.loads(params)
-                            except (json.JSONDecodeError, TypeError):
-                                params = {}
-                        
-                        # 解析 tags
-                        tags = tool_info.get("tags", [])
-                        if isinstance(tags, str):
-                            try:
-                                tags = json.loads(tags)
-                            except (json.JSONDecodeError, TypeError):
-                                tags = []
-                        
-                        # 转换parameters格式为标准的JSON Schema inputSchema
-                        if isinstance(params, dict):
-                            if "type" in params and "properties" in params:
-                                # 已经是完整的inputSchema格式
-                                input_schema = params
-                            else:
-                                # 从tool vectorizer格式转换为JSON Schema格式
-                                properties = {}
-                                required = []
-                                
-                                for param_name, param_info in params.items():
-                                    if isinstance(param_info, dict):
-                                        # 转换类型名称
-                                        param_type = param_info.get('type', 'string')
-                                        if param_type.startswith('<class \'') and param_type.endswith('\'>'):
-                                            # 从 <class 'str'> 格式提取类型
-                                            param_type = param_type.split('\'')[1]
-                                        
-                                        # 映射Python类型到JSON Schema类型
-                                        type_mapping = {
-                                            'str': 'string',
-                                            'int': 'integer', 
-                                            'float': 'number',
-                                            'bool': 'boolean',
-                                            'list': 'array',
-                                            'dict': 'object'
-                                        }
-                                        json_type = type_mapping.get(param_type, 'string')
-                                        
-                                        properties[param_name] = {
-                                            "type": json_type,
-                                            "description": f"Parameter {param_name}"
-                                        }
-                                        
-                                        # 检查是否必需
-                                        if param_info.get('required', True):
-                                            required.append(param_name)
-                                    else:
-                                        # 简单格式处理
-                                        properties[param_name] = {
-                                            "type": "string",
-                                            "description": f"Parameter {param_name}"
-                                        }
-                                        required.append(param_name)
-                                
-                                input_schema = {
-                                    "type": "object",
-                                    "properties": properties,
-                                    "required": required,
-                                    "additionalProperties": False
-                                }
-                        else:
-                            # 默认空schema
-                            input_schema = {
-                                "type": "object",
-                                "properties": {},
-                                "required": [],
-                                "additionalProperties": False
-                            }
-                        
-                        tools.append({
-                            "name": tool_info["name"],
-                            "description": tool_info.get("description", ""),
-                            "category": tool_info.get("category", "general"),
-                            "docstring": tool_info.get("docstring", ""),
-                            "inputSchema": input_schema,  # 使用标准的inputSchema字段名
-                            "parameters": input_schema,   # 保持向后兼容
-                            "tags": tags
-                        })
-        return tools
+            # 直接使用meta工具返回的标准化工具信息
+            # meta工具已经处理了parameters格式转换
+            processed_tools.append({
+                "name": tool_info["name"],
+                "description": tool_info.get("description", ""),
+                "category": tool_info.get("category", "general"),
+                "docstring": tool_info.get("docstring", ""),
+                "inputSchema": tool_info.get("parameters", {}),
+                "parameters": tool_info.get("parameters", {}),  # 保持向后兼容
+                "tags": tool_info.get("tags", [])
+            })
+        
+        return processed_tools
     
     def cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]) -> None:
         """
