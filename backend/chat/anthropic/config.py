@@ -46,7 +46,7 @@ class AnthropicModelConfig(BaseModel):
         description="Whether to enable thinking for supported models"
     )
     thinking_budget_tokens: int = Field(
-        default=10000,
+        default=4096,
         ge=1000,
         le=50000,
         description="Budget tokens for thinking process"

@@ -378,7 +378,7 @@ class ImagePromptGenerator:
                         "threshold": types.HarmBlockThreshold.BLOCK_NONE
                     }
                 ],
-                temperature=2.0,
+                temperature=1.6,
                 max_output_tokens=4096
             )
             

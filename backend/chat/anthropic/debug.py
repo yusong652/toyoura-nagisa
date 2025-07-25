@@ -97,6 +97,9 @@ class AnthropicDebugger:
                 print(f"[{component}]   Type: {thinking_config.get('type', 'N/A')}")
                 print(f"[{component}]   Budget tokens: {thinking_config.get('budget_tokens', 'N/A')}")
         
+        # 添加消息格式验证
+        AnthropicDebugger._validate_message_format(messages, component)
+        
         print(f"[{component}] === End API Payload ===")
 
     @staticmethod
@@ -273,6 +276,42 @@ class AnthropicDebugger:
         
         if hasattr(response, 'stop_reason'):
             print(f"[ANTHROPIC DEBUG] Stop Reason: {response.stop_reason}")
+
+    @staticmethod
+    def log_raw_response(response: Any, component: str = "ANTHROPIC") -> None:
+        """
+        Log the complete raw API response from Claude.
+        
+        Args:
+            response: Raw response from Claude API
+            component: Component name for log prefix
+        """
+        print(f"\n========== {component} RAW RESPONSE ==========")
+        
+        # Convert response to dictionary format for better readability
+        try:
+            if hasattr(response, 'model_dump'):
+                # Pydantic object with model_dump method
+                response_dict = response.model_dump()
+            elif hasattr(response, '__dict__'):
+                # Regular object with attributes
+                response_dict = AnthropicDebugger._convert_object_to_dict(response)
+            else:
+                response_dict = str(response)
+            
+            # Print the raw response in JSON format
+            print("📄 Complete Raw Response:")
+            if isinstance(response_dict, dict):
+                json_output = json.dumps(response_dict, indent=2, ensure_ascii=False, default=str)
+                print(json_output)
+            else:
+                print(response_dict)
+                
+        except Exception as e:
+            print(f"Failed to serialize raw response: {e}")
+            print(f"Raw response object: {response}")
+            
+        print("========== END RAW RESPONSE ==========\n")
 
     @staticmethod
     def log_tool_execution(
@@ -692,3 +731,59 @@ class AnthropicDebugger:
             # If JSON serialization fails, fall back to basic string representation
             print(f"Debug payload (JSON serialization failed: {e}):")
             print(str(cleaned_payload))
+
+    @staticmethod
+    def _validate_message_format(messages: List[Dict[str, Any]], component: str = "ANTHROPIC") -> None:
+        """
+        Validate message format for Anthropic API compatibility.
+        
+        Args:
+            messages: List of message dictionaries
+            component: Component name for log prefix
+        """
+        print(f"[{component}] === Message Format Validation ===")
+        
+        tool_use_ids = set()
+        tool_result_ids = set()
+        
+        for i, msg in enumerate(messages):
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', [])
+            
+            if not isinstance(content, list):
+                print(f"[{component}] WARNING: Message {i+1} content is not a list: {type(content)}")
+                continue
+            
+            for j, content_block in enumerate(content):
+                if not isinstance(content_block, dict):
+                    print(f"[{component}] WARNING: Message {i+1} content block {j+1} is not a dict: {type(content_block)}")
+                    continue
+                
+                content_type = content_block.get('type', 'unknown')
+                
+                if content_type == 'tool_use':
+                    tool_id = content_block.get('id', 'unknown')
+                    tool_name = content_block.get('name', 'unknown')
+                    tool_use_ids.add(tool_id)
+                    print(f"[{component}] Found tool_use: {tool_name} (id: {tool_id})")
+                    
+                elif content_type == 'tool_result':
+                    tool_id = content_block.get('tool_use_id', 'unknown')
+                    tool_result_ids.add(tool_id)
+                    is_error = content_block.get('is_error', False)
+                    print(f"[{component}] Found tool_result: id={tool_id}, error={is_error}")
+        
+        # 检查工具调用和结果的匹配
+        missing_results = tool_use_ids - tool_result_ids
+        extra_results = tool_result_ids - tool_use_ids
+        
+        if missing_results:
+            print(f"[{component}] ERROR: Missing tool_result for tool_use IDs: {missing_results}")
+        
+        if extra_results:
+            print(f"[{component}] WARNING: Extra tool_result for non-existent tool_use IDs: {extra_results}")
+        
+        if not missing_results and not extra_results:
+            print(f"[{component}] ✓ Message format validation passed")
+        
+        print(f"[{component}] === End Validation ===")

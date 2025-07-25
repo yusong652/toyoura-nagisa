@@ -20,6 +20,7 @@ class MessageFormatter:
     - Converting history messages to Anthropic API format
     - Processing multimodal content (images, documents) in user messages
     - Role mapping between formats
+    - Formatting tool result content for API compatibility
     
     Optimized for historical message processing only - working context
     is handled directly in context manager without formatting.
@@ -81,6 +82,55 @@ class MessageFormatter:
             return None
 
     @staticmethod
+    def format_tool_result_content(result: Any) -> Any:
+        """
+        Format tool result content according to Anthropic API documentation requirements.
+        
+        According to official documentation, the content field can be:
+        1. Simple string: return directly
+        2. Structured data: serialize to JSON string
+        3. Multimodal content: build content array with text and image blocks
+        
+        Args:
+            result: Tool execution result
+            
+        Returns:
+            Formatted content compatible with Anthropic API
+        """
+        # Handle multimodal content (contains inline_data)
+        if isinstance(result, dict) and 'inline_data' in result:
+            content_parts = []
+            
+            # Add text part (if there are other fields)
+            text_content = {k: v for k, v in result.items() if k != 'inline_data'}
+            if text_content:
+                content_parts.append({
+                    "type": "text", 
+                    "text": json.dumps(text_content, ensure_ascii=False)
+                })
+            
+            # Add image part
+            inline_data = result['inline_data']
+            content_parts.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": inline_data.get('mime_type', 'image/png'),
+                    "data": inline_data['data']
+                }
+            })
+            
+            return content_parts
+        
+        # Regular structured data, serialize to JSON string
+        elif isinstance(result, (dict, list)):
+            return json.dumps(result, ensure_ascii=False, indent=2)
+        
+        # Simple string or other types, convert to string
+        else:
+            return str(result)
+
+    @staticmethod
     def format_messages_for_anthropic(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
         Format history messages for Anthropic Claude API.
@@ -88,6 +138,7 @@ class MessageFormatter:
         Converts internal message format to Anthropic API compatible format:
         - User messages (text + optional multimodal content)  
         - Assistant final responses (text only)
+        - Tool result messages (tool_result blocks)
         
         Args:
             messages: List of BaseMessage objects from conversation history
@@ -98,6 +149,25 @@ class MessageFormatter:
         formatted_messages = []
         
         for msg in messages:
+            # 特殊处理ToolResultMessage
+            if hasattr(msg, 'tool_call_id') and hasattr(msg, 'name'):
+                # 这是一个工具结果消息，需要格式化为tool_result块
+                tool_result_block = {
+                    "type": "tool_result",
+                    "tool_use_id": msg.tool_call_id,
+                    "content": MessageFormatter.format_tool_result_content(msg.content),
+                    "is_error": isinstance(msg.content, str) and msg.content.startswith("Tool execution failed:")
+                }
+                
+                # 构建user消息包含tool_result
+                user_message = {
+                    "role": "user",
+                    "content": [tool_result_block]
+                }
+                formatted_messages.append(user_message)
+                continue
+            
+            # 处理普通消息
             content = []
             
             # Handle message content based on format
@@ -130,36 +200,3 @@ class MessageFormatter:
         
         return formatted_messages
 
-    @staticmethod
-    def format_tool_result_for_anthropic(tool_call_id: str, result: Any, is_error: bool = False) -> Dict[str, Any]:
-        """
-        Format tool execution result for Anthropic API.
-        
-        Args:
-            tool_call_id: ID of the tool call
-            result: Tool execution result
-            is_error: Whether the result represents an error
-            
-        Returns:
-            Anthropic API compatible tool result message
-        """
-        if is_error:
-            content = f"Error: {str(result)}"
-            is_error_flag = True
-        else:
-            # Convert result to string if it's not already
-            if isinstance(result, (dict, list)):
-                content = json.dumps(result, ensure_ascii=False, indent=2)
-            else:
-                content = str(result)
-            is_error_flag = False
-            
-        return {
-            "role": "user",
-            "content": [{
-                "type": "tool_result",
-                "tool_use_id": tool_call_id,
-                "content": content,
-                "is_error": is_error_flag
-            }]
-        }
