@@ -364,7 +364,7 @@ class GeminiClient(LLMClientBase):
                 }
             
             # 添加当前响应到上下文
-            context_manager.add_raw_response(current_response)
+            context_manager.add_response(current_response)
             
             # 提取并执行工具调用
             tool_calls = ResponseProcessor.extract_tool_calls(current_response)
