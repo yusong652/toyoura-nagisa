@@ -83,10 +83,9 @@ def register_location_tools(mcp: FastMCP):
 
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
-        """Get current location information.
+        """Get the user's current geographic location.
         
-        Requests geolocation from browser client and uses server IP geolocation as fallback.
-        Returns coordinates with city/region/country details.
+        Returns latitude, longitude, city, region, and country information.
         """
         try:
             session_id = context.client_id
