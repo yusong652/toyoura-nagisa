@@ -124,12 +124,73 @@ class BaseToolManager(ABC):
                             except (json.JSONDecodeError, TypeError):
                                 tags = []
                         
+                        # 转换parameters格式为标准的JSON Schema inputSchema
+                        if isinstance(params, dict):
+                            if "type" in params and "properties" in params:
+                                # 已经是完整的inputSchema格式
+                                input_schema = params
+                            else:
+                                # 从tool vectorizer格式转换为JSON Schema格式
+                                properties = {}
+                                required = []
+                                
+                                for param_name, param_info in params.items():
+                                    if isinstance(param_info, dict):
+                                        # 转换类型名称
+                                        param_type = param_info.get('type', 'string')
+                                        if param_type.startswith('<class \'') and param_type.endswith('\'>'):
+                                            # 从 <class 'str'> 格式提取类型
+                                            param_type = param_type.split('\'')[1]
+                                        
+                                        # 映射Python类型到JSON Schema类型
+                                        type_mapping = {
+                                            'str': 'string',
+                                            'int': 'integer', 
+                                            'float': 'number',
+                                            'bool': 'boolean',
+                                            'list': 'array',
+                                            'dict': 'object'
+                                        }
+                                        json_type = type_mapping.get(param_type, 'string')
+                                        
+                                        properties[param_name] = {
+                                            "type": json_type,
+                                            "description": f"Parameter {param_name}"
+                                        }
+                                        
+                                        # 检查是否必需
+                                        if param_info.get('required', True):
+                                            required.append(param_name)
+                                    else:
+                                        # 简单格式处理
+                                        properties[param_name] = {
+                                            "type": "string",
+                                            "description": f"Parameter {param_name}"
+                                        }
+                                        required.append(param_name)
+                                
+                                input_schema = {
+                                    "type": "object",
+                                    "properties": properties,
+                                    "required": required,
+                                    "additionalProperties": False
+                                }
+                        else:
+                            # 默认空schema
+                            input_schema = {
+                                "type": "object",
+                                "properties": {},
+                                "required": [],
+                                "additionalProperties": False
+                            }
+                        
                         tools.append({
                             "name": tool_info["name"],
                             "description": tool_info.get("description", ""),
                             "category": tool_info.get("category", "general"),
                             "docstring": tool_info.get("docstring", ""),
-                            "parameters": params,
+                            "inputSchema": input_schema,  # 使用标准的inputSchema字段名
+                            "parameters": input_schema,   # 保持向后兼容
                             "tags": tags
                         })
         return tools
@@ -244,17 +305,37 @@ class BaseToolManager(ABC):
                         "is_error": True
                     }
                 
-                # 缓存meta工具结果
+                # 缓存meta工具结果 - 从完整的result对象中提取，而不是从text_result中
                 if tool_name in ["search_tools_by_keywords", "search_tools"] and session_id:
                     try:
+                        # 使用完整的result对象进行工具提取
                         meta_result = {}
-                        if isinstance(text_result, dict):
-                            meta_result = text_result
-                        elif isinstance(text_result, str):
-                            try:
-                                meta_result = json.loads(text_result)
-                            except (json.JSONDecodeError, TypeError):
-                                meta_result = {}
+                        
+                        # 处理不同类型的result对象
+                        if hasattr(result, 'content') and result.content:
+                            # MCP CallToolResult对象
+                            if hasattr(result.content[0], 'text'):
+                                try:
+                                    meta_result = json.loads(result.content[0].text)
+                                except (json.JSONDecodeError, TypeError):
+                                    meta_result = {}
+                        elif isinstance(result, dict):
+                            # 直接的字典结果
+                            meta_result = result
+                        else:
+                            # 尝试从text_result解析（兼容性处理）
+                            if isinstance(text_result, dict):
+                                meta_result = text_result
+                            elif isinstance(text_result, str):
+                                try:
+                                    meta_result = json.loads(text_result)
+                                except (json.JSONDecodeError, TypeError):
+                                    meta_result = {}
+                        
+                        if debug:
+                            print(f"[DEBUG] Meta result structure: {type(meta_result)}")
+                            if isinstance(meta_result, dict):
+                                print(f"[DEBUG] Meta result keys: {list(meta_result.keys())}")
                         
                         extracted_tools = self.extract_tools_from_meta_result(meta_result)
                         if extracted_tools:
@@ -263,9 +344,14 @@ class BaseToolManager(ABC):
                                 print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
                                 for tool in extracted_tools:
                                     print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
+                        else:
+                            if debug:
+                                print(f"[DEBUG] No tools extracted from meta result")
                     except Exception as e:
                         if debug:
                             print(f"[DEBUG] Failed to cache tools from meta result: {e}")
+                            import traceback
+                            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
                 
                 return text_result
                 

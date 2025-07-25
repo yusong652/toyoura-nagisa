@@ -7,7 +7,6 @@ from fastmcp import FastMCP
 from pydantic import Field
 import sys
 import os
-from datetime import datetime
 
 from backend.config import TOOL_DB_PATH
 from ...tool_vectorizer import ToolVectorizer
@@ -48,55 +47,9 @@ def register_meta_tools(mcp: FastMCP):
         )
     ) -> Dict[str, Any]:
         """Discover and activate relevant tools using semantic search.
-
-        ## Core Functionality
-        - Performs semantic search over tool vector database
-        - Returns most relevant tools for given keywords
-        - Automatically activates discovered tools for immediate use
-        - Supports domain-specific tool discovery (coding, communication, etc.)
-
-        ## Strategic Usage
-        - Use before calling domain-specific tools to ensure availability
-        - Include action + domain in keywords: `"email send"`, `"image generate"`
-        - Combine with `get_available_tool_categories()` for comprehensive discovery
-
-        ## Return Value
-        Returns structured tool discovery results with comprehensive metadata.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "tool_discovery",
-            "keywords": "weather forecast",
-            "max_results": 5,
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "tools_found": ["weather_forecast", "get_weather"],
-            "search_limited": false
-          },
-          "summary": {
-            "operation_type": "tool_discovery",
-            "success": true
-          }
-        }
-        ```
-
-        **Optional Fields:**
-        - `result.guidance`: Present only when `search_limited` is true, provides optimization suggestions
-
-        ## Examples
-        ```python
-        # Find weather tools
-        search_tools("weather forecast Paris")
-        
-        # Find coding tools
-        search_tools("file edit replace")
-        
-        # Find communication tools
-        search_tools("email send calendar")
-        ```
+        Performs semantic search over tool vector database and returns most relevant tools.
+        Use before calling domain-specific tools to ensure availability.
         """
         try:
             vectorizer = get_vectorizer()
@@ -111,17 +64,39 @@ def register_meta_tools(mcp: FastMCP):
             formatted_tools = []
             for tool_info in tools:
                 metadata = tool_info.get('metadata', {})
+                
+                # 解析parameters信息（从JSON字符串转换）
+                parameters = {}
+                if 'parameters' in metadata:
+                    try:
+                        import json
+                        parameters = json.loads(metadata['parameters']) if isinstance(metadata['parameters'], str) else metadata['parameters']
+                    except (json.JSONDecodeError, TypeError):
+                        parameters = {}
+                
+                # 解析tags信息（从JSON字符串转换）
+                tags = []
+                if 'tags' in metadata:
+                    try:
+                        import json
+                        tags = json.loads(metadata['tags']) if isinstance(metadata['tags'], str) else metadata['tags']
+                        if not isinstance(tags, list):
+                            tags = []
+                    except (json.JSONDecodeError, TypeError):
+                        tags = []
+                
                 formatted_tool = {
                     "id": tool_info['id'],
                     "name": metadata.get('function_name', 'unknown'),
                     "category": metadata.get('category', 'general'),
                     "description": tool_info.get('description', ''),
-                    "tags": metadata.get('tags', [])
+                    "docstring": metadata.get('docstring', ''),
+                    "parameters": parameters,  # 包含完整的参数信息
+                    "tags": tags
                 }
                 formatted_tools.append(formatted_tool)
             
             # Build structured response following unified standard
-            timestamp = datetime.now().isoformat()
             
             # Extract tool names for better LLM understanding
             tools_found = [tool.get("name", "unknown") for tool in formatted_tools]
@@ -135,8 +110,7 @@ def register_meta_tools(mcp: FastMCP):
                 "operation": {
                     "type": "tool_discovery",
                     "keywords": keywords,
-                    "max_results": max_results,
-                    "timestamp": timestamp
+                    "max_results": max_results
                 },
                 "result": {
                     "tools_found": tools_found,
@@ -183,47 +157,9 @@ def register_meta_tools(mcp: FastMCP):
     @mcp.tool(**common_kwargs_meta)
     def get_available_tool_categories() -> Dict[str, Any]:
         """Get comprehensive list of available tool categories.
-
-        ## Core Functionality
-        - Returns all registered tool categories in the system
-        - Provides category overview for strategic tool discovery
-        - Helps LLM understand available tool scope and capabilities
-
-        ## Strategic Usage
-        - Use before `search_tools()` to understand available domains
-        - Helps formulate better search keywords based on available categories
-        - Provides context for tool selection strategy
-
-        ## Return Value
-        Returns structured category information with comprehensive metadata.
         
-        **Structure:**
-        ```json
-        {
-          "operation": {
-            "type": "category_discovery",
-            "timestamp": "2025-01-08T10:30:00.123"
-          },
-          "result": {
-            "total_categories": 4,
-            "categories_available": ["coding", "communication", "information", "weather"]
-          },
-          "summary": {
-            "operation_type": "category_discovery",
-            "success": true
-          }
-        }
-        ```
-
-        ## Examples
-        ```python
-        # Get all available categories
-        categories = get_available_tool_categories()
-        
-        # Use categories to guide tool search
-        if "weather" in categories["result"]["categories_available"]:
-            search_tools("weather forecast")
-        ```
+        Returns all registered tool categories in the system.
+        Use before search_tools() to understand available domains.
         """
         try:
             vectorizer = get_vectorizer()
@@ -250,12 +186,10 @@ def register_meta_tools(mcp: FastMCP):
                                for cat in categories}
             
             # Build structured response following unified standard
-            timestamp = datetime.now().isoformat()
             
             llm_content = {
                 "operation": {
-                    "type": "category_discovery",
-                    "timestamp": timestamp
+                    "type": "category_discovery"
                 },
                 "result": {
                     "categories_available": categories,

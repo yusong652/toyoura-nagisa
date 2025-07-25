@@ -109,25 +109,46 @@ class AnthropicToolManager(BaseToolManager):
                 continue
                 
             if tool_name in tools_map:
+                # 工具在MCP中存在，使用完整的MCP schema
                 final_tools.append(tools_map[tool_name])
                 added_tool_names.add(tool_name)
                 if debug:
-                    print(f"[DEBUG] Added cached tool: {tool_name}")
+                    print(f"[DEBUG] Added cached tool from MCP: {tool_name}")
             else:
-                # 为缓存工具创建基础schema
+                # 工具不在MCP中，使用缓存的schema信息
+                # 优先使用inputSchema，其次使用parameters
+                cached_input_schema = cached_tool.get("inputSchema") or cached_tool.get("parameters", {})
+                
+                # 确保是正确的schema格式
+                if isinstance(cached_input_schema, dict):
+                    if "type" in cached_input_schema and "properties" in cached_input_schema:
+                        # 已经是完整的inputSchema格式
+                        input_schema = dict(cached_input_schema)
+                    else:
+                        # 只是properties字典，需要包装
+                        input_schema = {
+                            "type": "object",
+                            "properties": cached_input_schema,
+                            "required": list(cached_input_schema.keys()) if cached_input_schema else [],
+                            "additionalProperties": False
+                        }
+                else:
+                    # 默认空schema
+                    input_schema = {
+                        "type": "object", 
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": False
+                    }
+                
                 final_tools.append({
                     "name": tool_name,
                     "description": cached_tool.get("description", tool_name),
-                    "parameters": {
-                        "type": "object",
-                        "properties": cached_tool.get("parameters", {}),
-                        "required": list(cached_tool.get("parameters", {}).keys()),
-                        "additionalProperties": False
-                    }
+                    "parameters": input_schema
                 })
                 added_tool_names.add(tool_name)
                 if debug:
-                    print(f"[DEBUG] Added cached tool with basic schema: {tool_name}")
+                    print(f"[DEBUG] Added cached tool with constructed schema: {tool_name}")
         
         if debug:
             print(f"[DEBUG] Final tools count: {len(final_tools)} (meta: {len(meta_tools)}, cached: {len(cached_tools)})")
