@@ -49,154 +49,43 @@ class GeminiDebugger:
         
         # 使用简化的payload打印，避免过长的description影响调试
         print("\n📝 Simplified Payload (truncated descriptions):")
-        GeminiDebugger._print_simplified_payload(payload_to_print, max_desc_length=50)
+        GeminiDebugger._print_simplified_payload(payload_to_print)
         print("========== END ==========")
 
     @staticmethod
     def print_debug_response(response) -> None:
         """
-        Print comprehensive debug information for Gemini API responses.
+        Print simplified debug information for Gemini API responses.
         
         Args:
             response: Raw response object from Gemini API
         """
-        print("\n========== Gemini API 响应格式 ==========")
-        print("🔍 Full LLM Response Structure:")
-        
-        # 打印response基本信息
+        print("\n========== Gemini API Response ==========")
         print(f"Response type: {type(response).__name__}")
         
-        # 检查并打印error信息（如果有）
+        # Check for errors
         if hasattr(response, 'error') and response.error:
             print(f"❌ Error: {response.error}")
+            return
             
-        # 检查并打印candidates
+        # Check candidates
         if hasattr(response, 'candidates') and response.candidates:
-            print(f"📋 Candidates count: {len(response.candidates)}")
+            print(f"📋 Candidates: {len(response.candidates)}")
             
             for i, candidate in enumerate(response.candidates):
-                print(f"\n--- Candidate {i+1} ---")
-                
-                # 打印candidate基本信息
-                if hasattr(candidate, 'index'):
-                    print(f"  Index: {candidate.index}")
                 if hasattr(candidate, 'finish_reason'):
-                    print(f"  Finish reason: {candidate.finish_reason}")
+                    print(f"  Candidate {i+1}: {candidate.finish_reason}")
                 
-                # 打印top-level thought（如果有）
-                if hasattr(candidate, 'thought') and candidate.thought:
-                    thought_preview = candidate.thought[:100] + "..." if len(candidate.thought) > 100 else candidate.thought
-                    print(f"  💭 Top-level thought: {repr(thought_preview)}")
-                
-                # 打印content和parts
                 if hasattr(candidate, 'content') and candidate.content:
-                    content = candidate.content
-                    print(f"  📝 Content type: {type(content).__name__}")
-                    
-                    if hasattr(content, 'parts') and content.parts:
-                        print(f"  🧩 Parts count: {len(content.parts)}")
-                        
-                        for j, part in enumerate(content.parts):
-                            print(f"    Part {j+1}: {type(part).__name__}")
-                            
-                            # 🔍 打印part的完整属性信息
-                            part_attributes = {}
-                            special_fields = ['text', 'function_call', 'function_response', 'thought_signature', 'thought', 'inline_data']
-                            
-                            for attr in dir(part):
-                                if not attr.startswith('_') and not attr.startswith('model_'):
-                                    try:
-                                        value = getattr(part, attr)
-                                        if not callable(value) and value is not None:
-                                            part_attributes[attr] = value
-                                    except:
-                                        pass
-                            
-                            # 详细打印已知的特殊字段
+                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                        for j, part in enumerate(candidate.content.parts):
                             if hasattr(part, 'text') and part.text:
-                                text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
-                                print(f"      📄 Text: {repr(text_preview)}")
-                            
-                            if hasattr(part, 'thought_signature') and part.thought_signature:
-                                print(f"      🧠 Thought Signature: {repr(part.thought_signature)}")
-                            
-                            if hasattr(part, 'thought') and part.thought:
-                                print(f"      💭 Is Thought Content: {part.thought}")
-                                # 注意：思维内容实际在 part.text 中，part.thought 只是布尔标识符
-                            
-                            if hasattr(part, 'function_call') and part.function_call:
-                                func_call = part.function_call
-                                print(f"      🔧 Function call:")
-                                print(f"        Name: {func_call.name}")
-                                if hasattr(func_call, 'id'):
-                                    print(f"        ID: {func_call.id}")
-                                if hasattr(func_call, 'args') and func_call.args:
-                                    print(f"        Args: {func_call.args}")
-                                elif hasattr(func_call, 'arguments') and func_call.arguments:
-                                    print(f"        Arguments: {func_call.arguments}")
-                            
-                            if hasattr(part, 'function_response') and part.function_response:
-                                func_resp = part.function_response
-                                print(f"      🔄 Function response:")
-                                print(f"        Name: {func_resp.name}")
-                                if hasattr(func_resp, 'response'):
-                                    print(f"        Response: {func_resp.response}")
-                            
-                            if hasattr(part, 'inline_data') and part.inline_data:
-                                print(f"      📎 Inline data: {type(part.inline_data).__name__}")
-                            
-                            # 打印所有属性的完整JSON（用于调试）
-                            try:
-                                serializable_attrs = {}
-                                for key, value in part_attributes.items():
-                                    try:
-                                        # 尝试序列化，如果失败则转为字符串
-                                        json.dumps(value)
-                                        serializable_attrs[key] = value
-                                    except:
-                                        serializable_attrs[key] = str(value) if value is not None else None
-                                
-                                if serializable_attrs:
-                                    part_json = json.dumps(serializable_attrs, indent=8, ensure_ascii=False, default=str)
-                                    print(f"      🔍 完整Part属性: {part_json}")
-                            except Exception as e:
-                                print(f"      ❌ Part属性序列化失败: {e}")
-                                print(f"      🔍 Part原始信息: {part}")
-                else:
-                    print(f"  ❌ No content found in candidate")
+                                text_preview = part.text[:100] + "..." if len(part.text) > 100 else part.text
+                                print(f"    Text part {j+1}: {repr(text_preview)}")
+                            elif hasattr(part, 'function_call') and part.function_call:
+                                print(f"    Function call: {part.function_call.name}")
         else:
-            print("❌ No candidates found in response")
-        
-        # 打印response的其他属性
-        print(f"\n🔍 Response attributes:")
-        try:
-            response_attrs = {}
-            # 需要跳过的Pydantic内部属性和其他已处理的属性
-            skip_attrs = {
-                'candidates', 'error', 'model_computed_fields', 'model_fields', 
-                'model_config', 'model_fields_set', 'model_extra', 'model_dump',
-                'model_dump_json', 'model_copy', 'model_validate', 'model_validate_json'
-            }
-            
-            for attr in dir(response):
-                if (not attr.startswith('_') and 
-                    attr not in skip_attrs and 
-                    not attr.startswith('model_')):
-                    try:
-                        value = getattr(response, attr)
-                        if not callable(value):
-                            response_attrs[attr] = str(value) if value is not None else None
-                    except Exception:
-                        # 跳过无法访问的属性
-                        pass
-                        
-            if response_attrs:
-                attrs_json = json.dumps(response_attrs, indent=2, ensure_ascii=False, default=str)
-                print(attrs_json)
-            else:
-                print("No additional attributes found")
-        except Exception as e:
-            print(f"Failed to extract response attributes: {e}")
+            print("❌ No candidates found")
         
         print("========== END RESPONSE ==========")
 
@@ -391,23 +280,20 @@ class GeminiDebugger:
     @staticmethod
     def _convert_object_to_dict(obj) -> Any:
         """
-        将对象转换为字典格式，解决混合格式序列化问题
+        Convert object to dictionary format for serialization.
         
         Args:
-            obj: 需要转换的对象
+            obj: Object to convert
             
         Returns:
-            转换后的字典或原始值
+            Converted dictionary or original value
         """
-        # 如果是基本类型，直接返回
         if obj is None or isinstance(obj, (str, int, float, bool, list, dict)):
             return obj
         
-        # 尝试转换为字典格式
         try:
             result = {}
             
-            # 提取对象的有效属性
             for attr in dir(obj):
                 if (not attr.startswith('_') and 
                     not attr.startswith('model_') and
@@ -415,7 +301,6 @@ class GeminiDebugger:
                     try:
                         value = getattr(obj, attr)
                         if value is not None:
-                            # 递归处理嵌套对象
                             if isinstance(value, list):
                                 result[attr] = [GeminiDebugger._convert_object_to_dict(item) for item in value]
                             elif hasattr(value, '__dict__') or hasattr(value, '__slots__'):
@@ -423,33 +308,27 @@ class GeminiDebugger:
                             else:
                                 result[attr] = value
                     except Exception:
-                        # 如果无法访问属性，跳过
                         pass
             
             return result if result else str(obj)
             
         except Exception:
-            # 如果转换失败，返回字符串表示
             return str(obj)
 
     @staticmethod
-    def _print_simplified_payload(payload: Dict[str, Any], max_desc_length: int = 60) -> None:
+    def _print_simplified_payload(payload: Dict[str, Any]) -> None:
         """
         Print simplified payload using JSON format for better readability.
         
         Args:
             payload: Payload dictionary to print
-            max_desc_length: Maximum length for description fields (unused, handled upstream)
         """
-        # 由于payload已经在_create_debug_config中被预处理，
-        # 这里只需要处理一些可能遗漏的递归结构
         def final_cleanup(obj):
-            """最终清理，确保没有遗漏的长字段，并统一对象格式"""
+            """Final cleanup to ensure no long fields are missed and unified object format"""
             if isinstance(obj, dict):
                 result = {}
                 for key, value in obj.items():
                     if isinstance(value, str) and len(value) > 300:
-                        # 对任何仍然过长的字符串进行最终截断
                         result[key] = GeminiDebugger._truncate_text_for_debug(
                             value, max_length=100, field_name=f"field '{key}'"
                         )
@@ -461,17 +340,13 @@ class GeminiDebugger:
             elif isinstance(obj, list):
                 return [final_cleanup(item) for item in obj]
             else:
-                # 🚀 修复：将对象转换为字典格式，避免混合序列化问题
                 return GeminiDebugger._convert_object_to_dict(obj)
         
         cleaned_payload = final_cleanup(payload)
         
-        # 使用JSON dumps代替pprint，确保description等字段单行显示
         try:
-            # 使用indent=2进行美观格式化，但避免pprint的自动文本换行
             json_output = json.dumps(cleaned_payload, indent=2, ensure_ascii=False, default=str)
             print(json_output)
         except (TypeError, ValueError) as e:
-            # 如果JSON序列化失败，回退到基本字符串表示
             print(f"Debug payload (JSON serialization failed: {e}):")
             print(str(cleaned_payload)) 
