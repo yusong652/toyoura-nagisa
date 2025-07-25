@@ -6,24 +6,22 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 
 核心设计原则：
 1. 工作上下文：保持原始 Gemini API 格式，包含完整的思维链信息和验证字段
-2. 存储上下文：转换为标准化消息格式，用于本地存储和历史记录
-3. 双轨制管理：确保API调用时的上下文完整性，同时支持标准化存储
+2. 专注于工具调用期间的上下文状态管理
 """
 
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
-from backend.chat.models import BaseMessage, ToolResultMessage, message_factory
+from backend.chat.models import BaseMessage, message_factory
 from backend.chat.base_context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 
 
 class GeminiContextManager(BaseContextManager):
     """
-    管理 Gemini API 工具调用过程中的双轨制上下文
+    管理 Gemini API 工具调用过程中的上下文
     
     核心功能：
     - 维护原始格式的工作上下文，确保思维链完整性
-    - 管理标准化的存储上下文，用于历史记录
     - 提供工具调用期间的上下文状态管理
     - 支持多轮工具调用的上下文连续性
     
@@ -37,7 +35,6 @@ class GeminiContextManager(BaseContextManager):
         """初始化上下文管理器"""
         super().__init__()
         self.working_contents: List[Dict[str, Any]] = []  # 原始Gemini API格式上下文
-        self.storage_messages: List[BaseMessage] = []     # 标准化存储格式消息
         
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -48,9 +45,6 @@ class GeminiContextManager(BaseContextManager):
         """
         # 转换为Gemini API格式的工作上下文
         self.working_contents = MessageFormatter.format_messages_for_gemini(messages)
-        
-        # 保存存储格式的副本
-        self.storage_messages = messages.copy()
         
         # 清空工具调用序列
         self._tool_call_sequence.clear()
@@ -170,14 +164,6 @@ class GeminiContextManager(BaseContextManager):
         # 添加到工作上下文
         self.working_contents.append(working_content)
         
-        # 创建对应的存储格式消息
-        storage_message = ToolResultMessage(
-            tool_call_id=tool_call_id,
-            name=tool_name,
-            content=result
-        )
-        self.storage_messages.append(storage_message)
-        
         return working_content
     
     def get_working_contents(self) -> List[Dict[str, Any]]:
@@ -188,15 +174,6 @@ class GeminiContextManager(BaseContextManager):
             原始格式的上下文列表，用于API调用
         """
         return self.working_contents
-    
-    def get_storage_messages(self) -> List[BaseMessage]:
-        """
-        获取存储格式的消息列表
-        
-        Returns:
-            标准化的消息列表，用于历史记录存储
-        """
-        return self.storage_messages
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """添加工具执行结果到上下文中 - 基类接口实现"""
@@ -228,9 +205,6 @@ class GeminiContextManager(BaseContextManager):
             "content": llm_response.content,
             "keyword": keyword
         })
-        
-        # 添加到存储消息列表
-        self.storage_messages.append(storage_message)
         
         return storage_message
     

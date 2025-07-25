@@ -6,7 +6,7 @@ BaseContextManager - 所有LLM客户端Context Manager的抽象基类
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from backend.chat.models import BaseMessage
 
 
@@ -18,7 +18,6 @@ class BaseContextManager(ABC):
     - 消息历史管理和状态隔离
     - 工具调用序列记录和追踪  
     - 响应内容的上下文保持
-    - 最终存储消息的格式化
     """
     
     def __init__(self):

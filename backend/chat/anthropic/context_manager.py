@@ -7,23 +7,21 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 
 from typing import List, Dict, Any
 from backend.chat.base_context_manager import BaseContextManager
-from backend.chat.models import BaseMessage, AssistantMessage, ToolResultMessage
+from backend.chat.models import BaseMessage, AssistantMessage
 
 
 class AnthropicContextManager(BaseContextManager):
     """
     Anthropic Claude特化的上下文管理器
     
-    采用双轨制设计，与Gemini保持一致：
+    专注于工作上下文管理：
     - 工作上下文：保持原始Anthropic API格式，确保完整性
-    - 存储上下文：转换为标准化消息格式，用于历史记录
-    - 双轨制管理：确保API调用时的上下文完整性，同时支持标准化存储
+    - 支持工具调用期间的上下文状态管理
     """
     
     def __init__(self):
         super().__init__()
         self.working_messages: List[Dict[str, Any]] = []  # 原始Anthropic API格式上下文
-        self.storage_messages: List[BaseMessage] = []     # 标准化存储格式消息
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -36,9 +34,6 @@ class AnthropicContextManager(BaseContextManager):
         
         # 转换为Anthropic API格式的工作上下文
         self.working_messages = MessageFormatter.format_messages_for_anthropic(messages)
-        
-        # 保存存储格式的副本
-        self.storage_messages = messages.copy()
     
     def add_response(self, response) -> None:
         """
@@ -91,14 +86,6 @@ class AnthropicContextManager(BaseContextManager):
         
         # 添加到工作上下文
         self.working_messages.append(user_message)
-        
-        # 创建对应的存储格式消息
-        storage_message = ToolResultMessage(
-            tool_call_id=tool_call_id,
-            name=tool_name,
-            content=result
-        )
-        self.storage_messages.append(storage_message)
     
     def get_working_messages(self) -> List[Dict[str, Any]]:
         """
@@ -108,16 +95,6 @@ class AnthropicContextManager(BaseContextManager):
             原始格式的消息列表，用于API调用
         """
         return self.working_messages
-    
-    def get_storage_messages(self) -> List[BaseMessage]:
-        """
-        获取存储格式的消息列表
-        
-        Returns:
-            标准化的消息列表，用于历史记录存储
-        """
-        return self.storage_messages
-    
     
     def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
         """
@@ -201,13 +178,9 @@ class AnthropicContextManager(BaseContextManager):
             keyword=keyword
         )
         
-        # 添加到存储消息列表
-        self.storage_messages.append(storage_message)
-        
         return storage_message
     
     def clear_context(self) -> None:
         """清理上下文状态"""
         super().clear_context()
         self.working_messages.clear()
-        self.storage_messages.clear()
