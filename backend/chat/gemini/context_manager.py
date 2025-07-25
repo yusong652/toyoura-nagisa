@@ -272,38 +272,28 @@ class GeminiContextManager(BaseContextManager):
                 }
                 self._tool_call_sequence.append(tool_call)
     
-    def extract_tool_calls_from_latest_response(self) -> List[Dict[str, Any]]:
+    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
         """
-        从最新添加的响应中提取工具调用信息
+        从响应中提取工具调用信息
         
+        Args:
+            response: Gemini API响应对象
+            
         Returns:
             工具调用列表，格式：[{'name': str, 'arguments': dict, 'id': str}]
         """
-        if not self.working_contents:
+        if not (hasattr(response, 'candidates') and response.candidates):
+            return []
+            
+        candidate = response.candidates[0]
+        if not (hasattr(candidate, 'content') and hasattr(candidate.content, 'parts')):
             return []
         
-        latest_content = self.working_contents[-1]
-        
-        # 安全地检查 role，支持对象和字典两种格式
-        content_role = None
-        if hasattr(latest_content, 'role'):
-            content_role = latest_content.role
-        elif isinstance(latest_content, dict) and 'role' in latest_content:
-            content_role = latest_content['role']
-        
-        if content_role != "model":
+        if candidate.content.role != "model":
             return []
         
         tool_calls = []
-        
-        # 安全地获取 parts，支持对象和字典两种格式
-        parts = []
-        if hasattr(latest_content, 'parts'):
-            parts = latest_content.parts
-        elif isinstance(latest_content, dict) and 'parts' in latest_content:
-            parts = latest_content['parts']
-        
-        for part in parts:
+        for part in candidate.content.parts:
             if hasattr(part, 'function_call') and part.function_call:
                 tool_call = {
                     'name': part.function_call.name,

@@ -270,7 +270,7 @@ class AnthropicClient(LLMClientBase):
             context_manager.add_response(current_response)
             
             # 提取并执行工具调用
-            tool_calls = context_manager.extract_tool_calls_from_latest_response()
+            tool_calls = context_manager.extract_tool_calls_from_response(current_response)
             
             # 执行工具调用 - 每个工具调用都实时通知并立即添加到上下文
             for tool_call in tool_calls:

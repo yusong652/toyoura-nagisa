@@ -119,46 +119,29 @@ class AnthropicContextManager(BaseContextManager):
         return self.storage_messages
     
     
-    def extract_tool_calls_from_latest_response(self) -> List[Dict[str, Any]]:
+    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
         """
-        从最新添加的响应中提取工具调用信息
+        从响应中提取工具调用信息
         
+        Args:
+            response: Anthropic API响应对象
+            
         Returns:
             工具调用列表，格式：[{'name': str, 'arguments': dict, 'id': str}]
         """
-        if not self.working_messages:
+        if not hasattr(response, 'content') or not response.content:
             return []
         
-        latest_msg = self.working_messages[-1]
-        
-        # 处理响应对象格式
-        if hasattr(latest_msg, 'role') and hasattr(latest_msg, 'content'):
-            if latest_msg.role != "assistant":
-                return []
-            content = latest_msg.content
-        # 处理字典格式
-        elif isinstance(latest_msg, dict):
-            if latest_msg.get("role") != "assistant":
-                return []
-            content = latest_msg.get("content", [])
-        else:
+        if response.role != "assistant":
             return []
         
         tool_calls = []
-        for item in content:
-            # 处理响应对象中的内容项
-            if hasattr(item, 'type') and item.type == "tool_use":
+        for item in response.content:
+            if item.type == "tool_use":
                 tool_calls.append({
                     'name': item.name,
                     'arguments': item.input,
                     'id': item.id
-                })
-            # 处理字典格式的内容项
-            elif isinstance(item, dict) and item.get("type") == "tool_use":
-                tool_calls.append({
-                    'name': item.get('name', ''),
-                    'arguments': item.get('input', {}),
-                    'id': item.get('id', '')
                 })
         
         return tool_calls

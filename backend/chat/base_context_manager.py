@@ -50,10 +50,13 @@ class BaseContextManager(ABC):
     
     
     @abstractmethod
-    def extract_tool_calls_from_latest_response(self) -> List[Dict[str, Any]]:
+    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
         """
-        从最新添加的响应中提取工具调用信息
+        从响应中提取工具调用信息
         
+        Args:
+            response: LLM API响应对象
+            
         Returns:
             List[Dict[str, Any]]: 工具调用信息列表，每个工具调用包含name、arguments、id等字段
         """
