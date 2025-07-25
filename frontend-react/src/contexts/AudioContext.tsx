@@ -33,8 +33,8 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
   const [currentAnalyser, setCurrentAnalyser] = useState<AnalyserNode | null>(null)
   const [audioQueue, setAudioQueue] = useState<AudioQueueItem[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
-  const [currentAudioPromise, setCurrentAudioPromise] = useState<Promise<void> | null>(null)
   const [audioContextInitialized, setAudioContextInitialized] = useState(false)
+  const [currentAudioPromise, setCurrentAudioPromise] = useState<Promise<void> | null>(null)
   // 添加一个ref来跟踪队列状态，避免闭包问题
   const audioQueueRef = useRef<AudioQueueItem[]>([])
   const isPlayingRef = useRef<boolean>(false)
