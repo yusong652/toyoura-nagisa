@@ -6,6 +6,8 @@ def extract_text_from_mcp_result(result):
     统一提取MCP工具返回的TextContent内容，并自动结构化（如JSON）。
     支持单个TextContent、TextContent列表、字符串、dict等常见情况。
     返回结构化内容（dict/list）或纯文本。
+    
+    对于ToolResult格式的返回，只提取llm_content字段，忽略data字段。
     """
     def try_json(text):
         try:
@@ -37,7 +39,12 @@ def extract_text_from_mcp_result(result):
         for item in result.content:
             # TextContent
             if hasattr(item, "type") and item.type == "text":
-                structured_items.append(try_json(getattr(item, "text", "")))
+                text_content = try_json(getattr(item, "text", ""))
+                # 如果这是一个ToolResult格式的JSON，只提取llm_content
+                if isinstance(text_content, dict) and "llm_content" in text_content:
+                    structured_items.append(text_content["llm_content"])
+                else:
+                    structured_items.append(text_content)
             # ImageContent
             elif hasattr(item, "type") and item.type == "image":
                 structured_items.append({
@@ -61,20 +68,32 @@ def extract_text_from_mcp_result(result):
         # 如果存在 isError 标记，包装为 dict 以便后续判断
         if getattr(result, "isError", False):
             return {
-                "is_error": True,
+                "is_error": True,  
                 "content": payload,
             }
         return payload
 
     # 2. 处理单个TextContent对象
     if hasattr(result, "text") and isinstance(result.text, str):
-        return try_json(result.text)
+        text_content = try_json(result.text)
+        # 如果这是一个ToolResult格式的JSON，只提取llm_content
+        if isinstance(text_content, dict) and "llm_content" in text_content:
+            return text_content["llm_content"]
+        return text_content
     # 3. 处理dict
     if isinstance(result, dict) and "text" in result:
-        return try_json(result["text"])
+        text_content = try_json(result["text"])
+        # 如果这是一个ToolResult格式的JSON，只提取llm_content
+        if isinstance(text_content, dict) and "llm_content" in text_content:
+            return text_content["llm_content"]
+        return text_content
     # 4. 处理字符串
     if isinstance(result, str):
-        return try_json(result)
+        text_content = try_json(result)
+        # 如果这是一个ToolResult格式的JSON，只提取llm_content
+        if isinstance(text_content, dict) and "llm_content" in text_content:
+            return text_content["llm_content"]
+        return text_content
     # 5. fallback: 其他类型
 
     return result
