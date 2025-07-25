@@ -5,7 +5,7 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 采用与Gemini相同的双轨制设计：保持原始API格式用于工作上下文，标准化格式用于存储。
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from backend.chat.base_context_manager import BaseContextManager
 from backend.chat.models import BaseMessage, AssistantMessage, ToolResultMessage
 
@@ -39,52 +39,35 @@ class AnthropicContextManager(BaseContextManager):
         
         # 保存存储格式的副本
         self.storage_messages = messages.copy()
-        
-        # 清空工具调用序列
-        self._tool_call_sequence.clear()
     
     def add_response(self, response) -> None:
         """
-        添加Anthropic API响应到上下文中
+        添加Anthropic API响应到上下文中 - 按官方文档要求保存完整原始响应
+        
+        根据Anthropic官方文档：
+        - "pass back the complete, unmodified thinking blocks to the API"
+        - "always passing back all thinking blocks to the API"
+        - 保持"模型推理流程和对话完整性"
         
         Args:
             response: Anthropic Messages API的响应对象
         """
-        # 构建原始响应内容
-        response_content = []
+        if not hasattr(response, 'content') or not response.content:
+            raise ValueError("Invalid Anthropic API response format")
         
-        # 添加响应中的所有内容（text, thinking, tool_use等）
-        for item in response.content:
-            if item.type == "text":
-                response_content.append({"type": "text", "text": item.text})
-            elif item.type == "tool_use":
-                response_content.append({
-                    "type": "tool_use",
-                    "id": item.id,
-                    "name": item.name,
-                    "input": item.input
-                })
-                # 记录工具调用序列
-                self._tool_call_sequence.append({
-                    'name': item.name,
-                    'arguments': item.input,
-                    'id': item.id
-                })
-            elif item.type == "thinking":
-                response_content.append({
-                    "type": "thinking", 
-                    "thinking": item.thinking
-                })
-        
-        # 添加到工作上下文
-        self.working_messages.append({
-            "role": "assistant",
-            "content": response_content
-        })
+        # ✅ 按官方文档：过滤响应对象，只保留API支持的字段
+        # 官方API只支持 role 和 content 字段
+        filtered_message = {
+            "role": response.role,
+            "content": response.content
+        }
+        self.working_messages.append(filtered_message)
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
-        添加工具执行结果到上下文中
+        添加工具执行结果到上下文中 - 简化实现
+        
+        直接构建符合Anthropic API要求的tool_result块并添加到工作上下文
         
         Args:
             tool_call_id: 工具调用的唯一标识
@@ -93,13 +76,21 @@ class AnthropicContextManager(BaseContextManager):
         """
         from .message_formatter import MessageFormatter
         
-        # 格式化工具结果为Anthropic格式
-        tool_result_msg = MessageFormatter.format_tool_result_for_anthropic(
-            tool_call_id, result
-        )
+        # 构建tool_result块
+        tool_result_block = {
+            "type": "tool_result",
+            "tool_use_id": tool_call_id,
+            "content": MessageFormatter.format_tool_result_content(result)
+        }
+        
+        # 构建user消息包含tool_result
+        user_message = {
+            "role": "user",
+            "content": [tool_result_block]
+        }
         
         # 添加到工作上下文
-        self.working_messages.append(tool_result_msg)
+        self.working_messages.append(user_message)
         
         # 创建对应的存储格式消息
         storage_message = ToolResultMessage(
@@ -127,27 +118,6 @@ class AnthropicContextManager(BaseContextManager):
         """
         return self.storage_messages
     
-    def has_pending_tool_calls(self) -> bool:
-        """
-        检查是否有待处理的工具调用
-        
-        Returns:
-            bool: 如果有待处理的工具调用返回True
-        """
-        # 检查最新的工作消息是否包含tool_use
-        if not self.working_messages:
-            return False
-        
-        latest_msg = self.working_messages[-1]
-        if latest_msg.get("role") != "assistant":
-            return False
-        
-        content = latest_msg.get("content", [])
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "tool_use":
-                return True
-        
-        return False
     
     def extract_tool_calls_from_latest_response(self) -> List[Dict[str, Any]]:
         """
@@ -160,13 +130,31 @@ class AnthropicContextManager(BaseContextManager):
             return []
         
         latest_msg = self.working_messages[-1]
-        if latest_msg.get("role") != "assistant":
+        
+        # 处理响应对象格式
+        if hasattr(latest_msg, 'role') and hasattr(latest_msg, 'content'):
+            if latest_msg.role != "assistant":
+                return []
+            content = latest_msg.content
+        # 处理字典格式
+        elif isinstance(latest_msg, dict):
+            if latest_msg.get("role") != "assistant":
+                return []
+            content = latest_msg.get("content", [])
+        else:
             return []
         
         tool_calls = []
-        content = latest_msg.get("content", [])
         for item in content:
-            if isinstance(item, dict) and item.get("type") == "tool_use":
+            # 处理响应对象中的内容项
+            if hasattr(item, 'type') and item.type == "tool_use":
+                tool_calls.append({
+                    'name': item.name,
+                    'arguments': item.input,
+                    'id': item.id
+                })
+            # 处理字典格式的内容项
+            elif isinstance(item, dict) and item.get("type") == "tool_use":
                 tool_calls.append({
                     'name': item.get('name', ''),
                     'arguments': item.get('input', {}),
@@ -177,12 +165,33 @@ class AnthropicContextManager(BaseContextManager):
     
     def should_continue_tool_calling(self) -> bool:
         """
-        判断是否应该继续工具调用循环
+        判断是否应该继续工具调用循环 - Anthropic client不使用此方法
+        实际使用should_continue_tool_calling_from_response()
         
         Returns:
-            bool: 如果需要继续工具调用返回True
+            bool: 始终返回False，因为client有自己的工具调用逻辑
         """
-        return self.has_pending_tool_calls()
+        return False
+    
+    def should_continue_tool_calling_from_response(self, response) -> bool:
+        """
+        根据API响应判断是否应该继续工具调用循环 - 与Gemini对齐
+        
+        Args:
+            response: Anthropic API响应对象
+            
+        Returns:
+            bool: 如果响应包含工具调用返回True
+        """
+        if not hasattr(response, 'content') or not response.content:
+            return False
+            
+        # 检查响应中是否包含tool_use
+        for item in response.content:
+            if item.type == "tool_use":
+                return True
+        
+        return False
     
     def finalize_and_get_storage_message(self, final_response) -> BaseMessage:
         """

@@ -48,15 +48,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    @abstractmethod
-    def has_pending_tool_calls(self) -> bool:
-        """
-        检查是否有待处理的工具调用
-        
-        Returns:
-            bool: 如果有待处理的工具调用返回True，否则False
-        """
-        pass
     
     @abstractmethod
     def extract_tool_calls_from_latest_response(self) -> List[Dict[str, Any]]:
@@ -142,6 +133,6 @@ class BaseContextManager(ABC):
             'messages_count': self.get_messages_count(),
             'tool_calls_count': self.get_tool_calls_count(),
             'current_iteration': self.get_current_iteration(),
-            'has_pending_tool_calls': self.has_pending_tool_calls(),
+            'has_pending_tool_calls': self.should_continue_tool_calling(),
             'execution_metadata': self._execution_metadata.copy()
         }

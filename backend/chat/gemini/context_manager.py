@@ -56,10 +56,6 @@ class GeminiContextManager(BaseContextManager):
         self._tool_call_sequence.clear()
     
     def add_response(self, response) -> None:
-        """添加LLM API响应到上下文中 - 基类接口实现"""
-        self.add_raw_response(response)
-    
-    def add_raw_response(self, response) -> Dict[str, Any]:
         """
         添加原始 Gemini API 响应到工作上下文
         
@@ -68,9 +64,6 @@ class GeminiContextManager(BaseContextManager):
         
         Args:
             response: 原始 Gemini API 响应对象
-            
-        Returns:
-            添加到上下文的原始内容字典
         """
         if not (hasattr(response, 'candidates') and response.candidates and 
                 hasattr(response.candidates[0], 'content')):
@@ -87,8 +80,6 @@ class GeminiContextManager(BaseContextManager):
         
         # 记录工具调用序列（如果存在）
         self._record_tool_calls_from_response(response)
-        
-        return raw_content
     
     def _create_multimodal_parts(self, tool_name: str, result: Dict[str, Any]) -> List[Any]:
         """
@@ -243,14 +234,6 @@ class GeminiContextManager(BaseContextManager):
         
         return storage_message
     
-    def has_pending_tool_calls(self) -> bool:
-        """
-        检查是否有待处理的工具调用
-        
-        Returns:
-            如果有待处理的工具调用返回True
-        """
-        return len(self._tool_call_sequence) > 0
     
     def get_tool_call_sequence(self) -> List[Dict[str, Any]]:
         """
@@ -333,10 +316,9 @@ class GeminiContextManager(BaseContextManager):
     
     def should_continue_tool_calling(self) -> bool:
         """
-        检查最新响应是否包含工具调用，判断是否需要继续工具调用流程
+        检查是否需要继续工具调用流程
         
         Returns:
             如果需要继续工具调用返回True
         """
-        tool_calls = self.extract_tool_calls_from_latest_response()
-        return len(tool_calls) > 0
+        return len(self._tool_call_sequence) > 0
