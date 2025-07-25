@@ -195,15 +195,64 @@ class ResponseProcessor:
         """
         Extract thinking content from Claude response if present.
         
-        Note: Claude doesn't typically expose thinking content directly,
-        but this method is here for future compatibility.
-        
         Args:
             response: Raw response from Anthropic Claude API
             
         Returns:
             Thinking content if found, None otherwise
         """
-        # Claude API doesn't typically expose thinking content
-        # This is a placeholder for potential future functionality
-        return None
+        if not hasattr(response, "content") or not response.content:
+            return None
+            
+        thinking_parts = []
+        for item in response.content:
+            if item.type == "thinking":
+                thinking_parts.append(item.thinking)
+                
+        return "\n".join(thinking_parts).strip() if thinking_parts else None
+
+    @staticmethod
+    def format_response_for_storage(response: Any, keyword: Optional[str] = None):
+        """
+        Format Anthropic API response for storage as BaseMessage.
+        
+        This method creates standardized message objects optimized for:
+        - Database storage efficiency
+        - Historical retrieval performance
+        - Cross-LLM compatibility
+        
+        Args:
+            response: Raw Anthropic API response object
+            keyword: Optional extracted keyword for categorization
+            
+        Returns:
+            BaseMessage object ready for storage
+        """
+        from backend.chat.models import AssistantMessage
+        
+        if not hasattr(response, "content") or not response.content:
+            return AssistantMessage(
+                role="assistant",
+                content=[{"type": "text", "text": ""}],
+                keyword=keyword
+            )
+        
+        content_list = []
+        text_content = ""
+        
+        for item in response.content:
+            if item.type == "text":
+                content_list.append({"type": "text", "text": item.text})
+                text_content += item.text
+            elif item.type == "thinking":
+                content_list.append({"type": "thinking", "thinking": item.thinking})
+        
+        # Extract keyword from text content if not provided
+        if text_content and not keyword:
+            _, keyword = parse_llm_output(text_content)
+        
+        return AssistantMessage(
+            role="assistant",
+            content=content_list,
+            keyword=keyword
+        )

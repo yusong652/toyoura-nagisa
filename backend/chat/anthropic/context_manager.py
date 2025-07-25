@@ -7,7 +7,7 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 
 from typing import List, Dict, Any
 from backend.chat.base_context_manager import BaseContextManager
-from backend.chat.models import BaseMessage, AssistantMessage
+from backend.chat.models import BaseMessage
 
 
 class AnthropicContextManager(BaseContextManager):
@@ -144,41 +144,6 @@ class AnthropicContextManager(BaseContextManager):
         
         return False
     
-    def finalize_and_get_storage_message(self, final_response) -> BaseMessage:
-        """
-        完成当前对话轮次，返回用于存储的最终消息对象
-        
-        Args:
-            final_response: 最终的Anthropic API响应
-            
-        Returns:
-            BaseMessage: 格式化后的用于存储的消息对象
-        """
-        # 提取最终响应内容
-        content = []
-        text_content = ""
-        
-        for item in final_response.content:
-            if item.type == "text":
-                content.append({"type": "text", "text": item.text})
-                text_content += item.text
-            elif item.type == "thinking":
-                content.append({"type": "thinking", "thinking": item.thinking})
-        
-        # 解析关键词（如果有）
-        keyword = None
-        if text_content:
-            from backend.chat.utils import parse_llm_output
-            _, keyword = parse_llm_output(text_content)
-        
-        # 创建标准化的助手消息
-        storage_message = AssistantMessage(
-            role="assistant",
-            content=content,
-            keyword=keyword
-        )
-        
-        return storage_message
     
     def clear_context(self) -> None:
         """清理上下文状态"""

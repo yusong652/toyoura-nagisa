@@ -11,7 +11,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
-from backend.chat.models import BaseMessage, message_factory
+from backend.chat.models import BaseMessage
 from backend.chat.base_context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 
@@ -179,34 +179,6 @@ class GeminiContextManager(BaseContextManager):
         """添加工具执行结果到上下文中 - 基类接口实现"""
         self.add_tool_response(tool_name, tool_call_id, result)
     
-    def finalize_and_get_storage_message(self, final_response, keyword: Optional[str] = None) -> BaseMessage:
-        """
-        完成工具调用序列，创建最终的存储消息
-        
-        此方法在工具调用完成后调用，用于：
-        1. 处理最终的文本响应
-        2. 创建用于存储的标准化消息
-        3. 清理临时状态
-        
-        Args:
-            final_response: 最终的 Gemini API 响应（通常是文本响应）
-            keyword: 提取的关键词
-            
-        Returns:
-            格式化后的存储消息
-        """
-        # 使用ResponseProcessor格式化最终响应
-        from .response_processor import ResponseProcessor
-        llm_response = ResponseProcessor.format_llm_response(final_response)
-        
-        # 创建标准化的助手消息
-        storage_message = message_factory({
-            "role": "assistant",
-            "content": llm_response.content,
-            "keyword": keyword
-        })
-        
-        return storage_message
     
     
     def get_tool_call_sequence(self) -> List[Dict[str, Any]]:

@@ -188,8 +188,8 @@ class AnthropicClient(LLMClientBase):
             metadata['status'] = 'completed'
             metadata['end_time'] = self._get_timestamp()
             
-            # 创建最终存储消息
-            final_message = context_manager.finalize_and_get_storage_message(final_response)
+            # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
+            final_message = ResponseProcessor.format_response_for_storage(final_response)
             
             # Yield最终结果
             yield (final_message, metadata)

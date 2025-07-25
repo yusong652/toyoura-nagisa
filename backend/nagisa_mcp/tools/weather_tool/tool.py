@@ -4,6 +4,7 @@ import os
 import requests
 import asyncio
 from typing import Optional, Dict, Any
+from datetime import datetime
 from fastmcp.server.context import Context  # type: ignore
 
 from backend.nagisa_mcp.utils.tool_result import ToolResult
@@ -110,7 +111,18 @@ def register_weather_tools(mcp: FastMCP):
                     daily_wind[date_key].append(item["wind"]["speed"])
 
                 forecast = []
-                for date_key in sorted(daily_temps.keys())[:forecast_days]:
+                all_dates = sorted(daily_temps.keys())
+                
+                # Skip today if it has incomplete data (less than 8 entries)
+                # This ensures we get complete day forecasts
+                start_index = 0
+                if all_dates and len(daily_temps[all_dates[0]]) < 8:
+                    start_index = 1
+                
+                # Get the requested number of complete forecast days
+                forecast_dates = all_dates[start_index:start_index + forecast_days]
+                
+                for date_key in forecast_dates:
                     temps = daily_temps[date_key]
                     desc = max(set(daily_desc[date_key]), key=daily_desc[date_key].count)
                     avg_humidity = sum(daily_humidity[date_key]) / len(daily_humidity[date_key])

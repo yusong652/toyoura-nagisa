@@ -62,7 +62,7 @@ def register_email_tools(mcp: FastMCP):
                     "email_configured": True
                 },
                 "summary": {
-                    "operation_type": "get_user_email",
+                    "operation_type": "email",
                     "success": True
                 }
             }
@@ -137,7 +137,7 @@ def register_email_tools(mcp: FastMCP):
                     "delivery_status": "sent"
                 },
                 "summary": {
-                    "operation_type": "send_email",
+                    "operation_type": "email",
                     "success": True
                 }
             }
@@ -226,7 +226,7 @@ def register_email_tools(mcp: FastMCP):
                     "emails_limited": len(email_list) >= max_emails
                 },
                 "summary": {
-                    "operation_type": "check_emails",
+                    "operation_type": "emails",
                     "success": True
                 }
             }

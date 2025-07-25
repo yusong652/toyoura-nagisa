@@ -300,8 +300,8 @@ class GeminiClient(LLMClientBase):
             thinking_content = ResponseProcessor.extract_thinking_content(final_response)
             metadata['thinking_preserved'] = thinking_content is not None
             
-            # 创建最终存储消息
-            final_message = context_manager.finalize_and_get_storage_message(final_response)
+            # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
+            final_message = ResponseProcessor.format_response_for_storage(final_response)
             
             # Yield最终结果
             yield (final_message, metadata)

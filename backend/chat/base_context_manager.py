@@ -73,18 +73,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    @abstractmethod
-    def finalize_and_get_storage_message(self, final_response) -> BaseMessage:
-        """
-        完成当前对话轮次，返回用于存储的最终消息对象
-        
-        Args:
-            final_response: 最终的LLM API响应
-            
-        Returns:
-            BaseMessage: 格式化后的用于存储的消息对象
-        """
-        pass
     
     
     # === 通用辅助方法 ===

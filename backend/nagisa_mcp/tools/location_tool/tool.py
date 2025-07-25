@@ -80,7 +80,7 @@ def register_location_tools(mcp: FastMCP):
                 asyncio.create_task(cm.send_json(session_id, {"type": "REQUEST_LOCATION"}))
 
             # Wait for browser response
-            wait_time, elapsed = 30, 0.5
+            wait_time, elapsed = 5, 0.5
             while elapsed < wait_time:
                 await asyncio.sleep(0.5)
                 elapsed += 0.5
@@ -121,9 +121,7 @@ def register_location_tools(mcp: FastMCP):
         llm_content = {
             "operation": {
                 "type": "get_location",
-                "session_id": session_id,
                 "location_source": source_type,
-                "timestamp": timestamp
             },
             "result": {
                 "latitude": loc.latitude,
