@@ -46,8 +46,6 @@ class GeminiContextManager(BaseContextManager):
         # 转换为Gemini API格式的工作上下文
         self.working_contents = MessageFormatter.format_messages_for_gemini(messages)
         
-        # 清空工具调用序列
-        self._tool_call_sequence.clear()
     
     def add_response(self, response) -> None:
         """
@@ -59,11 +57,10 @@ class GeminiContextManager(BaseContextManager):
         Args:
             response: 原始 Gemini API 响应对象
         """
-        if not (hasattr(response, 'candidates') and response.candidates and 
-                hasattr(response.candidates[0], 'content')):
+        try:
+            candidate = response.candidates[0]
+        except (AttributeError, IndexError):
             raise ValueError("Invalid Gemini API response format")
-        
-        candidate = response.candidates[0]
         
         # ✅ 官方最佳实践：直接使用 candidate.content，不重构任何内容
         # 这确保了完整保留所有原始字段，包括思维链、验证字段等
@@ -71,9 +68,6 @@ class GeminiContextManager(BaseContextManager):
         
         # 添加到工作上下文
         self.working_contents.append(raw_content)
-        
-        # 记录工具调用序列（如果存在）
-        self._record_tool_calls_from_response(response)
     
     def _create_multimodal_parts(self, tool_name: str, result: Dict[str, Any]) -> List[Any]:
         """
@@ -149,6 +143,7 @@ class GeminiContextManager(BaseContextManager):
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """添加工具执行结果到上下文中 - 基类接口实现"""
+        # tool_call_id is required by interface but not used in this implementation
         parts = []
         
         # 创建多模态内容 Parts（如果存在）
@@ -168,43 +163,6 @@ class GeminiContextManager(BaseContextManager):
         # 添加到工作上下文
         self.working_contents.append(working_content)
     
-    def get_tool_call_sequence(self) -> List[Dict[str, Any]]:
-        """
-        获取当前的工具调用序列
-        
-        Returns:
-            工具调用序列列表
-        """
-        return self._tool_call_sequence.copy()
-    
-    def clear_tool_call_sequence(self) -> None:
-        """清空工具调用序列"""
-        self._tool_call_sequence.clear()
-    
-    def _record_tool_calls_from_response(self, response) -> None:
-        """
-        从响应中记录工具调用信息
-        
-        Args:
-            response: Gemini API 响应对象
-        """
-        if not (hasattr(response, 'candidates') and response.candidates):
-            return
-            
-        candidate = response.candidates[0]
-        if not (hasattr(candidate, 'content') and hasattr(candidate.content, 'parts')):
-            return
-        
-        # 提取工具调用
-        for part in candidate.content.parts:
-            if hasattr(part, 'function_call') and part.function_call:
-                tool_call = {
-                    'name': part.function_call.name,
-                    'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
-                    'id': part.function_call.id or part.function_call.name
-                }
-                self._tool_call_sequence.append(tool_call)
-    
     def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
         """
         从响应中提取工具调用信息
@@ -215,25 +173,22 @@ class GeminiContextManager(BaseContextManager):
         Returns:
             工具调用列表，格式：[{'name': str, 'arguments': dict, 'id': str}]
         """
-        if not (hasattr(response, 'candidates') and response.candidates):
-            return []
+        try:
+            candidate = response.candidates[0]
+            if candidate.content.role != "model":
+                return []
             
-        candidate = response.candidates[0]
-        if not (hasattr(candidate, 'content') and hasattr(candidate.content, 'parts')):
+            tool_calls = []
+            for part in candidate.content.parts:
+                if part.function_call:
+                    tool_call = {
+                        'name': part.function_call.name,
+                        'arguments': getattr(part.function_call, 'args', getattr(part.function_call, 'arguments', {})),
+                        'id': getattr(part.function_call, 'id', part.function_call.name)
+                    }
+                    tool_calls.append(tool_call)
+            
+            return tool_calls
+        except (AttributeError, IndexError):
             return []
-        
-        if candidate.content.role != "model":
-            return []
-        
-        tool_calls = []
-        for part in candidate.content.parts:
-            if hasattr(part, 'function_call') and part.function_call:
-                tool_call = {
-                    'name': part.function_call.name,
-                    'arguments': part.function_call.args if hasattr(part.function_call, 'args') else part.function_call.arguments,
-                    'id': part.function_call.id or part.function_call.name
-                }
-                tool_calls.append(tool_call)
-        
-        return tool_calls
     

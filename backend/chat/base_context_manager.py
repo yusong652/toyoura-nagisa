@@ -16,14 +16,13 @@ class BaseContextManager(ABC):
     
     定义了统一的接口规范，支持：
     - 消息历史管理和状态隔离
-    - 工具调用序列记录和追踪  
+  
     - 响应内容的上下文保持
     """
     
     def __init__(self):
         """初始化基础状态"""
         self._messages_history: List[BaseMessage] = []
-        self._tool_call_sequence: List[Dict[str, Any]] = []
         self._current_iteration = 0
         self._execution_metadata: Dict[str, Any] = {}
     
@@ -87,9 +86,6 @@ class BaseContextManager(ABC):
         """获取消息历史数量"""
         return len(self._messages_history)
     
-    def get_tool_calls_count(self) -> int:
-        """获取工具调用总数"""
-        return len(self._tool_call_sequence)
     
     def set_execution_metadata(self, key: str, value: Any) -> None:
         """设置执行元数据"""
@@ -102,7 +98,6 @@ class BaseContextManager(ABC):
     def clear_context(self) -> None:
         """清理上下文状态"""
         self._messages_history.clear()
-        self._tool_call_sequence.clear()
         self._current_iteration = 0
         self._execution_metadata.clear()
     
@@ -110,7 +105,6 @@ class BaseContextManager(ABC):
         """获取调试信息"""
         return {
             'messages_count': self.get_messages_count(),
-            'tool_calls_count': self.get_tool_calls_count(),
             'current_iteration': self.get_current_iteration(),
             'execution_metadata': self._execution_metadata.copy()
         }
