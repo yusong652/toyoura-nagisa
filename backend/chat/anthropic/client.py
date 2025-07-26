@@ -8,7 +8,6 @@ from backend.chat.models import BaseMessage, LLMResponse, ToolResultMessage, Use
 from backend.chat.utils import parse_llm_output
 import anthropic
 from fastmcp import Client as MCPClient
-from backend.nagisa_mcp.utils import extract_text_from_mcp_result
 from backend.config import get_system_prompt
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult

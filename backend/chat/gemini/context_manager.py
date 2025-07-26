@@ -88,17 +88,22 @@ class GeminiContextManager(BaseContextManager):
         """
         parts = []
         
-        # 检查并处理 inline_data（多模态内容）
-        if isinstance(result, dict) and 'inline_data' in result:
-            inline_data = result['inline_data']
+        # 多模态内容检测：支持新的统一格式和旧格式
+        if isinstance(result, dict):
+            # 检查新格式：包含 inline_data 字段的结果
+            if 'inline_data' in result:
+                blob = MessageFormatter.process_inline_data(result['inline_data'])
+                if blob:
+                    parts.append(types.Part(inline_data=blob))
+                    print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
             
-            # 使用统一的 inline_data 处理方法，保持架构一致性
-            blob = MessageFormatter.process_inline_data(inline_data)
-            if blob:
-                parts.append(types.Part(inline_data=blob))
-                print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
-            else:
-                print(f"[WARNING] Failed to process inline_data for {tool_name}")
+            # 兼容旧格式：data.processing_result.content.inline_data 路径
+            elif result.get('data', {}).get('processing_result', {}).get('content_format') == 'inline_data':
+                inline_data = result['data']['processing_result']['content']['inline_data']
+                blob = MessageFormatter.process_inline_data(inline_data)
+                if blob:
+                    parts.append(types.Part(inline_data=blob))
+                    print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
         
         return parts
     
@@ -124,7 +129,6 @@ class GeminiContextManager(BaseContextManager):
         # 对于多模态内容，排除大的 inline_data 避免重复
         if 'inline_data' in response_dict:
             response_dict = {k: v for k, v in response_dict.items() if k != 'inline_data'}
-            response_dict['multimodal_content'] = 'Processed as separate image Part'
         
         function_response = types.FunctionResponse(
             name=tool_name,
@@ -133,18 +137,18 @@ class GeminiContextManager(BaseContextManager):
         
         return types.Part(function_response=function_response)
     
-    def add_tool_response(self, tool_name: str, tool_call_id: str, result: Any) -> Dict[str, Any]:
+    
+    def get_working_contents(self) -> List[Dict[str, Any]]:
         """
-        添加工具响应到工作上下文
+        获取工作上下文（原始Gemini API格式）
         
-        Args:
-            tool_name: 工具名称
-            tool_call_id: 工具调用ID
-            result: 工具执行结果
-            
         Returns:
-            添加到上下文的工具响应内容
+            原始格式的上下文列表，用于API调用
         """
+        return self.working_contents
+    
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+        """添加工具执行结果到上下文中 - 基类接口实现"""
         parts = []
         
         # 创建多模态内容 Parts（如果存在）
@@ -163,23 +167,6 @@ class GeminiContextManager(BaseContextManager):
         
         # 添加到工作上下文
         self.working_contents.append(working_content)
-        
-        return working_content
-    
-    def get_working_contents(self) -> List[Dict[str, Any]]:
-        """
-        获取工作上下文（原始Gemini API格式）
-        
-        Returns:
-            原始格式的上下文列表，用于API调用
-        """
-        return self.working_contents
-    
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
-        """添加工具执行结果到上下文中 - 基类接口实现"""
-        self.add_tool_response(tool_name, tool_call_id, result)
-    
-    
     
     def get_tool_call_sequence(self) -> List[Dict[str, Any]]:
         """

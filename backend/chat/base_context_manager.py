@@ -73,8 +73,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    
-    
     # === 通用辅助方法 ===
     
     def get_current_iteration(self) -> int:

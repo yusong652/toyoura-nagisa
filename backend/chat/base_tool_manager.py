@@ -12,7 +12,7 @@ from fastmcp import Client as MCPClient
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
 from backend.nagisa_mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from backend.nagisa_mcp.utils import extract_text_from_mcp_result
+from backend.nagisa_mcp.utils import extract_tool_result_from_mcp
 
 
 class BaseToolManager(ABC):
@@ -199,7 +199,7 @@ class BaseToolManager(ABC):
         try:
             # 执行meta工具
             result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            text_result = extract_text_from_mcp_result(result)
+            text_result = extract_tool_result_from_mcp(result)
             
             # 检查执行错误
             if isinstance(result, dict) and result.get("error"):
@@ -231,29 +231,25 @@ class BaseToolManager(ABC):
             debug: 是否启用调试输出
             
         Returns:
-            Any: 工具执行结果
+            Any: 工具执行结果，传递给LLM
         """
         try:
             # 执行普通工具
             result_obj = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            tool_output = extract_text_from_mcp_result(result_obj)
+            tool_result = extract_tool_result_from_mcp(result_obj)
             
-            # 检查错误状态
-            if isinstance(tool_output, dict) and tool_output.get("status") == "error":
+            # 检查MCP层面的错误（is_error字段）
+            if tool_result.get("is_error"):
                 return self._create_error_response(
-                    tool_id, tool_name, tool_output.get("message", "Tool execution failed.")
+                    tool_id, tool_name, tool_result.get("content", "Tool execution failed.")
                 )
             
-            # 处理多媒体内容
-            processed_output = self._process_multimodal_content(tool_output, tool_name, debug)
-            if processed_output is not None:
-                return processed_output
+            # 处理多模态内容：检查是否有inline_data并提取
+            if self._has_multimodal_content(tool_result):
+                return self._extract_multimodal_content(tool_result)
             
-            # 提取LLM内容（如果存在）
-            if isinstance(tool_output, dict) and 'llm_content' in tool_output:
-                return tool_output['llm_content']
-            
-            return tool_output
+            # 普通内容：也使用统一的内容提取方法
+            return self._extract_regular_content(tool_result)
             
         except Exception as e:
             if debug:
@@ -352,44 +348,58 @@ class BaseToolManager(ABC):
                 import traceback
                 print(f"[DEBUG] Traceback: {traceback.format_exc()}")
     
-    def _process_multimodal_content(self, tool_output: Any, tool_name: str, debug: bool = False) -> Optional[Dict[str, Any]]:
+    def _has_multimodal_content(self, tool_result: Dict[str, Any]) -> bool:
         """
-        处理工具输出中的多媒体内容
+        检查ToolResult是否包含多模态内容
         
         Args:
-            tool_output: 工具输出结果
-            tool_name: 工具名称
-            debug: 是否启用调试输出
+            tool_result: 完整的ToolResult字典
             
         Returns:
-            Optional[Dict]: 如果检测到多媒体内容，返回处理后的结构；否则返回None
+            bool: 是否包含多模态内容
         """
-        if not isinstance(tool_output, dict):
-            return None
+        return (
+            tool_result.get("data", {})
+            .get("processing_result", {})
+            .get("content_format") == "inline_data"
+        )
+    
+    def _extract_multimodal_content(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        提取多模态内容，合并llm_content和inline_data
         
-        # 检查是否包含inline_data
-        if ('data' in tool_output and 
-            isinstance(tool_output['data'], dict) and
-            'processing_result' in tool_output['data'] and
-            isinstance(tool_output['data']['processing_result'], dict)):
+        Args:
+            tool_result: 完整的ToolResult字典
             
-            processing_result = tool_output['data']['processing_result']
-            if (processing_result.get('content_format') == 'inline_data' and
-                'content' in processing_result and
-                isinstance(processing_result['content'], dict) and
-                'inline_data' in processing_result['content']):
-                
-                inline_data_content = processing_result['content']
-                
-                if debug:
-                    print(f"[DEBUG] Detected inline_data in {tool_name} result")
-                
-                return {
-                    **tool_output.get('llm_content', {}),
-                    'inline_data': inline_data_content['inline_data']
-                }
+        Returns:
+            Dict: 合并后的内容，包含inline_data
+        """
+        llm_content = tool_result.get("llm_content", {})
+        inline_data = (
+            tool_result.get("data", {})
+            .get("processing_result", {})
+            .get("content", {})
+            .get("inline_data", {})
+        )
         
-        return None
+        return {
+            **llm_content,
+            "inline_data": inline_data
+        }
+    
+    def _extract_regular_content(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        提取普通内容，包装在llm_content字段中，与多模态内容格式对齐
+        
+        Args:
+            tool_result: 完整的ToolResult字典
+            
+        Returns:
+            Dict: 包含llm_content字段的字典，与多模态内容格式一致
+        """
+        return {
+            "llm_content": tool_result.get("llm_content")
+        }
     
     def _create_error_response(self, tool_id: str, tool_name: str, error_message: str) -> Dict[str, Any]:
         """

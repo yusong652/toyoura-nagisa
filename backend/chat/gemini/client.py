@@ -192,14 +192,6 @@ class GeminiClient(LLMClientBase):
             self.client, first_user_message, first_assistant_message, title_generation_system_prompt
         )
 
-    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None):
-        """
-        处理 LLM 生成的 function_call 请求，自动分发到 MCP 工具
-        function_call: 形如 {"name": "search_weather", "arguments": {"city": "北京"}}
-        session_id: 可选的会话ID，用于需要会话上下文的工具（如文生图）
-        """
-        debug = self.gemini_config.debug
-        return await self.tool_manager.handle_function_call(function_call, session_id, debug)
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
@@ -393,9 +385,9 @@ class GeminiClient(LLMClientBase):
                 }
                 
                 # 添加工具响应到上下文
-                context_manager.add_tool_response(
-                    tool_call['name'],
+                context_manager.add_tool_result(
                     tool_call['id'],
+                    tool_call['name'],
                     tool_result
                 )
             
