@@ -34,28 +34,10 @@ class AssistantMessage(BaseMessage):
     role: Literal["assistant"] = "assistant"
 
 # =====================
-# 工具调用消息（助手发起）
+# 工具相关类已移除
 # =====================
-class AssistantToolMessage(BaseMessage):
-    """
-    LLM 触发的工具调用消息（function call），等待工具执行并返回结果。
-    """
-    tool_calls: List[Dict[str, Any]]
-    content: Optional[Union[str, List[dict]]] = None  # 使 content 成为可选字段
-    role: Literal["assistant"] = "assistant"
-
-# =====================
-# 工具调用结果消息（工具响应，回复 AssistantToolMessage）
-# =====================
-class ToolResultMessage(BaseMessage):
-    """
-    工具调用的结果消息（tool result），用于回复 AssistantToolMessage。
-    这是工具执行后返回的结果消息。
-    """
-    tool_call_id: str  # 确保这是必需的字段
-    name: str
-    content: Any  # 使用 Any 类型，因为工具返回的内容可能是任何类型
-    role: Literal["tool"] = "tool"
+# 工具调用现在在LLM客户端内部处理，不再需要存储工具调用和结果消息
+# AssistantToolMessage 和 ToolResultMessage 已移除
 
 # =====================
 # 图片消息
@@ -73,7 +55,7 @@ class ImageMessage(BaseModel):
 # =====================
 # 类型提示用 Union
 # =====================
-MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, ToolResultMessage, ImageMessage]
+MessageType = Union[UserMessage, AssistantMessage, ImageMessage]
 
 # =====================
 # 消息工厂函数
@@ -81,17 +63,13 @@ MessageType = Union[UserMessage, AssistantMessage, AssistantToolMessage, ToolRes
 def message_factory(data: dict) -> BaseMessage:
     """
     根据输入字典自动实例化正确的消息类型。
+    
+    简化版本 - 工具调用在LLM客户端内部处理，消息存储只需要用户、助手、图片三种类型。
     """
-    # First check for tool-related messages
-    if data.get('role') == 'tool':
-        if 'tool_call_id' not in data:
-            raise ValueError("Tool response message must have a tool_call_id")
-        return ToolResultMessage(
-            tool_call_id=data['tool_call_id'],
-            name=data['name'],
-            content=data['content']
-        )
-    elif data.get('role') == 'image':
+    role = data.get('role')
+    
+    # 处理图片消息
+    if role == 'image':
         if 'image_path' not in data:
             raise ValueError("Image message must have an image_path")
         return ImageMessage(
@@ -100,52 +78,22 @@ def message_factory(data: dict) -> BaseMessage:
             id=data.get('id'),
             timestamp=data.get('timestamp')
         )
-    elif 'tool_calls' in data:
-        # AssistantToolMessage 也需要过滤 content
-        filtered_data = {k: v for k, v in data.items() if k != 'role'}
-        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
-            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
-        return AssistantToolMessage(**filtered_data)
     
-    # Check for tool_use in content
-    if isinstance(data.get('content'), list):
-        for item in data.get('content', []):
-            if isinstance(item, dict) and item.get('type') == 'tool_use':
-                return AssistantToolMessage(
-                    content=data['content'],
-                    id=item.get('id'),
-                    tool_calls=[{
-                        'id': item.get('id'),
-                        'type': 'function',
-                        'function': {
-                            'name': item.get('name'),
-                            'arguments': json.dumps(item.get('input', {}))
-                        }
-                    }]
-                )
+    # 处理普通消息
+    filtered_data = {k: v for k, v in data.items() if k != 'role'}
     
-    # Then check for regular messages based on role
-    role = data.get('role')
     if role == 'assistant':
-        filtered_data = {k: v for k, v in data.items() if k != 'role'}
-        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
-            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
         return AssistantMessage(**filtered_data)
-    elif role == 'user':
-        return UserMessage(**{k: v for k, v in data.items() if k != 'role'})
     else:
-        # If no role is specified, try to infer from content
-        if isinstance(data.get('content'), str) and data.get('content', '').startswith('[[thinking]]'):
-            return AssistantMessage(**{k: v for k, v in data.items() if k != 'role'})
-        else:
-            return UserMessage(**{k: v for k, v in data.items() if k != 'role'})
+        # 用户消息或默认情况
+        return UserMessage(**filtered_data)
 
 # =====================
 # 创建历史记录消息
 # =====================
 def message_factory_no_thinking(data: dict) -> BaseMessage:
     """
-    message_factory_no_thinking: 创建用于历史记录的消息对象，过滤掉 thinking 和 redacted_thinking 块。
+    创建用于历史记录的消息对象，过滤掉 thinking 和 redacted_thinking 块。
     这个函数主要用于构造发送给 LLM 的历史消息，以减少不必要的 token 消耗。
     
     Args:
@@ -154,63 +102,45 @@ def message_factory_no_thinking(data: dict) -> BaseMessage:
     Returns:
         BaseMessage: 过滤后的消息对象
     """
-    # 首先处理工具相关的消息，这些保持不变
-    if data.get('role') == 'tool':
-        if 'tool_call_id' not in data:
-            raise ValueError("Tool response message must have a tool_call_id")
-        return ToolResultMessage(
-            tool_call_id=data['tool_call_id'],
-            name=data['name'],
-            content=data['content']
-        )
-    elif data.get('role') == 'image':
-        if 'image_path' not in data:
-            raise ValueError("Image message must have an image_path")
-        return ImageMessage(
-            content=data.get('content', ''),
-            image_path=data['image_path'],
-            id=data.get('id'),
-            timestamp=data.get('timestamp')
-        )
-    elif 'tool_calls' in data:
-        filtered_data = {k: v for k, v in data.items() if k != 'role'}
-        if 'content' in filtered_data and isinstance(filtered_data['content'], str):
-            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
-        return AssistantToolMessage(**filtered_data)
-    
-    # 处理带有结构化内容的消息
-    if isinstance(data.get('content'), list):
-        # 过滤掉 thinking 和 redacted_thinking 块，只保留 text 和其他类型的块
-        filtered_content = []
-        for item in data['content']:
-            if isinstance(item, dict):
-                if item.get('type') not in ['thinking', 'redacted_thinking']:
-                    filtered_content.append(item)
-            else:
-                filtered_content.append(item)
-        
-        # 如果过滤后没有内容，添加一个空的文本块
-        if not filtered_content:
-            filtered_content = [{"type": "text", "text": ""}]
-        
-        # 更新消息数据
-        filtered_data = {k: v for k, v in data.items() if k != 'role'}
-        filtered_data['content'] = filtered_content
-        
-        if data.get('role') == 'assistant':
-            return AssistantMessage(**filtered_data)
-        else:
-            return UserMessage(**filtered_data)
-    
-    # 处理字符串内容的消息
     role = data.get('role')
+    
+    # 图片消息保持不变
+    if role == 'image':
+        return message_factory(data)
+    
+    # 处理需要过滤thinking的消息
     filtered_data = {k: v for k, v in data.items() if k != 'role'}
+    
+    # 处理结构化内容
+    if isinstance(data.get('content'), list):
+        filtered_content = _filter_thinking_blocks(data['content'])
+        filtered_data['content'] = filtered_content
+    # 处理字符串内容
+    elif isinstance(filtered_data.get('content'), str):
+        filtered_data['content'] = extract_response_without_think(filtered_data['content'])
+    
+    # 创建消息对象
     if role == 'assistant':
-        if isinstance(filtered_data.get('content'), str):
-            filtered_data['content'] = extract_response_without_think(filtered_data['content'])
         return AssistantMessage(**filtered_data)
     else:
         return UserMessage(**filtered_data)
+
+
+def _filter_thinking_blocks(content_list: list) -> list:
+    """过滤掉thinking和redacted_thinking块"""
+    filtered_content = []
+    for item in content_list:
+        if isinstance(item, dict):
+            if item.get('type') not in ['thinking', 'redacted_thinking']:
+                filtered_content.append(item)
+        else:
+            filtered_content.append(item)
+    
+    # 如果过滤后没有内容，添加一个空的文本块
+    if not filtered_content:
+        filtered_content = [{"type": "text", "text": ""}]
+    
+    return filtered_content
 
 # =====================
 # 兼容原有类型提示

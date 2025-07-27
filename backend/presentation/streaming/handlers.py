@@ -129,45 +129,44 @@ async def _process_content_pipeline(
     
     content = final_message.content
     
-    # 提取文本内容，过滤掉thinking部分
+    # 提取文本内容用于TTS（不包含thinking）
     text_content = ""
     if isinstance(content, list):
         for item in content:
             if isinstance(item, dict) and item.get('type') == 'text':
                 text_content += item.get('text', '')
-            # 明确跳过thinking和redacted_thinking类型
-            elif isinstance(item, dict) and item.get('type') in ['thinking', 'redacted_thinking']:
-                continue
+            # thinking内容不用于TTS，但会保存到历史记录
     else:
         text_content = str(content)
     
     if not text_content.strip():
         return 
     
-    # 处理AI文本消息 - 保存到历史记录，使用过滤后的内容
+    # 处理AI文本消息 - 保存到历史记录，包含完整content（包括thinking）
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     
-    # 创建过滤后的内容用于保存和TTS
-    filtered_content = content
-    if isinstance(content, list):
-        filtered_content = []
-        for item in content:
-            if isinstance(item, dict) and item.get('type') not in ['thinking', 'redacted_thinking']:
-                filtered_content.append(item)
-            elif not isinstance(item, dict):
-                filtered_content.append(item)
-        
-        # 如果过滤后没有内容，添加空文本块
-        if not filtered_content:
-            filtered_content = [{"type": "text", "text": ""}]
-    
+    # 直接保存完整内容，包括thinking
     ai_msg_id, processed_content = process_ai_text_message(
-        filtered_content,
+        content,  # 保存完整content，包括thinking内容
         getattr(final_message, 'keyword', None),
         history_msgs,
         session_id
     )
+    
+    # 创建过滤后的内容仅用于TTS（移除thinking）
+    filtered_content_for_tts = content
+    if isinstance(content, list):
+        filtered_content_for_tts = []
+        for item in content:
+            if isinstance(item, dict) and item.get('type') not in ['thinking', 'redacted_thinking']:
+                filtered_content_for_tts.append(item)
+            elif not isinstance(item, dict):
+                filtered_content_for_tts.append(item)
+        
+        # 如果过滤后没有内容，添加空文本块
+        if not filtered_content_for_tts:
+            filtered_content_for_tts = [{"type": "text", "text": ""}]
     
     # 发送消息ID
     yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"

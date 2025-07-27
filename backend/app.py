@@ -1,26 +1,18 @@
 import os
 import traceback
-import json
-import base64
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from pathlib import Path
-import uvicorn
 from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from backend.infrastructure.tts.remote.fish_audio import FishAudioTTS
 from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
 from backend.infrastructure.llm.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
-from backend.infrastructure.llm.title_generator import generate_conversation_title
 from backend.infrastructure.llm.llm_factory import get_client
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config, LOCATION_DB_PATH
-import uuid
 from backend.shared.utils.helpers import (
     parse_message_data,
     process_user_message,
