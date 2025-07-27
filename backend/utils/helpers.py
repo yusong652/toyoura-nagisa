@@ -3,12 +3,12 @@ import base64
 import asyncio
 import uuid
 from datetime import datetime
-from backend.chat.utils import get_all_sessions, update_session_title, save_history, load_history
-from backend.tts.base import BaseTTS
-from backend.chat.title_generator import generate_conversation_title
+from backend.infrastructure.llm.utils import get_all_sessions, update_session_title, save_history, load_history
+from backend.infrastructure.tts.base import BaseTTS
+from backend.infrastructure.llm.title_generator import generate_conversation_title
 from backend.config import get_llm_config
-from backend.chat.models import message_factory, AssistantMessage, UserMessage, BaseMessage
-from backend.memory import MemoryManager
+from backend.infrastructure.llm.models import message_factory, AssistantMessage, UserMessage, BaseMessage
+from backend.infrastructure.memory import MemoryManager
 from typing import Any, List, Dict
 import re
 from backend.utils.text_clean import extract_response_without_think

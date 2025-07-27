@@ -2,18 +2,18 @@ import json
 import uuid
 import asyncio
 from typing import Dict, Any, List, AsyncGenerator
-from backend.chat import LLMClientBase
-from backend.chat.models import BaseMessage, message_factory, message_factory_no_thinking
-from backend.chat.utils import load_all_message_history, load_history
-from backend.tts.base import BaseTTS
-from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
+from backend.infrastructure.llm import LLMClientBase
+from backend.infrastructure.llm.models import BaseMessage, message_factory, message_factory_no_thinking
+from backend.infrastructure.llm.utils import load_all_message_history, load_history
+from backend.infrastructure.tts.base import BaseTTS
+from backend.infrastructure.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
 from backend.utils.helpers import (
     process_ai_text_message,
     process_tts_sentence,
     should_generate_title,
     generate_title_for_session,
 )
-from backend.chat.utils import update_session_title
+from backend.infrastructure.llm.utils import update_session_title
 from backend.config import get_llm_config
 
 

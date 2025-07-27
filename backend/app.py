@@ -12,13 +12,13 @@ from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from backend.tts.remote.fish_audio import FishAudioTTS
-from backend.tts.base import BaseTTS, TTSRequest
-from backend.chat import LLMClientBase, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
-from backend.chat.title_generator import generate_conversation_title
-from backend.chat.llm_factory import get_client
-from backend.tts.tts_factory import get_tts_engine
+from backend.infrastructure.tts.remote.fish_audio import FishAudioTTS
+from backend.infrastructure.tts.base import BaseTTS, TTSRequest
+from backend.infrastructure.llm import LLMClientBase, ErrorResponse
+from backend.infrastructure.llm.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
+from backend.infrastructure.llm.title_generator import generate_conversation_title
+from backend.infrastructure.llm.llm_factory import get_client
+from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config, LOCATION_DB_PATH
 import uuid
 from backend.utils.helpers import (
@@ -26,8 +26,8 @@ from backend.utils.helpers import (
     process_user_message,
     generate_title_for_session,
 )
-from backend.chat.models import message_factory
-from backend.chat.models import (
+from backend.infrastructure.llm.models import message_factory
+from backend.infrastructure.llm.models import (
     NewHistoryRequest,
     HistorySessionResponse,
     SwitchSessionRequest,
@@ -38,12 +38,12 @@ from backend.chat.models import (
     UpdateTTSEnabledRequest,
     GenerateImageRequest
 )
-from backend.nagisa_mcp.smart_mcp_server import mcp
+from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
-from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
+from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
 from backend.presentation.api import images
-from backend.memory.memory_manager import MemoryManager
+from backend.infrastructure.memory.memory_manager import MemoryManager
 
 
 # 加载环境变量
@@ -441,7 +441,7 @@ async def update_browser_location(request: Request):
         }
         
         # Store in temporary location storage for active tool calls
-        from backend.nagisa_mcp.tools.location_tool.tool import store_temp_location
+        from backend.infrastructure.mcp.tools.location_tool.tool import store_temp_location
         if session_id:
             store_temp_location(session_id, location_data)
         
@@ -531,7 +531,7 @@ async def _validate_llm_configuration():
     验证LLM配置，确保使用的是支持的客户端
     """
     try:
-        from backend.chat.llm_factory import get_supported_clients, is_client_supported
+        from backend.infrastructure.llm.llm_factory import get_supported_clients, is_client_supported
         from backend.config import get_current_llm_type
         
         current_llm = get_current_llm_type()
