@@ -9,7 +9,7 @@ import re
 import os
 import json
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Union
 from google.genai import types
 from backend.infrastructure.llm.models import BaseMessage, UserMessage, AssistantMessage
 from .message_formatter import MessageFormatter
@@ -385,6 +385,33 @@ class WebSearchGenerator:
             return {"error": error_msg, "query": query}
 
 
+def _extract_text_content(content: Union[str, List[dict]]) -> str:
+    """
+    Extract text content from BaseMessage content field.
+    
+    Args:
+        content: Either a string or a list of content dictionaries
+        
+    Returns:
+        Extracted text content as string
+    """
+    if isinstance(content, str):
+        return content
+    
+    if isinstance(content, list):
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get('type') == 'text' and 'text' in item:
+                    text_parts.append(item['text'])
+                elif 'text' in item:  # Fallback for other formats
+                    text_parts.append(item['text'])
+        return ' '.join(text_parts)
+    
+    # Fallback for unexpected formats
+    return str(content)
+
+
 class ImagePromptGenerator:
     """
     Handles text-to-image prompt generation using Gemini API.
@@ -450,7 +477,9 @@ class ImagePromptGenerator:
             conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
             for msg in latest_messages:
                 if msg is not None:
-                    conversation_text += f"{msg.role}: {msg.content}\n"
+                    # 正确提取文本内容，处理 Union[str, List[dict]] 类型
+                    text_content = _extract_text_content(msg.content)
+                    conversation_text += f"{msg.role}: {text_content}\n"
             
             current_request = UserMessage(role="user", content=conversation_text)
             messages.append(current_request)
