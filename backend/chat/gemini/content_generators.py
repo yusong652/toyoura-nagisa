@@ -6,12 +6,99 @@ based on conversation context. Separates content generation concerns from the ma
 """
 
 import re
+import os
+import json
+from datetime import datetime
 from typing import Optional, Dict, List, Any
 from google.genai import types
-from backend.chat.models import BaseMessage, UserMessage
+from backend.chat.models import BaseMessage, UserMessage, AssistantMessage
 from .message_formatter import MessageFormatter
 from backend.config import get_text_to_image_config, get_llm_specific_config
 from backend.chat.utils import get_latest_n_messages
+
+
+def _get_text_to_image_history_file(session_id: str) -> str:
+    """Get the path to the text-to-image history file for a session."""
+    from backend.chat.utils import HISTORY_BASE_DIR
+    session_dir = os.path.join(HISTORY_BASE_DIR, session_id)
+    return os.path.join(session_dir, "text_to_image_history.json")
+
+
+def load_text_to_image_history(session_id: str) -> List[Dict[str, Any]]:
+    """
+    Load text-to-image prompt generation history for a session.
+    
+    Args:
+        session_id: Session ID to load history for
+        
+    Returns:
+        List of previous prompt generation records, each containing:
+        - user_message: The original request
+        - assistant_message: The generated prompt response
+        - timestamp: When the generation occurred
+    """
+    history_file = _get_text_to_image_history_file(session_id)
+    
+    if not os.path.exists(history_file):
+        return []
+    
+    try:
+        with open(history_file, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+            return history
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"[WARNING] Failed to load text-to-image history for session {session_id}: {e}")
+        return []
+
+
+def save_text_to_image_generation(
+    session_id: str, 
+    user_request: str, 
+    assistant_response: str,
+    max_history_length: int = 10
+) -> None:
+    """
+    Save a text-to-image prompt generation record to history.
+    
+    Args:
+        session_id: Session ID to save to
+        user_request: The original user request text
+        assistant_response: Complete assistant response content
+        max_history_length: Maximum number of records to keep (default: 10)
+    """
+    history_file = _get_text_to_image_history_file(session_id)
+    
+    # Ensure session directory exists
+    session_dir = os.path.dirname(history_file)
+    os.makedirs(session_dir, exist_ok=True)
+    
+    # Load existing history
+    history = load_text_to_image_history(session_id)
+    
+    # Create new record
+    new_record = {
+        "user_message": {
+            "role": "user",
+            "content": user_request
+        },
+        "assistant_message": {
+            "role": "assistant", 
+            "content": assistant_response  # 保存完整的assistant response，不做格式化
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Add new record and maintain history length
+    history.append(new_record)
+    if len(history) > max_history_length:
+        history = history[-max_history_length:]  # Keep only the latest records
+    
+    # Save updated history
+    try:
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[ERROR] Failed to save text-to-image history for session {session_id}: {e}")
 
 
 class TitleGenerator:
@@ -341,13 +428,32 @@ class ImagePromptGenerator:
                     print(f"[text_to_image] Error: {error_msg}")
                 return None
             
-            # 构造消息序列
+            # 加载历史few-shot示例
+            few_shot_history = load_text_to_image_history(session_id) if session_id else []
+            
+            # 构造消息序列，包含few-shot学习
+            messages = []
+            
+            # 添加few-shot示例（作为历史对话）
+            for record in few_shot_history[-3:]:  # 使用最近的3个示例
+                if debug:
+                    print(f"[text_to_image] Adding few-shot example from {record.get('timestamp', 'unknown')}")
+                
+                # 直接添加用户消息和助手回复，保持原有的格式
+                user_msg = UserMessage(role="user", content=record['user_message']['content'])
+                messages.append(user_msg)
+                
+                assistant_msg = AssistantMessage(role="assistant", content=record['assistant_message']['content'])
+                messages.append(assistant_msg)
+            
+            # 构造当前请求 - 注意：latest_messages是当前对话上下文，用于理解用户想要生成什么图像
             conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
             for msg in latest_messages:
                 if msg is not None:
                     conversation_text += f"{msg.role}: {msg.content}\n"
             
-            messages = [UserMessage(role="user", content=conversation_text)]
+            current_request = UserMessage(role="user", content=conversation_text)
+            messages.append(current_request)
             
             # 使用MessageFormatter进行消息格式转换
             contents = MessageFormatter.format_messages_for_gemini(messages)
@@ -389,7 +495,7 @@ class ImagePromptGenerator:
                 pprint.pprint(prompt_config)
             
             response = client.models.generate_content(
-                model=config.get("model_for_text_to_image", "gemini-1.5-pro-latest"),
+                model=config.get("model_for_text_to_image", "gemini-1.5-pro"),
                 contents=contents,
                 config=prompt_config
             )
@@ -453,10 +559,23 @@ class ImagePromptGenerator:
                     print(f"[Gemini][text_to_image] Final text_prompt: {text_prompt}")
                     print(f"[Gemini][text_to_image] Final negative_prompt: {negative_prompt}")
                 
-                return {
+                # 保存成功的生成记录到历史中，用于future few-shot学习
+                final_prompts = {
                     "text_prompt": text_prompt,
                     "negative_prompt": negative_prompt
                 }
+                
+                if session_id:
+                    try:
+                        save_text_to_image_generation(session_id, conversation_text, prompt_text)
+                        if debug:
+                            print(f"[text_to_image] Saved generation to history for session {session_id}")
+                    except Exception as e:
+                        if debug:
+                            print(f"[text_to_image] Warning: Failed to save generation to history: {e}")
+                        # 不阻止返回结果，只是记录错误
+                
+                return final_prompts
             return None
             
         except Exception as e:
