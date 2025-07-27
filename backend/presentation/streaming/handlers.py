@@ -7,7 +7,7 @@ from backend.infrastructure.llm.models import BaseMessage, message_factory, mess
 from backend.infrastructure.llm.utils import load_all_message_history, load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
-from backend.utils.helpers import (
+from backend.shared.utils.helpers import (
     process_ai_text_message,
     process_tts_sentence,
     should_generate_title,

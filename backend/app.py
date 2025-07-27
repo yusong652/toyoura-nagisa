@@ -21,7 +21,7 @@ from backend.infrastructure.llm.llm_factory import get_client
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_config, LOCATION_DB_PATH
 import uuid
-from backend.utils.helpers import (
+from backend.shared.utils.helpers import (
     parse_message_data,
     process_user_message,
     generate_title_for_session,

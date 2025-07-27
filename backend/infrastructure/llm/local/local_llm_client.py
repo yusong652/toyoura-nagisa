@@ -13,7 +13,7 @@ import httpx
 from backend.infrastructure.llm.models import BaseMessage, LLMResponse, AssistantMessage
 from backend.infrastructure.llm.base import LLMClientBase
 from backend.config.llm import get_llm_settings
-from backend.utils.text_clean import extract_response_without_think
+from backend.shared.utils.text_clean import extract_response_without_think
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field # 导入 Pydantic 的 BaseModel 和 Field
 from typing import List, Optional, Dict, Any, Union, Literal # 导入类型提示和 Literal 以及 Union
 from datetime import datetime # 导入 datetime 模块
 import json
-from backend.utils.text_clean import extract_response_without_think
+from backend.shared.utils.text_clean import extract_response_without_think
 
 # =====================
 # 消息模型基类

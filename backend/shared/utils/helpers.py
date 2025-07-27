@@ -11,7 +11,7 @@ from backend.infrastructure.llm.models import message_factory, AssistantMessage,
 from backend.infrastructure.memory import MemoryManager
 from typing import Any, List, Dict
 import re
-from backend.utils.text_clean import extract_response_without_think
+from backend.shared.utils.text_clean import extract_response_without_think
 
 # 初始化MemoryManager
 memory_manager = MemoryManager()
