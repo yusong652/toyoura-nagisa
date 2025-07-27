@@ -114,7 +114,16 @@ class GeminiContextManager(BaseContextManager):
         """
         # 处理不同类型的工具结果
         if isinstance(result, dict):
-            response_dict = result.copy()
+            # 如果result是ToolResult格式，优先使用llm_content字段
+            if 'llm_content' in result and result['llm_content'] is not None:
+                # 使用llm_content作为LLM对话内容
+                response_dict = result['llm_content'] if isinstance(result['llm_content'], dict) else {"content": result['llm_content']}
+            elif 'status' in result and 'message' in result:
+                # 这是ToolResult格式但没有llm_content，使用message字段
+                response_dict = {"result": result['message']}
+            else:
+                # 传统格式，直接使用
+                response_dict = result.copy()
         elif isinstance(result, str):
             response_dict = {"result": result}
         else:

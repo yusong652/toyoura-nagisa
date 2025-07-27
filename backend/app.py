@@ -42,7 +42,7 @@ from backend.nagisa_mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
 from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
-from backend.routes import images
+from backend.presentation.api import images
 from backend.memory.memory_manager import MemoryManager
 
 
@@ -50,8 +50,8 @@ from backend.memory.memory_manager import MemoryManager
 load_dotenv()
 
 # ========== 导入重构后的模块 ==========
-from backend.api.websocket.connection import ConnectionManager
-from backend.core.streaming import generate_chat_stream
+from backend.presentation.websocket.connection import ConnectionManager
+from backend.presentation.streaming.handlers import generate_chat_stream
 
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
