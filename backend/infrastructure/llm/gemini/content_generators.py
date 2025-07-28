@@ -5,100 +5,40 @@ Specialized generators for creating titles, image prompts, and other derived con
 based on conversation context. Separates content generation concerns from the main client.
 """
 
-import re
-import os
-import json
-from datetime import datetime
-from typing import Optional, Dict, List, Any, Union
+from typing import Optional, Dict, Any
 from google.genai import types
 from backend.infrastructure.llm.models import BaseMessage, UserMessage, AssistantMessage
 from .message_formatter import MessageFormatter
+from .debug import GeminiDebugger
+from .response_processor import ResponseProcessor
 from backend.config import get_text_to_image_config, get_llm_specific_config
 from backend.infrastructure.llm.utils import get_latest_n_messages
-
-
-def _get_text_to_image_history_file(session_id: str) -> str:
-    """Get the path to the text-to-image history file for a session."""
-    from backend.infrastructure.llm.utils import HISTORY_BASE_DIR
-    session_dir = os.path.join(HISTORY_BASE_DIR, session_id)
-    return os.path.join(session_dir, "text_to_image_history.json")
-
-
-def load_text_to_image_history(session_id: str) -> List[Dict[str, Any]]:
-    """
-    Load text-to-image prompt generation history for a session.
-    
-    Args:
-        session_id: Session ID to load history for
-        
-    Returns:
-        List of previous prompt generation records, each containing:
-        - user_message: The original request
-        - assistant_message: The generated prompt response
-        - timestamp: When the generation occurred
-    """
-    history_file = _get_text_to_image_history_file(session_id)
-    
-    if not os.path.exists(history_file):
-        return []
-    
-    try:
-        with open(history_file, 'r', encoding='utf-8') as f:
-            history = json.load(f)
-            return history
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"[WARNING] Failed to load text-to-image history for session {session_id}: {e}")
-        return []
-
-
-def save_text_to_image_generation(
-    session_id: str, 
-    user_request: str, 
-    assistant_response: str,
-    max_history_length: int = 10
-) -> None:
-    """
-    Save a text-to-image prompt generation record to history.
-    
-    Args:
-        session_id: Session ID to save to
-        user_request: The original user request text
-        assistant_response: Complete assistant response content
-        max_history_length: Maximum number of records to keep (default: 10)
-    """
-    history_file = _get_text_to_image_history_file(session_id)
-    
-    # Ensure session directory exists
-    session_dir = os.path.dirname(history_file)
-    os.makedirs(session_dir, exist_ok=True)
-    
-    # Load existing history
-    history = load_text_to_image_history(session_id)
-    
-    # Create new record
-    new_record = {
-        "user_message": {
-            "role": "user",
-            "content": user_request
-        },
-        "assistant_message": {
-            "role": "assistant", 
-            "content": assistant_response  # 保存完整的assistant response，不做格式化
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    # Add new record and maintain history length
-    history.append(new_record)
-    if len(history) > max_history_length:
-        history = history[-max_history_length:]  # Keep only the latest records
-    
-    # Save updated history
-    try:
-        with open(history_file, 'w', encoding='utf-8') as f:
-            json.dump(history, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"[ERROR] Failed to save text-to-image history for session {session_id}: {e}")
+from .config import get_gemini_client_config
+from .shared.utils import (
+    load_text_to_image_history,
+    save_text_to_image_generation,
+    extract_text_content,
+    parse_text_to_image_response,
+    enhance_prompts_with_defaults,
+    parse_title_response
+)
+from .shared.constants.text_to_image import (
+    DEFAULT_NEGATIVE_PROMPT,
+    DEFAULT_FEW_SHOT_MAX_LENGTH,
+    DEFAULT_CONTEXT_MESSAGE_COUNT,
+    DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT,
+    CONVERSATION_TEXT_PROMPT_PREFIX
+)
+from .shared.constants.web_search import (
+    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
+    DEFAULT_WEB_SEARCH_TEMPERATURE
+)
+from .shared.constants.title_generation import (
+    DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+    DEFAULT_TITLE_GENERATION_TEMPERATURE,
+    DEFAULT_TITLE_MAX_LENGTH,
+    TITLE_GENERATION_REQUEST_TEXT
+)
 
 
 class TitleGenerator:
@@ -129,46 +69,27 @@ class TitleGenerator:
             Generated title string, or None if generation fails
         """
         try:
-            system_prompt = title_generation_system_prompt or (
-                "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。"
-                "标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，"
-                "并且除了这些标签和标题本身外，不要输出任何其他内容。"
-            )
+            # 读取Gemini配置
+            gemini_config = get_gemini_client_config()
+            
+            system_prompt = title_generation_system_prompt or DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
             
             # 配置生成标题的参数
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
-                temperature=2.0,
-                max_output_tokens=1024
+                temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
+                max_output_tokens=gemini_config.model_settings.max_output_tokens
             )
             
             # 构造消息序列，最后一条为user
             messages = [
                 first_user_message,
                 first_assistant_message,
-                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
+                UserMessage(role="user", content=[{"type": "text", "text": TITLE_GENERATION_REQUEST_TEXT}])
             ]
             
-            # 处理消息内容
-            contents = []
-            for msg in messages:
-                parts = []
-                if isinstance(msg.content, list):
-                    for item in msg.content:
-                        if "text" in item:
-                            parts.append(types.Part(text=item['text']))
-                        elif "inline_data" in item:
-                            # 使用统一的 inline_data 处理方法
-                            blob = MessageFormatter.process_inline_data(item['inline_data'])
-                            if blob:
-                                parts.append(types.Part(inline_data=blob))
-                else:
-                    # 处理字符串内容
-                    parts.append(types.Part(text=str(msg.content)))
-                
-                # 使用 MessageFormatter 的角色映射
-                mapped_role = MessageFormatter.map_role(msg.role)
-                contents.append({"role": mapped_role, "parts": parts})
+            # 使用MessageFormatter进行统一的消息格式转换
+            contents = MessageFormatter.format_messages_for_gemini(messages)
             
             # Get model from configuration
             gemini_config = get_llm_specific_config("gemini")
@@ -180,24 +101,11 @@ class TitleGenerator:
                 config=title_config
             )
             
-            if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
-                title_response_text = response.candidates[0].content.parts[0].text
-                
-                # 处理标题格式
-                title_match = re.search(r'<title>(.*?)</title>', title_response_text, re.DOTALL)
-                if title_match:
-                    title = title_match.group(1).strip()
-                    if not title:
-                        return None
-                    if len(title) > 30:
-                        title = title[:30]
-                    return title
-                
-                # 兜底处理
-                cleaned_title = title_response_text.strip().strip('"\'').strip()
-                if cleaned_title and len(cleaned_title) <= 30:
-                    return cleaned_title
-            return None
+            # Extract response text using ResponseProcessor
+            title_response_text = ResponseProcessor.extract_text_content(response)
+            
+            # Parse title using utility function
+            return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
             
         except Exception as e:
             print(f"Gemini生成标题时出错: {str(e)}")
@@ -238,32 +146,21 @@ class WebSearchGenerator:
             if debug:
                 print(f"[WebSearch] Performing search for query: {query}")
             
+            # 读取Gemini配置
+            gemini_config = get_gemini_client_config()
+            
             # Configure the Gemini model with the web search tool
             # Use google_search tool as per 2025 API requirements
-            web_search_system_prompt = (
-                "You are a professional web search assistant. Your task is to search for and synthesize "
-                "information from the web to provide comprehensive, accurate, and up-to-date answers. "
-                "When searching:\n"
-                "1. Use the search tool to find relevant and current information\n"
-                "2. Analyze multiple sources for accuracy and reliability\n"
-                "3. Synthesize information into a coherent, well-structured response\n"
-                "4. Prioritize recent and authoritative sources\n"
-                "5. Clearly indicate when information is uncertain or requires verification\n"
-                "6. Provide context and explain complex topics clearly\n"
-                "Focus on delivering factual, helpful information that directly addresses the user's query."
-            )
+            web_search_system_prompt = DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
             
             # Note: Gemini's google_search tool doesn't support max_uses parameter
             # The max_uses parameter is accepted for API compatibility but ignored
             search_config = types.GenerateContentConfig(
                 system_instruction=web_search_system_prompt,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.1,
-                max_output_tokens=4096
+                temperature=DEFAULT_WEB_SEARCH_TEMPERATURE,
+                max_output_tokens=gemini_config.model_settings.max_output_tokens
             )
-            
-            if debug and max_uses != 5:
-                print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Create user message with search query
             user_message = UserMessage(role="user", content=query)
@@ -272,9 +169,8 @@ class WebSearchGenerator:
             contents = MessageFormatter.format_messages_for_gemini([user_message])
             
             if debug:
-                print(f"[WebSearch] Formatted contents for API call:")
-                import pprint
-                pprint.pprint(contents)
+                GeminiDebugger.print_debug_request(contents, search_config)
+                print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Get model from configuration
             gemini_config = get_llm_specific_config("gemini")
@@ -288,77 +184,15 @@ class WebSearchGenerator:
             )
             
             if debug:
-                print(f"[WebSearch] Raw API response received")
-                # Debug: Print response structure
-                if hasattr(response, 'candidates') and response.candidates:
-                    candidate = response.candidates[0]
-                    print(f"[WebSearch] Candidate attributes: {dir(candidate)}")
-                    if hasattr(candidate, 'grounding_metadata'):
-                        print(f"[WebSearch] Grounding metadata found")
-                        gm = candidate.grounding_metadata
-                        print(f"[WebSearch] Grounding metadata attributes: {dir(gm)}")
-                    else:
-                        print(f"[WebSearch] No grounding_metadata found")
+                GeminiDebugger.print_debug_response(response)
             
             # Check for tool calls
             if hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
+                # Extract sources using ResponseProcessor
+                sources = ResponseProcessor.extract_web_search_sources(response, debug=debug)
                 
-                # Extract grounding metadata for sources
-                grounding_metadata = getattr(candidate, 'grounding_metadata', None)
-                sources = []
-                if grounding_metadata:
-                    grounding_chunks = getattr(grounding_metadata, 'grounding_chunks', [])
-                    
-                    # Process grounding chunks according to official API structure
-                    for i, chunk in enumerate(grounding_chunks):
-                        if hasattr(chunk, 'web'):
-                            web_info = chunk.web
-                            # Extract more comprehensive information
-                            source_data = {
-                                'url': getattr(web_info, 'uri', ''),
-                                'title': getattr(web_info, 'title', ''),
-                                'snippet': getattr(web_info, 'text', ''),
-                                'index': i
-                            }
-                            
-                            # Try to get additional metadata if available
-                            if hasattr(web_info, 'snippet'):
-                                source_data['snippet'] = web_info.snippet
-                            
-                            sources.append(source_data)
-                            
-                            if debug:
-                                print(f"[WebSearch] Source {i+1}: {source_data['title']}")
-                                print(f"[WebSearch]   URL: {source_data['url']}")
-                                print(f"[WebSearch]   Snippet: {source_data['snippet'][:100]}...")
-                                
-                        elif hasattr(chunk, 'uri'):  # Fallback for older format
-                            source_data = {
-                                'url': chunk.uri,
-                                'title': getattr(chunk, 'title', ''),
-                                'snippet': getattr(chunk, 'text', ''),
-                                'index': i
-                            }
-                            sources.append(source_data)
-                            
-                            if debug:
-                                print(f"[WebSearch] Source {i+1} (fallback): {source_data['title']}")
-                                
-                # Also try to extract citation/grounding support information
-                if grounding_metadata and hasattr(grounding_metadata, 'grounding_supports'):
-                    grounding_supports = grounding_metadata.grounding_supports
-                    if debug:
-                        print(f"[WebSearch] Found {len(grounding_supports)} grounding supports")
-                        for j, support in enumerate(grounding_supports):
-                            if hasattr(support, 'grounding_chunk_indices'):
-                                chunk_indices = support.grounding_chunk_indices
-                                print(f"[WebSearch] Support {j+1} references chunks: {chunk_indices}")
-                
-                # Extract response text
-                response_text = ""
-                if hasattr(candidate, 'content') and candidate.content.parts:
-                    response_text = candidate.content.parts[0].text
+                # Extract response text using ResponseProcessor
+                response_text = ResponseProcessor.extract_text_content(response)
                 
                 # Build structured result
                 result = {
@@ -384,32 +218,6 @@ class WebSearchGenerator:
                 print(f"[WebSearch] Error: {error_msg}")
             return {"error": error_msg, "query": query}
 
-
-def _extract_text_content(content: Union[str, List[dict]]) -> str:
-    """
-    Extract text content from BaseMessage content field.
-    
-    Args:
-        content: Either a string or a list of content dictionaries
-        
-    Returns:
-        Extracted text content as string
-    """
-    if isinstance(content, str):
-        return content
-    
-    if isinstance(content, list):
-        text_parts = []
-        for item in content:
-            if isinstance(item, dict):
-                if item.get('type') == 'text' and 'text' in item:
-                    text_parts.append(item['text'])
-                elif 'text' in item:  # Fallback for other formats
-                    text_parts.append(item['text'])
-        return ' '.join(text_parts)
-    
-    # Fallback for unexpected formats
-    return str(content)
 
 
 class ImagePromptGenerator:
@@ -438,17 +246,43 @@ class ImagePromptGenerator:
             Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
         """
         try:
+            # 读取所有配置
             config = get_text_to_image_config()
+            gemini_config = get_gemini_client_config()
+            
+            # 提取配置参数
             system_prompt = config.get(
                 "text_to_image_system_prompt", 
-                "You are a professional prompt engineer. Please generate a detailed and creative "
-                "text-to-image prompt based on the following conversation. The prompt should be "
-                "suitable for high-quality image generation."
+                DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT
             )
+            context_message_count = config.get("context_message_count", DEFAULT_CONTEXT_MESSAGE_COUNT)
+            few_shot_max_length = config.get("few_shot_max_length", DEFAULT_FEW_SHOT_MAX_LENGTH)
+            temperature = config.get("text_to_image_temperature", 1.0)
+            model_for_text_to_image = config.get("model_for_text_to_image", "gemini-1.5-pro")
+            default_positive_prompt = config.get("default_positive_prompt", "")
+            default_negative_prompt = config.get("default_negative_prompt", "")
+            safety_settings = gemini_config.safety_settings.to_gemini_format()
+            max_output_tokens = gemini_config.model_settings.max_output_tokens
+
+            # 创建API调用配置
+            config_kwargs = {
+                "system_instruction": system_prompt,
+                "safety_settings": safety_settings,
+                "temperature": temperature,
+                "max_output_tokens": max_output_tokens
+            }
+            
+            # 添加thinking配置（如果适用）
+            if (model_for_text_to_image.startswith("gemini-2.5") and 
+                gemini_config.model_settings.enable_thinking_for_gemini_2_5):
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    include_thoughts=gemini_config.model_settings.include_thoughts_in_response
+                )
+            
+            prompt_config = types.GenerateContentConfig(**config_kwargs)
             
             # 获取最新的对话消息
-            n = config.get("context_message_count", 4)
-            latest_messages = get_latest_n_messages(session_id, n) if session_id else tuple([None] * n)
+            latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
             if not any(latest_messages):
                 error_msg = f"Missing conversation context for session {session_id}"
                 if debug:
@@ -457,15 +291,10 @@ class ImagePromptGenerator:
             
             # 加载历史few-shot示例
             few_shot_history = load_text_to_image_history(session_id) if session_id else []
-            
             # 构造消息序列，包含few-shot学习
             messages = []
-            
             # 添加few-shot示例（作为历史对话）
-            for record in few_shot_history[-3:]:  # 使用最近的3个示例
-                if debug:
-                    print(f"[text_to_image] Adding few-shot example from {record.get('timestamp', 'unknown')}")
-                
+            for record in few_shot_history[-few_shot_max_length:]:  # 使用配置的示例数量
                 # 直接添加用户消息和助手回复，保持原有的格式
                 user_msg = UserMessage(role="user", content=record['user_message']['content'])
                 messages.append(user_msg)
@@ -474,11 +303,11 @@ class ImagePromptGenerator:
                 messages.append(assistant_msg)
             
             # 构造当前请求 - 注意：latest_messages是当前对话上下文，用于理解用户想要生成什么图像
-            conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
+            conversation_text = CONVERSATION_TEXT_PROMPT_PREFIX
             for msg in latest_messages:
                 if msg is not None:
                     # 正确提取文本内容，处理 Union[str, List[dict]] 类型
-                    text_content = _extract_text_content(msg.content)
+                    text_content = extract_text_content(msg.content)
                     conversation_text += f"{msg.role}: {text_content}\n"
             
             current_request = UserMessage(role="user", content=conversation_text)
@@ -487,106 +316,42 @@ class ImagePromptGenerator:
             # 使用MessageFormatter进行消息格式转换
             contents = MessageFormatter.format_messages_for_gemini(messages)
             if debug:
-                print("\n[text_to_image] Messages for prompt generation:")
                 import pprint
-                pprint.pprint(messages)
                 print("[text_to_image] Formatted contents:")
                 pprint.pprint(contents)
             
-            prompt_config = types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                safety_settings=[
-                    {
-                        "category": types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                        "threshold": types.HarmBlockThreshold.BLOCK_NONE
-                    },
-                    {
-                        "category": types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                        "threshold": types.HarmBlockThreshold.BLOCK_NONE
-                    },
-                    {
-                        "category": types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                        "threshold": types.HarmBlockThreshold.BLOCK_NONE
-                    },
-                    {
-                        "category": types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                        "threshold": types.HarmBlockThreshold.BLOCK_NONE
-                    }
-                ],
-                temperature=1.6,
-                max_output_tokens=4096
-            )
-            
-            if debug:
-                print("\n[Gemini][text_to_image] System prompt:")
-                print(system_prompt)
-                print("[Gemini][text_to_image] Prompt config:")
-                pprint.pprint(prompt_config)
+
             
             response = client.models.generate_content(
-                model=config.get("model_for_text_to_image", "gemini-1.5-pro"),
+                model=model_for_text_to_image,
                 contents=contents,
                 config=prompt_config
             )
 
-            if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
-                prompt_text = response.candidates[0].content.parts[0].text
-                text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
-                negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
-                
-                if not text_prompt_match:
-                    if debug:
-                        print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {prompt_text}")
-                    return None
-                
-                text_prompt = text_prompt_match.group(1).strip()
-                negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else (
-                    "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+            # Extract response text using ResponseProcessor
+            prompt_text = ResponseProcessor.extract_text_content(response)
+            
+            if prompt_text:
+                # 使用工具函数解析响应
+                parsed_result = parse_text_to_image_response(
+                    prompt_text,
+                    default_negative_prompt=DEFAULT_NEGATIVE_PROMPT,
+                    debug=debug
                 )
                 
-                if not text_prompt:
-                    if debug:
-                        print(f"[text_to_image] Error: Extracted text prompt is empty")
+                if parsed_result is None:
                     return None
-
-                # 获取默认关键词并补充
-                default_positive_prompt = config.get("default_positive_prompt", "")
-                default_negative_prompt = config.get("default_negative_prompt", "")
-
-                # 检查并补充默认关键词
-                if default_positive_prompt:
-                    # 用逗号分隔关键词
-                    default_keywords = default_positive_prompt.split(",")
-                    existing_keywords = text_prompt.split(",")
-                    # 找出缺失的关键词
-                    missing_keywords = [
-                        kw for kw in default_keywords 
-                        if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]
-                    ]
-                    if missing_keywords:
-                        # 清理原始提示词
-                        text_prompt = text_prompt.strip().lstrip(",").strip()
-                        # 用逗号连接所有关键词
-                        text_prompt = ", ".join(missing_keywords) + (", " + text_prompt if text_prompt else "")
-
-                if default_negative_prompt:
-                    # 用逗号分隔关键词
-                    default_keywords = default_negative_prompt.split(",")
-                    existing_keywords = negative_prompt.split(",")
-                    # 找出缺失的关键词
-                    missing_keywords = [
-                        kw for kw in default_keywords 
-                        if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]
-                    ]
-                    if missing_keywords:
-                        # 清理原始提示词
-                        negative_prompt = negative_prompt.strip().lstrip(",").strip()
-                        # 用逗号连接所有关键词，确保没有前导空格
-                        negative_prompt = ", ".join(missing_keywords) + (", " + negative_prompt.lstrip() if negative_prompt else "")
-
-                if debug:
-                    print(f"[Gemini][text_to_image] Final text_prompt: {text_prompt}")
-                    print(f"[Gemini][text_to_image] Final negative_prompt: {negative_prompt}")
+                
+                text_prompt, negative_prompt = parsed_result
+                
+                # 使用工具函数增强提示词
+                text_prompt, negative_prompt = enhance_prompts_with_defaults(
+                    text_prompt=text_prompt,
+                    negative_prompt=negative_prompt,
+                    default_positive_prompt=default_positive_prompt,
+                    default_negative_prompt=default_negative_prompt,
+                    debug=debug
+                )
                 
                 # 保存成功的生成记录到历史中，用于future few-shot学习
                 final_prompts = {
@@ -605,6 +370,7 @@ class ImagePromptGenerator:
                         # 不阻止返回结果，只是记录错误
                 
                 return final_prompts
+            
             return None
             
         except Exception as e:

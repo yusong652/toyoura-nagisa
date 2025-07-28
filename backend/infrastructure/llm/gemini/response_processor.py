@@ -13,7 +13,7 @@ during multi-turn tool calling while ensuring proper storage format compatibilit
 
 from typing import List, Dict, Any, Optional, Tuple, Union
 from backend.infrastructure.llm.models import LLMResponse, BaseMessage, message_factory
-from .constants import PYDANTIC_METADATA_ATTRS
+from .shared.constants import PYDANTIC_METADATA_ATTRS
 from backend.infrastructure.llm.utils import parse_llm_output
 
 
@@ -323,6 +323,93 @@ class ResponseProcessor:
         except Exception as e:
             print(f"[WARNING] Error extracting thinking content: {e}")
             return None
+
+    @staticmethod
+    def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from grounding metadata in Gemini API response.
+        
+        This method processes grounding metadata to extract search sources
+        with comprehensive debugging support.
+        
+        Args:
+            response: Raw Gemini API response object
+            debug: Enable debug output for source extraction
+            
+        Returns:
+            List of source dictionaries with url, title, snippet, and index
+        """
+        sources = []
+        
+        try:
+            analysis = ResponseProcessor.analyze_response_state(response)
+            if analysis['is_error'] or not analysis['has_candidates']:
+                if debug:
+                    print("[WebSearch] No valid candidates found for source extraction")
+                return sources
+                
+            candidate = response.candidates[0]
+            
+            # Extract grounding metadata for sources
+            grounding_metadata = getattr(candidate, 'grounding_metadata', None)
+            if not grounding_metadata:
+                if debug:
+                    print("[WebSearch] No grounding metadata found")
+                return sources
+                
+            grounding_chunks = getattr(grounding_metadata, 'grounding_chunks', [])
+            if debug:
+                print(f"[WebSearch] Found {len(grounding_chunks)} grounding chunks")
+            
+            # Process grounding chunks according to official API structure
+            for i, chunk in enumerate(grounding_chunks):
+                if hasattr(chunk, 'web'):
+                    web_info = chunk.web
+                    # Extract comprehensive information
+                    source_data = {
+                        'url': getattr(web_info, 'uri', ''),
+                        'title': getattr(web_info, 'title', ''),
+                        'snippet': getattr(web_info, 'text', ''),
+                        'index': i
+                    }
+                    
+                    # Try to get additional metadata if available
+                    if hasattr(web_info, 'snippet'):
+                        source_data['snippet'] = web_info.snippet
+                    
+                    sources.append(source_data)
+                    
+                    if debug:
+                        print(f"[WebSearch] Source {i+1}: {source_data['title']}")
+                        print(f"[WebSearch]   URL: {source_data['url']}")
+                        print(f"[WebSearch]   Snippet: {source_data['snippet'][:100]}...")
+                        
+                elif hasattr(chunk, 'uri'):  # Fallback for older format
+                    source_data = {
+                        'url': chunk.uri,
+                        'title': getattr(chunk, 'title', ''),
+                        'snippet': getattr(chunk, 'text', ''),
+                        'index': i
+                    }
+                    sources.append(source_data)
+                    
+                    if debug:
+                        print(f"[WebSearch] Source {i+1} (fallback): {source_data['title']}")
+            
+            # Also extract citation/grounding support information for debugging
+            if debug and grounding_metadata and hasattr(grounding_metadata, 'grounding_supports'):
+                grounding_supports = grounding_metadata.grounding_supports
+                print(f"[WebSearch] Found {len(grounding_supports)} grounding supports")
+                for j, support in enumerate(grounding_supports):
+                    if hasattr(support, 'grounding_chunk_indices'):
+                        chunk_indices = support.grounding_chunk_indices
+                        print(f"[WebSearch] Support {j+1} references chunks: {chunk_indices}")
+                        
+        except Exception as e:
+            if debug:
+                print(f"[WebSearch] Error extracting sources: {e}")
+            
+        return sources
 
     @staticmethod
     def extract_text_content(response) -> str:
