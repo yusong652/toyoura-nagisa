@@ -12,6 +12,8 @@ import requests
 from datetime import datetime
 from typing import Optional
 from backend.domain.models.messages import ImageMessage
+from backend.infrastructure.storage.session_manager import load_all_message_history, save_history
+    
 
 
 def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = "chat/data") -> str:
@@ -109,9 +111,6 @@ def _create_and_save_image_message(session_id: str, filename: str) -> None:
         session_id: 会话ID
         filename: 图片文件名
     """
-    # 延迟导入避免循环依赖
-    from backend.infrastructure.storage.session_manager import load_all_message_history, save_history
-    
     # 创建图片消息
     relative_path = os.path.join(session_id, filename)
     print(f"[DEBUG] Creating image message with relative_path: {relative_path}")

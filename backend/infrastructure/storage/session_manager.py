@@ -11,10 +11,14 @@ import uuid
 import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from backend.domain.models.message_factory import message_factory
+from backend.domain.models.message_factory import message_factory
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from backend.domain.models.messages import BaseMessage
+
+
+
 
 
 # 聊天历史相关工具
@@ -243,8 +247,6 @@ def load_and_restore_history(session_id: str):
     """
     加载并还原指定会话ID的聊天历史，返回消息对象列表
     """
-    # 延迟导入避免循环依赖
-    from backend.domain.models.message_factory import message_factory
     
     history = load_all_message_history(session_id)
     return [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
@@ -287,8 +289,6 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
     Returns:
         Tuple: 包含消息对象的元组，如果消息不足n条，返回所有实际消息
     """
-    # 延迟导入避免循环依赖
-    from backend.domain.models.message_factory import message_factory
     
     history = load_history(session_id)  # 只返回非 image 消息
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
