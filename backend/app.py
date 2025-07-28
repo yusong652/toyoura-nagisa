@@ -12,7 +12,7 @@ from backend.infrastructure.llm import LLMClientBase, ErrorResponse
 from backend.infrastructure.llm.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
 from backend.infrastructure.llm.llm_factory import get_client
 from backend.infrastructure.tts.tts_factory import get_tts_engine
-from backend.config import get_llm_config, LOCATION_DB_PATH
+from backend.config import get_llm_settings, LOCATION_DB_PATH
 from backend.shared.utils.helpers import (
     parse_message_data,
     process_user_message,
@@ -220,7 +220,7 @@ async def switch_session(request: SwitchSessionRequest):
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         # 返回会话信息和最近的消息
-        recent_messages_length = get_llm_config().get("recent_messages_length", 5)
+        recent_messages_length = get_llm_settings().get("recent_messages_length", 5)
         recent_messages = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
         
         return {

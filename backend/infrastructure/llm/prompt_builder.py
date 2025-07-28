@@ -2,7 +2,7 @@
 
 This module centralises the logic for building the system prompt fed into the
 LLM.  The first step is simply **reading** the static template file
-`base_prompt.md` so that individual LLM clients (GPT, Gemini, Anthropic …) can
+`config/prompts/base_prompt.md` so that individual LLM clients (GPT, Gemini, Anthropic …) can
 reuse the same prompt without duplicating I/O code.
 
 Later we will extend this module to inject dynamic environment context (date,
@@ -31,8 +31,8 @@ from typing import Optional
 #        to a custom markdown prompt file.
 ENV_VAR = "NAGISA_SYSTEM_MD"
 
-# 2. Default prompt file lives next to this module
-DEFAULT_PROMPT_PATH = Path(__file__).with_name("base_prompt.md")
+# 2. Default prompt file lives in config/prompts directory
+DEFAULT_PROMPT_PATH = Path(__file__).parent.parent.parent / "config" / "prompts" / "base_prompt.md"
 
 
 # -----------------------------------------------------------------------------
@@ -45,7 +45,7 @@ def load_base_prompt() -> str:
 
     The lookup strategy is:
       1. Check ``$NAGISA_SYSTEM_MD`` env variable (see table above).
-      2. Fallback to the default path ``backend/chat/base_prompt.md``.
+      2. Fallback to the default path ``backend/config/prompts/base_prompt.md``.
 
     If the file does not exist or is disabled, an empty string is returned – the
     calling code can then decide how to proceed (e.g. use a hard-coded

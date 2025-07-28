@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from google import genai
 from google.genai import types
 
-from backend.config import get_llm_specific_config, get_system_prompt
+from backend.config import get_llm_settings, get_system_prompt
 from backend.infrastructure.llm.base import LLMClientBase
 from backend.infrastructure.llm.models import BaseMessage, LLMResponse
 from .config import get_gemini_client_config, GeminiClientConfig

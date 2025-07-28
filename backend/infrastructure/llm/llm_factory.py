@@ -5,7 +5,7 @@ from backend.infrastructure.llm.gemini import GeminiClient
 from backend.infrastructure.llm.local.local_llm_client import LocalLLMClient
 from backend.infrastructure.llm.anthropic import AnthropicClient
 from backend.infrastructure.llm.gpt import GPTClient
-from backend.config import get_llm_config, get_current_llm_type, get_llm_specific_config
+from backend.config import get_llm_settings
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,11 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
         Local clients (local_llm, ollama) provide offline inference capabilities
         with automatic service management and health monitoring.
     """
+    # 获取LLM配置
+    llm_settings = get_llm_settings()
+    
     # 如果没有指定名称，使用配置中的类型
-    name = name or get_current_llm_type()
+    name = name or llm_settings.type
     
     # 验证客户端是否支持
     if name not in _clients:
@@ -89,52 +92,67 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
             f"💡 Solution: Configure your LLM to use one of the supported clients."
         )
     
-    # 获取全局配置和特定 LLM 的配置
-    global_config = get_llm_config()
-    specific_config = get_llm_specific_config(name)
-    
-    # 合并配置和参数 - 正确处理必需参数和可选参数
-    extra_config = {
-        "recent_messages_length": global_config.get("recent_messages_length", 20),
-        "debug": global_config.get("debug", False),
-        # 合并特定LLM配置
-        **specific_config,
-        # 合并传入的kwargs
-        **kwargs
-    }
-    
-    # 提取必需的构造函数参数（如API key）
+    # 准备客户端配置
     client_kwargs = {
-        "tools_enabled": global_config.get("tools_enabled", True),
-        "extra_config": {}
+        "tools_enabled": getattr(llm_settings, 'tools_enabled', True),
+        "extra_config": kwargs  # 直接传递额外的kwargs
     }
     
-    # 将特定LLM的必需参数从extra_config中提取出来
-    if name == "gemini" and "api_key" in extra_config:
-        client_kwargs["api_key"] = extra_config.pop("api_key")
-    elif name in ["anthropic"] and "api_key" in extra_config:
-        client_kwargs["api_key"] = extra_config.pop("api_key")
-    elif name in ["gpt", "openai"] and "api_key" in extra_config:
-        client_kwargs["api_key"] = extra_config.pop("api_key")
+    # 根据LLM类型获取特定配置和API key
+    if name == "gemini":
+        gemini_config = llm_settings.get_gemini_config()
+        client_kwargs["api_key"] = gemini_config.google_api_key
+        client_kwargs["extra_config"].update({
+            "model": gemini_config.model,
+            "temperature": gemini_config.temperature,
+            "top_p": gemini_config.top_p,
+            "top_k": gemini_config.top_k,
+            "max_output_tokens": gemini_config.max_output_tokens,
+            "web_search_max_uses": gemini_config.web_search_max_uses,
+            "debug": llm_settings.debug,
+        })
+    elif name == "anthropic":
+        anthropic_config = llm_settings.get_anthropic_config()
+        client_kwargs["api_key"] = anthropic_config.anthropic_api_key
+        client_kwargs["extra_config"].update({
+            "model": anthropic_config.model,
+            "temperature": anthropic_config.temperature,
+            "max_tokens": anthropic_config.max_tokens,
+            "top_p": anthropic_config.top_p,
+            "top_k": anthropic_config.top_k,
+            "web_search_max_uses": anthropic_config.web_search_max_uses,
+            "debug": llm_settings.debug,
+        })
+    elif name in ["gpt", "openai"]:
+        gpt_config = llm_settings.get_gpt_config()
+        client_kwargs["api_key"] = gpt_config.openai_api_key
+        client_kwargs["extra_config"].update({
+            "model": gpt_config.model,
+            "temperature": gpt_config.temperature,
+            "top_p": gpt_config.top_p,
+            "top_k": gpt_config.top_k,
+            "max_tokens": gpt_config.max_tokens,
+        })
     elif name == "local_llm":
-        # Local LLM specific parameters
-        if "server_url" in extra_config:
-            client_kwargs["server_url"] = extra_config.pop("server_url")
-        if "api_key" in extra_config:
-            client_kwargs["api_key"] = extra_config.pop("api_key")
-        if "model" in extra_config:
-            client_kwargs["model"] = extra_config.pop("model")
-        if "timeout" in extra_config:
-            client_kwargs["timeout"] = extra_config.pop("timeout")
+        local_llm_config = llm_settings.get_local_llm_config()
+        client_kwargs.update({
+            "server_url": local_llm_config.server_url,
+            "api_key": local_llm_config.api_key,
+            "model": local_llm_config.model,
+            "timeout": local_llm_config.timeout,
+        })
+        client_kwargs["extra_config"].update({
+            "temperature": local_llm_config.temperature,
+            "top_p": local_llm_config.top_p,
+            "max_tokens": local_llm_config.max_tokens,
+        })
     elif name == "ollama":
-        # Ollama specific parameters
-        if "model_name" in extra_config:
-            client_kwargs["model_name"] = extra_config.pop("model_name")
-        if "base_url" in extra_config:
-            client_kwargs["base_url"] = extra_config.pop("base_url")
-    
-    # 将剩余配置放入extra_config
-    client_kwargs["extra_config"] = extra_config
+        # Ollama使用local_llm配置
+        local_llm_config = llm_settings.get_local_llm_config()
+        client_kwargs.update({
+            "model_name": local_llm_config.model,
+            "base_url": local_llm_config.server_url,
+        })
     
     # 如果app实例被传递，将其添加到extra_config中
     if app:

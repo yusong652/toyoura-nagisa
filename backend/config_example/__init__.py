@@ -85,8 +85,8 @@ MEMORY_DB_PATH = BASE_DIR / "memory_db"
 
 # 提示词加载函数
 def _load_prompt_file(filename: str) -> str:
-    """从 chat 目录加载指定的提示文件"""
-    prompt_path = CHAT_DIR / filename
+    """从 config/prompts 目录加载指定的提示文件"""
+    prompt_path = BASE_DIR / "config" / "prompts" / filename
     try:
         return prompt_path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:

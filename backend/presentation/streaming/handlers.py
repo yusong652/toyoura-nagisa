@@ -14,7 +14,7 @@ from backend.shared.utils.helpers import (
     generate_title_for_session,
 )
 from backend.infrastructure.llm.utils import update_session_title
-from backend.config import get_llm_config
+from backend.config import get_llm_settings
 
 
 # 全局状态管理
@@ -258,7 +258,7 @@ async def generate_chat_stream(session_id: str, recent_msgs: List[BaseMessage], 
         recent_history = load_history(session_id)  # load history without image
         # 使用 message_factory_no_thinking 创建历史消息，过滤掉 thinking 块
         recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
-        recent_messages_length = get_llm_config().get("recent_messages_length", 20)
+        recent_messages_length = get_llm_settings().recent_messages_length
         recent_msgs = recent_msgs[-recent_messages_length:]
         
         async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):

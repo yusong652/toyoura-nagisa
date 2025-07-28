@@ -7,7 +7,7 @@ from typing import Optional
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.tts.remote.fish_audio import FishAudioTTS, FishSpeechConfig
 from backend.infrastructure.tts.local.gpt_sovits import GPTSoVITSTTS, GPTSoVITSConfig
-from backend.config import get_tts_config
+from backend.config import get_tts_settings
 
 def get_tts_engine() -> BaseTTS:
     """
@@ -19,12 +19,29 @@ def get_tts_engine() -> BaseTTS:
     Raises:
         ValueError: 如果配置的 TTS 类型不支持
     """
-    config = get_tts_config()
-    tts_type = config.get('type', 'fish_audio').lower()
+    settings = get_tts_settings()
+    tts_type = settings.type.lower()
     
     if tts_type == 'fish_audio':
-        return FishAudioTTS(FishSpeechConfig(config.get('fish_audio', {})))
+        fish_config = settings.get_fish_audio_config()
+        return FishAudioTTS(FishSpeechConfig({
+            'api_key': fish_config.fish_audio_api_key,
+            'reference_id': fish_config.fish_audio_reference_id,
+        }))
     elif tts_type == 'gpt_sovits':
-        return GPTSoVITSTTS(GPTSoVITSConfig(config.get('gpt_sovits', {})))
+        gpt_config = settings.get_gpt_sovits_config()
+        return GPTSoVITSTTS(GPTSoVITSConfig({
+            'server_url': gpt_config.server_url,
+            'text_lang': gpt_config.text_lang,
+            'speed': gpt_config.speed,
+            'ref_audio_path': gpt_config.ref_audio_path,
+            'prompt_lang': gpt_config.prompt_lang,
+            'prompt_text': gpt_config.prompt_text,
+            'cut_punc': gpt_config.cut_punc,
+            'top_k': gpt_config.top_k,
+            'top_p': gpt_config.top_p,
+            'temperature': gpt_config.temperature,
+            'inp_refs': gpt_config.inp_refs,
+        }))
     else:
         raise ValueError(f"Unsupported TTS type: {tts_type}") 

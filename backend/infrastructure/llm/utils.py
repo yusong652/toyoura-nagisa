@@ -201,8 +201,10 @@ def get_allowed_keywords_from_prompt_file() -> List[str]:
     if _allowed_keywords_cache is not None:
         return _allowed_keywords_cache
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(current_dir, "expression_prompt.md")
+    # Use the new location in config/prompts
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent.parent
+    file_path = project_root / "config" / "prompts" / "expression_prompt.md"
     keywords = []
     try:
         with open(file_path, 'r', encoding='utf-8') as f:

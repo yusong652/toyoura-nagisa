@@ -2,7 +2,7 @@
 
 import re
 import emoji # 需要 pip install emoji
-from backend.config import get_tts_config
+from backend.config import get_tts_settings
 
 # 预编译一些可能用到的、比较安全的正则表达式
 # 匹配括号及内部2-15个非括号字符 (尝试匹配简单颜文字如 (^_^) )
@@ -13,9 +13,9 @@ KEYWORD_MARKER_PATTERN = re.compile(r'\[\[\w+\]\]\s*$')
 WHITESPACE_PATTERN = re.compile(r'\s+')
 
 # 从配置文件获取默认值
-TTS_CONFIG = get_tts_config()
-DEFAULT_SPLIT_PUNCTUATIONS = TTS_CONFIG.get("split_punctuations", ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'])
-DEFAULT_PUNCTUATION_LIMIT = int(TTS_CONFIG.get("split_size", 4))
+tts_settings = get_tts_settings()
+DEFAULT_SPLIT_PUNCTUATIONS = getattr(tts_settings, 'split_punctuations', ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'])
+DEFAULT_PUNCTUATION_LIMIT = getattr(tts_settings, 'split_size', 4)
 
 # 新增：提取并替换emoji和kaomoji为占位符
 KAOMOJI_PLACEHOLDER = "__KAOMOJI_{}__"
@@ -38,7 +38,7 @@ def extract_and_replace_emoticons(text: str):
     text = KAOMOJI_PATTERN_PARENS.sub(_kaomoji_repl, text)
     # 再替换emoji
     emoji_idx = [0]
-    def _emoji_repl(char, data=None):  # 修正：接收两个参数
+    def _emoji_repl(char, _data=None):  # 修正：接收两个参数
         idx = emoji_idx[0]
         emoji_list.append(char)
         emoji_idx[0] += 1

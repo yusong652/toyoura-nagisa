@@ -1,7 +1,7 @@
 """Web Search Tool Factory for Multi-LLM Support."""
 
 from typing import Dict, Any, Optional
-from backend.config import get_llm_specific_config
+from backend.config import get_llm_settings
 
 
 class WebSearchToolFactory:
@@ -53,15 +53,22 @@ class WebSearchToolFactory:
             WebSearchGenerator = WebSearchToolFactory.get_web_search_generator(llm_type)
             
             # Get LLM-specific configuration
-            llm_config = get_llm_specific_config(llm_type.lower())
+            llm_settings = get_llm_settings()
             
             # Use configured max_uses if not provided
             if max_uses is None:
-                max_uses = llm_config.get("web_search_max_uses", 5)
+                if llm_type.lower() == 'gemini':
+                    gemini_config = llm_settings.get_gemini_config()
+                    max_uses = gemini_config.web_search_max_uses
+                elif llm_type.lower() == 'anthropic':
+                    anthropic_config = llm_settings.get_anthropic_config()
+                    max_uses = anthropic_config.web_search_max_uses
+                else:
+                    max_uses = 5
             
             # Get debug setting from configuration if not explicitly set
             if not debug:
-                debug = llm_config.get("debug", False)
+                debug = llm_settings.debug
             
             # Perform the search with appropriate parameters
             if llm_type.lower() == 'gemini':

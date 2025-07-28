@@ -74,8 +74,6 @@ class AnthropicClient(LLMClientBase):
         """清除会话的工具缓存"""
         self.tool_manager.clear_session_tool_cache(session_id)
 
-
-
     def _format_llm_response(self, response) -> LLMResponse:
         """
         Format Anthropic API response into LLMResponse object.

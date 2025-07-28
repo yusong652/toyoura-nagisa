@@ -11,7 +11,7 @@ from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from openai import OpenAI
 from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
-from backend.config import get_text_to_image_config, get_llm_specific_config, get_system_prompt
+from backend.config import get_text_to_image_settings, get_llm_settings, get_system_prompt
 
 class GPTClient(LLMClientBase):
     """

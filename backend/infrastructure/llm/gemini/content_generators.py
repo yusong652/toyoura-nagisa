@@ -11,7 +11,7 @@ from backend.infrastructure.llm.models import BaseMessage, UserMessage, Assistan
 from .message_formatter import MessageFormatter
 from .debug import GeminiDebugger
 from .response_processor import ResponseProcessor
-from backend.config import get_text_to_image_config, get_llm_specific_config
+from backend.config import get_text_to_image_settings, get_llm_settings
 from backend.infrastructure.llm.utils import get_latest_n_messages
 from .config import get_gemini_client_config
 from .shared.utils import (
@@ -92,8 +92,9 @@ class TitleGenerator:
             contents = MessageFormatter.format_messages_for_gemini(messages)
             
             # Get model from configuration
-            gemini_config = get_llm_specific_config("gemini")
-            model = gemini_config.get("model", "gemini-2.5-flash")
+            llm_settings = get_llm_settings()
+            gemini_config = llm_settings.get_gemini_config()
+            model = gemini_config.model
             
             response = client.models.generate_content(
                 model=model,
@@ -173,8 +174,9 @@ class WebSearchGenerator:
                 print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Get model from configuration
-            gemini_config = get_llm_specific_config("gemini")
-            model = gemini_config.get("model", "gemini-2.5-flash")
+            llm_settings = get_llm_settings()
+            gemini_config = llm_settings.get_gemini_config()
+            model = gemini_config.model
             
             # Call the model with the query
             response = client.models.generate_content(
@@ -247,20 +249,17 @@ class ImagePromptGenerator:
         """
         try:
             # 读取所有配置
-            config = get_text_to_image_config()
+            text_to_image_settings = get_text_to_image_settings()
             gemini_config = get_gemini_client_config()
             
             # 提取配置参数
-            system_prompt = config.get(
-                "text_to_image_system_prompt", 
-                DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT
-            )
-            context_message_count = config.get("context_message_count", DEFAULT_CONTEXT_MESSAGE_COUNT)
-            few_shot_max_length = config.get("few_shot_max_length", DEFAULT_FEW_SHOT_MAX_LENGTH)
-            temperature = config.get("text_to_image_temperature", 1.0)
-            model_for_text_to_image = config.get("model_for_text_to_image", "gemini-1.5-pro")
-            default_positive_prompt = config.get("default_positive_prompt", "")
-            default_negative_prompt = config.get("default_negative_prompt", "")
+            system_prompt = text_to_image_settings.text_to_image_system_prompt or DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT
+            context_message_count = text_to_image_settings.context_message_count
+            few_shot_max_length = getattr(text_to_image_settings, 'few_shot_max_length', DEFAULT_FEW_SHOT_MAX_LENGTH)
+            temperature = getattr(text_to_image_settings, 'text_to_image_temperature', 1.0)
+            model_for_text_to_image = getattr(text_to_image_settings, 'model_for_text_to_image', "gemini-1.5-pro")
+            default_positive_prompt = text_to_image_settings.default_positive_prompt
+            default_negative_prompt = text_to_image_settings.default_negative_prompt
             safety_settings = gemini_config.safety_settings.to_gemini_format()
             max_output_tokens = gemini_config.model_settings.max_output_tokens
 
