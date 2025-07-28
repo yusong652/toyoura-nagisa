@@ -53,7 +53,7 @@ async def handle_llm_response(
     try:
         # ========== PHASE 2: 客户端验证 ==========
         # 支持所有已实现的LLM客户端
-        supported_clients = ['GeminiClient', 'LocalLLMClient', 'AnthropicClient', 'GPTClient']
+        supported_clients = ['GeminiClient', 'LocalLLMClient', 'AnthropicClient', 'OpenAIClient']
         if type(llm_client).__name__ not in supported_clients:
             error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
             yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
@@ -82,8 +82,6 @@ async def handle_llm_response(
             elif isinstance(item, dict):
                 # 实时通知: 工具调用状态更新
                 yield f"data: {json.dumps(item)}\n\n"
-                # 添加小延迟以确保通知按顺序处理
-                await asyncio.sleep(0.05)
         
         # ========== PHASE 4: 内容处理流水线 ==========
         if final_message:

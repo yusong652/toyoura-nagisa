@@ -4,7 +4,7 @@ from backend.infrastructure.llm.base import LLMClientBase
 from backend.infrastructure.llm.gemini import GeminiClient
 from backend.infrastructure.llm.local.local_llm_client import LocalLLMClient
 from backend.infrastructure.llm.anthropic import AnthropicClient
-from backend.infrastructure.llm.gpt import GPTClient
+from backend.infrastructure.llm.openai import OpenAIClient
 from backend.config import get_llm_settings
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 _clients: Dict[str, Type[LLMClientBase]] = {
     "gemini": GeminiClient,
     "anthropic": AnthropicClient,
-    "gpt": GPTClient,
-    "openai": GPTClient,  # Alias for GPT
+    "gpt": OpenAIClient,
+    "openai": OpenAIClient,  # Alias for GPT
     "local_llm": LocalLLMClient,
 }
 
