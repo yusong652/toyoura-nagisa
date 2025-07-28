@@ -73,7 +73,7 @@ def get_client(name: Optional[str] = None, app: Optional[Any] = None, **kwargs) 
     llm_settings = get_llm_settings()
     
     # 如果没有指定名称，使用配置中的类型
-    name = name or llm_settings.type
+    name = name or llm_settings.provider
     
     # 验证客户端是否支持
     if name not in _clients:

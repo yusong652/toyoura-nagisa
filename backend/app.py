@@ -220,7 +220,7 @@ async def switch_session(request: SwitchSessionRequest):
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         # 返回会话信息和最近的消息
-        recent_messages_length = get_llm_settings().get("recent_messages_length", 5)
+        recent_messages_length = get_llm_settings().recent_messages_length
         recent_messages = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
         
         return {
@@ -524,9 +524,9 @@ async def _validate_llm_configuration():
     """
     try:
         from backend.infrastructure.llm.llm_factory import get_supported_clients, is_client_supported
-        from backend.config import get_current_llm_type
+        from backend.config.llm import get_llm_settings
         
-        current_llm = get_current_llm_type()
+        current_llm = get_llm_settings().provider
         supported_clients = get_supported_clients()
         
         if not is_client_supported(current_llm):

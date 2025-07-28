@@ -203,57 +203,6 @@ def get_current_llm_type() -> str:
     return get_app_settings().get_llm_settings().type
 
 
-def get_llm_specific_config(llm_type: str = None) -> Dict[str, Any]:
-    """获取特定 LLM 的配置"""
-    llm_type = llm_type or get_current_llm_type()
-    settings = get_app_settings().get_llm_settings()
-    
-    # 根据LLM类型获取特定配置
-    if llm_type in ["gpt", "openai"]:
-        config = settings.get_gpt_config()
-        return {
-            "api_key": config.openai_api_key,
-            "model": config.model,
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "top_k": config.top_k,
-            "max_tokens": config.max_tokens,
-        }
-    elif llm_type == "gemini":
-        config = settings.get_gemini_config()
-        return {
-            "api_key": config.google_api_key,
-            "model": config.model,
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "top_k": config.top_k,
-            "maxOutputTokens": config.max_output_tokens,
-        }
-    elif llm_type == "anthropic":
-        config = settings.get_anthropic_config()
-        return {
-            "api_key": config.anthropic_api_key,
-            "model": config.model,
-            "temperature": config.temperature,
-            "max_tokens": config.max_tokens,
-            "top_p": config.top_p,
-            "top_k": config.top_k,
-        }
-    elif llm_type == "local_llm":
-        config = settings.get_local_llm_config()
-        return {
-            "server_url": config.server_url,
-            "api_key": config.api_key,
-            "model": config.model,
-            "timeout": config.timeout,
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "max_tokens": config.max_tokens,
-        }
-    else:
-        return {}
-
-
 def get_tts_config() -> Dict[str, Any]:
     """获取 TTS 配置（向后兼容）"""
     settings = get_app_settings().get_tts_settings()
@@ -393,7 +342,6 @@ __all__ = [
     "get_system_prompt",
     "get_llm_config",
     "get_current_llm_type",
-    "get_llm_specific_config",
     "get_tts_config",
     "get_email_config",
     "get_auth_config",
