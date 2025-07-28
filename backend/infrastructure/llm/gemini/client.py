@@ -293,6 +293,12 @@ class GeminiClient(LLMClientBase):
             thinking_content = ResponseProcessor.extract_thinking_content(final_response)
             metadata['thinking_preserved'] = thinking_content is not None
             
+            # 提取关键词 - 在格式化之前从原始响应提取
+            original_text = ResponseProcessor.extract_text_content(final_response)
+            from backend.shared.utils.text_parser import parse_llm_output
+            _, extracted_keyword = parse_llm_output(original_text)
+            metadata['keyword'] = extracted_keyword
+            
             # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
             final_message = ResponseProcessor.format_response_for_storage(final_response)
             

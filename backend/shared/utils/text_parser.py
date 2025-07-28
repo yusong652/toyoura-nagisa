@@ -30,7 +30,7 @@ def get_allowed_keywords_from_prompt_file() -> List[str]:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        matches = re.findall(r'\\[\\[(\\w+)\\]\\]', content)
+        matches = re.findall(r'\[\[(\w+)\]\]', content)
         if matches:
             keywords = [keyword.lower() for keyword in matches]
         else:
@@ -55,7 +55,7 @@ def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
     keyword = "neutral"  # Default keyword
     response_text = llm_full_response.strip()
 
-    match = re.search(r'\\[\\[(\\w+)\\]\\]\\s*$', llm_full_response.strip())
+    match = re.search(r'\[\[(\w+)\]\]\s*$', llm_full_response.strip())
     if match:
         extracted_keyword = match.group(1).lower()
         if extracted_keyword in allowed_keywords:

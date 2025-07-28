@@ -1,7 +1,7 @@
 import json
 import uuid
 import asyncio
-from typing import Dict, Any, List, AsyncGenerator
+from typing import Dict, Any, List, AsyncGenerator, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory, message_factory_no_thinking
@@ -74,7 +74,6 @@ async def handle_llm_response(
         async for item in llm_client.get_response(
             recent_msgs, 
             session_id=session_id,
-            max_iterations=10
         ):
             if isinstance(item, tuple):
                 # 最终结果: (final_message, execution_metadata)
@@ -88,7 +87,7 @@ async def handle_llm_response(
         
         # ========== PHASE 4: 内容处理流水线 ==========
         if final_message:
-            async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id):
+            async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id, execution_metadata):
                 yield chunk
         
         # ========== PHASE 5: 后处理流水线 ==========
@@ -118,7 +117,8 @@ async def _process_content_pipeline(
     final_message: BaseMessage,
     session_id: str,
     tts_engine: BaseTTS,
-    request_id: str
+    request_id: str,
+    execution_metadata: Optional[Dict[str, Any]] = None
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     内容处理流水线 - 专门处理最终响应内容
@@ -147,10 +147,19 @@ async def _process_content_pipeline(
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     
+    # 提取关键词 - 优先使用metadata中的关键词，回退到文本解析
+    extracted_keyword = None
+    if execution_metadata and 'keyword' in execution_metadata:
+        extracted_keyword = execution_metadata['keyword']
+    else:
+        # 回退：从文本内容中解析表情关键词
+        from backend.shared.utils.text_parser import parse_llm_output
+        _, extracted_keyword = parse_llm_output(text_content)
+    
     # 直接保存完整内容，包括thinking
     ai_msg_id, processed_content = process_ai_text_message(
         content,  # 保存完整content，包括thinking内容
-        getattr(final_message, 'keyword', None),
+        extracted_keyword,  # 使用提取的关键词
         history_msgs,
         session_id
     )
@@ -172,9 +181,9 @@ async def _process_content_pipeline(
     # 发送消息ID
     yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
     
-    # 发送关键词
-    if hasattr(final_message, 'keyword') and final_message.keyword:
-        yield f"data: {json.dumps({'keyword': final_message.keyword})}\n\n"
+    # 发送关键词 - 发送所有有效关键词（包括neutral）
+    if extracted_keyword:
+        yield f"data: {json.dumps({'keyword': extracted_keyword})}\n\n"
     
     # TTS处理流水线
     async for chunk in _process_tts_pipeline(processed_content, tts_engine):

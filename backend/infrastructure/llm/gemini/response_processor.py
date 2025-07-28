@@ -42,25 +42,6 @@ class ResponseProcessor:
     - Extensible design for future enhancements
     """
 
-    @staticmethod
-    def format_llm_response(response) -> LLMResponse:
-        """
-        [LEGACY] Format Gemini API response into LLMResponse object.
-        
-        This method maintains backward compatibility while serving as the
-        foundation for storage mode processing.
-        
-        Args:
-            response: Raw response from Gemini API
-            
-        Returns:
-            LLMResponse object containing the formatted response
-            
-        Note:
-            This method is kept for backward compatibility. New implementations
-            should consider using the more specific dual-mode methods.
-        """
-        return ResponseProcessor._process_response_for_storage(response)
 
     @staticmethod
     def analyze_response_state(response) -> Dict[str, Any]:
@@ -245,7 +226,7 @@ class ResponseProcessor:
         return tool_calls
 
     @staticmethod
-    def format_response_for_storage(response, keyword: Optional[str] = None) -> BaseMessage:
+    def format_response_for_storage(response) -> BaseMessage:
         """
         Format response specifically for persistent storage.
         
@@ -255,9 +236,10 @@ class ResponseProcessor:
         - Cross-LLM compatibility
         - Future migration support
         
+        The keyword is automatically extracted from the response text content.
+        
         Args:
             response: Raw Gemini API response object
-            keyword: Optional extracted keyword for categorization
             
         Returns:
             BaseMessage object ready for storage
@@ -266,8 +248,8 @@ class ResponseProcessor:
             ValueError: If response cannot be formatted for storage
         """
         try:
-            # Use the internal storage processor
-            llm_response = ResponseProcessor._process_response_for_storage(response, keyword)
+            # Use the internal storage processor (keyword is extracted automatically)
+            llm_response = ResponseProcessor._process_response_for_storage(response)
             
             # Convert to message format
             if llm_response.is_error:
@@ -277,7 +259,7 @@ class ResponseProcessor:
             message_data = {
                 "role": "assistant",
                 "content": llm_response.content,
-                "keyword": keyword or llm_response.keyword,
+                "keyword": llm_response.keyword,
             }
             
             storage_message = message_factory(message_data)
@@ -449,16 +431,17 @@ class ResponseProcessor:
             return ""
 
     @staticmethod
-    def _process_response_for_storage(response, keyword: Optional[str] = None) -> LLMResponse:
+    def _process_response_for_storage(response) -> LLMResponse:
         """
         Internal method for processing responses in storage mode.
         
         This is the core storage processing logic, optimized for
         message history and database storage requirements.
         
+        The keyword is automatically extracted from the response text content.
+        
         Args:
             response: Raw Gemini API response object
-            keyword: Optional keyword for response categorization
             
         Returns:
             LLMResponse object formatted for storage
@@ -470,7 +453,8 @@ class ResponseProcessor:
             error_message = analysis.get('error_info', {}).get('message', 'Unknown error')
             return LLMResponse(
                 content=error_message,
-                error=error_message
+                error=error_message,
+                keyword="neutral"  # Default keyword for error responses
             )
 
         candidate = response.candidates[0]
@@ -478,6 +462,7 @@ class ResponseProcessor:
         content_list = []
         thinking_parts = []
         text_parts = []
+        extracted_keyword = "neutral"  # Default keyword
         
         # Extract top-level thought
         if hasattr(candidate, 'thought') and candidate.thought:
@@ -502,7 +487,7 @@ class ResponseProcessor:
                     "thinking": full_thinking_content,
                 })
         
-        # Process text content
+        # Process text content and extract keyword
         full_text_content = "".join(text_parts).strip()
         if full_text_content:
             response_text, extracted_keyword = parse_llm_output(full_text_content)
@@ -510,18 +495,15 @@ class ResponseProcessor:
                 "type": "text",
                 "text": response_text
             })
-            # Use provided keyword or extracted keyword
-            if not keyword:
-                keyword = extracted_keyword
 
         # Create simplified LLMResponse
         if content_list:
             return LLMResponse(
                 content=content_list,
-                keyword=keyword
+                keyword=extracted_keyword
             )
             
         return LLMResponse(
             content=[{"type": "text", "text": "Empty response from model."}],
-            keyword=keyword
+            keyword=extracted_keyword
         ) 
