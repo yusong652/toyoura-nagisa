@@ -2,7 +2,7 @@ import os
 import traceback
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -87,7 +87,8 @@ async def lifespan(app: FastAPI):
         print("[INIT] MCP Server started on SSE port 9000")
         
         # 验证LLM配置
-        await _validate_llm_configuration()
+        from backend.shared.utils.config_validator import validate_llm_configuration
+        await validate_llm_configuration()
         
         print("[INIT] All services initialized successfully")
         yield
@@ -457,88 +458,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 # ========== 全局异常处理器 - SOTA架构 ==========
 
+from backend.shared.utils.exception_handlers import handle_value_error, handle_import_error
+
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
-    """
-    处理配置相关的值错误，特别是LLM客户端不支持的情况
-    """
-    error_message = str(exc)
-    
-    # 检查是否是LLM客户端相关的错误
-    if "Unsupported LLM client" in error_message or "Unknown LLM client" in error_message:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "LLM Configuration Error",
-                "message": error_message,
-                "type": "unsupported_llm_client",
-                "suggestion": "Please update your configuration to use 'gemini' as the LLM client."
-            }
-        )
-    
-    # 其他值错误
-    return JSONResponse(
-        status_code=400,
-        content={
-            "error": "Configuration Error",
-            "message": error_message,
-            "type": "value_error"
-        }
-    )
+    """处理配置相关的值错误，特别是LLM客户端不支持的情况"""
+    return await handle_value_error(request, exc)
 
 @app.exception_handler(ImportError)
 async def import_error_handler(request: Request, exc: ImportError):
-    """
-    处理导入错误，通常是由于缺少依赖或已删除的模块引起
-    """
-    error_message = str(exc)
-    
-    # 检查是否是LLM客户端相关的导入错误
-    if any(client in error_message for client in ["gpt", "anthropic", "mistral", "grok"]):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "LLM Client Import Error",
-                "message": "Legacy LLM clients have been removed in the new architecture.",
-                "type": "deprecated_client",
-                "details": error_message,
-                "solution": "Please configure your system to use 'gemini' as the LLM client."
-            }
-        )
-    
-    # 其他导入错误
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Import Error",
-            "message": error_message,
-            "type": "import_error"
-        }
-    )
+    """处理导入错误，通常是由于缺少依赖或已删除的模块引起"""
+    return await handle_import_error(request, exc)
 
-# ========== 启动时验证 ==========
-
-async def _validate_llm_configuration():
-    """
-    验证LLM配置，确保使用的是支持的客户端
-    """
-    try:
-        from backend.infrastructure.llm.llm_factory import get_supported_clients, is_client_supported
-        from backend.config.llm import get_llm_settings
-        
-        current_llm = get_llm_settings().provider
-        supported_clients = get_supported_clients()
-        
-        if not is_client_supported(current_llm):
-            print(f"❌ [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
-            print(f"📋 Supported clients: {', '.join(supported_clients)}")
-            print(f"💡 Please update your configuration to use one of the supported clients.")
-            # 注意：这里不抛出异常，让应用启动，但在运行时会被工厂方法捕获
-            
-        else:
-            print(f"✅ [STARTUP] LLM client '{current_llm}' is supported and ready")
-            
-    except Exception as e:
-        print(f"⚠️  [STARTUP WARNING] Could not validate LLM configuration: {e}")
-
-# ========== API ENDPOINTS - 保持不变 ==========
