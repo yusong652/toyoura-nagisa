@@ -12,7 +12,7 @@ from .message_formatter import MessageFormatter
 from .debug import GeminiDebugger
 from .response_processor import ResponseProcessor
 from backend.config import get_text_to_image_settings, get_llm_settings
-from backend.infrastructure.llm.utils import get_latest_n_messages
+from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from .config import get_gemini_client_config
 from .shared.utils import (
     load_text_to_image_history,

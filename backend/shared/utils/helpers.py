@@ -3,7 +3,7 @@ import base64
 import asyncio
 import uuid
 from datetime import datetime
-from backend.infrastructure.llm.utils import get_all_sessions, update_session_title, save_history, load_history
+from backend.infrastructure.storage.session_manager import get_all_sessions, update_session_title, save_history, load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.llm.title_generator import generate_conversation_title
 from backend.config import get_llm_settings

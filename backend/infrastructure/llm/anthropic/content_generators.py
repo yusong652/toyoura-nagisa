@@ -13,7 +13,7 @@ from backend.infrastructure.llm.models import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
 from backend.config import get_text_to_image_config
 from .config import get_anthropic_client_config
-from backend.infrastructure.llm.utils import get_latest_n_messages
+from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from .debug import AnthropicDebugger
 
 

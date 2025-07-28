@@ -14,7 +14,7 @@ during multi-turn tool calling while ensuring proper storage format compatibilit
 from typing import List, Dict, Any, Optional, Tuple, Union
 from backend.infrastructure.llm.models import LLMResponse, BaseMessage, message_factory
 from .shared.constants import PYDANTIC_METADATA_ATTRS
-from backend.infrastructure.llm.utils import parse_llm_output
+from backend.shared.utils.text_parser import parse_llm_output
 
 
 class ResponseProcessor:

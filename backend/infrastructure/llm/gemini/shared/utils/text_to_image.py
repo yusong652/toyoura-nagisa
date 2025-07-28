@@ -21,7 +21,7 @@ from ..constants import (
 
 def get_text_to_image_history_file(session_id: str) -> str:
     """Get the path to the text-to-image history file for a session."""
-    from backend.infrastructure.llm.utils import HISTORY_BASE_DIR
+    from backend.infrastructure.storage.session_manager import HISTORY_BASE_DIR
     session_dir = os.path.join(HISTORY_BASE_DIR, session_id)
     return os.path.join(session_dir, TEXT_TO_IMAGE_HISTORY_FILENAME)
 
