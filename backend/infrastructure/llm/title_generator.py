@@ -1,6 +1,6 @@
 from typing import Optional
 from backend.infrastructure.llm.base import LLMClientBase
-from backend.infrastructure.llm.models import BaseMessage
+from backend.domain.models.messages import BaseMessage
 import traceback
 
 def multimodal_to_prompt(content):

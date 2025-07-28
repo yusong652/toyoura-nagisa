@@ -7,7 +7,7 @@ based on conversation context. Separates content generation concerns from the ma
 
 from typing import Optional, Dict, Any
 from google.genai import types
-from backend.infrastructure.llm.models import BaseMessage, UserMessage, AssistantMessage
+from backend.domain.models.messages import BaseMessage, UserMessage, AssistantMessage
 from .message_formatter import MessageFormatter
 from .debug import GeminiDebugger
 from .response_processor import ResponseProcessor

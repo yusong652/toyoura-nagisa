@@ -3,7 +3,8 @@
 import os
 from abc import ABC, abstractmethod # 导入 ABC 和 abstractmethod
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union # 导入类型提示
-from backend.infrastructure.llm.models import BaseMessage, LLMResponse         # 从同目录的 models.py 导入 Message 模型
+from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.response_models import LLMResponse
 from backend.config import get_system_prompt
 
 # 定义一个简单的模型来表示 LLM 的输出（或者直接用 Tuple）

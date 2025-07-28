@@ -1,4 +1,4 @@
-from backend.infrastructure.llm.models import ErrorResponse
+from backend.presentation.models.api_models import ErrorResponse
 from backend.infrastructure.llm.llm_factory import get_client
 from backend.infrastructure.llm.base import LLMClientBase
 

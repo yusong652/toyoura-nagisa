@@ -7,7 +7,7 @@ BaseContextManager - 所有LLM客户端Context Manager的抽象基类
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-from backend.infrastructure.llm.models import BaseMessage
+from backend.domain.models.messages import BaseMessage
 
 
 class BaseContextManager(ABC):

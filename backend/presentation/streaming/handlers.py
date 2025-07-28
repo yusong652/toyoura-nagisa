@@ -3,7 +3,8 @@ import uuid
 import asyncio
 from typing import Dict, Any, List, AsyncGenerator
 from backend.infrastructure.llm import LLMClientBase
-from backend.infrastructure.llm.models import BaseMessage, message_factory, message_factory_no_thinking
+from backend.domain.models.messages import BaseMessage
+from backend.domain.models.message_factory import message_factory, message_factory_no_thinking
 from backend.infrastructure.storage.session_manager import load_all_message_history, load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons

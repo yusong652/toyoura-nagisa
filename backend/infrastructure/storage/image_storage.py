@@ -11,7 +11,7 @@ import base64
 import requests
 from datetime import datetime
 from typing import Optional
-from backend.infrastructure.llm.models import ImageMessage
+from backend.domain.models.messages import ImageMessage
 
 
 def save_image_from_url(image_url: str, session_id: str, output_dir_base: str = "chat/data") -> str:

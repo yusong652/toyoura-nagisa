@@ -4,7 +4,8 @@ import json
 from typing import List, Tuple, Optional, Dict, Any
 import httpx
 from backend.infrastructure.llm.base import LLMClientBase
-from backend.infrastructure.llm.models import LLMResponse, BaseMessage, UserMessage
+from backend.domain.models.messages import BaseMessage, UserMessage
+from backend.infrastructure.llm.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from fastmcp import Client as MCPClient

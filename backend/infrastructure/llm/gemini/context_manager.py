@@ -11,7 +11,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
-from backend.infrastructure.llm.models import BaseMessage
+from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base_context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 

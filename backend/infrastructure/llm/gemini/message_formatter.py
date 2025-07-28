@@ -9,7 +9,7 @@ import base64
 from typing import List, Dict, Any, Optional
 from google.genai import types
 
-from backend.infrastructure.llm.models import BaseMessage
+from backend.domain.models.messages import BaseMessage
 
 
 class MessageFormatter:

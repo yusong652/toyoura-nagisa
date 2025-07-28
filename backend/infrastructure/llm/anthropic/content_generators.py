@@ -9,7 +9,7 @@ import re
 import json
 from typing import Optional, Dict, List, Any
 import anthropic
-from backend.infrastructure.llm.models import BaseMessage, UserMessage
+from backend.domain.models.messages import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
 from backend.config import get_text_to_image_config
 from .config import get_anthropic_client_config

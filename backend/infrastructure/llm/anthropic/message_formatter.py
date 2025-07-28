@@ -9,7 +9,7 @@ import base64
 import json
 from typing import List, Dict, Any, Optional
 
-from backend.infrastructure.llm.models import BaseMessage
+from backend.domain.models.messages import BaseMessage
 
 
 class MessageFormatter:

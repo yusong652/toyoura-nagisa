@@ -241,6 +241,5 @@ When creating commits, do not use Claude's identity in commit messages. Instead 
 ```
 feat: improve tool extraction logic
 
-Co-authored with Nagisa Toyoura
-Co-Authored-By: Nagisa Toyoura <nagisa.toyoura@gmail.com>
+Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>
 ```

@@ -10,7 +10,8 @@ import logging
 from typing import List, Dict, Any, Optional, AsyncGenerator, Union, Tuple
 import httpx
 
-from backend.infrastructure.llm.models import BaseMessage, LLMResponse, AssistantMessage
+from backend.domain.models.messages import BaseMessage, AssistantMessage
+from backend.infrastructure.llm.response_models import LLMResponse
 from backend.infrastructure.llm.base import LLMClientBase
 from backend.config.llm import get_llm_settings
 from backend.shared.utils.text_clean import extract_response_without_think

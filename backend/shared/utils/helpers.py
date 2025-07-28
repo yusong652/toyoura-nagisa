@@ -7,7 +7,8 @@ from backend.infrastructure.storage.session_manager import get_all_sessions, upd
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.llm.title_generator import generate_conversation_title
 from backend.config import get_llm_settings
-from backend.infrastructure.llm.models import message_factory, AssistantMessage, UserMessage, BaseMessage
+from backend.domain.models.message_factory import message_factory
+from backend.domain.models.messages import AssistantMessage, UserMessage, BaseMessage
 from backend.infrastructure.memory import MemoryManager
 from typing import Any, List, Dict
 import re

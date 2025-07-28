@@ -19,8 +19,8 @@ from backend.shared.utils.helpers import (
     process_user_message,
     generate_title_for_session,
 )
-from backend.infrastructure.llm.models import message_factory
-from backend.infrastructure.llm.models import (
+from backend.domain.models.message_factory import message_factory
+from backend.presentation.models.api_models import (
     NewHistoryRequest,
     HistorySessionResponse,
     SwitchSessionRequest,

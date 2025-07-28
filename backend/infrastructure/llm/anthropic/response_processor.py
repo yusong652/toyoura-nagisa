@@ -7,7 +7,7 @@ multimodal content, and error handling.
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
-from backend.infrastructure.llm.models import LLMResponse
+from backend.infrastructure.llm.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
 
 
@@ -228,7 +228,7 @@ class ResponseProcessor:
         Returns:
             BaseMessage object ready for storage
         """
-        from backend.infrastructure.llm.models import AssistantMessage
+        from backend.domain.models.messages import AssistantMessage
         
         if not hasattr(response, "content") or not response.content:
             return AssistantMessage(
