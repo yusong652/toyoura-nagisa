@@ -227,7 +227,6 @@ class GeminiClient(LLMClientBase):
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
-        max_iterations: int = 10,
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
         """
@@ -242,7 +241,6 @@ class GeminiClient(LLMClientBase):
         Args:
             messages: Input message history
             session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations
             **kwargs: Additional API configuration parameters
             
         Yields:
@@ -274,6 +272,9 @@ class GeminiClient(LLMClientBase):
         
         try:
             # === EXECUTION PHASE - 流式工具调用循环 ===
+            # 从配置中获取最大工具调用迭代次数
+            max_iterations = get_llm_settings().max_tool_iterations
+            
             final_response = None
             async for item in self._streaming_tool_calling_loop(
                 context_manager, session_id, max_iterations, metadata, debug, **kwargs
