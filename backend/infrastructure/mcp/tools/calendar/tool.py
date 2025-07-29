@@ -47,6 +47,8 @@ PERFORMANCE_LARGE_THRESHOLD = 5.0  # seconds
 # Time validation thresholds
 PAST_TIME_WARNING_THRESHOLD = 24 * 60 * 60  # 24 hours in seconds - warn if event is more than 24 hours in the past
 IMMEDIATE_PAST_WARNING_THRESHOLD = 60  # 60 seconds - warn if event is in the immediate past
+CALENDAR_OAUTH_TOKEN_DIR = Path(os.getenv("CALENDAR_OAUTH_TOKEN_DIR", 
+    Path(__file__).parent / "../google_auth/tokens")).resolve()    
 
 # -----------------------------------------------------------------------------
 # Enums for type safety
@@ -383,7 +385,7 @@ def register_calendar_tools(mcp: FastMCP):
         try:
             # Get user email and build service
             user_email = get_user_email()
-            service = build_google_calendar_service(user_email)
+            service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
             
             # Prepare query parameters
             query_params = {
@@ -542,7 +544,7 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Get user email and build service
             user_email = get_user_email()
-            service = build_google_calendar_service(user_email)
+            service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
             
             # Prepare event data
             event_data = {
@@ -730,7 +732,7 @@ def register_calendar_tools(mcp: FastMCP):
             
             # Get user email and build service
             user_email = get_user_email()
-            service = build_google_calendar_service(user_email)
+            service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
             
             # Get existing event
             existing_event = service.events().get(
@@ -833,7 +835,7 @@ def register_calendar_tools(mcp: FastMCP):
         try:
             # Get user email and build service
             user_email = get_user_email()
-            service = build_google_calendar_service(user_email)
+            service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
             
             # Execute calendar operation
             def delete_operation():
