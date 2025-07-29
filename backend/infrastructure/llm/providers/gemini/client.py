@@ -469,3 +469,13 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
             
             return error_result
+
+    def _generate_execution_id(self) -> str:
+        """Generate unique execution ID"""
+        import uuid
+        return f"EXE_{str(uuid.uuid4())[:8]}"
+    
+    def _get_timestamp(self) -> float:
+        """Get timestamp"""
+        import time
+        return time.time()

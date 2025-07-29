@@ -32,163 +32,187 @@ class GeminiToolManager(BaseToolManager):
         if not self.tools_enabled:
             return []
         
-        tools = []
+        # Get cached tools for session
+        cached_tools = []
+        if session_id:
+            cached_tools = self.get_cached_tools_for_session(session_id)
+            if debug:
+                print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
         
-        # Get MCP client for this session
+        # Get all MCP tools
         mcp_client = self.get_mcp_client(session_id)
         
         try:
             async with mcp_client as mcp_async_client:
-                # Get available tools from MCP server
-                list_tools_result = await mcp_async_client.list_tools()
+                mcp_tools_result = await mcp_async_client.list_tools()
                 
-                # Add meta tools (always available)
-                for tool in list_tools_result.tools:
+                # Build tools map and collect meta tools
+                function_declarations = []
+                added_tool_names = set()
+                
+                # Handle different return formats from MCP client
+                if hasattr(mcp_tools_result, 'tools'):
+                    mcp_tools = mcp_tools_result.tools
+                elif isinstance(mcp_tools_result, list):
+                    mcp_tools = mcp_tools_result
+                else:
+                    if debug:
+                        print(f"[DEBUG] Unexpected MCP tools format: {type(mcp_tools_result)}")
+                    mcp_tools = []
+                
+                # Add meta tools first
+                for tool in mcp_tools:
                     if self.is_meta_tool(tool.name):
-                        gemini_tool = self._convert_mcp_tool_to_gemini(tool)
-                        if gemini_tool:
-                            tools.append(gemini_tool)
+                        func_decl = self._convert_mcp_tool_to_gemini_declaration(tool)
+                        if func_decl:
+                            function_declarations.append(func_decl)
+                            added_tool_names.add(tool.name)
                 
-                # Add cached tools for this session
-                if session_id:
-                    cached_tools = self.get_cached_tools_for_session(session_id)
-                    for cached_tool in cached_tools:
-                        gemini_tool = self._convert_cached_tool_to_gemini(cached_tool)
-                        if gemini_tool:
-                            tools.append(gemini_tool)
+                # Add cached tools (avoid duplicates)
+                for cached_tool in cached_tools:
+                    tool_name = cached_tool["name"]
+                    if tool_name in added_tool_names:
+                        if debug:
+                            print(f"[DEBUG] Skipped duplicate cached tool: {tool_name}")
+                        continue
+                    
+                    func_decl = self._convert_cached_tool_to_gemini_declaration(cached_tool)
+                    if func_decl:
+                        function_declarations.append(func_decl)
+                        added_tool_names.add(tool_name)
                 
                 if debug:
-                    print(f"[DEBUG] Returning {len(tools)} tools for Gemini (session: {session_id})")
-                    for tool in tools:
-                        if hasattr(tool, 'function_declarations'):
-                            for func_decl in tool.function_declarations:
-                                print(f"[DEBUG]   - {func_decl.name}")
+                    print(f"[DEBUG] Final tools count: {len(function_declarations)}")
+                    for func_decl in function_declarations:
+                        print(f"[DEBUG]   - {func_decl.name}")
                 
-                return tools
+                # Return as Tool objects
+                if function_declarations:
+                    return [types.Tool(function_declarations=function_declarations)]
+                else:
+                    return []
                 
         except Exception as e:
             if debug:
                 print(f"[DEBUG] Error getting function call schemas: {e}")
             return []
     
-    def _convert_mcp_tool_to_gemini(self, mcp_tool) -> Optional[types.Tool]:
+    def _convert_mcp_tool_to_gemini_declaration(self, mcp_tool) -> Optional[types.FunctionDeclaration]:
         """
-        Convert MCP tool to Gemini Tool format.
+        Convert MCP tool to Gemini FunctionDeclaration format.
         
         Args:
             mcp_tool: MCP tool object
             
         Returns:
-            types.Tool: Gemini tool format, or None if conversion failed
+            types.FunctionDeclaration: Gemini function declaration, or None if conversion failed
         """
         try:
             # Build function declaration
-            func_decl = types.FunctionDeclaration(
-                name=mcp_tool.name,
-                description=mcp_tool.description or "No description available"
-            )
+            func_decl_dict = {
+                "name": mcp_tool.name,
+                "description": mcp_tool.description or "No description available"
+            }
             
             # Add parameters if available
             if hasattr(mcp_tool, 'inputSchema') and mcp_tool.inputSchema:
-                func_decl.parameters = self._convert_json_schema_to_gemini(mcp_tool.inputSchema)
+                input_schema = self._sanitize_jsonschema_for_gemini(mcp_tool.inputSchema)
+                func_decl_dict["parameters"] = input_schema
             
-            return types.Tool(function_declarations=[func_decl])
+            return types.FunctionDeclaration(**func_decl_dict)
             
         except Exception as e:
             print(f"[WARNING] Failed to convert MCP tool {mcp_tool.name} to Gemini format: {e}")
             return None
     
-    def _convert_cached_tool_to_gemini(self, cached_tool: Dict[str, Any]) -> Optional[types.Tool]:
+    def _convert_cached_tool_to_gemini_declaration(self, cached_tool: Dict[str, Any]) -> Optional[types.FunctionDeclaration]:
         """
-        Convert cached tool info to Gemini Tool format.
+        Convert cached tool info to Gemini FunctionDeclaration format.
         
         Args:
             cached_tool: Cached tool information dictionary
             
         Returns:
-            types.Tool: Gemini tool format, or None if conversion failed
+            types.FunctionDeclaration: Gemini function declaration, or None if conversion failed
         """
         try:
             # Build function declaration
-            func_decl = types.FunctionDeclaration(
-                name=cached_tool["name"],
-                description=cached_tool.get("description", "No description available")
-            )
+            func_decl_dict = {
+                "name": cached_tool["name"],
+                "description": cached_tool.get("description", "No description available")
+            }
             
             # Add parameters if available
             if "inputSchema" in cached_tool and cached_tool["inputSchema"]:
-                func_decl.parameters = self._convert_json_schema_to_gemini(cached_tool["inputSchema"])
+                input_schema = self._sanitize_jsonschema_for_gemini(cached_tool["inputSchema"])
+                func_decl_dict["parameters"] = input_schema
             elif "parameters" in cached_tool and cached_tool["parameters"]:
-                func_decl.parameters = self._convert_json_schema_to_gemini(cached_tool["parameters"])
+                # Handle different parameter formats
+                parameters = cached_tool["parameters"]
+                if isinstance(parameters, dict):
+                    if "type" in parameters and "properties" in parameters:
+                        # Already a complete schema
+                        input_schema = self._sanitize_jsonschema_for_gemini(parameters)
+                    else:
+                        # Just properties, wrap it
+                        input_schema = {
+                            "type": "object",
+                            "properties": parameters,
+                            "required": list(parameters.keys()) if parameters else []
+                        }
+                        input_schema = self._sanitize_jsonschema_for_gemini(input_schema)
+                    func_decl_dict["parameters"] = input_schema
             
-            return types.Tool(function_declarations=[func_decl])
+            return types.FunctionDeclaration(**func_decl_dict)
             
         except Exception as e:
             print(f"[WARNING] Failed to convert cached tool {cached_tool.get('name', 'unknown')} to Gemini format: {e}")
             return None
     
-    def _convert_json_schema_to_gemini(self, json_schema: Dict[str, Any]) -> types.Schema:
+    def _sanitize_jsonschema_for_gemini(self, schema: dict) -> dict:
         """
-        Convert JSON schema to Gemini Schema format.
+        Sanitize JSON schema for Gemini API compatibility.
+        
+        Gemini function-call schema only supports a subset of JSON Schema draft-7
+        (type/properties/required/description/enum/items/default/title)
+        Other keywords like exclusiveMinimum will cause validation errors.
         
         Args:
-            json_schema: JSON schema dictionary
+            schema: Schema to sanitize
             
         Returns:
-            types.Schema: Gemini schema format
+            dict: Sanitized schema
         """
-        # Handle different schema formats
-        if "type" not in json_schema and "properties" in json_schema:
-            # Assume object type if properties exist but type is missing
-            json_schema = {"type": "object", **json_schema}
-        
-        # Build Gemini schema
-        schema_dict = {
-            "type": json_schema.get("type", "object")
+        ALLOWED_KEYS = {
+            "type", "properties", "required", "description", 
+            "enum", "items", "default", "title",
         }
         
-        # Add properties if present
-        if "properties" in json_schema:
-            schema_dict["properties"] = {}
-            for prop_name, prop_schema in json_schema["properties"].items():
-                schema_dict["properties"][prop_name] = self._convert_property_schema(prop_schema)
+        if not isinstance(schema, dict):
+            return schema
         
-        # Add required fields
-        if "required" in json_schema:
-            schema_dict["required"] = json_schema["required"]
-        
-        # Add description
-        if "description" in json_schema:
-            schema_dict["description"] = json_schema["description"]
-        
-        return types.Schema(**schema_dict)
-    
-    def _convert_property_schema(self, prop_schema: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Convert property schema to Gemini format.
-        
-        Args:
-            prop_schema: Property schema dictionary
+        cleaned: dict = {}
+        for key, value in schema.items():
+            if key not in ALLOWED_KEYS:
+                continue
             
-        Returns:
-            Dict[str, Any]: Converted property schema
-        """
-        result = {
-            "type": prop_schema.get("type", "string")
-        }
+            if key == "properties":
+                cleaned["properties"] = {
+                    prop_name: self._sanitize_jsonschema_for_gemini(prop_schema)
+                    for prop_name, prop_schema in value.items()
+                    if isinstance(prop_schema, dict)
+                }
+            elif key == "items":
+                cleaned["items"] = self._sanitize_jsonschema_for_gemini(value)
+            else:
+                cleaned[key] = value
         
-        if "description" in prop_schema:
-            result["description"] = prop_schema["description"]
+        # Auto-infer required fields for object type
+        if cleaned.get("type") == "object" and "required" not in cleaned and "properties" in cleaned:
+            cleaned["required"] = list(cleaned["properties"].keys())
         
-        if "enum" in prop_schema:
-            result["enum"] = prop_schema["enum"]
+        # Ensure type is set
+        if "type" not in cleaned:
+            cleaned["type"] = "object"
         
-        if "items" in prop_schema:
-            result["items"] = self._convert_property_schema(prop_schema["items"])
-        
-        if "properties" in prop_schema:
-            result["properties"] = {}
-            for nested_name, nested_schema in prop_schema["properties"].items():
-                result["properties"][nested_name] = self._convert_property_schema(nested_schema)
-        
-        return result
+        return cleaned

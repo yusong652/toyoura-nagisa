@@ -28,6 +28,7 @@ from backend.infrastructure.llm.shared.constants.prompts import (
 
 # Import Gemini-specific components
 from .config import get_gemini_client_config
+from .debug import GeminiDebugger
 from .message_formatter import GeminiMessageFormatter
 from .response_processor import GeminiResponseProcessor
 
@@ -137,6 +138,7 @@ class GeminiWebSearchGenerator:
             contents = GeminiMessageFormatter.format_messages_for_api([context['user_message']])
             
             if debug:
+                GeminiDebugger.print_debug_request(contents, search_config)
                 print(f"[WebSearch] Note: max_uses={max_uses} parameter ignored for Gemini (API limitation)")
             
             # Get model from configuration
@@ -153,6 +155,7 @@ class GeminiWebSearchGenerator:
             
             if debug:
                 print(f"[WebSearch] API call completed")
+                GeminiDebugger.print_debug_response(response)
             
             # Check for candidates
             if hasattr(response, 'candidates') and response.candidates:
@@ -242,15 +245,18 @@ class GeminiImagePromptGenerator:
             contents = GeminiMessageFormatter.format_messages_for_api(messages)
             
             if debug:
-                import pprint
-                print("[text_to_image] Formatted contents:")
-                pprint.pprint(contents)
+                print("[text_to_image] Formatted contents (simplified):")
+                GeminiDebugger.print_debug_request(contents, prompt_config)
             
             response = client.models.generate_content(
                 model=model_for_text_to_image,
                 contents=contents,
                 config=prompt_config
             )
+            
+            if debug:
+                print("[text_to_image] Response received:")
+                GeminiDebugger.print_debug_response(response)
             
             # Extract response text using ResponseProcessor
             prompt_text = GeminiResponseProcessor.extract_text_content(response)

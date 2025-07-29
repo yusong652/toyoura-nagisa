@@ -67,8 +67,8 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
-                if hasattr(part, 'functionCall'):
-                    func_call = part.functionCall
+                if hasattr(part, 'function_call') and part.function_call:
+                    func_call = part.function_call
                     tool_call = {
                         'id': getattr(func_call, 'id', f"call_{len(tool_calls)}"),
                         'name': func_call.name,
@@ -133,9 +133,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         thinking_parts.append(part.text)
                     else:
                         text_parts.append(part.text)
-                elif hasattr(part, 'functionCall'):
+                elif hasattr(part, 'function_call') and part.function_call:
                     # Include function calls in storage format
-                    func_call = part.functionCall
+                    func_call = part.function_call
                     content.append({
                         "type": "tool_use",
                         "id": getattr(func_call, 'id', f"call_{len(content)}"),

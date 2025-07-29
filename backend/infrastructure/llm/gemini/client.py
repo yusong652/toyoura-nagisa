@@ -13,7 +13,7 @@ from .context_manager import GeminiContextManager
 from .debug import GeminiDebugger
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
-from .tool_manager import ToolManager
+from backend.infrastructure.llm.providers.gemini.tool_manager import GeminiToolManager as ToolManager
 from .content_generators import TitleGenerator, ImagePromptGenerator, WebSearchGenerator
 
 class GeminiClient(LLMClientBase):
