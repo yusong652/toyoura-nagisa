@@ -36,19 +36,19 @@ def import_and_register_all_tools(mcp):
     """
     tool_module_paths = [
         # Core tool suites
-        'nagisa_mcp.tools.builtin',  # builtin tools including web search
-        'nagisa_mcp.tools.coding.tools',  # aggregated coding tools
-        'nagisa_mcp.tools.email_tools.tool',
-        'nagisa_mcp.tools.calendar.tool',
-        'nagisa_mcp.tools.text_to_image.tool',
-        'nagisa_mcp.tools.contact_tools.tool',
-        'nagisa_mcp.tools.places_tools.tool',
-        'nagisa_mcp.tools.location_tool.tool',
-        'nagisa_mcp.tools.memory_tools.tool',
-        'nagisa_mcp.tools.calculator_tool.tool',
-        'nagisa_mcp.tools.weather_tool.tool',
-        'nagisa_mcp.tools.meta_tool.tool',
-        'nagisa_mcp.tools.time_tool.tool',
+        'backend.infrastructure.mcp.tools.builtin',  # builtin tools including web search
+        'backend.infrastructure.mcp.tools.coding.tools',  # aggregated coding tools
+        'backend.infrastructure.mcp.tools.email_tools.tool',
+        'backend.infrastructure.mcp.tools.calendar.tool',
+        'backend.infrastructure.mcp.tools.text_to_image.tool',
+        'backend.infrastructure.mcp.tools.contact_tools.tool',
+        'backend.infrastructure.mcp.tools.places_tools.tool',
+        'backend.infrastructure.mcp.tools.location_tool.tool',
+        'backend.infrastructure.mcp.tools.memory_tools.tool',
+        'backend.infrastructure.mcp.tools.calculator_tool.tool',
+        'backend.infrastructure.mcp.tools.weather_tool.tool',
+        'backend.infrastructure.mcp.tools.meta_tool.tool',
+        'backend.infrastructure.mcp.tools.time_tool.tool',
     ]
     for module_path in tool_module_paths:
         try:
@@ -102,7 +102,7 @@ def main():
                     
                     # ---------- 修改: 如果没有提供category，则根据module_name推断 ----------
                     if not category:
-                        if module_name.startswith('nagisa_mcp.tools.'):
+                        if module_name.startswith('mcp.tools.'):
                             # 取 tools. 后的一级目录作为类别，例如 nagisa_mcp.tools.coding.workspace -> coding
                             parts = module_name.split('.')
                             try:
@@ -115,10 +115,11 @@ def main():
                         category = list(tags)[0]
                     if not category:
                         category = 'general'
-                    parameters = getattr(tool, 'parameters', {}) or {}
+                    # 获取参数信息 - FastMCP使用inputSchema而不是parameters
+                    input_schema = getattr(tool, 'inputSchema', {}) or {}
                     docstring = getattr(tool, 'docstring', '') or description
                     # func对象无法直接获得，只能存元数据
-                    params_str = json.dumps(parameters, ensure_ascii=False, default=str)
+                    params_str = json.dumps(input_schema, ensure_ascii=False, default=str)
                     # 只存元数据，不存func对象
                     vectorizer.collection.add(
                         documents=[description],
