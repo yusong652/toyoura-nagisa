@@ -54,27 +54,41 @@ def register_meta_tools(mcp: FastMCP):
         try:
             vectorizer = get_vectorizer()
             
-            # Execute tool search
-            tools = vectorizer.search_tools(
+            # Step 1: Execute semantic search to get tool names and basic info
+            search_results = vectorizer.search_tools(
                 query=keywords,
                 n_results=max_results
             )
             
-            # Format return results
+            # Step 2: Get all MCP tools to create a live mapping
+            # Since we're already in MCP context, get tools directly from the server
+            from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
+            
+            # Get all registered tools directly from the MCP server
+            try:
+                # Use FastMCP's get_tools() method to access live tools
+                all_mcp_tools = GLOBAL_MCP.get_tools()
+                
+                # Create mapping: tool_name -> live_tool_object
+                mcp_tools_map = {tool.name: tool for tool in all_mcp_tools}
+                
+                if len(mcp_tools_map) == 0:
+                    print(f"[WARNING] No MCP tools found in live server")
+                
+            except Exception as e:
+                print(f"[WARNING] Could not access live MCP tools: {e}")
+                mcp_tools_map = {}
+            
+            # Step 3: Combine search results with live MCP data
             formatted_tools = []
-            for tool_info in tools:
+            for tool_info in search_results:
                 metadata = tool_info.get('metadata', {})
+                tool_name = metadata.get('function_name', 'unknown')
                 
-                # 解析parameters信息（从JSON字符串转换）
-                parameters = {}
-                if 'parameters' in metadata:
-                    try:
-                        import json
-                        parameters = json.loads(metadata['parameters']) if isinstance(metadata['parameters'], str) else metadata['parameters']
-                    except (json.JSONDecodeError, TypeError):
-                        parameters = {}
+                # Get live tool data from MCP server (if available)
+                live_tool = mcp_tools_map.get(tool_name)
                 
-                # 解析tags信息（从JSON字符串转换）
+                # Parse tags from vector database (for search accuracy)
                 tags = []
                 if 'tags' in metadata:
                     try:
@@ -85,15 +99,39 @@ def register_meta_tools(mcp: FastMCP):
                     except (json.JSONDecodeError, TypeError):
                         tags = []
                 
-                formatted_tool = {
-                    "id": tool_info['id'],
-                    "name": metadata.get('function_name', 'unknown'),
-                    "category": metadata.get('category', 'general'),
-                    "description": tool_info.get('description', ''),
-                    "docstring": metadata.get('docstring', ''),
-                    "parameters": parameters,  # 包含完整的参数信息
-                    "tags": tags
-                }
+                if live_tool:
+                    # Use live data from MCP server (guaranteed fresh and accurate)
+                    formatted_tool = {
+                        "id": tool_info['id'],
+                        "name": live_tool.name,
+                        "category": metadata.get('category', 'general'),  # Keep vector DB category for consistency
+                        "description": live_tool.description or tool_info.get('description', ''),
+                        "docstring": metadata.get('docstring', ''),  # Keep vector DB docstring
+                        "parameters": getattr(live_tool, 'inputSchema', {}),  # Live schema from MCP
+                        "tags": tags  # Keep vector DB tags for search context
+                    }
+                else:
+                    # Fallback: tool not found in MCP (maybe disabled), use vector DB data
+                    # but mark parameters as potentially stale
+                    parameters = {}
+                    if 'parameters' in metadata:
+                        try:
+                            import json
+                            parameters = json.loads(metadata['parameters']) if isinstance(metadata['parameters'], str) else metadata['parameters']
+                        except (json.JSONDecodeError, TypeError):
+                            parameters = {}
+                    
+                    formatted_tool = {
+                        "id": tool_info['id'],
+                        "name": tool_name,
+                        "category": metadata.get('category', 'general'),
+                        "description": tool_info.get('description', ''),
+                        "docstring": metadata.get('docstring', ''),
+                        "parameters": parameters,  # Potentially stale data
+                        "tags": tags,
+                        "_warning": "Tool not found in live MCP server - data may be outdated"
+                    }
+                
                 formatted_tools.append(formatted_tool)
             
             # Build structured response following unified standard
