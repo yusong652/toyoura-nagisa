@@ -2,7 +2,7 @@ import os
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from backend.config import get_auth_config
-from .oauth import SCOPES
+from backend.infrastructure.mcp.tools.google_auth.oauth import SCOPES
 
 def main():
     """

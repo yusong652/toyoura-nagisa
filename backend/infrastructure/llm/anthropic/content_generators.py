@@ -111,7 +111,7 @@ class WebSearchGenerator:
     """
 
     @staticmethod
-    def perform_web_search(
+    async def perform_web_search(
         client: anthropic.Anthropic,
         query: str,
         debug: bool = False,
@@ -177,8 +177,8 @@ class WebSearchGenerator:
                 # 使用统一的调试工具打印详细的API payload
                 AnthropicDebugger.log_api_payload(api_kwargs, component="WebSearch", detailed=True)
             
-            # Call the API with web search tool
-            response = client.messages.create(**api_kwargs)
+            # Call the API with web search tool (async version)
+            response = await client.messages.create(**api_kwargs)
             
             if debug:
                 # 使用统一的调试工具打印API响应信息
