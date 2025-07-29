@@ -19,7 +19,7 @@ class WebSearchToolFactory:
             WebSearchGenerator class for the specified LLM type
         """
         if llm_type.lower() == 'gemini':
-            from backend.infrastructure.llm.gemini.content_generators import WebSearchGenerator
+            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'anthropic':
             from backend.infrastructure.llm.anthropic.content_generators import WebSearchGenerator
