@@ -46,7 +46,7 @@ class SharedImagePromptGenerator(BaseImagePromptGenerator):
         
         # Get latest conversation messages
         latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
-        
+        print(f"[text_to_image] Loaded {len(latest_messages)} latest messages for session {session_id}")
         # Load few-shot history
         few_shot_history = load_text_to_image_history(session_id) if session_id else []
         

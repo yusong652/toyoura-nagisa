@@ -301,6 +301,7 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
             if len(latest_messages) == n:
                 break
     latest_messages.reverse()
+
     return tuple(latest_messages)
 
 

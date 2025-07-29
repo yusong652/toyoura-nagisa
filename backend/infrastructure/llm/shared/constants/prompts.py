@@ -26,8 +26,8 @@ DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT = (
     "You are an expert at creating detailed, artistic text-to-image prompts. Based on the conversation "
     "context provided, generate a comprehensive and creative prompt for image generation. "
     "Your response must include both a positive prompt and a negative prompt in the specified format:\n\n"
-    "TEXT_PROMPT: [detailed positive prompt here]\n"
-    "NEGATIVE_PROMPT: [negative prompt here]\n\n"
+    "<text_to_image_prompt>[detailed positive prompt here]</text_to_image_prompt>\n"
+    "<negative_prompt>[negative prompt here]</negative_prompt>\n\n"
     "The positive prompt should be descriptive, artistic, and include relevant style, lighting, "
     "composition, and quality keywords. The negative prompt should specify what to avoid."
 )
@@ -43,10 +43,10 @@ CONVERSATION_TEXT_PROMPT_PREFIX = "Based on the following conversation, please g
 # === REGEX PATTERNS ===
 
 # Pattern for extracting text prompts from responses
-TEXT_TO_IMAGE_PROMPT_PATTERN = r'TEXT_PROMPT:\s*(.*?)(?=NEGATIVE_PROMPT:|$)'
+TEXT_TO_IMAGE_PROMPT_PATTERN = r'<text_to_image_prompt>(.*?)</text_to_image_prompt>'
 
 # Pattern for extracting negative prompts from responses
-NEGATIVE_PROMPT_PATTERN = r'NEGATIVE_PROMPT:\s*(.*?)(?=\n\n|$)'
+NEGATIVE_PROMPT_PATTERN = r'<negative_prompt>(.*?)</negative_prompt>'
 
 # Pattern for extracting titles from responses
 TITLE_PROMPT_PATTERN = r'<title>(.*?)</title>'

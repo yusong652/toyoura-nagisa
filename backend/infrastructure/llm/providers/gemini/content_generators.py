@@ -190,7 +190,6 @@ class GeminiWebSearchGenerator:
                 print(f"[WebSearch] Error: {error_msg}")
             return SharedWebSearchGenerator.format_search_error(query, error_msg)
 
-
 class GeminiImagePromptGenerator:
     """
     Gemini-specific image prompt generation using shared logic.
@@ -211,11 +210,7 @@ class GeminiImagePromptGenerator:
                 session_id=session_id
             )
             
-            if not any(msg for msg in context.get('few_shot_history', [])):
-                error_msg = f"Missing conversation context for session {session_id}"
-                if debug:
-                    print(f"[text_to_image] Error: {error_msg}")
-                return None
+            # Note: Context preparation already handles empty conversation validation
             
             # Read Gemini configuration
             gemini_config = get_gemini_client_config()
