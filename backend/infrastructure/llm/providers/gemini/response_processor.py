@@ -1,0 +1,230 @@
+"""
+Gemini-specific response processor.
+
+Handles processing of Gemini API responses, extracting content, tool calls, and metadata.
+"""
+
+from typing import List, Dict, Any, Optional
+from backend.domain.models.messages import BaseMessage, AssistantMessage
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+
+
+class GeminiResponseProcessor(BaseResponseProcessor):
+    """
+    Gemini-specific response processor.
+    
+    Handles processing of Gemini API responses with proper extraction of
+    text content, tool calls, thinking content, and web search sources.
+    """
+    
+    @staticmethod
+    def extract_text_content(response) -> str:
+        """
+        Extract text content from Gemini API response.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            str: Extracted text content
+        """
+        if not hasattr(response, 'candidates') or not response.candidates:
+            return ""
+        
+        candidate = response.candidates[0]
+        if not hasattr(candidate, 'content') or not candidate.content:
+            return ""
+        
+        text_parts = []
+        if hasattr(candidate.content, 'parts'):
+            for part in candidate.content.parts:
+                if hasattr(part, 'text'):
+                    text_parts.append(part.text)
+        
+        return ' '.join(text_parts)
+    
+    @staticmethod
+    def extract_tool_calls(response) -> List[Dict[str, Any]]:
+        """
+        Extract tool call information from Gemini API response.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            List[Dict[str, Any]]: List of tool calls with id, name, arguments
+        """
+        tool_calls = []
+        
+        if not hasattr(response, 'candidates') or not response.candidates:
+            return tool_calls
+        
+        candidate = response.candidates[0]
+        if not hasattr(candidate, 'content') or not candidate.content:
+            return tool_calls
+        
+        if hasattr(candidate.content, 'parts'):
+            for part in candidate.content.parts:
+                if hasattr(part, 'functionCall'):
+                    func_call = part.functionCall
+                    tool_call = {
+                        'id': getattr(func_call, 'id', f"call_{len(tool_calls)}"),
+                        'name': func_call.name,
+                        'arguments': dict(func_call.args) if hasattr(func_call, 'args') else {}
+                    }
+                    tool_calls.append(tool_call)
+        
+        return tool_calls
+    
+    @staticmethod
+    def should_continue_tool_calling(response) -> bool:
+        """
+        Determine if tool calling should continue based on Gemini response.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            bool: True if response contains tool calls that need execution
+        """
+        tool_calls = GeminiResponseProcessor.extract_tool_calls(response)
+        return len(tool_calls) > 0
+    
+    @staticmethod
+    def format_response_for_storage(response) -> BaseMessage:
+        """
+        Format Gemini API response for storage in conversation history.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            BaseMessage: Formatted message for storage
+        """
+        # Extract text content
+        text_content = GeminiResponseProcessor.extract_text_content(response)
+        
+        # Build content array for multimodal support
+        content = []
+        
+        if not hasattr(response, 'candidates') or not response.candidates:
+            return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
+        
+        candidate = response.candidates[0]
+        if not hasattr(candidate, 'content') or not candidate.content:
+            return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
+        
+        # Process all parts from the response
+        if hasattr(candidate.content, 'parts'):
+            for part in candidate.content.parts:
+                if hasattr(part, 'text'):
+                    content.append({
+                        "type": "text",
+                        "text": part.text
+                    })
+                elif hasattr(part, 'functionCall'):
+                    # Include function calls in storage format
+                    func_call = part.functionCall
+                    content.append({
+                        "type": "tool_use",
+                        "id": getattr(func_call, 'id', f"call_{len(content)}"),
+                        "name": func_call.name,
+                        "input": dict(func_call.args) if hasattr(func_call, 'args') else {}
+                    })
+        
+        # If no content was extracted, add empty text
+        if not content:
+            content = [{"type": "text", "text": text_content}]
+        
+        return AssistantMessage(role="assistant", content=content)
+    
+    @staticmethod
+    def extract_thinking_content(response) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from Gemini response.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            Optional[str]: Extracted thinking content, None if not available
+        """
+        if not hasattr(response, 'candidates') or not response.candidates:
+            return None
+        
+        candidate = response.candidates[0]
+        if hasattr(candidate, 'reasoning') and candidate.reasoning:
+            return candidate.reasoning
+        
+        # Check for thinking in content parts (for Gemini 2.5 models)
+        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+            for part in candidate.content.parts:
+                if hasattr(part, 'thought') and part.thought:
+                    return part.thought
+        
+        return None
+    
+    @staticmethod
+    def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
+        """
+        Extract web search sources from Gemini response.
+        
+        Args:
+            response: Raw Gemini API response object
+            debug: Enable debug output
+            
+        Returns:
+            List[Dict[str, Any]]: List of web search sources
+        """
+        sources = []
+        
+        if not hasattr(response, 'candidates') or not response.candidates:
+            return sources
+        
+        candidate = response.candidates[0]
+        
+        # Check for grounding metadata (Gemini's search results)
+        if hasattr(candidate, 'groundingMetadata'):
+            grounding = candidate.groundingMetadata
+            if hasattr(grounding, 'webSearchQueries'):
+                for query in grounding.webSearchQueries:
+                    if hasattr(query, 'searchResults'):
+                        for result in query.searchResults:
+                            source = {
+                                'title': getattr(result, 'title', ''),
+                                'url': getattr(result, 'uri', ''),
+                                'snippet': getattr(result, 'snippet', ''),
+                                'type': 'web_search'
+                            }
+                            sources.append(source)
+        
+        # Check for citations in content
+        if hasattr(candidate, 'citationMetadata'):
+            citations = candidate.citationMetadata
+            if hasattr(citations, 'citationSources'):
+                for citation in citations.citationSources:
+                    source = {
+                        'title': getattr(citation, 'title', ''),
+                        'url': getattr(citation, 'uri', ''),
+                        'snippet': '',
+                        'type': 'citation'
+                    }
+                    sources.append(source)
+        
+        if debug and sources:
+            print(f"[WebSearch] Extracted {len(sources)} sources from Gemini response")
+        
+        return sources
+    
+    @staticmethod
+    def has_tool_calls(response) -> bool:
+        """
+        Check if Gemini response contains tool calls.
+        
+        Args:
+            response: Raw Gemini API response object
+            
+        Returns:
+            bool: True if response contains tool calls
+        """
+        return len(GeminiResponseProcessor.extract_tool_calls(response)) > 0

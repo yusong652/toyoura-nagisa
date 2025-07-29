@@ -1,10 +1,10 @@
 import logging
 from typing import Dict, Optional, Type, Any, List
 from backend.infrastructure.llm.base import LLMClientBase
-from backend.infrastructure.llm.gemini import GeminiClient
+from backend.infrastructure.llm.providers.gemini import GeminiClient
+from backend.infrastructure.llm.providers.anthropic import AnthropicClient
+from backend.infrastructure.llm.providers.openai import OpenAIClient
 from backend.infrastructure.llm.local.local_llm_client import LocalLLMClient
-from backend.infrastructure.llm.anthropic import AnthropicClient
-from backend.infrastructure.llm.openai import OpenAIClient
 from backend.config import get_llm_settings
 
 logger = logging.getLogger(__name__)
