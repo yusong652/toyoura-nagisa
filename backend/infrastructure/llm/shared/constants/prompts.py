@@ -40,12 +40,6 @@ TITLE_GENERATION_REQUEST_TEXT = "Please generate a title for the above conversat
 # Conversation context prefix for text-to-image
 CONVERSATION_TEXT_PROMPT_PREFIX = "Based on the following conversation, please generate a text-to-image prompt:\n\n"
 
-# Default temperature for title generation
-DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.7
-
-# Default temperature for web search
-DEFAULT_WEB_SEARCH_TEMPERATURE = 0.1
-
 # === REGEX PATTERNS ===
 
 # Pattern for extracting text prompts from responses

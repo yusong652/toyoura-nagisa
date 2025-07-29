@@ -12,9 +12,7 @@ TEXT_TO_IMAGE_HISTORY_FILENAME = "text_to_image_history.json"
 
 # Default negative prompt for image generation
 DEFAULT_NEGATIVE_PROMPT = (
-    "low quality, worst quality, blurry, out of focus, distorted, deformed, "
-    "extra limbs, extra fingers, missing limbs, bad anatomy, bad proportions, "
-    "ugly, disgusting, mutated, watermark, signature, text, logo"
+    "low quality, worst quality, blurry, out of focus, distorted, deformed"
 )
 
 # Title generation defaults
@@ -30,3 +28,9 @@ DEFAULT_API_TIMEOUT = 60
 # Model configuration defaults
 DEFAULT_MAX_OUTPUT_TOKENS = 8192
 DEFAULT_TEMPERATURE = 0.7
+
+# Default temperature for title generation
+DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.7
+
+# Default temperature for web search
+DEFAULT_WEB_SEARCH_TEMPERATURE = 0.1

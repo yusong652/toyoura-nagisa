@@ -38,10 +38,12 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         text_parts = []
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
-                if hasattr(part, 'text'):
-                    text_parts.append(part.text)
+                if hasattr(part, 'text') and part.text:
+                    # Only extract non-thinking text parts
+                    if not getattr(part, 'thought', False):
+                        text_parts.append(part.text)
         
-        return ' '.join(text_parts)
+        return ''.join(text_parts).strip()
     
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
@@ -114,14 +116,23 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         if not hasattr(candidate, 'content') or not candidate.content:
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
         
+        # Extract thinking content
+        thinking_parts = []
+        text_parts = []
+        
+        # Extract top-level thought
+        if hasattr(candidate, 'thought') and candidate.thought:
+            thinking_parts.append(str(candidate.thought))
+        
         # Process all parts from the response
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
-                if hasattr(part, 'text'):
-                    content.append({
-                        "type": "text",
-                        "text": part.text
-                    })
+                if hasattr(part, 'text') and part.text:
+                    # Categorize text content
+                    if getattr(part, 'thought', False):
+                        thinking_parts.append(part.text)
+                    else:
+                        text_parts.append(part.text)
                 elif hasattr(part, 'functionCall'):
                     # Include function calls in storage format
                     func_call = part.functionCall
@@ -131,6 +142,25 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         "name": func_call.name,
                         "input": dict(func_call.args) if hasattr(func_call, 'args') else {}
                     })
+        
+        # Build content list for storage
+        if thinking_parts:
+            full_thinking_content = "\n".join(thinking_parts).strip()
+            if full_thinking_content:
+                content.append({
+                    "type": "thinking",
+                    "thinking": full_thinking_content,
+                })
+        
+        # Process text content and extract keyword
+        full_text_content = "".join(text_parts).strip()
+        if full_text_content:
+            from backend.shared.utils.text_parser import parse_llm_output
+            response_text, _ = parse_llm_output(full_text_content)
+            content.append({
+                "type": "text",
+                "text": response_text
+            })
         
         # If no content was extracted, add empty text
         if not content:
@@ -149,20 +179,29 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         Returns:
             Optional[str]: Extracted thinking content, None if not available
         """
-        if not hasattr(response, 'candidates') or not response.candidates:
+        thinking_parts = []
+        
+        try:
+            if not hasattr(response, 'candidates') or not response.candidates:
+                return None
+                
+            candidate = response.candidates[0]
+            
+            # Extract top-level thought
+            if hasattr(candidate, 'thought') and candidate.thought and str(candidate.thought).strip():
+                thinking_parts.append(str(candidate.thought))
+                
+            # Extract part-level thinking
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                for part in candidate.content.parts:
+                    if hasattr(part, 'text') and part.text and getattr(part, 'thought', False):
+                        thinking_parts.append(str(part.text))
+            
+            return "\n".join(thinking_parts).strip() if thinking_parts else None
+            
+        except Exception as e:
+            print(f"[WARNING] Error extracting thinking content: {e}")
             return None
-        
-        candidate = response.candidates[0]
-        if hasattr(candidate, 'reasoning') and candidate.reasoning:
-            return candidate.reasoning
-        
-        # Check for thinking in content parts (for Gemini 2.5 models)
-        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-            for part in candidate.content.parts:
-                if hasattr(part, 'thought') and part.thought:
-                    return part.thought
-        
-        return None
     
     @staticmethod
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:

@@ -162,19 +162,6 @@ async def _process_content_pipeline(
         session_id
     )
     
-    # 创建过滤后的内容仅用于TTS（移除thinking）
-    filtered_content_for_tts = content
-    if isinstance(content, list):
-        filtered_content_for_tts = []
-        for item in content:
-            if isinstance(item, dict) and item.get('type') not in ['thinking', 'redacted_thinking']:
-                filtered_content_for_tts.append(item)
-            elif not isinstance(item, dict):
-                filtered_content_for_tts.append(item)
-        
-        # 如果过滤后没有内容，添加空文本块
-        if not filtered_content_for_tts:
-            filtered_content_for_tts = [{"type": "text", "text": ""}]
     
     # 发送消息ID
     yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
@@ -183,8 +170,8 @@ async def _process_content_pipeline(
     if extracted_keyword:
         yield f"data: {json.dumps({'keyword': extracted_keyword})}\n\n"
     
-    # TTS处理流水线
-    async for chunk in _process_tts_pipeline(processed_content, tts_engine):
+    # TTS处理流水线 - 使用过滤后的纯文本内容（不包含thinking）
+    async for chunk in _process_tts_pipeline(text_content, tts_engine):
         yield chunk
 
 

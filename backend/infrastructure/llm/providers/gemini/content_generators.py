@@ -16,13 +16,14 @@ from backend.infrastructure.llm.shared.content_generators import (
     SharedWebSearchGenerator
 )
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
-from backend.infrastructure.llm.shared.constants.defaults import DEFAULT_TITLE_MAX_LENGTH
+from backend.infrastructure.llm.shared.constants.defaults import (
+    DEFAULT_TITLE_MAX_LENGTH,
+    DEFAULT_TITLE_GENERATION_TEMPERATURE,
+    DEFAULT_WEB_SEARCH_TEMPERATURE)
 from backend.infrastructure.llm.shared.constants.prompts import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    DEFAULT_TITLE_GENERATION_TEMPERATURE,
     TITLE_GENERATION_REQUEST_TEXT,
-    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
-    DEFAULT_WEB_SEARCH_TEMPERATURE
+    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
 )
 
 # Import Gemini-specific components
