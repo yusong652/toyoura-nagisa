@@ -116,26 +116,22 @@ class GeminiWebSearchGenerator:
             if debug:
                 print(f"[WebSearch] Performing search for query: {query}")
             
-            # Prepare search context using shared logic
-            context = SharedWebSearchGenerator.prepare_search_context(
-                query=query,
-                system_prompt=DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
-                temperature=DEFAULT_WEB_SEARCH_TEMPERATURE
-            )
+            # Create user message directly (like old version)
+            user_message = UserMessage(role="user", content=query)
             
             # Read Gemini configuration
             gemini_config = get_gemini_client_config()
             
-            # Configure the Gemini model with the web search tool
+            # Configure the Gemini model with the web search tool  
             search_config = types.GenerateContentConfig(
-                system_instruction=context['system_prompt'],
+                system_instruction=DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=context['temperature'],
+                temperature=DEFAULT_WEB_SEARCH_TEMPERATURE,
                 max_output_tokens=gemini_config.model_settings.max_output_tokens
             )
             
             # Format message using MessageFormatter
-            contents = GeminiMessageFormatter.format_messages_for_api([context['user_message']])
+            contents = GeminiMessageFormatter.format_messages_for_api([user_message])
             
             if debug:
                 GeminiDebugger.print_debug_request(contents, search_config)
@@ -146,8 +142,8 @@ class GeminiWebSearchGenerator:
             gemini_config = llm_settings.get_gemini_config()
             model = gemini_config.model
             
-            # Call the model with the query
-            response = client.models.generate_content(
+            # Call the model with the query (async version)
+            response = await client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=search_config
@@ -165,13 +161,12 @@ class GeminiWebSearchGenerator:
                 # Extract response text using ResponseProcessor
                 response_text = GeminiResponseProcessor.extract_text_content(response)
                 
-                # Build structured result
+                # Build structured result (match old version format)
                 result = {
                     "query": query,
                     "response_text": response_text,
                     "sources": sources,
-                    "total_sources": len(sources),
-                    "error": None
+                    "total_sources": len(sources)
                 }
                 
                 if debug:
@@ -182,13 +177,13 @@ class GeminiWebSearchGenerator:
             else:
                 if debug:
                     print("[WebSearch] No candidates found in response")
-                return SharedWebSearchGenerator.format_search_error(query, "No search results found")
+                return {"error": "No search results found", "query": query}
                 
         except Exception as e:
             error_msg = f"An error occurred during web search: {str(e)}"
             if debug:
                 print(f"[WebSearch] Error: {error_msg}")
-            return SharedWebSearchGenerator.format_search_error(query, error_msg)
+            return {"error": error_msg, "query": query}
 
 class GeminiImagePromptGenerator:
     """

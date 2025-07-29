@@ -28,7 +28,7 @@ class WebSearchToolFactory:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
     
     @staticmethod
-    def perform_web_search(
+    async def perform_web_search(
         llm_client,
         llm_type: str,
         query: str,
@@ -74,7 +74,7 @@ class WebSearchToolFactory:
             if llm_type.lower() == 'gemini':
                 # Gemini client expects the raw client
                 client = getattr(llm_client, 'client', llm_client)
-                return WebSearchGenerator.perform_web_search(
+                return await WebSearchGenerator.perform_web_search(
                     client=client,
                     query=query,
                     debug=debug,
@@ -83,7 +83,7 @@ class WebSearchToolFactory:
             elif llm_type.lower() == 'anthropic':
                 # Anthropic client can be passed directly
                 client = getattr(llm_client, 'client', llm_client)
-                return WebSearchGenerator.perform_web_search(
+                return await WebSearchGenerator.perform_web_search(
                     client=client,
                     query=query,
                     debug=debug,

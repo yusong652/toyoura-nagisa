@@ -10,7 +10,7 @@ from backend.config import get_llm_settings
 
 __all__ = ["web_search", "register_web_search_tool"]
 
-def web_search(
+async def web_search(
     query: str = Field(..., description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')"),
     max_uses: int = Field(5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"),
     context: Context = None
@@ -49,7 +49,7 @@ def web_search(
             ).model_dump()
         
         # Use WebSearchToolFactory to perform search with detected client type
-        search_result = WebSearchToolFactory.perform_web_search(
+        search_result = await WebSearchToolFactory.perform_web_search(
             llm_client=llm_client,
             llm_type=llm_type,
             query=query,
