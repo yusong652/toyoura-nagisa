@@ -5,7 +5,6 @@ This implementation inherits from the base LLMClientBase and uses shared compone
 where possible, while implementing Gemini-specific functionality.
 """
 
-import os
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 
 from google import genai

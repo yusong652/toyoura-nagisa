@@ -22,6 +22,10 @@ from fastmcp import FastMCP
 from backend.infrastructure.mcp.tools.google_auth.google_calendar import build_google_calendar_service
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
 from backend.infrastructure.mcp.utils import ensure_future_datetime
+from backend.infrastructure.mcp.utils.datetime_builder import (
+    parse_calendar_datetime_params,
+    get_date_range_examples
+)
 
 __all__ = ["register_calendar_tools"]
 
@@ -343,13 +347,13 @@ def register_calendar_tools(mcp: FastMCP):
             le=MAX_EVENTS_HARD_LIMIT,
             description="Maximum number of events to retrieve (1-100).",
         ),
-        time_min: Optional[str] = Field(
+        time_min: Optional[Dict[str, int]] = Field(
             None,
-            description="Lower bound (exclusive) for events to filter by. RFC3339 format (e.g., '2024-01-01T00:00:00Z').",
+            description="Start time filter. Provide a simple object with year, month, day, and optionally hour, minute. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 0, 'minute': 0}",
         ),
-        time_max: Optional[str] = Field(
+        time_max: Optional[Dict[str, int]] = Field(
             None,
-            description="Upper bound (exclusive) for events to filter by. RFC3339 format (e.g., '2024-12-31T23:59:59Z').",
+            description="End time filter. Provide a simple object with year, month, day, and optionally hour, minute. Example: {'year': 2025, 'month': 7, 'day': 31, 'hour': 23, 'minute': 59}",
         ),
     ) -> Dict[str, Any]:
         """List upcoming events from Google Calendar with comprehensive filtering and metadata.
@@ -370,22 +374,70 @@ def register_calendar_tools(mcp: FastMCP):
                 data=data,
             ).model_dump()
 
-        # Parameter validation and normalization
-        if isinstance(max_results, FieldInfo):
-            max_results = DEFAULT_MAX_EVENTS
-        if isinstance(time_min, FieldInfo):
-            time_min = None
-        if isinstance(time_max, FieldInfo):
-            time_max = None
+        print(f"[DEBUG] list_calendar_events called with:")
+        print(f"  max_results: {max_results} (type: {type(max_results)})")
+        print(f"  time_min: {time_min} (type: {type(time_min)})")
+        print(f"  time_max: {time_max} (type: {type(time_max)})")
+
+        # Parameter processing
+        try:
+            # Handle FieldInfo objects (default values)
+            if isinstance(max_results, FieldInfo):
+                print(f"[DEBUG] max_results is FieldInfo, setting to DEFAULT_MAX_EVENTS: {DEFAULT_MAX_EVENTS}")
+                max_results = DEFAULT_MAX_EVENTS
+            if isinstance(time_min, FieldInfo):
+                print(f"[DEBUG] time_min is FieldInfo, setting to None")
+                time_min = None
+            if isinstance(time_max, FieldInfo):
+                print(f"[DEBUG] time_max is FieldInfo, setting to None")
+                time_max = None
+
+            # Convert simple datetime parameters to ISO strings
+            processed_params = parse_calendar_datetime_params(
+                max_results=max_results,
+                time_min=time_min,
+                time_max=time_max
+            )
+            
+            max_results = processed_params.get('max_results', DEFAULT_MAX_EVENTS)
+            time_min = processed_params.get('time_min')
+            time_max = processed_params.get('time_max')
+            
+            print(f"[DEBUG] After datetime processing:")
+            print(f"  max_results: {max_results}")
+            print(f"  time_min: {time_min}")
+            print(f"  time_max: {time_max}")
+            
+        except ValueError as e:
+            print(f"[DEBUG] Parameter processing failed: {str(e)}")
+            return _error(f"Invalid parameters: {str(e)}")
 
         # Validate parameters
         if max_results <= 0 or max_results > MAX_EVENTS_HARD_LIMIT:
-            return _error(f"max_results must be between 1 and {MAX_EVENTS_HARD_LIMIT}")
+            error_msg = f"max_results must be between 1 and {MAX_EVENTS_HARD_LIMIT}"
+            print(f"[DEBUG] Parameter validation failed: {error_msg}")
+            return _error(error_msg)
 
         try:
+            print(f"[DEBUG] Starting calendar operation...")
+            
             # Get user email and build service
-            user_email = get_user_email()
-            service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
+            print(f"[DEBUG] Getting user email...")
+            try:
+                user_email = get_user_email()
+                print(f"[DEBUG] User email: {user_email}")
+            except Exception as e:
+                print(f"[DEBUG] Failed to get user email: {str(e)}")
+                raise
+
+            print(f"[DEBUG] Building Google Calendar service...")
+            print(f"[DEBUG] Tokens directory: {CALENDAR_OAUTH_TOKEN_DIR}")
+            try:
+                service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
+                print(f"[DEBUG] Service built successfully")
+            except Exception as e:
+                print(f"[DEBUG] Failed to build service: {str(e)}")
+                raise
             
             # Prepare query parameters
             query_params = {
@@ -398,27 +450,54 @@ def register_calendar_tools(mcp: FastMCP):
             # Set time bounds
             if time_min:
                 query_params['timeMin'] = time_min
+                print(f"[DEBUG] Using provided time_min: {time_min}")
             else:
-                query_params['timeMin'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+                # Use proper RFC3339 format with Z suffix for UTC (no microseconds)
+                default_time_min = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                query_params['timeMin'] = default_time_min
+                print(f"[DEBUG] Using default time_min: {default_time_min}")
             
             if time_max:
                 query_params['timeMax'] = time_max
+                print(f"[DEBUG] Using time_max: {time_max}")
+            
+            print(f"[DEBUG] Final query parameters: {query_params}")
             
             # Execute calendar operation
             def list_operation():
-                return service.events().list(**query_params).execute()
+                print(f"[DEBUG] Executing calendar API call...")
+                try:
+                    result = service.events().list(**query_params).execute()
+                    print(f"[DEBUG] API call successful, got result with keys: {list(result.keys())}")
+                    items = result.get('items', [])
+                    print(f"[DEBUG] Found {len(items)} items")
+                    return result
+                except Exception as e:
+                    print(f"[DEBUG] API call failed: {str(e)}")
+                    print(f"[DEBUG] Exception type: {type(e)}")
+                    raise
             
+            print(f"[DEBUG] Calling _execute_calendar_operation...")
             result = _execute_calendar_operation(
                 CalendarOperationType.LIST_EVENTS,
                 list_operation,
             )
             
+            print(f"[DEBUG] Operation result:")
+            print(f"  success: {result.success}")
+            print(f"  total_events: {result.total_events}")
+            print(f"  execution_time: {result.execution_time}")
+            print(f"  error_message: {result.error_message}")
+            print(f"  warnings: {result.warnings}")
+            
             # Build user-facing message
             if result.success:
                 events_word = "event" if result.total_events == 1 else "events"
                 message = f"Retrieved {result.total_events} {events_word} from primary calendar ({result.execution_time:.2f}s)"
+                print(f"[DEBUG] Success message: {message}")
             else:
                 message = f"Failed to retrieve events: {result.error_message}"
+                print(f"[DEBUG] Error message: {message}")
             
             # Build structured LLM content
             llm_content = {
@@ -448,18 +527,27 @@ def register_calendar_tools(mcp: FastMCP):
             if result.warnings:
                 llm_content["warnings"] = result.warnings
             
-            return _success(message, llm_content, **result.to_dict())
+            print(f"[DEBUG] Returning success result")
+            return _success(message, llm_content, operation_result=result.to_dict())
             
         except ValueError as e:
-            return _error(str(e))
+            error_msg = str(e)
+            print(f"[DEBUG] ValueError caught: {error_msg}")
+            return _error(error_msg)
         except Exception as e:
-            return _error(f"Unexpected error listing events: {str(e)}")
+            error_msg = f"Unexpected error listing events: {str(e)}"
+            print(f"[DEBUG] Exception caught: {error_msg}")
+            print(f"[DEBUG] Exception type: {type(e)}")
+            import traceback
+            print(f"[DEBUG] Full traceback:")
+            traceback.print_exc()
+            return _error(error_msg)
 
     @mcp.tool(tags=common_tags, annotations=common_annotations)
     def create_calendar_event(
         summary: str = Field(..., description="Event summary/title (required)."),
-        start: str = Field(..., description="Event start time in RFC3339 format (e.g., '2024-06-06T10:00:00+09:00')."),
-        end: str = Field(..., description="Event end time in RFC3339 format (e.g., '2024-06-06T11:00:00+09:00')."),
+        start: Dict[str, int] = Field(..., description="Event start time. Provide a simple object with year, month, day, hour, minute. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 10, 'minute': 0}"),
+        end: Dict[str, int] = Field(..., description="Event end time. Provide a simple object with year, month, day, hour, minute. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 11, 'minute': 0}"),
         location: Optional[str] = Field(None, description="Event location (e.g., 'Conference Room A', '123 Main St')."),
         description: Optional[str] = Field(None, description="Event description or notes."),
     ) -> Dict[str, Any]:
@@ -483,11 +571,31 @@ def register_calendar_tools(mcp: FastMCP):
                 data=data,
             ).model_dump()
 
-        # Parameter validation and normalization
-        if isinstance(location, FieldInfo):
-            location = None
-        if isinstance(description, FieldInfo):
-            description = None
+        # Parameter processing
+        try:
+            # Handle FieldInfo objects (default values)
+            if isinstance(location, FieldInfo):
+                location = None
+            if isinstance(description, FieldInfo):
+                description = None
+
+            # Convert simple datetime parameters to ISO strings
+            processed_params = parse_calendar_datetime_params(
+                summary=summary,
+                start=start,
+                end=end,
+                location=location,
+                description=description
+            )
+            
+            summary = processed_params.get('summary', summary)
+            start = processed_params.get('start', start)
+            end = processed_params.get('end', end)
+            location = processed_params.get('location', location)
+            description = processed_params.get('description', description)
+            
+        except ValueError as e:
+            return _error(f"Invalid parameters: {str(e)}")
 
         # Validate event data
         warnings = _validate_event_data(summary, start, end, location, description)
@@ -539,8 +647,8 @@ def register_calendar_tools(mcp: FastMCP):
                 else:
                     warnings.append(f"End time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
             
-            start = start_dt.isoformat()
-            end = end_dt.isoformat()
+            start = start_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
+            end = end_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
             
             # Get user email and build service
             user_email = get_user_email()
@@ -596,7 +704,7 @@ def register_calendar_tools(mcp: FastMCP):
             if result.warnings:
                 llm_content["warnings"] = result.warnings
             
-            return _success(message, llm_content, **result.to_dict())
+            return _success(message, llm_content, operation_result=result.to_dict())
             
         except ValueError as e:
             return _error(str(e))
@@ -698,7 +806,7 @@ def register_calendar_tools(mcp: FastMCP):
                             else:
                                 warnings.append(f"Updated start time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
                         
-                        start = start_dt.isoformat()
+                        start = start_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
                     except ValueError as e:
                         return _error(f"Invalid start time format: {str(e)}. Please use RFC3339 format")
                 
@@ -719,7 +827,7 @@ def register_calendar_tools(mcp: FastMCP):
                             else:
                                 warnings.append(f"Updated end time was {time_diff:.0f} seconds in the past. Automatically scheduled for next occurrence.")
                         
-                        end = end_dt.isoformat()
+                        end = end_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
                     except ValueError as e:
                         return _error(f"Invalid end time format: {str(e)}. Please use RFC3339 format")
                 
@@ -796,7 +904,7 @@ def register_calendar_tools(mcp: FastMCP):
             if result.warnings:
                 llm_content["warnings"] = result.warnings
             
-            return _success(message, llm_content, **result.to_dict())
+            return _success(message, llm_content, operation_result=result.to_dict())
             
         except Exception as e:
             if 'Not Found' in str(e):
@@ -872,7 +980,7 @@ def register_calendar_tools(mcp: FastMCP):
             if result.warnings:
                 llm_content["warnings"] = result.warnings
             
-            return _success(message, llm_content, **result.to_dict())
+            return _success(message, llm_content, operation_result=result.to_dict())
             
         except Exception as e:
             if 'Not Found' in str(e):
