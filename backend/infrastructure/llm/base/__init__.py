@@ -11,6 +11,7 @@ from .tool_manager import BaseToolManager
 from .content_generators import BaseContentGenerator
 from .message_formatter import BaseMessageFormatter
 from .response_processor import BaseResponseProcessor
+from .factory import LLMFactory, get_default_factory, initialize_factory
 
 __all__ = [
     "LLMClientBase",
@@ -18,5 +19,8 @@ __all__ = [
     "BaseToolManager",
     "BaseContentGenerator",
     "BaseMessageFormatter",
-    "BaseResponseProcessor"
+    "BaseResponseProcessor",
+    "LLMFactory",
+    "get_default_factory",
+    "initialize_factory"
 ]

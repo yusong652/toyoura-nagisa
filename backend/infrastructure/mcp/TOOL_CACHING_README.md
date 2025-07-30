@@ -107,9 +107,14 @@ async def get_function_call_schemas(self, session_id: Optional[str] = None):
 ### 1. 基本使用
 
 ```python
-# 创建客户端
-from backend.infrastructure.llm.llm_factory import get_client
-client = get_client()  # 自动创建GeminiClient
+# 创建客户端 (新方式)
+from backend.infrastructure.llm import initialize_factory
+factory = initialize_factory()
+client = factory.create_client()  # 自动创建GeminiClient
+
+# 或者使用默认工厂
+from backend.infrastructure.llm import get_default_factory
+client = get_default_factory().create_client()
 
 # 发送消息（会自动处理工具缓存）
 final_message, metadata = await client.get_enhanced_response(messages, session_id="session_123")

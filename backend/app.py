@@ -11,7 +11,7 @@ from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
 from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, load_all_message_history
 from backend.infrastructure.storage.image_storage import save_image_from_url, save_image_from_base64
-from backend.infrastructure.llm.llm_factory import get_client
+from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_settings, LOCATION_DB_PATH
 from backend.shared.utils.helpers import (
@@ -72,9 +72,12 @@ async def lifespan(app: FastAPI):
         app.state.tts_engine = tts_engine
         print("[INIT] TTS Engine initialized successfully")
         
-        # 初始化 LLM Client
-        llm_client = get_client()
+        # 初始化 LLM Factory
+        llm_factory = initialize_factory()
+        llm_client = llm_factory.create_client()
         app.state.llm_client = llm_client
+        app.state.llm_factory = llm_factory
+        print(f"[INIT] LLM Factory initialized successfully")
         print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
         
         # 初始化 MCP 服务器

@@ -9,13 +9,14 @@ async def validate_llm_configuration():
     验证LLM配置，确保使用的是支持的客户端
     """
     try:
-        from backend.infrastructure.llm.llm_factory import get_supported_clients, is_client_supported
+        from backend.infrastructure.llm import get_default_factory
         from backend.config.llm import get_llm_settings
         
         current_llm = get_llm_settings().provider
-        supported_clients = get_supported_clients()
+        factory = get_default_factory()
+        supported_clients = factory.get_supported_clients()
         
-        if not is_client_supported(current_llm):
+        if not factory.is_client_supported(current_llm):
             print(f"❌ [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
             print(f"📋 Supported clients: {', '.join(supported_clients)}")
             print(f"💡 Please update your configuration to use one of the supported clients.")
