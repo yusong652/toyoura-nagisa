@@ -187,7 +187,7 @@ class OpenAIToolManager(BaseToolManager):
                 meta_result = {"data": {"tools": []}}
             
             # Extract and cache tools
-            extracted_tools = self.extract_tools_from_meta_result(meta_result)
+            extracted_tools = await self.extract_tools_from_meta_result(meta_result, session_id)
             if extracted_tools:
                 self.cache_tools_for_session(session_id, extracted_tools)
                 if debug:

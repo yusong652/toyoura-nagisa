@@ -82,15 +82,16 @@ class BaseToolManager(ABC):
             "search_tools",  # Name used by Gemini client
         }
     
-    def extract_tools_from_meta_result(self, meta_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def extract_tools_from_meta_result(self, meta_result: Dict[str, Any], session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Extract tool information from meta tool result.
+        Extract tool information from meta tool result and get live schemas from MCP server.
         
         Args:
             meta_result: Meta tool execution result (standard ToolResult format)
+            session_id: Optional session ID for MCP client
             
         Returns:
-            List: Parsed tool information list
+            List: Parsed tool information list with live schemas
         """
         if not isinstance(meta_result, dict) or "data" not in meta_result:
             return []
@@ -103,22 +104,83 @@ class BaseToolManager(ABC):
         if not isinstance(tools_data, list):
             return []
         
-        processed_tools = []
+        # Extract tool names from meta result (discovery from vector DB)
+        tool_names = []
+        meta_info = {}
         for tool_info in tools_data:
             if not isinstance(tool_info, dict) or "name" not in tool_info:
                 continue
-            
-            # Directly use standardized tool information returned by meta tool
-            # Meta tool has already handled parameters format conversion
-            processed_tools.append({
-                "name": tool_info["name"],
+            tool_name = tool_info["name"]
+            tool_names.append(tool_name)
+            # Store meta info (description, category, tags) but not schema
+            meta_info[tool_name] = {
                 "description": tool_info.get("description", ""),
                 "category": tool_info.get("category", "general"),
                 "docstring": tool_info.get("docstring", ""),
-                "inputSchema": tool_info.get("parameters", {}),
-                "parameters": tool_info.get("parameters", {}),  # Maintain backward compatibility
                 "tags": tool_info.get("tags", [])
-            })
+            }
+        
+        if not tool_names:
+            return []
+        
+        # Get live schemas from MCP server
+        processed_tools = []
+        try:
+            mcp_client = self.get_mcp_client(session_id)
+            async with mcp_client as mcp_async_client:
+                mcp_tools_result = await mcp_async_client.list_tools()
+                
+                # Handle different return formats from MCP client
+                if hasattr(mcp_tools_result, 'tools'):
+                    mcp_tools = mcp_tools_result.tools
+                elif isinstance(mcp_tools_result, list):
+                    mcp_tools = mcp_tools_result
+                else:
+                    mcp_tools = []
+                
+                # Match tools by name and use live schema
+                for mcp_tool in mcp_tools:
+                    tool_name = mcp_tool.name
+                    if tool_name in tool_names:
+                        # Use live schema from MCP server
+                        input_schema = getattr(mcp_tool, "inputSchema", {}) or {}
+                        
+                        # Combine live schema with meta info
+                        tool_data = {
+                            "name": tool_name,
+                            "inputSchema": input_schema,
+                            "parameters": input_schema,  # Maintain backward compatibility
+                        }
+                        
+                        # Add meta info if available, otherwise use MCP tool info
+                        if tool_name in meta_info:
+                            tool_data.update(meta_info[tool_name])
+                        else:
+                            tool_data.update({
+                                "description": mcp_tool.description or "",
+                                "category": "general",
+                                "docstring": mcp_tool.description or "",
+                                "tags": []
+                            })
+                        
+                        processed_tools.append(tool_data)
+        
+        except Exception as e:
+            print(f"[WARNING] Failed to get live schemas from MCP server: {e}")
+            # Fallback to original behavior (using cached parameters)
+            for tool_info in tools_data:
+                if not isinstance(tool_info, dict) or "name" not in tool_info:
+                    continue
+                
+                processed_tools.append({
+                    "name": tool_info["name"],
+                    "description": tool_info.get("description", ""),
+                    "category": tool_info.get("category", "general"),
+                    "docstring": tool_info.get("docstring", ""),
+                    "inputSchema": tool_info.get("parameters", {}),
+                    "parameters": tool_info.get("parameters", {}),  # Maintain backward compatibility
+                    "tags": tool_info.get("tags", [])
+                })
         
         return processed_tools
     
@@ -331,7 +393,7 @@ class BaseToolManager(ABC):
                     print(f"[DEBUG] Meta result keys: {list(meta_result.keys())}")
             
             # Extract and cache tool information
-            extracted_tools = self.extract_tools_from_meta_result(meta_result)
+            extracted_tools = await self.extract_tools_from_meta_result(meta_result, session_id)
             if extracted_tools:
                 self.cache_tools_for_session(session_id, extracted_tools)
                 if debug:
