@@ -4,7 +4,7 @@ from backend.infrastructure.llm.base import LLMClientBase
 from backend.infrastructure.llm.providers.gemini import GeminiClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
-from backend.infrastructure.llm.local.local_llm_client import LocalLLMClient
+from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
 from backend.config import get_llm_settings
 
 logger = logging.getLogger(__name__)
