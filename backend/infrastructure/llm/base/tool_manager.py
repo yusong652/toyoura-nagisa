@@ -264,9 +264,9 @@ class BaseToolManager(ABC):
             result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             text_result = extract_tool_result_from_mcp(result)
             
-            # Check execution error
+            # Check execution error - return tool's original error structure
             if isinstance(result, dict) and result.get("error"):
-                return self._create_error_response(tool_id, tool_name, text_result)
+                return text_result
             
             # Cache results from search tools
             if tool_name in ["search_tools_by_keywords", "search_tools"] and session_id:
@@ -306,11 +306,9 @@ class BaseToolManager(ABC):
             result_obj = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(result_obj)
             
-            # Check MCP-level errors (is_error field)
+            # Check MCP-level errors (is_error field) - return tool's original error structure
             if tool_result.get("is_error"):
-                return self._create_error_response(
-                    tool_id, tool_name, tool_result.get("content", "Tool execution failed.")
-                )
+                return tool_result
             
             # Handle multimodal content: check for inline_data and extract
             if self._has_multimodal_content(tool_result):
