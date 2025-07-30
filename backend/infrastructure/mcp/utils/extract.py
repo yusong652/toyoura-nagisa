@@ -10,17 +10,16 @@ def extract_tool_result_from_mcp(result):
     - isError: bool 
     
     我们的工具返回的 ToolResult 对象序列化在 TextContent.text 中。
-    总是返回完整的字典，让调用方决定如何使用。
+    所有工具都通过 ToolResult.model_dump() 返回规范的 JSON，因此不需要错误处理。
     """
-    # 错误情况
-    if result.isError:
-        return {"is_error": True, "content": "Tool execution failed"}
-    
-    # 提取第一个 TextContent 中的 ToolResult
+    # 提取并解析 TextContent 中的 ToolResult JSON
     text_content = result.content[0].text
     tool_result = json.loads(text_content)
     
-    # 返回完整的 ToolResult 字典
+    # 如果 MCP 标记为错误，确保设置 is_error 标志
+    if result.isError:
+        tool_result["is_error"] = True
+        
     return tool_result
 
 def ensure_future_datetime(dt: datetime, now: datetime = None) -> datetime:
