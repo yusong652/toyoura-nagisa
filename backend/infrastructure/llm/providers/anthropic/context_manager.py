@@ -6,7 +6,7 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 """
 
 from typing import List, Dict, Any
-from backend.infrastructure.llm.base_context_manager import BaseContextManager
+from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 
 
@@ -144,6 +144,18 @@ class AnthropicContextManager(BaseContextManager):
         
         return False
     
+    def should_continue_tool_calling(self, response) -> bool:
+        """
+        判断是否应该继续工具调用 - 基类抽象方法实现
+        
+        Args:
+            response: Anthropic API响应对象
+            
+        Returns:
+            bool: 是否应该继续工具调用
+        """
+        # Delegate to the existing implementation
+        return self.should_continue_tool_calling_from_response(response)
     
     def clear_context(self) -> None:
         """清理上下文状态"""

@@ -12,7 +12,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 from typing import List, Dict, Any, Optional, Tuple
 from google.genai import types
 from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.llm.base_context_manager import BaseContextManager
+from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import GeminiMessageFormatter
 
 
@@ -200,4 +200,18 @@ class GeminiContextManager(BaseContextManager):
             return tool_calls
         except (AttributeError, IndexError):
             return []
+    
+    def should_continue_tool_calling(self, response) -> bool:
+        """
+        判断是否应该继续工具调用
+        
+        Args:
+            response: Gemini API响应对象
+            
+        Returns:
+            bool: 是否应该继续工具调用
+        """
+        # Delegate to the static method in response processor
+        from .response_processor import GeminiResponseProcessor
+        return GeminiResponseProcessor.should_continue_tool_calling(response)
     
