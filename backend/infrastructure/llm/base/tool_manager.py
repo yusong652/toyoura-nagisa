@@ -275,16 +275,15 @@ class BaseToolManager(ABC):
             return text_result
             
         except (ValueError, PermissionError) as e:
-            # Security policy violations - provide clear error messages
+            # Security policy violations - re-raise for upper layer handling
             if debug:
                 print(f"Security policy violation for meta tool {tool_name}: {str(e)}")
-            return self._create_error_response(tool_id, tool_name, f"Security Error: {str(e)}")
+            raise ValueError(f"Security Error in meta tool '{tool_name}': {str(e)}") from e
         except Exception as e:
+            # System/infrastructure errors - re-raise for upper layer handling
             if debug:
                 print(f"Error calling meta tool {tool_name}: {str(e)}")
-            return self._create_error_response(
-                tool_id, tool_name, f"Error: Meta tool execution failed - {str(e)}"
-            )
+            raise RuntimeError(f"Meta tool '{tool_name}' execution failed: {str(e)}") from e
     
     async def _handle_regular_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str,
                                   session_id: Optional[str] = None, debug: bool = False) -> Any:
@@ -318,16 +317,15 @@ class BaseToolManager(ABC):
             return self._extract_regular_content(tool_result)
             
         except (ValueError, PermissionError) as e:
-            # Security policy violations - provide clear error messages
+            # Security policy violations - re-raise for upper layer handling
             if debug:
                 print(f"Security policy violation for tool {tool_name}: {str(e)}")
-            return self._create_error_response(tool_id, tool_name, f"Security Error: {str(e)}")
+            raise ValueError(f"Security Error in tool '{tool_name}': {str(e)}") from e
         except Exception as e:
+            # System/infrastructure errors - re-raise for upper layer handling
             if debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")
-            return self._create_error_response(
-                tool_id, tool_name, f"Error: Tool execution failed - {str(e)}"
-            )
+            raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
     
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
                                session_id: Optional[str] = None) -> Any:
@@ -475,25 +473,6 @@ class BaseToolManager(ABC):
             "llm_content": tool_result.get("llm_content")
         }
     
-    def _create_error_response(self, tool_id: str, tool_name: str, error_message: str) -> Dict[str, Any]:
-        """
-        Create standardized error response.
-        
-        Args:
-            tool_id: Tool call ID
-            tool_name: Tool name
-            error_message: Error message
-            
-        Returns:
-            Dict: Standardized error response structure
-        """
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "name": tool_name,
-            "content": error_message,
-            "is_error": True
-        }
     
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Any:
         """
