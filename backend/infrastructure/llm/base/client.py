@@ -9,7 +9,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 from backend.config import get_system_prompt
 
 

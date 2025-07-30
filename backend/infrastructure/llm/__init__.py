@@ -8,7 +8,7 @@ Gemini, Anthropic, OpenAI, and local model support using the new base/shared/pro
 from backend.presentation.models.api_models import ErrorResponse
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.base.factory import LLMFactory, get_default_factory, initialize_factory
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 
 # Import specific client implementations for direct use if needed
 from backend.infrastructure.llm.providers.gemini import GeminiClient

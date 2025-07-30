@@ -7,7 +7,7 @@ multimodal content, and error handling.
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
 
 

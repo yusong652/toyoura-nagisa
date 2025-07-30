@@ -14,7 +14,7 @@ from google.genai import types
 from backend.config import get_llm_settings, get_system_prompt
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 
 # Import Gemini-specific implementations
 from .config import get_gemini_client_config, GeminiClientConfig

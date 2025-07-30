@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional, AsyncGenerator, Union, Tuple
 import httpx
 
 from backend.domain.models.messages import BaseMessage, AssistantMessage
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.config.llm import get_llm_settings
 from backend.shared.utils.text_clean import extract_response_without_think

@@ -5,7 +5,7 @@ import uuid
 import time
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.infrastructure.llm.response_models import LLMResponse
+from backend.domain.models.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
 import anthropic
 from fastmcp import Client as MCPClient
