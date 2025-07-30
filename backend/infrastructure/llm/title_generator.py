@@ -1,5 +1,5 @@
 from typing import Optional
-from backend.infrastructure.llm.base import LLMClientBase
+from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 import traceback
 

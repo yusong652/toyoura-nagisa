@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Optional, Type, Any, List
-from backend.infrastructure.llm.base import LLMClientBase
+from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.llm.providers.gemini import GeminiClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient

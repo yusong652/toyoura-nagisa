@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 import json
 import uuid
 import time
-from backend.infrastructure.llm.base import LLMClientBase
+from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.infrastructure.llm.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
