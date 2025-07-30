@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from backend.infrastructure.storage.session_manager import get_all_sessions, update_session_title, save_history, load_history
 from backend.infrastructure.tts.base import BaseTTS
-from backend.infrastructure.llm.title_generator import generate_conversation_title
+# Removed legacy title_generator import - now using LLM client methods directly
 from backend.config import get_llm_settings
 from backend.domain.models.message_factory import message_factory
 from backend.domain.models.messages import AssistantMessage, UserMessage, BaseMessage
@@ -195,7 +195,11 @@ async def generate_title_for_session(session_id: str, llm_client) -> str:
     if not latest_user_msg or not latest_assistant_msg:
         return None
         
-    title = await generate_conversation_title(latest_user_msg, latest_assistant_msg, llm_client)
+    # Use LLM client's built-in title generation method directly
+    title = await llm_client.generate_title_from_messages(
+        first_user_message=latest_user_msg,
+        first_assistant_message=latest_assistant_msg
+    )
     return title
 
 def extract_response_without_think(response_text: str) -> str:
