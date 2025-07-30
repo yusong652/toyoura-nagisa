@@ -56,28 +56,34 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const locationData = await geolocationService.requestLocation();
       
       if (locationData) {
-        // 添加session_id到位置数据中
-        const locationDataWithSession = {
-          ...locationData,
-          session_id: currentSessionId
-        };
-        
-        // 发送位置信息到后端
-        const response = await fetch('/api/location/update', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(locationDataWithSession),
-        });
-        
-        if (response.ok) {
-          console.log('位置信息已成功发送到后端，session_id:', currentSessionId);
+        // 通过WebSocket直接回复位置数据
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          const locationResponse = {
+            type: 'LOCATION_RESPONSE',
+            session_id: currentSessionId,
+            location_data: locationData,
+            timestamp: Date.now()
+          };
+          
+          wsRef.current.send(JSON.stringify(locationResponse));
+          console.log('位置信息已通过WebSocket发送到后端:', locationData);
         } else {
-          console.warn('位置信息发送失败');
+          console.warn('WebSocket连接不可用，无法发送位置信息');
         }
       } else {
         console.warn('无法获取位置信息');
+        
+        // 发送位置获取失败的响应
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          const errorResponse = {
+            type: 'LOCATION_RESPONSE',
+            session_id: currentSessionId,
+            error: 'Failed to get location',
+            timestamp: Date.now()
+          };
+          
+          wsRef.current.send(JSON.stringify(errorResponse));
+        }
       }
     } catch (error) {
       console.error('处理位置请求时出错:', error);
@@ -1074,11 +1080,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             return;
           }
           
-          // 处理位置请求事件
-          if (data.type === 'REQUEST_LOCATION') {
-            handleLocationRequest(data);
-            return;
-          }
+          // 位置请求事件在普通WebSocket连接中处理，这里不需要重复处理
           
           // 处理消息状态更新
           if (data.status) {

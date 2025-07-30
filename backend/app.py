@@ -49,6 +49,10 @@ from backend.presentation.streaming.handlers import generate_chat_stream
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
 
+# 位置响应事件存储 - 非阻塞事件机制
+# 格式: {session_id: {"location_data": {...}, "timestamp": timestamp, "event": asyncio.Event}}
+_location_response_events = {}
+
 # ========== 应用生命周期管理器 - 增强版 ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -422,41 +426,49 @@ async def generate_image_endpoint(request: GenerateImageRequest):
         print(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@app.post("/api/location/update")
-async def update_browser_location(request: Request):
-    """接收前端发送的浏览器位置信息"""
-    try:
-        data = await request.json()
-        session_id = data.get("session_id")
-        
-        location_data = {
-            "latitude": data.get("latitude"),
-            "longitude": data.get("longitude"),
-            "accuracy": data.get("accuracy"),
-            "timestamp": data.get("timestamp") or int(datetime.now().timestamp()),
-            "source": "browser_geolocation"
-        }
-        
-        # Store in temporary location storage for active tool calls
-        from backend.infrastructure.mcp.tools.location_tool.tool import store_temp_location
-        if session_id:
-            store_temp_location(session_id, location_data)
-        
-        print(f"[DEBUG] Browser location stored temporarily for session {session_id}: {location_data}")
-        return {"success": True, "session_id": session_id}
-    except Exception as e:
-        print(f"[ERROR] Failed to process browser location: {e}")
-        return {"success": False, "error": str(e)}
+# Location update API removed - now handled via WebSocket LOCATION_RESPONSE messages
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """为每个客户端会话建立 WebSocket 连接。"""
+    import json
+    import asyncio
+    
     connection_manager: ConnectionManager = websocket.app.state.connection_manager
     await connection_manager.connect(websocket, session_id)
     try:
         while True:
-            # 保持连接开放以接收后端推送
-            await websocket.receive_text()
+            # 接收并处理来自前端的消息
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                
+                # 处理位置响应消息
+                if message.get("type") == "LOCATION_RESPONSE":
+                    print(f"[DEBUG] Received location response for session {session_id}: {message}")
+                    
+                    # 存储位置数据并触发事件
+                    if session_id in _location_response_events:
+                        event_info = _location_response_events[session_id]
+                        
+                        # 存储位置数据
+                        if "location_data" in message:
+                            event_info["location_data"] = message["location_data"]
+                            event_info["timestamp"] = message.get("timestamp", int(datetime.now().timestamp()))
+                            event_info["success"] = True
+                        else:
+                            event_info["error"] = message.get("error", "Unknown error")
+                            event_info["success"] = False
+                        
+                        # 触发事件，通知等待的工具
+                        event_info["event"].set()
+                        print(f"[DEBUG] Location event triggered for session {session_id}")
+                    else:
+                        print(f"[DEBUG] No location request pending for session {session_id}")
+                        
+            except json.JSONDecodeError:
+                print(f"[DEBUG] Received non-JSON message from {session_id}: {data}")
+                
     except WebSocketDisconnect:
         connection_manager.disconnect(session_id)
 
