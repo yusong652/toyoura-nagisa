@@ -7,7 +7,7 @@ Anthropic Tool Manager - 专门用于Anthropic API的工具管理器
 
 from typing import Dict, Any, List, Optional
 
-from backend.infrastructure.llm.base_tool_manager import BaseToolManager
+from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 
 
 class AnthropicToolManager(BaseToolManager):
