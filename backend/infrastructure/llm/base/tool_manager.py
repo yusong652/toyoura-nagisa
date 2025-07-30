@@ -78,7 +78,6 @@ class BaseToolManager(ABC):
             bool: True if it's a meta tool
         """
         return tool_name in {
-            "search_tools_by_keywords",
             "get_available_tool_categories",
             "search_tools",  # Name used by Gemini client
         }
