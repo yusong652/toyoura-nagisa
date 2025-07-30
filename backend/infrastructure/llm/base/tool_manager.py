@@ -13,11 +13,7 @@ from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, Cl
 
 from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
-from backend.shared.constants.tools.security import (
-    is_session_required_tool,
-    is_session_optional_tool,
-    is_session_blocked_tool
-)
+# Security imports removed - all tools now require session ID
 
 
 class BaseToolManager(ABC):
@@ -338,56 +334,36 @@ class BaseToolManager(ABC):
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
                                session_id: Optional[str] = None) -> Any:
         """
-        Unified method for executing MCP tool calls with security policies.
+        Unified method for executing MCP tool calls with mandatory session injection.
         
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
-            session_id: Optional session ID
+            session_id: Session ID (required for all tools)
             
         Returns:
             Any: MCP tool execution result
             
         Raises:
-            ValueError: If tool requires session ID but none provided
-            PermissionError: If tool is blocked without session context
+            ValueError: If session ID is not provided
         """
-        # Apply security policies
+        # All tools now require session ID for dependency injection
         if session_id is None:
-            if is_session_required_tool(tool_name):
-                raise ValueError(
-                    f"Tool '{tool_name}' requires session ID for secure execution. "
-                    f"This tool accesses user-specific data and cannot run without session context."
-                )
-            elif is_session_blocked_tool(tool_name):
-                raise PermissionError(
-                    f"Tool '{tool_name}' is blocked without session context for security reasons."
-                )
-            # SESSION_OPTIONAL_TOOLS can proceed without session_id
+            raise ValueError(
+                f"Tool '{tool_name}' requires session ID for dependency injection. "
+                f"All tools must be executed with session context."
+            )
         
         mcp_client = self.get_mcp_client(session_id)
         async with mcp_client as mcp_async_client:
-            if session_id:
-                try:
-                    # Try using session ID-aware call method
-                    params = CallToolRequestParams(
-                        name=tool_name,
-                        arguments=tool_args,
-                        **{"_meta": {"client_id": session_id}},
-                    )
-                    call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
-                    return await mcp_async_client.session.send_request(call_req, CallToolResult)
-                except Exception as e:
-                    # For session-required tools, don't fallback to unsafe call
-                    if is_session_required_tool(tool_name):
-                        raise RuntimeError(
-                            f"Failed to execute session-required tool '{tool_name}' with session context: {str(e)}"
-                        ) from e
-                    # For optional tools, fallback is acceptable
-                    return await mcp_async_client.call_tool(tool_name, tool_args)
-            else:
-                # Only session-optional tools reach this point due to security check above
-                return await mcp_async_client.call_tool(tool_name, tool_args)
+            # Always use session ID-aware call method
+            params = CallToolRequestParams(
+                name=tool_name,
+                arguments=tool_args,
+                **{"_meta": {"client_id": session_id}},
+            )
+            call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
+            return await mcp_async_client.session.send_request(call_req, CallToolResult)
     
     async def _cache_meta_tool_results(self, result: Any, text_result: Any, 
                                       session_id: str, debug: bool = False) -> None:
