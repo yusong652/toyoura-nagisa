@@ -7,7 +7,7 @@ Handles message formatting, tool result integration, and state management.
 
 from typing import List, Dict, Any
 from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.llm.base_context_manager import BaseContextManager
+from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
 

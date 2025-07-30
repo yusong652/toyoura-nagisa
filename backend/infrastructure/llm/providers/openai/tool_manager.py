@@ -6,7 +6,7 @@ tool execution, and result processing.
 """
 
 from typing import List, Dict, Any, Optional
-from backend.infrastructure.llm.base_tool_manager import BaseToolManager
+from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 
 
 class OpenAIToolManager(BaseToolManager):
