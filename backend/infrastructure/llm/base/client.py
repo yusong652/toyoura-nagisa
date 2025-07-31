@@ -179,15 +179,15 @@ class LLMClientBase(ABC):
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: Optional[str] = None):
+    async def get_function_call_schemas(self, session_id: str) -> List[Any]:
         """
         Get function call schemas for tool registration.
         
         Args:
-            session_id: Optional session ID for context-specific tools
+            session_id: Session ID for context-specific tools (required for dependency injection)
             
         Returns:
-            List of tool schemas in provider-specific format
+            List[Any]: List of tool schemas in provider-specific format
         """
         pass
 
@@ -195,18 +195,47 @@ class LLMClientBase(ABC):
     async def call_api_with_context(
         self, 
         context_contents: List[Dict[str, Any]], 
-        session_id: Optional[str] = None,
+        session_id: str,
         **kwargs
-    ):
+    ) -> Any:
         """
-        Direct API call using context contents in provider-specific format.
+        Execute direct LLM API call with provider-specific context format and tool integration.
+        
+        Performs a complete API call using pre-formatted context contents while maintaining
+        provider-specific response structure. Automatically retrieves session-specific tool
+        schemas and applies configuration overrides for optimal provider performance.
         
         Args:
-            context_contents: Pre-formatted context contents
-            session_id: Optional session ID for tool schema retrieval
-            **kwargs: Additional parameters for API configuration
-            
+            context_contents: Pre-formatted context contents in provider-specific format with structure:
+                - Provider-specific message format (e.g., Gemini, OpenAI, Anthropic formats)
+                - Message roles and content parts as required by each provider
+                - Function call definitions and tool schemas when applicable
+            session_id: Session ID for tool schema retrieval and dependency injection
+            **kwargs: Additional API configuration parameters:
+                - temperature: Optional[float] - Sampling temperature override
+                - max_output_tokens: Optional[int] - Maximum output tokens override
+                - top_p: Optional[float] - Nucleus sampling parameter (provider-dependent)
+                - top_k: Optional[int] - Top-k sampling parameter (provider-dependent)
+                - Additional provider-specific parameters
+                
         Returns:
-            Raw API response object
+            Any: Raw API response object in provider-specific format:
+                - Response structure varies by provider (Gemini, OpenAI, Anthropic formats)
+                - Contains response candidates, usage metadata, and tool call results
+                - Maintains complete original response structure for downstream processing
+                
+        Raises:
+            Exception: If API call fails, returns invalid response, or encounters authentication errors
+            NotImplementedError: If concrete implementation is not provided by subclass
+            
+        Example:
+            # Provider-specific implementation required
+            context = provider_formatter.format_messages(messages)
+            response = await client.call_api_with_context(context, session_id="123")
+            
+        Note:
+            Each provider implementation must handle session-specific tool schemas
+            and integrate with their respective tool managers and debug systems.
+            Response format preservation is critical for tool calling sequences.
         """
         pass

@@ -83,10 +83,16 @@ class GeminiClient(LLMClientBase):
 
     # ========== CORE API METHODS ==========
 
-    async def get_function_call_schemas(self, session_id: Optional[str] = None):
+    async def get_function_call_schemas(self, session_id: str) -> List[types.Tool]:
         """
         Get all MCP tool schemas in Gemini format.
         Only return meta tools + cached tools, not all regular tools.
+        
+        Args:
+            session_id: Session ID for context-specific tools (required for dependency injection)
+            
+        Returns:
+            List[types.Tool]: Tool schemas in Gemini format
         """
         debug = self.gemini_config.debug
         return await self.tool_manager.get_function_call_schemas(session_id, debug)
@@ -94,25 +100,43 @@ class GeminiClient(LLMClientBase):
     async def call_api_with_context(
         self, 
         context_contents: List[Dict[str, Any]], 
-        session_id: Optional[str] = None,
+        session_id: str,
         **kwargs
-    ):
+    ) -> types.GenerateContentResponse:
         """
-        Direct API call using context contents in original Gemini format.
+        Execute direct Gemini API call with preserved context and tool integration.
         
-        This method preserves the original API response format completely,
-        ensuring no information loss during tool calling sequences.
+        Performs a complete API call using pre-formatted context contents while maintaining
+        original response structure integrity. Automatically retrieves session-specific tool
+        schemas and applies configuration overrides for optimal API performance.
         
         Args:
-            context_contents: Pre-formatted Gemini API context contents
-            session_id: Optional session ID for tool schema retrieval
-            **kwargs: Additional parameters for API configuration
-            
+            context_contents: Pre-formatted Gemini API context contents with structure:
+                - role: str - Message role ("user", "model", "system")
+                - parts: List[Dict] - Content parts including text and function calls
+            session_id: Session ID for tool schema retrieval and dependency injection
+            **kwargs: Additional API configuration parameters:
+                - temperature: Optional[float] - Sampling temperature override
+                - max_output_tokens: Optional[int] - Maximum output tokens override
+                - top_p: Optional[float] - Nucleus sampling parameter
+                - top_k: Optional[int] - Top-k sampling parameter
+                
         Returns:
-            Raw Gemini API response object with all original fields preserved
-            
+            types.GenerateContentResponse: Raw Gemini API response with complete structure:
+                - candidates: List[types.Candidate] - Response candidates with content
+                - usage_metadata: types.UsageMetadata - Token usage information
+                - prompt_feedback: Optional[types.PromptFeedback] - Content filtering feedback
+                
         Raises:
-            Exception: If API call fails or returns invalid response
+            Exception: If API call fails, returns invalid response, or encounters authentication errors
+            
+        Example:
+            context = [{"role": "user", "parts": [{"text": "Hello"}]}]
+            response = await client.call_api_with_context(context, session_id="123")
+            
+        Note:
+            This method integrates with GeminiToolManager for session-specific tool schemas
+            and GeminiDebugger for comprehensive request/response logging when debug mode is enabled.
         """
         # Get tool schemas for the session
         tool_schemas = await self.get_function_call_schemas(session_id)
@@ -440,13 +464,32 @@ class GeminiClient(LLMClientBase):
         debug: bool
     ) -> Any:
         """
-        Execute single tool call - atomic operation.
+        Execute single tool call with comprehensive error handling.
         
-        Tool execution method designed for streaming architecture, supporting:
-        1. Atomic tool call execution
-        2. Complete error handling and recovery
-        3. Debug information output
-        4. Session-level context management
+        Performs atomic tool execution with proper separation between business logic errors
+        (handled by the tool layer) and system-level errors (propagated to caller).
+        
+        Args:
+            tool_call: Tool call specification with structure:
+                - id: str - Unique tool call identifier
+                - name: str - Tool name to execute
+                - args: Dict[str, Any] - Tool parameters
+            session_id: Session ID for context-specific tool execution
+            execution_id: Unique execution identifier for debugging and tracking
+            debug: Enable detailed debug logging
+            
+        Returns:
+            Any: Tool execution result in standardized ToolResult format:
+                - Business logic errors: Formatted error ToolResult from tool layer
+                - Successful execution: Tool-specific result data
+                
+        Raises:
+            Exception: System-level errors (network, memory, code bugs) that cannot be
+                      handled by the tool layer and should not be passed to LLM
+                      
+        Note:
+            Business logic errors are handled by the tool layer and returned as formatted
+            ToolResult objects. Only unexpected system errors are raised as exceptions.
         """
         try:
             if debug:
@@ -462,12 +505,13 @@ class GeminiClient(LLMClientBase):
             return result
             
         except Exception as e:
-            error_result = f"Tool execution failed: {str(e)}"
-            
+            # System-level errors should not be passed to LLM
+            # These indicate infrastructure problems, not business logic issues
             if debug:
-                print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
+                print(f"[DEBUG] SYSTEM ERROR: Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
             
-            return error_result
+            # Re-raise system errors for upper-level handling
+            raise e
 
     def _generate_execution_id(self) -> str:
         """Generate unique execution ID"""
