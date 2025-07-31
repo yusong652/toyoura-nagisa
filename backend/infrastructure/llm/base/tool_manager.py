@@ -13,6 +13,7 @@ from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, Cl
 
 from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
+from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema, ToolSchemaProcessor
 # Security imports removed - all tools now require session ID
 
 
@@ -42,8 +43,8 @@ class BaseToolManager(ABC):
         # Tool caching mechanism
         self.tool_cache: Dict[str, Any] = {}
         self.meta_tools: Set[str] = set()
-        # Session-level tool cache: {session_id: List[tool_schema]}
-        self.session_tool_cache: Dict[str, List[Dict[str, Any]]] = {}
+        # Session-level tool cache: {session_id: List[ToolSchema]}
+        self.session_tool_cache: Dict[str, List[ToolSchema]] = {}
     
     def get_mcp_client(self) -> MCPClient:
         """
@@ -135,23 +136,25 @@ class BaseToolManager(ABC):
     
     def cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]) -> None:
         """
-        Cache tools for specific session.
+        Cache tools for specific session. Converts dict tools to ToolSchema objects.
         
         Args:
             session_id: Session ID
-            tools: Tools list to cache
+            tools: Tools list to cache (in dict format)
         """
         if session_id not in self.session_tool_cache:
             self.session_tool_cache[session_id] = []
         
-        # Add new tools, avoid duplicates
-        existing_names = {tool["name"] for tool in self.session_tool_cache[session_id]}
-        for tool in tools:
-            if tool["name"] not in existing_names:
-                self.session_tool_cache[session_id].append(tool)
-                existing_names.add(tool["name"])
+        # Convert dict tools to ToolSchema objects and add new tools, avoid duplicates
+        existing_names = {tool.name for tool in self.session_tool_cache[session_id]}
+        for tool_dict in tools:
+            tool_name = tool_dict["name"]
+            if tool_name not in existing_names:
+                tool_schema = ToolSchema.from_dict(tool_dict)
+                self.session_tool_cache[session_id].append(tool_schema)
+                existing_names.add(tool_name)
     
-    def get_cached_tools_for_session(self, session_id: str) -> List[Dict[str, Any]]:
+    def get_cached_tools_for_session(self, session_id: str) -> List[ToolSchema]:
         """
         Get cached tools for specific session.
         
@@ -159,7 +162,7 @@ class BaseToolManager(ABC):
             session_id: Session ID
             
         Returns:
-            List: Cached tools list
+            List[ToolSchema]: Cached tools list
         """
         return self.session_tool_cache.get(session_id, [])
     
@@ -173,14 +176,64 @@ class BaseToolManager(ABC):
         if session_id in self.session_tool_cache:
             del self.session_tool_cache[session_id]
     
-    @abstractmethod
-    async def get_function_call_schemas(self, session_id: Optional[str] = None, debug: bool = False) -> Any:
+    async def get_standardized_tools(self, session_id: str, debug: bool = False) -> Dict[str, ToolSchema]:
         """
-        Get all MCP tool schemas, return format suitable for target LLM.
-        Only return meta tools + cached tools, not all regular tools.
+        Get standardized ToolSchema objects for meta tools + cached tools.
+        This method provides the unified tool data that providers can then format.
         
         Args:
-            session_id: Optional session ID for tool caching
+            session_id: Session ID for tool caching (required)
+            debug: Whether to enable debug output
+            
+        Returns:
+            Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
+        """
+        if not self.tools_enabled:
+            return {}
+        
+        tools_dict: Dict[str, ToolSchema] = {}
+        
+        try:
+            mcp_client = self.get_mcp_client()
+            async with mcp_client as mcp_async_client:
+                # Get all MCP tools - list_tools() always returns a list
+                mcp_tools = await mcp_async_client.list_tools()
+                
+                # Add meta tools first
+                for mcp_tool in mcp_tools:
+                    if self.is_meta_tool(mcp_tool.name):
+                        tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
+                        tools_dict[tool_schema.name] = tool_schema
+                
+                # Add cached tools (automatic deduplication with dict)
+                cached_tools = self.get_cached_tools_for_session(session_id)
+                
+                for cached_tool in cached_tools:
+                    if cached_tool.name not in tools_dict:  # O(1) lookup
+                        tools_dict[cached_tool.name] = cached_tool
+                        if debug:
+                            print(f"[DEBUG] Added cached tool: {cached_tool.name}")
+                    elif debug:
+                        print(f"[DEBUG] Skipped duplicate cached tool: {cached_tool.name}")
+                
+                if debug:
+                    print(f"[DEBUG] Total standardized tools: {len(tools_dict)}")
+                
+                return tools_dict
+                
+        except Exception as e:
+            if debug:
+                print(f"[DEBUG] Error getting standardized tools: {e}")
+            return {}
+
+    @abstractmethod
+    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> Any:
+        """
+        Get tool schemas formatted for the specific LLM provider.
+        Uses get_standardized_tools() internally, then converts to provider format.
+        
+        Args:
+            session_id: Session ID for tool caching (required)
             debug: Whether to enable debug output
             
         Returns:
