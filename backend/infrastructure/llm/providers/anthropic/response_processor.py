@@ -11,7 +11,7 @@ from backend.domain.models.response_models import LLMResponse
 from backend.shared.utils.text_parser import parse_llm_output
 
 
-class ResponseProcessor:
+class AnthropicResponseProcessor:
     """
     Processes Anthropic Claude API responses into standardized formats.
     

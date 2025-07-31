@@ -96,32 +96,6 @@ class AnthropicContextManager(BaseContextManager):
         """
         return self.working_messages
     
-    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
-        """
-        从响应中提取工具调用信息
-        
-        Args:
-            response: Anthropic API响应对象
-            
-        Returns:
-            工具调用列表，格式：[{'name': str, 'arguments': dict, 'id': str}]
-        """
-        if not hasattr(response, 'content') or not response.content:
-            return []
-        
-        if response.role != "assistant":
-            return []
-        
-        tool_calls = []
-        for item in response.content:
-            if item.type == "tool_use":
-                tool_calls.append({
-                    'name': item.name,
-                    'arguments': item.input,
-                    'id': item.id
-                })
-        
-        return tool_calls
     
     
     def should_continue_tool_calling_from_response(self, response) -> bool:

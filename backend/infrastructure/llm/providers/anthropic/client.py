@@ -16,7 +16,7 @@ from .config import AnthropicClientConfig, get_anthropic_client_config
 from .constants import *
 from .message_formatter import MessageFormatter
 from .content_generators import TitleGenerator, ImagePromptGenerator, AnalysisGenerator
-from .response_processor import ResponseProcessor
+from .response_processor import AnthropicResponseProcessor
 from .debug import AnthropicDebugger
 from .context_manager import AnthropicContextManager
 from .tool_manager import AnthropicToolManager
@@ -187,7 +187,7 @@ class AnthropicClient(LLMClientBase):
             metadata['end_time'] = self._get_timestamp()
             
             # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
-            final_message = ResponseProcessor.format_response_for_storage(final_response)
+            final_message = AnthropicResponseProcessor.format_response_for_storage(final_response)
             
             # Yield最终结果
             yield (final_message, metadata)

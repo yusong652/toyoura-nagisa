@@ -45,18 +45,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    @abstractmethod
-    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
-        """
-        Extract tool call information from response.
-        
-        Args:
-            response: LLM API response object
-            
-        Returns:
-            List[Dict[str, Any]]: Tool call information list, each containing name, arguments, id, etc.
-        """
-        pass
     
     @abstractmethod
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
@@ -70,18 +58,6 @@ class BaseContextManager(ABC):
         """
         pass
     
-    @abstractmethod
-    def should_continue_tool_calling(self, response) -> bool:
-        """
-        Determine if tool calling should continue based on response.
-        
-        Args:
-            response: LLM API response object
-            
-        Returns:
-            bool: True if tool calling should continue, False otherwise
-        """
-        pass
     
     # === Common utility methods ===
     

@@ -172,46 +172,5 @@ class GeminiContextManager(BaseContextManager):
         # 添加到工作上下文
         self.working_contents.append(working_content)
     
-    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
-        """
-        从响应中提取工具调用信息
-        
-        Args:
-            response: Gemini API响应对象
-            
-        Returns:
-            工具调用列表，格式：[{'name': str, 'arguments': dict, 'id': str}]
-        """
-        try:
-            candidate = response.candidates[0]
-            if candidate.content.role != "model":
-                return []
-            
-            tool_calls = []
-            for part in candidate.content.parts:
-                if part.function_call:
-                    tool_call = {
-                        'name': part.function_call.name,
-                        'arguments': getattr(part.function_call, 'args', getattr(part.function_call, 'arguments', {})),
-                        'id': getattr(part.function_call, 'id', part.function_call.name)
-                    }
-                    tool_calls.append(tool_call)
-            
-            return tool_calls
-        except (AttributeError, IndexError):
-            return []
     
-    def should_continue_tool_calling(self, response) -> bool:
-        """
-        判断是否应该继续工具调用
-        
-        Args:
-            response: Gemini API响应对象
-            
-        Returns:
-            bool: 是否应该继续工具调用
-        """
-        # Delegate to the static method in response processor
-        from .response_processor import GeminiResponseProcessor
-        return GeminiResponseProcessor.should_continue_tool_calling(response)
     
