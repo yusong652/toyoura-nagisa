@@ -258,17 +258,17 @@ class BaseToolManager(ABC):
         try:
             # Execute meta tool
             result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            text_result = extract_tool_result_from_mcp(result)
+            tool_result = extract_tool_result_from_mcp(result)
             
             # Check execution error - return tool's original error structure
             if isinstance(result, dict) and result.get("error"):
-                return text_result
+                return tool_result
             
             # Cache results from search tools
             if tool_name in ["search_tools"] and session_id:
-                await self._cache_meta_tool_results(result, text_result, session_id, debug)
+                await self._cache_meta_tool_results(tool_result, session_id, debug)
             
-            return text_result
+            return tool_result
             
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
@@ -350,44 +350,21 @@ class BaseToolManager(ABC):
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
     
-    async def _cache_meta_tool_results(self, result: Any, text_result: Any, 
+    async def _cache_meta_tool_results(self, tool_result: Dict[str, Any], 
                                       session_id: str, debug: bool = False) -> None:
         """
         Cache meta tool search results.
         
         Args:
-            result: Raw MCP tool result
-            text_result: Extracted text result
+            tool_result: Extracted tool result dictionary from extract_tool_result_from_mcp
             session_id: Session ID
             debug: Whether to enable debug output
         """
         
         try:
-            meta_result = {}
-            
-            # Parse different formats of result objects
-            if hasattr(result, 'content') and result.content:
-                # MCP CallToolResult object
-                if hasattr(result.content[0], 'text'):
-                    try:
-                        meta_result = json.loads(result.content[0].text)
-                    except (json.JSONDecodeError, TypeError):
-                        meta_result = {}
-            elif isinstance(result, dict):
-                # Direct dictionary result
-                meta_result = result
-            else:
-                # Parse from text_result (compatibility handling)
-                if isinstance(text_result, dict):
-                    meta_result = text_result
-                elif isinstance(text_result, str):
-                    try:
-                        meta_result = json.loads(text_result)
-                    except (json.JSONDecodeError, TypeError):
-                        meta_result = {}
-            
-            # Extract and cache tool information
-            extracted_tools = await self.extract_tools_from_meta_result(meta_result)
+            # tool_result is already processed by extract_tool_result_from_mcp
+            # Extract and cache tool information directly
+            extracted_tools = await self.extract_tools_from_meta_result(tool_result)
             if extracted_tools:
                 self.cache_tools_for_session(session_id, extracted_tools)
                 if debug:
