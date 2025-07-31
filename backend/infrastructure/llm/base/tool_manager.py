@@ -211,14 +211,7 @@ class BaseToolManager(ABC):
                 for cached_tool in cached_tools:
                     if cached_tool.name not in tools_dict:  # O(1) lookup
                         tools_dict[cached_tool.name] = cached_tool
-                        if debug:
-                            print(f"[DEBUG] Added cached tool: {cached_tool.name}")
-                    elif debug:
-                        print(f"[DEBUG] Skipped duplicate cached tool: {cached_tool.name}")
-                
-                if debug:
-                    print(f"[DEBUG] Total standardized tools: {len(tools_dict)}")
-                
+
                 return tools_dict
                 
         except Exception as e:
@@ -277,11 +270,6 @@ class BaseToolManager(ABC):
             
             return text_result
             
-        except (ValueError, PermissionError) as e:
-            # Security policy violations - re-raise for upper layer handling
-            if debug:
-                print(f"Security policy violation for meta tool {tool_name}: {str(e)}")
-            raise ValueError(f"Security Error in meta tool '{tool_name}': {str(e)}") from e
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
             if debug:
@@ -322,11 +310,6 @@ class BaseToolManager(ABC):
             # Regular content: also use unified content extraction method
             return self._extract_regular_content(tool_result)
             
-        except (ValueError, PermissionError) as e:
-            # Security policy violations - re-raise for upper layer handling
-            if debug:
-                print(f"Security policy violation for tool {tool_name}: {str(e)}")
-            raise ValueError(f"Security Error in tool '{tool_name}': {str(e)}") from e
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
             if debug:
@@ -402,11 +385,6 @@ class BaseToolManager(ABC):
                         meta_result = json.loads(text_result)
                     except (json.JSONDecodeError, TypeError):
                         meta_result = {}
-            
-            if debug:
-                print(f"[DEBUG] Meta result structure: {type(meta_result)}")
-                if isinstance(meta_result, dict):
-                    print(f"[DEBUG] Meta result keys: {list(meta_result.keys())}")
             
             # Extract and cache tool information
             extracted_tools = await self.extract_tools_from_meta_result(meta_result)
