@@ -37,7 +37,7 @@ class OpenAIToolManager(BaseToolManager):
         if not self.tools_enabled:
             return None
         
-        mcp_client = self.get_mcp_client(session_id)
+        mcp_client = self.get_mcp_client()
         
         try:
             async with mcp_client as mcp_async_client:
@@ -187,7 +187,7 @@ class OpenAIToolManager(BaseToolManager):
                 meta_result = {"data": {"tools": []}}
             
             # Extract and cache tools
-            extracted_tools = await self.extract_tools_from_meta_result(meta_result, session_id)
+            extracted_tools = await self.extract_tools_from_meta_result(meta_result)
             if extracted_tools:
                 self.cache_tools_for_session(session_id, extracted_tools)
                 if debug:

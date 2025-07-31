@@ -75,7 +75,7 @@ class AnthropicToolManager(BaseToolManager):
                 print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
         
         # 获取所有MCP工具
-        mcp_client = self.get_mcp_client(session_id)
+        mcp_client = self.get_mcp_client()
         async with mcp_client as mcp_async_client:
             mcp_tools = await mcp_async_client.list_tools()
         

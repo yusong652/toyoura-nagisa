@@ -37,7 +37,7 @@ class GeminiToolManager(BaseToolManager):
         added_tool_names = set()
         
         # Get all MCP tools and add meta tools to the list
-        mcp_client = self.get_mcp_client(session_id)
+        mcp_client = self.get_mcp_client()
         
         try:
             async with mcp_client as mcp_async_client:
