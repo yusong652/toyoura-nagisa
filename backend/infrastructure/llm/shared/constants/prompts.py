@@ -10,7 +10,9 @@ Common prompt templates, system prompts, and regex patterns for response parsing
 DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT = (
     "You are a professional conversation title generator. Based on the provided conversation content, "
     "generate a concise title (5-15 words). The title should accurately summarize the main topic or intent "
-    "of the conversation. You must place the title within <title></title> tags, and output nothing else "
+    "of the conversation. IMPORTANT: Generate the title in the same language as the conversation - if the "
+    "conversation is in Chinese, generate a Chinese title; if in English, generate an English title, etc. "
+    "You must place the title within <title></title> tags, and output nothing else "
     "except these tags and the title itself."
 )
 

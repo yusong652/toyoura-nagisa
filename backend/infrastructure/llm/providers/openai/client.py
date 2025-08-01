@@ -121,9 +121,7 @@ class OpenAIClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate conversation title using OpenAI API.

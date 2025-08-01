@@ -191,21 +191,17 @@ class GeminiClient(LLMClientBase):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate conversation title using Gemini API.
         Customized implementation for Gemini API supporting multimodal content.
         
         Args:
-            first_user_message: Message object containing the first user message
-            first_assistant_message: Message object containing the first assistant message
-            title_generation_system_prompt: Optional custom system prompt for title generation
+            latest_messages: Recent conversation messages to generate title from
         """
         return await GeminiTitleGenerator.generate_title_from_messages(
-            self.client, first_user_message, first_assistant_message, title_generation_system_prompt
+            self.client, latest_messages
         )
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:

@@ -43,7 +43,7 @@ class LLMClientBase(ABC):
         self.client = None  # Will be set by concrete implementations
         self.tool_manager = None  # Will be initialized by concrete implementations
 
-    @abstractmethod
+    @abstractmethod     
     async def get_response(
         self,
         messages: List[BaseMessage],
@@ -116,17 +116,13 @@ class LLMClientBase(ABC):
 
     async def generate_title_from_messages(
         self,
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         [Optional Interface] Generate title from conversation messages.
         
         Args:
-            first_user_message: First user message
-            first_assistant_message: First assistant message
-            title_generation_system_prompt: Optional title generation system prompt
+            latest_messages: Recent conversation messages to generate title from
             
         Returns:
             Generated title string, or None if failed

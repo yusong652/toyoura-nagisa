@@ -5,7 +5,7 @@ Specialized generators that leverage shared logic while implementing
 Gemini-specific API calls and response handling.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from google.genai import types
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_text_to_image_settings, get_llm_settings
@@ -41,20 +41,21 @@ class GeminiTitleGenerator:
     @staticmethod
     async def generate_title_from_messages(
         client,  # Gemini client instance
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
-        Generate a concise conversation title based on the first message exchange.
+        Generate a concise conversation title based on recent messages.
         
         Uses Gemini API with shared processing logic.
         """
         try:
+            if not latest_messages or len(latest_messages) < 2:
+                return None
+            
             # Read Gemini configuration
             gemini_config = get_gemini_client_config()
             
-            system_prompt = title_generation_system_prompt or DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
+            system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
             
             # Configure title generation parameters
             title_config = types.GenerateContentConfig(
@@ -64,9 +65,7 @@ class GeminiTitleGenerator:
             )
             
             # Build message sequence, ending with user
-            messages = [
-                first_user_message,
-                first_assistant_message,
+            messages = list(latest_messages) + [
                 UserMessage(role="user", content=[{"type": "text", "text": TITLE_GENERATION_REQUEST_TEXT}])
             ]
             

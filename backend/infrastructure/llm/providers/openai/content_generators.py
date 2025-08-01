@@ -6,7 +6,7 @@ based on conversation context. Provides OpenAI-specific implementations while
 maintaining compatibility with the unified content generation interface.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import re
 import json
 from backend.domain.models.messages import BaseMessage, UserMessage
@@ -28,34 +28,31 @@ class TitleGenerator:
     @staticmethod
     def generate_title_from_messages(
         client,  # OpenAI client instance
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
-        Generate a concise conversation title based on the first message exchange.
+        Generate a concise conversation title based on recent messages.
         
         Args:
             client: OpenAI client instance for API calls
-            first_user_message: First user message in the conversation
-            first_assistant_message: First assistant response message
-            title_generation_system_prompt: Optional custom system prompt
+            latest_messages: Recent conversation messages to generate title from
             
         Returns:
             Generated title string, or None if generation fails
         """
         try:
+            if not latest_messages or len(latest_messages) < 2:
+                return None
+            
             # Default system prompt for title generation
-            system_prompt = title_generation_system_prompt or (
+            system_prompt = (
                 "You are a professional conversation title generator. Generate a concise title (5-15 words) "
                 "that accurately summarizes the main topic or intent of the conversation. "
                 "Put the title in <title></title> tags and output nothing else."
             )
             
             # Build conversation messages
-            messages = [
-                first_user_message,
-                first_assistant_message,
+            messages = list(latest_messages) + [
                 UserMessage(role="user", content=[{"type": "text", "text": "Please generate a title for the above conversation"}])
             ]
             

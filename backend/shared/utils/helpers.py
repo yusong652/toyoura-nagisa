@@ -194,12 +194,12 @@ async def generate_title_for_session(session_id: str, llm_client) -> str:
     
     if not latest_user_msg or not latest_assistant_msg:
         return None
+    
+    # Create a list of latest messages for title generation
+    latest_messages = [latest_user_msg, latest_assistant_msg]
         
     # Use LLM client's built-in title generation method directly
-    title = await llm_client.generate_title_from_messages(
-        first_user_message=latest_user_msg,
-        first_assistant_message=latest_assistant_msg
-    )
+    title = await llm_client.generate_title_from_messages(latest_messages)
     return title
 
 def extract_response_without_think(response_text: str) -> str:

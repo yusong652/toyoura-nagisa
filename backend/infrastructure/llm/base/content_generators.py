@@ -6,7 +6,7 @@ extracting common patterns and providing shared interfaces.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from backend.domain.models.messages import BaseMessage
 
 
@@ -43,18 +43,14 @@ class BaseTitleGenerator(BaseContentGenerator):
     @abstractmethod
     def generate_title_from_messages(
         client,  # LLM client instance
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
-        Generate a concise conversation title based on the first message exchange.
+        Generate a concise conversation title based on recent messages.
         
         Args:
             client: LLM client instance for API calls
-            first_user_message: First user message in the conversation
-            first_assistant_message: First assistant response message
-            title_generation_system_prompt: Optional custom system prompt
+            latest_messages: Recent conversation messages to generate title from
             
         Returns:
             Generated title string, or None if generation fails

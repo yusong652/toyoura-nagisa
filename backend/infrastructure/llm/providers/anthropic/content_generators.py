@@ -28,33 +28,30 @@ class TitleGenerator:
     @staticmethod
     def generate_title_from_messages(
         client: anthropic.Anthropic,
-        first_user_message: BaseMessage,
-        first_assistant_message: BaseMessage,
-        title_generation_system_prompt: Optional[str] = None
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
-        Generate a concise conversation title based on the first message exchange.
+        Generate a concise conversation title based on recent messages.
         
         Args:
             client: Anthropic Claude client instance for API calls
-            first_user_message: First user message in the conversation
-            first_assistant_message: First assistant response message
-            title_generation_system_prompt: Optional custom system prompt
+            latest_messages: Recent conversation messages to generate title from
             
         Returns:
             Generated title string, or None if generation fails
         """
         try:
-            system_prompt = title_generation_system_prompt or (
+            if not latest_messages or len(latest_messages) < 2:
+                return None
+            
+            system_prompt = (
                 "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。"
                 "标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，"
                 "并且除了这些标签和标题本身外，不要输出任何其他内容。"
             )
             
             # 构造消息序列
-            messages = [
-                first_user_message,
-                first_assistant_message,
+            messages = list(latest_messages) + [
                 UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
             
