@@ -60,88 +60,17 @@ def register_meta_tools(mcp: FastMCP):
                 n_results=max_results
             )
             
-            # Step 2: Get all MCP tools to create a live mapping
-            # Since we're already in MCP context, get tools directly from the server
-            from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
-            
-            # Get all registered tools directly from the MCP server
-            try:
-                # Use FastMCP's get_tools() method to access live tools
-                all_mcp_tools = GLOBAL_MCP.get_tools()
-                
-                # Create mapping: tool_name -> live_tool_object
-                mcp_tools_map = {tool.name: tool for tool in all_mcp_tools}
-                
-                if len(mcp_tools_map) == 0:
-                    print(f"[WARNING] No MCP tools found in live server")
-                
-            except Exception as e:
-                print(f"[WARNING] Could not access live MCP tools: {e}")
-                mcp_tools_map = {}
-            
-            # Step 3: Combine search results with live MCP data
-            formatted_tools = []
+            # Step 2: Extract tool names from search results (simplified approach)
+            discovered_tool_names = []
             for tool_info in search_results:
                 metadata = tool_info.get('metadata', {})
                 tool_name = metadata.get('function_name', 'unknown')
-                
-                # Get live tool data from MCP server (if available)
-                live_tool = mcp_tools_map.get(tool_name)
-                
-                # Parse tags from vector database (for search accuracy)
-                tags = []
-                if 'tags' in metadata:
-                    try:
-                        import json
-                        tags = json.loads(metadata['tags']) if isinstance(metadata['tags'], str) else metadata['tags']
-                        if not isinstance(tags, list):
-                            tags = []
-                    except (json.JSONDecodeError, TypeError):
-                        tags = []
-                
-                if live_tool:
-                    # Use live data from MCP server (guaranteed fresh and accurate)
-                    formatted_tool = {
-                        "id": tool_info['id'],
-                        "name": live_tool.name,
-                        "category": metadata.get('category', 'general'),  # Keep vector DB category for consistency
-                        "description": live_tool.description or tool_info.get('description', ''),
-                        "docstring": metadata.get('docstring', ''),  # Keep vector DB docstring
-                        "parameters": getattr(live_tool, 'inputSchema', {}),  # Live schema from MCP
-                        "tags": tags  # Keep vector DB tags for search context
-                    }
-                else:
-                    # Fallback: tool not found in MCP (maybe disabled), use vector DB data
-                    # but mark parameters as potentially stale
-                    parameters = {}
-                    if 'parameters' in metadata:
-                        try:
-                            import json
-                            parameters = json.loads(metadata['parameters']) if isinstance(metadata['parameters'], str) else metadata['parameters']
-                        except (json.JSONDecodeError, TypeError):
-                            parameters = {}
-                    
-                    formatted_tool = {
-                        "id": tool_info['id'],
-                        "name": tool_name,
-                        "category": metadata.get('category', 'general'),
-                        "description": tool_info.get('description', ''),
-                        "docstring": metadata.get('docstring', ''),
-                        "parameters": parameters,  # Potentially stale data
-                        "tags": tags,
-                        "_warning": "Tool not found in live MCP server - data may be outdated"
-                    }
-                
-                formatted_tools.append(formatted_tool)
-            
-            # Build structured response following unified standard
-            
-            # Extract tool names for better LLM understanding
-            tools_found = [tool.get("name", "unknown") for tool in formatted_tools]
+                if tool_name != 'unknown':
+                    discovered_tool_names.append(tool_name)
             
             # Prepare guidance for search limits
             guidance_message = ""
-            if len(formatted_tools) >= max_results:
+            if len(discovered_tool_names) >= max_results:
                 guidance_message = f"Search limited to {max_results} results. Consider increasing max_results parameter (up to 20) to find more tools."
             
             llm_content = {
@@ -151,8 +80,8 @@ def register_meta_tools(mcp: FastMCP):
                     "max_results": max_results
                 },
                 "result": {
-                    "tools_found": tools_found,
-                    "search_limited": len(formatted_tools) >= max_results,
+                    "tools_found": discovered_tool_names,
+                    "search_limited": len(discovered_tool_names) >= max_results,
                     "guidance": guidance_message if guidance_message else None
                 },
                 "summary": {
@@ -165,8 +94,8 @@ def register_meta_tools(mcp: FastMCP):
             if not llm_content["result"]["guidance"]:
                 del llm_content["result"]["guidance"]
             
-            message = f"Found {len(formatted_tools)} relevant tools for '{keywords}'"
-            if len(formatted_tools) >= max_results:
+            message = f"Found {len(discovered_tool_names)} relevant tools for '{keywords}'"
+            if len(discovered_tool_names) >= max_results:
                 message += f" (limited to {max_results}; increase max_results to find more)"
             
             return ToolResult(
@@ -174,9 +103,7 @@ def register_meta_tools(mcp: FastMCP):
                 message=message,
                 llm_content=llm_content,
                 data={
-                    "tools": formatted_tools,
-                    "tools_found": tools_found,
-                    "search_query": keywords
+                    "tools": [{"name": tool_name} for tool_name in discovered_tool_names]
                 }
             ).model_dump()
             
@@ -186,9 +113,7 @@ def register_meta_tools(mcp: FastMCP):
                 message=f"Tool discovery failed: {str(e)}",
                 error=str(e),
                 data={
-                    "tools": [],
-                    "tools_found": [],
-                    "search_query": keywords
+                    "tools": []
                 }
             ).model_dump()
 

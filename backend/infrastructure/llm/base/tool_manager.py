@@ -29,14 +29,13 @@ class BaseToolManager(ABC):
     - Client-specific schema formatting
     """
     
-    def __init__(self, mcp_client_source=None, tools_enabled: bool = True):
+    def __init__(self, tools_enabled: bool = True):
         """Initialize base state."""
-        self._mcp_client_source = mcp_client_source or GLOBAL_MCP
         self.tools_enabled = tools_enabled
         
         # Single shared MCP client - FastMCP handles session isolation per request
         self._mcp_client = MCPClient(
-            self._mcp_client_source,
+            GLOBAL_MCP,
             client_info=Implementation(name="aiNagisa_shared", version="0.1.0")
         )
         
@@ -81,58 +80,30 @@ class BaseToolManager(ABC):
         Returns:
             List: Parsed tool information list with live schemas
         """
-        # Extract tools data from meta result
-        data = meta_result.get("data", {})
-        tools_data = data.get("tools", [])
+        # Extract tools data from meta result - guaranteed standard format
+        tools_data = meta_result["data"]["tools"] # Format: [{"name": "tool_name", ...}, ...]
         
-        if not tools_data:
-            return []
+        # Extract tool names from meta result - simplified format
+        discovered_tool_names = [tool_info["name"] for tool_info in tools_data]
         
-        # Extract tool names from vector DB search results
-        discovered_tool_names = []
-        
-        for tool_info in tools_data:
-            tool_name = tool_info.get("name")
-            if not tool_name:
-                continue
-                
-            discovered_tool_names.append(tool_name)
-        
-        if not discovered_tool_names:
-            return []
-        
-        # Get live schemas from MCP server and match with discovered tools
-        final_tools = []
-        try:
-            mcp_client = self.get_mcp_client()
-            async with mcp_client:
-                # FastMCP list_tools() always returns a list of Tool objects
-                registered_mcp_tools = await mcp_client.list_tools()
-                
-                # Match discovered tools with registered MCP tools, using live schemas
-                for mcp_registered_tool in registered_mcp_tools:
-                    mcp_tool_name = mcp_registered_tool.name
-                    if mcp_tool_name in discovered_tool_names:
-                        # Use live schema from MCP server (authoritative source)
-                        live_input_schema = getattr(mcp_registered_tool, "inputSchema", {}) or {}
-                        
-                        # Build final tool data with live schema from MCP server (authoritative source)
-                        tool_data = {
-                            "name": mcp_tool_name,
-                            "description": mcp_registered_tool.description or "",
-                            "inputSchema": live_input_schema,
-                        }
-                        
-                        final_tools.append(tool_data)
-        
-        except Exception as e:
-            # MCP server connection failure is a critical error - don't fallback
-            raise RuntimeError(
-                f"Failed to get tool schemas from MCP server: {e}. "
-                f"Tools discovered: {discovered_tool_names}"
-            ) from e
-        
-        return final_tools
+        # Get live schemas from MCP server for all discovered tools
+        mcp_client = self.get_mcp_client()
+        async with mcp_client:
+            registered_mcp_tools = await mcp_client.list_tools()
+            
+            # Build tool name to MCP tool mapping for O(1) lookup
+            mcp_tools_map = {tool.name: tool for tool in registered_mcp_tools}
+            
+            # Match and build final tools with live schemas
+            return [
+                {
+                    "name": tool_name,
+                    "description": mcp_tools_map[tool_name].description or "",
+                    "inputSchema": getattr(mcp_tools_map[tool_name], "inputSchema", {}) or {}
+                }
+                for tool_name in discovered_tool_names
+                if tool_name in mcp_tools_map
+            ]
     
     def cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]) -> None:
         """
@@ -296,8 +267,8 @@ class BaseToolManager(ABC):
         
         try:
             # Execute regular tool
-            result_obj = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            tool_result = extract_tool_result_from_mcp(result_obj)
+            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
+            tool_result = extract_tool_result_from_mcp(call_tool_result)
             
             # Check MCP-level errors (is_error field) - return tool's original error structure
             if tool_result.get("is_error"):
@@ -317,7 +288,7 @@ class BaseToolManager(ABC):
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
     
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
-                               session_id: Optional[str] = None) -> Any:
+                               session_id: Optional[str] = None) -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
         
@@ -327,7 +298,7 @@ class BaseToolManager(ABC):
             session_id: Session ID (required for all tools)
             
         Returns:
-            Any: MCP tool execution result
+            CallToolResult: MCP tool execution result containing content, structuredContent, and isError fields
             
         Raises:
             ValueError: If session ID is not provided
@@ -365,15 +336,9 @@ class BaseToolManager(ABC):
             # tool_result is already processed by extract_tool_result_from_mcp
             # Extract and cache tool information directly
             extracted_tools = await self.extract_tools_from_meta_result(tool_result)
-            if extracted_tools:
-                self.cache_tools_for_session(session_id, extracted_tools)
-                if debug:
-                    print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
-                    for tool in extracted_tools:
-                        print(f"[DEBUG]   - {tool['name']}: {tool.get('description', '')}")
-            else:
-                if debug:
-                    print(f"[DEBUG] No tools extracted from meta result")
+            self.cache_tools_for_session(session_id, extracted_tools)
+            if debug:
+                print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
                     
         except Exception as e:
             if debug:
