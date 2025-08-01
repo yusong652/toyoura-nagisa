@@ -38,7 +38,8 @@ class GeminiClient(LLMClientBase):
     - Modular component architecture
     
     Components:
-    - GeminiContextManager: Manages dual-track context (working + storage)
+    - GeminiContextManager: Manages context and state for Gemini API calls
+    - GeminiDebugger: Provides detailed request/response logging in debug mode
     - GeminiResponseProcessor: Enhanced response processing with tool call extraction
     - GeminiToolManager: Advanced MCP tool integration
     - Content Generators: Specialized content generation utilities
