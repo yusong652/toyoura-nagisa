@@ -7,6 +7,7 @@ import hashlib
 from datetime import datetime
 import os
 from backend.config import TOOL_DB_PATH
+from backend.shared.utils.tool_utils import is_meta_tool
 
 class ToolVectorizer:
     def __init__(self, persist_directory: str = TOOL_DB_PATH):

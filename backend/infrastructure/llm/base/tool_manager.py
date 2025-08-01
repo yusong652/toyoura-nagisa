@@ -14,6 +14,7 @@ from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, Cl
 from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema, ToolSchemaProcessor
+from backend.shared.utils.tool_utils import is_meta_tool
 # Security imports removed - all tools now require session ID
 
 
@@ -65,10 +66,7 @@ class BaseToolManager(ABC):
         Returns:
             bool: True if it's a meta tool
         """
-        return tool_name in {
-            "get_available_tool_categories",
-            "search_tools",  # Name used by Gemini client
-        }
+        return is_meta_tool(tool_name)
     
     async def extract_tools_from_meta_result(self, meta_result: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -170,18 +168,16 @@ class BaseToolManager(ABC):
                 # Get all MCP tools - list_tools() always returns a list
                 mcp_tools = await mcp_async_client.list_tools()
                 
-                # Add meta tools first
+                # Add meta tools first (never vectorized, always available)
                 for mcp_tool in mcp_tools:
                     if self.is_meta_tool(mcp_tool.name):
                         tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
                         tools_dict[tool_schema.name] = tool_schema
                 
-                # Add cached tools (automatic deduplication with dict)
+                # Add cached tools (no conflict possible since meta tools are never cached)
                 cached_tools = self.get_cached_tools_for_session(session_id)
-                
                 for cached_tool in cached_tools:
-                    if cached_tool.name not in tools_dict:  # O(1) lookup
-                        tools_dict[cached_tool.name] = cached_tool
+                    tools_dict[cached_tool.name] = cached_tool
 
                 return tools_dict
                 
