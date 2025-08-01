@@ -205,6 +205,99 @@ class LLMClientBase(ABC):
             f"{self.__class__.__name__} does not support web search"
         )
 
+    # ========== ABSTRACT TOOL CALLING METHODS ==========
+
+    @abstractmethod
+    async def _streaming_tool_calling_loop(
+        self,
+        context_manager: Any,
+        session_id: Optional[str],
+        max_iterations: int,
+        metadata: Dict[str, Any],
+        debug: bool,
+        **kwargs
+    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
+        """
+        Core streaming tool calling loop with real-time notifications.
+        
+        Implements the tool calling state machine with event-driven architecture for
+        real-time status updates during tool execution sequences.
+        
+        Args:
+            context_manager: Provider-specific context manager for conversation state:
+                - Manages conversation history and working contents
+                - Handles response integration and tool result addition
+                - Provider-specific implementation (GeminiContextManager, etc.)
+            session_id: Session ID for tool and context management
+            max_iterations: Maximum number of tool calling iterations allowed
+            metadata: Execution metadata dictionary with structure:
+                - execution_id: str - Unique execution identifier
+                - iterations: int - Current iteration count
+                - api_calls: int - Total API calls made
+                - tool_calls_executed: int - Number of tool calls executed
+                - tool_calls_detected: bool - Whether any tool calls were found
+            debug: Enable detailed debug logging and tracing
+            **kwargs: Additional API configuration parameters
+            
+        Yields:
+            Union[Dict[str, Any], Any]:
+            - Dict[str, Any]: Real-time notifications with structure:
+                - type: str - Notification type ('NAGISA_IS_USING_TOOL', 'error', etc.)
+                - tool_name: str - Name of tool being executed
+                - action_text: str - Human-readable action description
+            - Any: Final provider-specific response object for processing
+            
+        Raises:
+            Exception: If maximum iterations exceeded or system-level errors occur
+            
+        Note:
+            This method implements the core tool calling workflow:
+            1. Execute API calls and check for tool calls
+            2. Yield real-time notifications for each tool execution phase
+            3. Maintain execution state and handle iteration limits
+            4. Return final response for downstream processing
+        """
+        pass
+
+    @abstractmethod
+    async def _execute_single_tool_call(
+        self,
+        tool_call: Dict[str, Any],
+        session_id: Optional[str],
+        execution_id: str,
+        debug: bool
+    ) -> Any:
+        """
+        Execute single tool call with comprehensive error handling.
+        
+        Performs atomic tool execution with proper separation between business logic
+        errors (handled by tool layer) and system-level errors (propagated to caller).
+        
+        Args:
+            tool_call: Tool call specification with structure:
+                - id: str - Unique tool call identifier
+                - name: str - Tool name to execute
+                - args: Dict[str, Any] - Tool parameters and arguments
+            session_id: Session ID for context-specific tool execution
+            execution_id: Unique execution identifier for debugging and tracking
+            debug: Enable detailed debug logging and error tracing
+            
+        Returns:
+            Any: Tool execution result in standardized ToolResult format:
+                - Business logic errors: Formatted error ToolResult from tool layer
+                - Successful execution: Tool-specific result data and metadata
+                
+        Raises:
+            Exception: System-level errors (network, memory, code bugs) that cannot be
+                      handled by the tool layer and should not be passed to LLM
+                      
+        Note:
+            Business logic errors are handled by the tool layer and returned as formatted
+            ToolResult objects. Only unexpected system errors are raised as exceptions.
+            This ensures proper error boundaries between tool logic and system infrastructure.
+        """
+        pass
+
     # ========== SHARED UTILITY METHODS ==========
 
     def _generate_execution_id(self) -> str:
