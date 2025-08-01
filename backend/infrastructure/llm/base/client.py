@@ -5,12 +5,9 @@ This module provides the foundational LLMClientBase class that all provider-spec
 clients inherit from, implementing common patterns extracted from the Gemini implementation.
 """
 
-import os
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.response_models import LLMResponse
-from backend.config import get_system_prompt
 
 
 class LLMClientBase(ABC):
@@ -43,6 +40,8 @@ class LLMClientBase(ABC):
         self.client = None  # Will be set by concrete implementations
         self.tool_manager = None  # Will be initialized by concrete implementations
 
+    # ========== CORE STREAMING INTERFACE ==========
+
     @abstractmethod     
     async def get_response(
         self,
@@ -53,7 +52,7 @@ class LLMClientBase(ABC):
         """
         [Core Interface] Get LLM response with real-time tool calling notifications.
         
-        SOTA architecture designed for real-time tool calling notifications using streaming state machine pattern:
+        Architecture designed for real-time tool calling notifications using streaming state machine pattern:
         1. Real-time yield tool call start/progress/completion notifications
         2. Real-time yield tool execution progress and status updates
         3. Final yield complete response and execution metadata
@@ -81,96 +80,6 @@ class LLMClientBase(ABC):
             - Final result: (final_message, {'execution_id': '...', 'tool_calls_executed': 3, ...})
         """
         pass
-
-    def update_config(self, **kwargs):
-        """
-        Update client configuration.
-        
-        Args:
-            **kwargs: Configuration parameters to update
-        """
-        # Provide default implementation, subclasses can override
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-            # Also update extra_config
-            self.extra_config[key] = value
-
-    # ========== SHARED UTILITY METHODS ==========
-
-    def _generate_execution_id(self) -> str:
-        """Generate unique execution ID."""
-        import uuid
-        return f"EXE_{str(uuid.uuid4())[:8]}"
-    
-    def _get_timestamp(self) -> float:
-        """Get current timestamp."""
-        import time
-        return time.time()
-
-    async def _clear_session_tool_cache(self, session_id: str):
-        """Clear session tool cache - shared implementation."""
-        if self.tool_manager and hasattr(self.tool_manager, 'clear_session_tool_cache'):
-            self.tool_manager.clear_session_tool_cache(session_id)
-
-    # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
-
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        [Optional Interface] Generate title from conversation messages.
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-            
-        Returns:
-            Generated title string, or None if failed
-            
-        Raises:
-            NotImplementedError: If client doesn't support this functionality
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support title generation"
-        )
-
-    async def generate_text_to_image_prompt(
-        self, 
-        session_id: Optional[str] = None
-    ) -> Optional[Dict[str, str]]:
-        """
-        [Optional Interface] Generate text-to-image prompt.
-        
-        Args:
-            session_id: Session ID for getting context
-            
-        Returns:
-            Dictionary containing text prompt and negative prompt, or None if failed
-            
-        Raises:
-            NotImplementedError: If client doesn't support this functionality
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support image prompt generation"
-        )
-
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        [Optional Interface] Perform web search.
-        
-        Args:
-            query: Search query
-            **kwargs: Additional search parameters
-            
-        Returns:
-            Dictionary containing search results
-            
-        Raises:
-            NotImplementedError: If client doesn't support this functionality  
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support web search"
-        )
 
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
@@ -235,3 +144,93 @@ class LLMClientBase(ABC):
             Response format preservation is critical for tool calling sequences.
         """
         pass
+
+    # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
+
+    async def generate_title_from_messages(
+        self,
+        latest_messages: List[BaseMessage]
+    ) -> Optional[str]:
+        """
+        [Optional Interface] Generate title from conversation messages.
+        
+        Args:
+            latest_messages: Recent conversation messages to generate title from
+            
+        Returns:
+            Generated title string, or None if failed
+            
+        Raises:
+            NotImplementedError: If client doesn't support this functionality
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support title generation"
+        )
+
+    async def generate_text_to_image_prompt(
+        self, 
+        session_id: Optional[str] = None
+    ) -> Optional[Dict[str, str]]:
+        """
+        [Optional Interface] Generate text-to-image prompt.
+        
+        Args:
+            session_id: Session ID for getting context
+            
+        Returns:
+            Dictionary containing text prompt and negative prompt, or None if failed
+            
+        Raises:
+            NotImplementedError: If client doesn't support this functionality
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support image prompt generation"
+        )
+
+    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        [Optional Interface] Perform web search.
+        
+        Args:
+            query: Search query
+            **kwargs: Additional search parameters
+            
+        Returns:
+            Dictionary containing search results
+            
+        Raises:
+            NotImplementedError: If client doesn't support this functionality  
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support web search"
+        )
+
+    # ========== SHARED UTILITY METHODS ==========
+
+    def _generate_execution_id(self) -> str:
+        """Generate unique execution ID."""
+        import uuid
+        return f"EXE_{str(uuid.uuid4())[:8]}"
+    
+    def _get_timestamp(self) -> float:
+        """Get current timestamp."""
+        import time
+        return time.time()
+
+    async def _clear_session_tool_cache(self, session_id: str):
+        """Clear session tool cache - shared implementation."""
+        if self.tool_manager and hasattr(self.tool_manager, 'clear_session_tool_cache'):
+            self.tool_manager.clear_session_tool_cache(session_id)
+
+    def update_config(self, **kwargs):
+        """
+        Update client configuration.
+        
+        Args:
+            **kwargs: Configuration parameters to update
+        """
+        # Provide default implementation, subclasses can override
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+            # Also update extra_config
+            self.extra_config[key] = value

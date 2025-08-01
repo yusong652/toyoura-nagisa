@@ -13,13 +13,11 @@ from google.genai import types
 from backend.config import get_llm_settings, get_system_prompt
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.response_models import LLMResponse
 
 # Import Gemini-specific implementations
-from .config import get_gemini_client_config, GeminiClientConfig
+from .config import get_gemini_client_config
 from .context_manager import GeminiContextManager
 from .debug import GeminiDebugger
-from .message_formatter import GeminiMessageFormatter
 from .response_processor import GeminiResponseProcessor
 from .tool_manager import GeminiToolManager
 from .content_generators import GeminiTitleGenerator, GeminiImagePromptGenerator, GeminiWebSearchGenerator
@@ -81,7 +79,105 @@ class GeminiClient(LLMClientBase):
         # Initialize component managers with unified architecture
         self.tool_manager = GeminiToolManager(tools_enabled=self.tools_enabled)
 
-    # ========== CORE API METHODS ==========
+    # ========== CORE STREAMING INTERFACE ==========
+
+    async def get_response(
+        self,
+        messages: List[BaseMessage],
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
+        """
+        Streaming LLM response processor with real-time notifications.
+        
+        Streaming processor designed for real-time tool calling notifications using event-driven pattern:
+        1. Real-time yield tool call start/progress/completion notifications
+        2. Maintain complete execution tracking and error handling
+        3. Final return of complete response and metadata
+        4. Fully compatible with existing architecture
+        
+        Args:
+            messages: Input message history
+            session_id: Session ID for tool and context management
+            **kwargs: Additional API configuration parameters
+            
+        Yields:
+            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
+            - Intermediate notifications: tool calling status updates
+            - Final result: (final_message, execution_metadata)
+        """
+        # === INITIALIZATION PHASE ===
+        execution_id = self._generate_execution_id()
+        debug = self.gemini_config.debug
+
+        # Create independent context manager - ensure state isolation
+        context_manager = GeminiContextManager()
+        context_manager.initialize_from_messages(messages)
+        
+        # Execution metadata - complete tracking
+        metadata = {
+            'execution_id': execution_id,
+            'session_id': session_id,
+            'start_time': self._get_timestamp(),
+            'end_time': None,
+            'iterations': 0,
+            'api_calls': 0,
+            'tool_calls_executed': 0,
+            'tool_calls_detected': False,
+            'thinking_preserved': False,
+            'status': 'running'
+        }
+        
+        try:
+            # === EXECUTION PHASE - Streaming tool calling loop ===
+            # Get max tool calling iterations from configuration
+            max_iterations = get_llm_settings().max_tool_iterations
+            
+            final_response = None
+            async for item in self._streaming_tool_calling_loop(
+                context_manager, session_id, max_iterations, metadata, debug, **kwargs
+            ):
+                if isinstance(item, dict):
+                    # Intermediate notification - yield directly to API layer
+                    yield item
+                else:
+                    # Final response - save for subsequent processing
+                    final_response = item
+            
+            # === FINALIZATION PHASE ===
+            metadata['status'] = 'completed'
+            metadata['end_time'] = self._get_timestamp()
+            
+            # Extract thinking content
+            thinking_content = GeminiResponseProcessor.extract_thinking_content(final_response)
+            metadata['thinking_preserved'] = thinking_content is not None
+            
+            # Extract keyword - extract from original response before formatting
+            original_text = GeminiResponseProcessor.extract_text_content(final_response)
+            from backend.shared.utils.text_parser import parse_llm_output
+            _, extracted_keyword = parse_llm_output(original_text)
+            metadata['keyword'] = extracted_keyword
+            
+            # Create final storage message - use ResponseProcessor instead of context_manager
+            final_message = GeminiResponseProcessor.format_response_for_storage(final_response)
+            
+            # Yield final result
+            yield (final_message, metadata)
+            
+        except Exception as e:
+            metadata['status'] = 'failed'
+            metadata['error'] = str(e)
+            metadata['end_time'] = self._get_timestamp()
+            
+            # Yield error notification
+            yield {
+                'type': 'error',
+                'error': f"Tool calling sequence {execution_id} failed: {e}"
+            }
+            
+            raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
+
+    # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     async def get_function_call_schemas(self, session_id: str) -> List[types.Tool]:
         """
@@ -236,103 +332,7 @@ class GeminiClient(LLMClientBase):
         debug = self.gemini_config.debug
         return await GeminiWebSearchGenerator.perform_web_search(self.client, query, debug, **kwargs)
 
-    # ========== CORE STREAMING INTERFACE ==========
-
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
-        """
-        SOTA streaming LLM response processor with real-time notifications.
-        
-        Streaming processor designed for real-time tool calling notifications using event-driven pattern:
-        1. Real-time yield tool call start/progress/completion notifications
-        2. Maintain complete execution tracking and error handling
-        3. Final return of complete response and metadata
-        4. Fully compatible with existing architecture
-        
-        Args:
-            messages: Input message history
-            session_id: Session ID for tool and context management
-            **kwargs: Additional API configuration parameters
-            
-        Yields:
-            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
-            - Intermediate notifications: tool calling status updates
-            - Final result: (final_message, execution_metadata)
-        """
-        # === INITIALIZATION PHASE ===
-        execution_id = self._generate_execution_id()
-        debug = self.gemini_config.debug
-
-        # Create independent context manager - ensure state isolation
-        context_manager = GeminiContextManager()
-        context_manager.initialize_from_messages(messages)
-        
-        # Execution metadata - complete tracking
-        metadata = {
-            'execution_id': execution_id,
-            'session_id': session_id,
-            'start_time': self._get_timestamp(),
-            'end_time': None,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'tool_calls_detected': False,
-            'thinking_preserved': False,
-            'status': 'running'
-        }
-        
-        try:
-            # === EXECUTION PHASE - Streaming tool calling loop ===
-            # Get max tool calling iterations from configuration
-            max_iterations = get_llm_settings().max_tool_iterations
-            
-            final_response = None
-            async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, **kwargs
-            ):
-                if isinstance(item, dict):
-                    # Intermediate notification - yield directly to API layer
-                    yield item
-                else:
-                    # Final response - save for subsequent processing
-                    final_response = item
-            
-            # === FINALIZATION PHASE ===
-            metadata['status'] = 'completed'
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Extract thinking content
-            thinking_content = GeminiResponseProcessor.extract_thinking_content(final_response)
-            metadata['thinking_preserved'] = thinking_content is not None
-            
-            # Extract keyword - extract from original response before formatting
-            original_text = GeminiResponseProcessor.extract_text_content(final_response)
-            from backend.shared.utils.text_parser import parse_llm_output
-            _, extracted_keyword = parse_llm_output(original_text)
-            metadata['keyword'] = extracted_keyword
-            
-            # Create final storage message - use ResponseProcessor instead of context_manager
-            final_message = GeminiResponseProcessor.format_response_for_storage(final_response)
-            
-            # Yield final result
-            yield (final_message, metadata)
-            
-        except Exception as e:
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Yield error notification
-            yield {
-                'type': 'error',
-                'error': f"Tool calling sequence {execution_id} failed: {e}"
-            }
-            
-            raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
+    # ========== PRIVATE HELPER METHODS ==========
 
     async def _streaming_tool_calling_loop(
         self,
@@ -508,13 +508,3 @@ class GeminiClient(LLMClientBase):
             
             # Re-raise system errors for upper-level handling
             raise e
-
-    def _generate_execution_id(self) -> str:
-        """Generate unique execution ID"""
-        import uuid
-        return f"EXE_{str(uuid.uuid4())[:8]}"
-    
-    def _get_timestamp(self) -> float:
-        """Get timestamp"""
-        import time
-        return time.time()
