@@ -10,11 +10,9 @@ from google.genai import types
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_text_to_image_settings, get_llm_settings
 
-# Import shared components
-from backend.infrastructure.llm.shared.content_generators import (
-    SharedImagePromptGenerator, 
-    SharedWebSearchGenerator
-)
+# Import base components
+from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
+from backend.infrastructure.llm.shared.content_generators import SharedWebSearchGenerator
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,
@@ -184,9 +182,9 @@ class GeminiWebSearchGenerator:
                 print(f"[WebSearch] Error: {error_msg}")
             return {"error": error_msg, "query": query}
 
-class GeminiImagePromptGenerator:
+class GeminiImagePromptGenerator(BaseImagePromptGenerator):
     """
-    Gemini-specific image prompt generation using shared logic.
+    Gemini-specific image prompt generation inheriting base functionality.
     """
     
     @staticmethod
@@ -199,8 +197,8 @@ class GeminiImagePromptGenerator:
         Generate high-quality text-to-image prompts using shared context preparation.
         """
         try:
-            # Prepare generation context using shared logic
-            context = SharedImagePromptGenerator.prepare_generation_context(
+            # Prepare generation context using inherited method
+            context = GeminiImagePromptGenerator.prepare_generation_context(
                 session_id=session_id
             )
             
@@ -227,8 +225,8 @@ class GeminiImagePromptGenerator:
             
             prompt_config = types.GenerateContentConfig(**config_kwargs)
             
-            # Build messages using shared logic
-            messages = SharedImagePromptGenerator.build_messages_for_generation(context)
+            # Build messages using inherited method
+            messages = GeminiImagePromptGenerator.build_messages_for_generation(context)
             
             # Format messages using Gemini formatter
             contents = GeminiMessageFormatter.format_messages_for_api(messages)
@@ -251,8 +249,8 @@ class GeminiImagePromptGenerator:
             prompt_text = GeminiResponseProcessor.extract_text_content(response)
             
             if prompt_text:
-                # Process response using shared logic
-                return SharedImagePromptGenerator.process_generation_response(
+                # Process response using inherited method
+                return GeminiImagePromptGenerator.process_generation_response(
                     prompt_text, context, session_id, debug
                 )
             

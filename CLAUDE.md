@@ -375,8 +375,3 @@ https://github.com/yusong652/aiNagisa
 
 Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>
 ```
-
-### Prohibited Patterns
-- Do not reference external development tools or platforms in commit messages
-- Avoid generic "Generated with [Tool]" attributions
-- Do not use commit signatures that don't reflect the actual aiNagisa project

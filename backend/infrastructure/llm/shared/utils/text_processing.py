@@ -6,6 +6,7 @@ Common text processing functions that can be reused by different provider implem
 
 import re
 from typing import Union, List, Dict, Any, Optional, Tuple
+from backend.config import get_text_to_image_settings
 try:
     from ..constants.defaults import DEFAULT_NEGATIVE_PROMPT
     from ..constants.prompts import (
@@ -50,7 +51,6 @@ def extract_text_content(content: Union[str, List[dict]]) -> str:
 
 def parse_text_to_image_response(
     response_text: str,
-    default_negative_prompt: str = DEFAULT_NEGATIVE_PROMPT,
     debug: bool = False
 ) -> Optional[Tuple[str, str]]:
     """
@@ -58,11 +58,11 @@ def parse_text_to_image_response(
     
     Args:
         response_text: The raw response text from the model
-        default_negative_prompt: Default negative prompt if none found in response
         debug: Enable debug output
         
     Returns:
-        Tuple of (text_prompt, negative_prompt) if successful, None if failed
+        Tuple of (text_prompt, negative_prompt) if successful, None if failed.
+        negative_prompt will be empty string if none found in response.
     """
     try:
         # Extract text prompt
@@ -80,7 +80,7 @@ def parse_text_to_image_response(
         
         # Extract negative prompt
         negative_prompt_match = re.search(NEGATIVE_PROMPT_PATTERN, response_text, re.DOTALL)
-        negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else default_negative_prompt
+        negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else ""
         
         return text_prompt, negative_prompt
         
@@ -93,23 +93,23 @@ def parse_text_to_image_response(
 def enhance_prompts_with_defaults(
     text_prompt: str,
     negative_prompt: str,
-    default_positive_prompt: str = "",
-    default_negative_prompt: str = "",
     debug: bool = False
 ) -> Tuple[str, str]:
     """
-    Enhance text and negative prompts by adding missing default keywords.
+    Enhance text and negative prompts by adding missing default keywords from config.
     
     Args:
         text_prompt: Original text prompt
         negative_prompt: Original negative prompt
-        default_positive_prompt: Default positive keywords to add if missing
-        default_negative_prompt: Default negative keywords to add if missing
         debug: Enable debug output
         
     Returns:
         Tuple of (enhanced_text_prompt, enhanced_negative_prompt)
     """
+    # Read default prompts from configuration
+    text_to_image_settings = get_text_to_image_settings()
+    default_positive_prompt = text_to_image_settings.text_to_image_default_positive_prompt
+    default_negative_prompt = text_to_image_settings.text_to_image_default_negative_prompt
     enhanced_text_prompt = text_prompt
     enhanced_negative_prompt = negative_prompt
     

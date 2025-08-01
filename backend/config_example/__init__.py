@@ -271,8 +271,8 @@ def get_text_to_image_config() -> Dict[str, Any]:
         "type": settings.provider,
         "system_prompt": settings.text_to_image_system_prompt,
         "context_message_count": settings.context_message_count,
-        "default_positive_prompt": settings.default_positive_prompt,
-        "default_negative_prompt": settings.default_negative_prompt,
+        "text_to_image_default_positive_prompt": settings.text_to_image_default_positive_prompt,
+        "text_to_image_default_negative_prompt": settings.text_to_image_default_negative_prompt,
         "debug": settings.enable_debug,
         "models_lab": {},
         "stable_diffusion_webui": {}

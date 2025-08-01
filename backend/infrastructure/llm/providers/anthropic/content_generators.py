@@ -328,13 +328,13 @@ class ImagePromptGenerator:
                     return None
 
                 # 获取默认关键词并补充
-                default_positive_prompt = config.get("default_positive_prompt", "")
-                default_negative_prompt = config.get("default_negative_prompt", "")
+                text_to_image_default_positive_prompt = config.get("text_to_image_default_positive_prompt", "")
+                text_to_image_default_negative_prompt = config.get("text_to_image_default_negative_prompt", "")
 
                 # 检查并补充默认关键词
-                if default_positive_prompt:
+                if text_to_image_default_positive_prompt:
                     # 用逗号分隔关键词
-                    default_keywords = default_positive_prompt.split(",")
+                    default_keywords = text_to_image_default_positive_prompt.split(",")
                     existing_keywords = text_prompt.split(",")
                     # 找出缺失的关键词
                     missing_keywords = [
@@ -347,9 +347,9 @@ class ImagePromptGenerator:
                         # 用逗号连接所有关键词
                         text_prompt = ", ".join(missing_keywords) + (", " + text_prompt if text_prompt else "")
 
-                if default_negative_prompt:
+                if text_to_image_default_negative_prompt:
                     # 用逗号分隔关键词
-                    default_keywords = default_negative_prompt.split(",")
+                    default_keywords = text_to_image_default_negative_prompt.split(",")
                     existing_keywords = negative_prompt.split(",")
                     # 找出缺失的关键词
                     missing_keywords = [

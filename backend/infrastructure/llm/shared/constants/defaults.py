@@ -10,17 +10,12 @@ DEFAULT_CONTEXT_MESSAGE_COUNT = 6
 DEFAULT_MAX_HISTORY_LENGTH = 10
 TEXT_TO_IMAGE_HISTORY_FILENAME = "text_to_image_history.json"
 
-# Default negative prompt for image generation
-DEFAULT_NEGATIVE_PROMPT = (
-    "low quality, worst quality, blurry, out of focus, distorted, deformed"
-)
-
 # Title generation defaults
 DEFAULT_TITLE_MAX_LENGTH = 50
-DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.7
+DEFAULT_TITLE_GENERATION_TEMPERATURE = 0.3
 
 # Web search defaults  
-DEFAULT_WEB_SEARCH_TEMPERATURE = 0.3
+DEFAULT_WEB_SEARCH_TEMPERATURE = 0.1
 
 # API timeout defaults
 DEFAULT_API_TIMEOUT = 60

@@ -202,8 +202,8 @@ class ImagePromptGenerator:
             )
             
             # Enhance with defaults
-            default_positive = text_to_image_settings.default_positive_prompt
-            default_negative = text_to_image_settings.default_negative_prompt
+            default_positive = text_to_image_settings.text_to_image_default_positive_prompt
+            default_negative = text_to_image_settings.text_to_image_default_negative_prompt
             
             if default_positive:
                 # Add missing positive keywords

@@ -27,7 +27,7 @@ class ModelsLabConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file='.env',
-        env_nested_delimiter='__',
+        env_nested_delimiter='_',
         case_sensitive=False,
         env_prefix='',
         extra='ignore'
@@ -112,7 +112,7 @@ class StableDiffusionWebUIConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file='.env',
-        env_nested_delimiter='__',
+        env_nested_delimiter='_',
         case_sensitive=False,
         env_prefix='',
         populate_by_name=True,  # 允许使用字段或别名填充
@@ -138,11 +138,11 @@ class TextToImageSettings(BaseSettings):
     context_message_count: int = Field(default=10, ge=1, le=50, description="上下文消息数量")
     
     # 默认提示词配置
-    default_positive_prompt: str = Field(
+    text_to_image_default_positive_prompt: str = Field(
         default="high quality, detailed, masterpiece, best quality",
         description="默认正面提示词"
     )
-    default_negative_prompt: str = Field(
+    text_to_image_default_negative_prompt: str = Field(
         default="blurry, low quality, distorted, bad anatomy, text, watermark, ugly, deformed",
         description="默认负面提示词"
     )
@@ -152,7 +152,7 @@ class TextToImageSettings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file='.env',
-        env_nested_delimiter='__',
+        env_nested_delimiter='_',
         case_sensitive=False,
         env_prefix='',  # 删除前缀！
         extra='ignore'

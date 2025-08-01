@@ -227,10 +227,6 @@ class BaseToolManager(ABC):
             result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(result)
             
-            # Check execution error - return tool's original error structure
-            if isinstance(result, dict) and result.get("error"):
-                return tool_result
-            
             # Cache results from search tools
             if tool_name in ["search_tools"] and session_id:
                 await self._cache_meta_tool_results(tool_result, session_id, debug)

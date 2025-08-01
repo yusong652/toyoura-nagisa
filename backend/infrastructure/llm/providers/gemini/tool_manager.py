@@ -42,8 +42,6 @@ class GeminiToolManager(BaseToolManager):
             func_decl = self._convert_tool_schema_to_gemini_declaration(tool_schema)
             if func_decl:
                 function_declarations.append(func_decl)
-                if debug:
-                    print(f"[DEBUG] Converted tool to Gemini format: {tool_name}")
         
         if debug:
             print(f"[DEBUG] Final Gemini tools count: {len(function_declarations)}")

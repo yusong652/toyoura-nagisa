@@ -8,7 +8,7 @@ import os
 import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from ..constants.defaults import DEFAULT_MAX_HISTORY_LENGTH, TEXT_TO_IMAGE_HISTORY_FILENAME
+from ..constants.defaults import TEXT_TO_IMAGE_HISTORY_FILENAME
 
 
 def get_text_to_image_history_file(session_id: str) -> str:
@@ -48,8 +48,7 @@ def load_text_to_image_history(session_id: str) -> List[Dict[str, Any]]:
 def save_text_to_image_generation(
     session_id: str, 
     user_request: str, 
-    assistant_response: str,
-    max_history_length: int = DEFAULT_MAX_HISTORY_LENGTH
+    assistant_response: str
 ) -> None:
     """
     Save a text-to-image prompt generation record to history.
@@ -58,7 +57,6 @@ def save_text_to_image_generation(
         session_id: Session ID to save to
         user_request: The original user request text
         assistant_response: Complete assistant response content
-        max_history_length: Maximum number of records to keep (default: 10)
     """
     history_file = get_text_to_image_history_file(session_id)
     
@@ -82,10 +80,8 @@ def save_text_to_image_generation(
         "timestamp": datetime.now().isoformat()
     }
     
-    # Add new record and maintain history length
+    # Add new record
     history.append(new_record)
-    if len(history) > max_history_length:
-        history = history[-max_history_length:]  # Keep only the latest records
     
     # Save updated history
     try:
