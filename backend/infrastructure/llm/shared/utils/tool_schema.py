@@ -20,8 +20,11 @@ class JSONSchema(BaseModel):
     default: Optional[Any] = None
     enum: Optional[List[Any]] = None
     items: Optional[Union[Dict[str, Any], "JSONSchema"]] = None
+    # Allow common JSON Schema fields
+    definitions: Optional[Dict[str, Any]] = Field(default=None, alias="$defs")
+    defs: Optional[Dict[str, Any]] = Field(default=None, alias="definitions")
     
-    model_config = {"extra": "forbid"}  # Only allow defined fields
+    model_config = {"extra": "allow"}  # Allow additional JSON Schema fields
         
     @field_validator('properties')
     @classmethod

@@ -82,22 +82,13 @@ class GeminiContextManager(BaseContextManager):
         """
         parts = []
         
-        # 多模态内容检测：支持新的统一格式和旧格式
-        if isinstance(result, dict):
-            # 检查新格式：包含 inline_data 字段的结果
-            if 'inline_data' in result:
-                blob = GeminiMessageFormatter.process_inline_data(result['inline_data'])
-                if blob:
-                    parts.append(types.Part(inline_data=blob))
-                    print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
-            
-            # 兼容旧格式：data.processing_result.content.inline_data 路径
-            elif result.get('data', {}).get('processing_result', {}).get('content_format') == 'inline_data':
-                inline_data = result['data']['processing_result']['content']['inline_data']
-                blob = GeminiMessageFormatter.process_inline_data(inline_data)
-                if blob:
-                    parts.append(types.Part(inline_data=blob))
-                    print(f"[DEBUG] Created multimodal Part for {tool_name}: {blob.mime_type}, {len(blob.data)} bytes")
+        # 使用基类方法提取 inline_data
+        inline_data = self.extract_inline_data(result)
+        if inline_data:
+            blob = GeminiMessageFormatter._process_inline_data(inline_data)
+            if blob:
+                parts.append(types.Part(inline_data=blob))
+                self.debug_multimodal_content(tool_name, blob.mime_type, len(blob.data))
         
         return parts
     
@@ -112,26 +103,11 @@ class GeminiContextManager(BaseContextManager):
         Returns:
             函数响应的 Part 对象
         """
-        # 处理不同类型的工具结果
-        if isinstance(result, dict):
-            # 如果result是ToolResult格式，优先使用llm_content字段
-            if 'llm_content' in result and result['llm_content'] is not None:
-                # 使用llm_content作为LLM对话内容
-                response_dict = result['llm_content'] if isinstance(result['llm_content'], dict) else {"content": result['llm_content']}
-            elif 'status' in result and 'message' in result:
-                # 这是ToolResult格式但没有llm_content，使用message字段
-                response_dict = {"result": result['message']}
-            else:
-                # 传统格式，直接使用
-                response_dict = result.copy()
-        elif isinstance(result, str):
-            response_dict = {"result": result}
-        else:
-            response_dict = {"result": str(result)}
+        # 使用基类方法处理工具结果
+        response_dict = self.process_tool_result_for_llm(result)
         
-        # 对于多模态内容，排除大的 inline_data 避免重复
-        if 'inline_data' in response_dict:
-            response_dict = {k: v for k, v in response_dict.items() if k != 'inline_data'}
+        # 使用基类方法过滤多模态内容
+        response_dict = self.filter_multimodal_from_response(response_dict)
         
         function_response = types.FunctionResponse(
             name=tool_name,

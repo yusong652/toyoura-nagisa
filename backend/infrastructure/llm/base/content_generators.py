@@ -62,6 +62,40 @@ class BaseTitleGenerator(BaseContentGenerator):
             Generated title string, or None if generation fails
         """
         pass
+    
+    @staticmethod
+    def validate_messages_for_title(latest_messages: List[BaseMessage]) -> bool:
+        """
+        Validate if messages are sufficient for title generation.
+        
+        Args:
+            latest_messages: Messages to validate
+            
+        Returns:
+            True if messages are valid for title generation
+        """
+        return latest_messages and len(latest_messages) >= 2
+    
+    @staticmethod
+    def prepare_title_generation_messages(
+        latest_messages: List[BaseMessage], 
+        title_request_text: str
+    ) -> List[BaseMessage]:
+        """
+        Prepare message sequence for title generation.
+        
+        Args:
+            latest_messages: Original conversation messages
+            title_request_text: Text prompt requesting title generation
+            
+        Returns:
+            Complete message list including title request
+        """
+        from backend.infrastructure.llm.shared.constants.prompts import TITLE_GENERATION_REQUEST_TEXT
+        
+        return list(latest_messages) + [
+            UserMessage(role="user", content=[{"type": "text", "text": title_request_text or TITLE_GENERATION_REQUEST_TEXT}])
+        ]
 
 
 class BaseWebSearchGenerator(BaseContentGenerator):
@@ -94,6 +128,102 @@ class BaseWebSearchGenerator(BaseContentGenerator):
             Dictionary containing search results or error information
         """
         pass
+    
+    @staticmethod
+    def create_search_user_message(query: str) -> UserMessage:
+        """
+        Create a user message for web search query.
+        
+        Args:
+            query: The search query
+            
+        Returns:
+            UserMessage object containing the query
+        """
+        return UserMessage(role="user", content=query)
+    
+    @staticmethod
+    def format_search_result(
+        query: str,
+        response_text: str,
+        sources: List[Dict[str, Any]],
+        error: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Format web search results into standardized structure.
+        
+        Args:
+            query: Original search query
+            response_text: Synthesized response text
+            sources: List of source dictionaries
+            error: Optional error message
+            
+        Returns:
+            Standardized search result dictionary
+        """
+        return {
+            "query": query,
+            "response_text": response_text,
+            "sources": sources,
+            "total_sources": len(sources),
+            "error": error
+        }
+    
+    @staticmethod
+    def format_search_error(query: str, error_message: str) -> Dict[str, Any]:
+        """
+        Format search error into standardized response.
+        
+        Args:
+            query: Original search query
+            error_message: Error description
+            
+        Returns:
+            Standardized error response
+        """
+        return BaseWebSearchGenerator.format_search_result(
+            query=query,
+            response_text="",
+            sources=[],
+            error=error_message
+        )
+    
+    @staticmethod
+    def debug_search_start(query: str, debug: bool):
+        """
+        Print debug message for search start.
+        
+        Args:
+            query: Search query
+            debug: Whether debug is enabled
+        """
+        if debug:
+            print(f"[WebSearch] Performing search for query: {query}")
+    
+    @staticmethod
+    def debug_search_complete(debug: bool):
+        """
+        Print debug message for search completion.
+        
+        Args:
+            debug: Whether debug is enabled
+        """
+        if debug:
+            print(f"[WebSearch] API call completed")
+    
+    @staticmethod
+    def debug_search_results(sources_count: int, response_length: int, debug: bool):
+        """
+        Print debug message for search results.
+        
+        Args:
+            sources_count: Number of sources found
+            response_length: Length of response text
+            debug: Whether debug is enabled
+        """
+        if debug:
+            print(f"[WebSearch] Extracted {sources_count} sources")
+            print(f"[WebSearch] Response text length: {response_length}")
 
 
 class BaseImagePromptGenerator(BaseContentGenerator):

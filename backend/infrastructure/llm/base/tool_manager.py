@@ -266,12 +266,16 @@ class BaseToolManager(ABC):
             if tool_result.get("is_error"):
                 return tool_result
             
-            # Handle multimodal content: check for inline_data and extract
+            # Unified handling: always return inline_data + llm_content structure
             if self._has_multimodal_content(tool_result):
-                return self._extract_multimodal_content(tool_result)
+                inline_data = self._extract_multimodal_content(tool_result)
+            else:
+                inline_data = {}  # Empty for non-multimodal content
             
-            # Regular content: also use unified content extraction method
-            return self._extract_regular_content(tool_result)
+            return {
+                "inline_data": inline_data,
+                "llm_content": tool_result.get("llm_content")
+            }
             
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
@@ -348,48 +352,30 @@ class BaseToolManager(ABC):
         Returns:
             bool: Whether it contains multimodal content
         """
-        return (
-            tool_result.get("data", {})
-            .get("processing_result", {})
-            .get("content_format") == "inline_data"
-        )
+        # For read_file tool: check data.processing_result.content_format
+        data = tool_result.get("data")
+        if data and isinstance(data, dict):
+            processing_result = data.get("processing_result")
+            if processing_result and isinstance(processing_result, dict):
+                return processing_result.get("content_format") == "inline_data"
+        
+        return False
     
     def _extract_multimodal_content(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Extract multimodal content, merge llm_content and inline_data.
+        Extract multimodal content inline_data.
+        
+        Precondition: _has_multimodal_content() has already confirmed presence of multimodal content.
         
         Args:
             tool_result: Complete ToolResult dictionary
             
         Returns:
-            Dict: Merged content including inline_data
+            Dict: inline_data structure with mime_type and data
         """
-        llm_content = tool_result.get("llm_content", {})
-        inline_data = (
-            tool_result.get("data", {})
-            .get("processing_result", {})
-            .get("content", {})
-            .get("inline_data", {})
-        )
-        
-        return {
-            **llm_content,
-            "inline_data": inline_data
-        }
+        # Extract inline_data from data.processing_result.content
+        return tool_result["data"]["processing_result"]["content"]["inline_data"]
     
-    def _extract_regular_content(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Extract regular content, wrapped in llm_content field, aligned with multimodal content format.
-        
-        Args:
-            tool_result: Complete ToolResult dictionary
-            
-        Returns:
-            Dict: Dictionary containing llm_content field, consistent with multimodal content format
-        """
-        return {
-            "llm_content": tool_result.get("llm_content")
-        }
     
     
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Any:

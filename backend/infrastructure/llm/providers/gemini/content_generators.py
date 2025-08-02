@@ -7,12 +7,11 @@ Gemini-specific API calls and response handling.
 
 from typing import Optional, Dict, Any, List
 from google.genai import types
-from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.config import get_text_to_image_settings, get_llm_settings
+from backend.domain.models.messages import BaseMessage
+from backend.config import get_llm_settings
 
 # Import base components
-from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
-from backend.infrastructure.llm.shared.content_generators import SharedWebSearchGenerator
+from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,
@@ -31,7 +30,7 @@ from .message_formatter import GeminiMessageFormatter
 from .response_processor import GeminiResponseProcessor
 
 
-class GeminiTitleGenerator:
+class GeminiTitleGenerator(BaseTitleGenerator):
     """
     Gemini-specific title generation using shared logic where possible.
     """
@@ -47,7 +46,8 @@ class GeminiTitleGenerator:
         Uses Gemini API with shared processing logic.
         """
         try:
-            if not latest_messages or len(latest_messages) < 2:
+            # Use base class validation
+            if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
             
             # Read Gemini configuration
@@ -62,10 +62,10 @@ class GeminiTitleGenerator:
                 max_output_tokens=gemini_config.model_settings.max_output_tokens
             )
             
-            # Build message sequence, ending with user
-            messages = list(latest_messages) + [
-                UserMessage(role="user", content=[{"type": "text", "text": TITLE_GENERATION_REQUEST_TEXT}])
-            ]
+            # Build message sequence using base class method
+            messages = BaseTitleGenerator.prepare_title_generation_messages(
+                latest_messages, TITLE_GENERATION_REQUEST_TEXT
+            )
             
             # Use MessageFormatter for unified message format conversion
             contents = GeminiMessageFormatter.format_messages_for_api(messages)
@@ -92,7 +92,7 @@ class GeminiTitleGenerator:
             return None
 
 
-class GeminiWebSearchGenerator:
+class GeminiWebSearchGenerator(BaseWebSearchGenerator):
     """
     Gemini-specific web search using shared logic and Gemini's google_search tool.
     """
@@ -110,11 +110,11 @@ class GeminiWebSearchGenerator:
         Uses Gemini's modern google_search tool with shared result processing.
         """
         try:
-            if debug:
-                print(f"[WebSearch] Performing search for query: {query}")
+            # Use base class debug method
+            BaseWebSearchGenerator.debug_search_start(query, debug)
             
-            # Create user message directly (like old version)
-            user_message = UserMessage(role="user", content=query)
+            # Create user message using base class method
+            user_message = BaseWebSearchGenerator.create_search_user_message(query)
             
             # Read Gemini configuration
             gemini_config = get_gemini_client_config()
@@ -146,41 +146,44 @@ class GeminiWebSearchGenerator:
                 config=search_config
             )
             
+            # Use base class debug method
+            BaseWebSearchGenerator.debug_search_complete(debug)
             if debug:
-                print(f"[WebSearch] API call completed")
                 GeminiDebugger.print_debug_response(response)
             
             # Check for candidates
-            if hasattr(response, 'candidates') and response.candidates:
+            if response.candidates:
                 # Extract sources using ResponseProcessor
                 sources = GeminiResponseProcessor.extract_web_search_sources(response, debug=debug)
                 
                 # Extract response text using ResponseProcessor
                 response_text = GeminiResponseProcessor.extract_text_content(response)
                 
-                # Build structured result (match old version format)
-                result = {
-                    "query": query,
-                    "response_text": response_text,
-                    "sources": sources,
-                    "total_sources": len(sources)
-                }
+                # Build structured result using base class method
+                result = BaseWebSearchGenerator.format_search_result(
+                    query=query,
+                    response_text=response_text,
+                    sources=sources
+                )
                 
-                if debug:
-                    print(f"[WebSearch] Extracted {len(sources)} sources")
-                    print(f"[WebSearch] Response text length: {len(response_text)}")
+                # Use base class debug method
+                BaseWebSearchGenerator.debug_search_results(
+                    len(sources), len(response_text), debug
+                )
                 
                 return result
             else:
                 if debug:
                     print("[WebSearch] No candidates found in response")
-                return {"error": "No search results found", "query": query}
+                return BaseWebSearchGenerator.format_search_error(
+                    query, "No search results found"
+                )
                 
         except Exception as e:
             error_msg = f"An error occurred during web search: {str(e)}"
             if debug:
                 print(f"[WebSearch] Error: {error_msg}")
-            return {"error": error_msg, "query": query}
+            return BaseWebSearchGenerator.format_search_error(query, error_msg)
 
 class GeminiImagePromptGenerator(BaseImagePromptGenerator):
     """

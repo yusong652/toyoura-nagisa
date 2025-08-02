@@ -874,8 +874,29 @@ def read_file(
         include_metadata = True
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, operation_type: str = "read_file", file_path: str = "") -> Dict[str, Any]:
+        # Provide meaningful llm_content even for errors
+        llm_content = {
+            "operation": {
+                "type": operation_type,
+                "path": file_path,
+                "success": False
+            },
+            "error_info": {
+                "message": message,
+                "operation_type": operation_type
+            },
+            "summary": {
+                "operation_type": operation_type,
+                "success": False
+            }
+        }
+        return ToolResult(
+            status="error", 
+            message=message, 
+            error=message,
+            llm_content=llm_content
+        ).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
         return ToolResult(
@@ -887,14 +908,14 @@ def read_file(
 
     # Validate parameters
     if offset is not None and offset < 0:
-        return _error("offset must be non-negative")
+        return _error("offset must be non-negative", file_path=path)
     
     if limit is not None and limit <= 0:
-        return _error("limit must be positive")
+        return _error("limit must be positive", file_path=path)
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error("Cannot access workspace directory")
+        return _error("Cannot access workspace directory", file_path=path)
 
     # ------------------------------------------------------------------
     # Path validation and security checks
@@ -903,29 +924,29 @@ def read_file(
     # Validate file path
     abs_file_path = validate_path_in_workspace(path)
     if abs_file_path is None:
-        return _error(f"File path is outside workspace: {path}")
+        return _error(f"File path is outside workspace: {path}", file_path=path)
 
     try:
         file_path = Path(abs_file_path)
         
         # Check file existence and type
         if not file_path.exists():
-            return _error(f"File does not exist: {path}")
+            return _error(f"File does not exist: {path}", file_path=path)
         
         if not file_path.is_file():
-            return _error(f"Path is not a file: {path}")
+            return _error(f"Path is not a file: {path}", file_path=path)
         
         # Check file size
         file_size = file_path.stat().st_size
         if file_size > MAX_FILE_SIZE_BYTES:
-            return _error(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit")
+            return _error(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit", file_path=path)
         
         # Security checks
         if file_path.is_symlink() and not is_safe_symlink(file_path):
-            return _error("Cannot read unsafe symlink pointing outside workspace")
+            return _error("Cannot read unsafe symlink pointing outside workspace", file_path=path)
         
         if not check_parent_symlinks(file_path):
-            return _error("Cannot read file with unsafe parent symlinks")
+            return _error("Cannot read file with unsafe parent symlinks", file_path=path)
 
         # ------------------------------------------------------------------
         # File reading and analysis
@@ -1006,7 +1027,7 @@ def read_file(
         )
 
     except Exception as exc:
-        return _error(f"Unexpected error reading file: {exc}")
+        return _error(f"Unexpected error reading file: {exc}", file_path=path)
 
 # -----------------------------------------------------------------------------
 # Registration helper

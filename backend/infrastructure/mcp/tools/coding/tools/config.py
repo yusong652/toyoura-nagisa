@@ -29,10 +29,9 @@ class ToolsConfig:
 # ---------------------------------------------------------------------------
 
 # By default assume repo layout: <repo_root>/workspace/default
-# "repo_root" is five levels up from this file (tools → coding → tools → nagisa_mcp → backend → <repo_root>)
-# This is more robust than using parents[6] which pointed to the user's home dir
-# in some environments.
-_DEFAULT_ROOT = Path(__file__).resolve().parents[5] / "workspace" / "default"
+# "repo_root" is six levels up from this file:
+# config.py → tools → coding → tools → mcp → infrastructure → backend → <repo_root>
+_DEFAULT_ROOT = Path(__file__).resolve().parents[6] / "workspace" / "default"
 _DEFAULT_ROOT.mkdir(parents=True, exist_ok=True)
 
 _CONFIG: ToolsConfig = ToolsConfig(root_dir=_DEFAULT_ROOT)

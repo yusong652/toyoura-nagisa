@@ -6,7 +6,7 @@ Defines core methods that all Context Managers must implement to ensure consiste
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 from backend.domain.models.messages import BaseMessage
 
 
@@ -94,3 +94,108 @@ class BaseContextManager(ABC):
             'current_iteration': self.get_current_iteration(),
             'execution_metadata': self._execution_metadata.copy()
         }
+    
+    # === Common tool result processing methods ===
+    
+    @staticmethod
+    def process_tool_result_for_llm(result: Any) -> Dict[str, Any]:
+        """
+        Process tool result to extract LLM-relevant content.
+        
+        Handles standard ToolResult format with llm_content field.
+        
+        Args:
+            result: Raw tool execution result
+            
+        Returns:
+            Processed result dictionary for LLM consumption
+        """
+        if isinstance(result, dict):
+            # If result has llm_content field (ToolResult format), prioritize it
+            if 'llm_content' in result and result['llm_content'] is not None:
+                return result['llm_content'] if isinstance(result['llm_content'], dict) else {"content": result['llm_content']}
+            elif 'status' in result and 'message' in result:
+                # ToolResult format without llm_content, use message field
+                return {"result": result['message']}
+            else:
+                # Traditional format, use as-is
+                return result.copy()
+        elif isinstance(result, str):
+            return {"result": result}
+        else:
+            return {"result": str(result)}
+    
+    @staticmethod
+    def has_multimodal_content(result: Any) -> bool:
+        """
+        Check if tool result contains multimodal content.
+        
+        Args:
+            result: Tool execution result
+            
+        Returns:
+            True if result contains multimodal content
+        """
+        if not isinstance(result, dict):
+            return False
+        
+        # Check new unified format
+        if 'inline_data' in result:
+            return True
+        
+        # Check legacy format
+        if result.get('data', {}).get('processing_result', {}).get('content_format') == 'inline_data':
+            return True
+        
+        return False
+    
+    @staticmethod
+    def extract_inline_data(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Extract inline data from tool result.
+        
+        Args:
+            result: Tool execution result
+            
+        Returns:
+            Inline data dictionary with mime_type and data, or None
+        """
+        if not isinstance(result, dict):
+            return None
+        
+        # Check new unified format
+        if 'inline_data' in result:
+            return result['inline_data']
+        
+        # Check legacy format
+        if result.get('data', {}).get('processing_result', {}).get('content_format') == 'inline_data':
+            return result['data']['processing_result']['content']['inline_data']
+        
+        return None
+    
+    @staticmethod
+    def filter_multimodal_from_response(response_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Filter out large multimodal data from response to avoid duplication.
+        
+        Args:
+            response_dict: Response dictionary potentially containing inline_data
+            
+        Returns:
+            Filtered response dictionary
+        """
+        if 'inline_data' in response_dict:
+            return {k: v for k, v in response_dict.items() if k != 'inline_data'}
+        return response_dict
+    
+    @staticmethod
+    def debug_multimodal_content(tool_name: str, mime_type: str, data_size: int):
+        """
+        Print debug information for multimodal content.
+        
+        Args:
+            tool_name: Name of the tool that generated the content
+            mime_type: MIME type of the content
+            data_size: Size of the data in bytes
+        """
+        print(f"[DEBUG] Created multimodal Part for {tool_name}: {mime_type}, {data_size} bytes")
