@@ -1,34 +1,10 @@
-"""Comprehensive file reader for coding workflows with extended multimodal support.
+"""Read single files with automatic encoding detection.
 
-This tool provides intelligent file reading functionality optimized for code files and text documents,
-with comprehensive metadata analysis, security controls, and performance monitoring. It also supports
-binary files (images, documents, audio, video) for multimodal contexts.
-
-**Primary Focus:**
-- Code files (.py, .js, .ts, .java, etc.) with language detection and complexity analysis
-- Configuration files (.json, .yaml, .toml, etc.) with structured parsing
-- Documentation files (.md, .txt, .rst, etc.) with content analysis
-- Text files with intelligent encoding detection and truncation
-
-**Extended Support:**
-- Binary files (images, documents, audio, video) processed as separate multimodal Parts
-- Automatic file type detection and appropriate handling
-- Base64 encoding for LLM multimodal consumption (separate from text content)
-
-**Key Features:**
-- Intelligent file type detection and encoding
-- Comprehensive metadata analysis (language, complexity, security)
-- Performance monitoring and optimization insights
-- Security validation and size limits
-- Structured output format compatible with all LLM clients
-
-**Security & Performance:**
-- Path validation and symlink security checks
-- File size limits (50MB max, 1MB inline)
-- Performance thresholds and warnings
-- Enterprise-grade security controls
-
-Modeled after gemini-cli's file reading capabilities for consistency and interoperability.
+Supports:
+- Text files: automatic encoding detection, line-based reading
+- Binary files: images/docs/media returned as base64 for multimodal LLMs
+- Security: path validation, size limits (50MB max)
+- Reading modes: full, preview (100 lines), paginated
 """
 
 import os
@@ -828,33 +804,25 @@ def _read_file_safely(
 def read_file(
     path: str = Field(
         ...,
-        description="Target file path (workspace-relative or absolute within workspace).",
+        description="File path to read.",
     ),
     read_mode: ReadMode = Field(
         ReadMode.FULL,
-        description="Reading mode: 'full' (complete file), 'preview' (first 100 lines), 'paginated' (offset/limit), 'metadata_only' (no content).",
+        description="Reading mode: 'full' (complete file), 'preview' (first 100 lines), 'paginated' (use offset/limit).",
     ),
     offset: Optional[int] = Field(
         None,
-        description="Line offset (0-based) for paginated reading of text files.",
+        description="Start line for paginated reading (0-based).",
     ),
     limit: Optional[int] = Field(
         None,
-        description="Maximum number of lines to read for text files. Defaults to 5000.",
-    ),
-    analyze_content: bool = Field(
-        True,
-        description="Whether to perform detailed content analysis (language detection, complexity scoring, etc.).",
-    ),
-    include_metadata: bool = Field(
-        True,
-        description="Whether to include comprehensive file metadata in the response.",
+        description="Max lines to read.",
     ),
 ) -> Dict[str, Any]:
-    """Read and analyze files with comprehensive metadata and intelligent processing.
+    """Read a single file.
     
-    Handles text files with encoding detection and binary files with multimodal support.
-    Returns structured content with rich metadata analysis and performance monitoring.
+    Supports text and binary files. Text files use automatic encoding detection.
+    Binary files (images/docs) are returned as base64 for multimodal LLM processing.
     """
 
     # ------------------------------------------------------------------
@@ -868,10 +836,10 @@ def read_file(
         offset = None
     if isinstance(limit, FieldInfo):
         limit = None
-    if isinstance(analyze_content, FieldInfo):
-        analyze_content = True
-    if isinstance(include_metadata, FieldInfo):
-        include_metadata = True
+    
+    # Set default values for removed parameters
+    analyze_content = True
+    include_metadata = True
 
     # Helper shortcuts for consistent results
     def _error(message: str, operation_type: str = "read_file", file_path: str = "") -> Dict[str, Any]:
