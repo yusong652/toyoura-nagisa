@@ -3,13 +3,15 @@ from pathlib import Path
 
 # 使用 pathlib 优雅处理路径  
 _CURRENT_FILE = Path(__file__)
-_NAGISA_MCP_DIR = _CURRENT_FILE.parent
-_BACKEND_DIR = _NAGISA_MCP_DIR.parent
+_NAGISA_MCP_DIR = _CURRENT_FILE.parent  # backend/infrastructure/mcp
+_INFRASTRUCTURE_DIR = _NAGISA_MCP_DIR.parent  # backend/infrastructure
+_BACKEND_DIR = _INFRASTRUCTURE_DIR.parent  # backend
+_PROJECT_ROOT = _BACKEND_DIR.parent  # project root
 
-# 添加backend路径到 sys.path
-sys.path.insert(0, str(_BACKEND_DIR))
+# 添加项目根路径到 sys.path
+sys.path.insert(0, str(_PROJECT_ROOT))
 
-from nagisa_mcp.tool_vectorizer import ToolVectorizer
+from backend.infrastructure.mcp.tool_vectorizer import ToolVectorizer
 
 if __name__ == "__main__":
     vectorizer = ToolVectorizer()  # 使用默认配置路径
