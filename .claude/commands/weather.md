@@ -1,0 +1,1 @@
+Please show me the weather for $ARGUMENTS at $ARGUMENTS
