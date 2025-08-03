@@ -1,39 +1,26 @@
 import os
 import traceback
-import json
-import base64
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from pathlib import Path
-import uvicorn
-from typing import Optional, Union, List, Dict, Any, AsyncGenerator
+from fastapi.responses import FileResponse, StreamingResponse
+from typing import Optional, Union, List
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from backend.tts.remote.fish_audio import FishAudioTTS
-from backend.tts.base import BaseTTS, TTSRequest
-from backend.chat import LLMClientBase, ErrorResponse
-from backend.chat.utils import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, save_image_from_url, save_image_from_base64, load_all_message_history
-from backend.chat.title_generator import generate_conversation_title
-import asyncio
-from backend.chat.llm_factory import get_client
-from backend.tts.tts_factory import get_tts_engine
-from backend.config import get_llm_config, LOCATION_DB_PATH
-import uuid
-from backend.tts.utils import split_text_by_punctuations, clean_text_for_tts, extract_and_replace_emoticons, restore_emoticons
-from backend.utils.helpers import (
+from backend.infrastructure.tts.base import BaseTTS, TTSRequest
+from backend.infrastructure.llm import LLMClientBase, ErrorResponse
+from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, load_all_message_history
+from backend.infrastructure.storage.image_storage import save_image_from_url, save_image_from_base64
+from backend.infrastructure.llm.base.factory import initialize_factory
+from backend.infrastructure.tts.tts_factory import get_tts_engine
+from backend.config import get_llm_settings, LOCATION_DB_PATH
+from backend.shared.utils.helpers import (
     parse_message_data,
     process_user_message,
-    process_ai_text_message,
-    process_tts_sentence,
-    should_generate_title,
-    is_pure_text_assistant,
     generate_title_for_session,
 )
-from backend.chat.models import Message, UserMessage, AssistantMessage, message_factory, ToolResultMessage, BaseMessage, message_factory_no_thinking
-from backend.chat.models import (
+from backend.domain.models.message_factory import message_factory
+from backend.presentation.models.api_models import (
     NewHistoryRequest,
     HistorySessionResponse,
     SwitchSessionRequest,
@@ -44,50 +31,27 @@ from backend.chat.models import (
     UpdateTTSEnabledRequest,
     GenerateImageRequest
 )
-from backend.nagisa_mcp.smart_mcp_server import mcp
+from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
-from backend.nagisa_mcp.tools.text_to_image import generate_image_from_description
-from backend.routes import images
-from backend.memory.memory_manager import MemoryManager
-from backend.nagisa_mcp.location_manager import get_location_manager
+from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
+from backend.presentation.api import images
+from backend.infrastructure.memory.memory_manager import MemoryManager
 
 
 # 加载环境变量
 load_dotenv()
 
-# ========== 全局状态管理 - SOTA架构 ==========
-ACTIVE_REQUESTS: Dict[str, str] = {}  # session_id -> request_id
-ACTIVE_REQUESTS_LOCK = asyncio.Lock()
-
-# WebSocket 连接管理器
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-
-    async def connect(self, websocket: WebSocket, session_id: str):
-        await websocket.accept()
-        self.active_connections[session_id] = websocket
-        print(f"WebSocket connected for session: {session_id}")
-
-    def disconnect(self, session_id: str):
-        if session_id in self.active_connections:
-            del self.active_connections[session_id]
-            print(f"WebSocket disconnected for session: {session_id}")
-
-    async def send_json(self, session_id: str, data: dict):
-        if session_id in self.active_connections:
-            try:
-                await self.active_connections[session_id].send_json(data)
-                print(f"Sent message to session {session_id}: {data}")
-            except Exception as e:
-                print(f"Failed to send message to session {session_id}: {e}")
-                self.disconnect(session_id)
-        else:
-            print(f"No active WebSocket connection for session: {session_id}")
+# ========== 导入重构后的模块 ==========
+from backend.presentation.websocket.connection import ConnectionManager
+from backend.presentation.streaming.handlers import generate_chat_stream
 
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
+
+# 位置响应事件存储 - 非阻塞事件机制
+# 格式: {session_id: {"location_data": {...}, "timestamp": timestamp, "event": asyncio.Event}}
+_location_response_events = {}
 
 # ========== 应用生命周期管理器 - 增强版 ==========
 @asynccontextmanager
@@ -112,9 +76,12 @@ async def lifespan(app: FastAPI):
         app.state.tts_engine = tts_engine
         print("[INIT] TTS Engine initialized successfully")
         
-        # 初始化 LLM Client
-        llm_client = get_client()
+        # 初始化 LLM Factory
+        llm_factory = initialize_factory()
+        llm_client = llm_factory.create_client()
         app.state.llm_client = llm_client
+        app.state.llm_factory = llm_factory
+        print(f"[INIT] LLM Factory initialized successfully")
         print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
         
         # 初始化 MCP 服务器
@@ -128,7 +95,8 @@ async def lifespan(app: FastAPI):
         print("[INIT] MCP Server started on SSE port 9000")
         
         # 验证LLM配置
-        await _validate_llm_configuration()
+        from backend.shared.utils.config_validator import validate_llm_configuration
+        await validate_llm_configuration()
         
         print("[INIT] All services initialized successfully")
         yield
@@ -261,7 +229,7 @@ async def switch_session(request: SwitchSessionRequest):
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
         
         # 返回会话信息和最近的消息
-        recent_messages_length = get_llm_config().get("recent_messages_length", 5)
+        recent_messages_length = get_llm_settings().recent_messages_length
         recent_messages = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
         
         return {
@@ -275,246 +243,29 @@ async def switch_session(request: SwitchSessionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"切换会话失败: {str(e)}")
 
-async def handle_llm_response(
-    recent_msgs: List[BaseMessage],
-    session_id: str,
-    llm_client: LLMClientBase,
-    tts_engine: BaseTTS
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    SOTA Enhanced LLM Response Handler - 实时流式架构
-    
-    采用现代化实时流式设计，专为即时工具调用通知优化：
-    1. 实时工具调用通知 - 工具执行过程中即时推送状态
-    2. 流式响应处理 - 保持原有TTS和内容处理逻辑
-    3. 状态隔离 - 防重复机制与业务逻辑分离
-    4. 错误传播 - 统一错误处理和恢复
-    5. 可观测性 - 完整的执行追踪和监控
-    """
-    # ========== PHASE 1: 请求初始化和防重复 ==========
-    request_id = f"REQ_{str(uuid.uuid4())[:8]}"
-    
-    async with ACTIVE_REQUESTS_LOCK:
-        if session_id in ACTIVE_REQUESTS:
-            existing_request = ACTIVE_REQUESTS[session_id]
-            error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
-            return
-        ACTIVE_REQUESTS[session_id] = request_id
-
-    try:
-        # ========== PHASE 2: 客户端验证 ==========
-        supported_clients = ['GeminiClient', 'LocalLLMClient']
-        if type(llm_client).__name__ not in supported_clients:
-            error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
-            return
-        
-        if not hasattr(llm_client, 'get_response'):
-            error_msg = f"{type(llm_client).__name__} missing get_response method"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
-            return
-
-        # ========== PHASE 3: 流式处理 - 实时工具调用通知 ==========
-        print(f"[DEBUG] Processing streaming request {request_id} for session {session_id}")
-        
-        final_message = None
-        execution_metadata = None
-        
-        # 使用新的流式方法 - 实时获取工具调用通知
-        async for item in llm_client.get_response(
-            recent_msgs, 
-            session_id=session_id,
-            max_iterations=10
-        ):
-            if isinstance(item, tuple):
-                # 最终结果: (final_message, execution_metadata)
-                final_message, execution_metadata = item
-                break
-            elif isinstance(item, dict):
-                # 实时通知: 工具调用状态更新
-                yield f"data: {json.dumps(item)}\n\n"
-                # 添加小延迟以确保通知按顺序处理
-                await asyncio.sleep(0.05)
-        
-        # ========== PHASE 4: 内容处理流水线 ==========
-        if final_message:
-            async for chunk in _process_content_pipeline(final_message, session_id, tts_engine, request_id):
-                yield chunk
-        
-        # ========== PHASE 5: 后处理流水线 ==========
-        if execution_metadata:
-            async for chunk in _process_post_pipeline(session_id, llm_client, request_id):
-                yield chunk
-        
-    except Exception as e:
-        print(f"[ERROR] Streaming request {request_id} failed: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # 确保工具使用结束信号被发送
-        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        error_data = {'type': 'error', 'error': f"Request processing failed: {str(e)}"}
-        yield f"data: {json.dumps(error_data)}\n\n"
-        
-    finally:
-        # ========== PHASE 6: 清理和释放 ==========
-        async with ACTIVE_REQUESTS_LOCK:
-            if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
-                del ACTIVE_REQUESTS[session_id]
-                print(f"[DEBUG] Released streaming request {request_id} for session {session_id}")
-
-# 注意：_process_notification_pipeline函数已被移除
-# 通知逻辑现在由LLM client层的get_response方法实时处理
-# 这样可以实现真正的即时工具调用通知，而不是事后批量通知
-
-async def _process_content_pipeline(
-    final_message: BaseMessage,
-    session_id: str,
-    tts_engine: BaseTTS,
-    request_id: str
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    内容处理流水线 - 专门处理最终响应内容
-    
-    原子性处理最终消息，包括消息保存、TTS处理等
-    """
-    if not hasattr(final_message, 'content'):
-        return
-    
-    content = final_message.content
-    
-    # 提取文本内容
-    text_content = ""
-    if isinstance(content, list):
-        for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text':
-                text_content += item.get('text', '')
-    else:
-        text_content = str(content)
-    
-    if not text_content.strip():
-        return 
-    
-    # 处理AI文本消息 - 保存到历史记录
-    loaded_history = load_all_message_history(session_id)
-    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    
-    ai_msg_id, processed_content = process_ai_text_message(
-        content,
-        getattr(final_message, 'keyword', None),
-        history_msgs,
-        session_id
-    )
-    
-    # 发送消息ID
-    yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
-    
-    # 发送关键词
-    if hasattr(final_message, 'keyword') and final_message.keyword:
-        yield f"data: {json.dumps({'keyword': final_message.keyword})}\n\n"
-    
-    # TTS处理流水线
-    async for chunk in _process_tts_pipeline(processed_content, tts_engine):
-        yield chunk
-
-async def _process_tts_pipeline(
-    content: str,
-    tts_engine: BaseTTS
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    TTS处理流水线 - 专门处理语音合成
-    
-    分句处理，支持表情符号和颜文字
-    """
-    # 处理表情和颜文字
-    text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
-    
-    # 分句处理
-    sentences = split_text_by_punctuations(text_with_placeholders)
-    
-    for sentence in sentences:
-        tts_text = clean_text_for_tts(sentence)
-        tts_result = await process_tts_sentence(tts_text, tts_engine)
-        
-        if tts_result:
-            tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)
-            yield f"data: {json.dumps(tts_result)}\n\n"
-
-async def _process_post_pipeline(
-    session_id: str,
-    llm_client: LLMClientBase,
-    request_id: str
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    后处理流水线 - 专门处理标题生成等后续任务
-    
-    非阻塞的后台处理，失败不影响主流程
-    """
-    try:
-        loaded_history = load_all_message_history(session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-        
-        if should_generate_title(session_id, history_msgs):
-            new_title = await generate_title_for_session(session_id, llm_client)
-            if new_title:
-                update_success = update_session_title(session_id, new_title)
-                if update_success:
-                    title_update_data = {
-                        'type': 'TITLE_UPDATE',
-                        'payload': {
-                            'session_id': session_id,
-                            'title': new_title
-                        }
-                    }
-                    yield f"data: {json.dumps(title_update_data)}\n\n"
-    except Exception as e:
-        # 后处理失败不应影响主流程，只记录日志
-        print(f"[WARNING] Post-processing failed for request {request_id}: {e}")
+# 注意：流式处理逻辑已移动到 backend/core/streaming.py
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(request: Request):
+    """聊天流式端点 - 使用重构后的流式处理模块"""
     data = await request.json()
     parsed_data, session_id = parse_message_data(data)
     if not parsed_data:
         return ErrorResponse(detail="无效的消息数据")
-    # 使用 load_all_message_history 来保存完整的消息历史
+    
+    # 处理用户消息
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    user_msg = process_user_message(parsed_data, session_id, history_msgs)
+    process_user_message(parsed_data, session_id, history_msgs)
+    
+    # 获取服务组件
     llm_client: LLMClientBase = request.app.state.llm_client
     tts_engine: BaseTTS = request.app.state.tts_engine
     
-    
     try:
-        async def generate():
-            # Generate unique request ID for debugging
-            request_id = str(uuid.uuid4())[:8]
-            print(f"[DEBUG] API Request {request_id} started - Session: {session_id}")
-            
-            yield f"data: {json.dumps({'status': 'sent'})}\n\n"
-            try:
-                yield f"data: {json.dumps({'status': 'read'})}\n\n"
-                # 使用 load_history 获取不含图片消息的最近对话
-                recent_history = load_history(session_id) # load history without image
-                # 使用 message_factory_no_thinking 创建历史消息，过滤掉 thinking 块
-                recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
-                recent_messages_length = get_llm_config().get("recent_messages_length", 20)
-                recent_msgs = recent_msgs[-recent_messages_length:]
-                
-                async for chunk in handle_llm_response(recent_msgs, session_id, llm_client, tts_engine):
-                    yield chunk
-            except Exception as e:
-                print(f"[ERROR] API Request {request_id} - Exception in generate(): {e}")
-                yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-                error_data = {
-                    'type': 'error',
-                    'error': str(e)
-                }
-                yield f"data: {json.dumps(error_data)}\n\n"
-                raise e
+        # 使用重构后的流式处理模块
         return StreamingResponse(
-            generate(),
+            generate_chat_stream(session_id, [], llm_client, tts_engine),
             media_type="text/event-stream"
         )
     except Exception as e:
@@ -675,130 +426,63 @@ async def generate_image_endpoint(request: GenerateImageRequest):
         print(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@app.post("/api/location/update")
-async def update_browser_location(request: Request):
-    """接收前端发送的浏览器位置信息"""
-    try:
-        data = await request.json()
-        session_id = data.get("session_id")  # 获取session_id
-        
-        location_data = {
-            "latitude": data.get("latitude"),
-            "longitude": data.get("longitude"),
-            "accuracy": data.get("accuracy"),
-            "timestamp": data.get("timestamp") or int(datetime.now().timestamp()),
-            "source": "browser_geolocation"
-        }
-        
-        # 更新位置管理器
-        location_manager = get_location_manager()
-        location_manager.update_location(
-            session_id=session_id or "global",
-            data=location_data
-        )
-        
-        print(f"[DEBUG] Browser location updated for session {session_id}: {location_data}")
-        return {"success": True, "session_id": session_id}
-    except Exception as e:
-        print(f"[ERROR] Failed to update browser location: {e}")
-        return {"success": False, "error": str(e)}
+# Location update API removed - now handled via WebSocket LOCATION_RESPONSE messages
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """为每个客户端会话建立 WebSocket 连接。"""
+    import json
+    import asyncio
+    
     connection_manager: ConnectionManager = websocket.app.state.connection_manager
     await connection_manager.connect(websocket, session_id)
     try:
         while True:
-            # 保持连接开放以接收后端推送
-            await websocket.receive_text()
+            # 接收并处理来自前端的消息
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                
+                # 处理位置响应消息
+                if message.get("type") == "LOCATION_RESPONSE":
+                    print(f"[DEBUG] Received location response for session {session_id}: {message}")
+                    
+                    # 存储位置数据并触发事件
+                    if session_id in _location_response_events:
+                        event_info = _location_response_events[session_id]
+                        
+                        # 存储位置数据
+                        if "location_data" in message:
+                            event_info["location_data"] = message["location_data"]
+                            event_info["timestamp"] = message.get("timestamp", int(datetime.now().timestamp()))
+                            event_info["success"] = True
+                        else:
+                            event_info["error"] = message.get("error", "Unknown error")
+                            event_info["success"] = False
+                        
+                        # 触发事件，通知等待的工具
+                        event_info["event"].set()
+                        print(f"[DEBUG] Location event triggered for session {session_id}")
+                    else:
+                        print(f"[DEBUG] No location request pending for session {session_id}")
+                        
+            except json.JSONDecodeError:
+                print(f"[DEBUG] Received non-JSON message from {session_id}: {data}")
+                
     except WebSocketDisconnect:
         connection_manager.disconnect(session_id)
 
 # ========== 全局异常处理器 - SOTA架构 ==========
 
+from backend.shared.utils.exception_handlers import handle_value_error, handle_import_error
+
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
-    """
-    处理配置相关的值错误，特别是LLM客户端不支持的情况
-    """
-    error_message = str(exc)
-    
-    # 检查是否是LLM客户端相关的错误
-    if "Unsupported LLM client" in error_message or "Unknown LLM client" in error_message:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "LLM Configuration Error",
-                "message": error_message,
-                "type": "unsupported_llm_client",
-                "suggestion": "Please update your configuration to use 'gemini' as the LLM client."
-            }
-        )
-    
-    # 其他值错误
-    return JSONResponse(
-        status_code=400,
-        content={
-            "error": "Configuration Error",
-            "message": error_message,
-            "type": "value_error"
-        }
-    )
+    """处理配置相关的值错误，特别是LLM客户端不支持的情况"""
+    return await handle_value_error(request, exc)
 
 @app.exception_handler(ImportError)
 async def import_error_handler(request: Request, exc: ImportError):
-    """
-    处理导入错误，通常是由于缺少依赖或已删除的模块引起
-    """
-    error_message = str(exc)
-    
-    # 检查是否是LLM客户端相关的导入错误
-    if any(client in error_message for client in ["gpt", "anthropic", "mistral", "grok"]):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "LLM Client Import Error",
-                "message": "Legacy LLM clients have been removed in the new architecture.",
-                "type": "deprecated_client",
-                "details": error_message,
-                "solution": "Please configure your system to use 'gemini' as the LLM client."
-            }
-        )
-    
-    # 其他导入错误
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Import Error",
-            "message": error_message,
-            "type": "import_error"
-        }
-    )
+    """处理导入错误，通常是由于缺少依赖或已删除的模块引起"""
+    return await handle_import_error(request, exc)
 
-# ========== 启动时验证 ==========
-
-async def _validate_llm_configuration():
-    """
-    验证LLM配置，确保使用的是支持的客户端
-    """
-    try:
-        from backend.chat.llm_factory import get_supported_clients, is_client_supported
-        from backend.config import get_current_llm_type
-        
-        current_llm = get_current_llm_type()
-        supported_clients = get_supported_clients()
-        
-        if not is_client_supported(current_llm):
-            print(f"❌ [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
-            print(f"📋 Supported clients: {', '.join(supported_clients)}")
-            print(f"💡 Please update your configuration to use one of the supported clients.")
-            # 注意：这里不抛出异常，让应用启动，但在运行时会被工厂方法捕获
-            
-        else:
-            print(f"✅ [STARTUP] LLM client '{current_llm}' is supported and ready")
-            
-    except Exception as e:
-        print(f"⚠️  [STARTUP WARNING] Could not validate LLM configuration: {e}")
-
-# ========== API ENDPOINTS - 保持不变 ==========

@@ -42,8 +42,11 @@ class AuthConfig(BaseSettings):
     """Google Auth配置"""
     
     # Google OAuth配置 - 必需的敏感信息
-    client_id: str = Field(description="Google OAuth客户端ID", env="AUTH_CLIENT_ID")
-    client_secret: str = Field(description="Google OAuth客户端密钥", env="AUTH_CLIENT_SECRET")
+    client_id: str = Field(description="Google OAuth客户端ID")
+    client_secret: str = Field(description="Google OAuth客户端密钥")
+    
+    # Google Maps API配置 - 必需的敏感信息
+    google_maps_api_key: str = Field(description="Google Maps API密钥", env="GOOGLE_MAPS_API_KEY")
     
     # 可选配置
     redirect_uri: str = Field(default="urn:ietf:wg:oauth:2.0:oob", description="重定向URI")
@@ -60,7 +63,7 @@ class AuthConfig(BaseSettings):
         env_file='.env',
         env_nested_delimiter='__',
         case_sensitive=False,
-        env_prefix='',
+        env_prefix='AUTH_',
         extra='ignore'
     )
     

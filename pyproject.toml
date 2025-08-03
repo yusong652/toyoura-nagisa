@@ -79,4 +79,9 @@ packages = ["backend"]
 dev-dependencies = [
     "pytest",
     "pytest-cov",
+]
+
+[project.optional-dependencies]
+dev = [
+    "github-cli",  # GitHub CLI for managing issues and PRs
 ] 

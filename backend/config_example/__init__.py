@@ -36,27 +36,27 @@ class AppSettings(BaseSettings):
     
     def get_llm_settings(self) -> LLMSettings:
         """获取LLM配置"""
-        return get_llm_settings()
+        return LLMSettings()
     
     def get_tts_settings(self) -> TTSSettings:
         """获取TTS配置"""
-        return get_tts_settings()
+        return TTSSettings()
     
     def get_email_config(self) -> EmailConfig:
         """获取邮件配置"""
-        return get_email_config()
+        return EmailConfig()
     
     def get_auth_config(self) -> AuthConfig:
         """获取认证配置"""
-        return get_auth_config()
+        return AuthConfig()
     
     def get_search_config(self) -> SearchConfig:
         """获取搜索配置"""
-        return get_search_config()
+        return SearchConfig()
     
     def get_text_to_image_settings(self) -> TextToImageSettings:
         """获取文本转图像配置"""
-        return get_text_to_image_settings()
+        return TextToImageSettings()
 
 
 # 全局配置实例 - 每次重新创建以确保最新配置
@@ -85,8 +85,8 @@ MEMORY_DB_PATH = BASE_DIR / "memory_db"
 
 # 提示词加载函数
 def _load_prompt_file(filename: str) -> str:
-    """从 chat 目录加载指定的提示文件"""
-    prompt_path = CHAT_DIR / filename
+    """从 config/prompts 目录加载指定的提示文件"""
+    prompt_path = BASE_DIR / "config" / "prompts" / filename
     try:
         return prompt_path.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
@@ -154,21 +154,21 @@ def get_llm_config() -> Dict[str, Any]:
         "type": settings.type,
         "debug": settings.debug,
         "recent_messages_length": getattr(settings, "recent_messages_length", 20),
-        "chatgpt": {},
+        "gpt": {},
         "gemini": {},
         "anthropic": {}
     }
     
     # 只有当前使用的LLM才包含完整配置，并且会触发验证
-    if settings.type == "chatgpt":
-        chatgpt_config = settings.get_chatgpt_config()  # 这里会触发fail fast验证
-        config["chatgpt"] = {
-            "api_key": chatgpt_config.openai_api_key,
-            "model": chatgpt_config.model,
-            "temperature": chatgpt_config.temperature,
-            "top_p": chatgpt_config.top_p,
-            "top_k": chatgpt_config.top_k,
-            "max_tokens": chatgpt_config.max_tokens,
+    if settings.type == "gpt":
+        gpt_config = settings.get_gpt_config()  # 这里会触发fail fast验证
+        config["gpt"] = {
+            "api_key": gpt_config.openai_api_key,
+            "model": gpt_config.model,
+            "temperature": gpt_config.temperature,
+            "top_p": gpt_config.top_p,
+            "top_k": gpt_config.top_k,
+            "max_tokens": gpt_config.max_tokens,
         }
     elif settings.type == "gemini":
         gemini_config = settings.get_gemini_config()  # 这里会触发fail fast验证
@@ -179,6 +179,8 @@ def get_llm_config() -> Dict[str, Any]:
             "top_p": gemini_config.top_p,
             "top_k": gemini_config.top_k,
             "maxOutputTokens": gemini_config.max_output_tokens,
+            "web_search_max_uses": gemini_config.web_search_max_uses,
+            "debug": settings.debug,
         }
     elif settings.type == "anthropic":
         anthropic_config = settings.get_anthropic_config()  # 这里会触发fail fast验证
@@ -189,6 +191,8 @@ def get_llm_config() -> Dict[str, Any]:
             "max_tokens": anthropic_config.max_tokens,
             "top_p": anthropic_config.top_p,
             "top_k": anthropic_config.top_k,
+            "web_search_max_uses": anthropic_config.web_search_max_uses,
+            "debug": settings.debug,
         }
     
     return config
@@ -197,13 +201,6 @@ def get_llm_config() -> Dict[str, Any]:
 def get_current_llm_type() -> str:
     """获取当前使用的 LLM 类型"""
     return get_app_settings().get_llm_settings().type
-
-
-def get_llm_specific_config(llm_type: str = None) -> Dict[str, Any]:
-    """获取特定 LLM 的配置"""
-    llm_type = llm_type or get_current_llm_type()
-    llm_config = get_llm_config()
-    return llm_config.get(llm_type, {})
 
 
 def get_tts_config() -> Dict[str, Any]:
@@ -262,6 +259,7 @@ def get_auth_config() -> Dict[str, Any]:
     return {
         "client_id": config.client_id,
         "client_secret": config.client_secret,
+        "google_maps_api_key": config.google_maps_api_key,
     }
 
 
@@ -273,8 +271,8 @@ def get_text_to_image_config() -> Dict[str, Any]:
         "type": settings.provider,
         "system_prompt": settings.text_to_image_system_prompt,
         "context_message_count": settings.context_message_count,
-        "default_positive_prompt": settings.default_positive_prompt,
-        "default_negative_prompt": settings.default_negative_prompt,
+        "text_to_image_default_positive_prompt": settings.text_to_image_default_positive_prompt,
+        "text_to_image_default_negative_prompt": settings.text_to_image_default_negative_prompt,
         "debug": settings.enable_debug,
         "models_lab": {},
         "stable_diffusion_webui": {}
@@ -344,7 +342,6 @@ __all__ = [
     "get_system_prompt",
     "get_llm_config",
     "get_current_llm_type",
-    "get_llm_specific_config",
     "get_tts_config",
     "get_email_config",
     "get_auth_config",

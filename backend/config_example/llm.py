@@ -8,8 +8,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ChatGPTConfig(BaseSettings):
-    """ChatGPT配置"""
+class GPTConfig(BaseSettings):
+    """GPT配置"""
     
     # 必需的敏感信息 - 字段名直接匹配环境变量OPENAI_API_KEY
     openai_api_key: str = Field(description="OpenAI API密钥")
@@ -44,6 +44,7 @@ class GeminiConfig(BaseSettings):
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K采样")
     max_output_tokens: int = Field(default=8192, alias="maxOutputTokens", ge=1, description="最大输出token数")
+    web_search_max_uses: int = Field(default=5, ge=1, le=20, description="Web搜索工具最大使用次数(注意:Gemini忽略此参数)")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -68,6 +69,7 @@ class AnthropicConfig(BaseSettings):
     max_tokens: int = Field(default=4096, ge=1, description="最大输出token数")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K采样")
+    web_search_max_uses: int = Field(default=5, ge=1, le=20, description="Web搜索工具最大使用次数")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -84,9 +86,10 @@ class LLMSettings(BaseSettings):
     """LLM总配置"""
     
     # 当前使用的LLM类型
-    type: Literal["chatgpt", "gemini", "anthropic"] = Field(default="gemini", description="当前使用的LLM类型")
+    type: Literal["gpt", "gemini", "anthropic"] = Field(default="gemini", description="当前使用的LLM类型")
     debug: bool = Field(default=False, description="是否开启调试模式")
     recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context (recent 消息条数)")
+    max_tool_iterations: int = Field(default=10, ge=1, le=50, description="Maximum number of tool calling iterations per request")
     # 各个LLM的配置 - 使用动态实例化以支持fail fast
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -96,9 +99,9 @@ class LLMSettings(BaseSettings):
         extra='ignore'
     )
     
-    def get_chatgpt_config(self) -> ChatGPTConfig:
-        """获取ChatGPT配置"""
-        return ChatGPTConfig()
+    def get_gpt_config(self) -> GPTConfig:
+        """获取GPT配置"""
+        return GPTConfig()
     
     def get_gemini_config(self) -> GeminiConfig:
         """获取Gemini配置"""
@@ -110,8 +113,8 @@ class LLMSettings(BaseSettings):
     
     def get_current_llm_config(self):
         """获取当前LLM配置"""
-        if self.type == "chatgpt":
-            return self.get_chatgpt_config()
+        if self.type == "gpt":
+            return self.get_gpt_config()
         elif self.type == "gemini":
             return self.get_gemini_config()
         elif self.type == "anthropic":
