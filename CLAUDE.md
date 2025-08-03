@@ -8,6 +8,22 @@ aiNagisa is an extensible, voice-enabled AI assistant with long-term memory and 
 
 ## Development Commands
 
+### Prerequisites
+- **GitHub CLI**: Required for issue management and PR workflows
+  ```bash
+  # macOS
+  brew install gh
+  
+  # Linux (Debian/Ubuntu)
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && sudo apt update \
+  && sudo apt install gh
+  
+  # After installation, authenticate with:
+  gh auth login
+  ```
+
 ### Backend Development
 ```bash
 # Start the backend server
@@ -21,6 +37,9 @@ uv run pytest
 
 # Install dependencies
 uv sync
+
+# Install development dependencies (including GitHub CLI)
+uv sync --extra dev
 ```
 
 ### Frontend Development
