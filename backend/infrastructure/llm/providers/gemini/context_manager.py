@@ -33,7 +33,6 @@ class GeminiContextManager(BaseContextManager):
         """初始化上下文管理器"""
         super().__init__(provider_name="gemini")
         # working_contents 已在基类中初始化
-        
     
     def add_response(self, response) -> None:
         """

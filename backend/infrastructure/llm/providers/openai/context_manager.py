@@ -6,7 +6,6 @@ Handles message formatting, tool result integration, and state management.
 """
 
 from typing import List, Dict, Any
-from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import MessageFormatter
 from .response_processor import ResponseProcessor
@@ -80,19 +79,8 @@ class OpenAIContextManager(BaseContextManager):
             tool_name: Name of the executed tool
             result: Tool execution result
         """
-        # Format tool result content
-        if isinstance(result, dict):
-            # Handle structured tool results
-            if "llm_content" in result:
-                content = str(result["llm_content"])
-            else:
-                import json
-                try:
-                    content = json.dumps(result, ensure_ascii=False)
-                except (TypeError, ValueError):
-                    content = str(result)
-        else:
-            content = str(result)
+        # Format tool result content using message formatter
+        content = MessageFormatter._format_tool_result(result)
         
         # Add tool result message
         tool_message = {
@@ -122,18 +110,14 @@ class OpenAIContextManager(BaseContextManager):
         """
         return {
             **self.get_debug_info(),
-            'working_messages_count': len(self._working_messages),
+            'working_messages_count': len(self.working_contents),
             'has_tool_calls': any(
-                'tool_calls' in msg for msg in self._working_messages
+                'tool_calls' in msg for msg in self.working_contents
                 if isinstance(msg, dict) and msg.get('role') == 'assistant'
             ),
             'tool_results_count': len([
-                msg for msg in self._working_messages
+                msg for msg in self.working_contents
                 if isinstance(msg, dict) and msg.get('role') == 'tool'
             ])
         }
     
-    def clear_context(self) -> None:
-        """Clear all context state"""
-        super().clear_context()
-        self._working_messages.clear()

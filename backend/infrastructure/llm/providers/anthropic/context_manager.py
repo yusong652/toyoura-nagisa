@@ -7,7 +7,6 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 
 from typing import List, Dict, Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 
 
 class AnthropicContextManager(BaseContextManager):
@@ -74,10 +73,3 @@ class AnthropicContextManager(BaseContextManager):
         """
         return self.working_contents
     
-    
-    
-    
-    def clear_context(self) -> None:
-        """清理上下文状态"""
-        super().clear_context()
-        # working_contents 在基类中已被清理
