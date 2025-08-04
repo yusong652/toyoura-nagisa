@@ -149,7 +149,8 @@ class MessageFormatter:
         Converts internal message format to Anthropic API compatible format:
         - User messages (text + optional multimodal content)  
         - Assistant final responses (text only)
-        - Tool result messages (tool_result blocks)
+        
+        Note: Tool results are handled separately via add_tool_result pathway.
         
         Args:
             messages: List of BaseMessage objects from conversation history
@@ -160,24 +161,6 @@ class MessageFormatter:
         formatted_messages = []
         
         for msg in messages:
-            # 特殊处理ToolResultMessage
-            if hasattr(msg, 'tool_call_id') and hasattr(msg, 'name'):
-                # 这是一个工具结果消息，需要格式化为tool_result块
-                tool_result_block = {
-                    "type": "tool_result",
-                    "tool_use_id": msg.tool_call_id,
-                    "content": MessageFormatter.format_tool_result_content(msg.content),
-                    "is_error": isinstance(msg.content, str) and msg.content.startswith("Tool execution failed:")
-                }
-                
-                # 构建user消息包含tool_result
-                user_message = {
-                    "role": "user",
-                    "content": [tool_result_block]
-                }
-                formatted_messages.append(user_message)
-                continue
-            
             # 处理普通消息
             content = []
             

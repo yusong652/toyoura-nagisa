@@ -22,6 +22,9 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         """
         Convert aiNagisa BaseMessage objects to Gemini API format.
         
+        Handles conversation history messages for context initialization and content generation.
+        Tool results are handled separately via add_tool_result pathway.
+        
         Args:
             messages: List of BaseMessage objects from aiNagisa's internal format
             
@@ -54,11 +57,6 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                             blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
                             if blob:
                                 parts.append(types.Part(inline_data=blob))
-                        elif item.get("type") == "tool_result":
-                            # Handle tool result content
-                            tool_part = GeminiMessageFormatter._format_tool_result(item)
-                            if tool_part:
-                                parts.append(tool_part)
                         elif "text" in item and item["text"]:
                             # Generic text content
                             parts.append(types.Part(text=item["text"]))
@@ -126,70 +124,6 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         except Exception as e:
             print(f"[WARNING] Failed to process inline_data: {e}")
             return None
-
-    @staticmethod
-    def _format_image_content(image_item: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Format image content for Gemini API.
-        
-        Args:
-            image_item: Image content dictionary
-            
-        Returns:
-            Dict[str, Any]: Formatted image part for Gemini
-        """
-        # Handle different image formats
-        if "url" in image_item:
-            # Image URL
-            return {
-                "fileData": {
-                    "fileUri": image_item["url"]
-                }
-            }
-        elif "data" in image_item:
-            # Base64 image data
-            return {
-                "inlineData": {
-                    "mimeType": image_item.get("mime_type", "image/jpeg"),
-                    "data": image_item["data"]
-                }
-            }
-        elif "file_path" in image_item:
-            # Local file path (need to handle upload)
-            # This would require additional file upload logic
-            return {
-                "text": f"[Image: {image_item['file_path']}]"
-            }
-        
-        return None
-    
-    @staticmethod
-    def _format_tool_result(tool_item: Dict[str, Any]) -> Any:
-        """
-        Format tool result content for Gemini API.
-        
-        Args:
-            tool_item: Tool result dictionary
-            
-        Returns:
-            types.Part: Formatted tool result part for Gemini
-        """
-        try:
-            from google.genai import types
-            
-            return types.Part(
-                function_response=types.FunctionResponse(
-                    name=tool_item.get("name", "unknown_tool"),
-                    response={
-                        "result": tool_item.get("content", tool_item.get("result", ""))
-                    }
-                )
-            )
-        except Exception as e:
-            print(f"[WARNING] Failed to format tool result: {e}")
-            # Fallback to text representation
-            from google.genai import types
-            return types.Part(text=f"Tool result: {tool_item.get('content', '')}")
     
     @staticmethod
     def format_tool_result_for_context(tool_name: str, result: Any) -> Dict[str, Any]:
@@ -234,26 +168,3 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             "role": "user",
             "parts": parts
         }
-
-    @staticmethod
-    def format_messages_for_gemini(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
-        """
-        Legacy method name for backward compatibility.
-        
-        Format history messages for Gemini API initialization.
-        
-        Optimized for historical message processing - only handles message types 
-        that actually appear in stored conversation history:
-        - User messages (text + optional multimodal content)  
-        - Assistant final responses (text only)
-        
-        REMOVED (not in history):
-        - Tool calls, tool responses, thinking blocks, intermediate states
-        
-        Args:
-            messages: List of BaseMessage objects
-            
-        Returns:
-            List[Dict[str, Any]]: Messages formatted for Gemini API
-        """
-        return GeminiMessageFormatter.format_messages(messages)
