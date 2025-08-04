@@ -192,6 +192,50 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             return types.Part(text=f"Tool result: {tool_item.get('content', '')}")
     
     @staticmethod
+    def format_tool_result_for_context(tool_name: str, result: Any) -> Dict[str, Any]:
+        """
+        Format tool result for Gemini working context.
+        
+        Creates complete working context entry with proper multimodal handling
+        and function response formatting for Gemini API.
+        
+        Args:
+            tool_name: Name of the tool that was executed
+            result: Tool execution result (can contain inline_data for multimodal)
+            
+        Returns:
+            Dict[str, Any]: Complete working context entry for Gemini API
+        """
+        from google.genai import types
+        
+        parts = []
+        
+        # Handle multimodal content (inline_data) if present
+        if isinstance(result, dict) and 'inline_data' in result:
+            inline_data = result['inline_data']
+            # Check if inline_data actually contains data
+            if inline_data and 'data' in inline_data and inline_data['data']:
+                blob = GeminiMessageFormatter._process_inline_data(inline_data)
+                if blob:
+                    parts.append(types.Part(inline_data=blob))
+        
+        # Create function response part
+        # Filter out inline_data to avoid duplication in function response
+        filtered_result = {k: v for k, v in result.items() if k != 'inline_data'} if isinstance(result, dict) else result
+        
+        function_response = types.FunctionResponse(
+            name=tool_name,
+            response=filtered_result if filtered_result else result
+        )
+        parts.append(types.Part(function_response=function_response))
+        
+        # Return complete working context entry
+        return {
+            "role": "user",
+            "parts": parts
+        }
+
+    @staticmethod
     def format_messages_for_gemini(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
         Legacy method name for backward compatibility.

@@ -9,9 +9,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 2. 专注于工具调用期间的上下文状态管理
 """
 
-from typing import List, Dict, Any, Optional, Tuple
-from google.genai import types
-from backend.domain.models.messages import BaseMessage
+from typing import List, Dict, Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import GeminiMessageFormatter
 
@@ -59,54 +57,6 @@ class GeminiContextManager(BaseContextManager):
         # 添加到工作上下文
         self.working_contents.append(raw_content)
     
-    def _create_multimodal_parts(self, tool_name: str, result: Dict[str, Any]) -> List[Any]:
-        """
-        创建多模态内容的 Parts
-        
-        Args:
-            result: 工具执行结果
-            tool_name: 工具名称
-            
-        Returns:
-            包含多模态内容的 Parts 列表
-        """
-        parts = []
-        
-        # 使用基类方法提取 inline_data
-        inline_data = self.extract_inline_data(result)
-        if inline_data:
-            blob = GeminiMessageFormatter._process_inline_data(inline_data)
-            if blob:
-                parts.append(types.Part(inline_data=blob))
-                self.debug_multimodal_content(tool_name, blob.mime_type, len(blob.data))
-        
-        return parts
-    
-    def _create_function_response_part(self, tool_name: str, result: Any) -> types.Part:
-        """
-        创建函数响应 Part
-        
-        Args:
-            tool_name: 工具名称
-            result: 工具执行结果
-            
-        Returns:
-            函数响应的 Part 对象
-        """
-        # 使用基类方法处理工具结果
-        response_dict = self.process_tool_result_for_llm(result)
-        
-        # 使用基类方法过滤多模态内容
-        response_dict = self.filter_multimodal_from_response(response_dict)
-        
-        function_response = types.FunctionResponse(
-            name=tool_name,
-            response=response_dict
-        )
-        
-        return types.Part(function_response=function_response)
-    
-    
     def get_working_contents(self) -> List[Dict[str, Any]]:
         """
         获取工作上下文（原始Gemini API格式）
@@ -117,23 +67,18 @@ class GeminiContextManager(BaseContextManager):
         return self.working_contents
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
-        """添加工具执行结果到上下文中 - 基类接口实现"""
-        # tool_call_id is required by interface but not used in this implementation
-        parts = []
+        """
+        添加工具执行结果到上下文中 - 统一实现
         
-        # 创建多模态内容 Parts（如果存在）
-        multimodal_parts = self._create_multimodal_parts(tool_name, result)
-        parts.extend(multimodal_parts)
+        使用消息格式化器处理格式，保持与Anthropic一致的架构模式
         
-        # 创建函数响应 Part
-        function_part = self._create_function_response_part(tool_name, result)
-        parts.append(function_part)
-        
-        # 构建工作上下文内容
-        working_content = {
-            "role": "user",
-            "parts": parts
-        }
+        Args:
+            tool_call_id: 工具调用的唯一标识（接口要求，Gemini不使用）
+            tool_name: 工具名称
+            result: 工具执行结果
+        """
+        # 使用消息格式化器处理工具结果格式
+        working_content = GeminiMessageFormatter.format_tool_result_for_context(tool_name, result)
         
         # 添加到工作上下文
         self.working_contents.append(working_content)

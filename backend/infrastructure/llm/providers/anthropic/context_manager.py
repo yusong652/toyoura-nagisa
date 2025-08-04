@@ -48,9 +48,9 @@ class AnthropicContextManager(BaseContextManager):
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
-        添加工具执行结果到上下文中 - 简化实现
+        添加工具执行结果到上下文中 - 统一实现
         
-        直接构建符合Anthropic API要求的tool_result块并添加到工作上下文
+        使用消息格式化器处理格式，保持架构一致性
         
         Args:
             tool_call_id: 工具调用的唯一标识
@@ -59,21 +59,11 @@ class AnthropicContextManager(BaseContextManager):
         """
         from .message_formatter import MessageFormatter
         
-        # 构建tool_result块
-        tool_result_block = {
-            "type": "tool_result",
-            "tool_use_id": tool_call_id,
-            "content": MessageFormatter.format_tool_result_content(result)
-        }
-        
-        # 构建user消息包含tool_result
-        user_message = {
-            "role": "user",
-            "content": [tool_result_block]
-        }
+        # 使用消息格式化器处理工具结果格式
+        working_content = MessageFormatter.format_tool_result_for_context(tool_call_id, tool_name, result)
         
         # 添加到工作上下文
-        self.working_contents.append(user_message)
+        self.working_contents.append(working_content)
     
     def get_working_contents(self) -> List[Dict[str, Any]]:
         """

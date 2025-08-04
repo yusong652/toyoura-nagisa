@@ -211,3 +211,32 @@ class MessageFormatter:
         
         return formatted_messages
 
+    @staticmethod
+    def format_tool_result_for_context(tool_call_id: str, tool_name: str, result: Any) -> Dict[str, Any]:
+        """
+        Format tool result for Anthropic working context.
+        
+        Creates complete working context entry with proper tool_result block
+        formatting for Anthropic API.
+        
+        Args:
+            tool_call_id: Tool call unique identifier
+            tool_name: Name of the tool that was executed  
+            result: Tool execution result (can contain inline_data for multimodal)
+            
+        Returns:
+            Dict[str, Any]: Complete working context entry for Anthropic API
+        """
+        # Build tool_result block
+        tool_result_block = {
+            "type": "tool_result",
+            "tool_use_id": tool_call_id,
+            "content": MessageFormatter.format_tool_result_content(result)
+        }
+        
+        # Build user message containing tool_result
+        return {
+            "role": "user",
+            "content": [tool_result_block]
+        }
+
