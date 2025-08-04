@@ -183,7 +183,7 @@ class AnthropicClient(LLMClientBase):
             metadata['iterations'] = iteration + 1
             
             # 状态检查：是否需要继续工具调用
-            if not context_manager.should_continue_tool_calling_from_response(current_response):
+            if not AnthropicResponseProcessor.has_tool_calls(current_response):
                 break
             
             # 首次检测到工具调用时设置标志并发送通知

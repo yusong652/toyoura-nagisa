@@ -127,6 +127,26 @@ class AnthropicResponseProcessor:
         return tool_calls
 
     @staticmethod
+    def has_tool_calls(response: Any) -> bool:
+        """
+        Check if Claude API response contains tool calls.
+        
+        Args:
+            response: Raw response from Anthropic Claude API
+            
+        Returns:
+            bool: True if response contains tool calls, False otherwise
+        """
+        if not hasattr(response, "content") or not response.content:
+            return False
+            
+        for item in response.content:
+            if item.type == "tool_use":
+                return True
+        
+        return False
+
+    @staticmethod
     def format_error_response(error: Exception) -> LLMResponse:
         """
         Format an error into a standardized LLMResponse.

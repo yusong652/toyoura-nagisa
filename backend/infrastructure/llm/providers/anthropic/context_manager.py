@@ -86,38 +86,6 @@ class AnthropicContextManager(BaseContextManager):
     
     
     
-    def should_continue_tool_calling_from_response(self, response) -> bool:
-        """
-        根据API响应判断是否应该继续工具调用循环 - 与Gemini对齐
-        
-        Args:
-            response: Anthropic API响应对象
-            
-        Returns:
-            bool: 如果响应包含工具调用返回True
-        """
-        if not hasattr(response, 'content') or not response.content:
-            return False
-            
-        # 检查响应中是否包含tool_use
-        for item in response.content:
-            if item.type == "tool_use":
-                return True
-        
-        return False
-    
-    def should_continue_tool_calling(self, response) -> bool:
-        """
-        判断是否应该继续工具调用 - 基类抽象方法实现
-        
-        Args:
-            response: Anthropic API响应对象
-            
-        Returns:
-            bool: 是否应该继续工具调用
-        """
-        # Delegate to the existing implementation
-        return self.should_continue_tool_calling_from_response(response)
     
     def clear_context(self) -> None:
         """清理上下文状态"""

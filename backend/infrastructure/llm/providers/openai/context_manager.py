@@ -112,17 +112,6 @@ class OpenAIContextManager(BaseContextManager):
         """
         return self.working_contents.copy()
     
-    def should_continue_tool_calling_from_response(self, response) -> bool:
-        """
-        Check if tool calling should continue based on response
-        
-        Args:
-            response: OpenAI API response object
-            
-        Returns:
-            True if tool calling should continue
-        """
-        return ResponseProcessor.should_continue_tool_calling(response)
     
     def get_context_summary(self) -> Dict[str, Any]:
         """
