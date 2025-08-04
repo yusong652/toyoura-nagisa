@@ -18,7 +18,7 @@ class MessageFormatter:
     """
     
     @staticmethod
-    def format_messages_for_openai(
+    def format_messages(
         messages: List[BaseMessage], 
         preserve_thinking: bool = True
     ) -> List[Dict[str, Any]]:

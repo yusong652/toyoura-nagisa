@@ -56,7 +56,7 @@ class TitleGenerator:
             ]
             
             # 使用MessageFormatter进行消息格式转换
-            formatted_messages = MessageFormatter.format_messages_for_anthropic(messages)
+            formatted_messages = MessageFormatter.format_messages(messages)
             
             # Use the new Anthropic configuration system
             anthropic_config = get_anthropic_client_config()
@@ -134,7 +134,7 @@ class WebSearchGenerator:
             user_message = UserMessage(role="user", content=query)
             
             # Format message using MessageFormatter
-            formatted_messages = MessageFormatter.format_messages_for_anthropic([user_message])
+            formatted_messages = MessageFormatter.format_messages([user_message])
             
             # Configure web search system prompt
             web_search_system_prompt = (
@@ -287,7 +287,7 @@ class ImagePromptGenerator:
             messages = [UserMessage(role="user", content=conversation_text)]
             
             # 使用MessageFormatter进行消息格式转换
-            formatted_messages = MessageFormatter.format_messages_for_anthropic(messages)
+            formatted_messages = MessageFormatter.format_messages(messages)
             
             if debug:
                 print("\n[text_to_image] Messages for prompt generation:")
@@ -422,7 +422,7 @@ class AnalysisGenerator:
             
             conversation_text += "\nProvide analysis in JSON format with keys: overall_sentiment, confidence, key_themes, tone."
             
-            analysis_messages = MessageFormatter.format_messages_for_anthropic([
+            analysis_messages = MessageFormatter.format_messages([
                 UserMessage(role="user", content=conversation_text)
             ])
             

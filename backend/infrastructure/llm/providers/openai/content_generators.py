@@ -57,7 +57,7 @@ class TitleGenerator:
             ]
             
             # Format messages for OpenAI API
-            formatted_messages = MessageFormatter.format_messages_for_openai(messages)
+            formatted_messages = MessageFormatter.format_messages(messages)
             
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
@@ -159,7 +159,7 @@ class ImagePromptGenerator:
             
             # Create user message
             user_message = UserMessage(role="user", content=conversation_text)
-            formatted_messages = MessageFormatter.format_messages_for_openai([user_message])
+            formatted_messages = MessageFormatter.format_messages([user_message])
             
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages

@@ -8,6 +8,7 @@ Defines core methods that all Context Managers must implement to ensure consiste
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Union
 from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
 class BaseContextManager(ABC):
@@ -17,23 +18,44 @@ class BaseContextManager(ABC):
     Defines unified interface specifications supporting:
     - Message history management and state isolation
     - Response content context preservation
+    - Automatic provider-specific message formatting
     """
     
-    def __init__(self):
-        """Initialize base state."""
+    def __init__(self, provider_name: Optional[str] = None):
+        """
+        Initialize base state.
+        
+        Args:
+            provider_name: Name of the LLM provider (e.g., 'gemini', 'anthropic', 'openai')
+        """
         self._messages_history: List[BaseMessage] = []
         self._current_iteration = 0
         self._execution_metadata: Dict[str, Any] = {}
+        self._provider_name = provider_name
+        # Working contents will be populated by initialize_from_messages
+        self.working_contents: List[Dict[str, Any]] = []
     
-    @abstractmethod
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
         Initialize context manager from input message list.
         
+        Uses provider-specific message formatter to convert messages
+        to the appropriate format for the LLM API.
+        
         Args:
             messages: Input message history list
+            
+        Raises:
+            ValueError: If provider name is not set
         """
-        pass
+        if not self._provider_name:
+            raise ValueError("Provider name not set in context manager")
+            
+        # Get the appropriate message formatter
+        formatter_class = get_message_formatter_class(self._provider_name)
+        
+        # Call the unified format_messages method
+        self.working_contents = formatter_class.format_messages(messages)
     
     @abstractmethod
     def add_response(self, response) -> None:

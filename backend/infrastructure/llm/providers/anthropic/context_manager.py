@@ -20,8 +20,9 @@ class AnthropicContextManager(BaseContextManager):
     """
     
     def __init__(self):
-        super().__init__()
+        super().__init__(provider_name="anthropic")
         self.working_messages: List[Dict[str, Any]] = []  # 原始Anthropic API格式上下文
+        # 注意：Anthropic 使用 working_messages 而不是 working_contents
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -30,10 +31,10 @@ class AnthropicContextManager(BaseContextManager):
         Args:
             messages: 输入的消息历史列表
         """
-        from .message_formatter import MessageFormatter
-        
-        # 转换为Anthropic API格式的工作上下文
-        self.working_messages = MessageFormatter.format_messages_for_anthropic(messages)
+        # 调用基类实现，会自动设置 self.working_contents
+        super().initialize_from_messages(messages)
+        # Anthropic 特定：同时设置 working_messages 以保持兼容性
+        self.working_messages = self.working_contents
     
     def add_response(self, response) -> None:
         """

@@ -18,7 +18,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
     """
     
     @staticmethod
-    def format_messages_for_api(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
+    def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
         Convert aiNagisa BaseMessage objects to Gemini API format.
         
@@ -212,4 +212,4 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         Returns:
             List[Dict[str, Any]]: Messages formatted for Gemini API
         """
-        return GeminiMessageFormatter.format_messages_for_api(messages)
+        return GeminiMessageFormatter.format_messages(messages)

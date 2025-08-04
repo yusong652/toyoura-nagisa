@@ -131,7 +131,7 @@ class MessageFormatter:
             return str(result)
 
     @staticmethod
-    def format_messages_for_anthropic(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
+    def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
         Format history messages for Anthropic Claude API.
         

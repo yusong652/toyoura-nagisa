@@ -68,7 +68,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             )
             
             # Use MessageFormatter for unified message format conversion
-            contents = GeminiMessageFormatter.format_messages_for_api(messages)
+            contents = GeminiMessageFormatter.format_messages(messages)
             
             # Get model from configuration
             llm_settings = get_llm_settings()
@@ -128,7 +128,7 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
             )
             
             # Format message using MessageFormatter
-            contents = GeminiMessageFormatter.format_messages_for_api([user_message])
+            contents = GeminiMessageFormatter.format_messages([user_message])
             
             if debug:
                 GeminiDebugger.print_debug_request(contents, search_config)
@@ -232,7 +232,7 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
             messages = GeminiImagePromptGenerator.build_messages_for_generation(context)
             
             # Format messages using Gemini formatter
-            contents = GeminiMessageFormatter.format_messages_for_api(messages)
+            contents = GeminiMessageFormatter.format_messages(messages)
             
             if debug:
                 print("[text_to_image] Formatted contents (simplified):")

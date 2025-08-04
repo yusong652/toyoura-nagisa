@@ -22,8 +22,9 @@ class OpenAIContextManager(BaseContextManager):
     
     def __init__(self):
         """Initialize OpenAI context manager"""
-        super().__init__()
+        super().__init__(provider_name="openai")
         self._working_messages: List[Dict[str, Any]] = []
+        # 注意：OpenAI 使用 _working_messages 而不是 working_contents
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -32,9 +33,11 @@ class OpenAIContextManager(BaseContextManager):
         Args:
             messages: List of input messages to initialize context
         """
+        # 调用基类实现，会自动设置 self.working_contents
+        super().initialize_from_messages(messages)
+        # OpenAI 特定：同时设置 _working_messages 以保持兼容性
+        self._working_messages = self.working_contents
         self._messages_history = messages.copy()
-        self._working_messages = MessageFormatter.format_messages_for_openai(messages)
-        self._current_iteration = 0
     
     def add_response(self, response) -> None:
         """

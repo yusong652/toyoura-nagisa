@@ -33,18 +33,8 @@ class GeminiContextManager(BaseContextManager):
     
     def __init__(self):
         """初始化上下文管理器"""
-        super().__init__()
-        self.working_contents: List[Dict[str, Any]] = []  # 原始Gemini API格式上下文
-        
-    def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
-        """
-        从历史消息初始化上下文管理器
-        
-        Args:
-            messages: 历史消息列表，包含用户消息、助手消息等
-        """
-        # 转换为Gemini API格式的工作上下文
-        self.working_contents = GeminiMessageFormatter.format_messages_for_gemini(messages)
+        super().__init__(provider_name="gemini")
+        # working_contents 已在基类中初始化
         
     
     def add_response(self, response) -> None:
