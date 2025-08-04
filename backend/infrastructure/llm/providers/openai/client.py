@@ -37,13 +37,19 @@ class OpenAIClient(LLMClientBase):
 
     # ========== CORE API METHODS ==========
 
-    async def get_function_call_schemas(self, session_id: Optional[str] = None):
+    async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Get all MCP tool schemas in OpenAI format.
-        TODO: Implement OpenAI-specific schema formatting.
+        Only return meta tools + cached tools, not all regular tools.
+        
+        Args:
+            session_id: Session ID for context-specific tools (required for dependency injection)
+            
+        Returns:
+            List[Dict[str, Any]]: Tool schemas in OpenAI format
         """
-        # TODO: Implement OpenAI tool schema formatting
-        return []
+        debug = getattr(self, 'debug', False)  # Fallback for debug flag
+        return await self.tool_manager.get_function_call_schemas(session_id, debug)
 
     async def call_api_with_context(
         self,

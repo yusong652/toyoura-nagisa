@@ -67,91 +67,31 @@ class AnthropicToolManager(BaseToolManager):
         if not self.tools_enabled:
             return []
         
-        # 获取会话缓存的工具
-        cached_tools = []
-        if session_id:
-            cached_tools = self.get_cached_tools_for_session(session_id)
+        if not session_id:
             if debug:
-                print(f"[DEBUG] Found {len(cached_tools)} cached tools for session {session_id}")
+                print("[DEBUG] No session_id provided, returning empty tool list")
+            return []
         
-        # 获取所有MCP工具
-        mcp_client = self.get_mcp_client()
-        async with mcp_client as mcp_async_client:
-            mcp_tools = await mcp_async_client.list_tools()
+        # 使用基类的标准化工具获取方法
+        tools_dict = await self.get_standardized_tools(session_id, debug)
         
-        # 构建工具映射
-        tools_map = {}
-        meta_tools = []
+        if not tools_dict:
+            return []
         
-        for tool in mcp_tools:
-            tool_name = tool.name
-            input_schema = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+        # 转换 ToolSchema 对象为 Anthropic 格式
+        anthropic_tools = []
+        for tool_name, tool_schema in tools_dict.items():
+            # 将 JSONSchema 对象转换为字典
+            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
             
-            tool_schema = {
-                "name": tool_name,
-                "description": getattr(tool, "description", tool_name),
-                "parameters": input_schema
-            }
-            
-            tools_map[tool_name] = tool_schema
-            if self.is_meta_tool(tool_name):
-                meta_tools.append(tool_schema)
-        
-        # 构建最终工具列表：meta tools + cached tools（避免重复）
-        final_tools = meta_tools.copy()
-        added_tool_names = {tool["name"] for tool in meta_tools}
-        
-        for cached_tool in cached_tools:
-            tool_name = cached_tool["name"]
-            if tool_name in added_tool_names:
-                if debug:
-                    print(f"[DEBUG] Skipped duplicate cached tool: {tool_name}")
-                continue
-                
-            if tool_name in tools_map:
-                # 工具在MCP中存在，使用完整的MCP schema
-                final_tools.append(tools_map[tool_name])
-                added_tool_names.add(tool_name)
-                if debug:
-                    print(f"[DEBUG] Added cached tool from MCP: {tool_name}")
-            else:
-                # 工具不在MCP中，使用缓存的schema信息
-                # 优先使用inputSchema，其次使用parameters
-                cached_input_schema = cached_tool.get("inputSchema") or cached_tool.get("parameters", {})
-                
-                # 确保是正确的schema格式
-                if isinstance(cached_input_schema, dict):
-                    if "type" in cached_input_schema and "properties" in cached_input_schema:
-                        # 已经是完整的inputSchema格式
-                        input_schema = dict(cached_input_schema)
-                    else:
-                        # 只是properties字典，需要包装
-                        input_schema = {
-                            "type": "object",
-                            "properties": cached_input_schema,
-                            "required": list(cached_input_schema.keys()) if cached_input_schema else [],
-                            "additionalProperties": False
-                        }
-                else:
-                    # 默认空schema
-                    input_schema = {
-                        "type": "object", 
-                        "properties": {},
-                        "required": [],
-                        "additionalProperties": False
-                    }
-                
-                final_tools.append({
-                    "name": tool_name,
-                    "description": cached_tool.get("description", tool_name),
-                    "parameters": input_schema
-                })
-                added_tool_names.add(tool_name)
-                if debug:
-                    print(f"[DEBUG] Added cached tool with constructed schema: {tool_name}")
+            anthropic_tool = self._format_schema_for_anthropic({
+                "name": tool_schema.name,
+                "description": tool_schema.description,
+                "parameters": input_schema_dict
+            })
+            anthropic_tools.append(anthropic_tool)
         
         if debug:
-            print(f"[DEBUG] Final tools count: {len(final_tools)} (meta: {len(meta_tools)}, cached: {len(cached_tools)})")
+            print(f"[DEBUG] Final Anthropic tools count: {len(anthropic_tools)}")
         
-        # 格式化为Anthropic格式
-        return [self._format_schema_for_anthropic(tool) for tool in final_tools]
+        return anthropic_tools

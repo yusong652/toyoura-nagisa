@@ -1,21 +1,10 @@
-import os
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
-import json
-import uuid
-import time
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.domain.models.response_models import LLMResponse
-from backend.shared.utils.text_parser import parse_llm_output
+from backend.domain.models.messages import BaseMessage
 import anthropic
-from fastmcp import Client as MCPClient
 from backend.config import get_system_prompt
-from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
-from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
-from .config import AnthropicClientConfig, get_anthropic_client_config
-from .constants import *
-from .message_formatter import MessageFormatter
-from .content_generators import TitleGenerator, ImagePromptGenerator, AnalysisGenerator
+from .config import get_anthropic_client_config
+from .content_generators import TitleGenerator, ImagePromptGenerator
 from .response_processor import AnthropicResponseProcessor
 from .debug import AnthropicDebugger
 from .context_manager import AnthropicContextManager
@@ -67,58 +56,7 @@ class AnthropicClient(LLMClientBase):
        
         # 初始化统一工具管理器
         self.tool_manager = AnthropicToolManager(
-            mcp_client_source=GLOBAL_MCP,
             tools_enabled=self.tools_enabled
-        )
-
-    def _clear_session_tool_cache(self, session_id: str):
-        """清除会话的工具缓存"""
-        self.tool_manager.clear_session_tool_cache(session_id)
-
-    def _format_llm_response(self, response) -> LLMResponse:
-        """
-        Format Anthropic API response into LLMResponse object.
-        
-        Args:
-            response: Raw response from Anthropic API
-            
-        Returns:
-            LLMResponse object containing the formatted response
-        """
-        if not hasattr(response, "content") or not response.content:
-            return LLMResponse(content=[{"type": "text", "text": ""}])
-
-        tool_calls = []
-        llm_content = []
-        llm_reply = ""
-
-        for item in response.content:
-            item_dict = {"type": item.type}
-            if item.type == "text":
-                item_dict["text"] = item.text
-                llm_reply += item.text
-            elif item.type == "tool_use":
-                item_dict["name"] = item.name
-                item_dict["input"] = item.input
-                item_dict["id"] = item.id
-                tool_calls.append({
-                    'name': item.name,
-                    'arguments': item.input,
-                    'id': item.id
-                })
-            elif item.type == "thinking":
-                item_dict["thinking"] = item.thinking
-                item_dict["signature"] = item.signature
-            elif item.type == "redacted_thinking":
-                pass
-            
-            llm_content.append(item_dict)
-
-        response_text, keyword = parse_llm_output(llm_reply)
-        
-        return LLMResponse(
-            content=llm_content,
-            keyword=keyword
         )
 
     async def get_response(
@@ -212,13 +150,6 @@ class AnthropicClient(LLMClientBase):
             
             raise Exception(f"Anthropic execution {execution_id} failed: {e}")
 
-    def _generate_execution_id(self) -> str:
-        """生成唯一执行ID"""
-        return str(uuid.uuid4())[:8]
-    
-    def _get_timestamp(self) -> float:
-        """获取时间戳"""
-        return time.time()
 
     async def _streaming_tool_calling_loop(
         self,
@@ -240,8 +171,8 @@ class AnthropicClient(LLMClientBase):
         execution_id = metadata['execution_id']
         
         # 获取初始响应
-        anthropic_messages = context_manager.get_working_messages()
-        current_response = await self._call_api_with_context(
+        anthropic_messages = context_manager.get_working_contents()
+        current_response = await self.call_api_with_context(
             anthropic_messages, session_id=session_id, **kwargs
         )
         metadata['api_calls'] += 1
@@ -268,7 +199,7 @@ class AnthropicClient(LLMClientBase):
             context_manager.add_response(current_response)
             
             # 提取并执行工具调用
-            tool_calls = context_manager.extract_tool_calls_from_response(current_response)
+            tool_calls = AnthropicResponseProcessor.extract_tool_calls(current_response)
             
             # 执行工具调用 - 每个工具调用都实时通知并立即添加到上下文
             for tool_call in tool_calls:
@@ -301,8 +232,8 @@ class AnthropicClient(LLMClientBase):
                 )
             
             # 获取下一轮响应
-            anthropic_messages = context_manager.get_working_messages()
-            current_response = await self._call_api_with_context(
+            anthropic_messages = context_manager.get_working_contents()
+            current_response = await self.call_api_with_context(
                 anthropic_messages, session_id=session_id, **kwargs
             )
             metadata['api_calls'] += 1
@@ -339,7 +270,21 @@ class AnthropicClient(LLMClientBase):
         # 返回最终响应
         yield current_response
 
-    async def _call_api_with_context(
+    async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all MCP tool schemas in Anthropic format.
+        Only return meta tools + cached tools, not all regular tools.
+        
+        Args:
+            session_id: Session ID for context-specific tools (required for dependency injection)
+            
+        Returns:
+            List[Dict[str, Any]]: Tool schemas in Anthropic format
+        """
+        debug = self.anthropic_config.debug
+        return await self.tool_manager.get_function_call_schemas(session_id, debug)
+
+    async def call_api_with_context(
         self,
         anthropic_messages: List[Dict[str, Any]],
         session_id: Optional[str] = None,

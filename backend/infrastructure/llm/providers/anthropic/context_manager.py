@@ -21,20 +21,7 @@ class AnthropicContextManager(BaseContextManager):
     
     def __init__(self):
         super().__init__(provider_name="anthropic")
-        self.working_messages: List[Dict[str, Any]] = []  # 原始Anthropic API格式上下文
-        # 注意：Anthropic 使用 working_messages 而不是 working_contents
-    
-    def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
-        """
-        从输入消息列表初始化上下文管理器
-        
-        Args:
-            messages: 输入的消息历史列表
-        """
-        # 调用基类实现，会自动设置 self.working_contents
-        super().initialize_from_messages(messages)
-        # Anthropic 特定：同时设置 working_messages 以保持兼容性
-        self.working_messages = self.working_contents
+        # 统一使用 working_contents，移除历史遗留的 working_messages
     
     def add_response(self, response) -> None:
         """
@@ -57,7 +44,7 @@ class AnthropicContextManager(BaseContextManager):
             "role": response.role,
             "content": response.content
         }
-        self.working_messages.append(filtered_message)
+        self.working_contents.append(filtered_message)
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
@@ -86,16 +73,16 @@ class AnthropicContextManager(BaseContextManager):
         }
         
         # 添加到工作上下文
-        self.working_messages.append(user_message)
+        self.working_contents.append(user_message)
     
-    def get_working_messages(self) -> List[Dict[str, Any]]:
+    def get_working_contents(self) -> List[Dict[str, Any]]:
         """
         获取工作上下文（原始Anthropic API格式）
         
         Returns:
             原始格式的消息列表，用于API调用
         """
-        return self.working_messages
+        return self.working_contents
     
     
     
@@ -135,4 +122,4 @@ class AnthropicContextManager(BaseContextManager):
     def clear_context(self) -> None:
         """清理上下文状态"""
         super().clear_context()
-        self.working_messages.clear()
+        # working_contents 在基类中已被清理

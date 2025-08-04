@@ -121,7 +121,7 @@ class AnthropicResponseProcessor:
                 tool_calls.append({
                     "id": item.id,
                     "name": item.name,
-                    "input": item.input
+                    "arguments": item.input  # 统一使用 arguments 字段
                 })
                 
         return tool_calls

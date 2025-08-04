@@ -23,21 +23,7 @@ class OpenAIContextManager(BaseContextManager):
     def __init__(self):
         """Initialize OpenAI context manager"""
         super().__init__(provider_name="openai")
-        self._working_messages: List[Dict[str, Any]] = []
-        # 注意：OpenAI 使用 _working_messages 而不是 working_contents
-    
-    def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
-        """
-        Initialize context from input messages
-        
-        Args:
-            messages: List of input messages to initialize context
-        """
-        # 调用基类实现，会自动设置 self.working_contents
-        super().initialize_from_messages(messages)
-        # OpenAI 特定：同时设置 _working_messages 以保持兼容性
-        self._working_messages = self.working_contents
-        self._messages_history = messages.copy()
+        # 统一使用 working_contents，移除历史遗留的 _working_messages
     
     def add_response(self, response) -> None:
         """
@@ -70,7 +56,7 @@ class OpenAIContextManager(BaseContextManager):
                     }
                 })
         
-        self._working_messages.append(assistant_message)
+        self.working_contents.append(assistant_message)
         self.increment_iteration()
     
     def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
@@ -115,16 +101,16 @@ class OpenAIContextManager(BaseContextManager):
             "tool_call_id": tool_call_id
         }
         
-        self._working_messages.append(tool_message)
+        self.working_contents.append(tool_message)
     
-    def get_working_messages(self) -> List[Dict[str, Any]]:
+    def get_working_contents(self) -> List[Dict[str, Any]]:
         """
         Get current working messages in OpenAI format
         
         Returns:
             List of OpenAI-formatted messages
         """
-        return self._working_messages.copy()
+        return self.working_contents.copy()
     
     def should_continue_tool_calling_from_response(self, response) -> bool:
         """
