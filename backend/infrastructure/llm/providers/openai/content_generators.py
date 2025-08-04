@@ -12,7 +12,7 @@ import json
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_text_to_image_settings
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
-from .message_formatter import MessageFormatter
+from .message_formatter import OpenAIMessageFormatter
 from .debug import OpenAIDebugger
 from .constants import *
 
@@ -26,7 +26,7 @@ class TitleGenerator:
     """
 
     @staticmethod
-    def generate_title_from_messages(
+    async def generate_title_from_messages(
         client,  # OpenAI client instance
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
@@ -57,7 +57,7 @@ class TitleGenerator:
             ]
             
             # Format messages for OpenAI API
-            formatted_messages = MessageFormatter.format_messages(messages)
+            formatted_messages = OpenAIMessageFormatter.format_messages(messages)
             
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
@@ -103,7 +103,7 @@ class ImagePromptGenerator:
     """
 
     @staticmethod
-    def generate_text_to_image_prompt(
+    async def generate_text_to_image_prompt(
         client,  # OpenAI client instance
         session_id: Optional[str] = None,
         debug: bool = False
@@ -159,7 +159,7 @@ class ImagePromptGenerator:
             
             # Create user message
             user_message = UserMessage(role="user", content=conversation_text)
-            formatted_messages = MessageFormatter.format_messages([user_message])
+            formatted_messages = OpenAIMessageFormatter.format_messages([user_message])
             
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
@@ -250,10 +250,11 @@ class WebSearchGenerator:
     """
 
     @staticmethod
-    def perform_web_search(
+    async def perform_web_search(
         client,  # OpenAI client instance
         query: str,
-        debug: bool = False
+        debug: bool = False,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Perform a web search using MCP tools (OpenAI doesn't have built-in search).

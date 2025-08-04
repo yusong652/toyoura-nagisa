@@ -216,7 +216,8 @@ class BaseToolManager(ABC):
         Returns:
             Any: Meta tool execution result
         """
-        # tool_id is unused but kept for API compatibility
+        # tool_id is not used by MCP but preserved for LLM context managers
+        # which need it to properly format tool results in conversation history
         _ = tool_id
         
         if debug:
@@ -254,7 +255,8 @@ class BaseToolManager(ABC):
         Returns:
             Any: Tool execution result passed to LLM
         """
-        # tool_id is unused but kept for API compatibility
+        # tool_id is not used by MCP but preserved for LLM context managers
+        # which need it to properly format tool results in conversation history
         _ = tool_id
         
         try:

@@ -70,14 +70,19 @@ class OpenAIToolManager(BaseToolManager):
             # Get the input schema and convert to dict
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
             
-            # Ensure required fields are present
+            # Handle required fields properly for OpenAI function calling
             if "properties" in input_schema_dict:
+                # Respect the original schema's required field if it exists
                 if "required" not in input_schema_dict:
-                    input_schema_dict["required"] = list(input_schema_dict["properties"].keys())
+                    # If no required field specified, assume no parameters are required
+                    # This is more lenient and works better with optional parameters
+                    input_schema_dict["required"] = []
+                # else: keep the existing required field as-is
             else:
                 input_schema_dict["properties"] = {}
                 input_schema_dict["required"] = []
             
+            # Ensure all required fields for OpenAI structured outputs
             if "additionalProperties" not in input_schema_dict:
                 input_schema_dict["additionalProperties"] = False
             
@@ -85,17 +90,23 @@ class OpenAIToolManager(BaseToolManager):
                 input_schema_dict["type"] = "object"
             
             # Create OpenAI tool schema
-            return {
+            # Note: Temporarily disable strict mode to avoid schema validation issues
+            # OpenAI's strict mode requires ALL properties to be in required array
+            # which may not work well with optional parameters in MCP tools
+            openai_tool = {
                 "type": "function",
                 "function": {
                     "name": tool_schema.name,
                     "description": tool_schema.description,
-                    "parameters": input_schema_dict,
-                    "strict": True  # Enable structured outputs
+                    "parameters": input_schema_dict
+                    # "strict": True  # Temporarily disabled - causes issues with optional params
                 }
             }
+                   
+            return openai_tool
             
         except Exception as e:
             print(f"[WARNING] Failed to convert tool {tool_schema.name} to OpenAI format: {e}")
+            print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
     

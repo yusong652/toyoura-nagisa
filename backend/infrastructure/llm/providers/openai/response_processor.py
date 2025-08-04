@@ -12,7 +12,7 @@ from backend.domain.models.messages import AssistantMessage
 from backend.shared.utils.text_parser import parse_llm_output
 
 
-class ResponseProcessor:
+class OpenAIResponseProcessor:
     """
     Process OpenAI API responses and extract relevant information
     
@@ -75,7 +75,7 @@ class ResponseProcessor:
         Returns:
             List of tool call dictionaries with name, arguments, and id
         """
-        if not ResponseProcessor.should_continue_tool_calling(response):
+        if not OpenAIResponseProcessor.should_continue_tool_calling(response):
             return []
         
         choice = response.choices[0]
@@ -115,7 +115,7 @@ class ResponseProcessor:
         Returns:
             Extracted thinking content or None if not found
         """
-        text_content = ResponseProcessor.extract_text_content(response)
+        text_content = OpenAIResponseProcessor.extract_text_content(response)
         if not text_content:
             return None
         
@@ -137,7 +137,7 @@ class ResponseProcessor:
         Returns:
             Visible content with thinking blocks removed
         """
-        text_content = ResponseProcessor.extract_text_content(response)
+        text_content = OpenAIResponseProcessor.extract_text_content(response)
         if not text_content:
             return ""
         
@@ -166,7 +166,7 @@ class ResponseProcessor:
         content_blocks = []
         
         # Handle thinking content
-        thinking_content = ResponseProcessor.extract_thinking_content(response)
+        thinking_content = OpenAIResponseProcessor.extract_thinking_content(response)
         if thinking_content:
             content_blocks.append({
                 "type": "thinking",
@@ -174,7 +174,7 @@ class ResponseProcessor:
             })
         
         # Handle visible text content
-        visible_content = ResponseProcessor.extract_visible_content(response)
+        visible_content = OpenAIResponseProcessor.extract_visible_content(response)
         if visible_content:
             # Parse for keywords using shared utility
             response_text, keyword = parse_llm_output(visible_content)
@@ -186,7 +186,7 @@ class ResponseProcessor:
         # Handle tool calls
         tool_calls = None
         if hasattr(choice, 'tool_calls') and choice.tool_calls:
-            tool_calls = ResponseProcessor.extract_tool_calls(response)
+            tool_calls = OpenAIResponseProcessor.extract_tool_calls(response)
         
         # Create AssistantMessage
         message = AssistantMessage(

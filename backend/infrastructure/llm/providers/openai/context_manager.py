@@ -7,8 +7,8 @@ Handles message formatting, tool result integration, and state management.
 
 from typing import List, Dict, Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from .message_formatter import MessageFormatter
-from .response_processor import ResponseProcessor
+from .message_formatter import OpenAIMessageFormatter
+from .response_processor import OpenAIResponseProcessor
 
 
 class OpenAIContextManager(BaseContextManager):
@@ -68,7 +68,7 @@ class OpenAIContextManager(BaseContextManager):
         Returns:
             List of tool call dictionaries
         """
-        return ResponseProcessor.extract_tool_calls(response)
+        return OpenAIResponseProcessor.extract_tool_calls(response)
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
@@ -77,10 +77,10 @@ class OpenAIContextManager(BaseContextManager):
         Args:
             tool_call_id: Tool call identifier
             tool_name: Name of the executed tool
-            result: Tool execution result
+            result: Tool execution result (can contain inline_data for images)
         """
         # Format tool result content using message formatter
-        content = MessageFormatter._format_tool_result(result)
+        content = OpenAIMessageFormatter._format_tool_result(result)
         
         # Add tool result message
         tool_message = {

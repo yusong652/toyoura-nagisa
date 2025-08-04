@@ -13,7 +13,7 @@ from backend.config import get_llm_settings
 @dataclass
 class OpenAIModelSettings:
     """OpenAI model-specific settings"""
-    model: str = "gpt-4o"
+    model: str = "gpt-4o-2024-11-20"  # Use specific version that supports function calling + vision
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     top_p: float = 1.0
