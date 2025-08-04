@@ -54,6 +54,11 @@ class MessageFormatter:
             Anthropic API compatible image block, or None if processing fails
         """
         try:
+            # Check if data field exists and has content
+            if 'data' not in inline_data or not inline_data['data']:
+                print(f"[WARNING] inline_data missing or empty data field")
+                return None
+                
             data_field = inline_data['data']
             mime_type = inline_data.get('mime_type', 'image/png')
             
@@ -97,30 +102,36 @@ class MessageFormatter:
         Returns:
             Formatted content compatible with Anthropic API
         """
-        # Handle multimodal content (contains inline_data)
+        # Handle multimodal content (contains inline_data with actual data)
         if isinstance(result, dict) and 'inline_data' in result:
-            content_parts = []
-            
-            # Add text part (if there are other fields)
-            text_content = {k: v for k, v in result.items() if k != 'inline_data'}
-            if text_content:
-                content_parts.append({
-                    "type": "text", 
-                    "text": json.dumps(text_content, ensure_ascii=False)
-                })
-            
-            # Add image part
             inline_data = result['inline_data']
-            content_parts.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": inline_data.get('mime_type', 'image/png'),
-                    "data": inline_data['data']
-                }
-            })
             
-            return content_parts
+            # Check if inline_data actually contains data (not just empty structure)
+            if inline_data and 'data' in inline_data and inline_data['data']:
+                content_parts = []
+                
+                # Add text part (if there are other fields)
+                text_content = {k: v for k, v in result.items() if k != 'inline_data'}
+                if text_content:
+                    content_parts.append({
+                        "type": "text", 
+                        "text": json.dumps(text_content, ensure_ascii=False)
+                    })
+                
+                # Add image part only if data exists
+                content_parts.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": inline_data.get('mime_type', 'image/png'),
+                        "data": inline_data['data']
+                    }
+                })
+                
+                return content_parts
+            else:
+                # inline_data exists but has no actual data, treat as regular structured data
+                return json.dumps(result, ensure_ascii=False, indent=2)
         
         # Regular structured data, serialize to JSON string
         elif isinstance(result, (dict, list)):
