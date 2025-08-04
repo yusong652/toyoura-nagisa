@@ -101,33 +101,3 @@ class ToolSchema(BaseModel):
             "description": self.description,
             "inputSchema": self.inputSchema.model_dump(exclude_none=True)
         }
-    
-
-class ToolSchemaProcessor:
-    """Utility class for processing tool schemas."""
-    
-    @staticmethod
-    def normalize_tool_list(tools: List[Dict[str, Any]]) -> List[ToolSchema]:
-        """Normalize a list of tool dictionaries to ToolSchema objects."""
-        normalized = []
-        for tool_dict in tools:
-            try:
-                tool_schema = ToolSchema.from_dict(tool_dict)
-                normalized.append(tool_schema)
-            except Exception as e:
-                print(f"[WARNING] Failed to normalize tool {tool_dict.get('name', 'unknown')}: {e}")
-                continue
-        return normalized
-    
-    @staticmethod
-    def convert_mcp_tools(mcp_tools: List[Any]) -> List[ToolSchema]:
-        """Convert MCP tools to ToolSchema objects."""
-        converted = []
-        for mcp_tool in mcp_tools:
-            try:
-                tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
-                converted.append(tool_schema)
-            except Exception as e:
-                print(f"[WARNING] Failed to convert MCP tool {getattr(mcp_tool, 'name', 'unknown')}: {e}")
-                continue
-        return converted

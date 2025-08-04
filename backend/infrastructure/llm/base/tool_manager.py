@@ -13,7 +13,7 @@ from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, Cl
 
 from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
-from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema, ToolSchemaProcessor
+from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.shared.utils.tool_utils import is_meta_tool
 # Security imports removed - all tools now require session ID
 
@@ -375,8 +375,6 @@ class BaseToolManager(ABC):
         """
         # Extract inline_data from data.processing_result.content
         return tool_result["data"]["processing_result"]["content"]["inline_data"]
-    
-    
     
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Any:
         """
