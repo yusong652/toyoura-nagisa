@@ -7,9 +7,10 @@ Supports multimodal content, tool calls, and message history processing.
 
 from typing import List, Dict, Any, Union
 from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
 
-class MessageFormatter:
+class MessageFormatter(BaseMessageFormatter):
     """
     Format messages for OpenAI API consumption
     
@@ -210,11 +211,7 @@ class MessageFormatter:
         if isinstance(arguments, str):
             return arguments
         
-        import json
-        try:
-            return json.dumps(arguments, ensure_ascii=False)
-        except (TypeError, ValueError):
-            return "{}"
+        return MessageFormatter.safe_json_serialize(arguments, ensure_ascii=False)
     
     @staticmethod
     def _format_tool_result(content: Any) -> str:
@@ -230,8 +227,4 @@ class MessageFormatter:
         if isinstance(content, str):
             return content
         
-        import json
-        try:
-            return json.dumps(content, ensure_ascii=False)
-        except (TypeError, ValueError):
-            return str(content)
+        return MessageFormatter.safe_json_serialize(content, ensure_ascii=False)

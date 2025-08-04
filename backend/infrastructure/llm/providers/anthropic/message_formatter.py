@@ -6,13 +6,13 @@ including multimodal content processing and role mapping.
 """
 
 import base64
-import json
 from typing import List, Dict, Any, Optional
 
 from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
 
-class MessageFormatter:
+class MessageFormatter(BaseMessageFormatter):
     """
     Handles message formatting for Anthropic Claude API interactions.
     
@@ -54,8 +54,8 @@ class MessageFormatter:
             Anthropic API compatible image block, or None if processing fails
         """
         try:
-            # Check if data field exists and has content
-            if 'data' not in inline_data or not inline_data['data']:
+            # Use base class validation
+            if not MessageFormatter.validate_inline_data(inline_data):
                 print(f"[WARNING] inline_data missing or empty data field")
                 return None
                 
@@ -115,7 +115,7 @@ class MessageFormatter:
                 if text_content:
                     content_parts.append({
                         "type": "text", 
-                        "text": json.dumps(text_content, ensure_ascii=False)
+                        "text": MessageFormatter.safe_json_serialize(text_content, ensure_ascii=False)
                     })
                 
                 # Add image part only if data exists
@@ -131,11 +131,11 @@ class MessageFormatter:
                 return content_parts
             else:
                 # inline_data exists but has no actual data, treat as regular structured data
-                return json.dumps(result, ensure_ascii=False, indent=2)
+                return MessageFormatter.safe_json_serialize(result, ensure_ascii=False, indent=2)
         
         # Regular structured data, serialize to JSON string
         elif isinstance(result, (dict, list)):
-            return json.dumps(result, ensure_ascii=False, indent=2)
+            return MessageFormatter.safe_json_serialize(result, ensure_ascii=False, indent=2)
         
         # Simple string or other types, convert to string
         else:

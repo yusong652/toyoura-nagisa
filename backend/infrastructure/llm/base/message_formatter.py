@@ -21,7 +21,7 @@ class BaseMessageFormatter(ABC):
     
     @staticmethod
     @abstractmethod
-    def format_messages_for_api(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
+    def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
         Convert aiNagisa BaseMessage objects to provider-specific API format.
         
@@ -30,20 +30,6 @@ class BaseMessageFormatter(ABC):
             
         Returns:
             List[Dict[str, Any]]: Messages formatted for specific LLM provider API
-        """
-        pass
-    
-    @staticmethod
-    @abstractmethod
-    def format_single_message(message: BaseMessage) -> Dict[str, Any]:
-        """
-        Convert a single BaseMessage to provider-specific format.
-        
-        Args:
-            message: Single BaseMessage object
-            
-        Returns:
-            Dict[str, Any]: Message formatted for specific LLM provider API
         """
         pass
     
@@ -81,7 +67,51 @@ class BaseMessageFormatter(ABC):
         """
         if isinstance(content, list):
             return any(
-                isinstance(item, dict) and item.get("type") == "image" 
+                isinstance(item, dict) and (
+                    item.get("type") == "image" or "inline_data" in item
+                )
                 for item in content
             )
         return False
+    
+    @staticmethod
+    def safe_json_serialize(data: Any, ensure_ascii: bool = False, indent: int = None) -> str:
+        """
+        Safely serialize data to JSON string (shared utility).
+        
+        Args:
+            data: Data to serialize
+            ensure_ascii: Whether to ensure ASCII encoding
+            indent: JSON indentation level
+            
+        Returns:
+            str: JSON string or string representation if serialization fails
+        """
+        if isinstance(data, str):
+            return data
+        
+        import json
+        try:
+            return json.dumps(data, ensure_ascii=ensure_ascii, indent=indent)
+        except (TypeError, ValueError):
+            return str(data)
+    
+    @staticmethod
+    def validate_inline_data(inline_data: Dict[str, Any]) -> bool:
+        """
+        Validate inline_data structure (shared utility).
+        
+        Args:
+            inline_data: Dictionary containing mime_type and data
+            
+        Returns:
+            bool: True if inline_data is valid and has data
+        """
+        if not isinstance(inline_data, dict):
+            return False
+        
+        return (
+            'data' in inline_data and 
+            inline_data['data'] and 
+            'mime_type' in inline_data
+        )
