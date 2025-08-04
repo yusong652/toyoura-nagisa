@@ -17,18 +17,19 @@ class OpenAIToolManager(BaseToolManager):
     tool execution with proper result formatting.
     """
     
-    def __init__(self, mcp_client_source=None, tools_enabled: bool = True):
+    def __init__(self, tools_enabled: bool = True):
         """Initialize OpenAI tool manager"""
-        super().__init__(mcp_client_source, tools_enabled)
+        super().__init__(tools_enabled)
     
-    async def get_function_call_schemas(self, session_id: Optional[str] = None, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
+    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
         """
         Get MCP tools formatted for OpenAI function calling
         
         Returns only meta tools + cached tools in OpenAI tools format.
+        Uses get_standardized_tools() from base class, then converts to OpenAI format.
         
         Args:
-            session_id: Optional session ID for tool caching
+            session_id: Session ID for tool caching (required)
             debug: Enable debug output
             
         Returns:
@@ -37,182 +38,64 @@ class OpenAIToolManager(BaseToolManager):
         if not self.tools_enabled:
             return None
         
-        mcp_client = self.get_mcp_client()
+        # Get standardized tools from base class
+        tools_dict = await self.get_standardized_tools(session_id, debug)
         
-        try:
-            async with mcp_client as mcp_async_client:
-                mcp_tools = await mcp_async_client.list_tools()
-        except Exception as e:
-            if debug:
-                print(f"[DEBUG] Failed to list MCP tools: {e}")
+        if not tools_dict:
             return None
         
-        # Build tools map and separate meta tools
-        tools_map: Dict[str, Dict[str, Any]] = {}
-        meta_tools: List[Dict[str, Any]] = []
+        # Convert ToolSchema objects to OpenAI format
+        openai_tools = []
+        for tool_name, tool_schema in tools_dict.items():
+            openai_tool = self._convert_tool_schema_to_openai_format(tool_schema)
+            if openai_tool:
+                openai_tools.append(openai_tool)
         
-        for tool in mcp_tools:
-            # Get input schema with defaults
-            input_schema = getattr(tool, "inputSchema", {"type": "object", "properties": {}})
+        if debug:
+            print(f"[DEBUG] Final OpenAI tools count: {len(openai_tools)}")
+        
+        return openai_tools if openai_tools else None
+    
+    def _convert_tool_schema_to_openai_format(self, tool_schema) -> Optional[Dict[str, Any]]:
+        """
+        Convert ToolSchema to OpenAI function format.
+        
+        Args:
+            tool_schema: ToolSchema object
+            
+        Returns:
+            Dict: OpenAI-formatted tool schema, or None if conversion failed
+        """
+        try:
+            # Get the input schema and convert to dict
+            input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
             
             # Ensure required fields are present
-            if "properties" in input_schema:
-                if "required" not in input_schema:
-                    input_schema["required"] = list(input_schema["properties"].keys())
+            if "properties" in input_schema_dict:
+                if "required" not in input_schema_dict:
+                    input_schema_dict["required"] = list(input_schema_dict["properties"].keys())
             else:
-                input_schema = {"type": "object", "properties": {}, "required": []}
+                input_schema_dict["properties"] = {}
+                input_schema_dict["required"] = []
             
-            if "additionalProperties" not in input_schema:
-                input_schema["additionalProperties"] = False
+            if "additionalProperties" not in input_schema_dict:
+                input_schema_dict["additionalProperties"] = False
+            
+            if "type" not in input_schema_dict:
+                input_schema_dict["type"] = "object"
             
             # Create OpenAI tool schema
-            tool_schema = {
+            return {
                 "type": "function",
                 "function": {
-                    "name": tool.name,
-                    "description": getattr(tool, "description", ""),
-                    "parameters": input_schema,
+                    "name": tool_schema.name,
+                    "description": tool_schema.description,
+                    "parameters": input_schema_dict,
                     "strict": True  # Enable structured outputs
                 }
             }
             
-            tools_map[tool.name] = tool_schema
-            
-            # Add to meta tools if applicable
-            if self.is_meta_tool(tool.name):
-                meta_tools.append(tool_schema)
-        
-        # Start with meta tools
-        final_tools: List[Dict[str, Any]] = meta_tools.copy()
-        added_tool_names = {tool["function"]["name"] for tool in meta_tools}
-        
-        # Add cached tools for the session
-        if session_id:
-            cached_tools = self.get_cached_tools_for_session(session_id)
-            for cached_tool in cached_tools:
-                tool_name = cached_tool["name"]
-                
-                # Skip if already added
-                if tool_name in added_tool_names:
-                    continue
-                
-                # Use existing schema if available
-                if tool_name in tools_map:
-                    final_tools.append(tools_map[tool_name])
-                    added_tool_names.add(tool_name)
-                else:
-                    # Create minimal schema from cached info
-                    parameters = cached_tool.get("parameters", {})
-                    if not isinstance(parameters, dict):
-                        parameters = {}
-                    
-                    tool_schema = {
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "description": cached_tool.get("description", tool_name),
-                            "parameters": {
-                                "type": "object",
-                                "properties": parameters,
-                                "required": list(parameters.keys()),
-                                "additionalProperties": False
-                            },
-                            "strict": True
-                        }
-                    }
-                    
-                    final_tools.append(tool_schema)
-                    added_tool_names.add(tool_name)
-        
-        if debug:
-            print(f"[DEBUG] OpenAI tools loaded: {len(final_tools)} total")
-            print(f"[DEBUG] Meta tools: {len(meta_tools)}")
-            if session_id:
-                cached_count = len(self.get_cached_tools_for_session(session_id))
-                print(f"[DEBUG] Cached tools for session {session_id}: {cached_count}")
-        
-        return final_tools if final_tools else None
-    
-    async def handle_function_call(self, function_call: Dict[str, Any], session_id: Optional[str] = None, debug: bool = False) -> Any:
-        """
-        Handle OpenAI function call request
-        
-        Args:
-            function_call: OpenAI function call dict with name, arguments, id
-            session_id: Optional session ID for context
-            debug: Enable debug output
-            
-        Returns:
-            Tool execution result formatted for OpenAI
-        """
-        tool_name = function_call["name"]
-        tool_args = function_call.get("arguments", {})
-        tool_id = function_call.get("id", "")
-        
-        if debug:
-            print(f"[DEBUG] OpenAI handling function call: {tool_name}")
-        
-        # Route to appropriate handler
-        if self.is_meta_tool(tool_name):
-            result = await self._handle_meta_tool(tool_name, tool_args, tool_id, session_id, debug)
-            
-            # Cache meta tool results if it's a search tool
-            if tool_name in ["search_tools_by_keywords", "search_tools"] and session_id:
-                await self._process_meta_tool_caching(result, session_id, debug)
-            
-            return result
-        else:
-            return await self._handle_regular_tool(tool_name, tool_args, tool_id, session_id, debug)
-    
-    async def _process_meta_tool_caching(self, result: Any, session_id: str, debug: bool = False) -> None:
-        """
-        Process and cache results from meta tool search
-        
-        Args:
-            result: Meta tool result
-            session_id: Session ID for caching
-            debug: Enable debug output
-        """
-        try:
-            # Convert result to dict format expected by extract_tools_from_meta_result
-            if isinstance(result, str):
-                import json
-                try:
-                    meta_result = json.loads(result)
-                except json.JSONDecodeError:
-                    meta_result = {"data": {"tools": []}}
-            elif isinstance(result, dict):
-                meta_result = result
-            else:
-                meta_result = {"data": {"tools": []}}
-            
-            # Extract and cache tools
-            extracted_tools = await self.extract_tools_from_meta_result(meta_result)
-            if extracted_tools:
-                self.cache_tools_for_session(session_id, extracted_tools)
-                if debug:
-                    print(f"[DEBUG] Cached {len(extracted_tools)} tools from meta search")
-            
         except Exception as e:
-            if debug:
-                print(f"[DEBUG] Failed to process meta tool caching: {e}")
+            print(f"[WARNING] Failed to convert tool {tool_schema.name} to OpenAI format: {e}")
+            return None
     
-    def _create_error_response(self, tool_id: str, tool_name: str, error_message: str) -> Dict[str, Any]:
-        """
-        Create OpenAI-specific error response
-        
-        Args:
-            tool_id: Tool call ID
-            tool_name: Tool name
-            error_message: Error message
-            
-        Returns:
-            Formatted error response
-        """
-        return {
-            "type": "tool_result",
-            "tool_call_id": tool_id,
-            "name": tool_name,
-            "content": error_message,
-            "is_error": True
-        }

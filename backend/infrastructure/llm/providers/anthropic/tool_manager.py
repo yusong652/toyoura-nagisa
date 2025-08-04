@@ -52,7 +52,7 @@ class AnthropicToolManager(BaseToolManager):
             "input_schema": input_schema
         }
     
-    async def get_function_call_schemas(self, session_id: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> List[Dict[str, Any]]:
         """
         获取所有MCP工具的schema，返回Anthropic格式
         只返回meta tools + cached tools，不返回所有regular tools
@@ -65,11 +65,6 @@ class AnthropicToolManager(BaseToolManager):
             List[Dict[str, Any]]: Anthropic格式的工具schema列表
         """
         if not self.tools_enabled:
-            return []
-        
-        if not session_id:
-            if debug:
-                print("[DEBUG] No session_id provided, returning empty tool list")
             return []
         
         # 使用基类的标准化工具获取方法
