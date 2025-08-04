@@ -1,0 +1,1 @@
+Create a git commit following the aiNagisa project guidelines in CLAUDE.md with proper attribution
