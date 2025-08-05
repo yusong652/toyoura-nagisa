@@ -202,19 +202,29 @@ class BaseToolManager(ABC):
         pass
     
     async def _handle_meta_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, 
-                               session_id: Optional[str] = None, debug: bool = False) -> Any:
+                               session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
         """
         Handle meta tool call.
+        
+        Meta tools (like search_tools) return standardized ToolResult dictionaries
+        that are passed directly to the LLM for interpretation.
         
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
-            tool_id: Tool call ID
-            session_id: Optional session ID
+            tool_id: Tool call ID (preserved for context managers)
+            session_id: Optional session ID for caching discovered tools
             debug: Whether to enable debug output
             
         Returns:
-            Any: Meta tool execution result
+            Dict[str, Any]: ToolResult dictionary with structure:
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-facing summary for display
+                - llm_content: Optional[Any] - Structured data for LLM conversation
+                - data: Optional[Dict[str, Any]] - Tool-specific payload:
+                    - For search_tools: {"tools": [{"name": str, "description": str}, ...]}
+                - error: Optional[str] - Detailed error info when status="error"
+                - is_error: bool - Added when MCP marks result as error
         """
         # tool_id is not used by MCP but preserved for LLM context managers
         # which need it to properly format tool results in conversation history
@@ -241,19 +251,30 @@ class BaseToolManager(ABC):
             raise RuntimeError(f"Meta tool '{tool_name}' execution failed: {str(e)}") from e
     
     async def _handle_regular_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str,
-                                  session_id: Optional[str] = None, debug: bool = False) -> Any:
+                                  session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
         """
         Handle regular tool call.
+        
+        Regular tools return a unified structure for both multimodal and non-multimodal content,
+        allowing LLM providers to handle content appropriately.
         
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
-            tool_id: Tool call ID
-            session_id: Optional session ID
+            tool_id: Tool call ID (preserved for context managers)
+            session_id: Optional session ID (required for all tools)
             debug: Whether to enable debug output
             
         Returns:
-            Any: Tool execution result passed to LLM
+            Dict[str, Any]: Unified tool result with structure:
+                - inline_data: Dict[str, Any] - Multimodal content when present:
+                    - mime_type: str - Content MIME type (e.g., "image/png")
+                    - data: str - Base64-encoded content
+                  Empty dict {} for non-multimodal results
+                - llm_content: Optional[Any] - Tool's textual/structured response
+                
+                Or for error cases (when MCP marks as error):
+                - Complete ToolResult dict with is_error=True
         """
         # tool_id is not used by MCP but preserved for LLM context managers
         # which need it to properly format tool results in conversation history
