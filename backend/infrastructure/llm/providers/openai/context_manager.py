@@ -58,18 +58,6 @@ class OpenAIContextManager(BaseContextManager):
         self.working_contents.append(assistant_message)
         self.increment_iteration()
     
-    def extract_tool_calls_from_response(self, response) -> List[Dict[str, Any]]:
-        """
-        Extract tool calls from OpenAI response
-        
-        Args:
-            response: OpenAI API response object
-            
-        Returns:
-            List of tool call dictionaries
-        """
-        return OpenAIResponseProcessor.extract_tool_calls(response)
-    
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
         Add tool execution result to context
@@ -99,25 +87,4 @@ class OpenAIContextManager(BaseContextManager):
             List of OpenAI-formatted messages
         """
         return self.working_contents.copy()
-    
-    
-    def get_context_summary(self) -> Dict[str, Any]:
-        """
-        Get summary of current context state
-        
-        Returns:
-            Dictionary containing context summary
-        """
-        return {
-            **self.get_debug_info(),
-            'working_messages_count': len(self.working_contents),
-            'has_tool_calls': any(
-                'tool_calls' in msg for msg in self.working_contents
-                if isinstance(msg, dict) and msg.get('role') == 'assistant'
-            ),
-            'tool_results_count': len([
-                msg for msg in self.working_contents
-                if isinstance(msg, dict) and msg.get('role') == 'tool'
-            ])
-        }
     

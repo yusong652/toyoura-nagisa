@@ -8,8 +8,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class GPTConfig(BaseSettings):
-    """GPT配置"""
+class OpenAIConfig(BaseSettings):
+    """OpenAI配置"""
     
     # 必需的敏感信息 - 字段名直接匹配环境变量OPENAI_API_KEY
     openai_api_key: str = Field(description="OpenAI API密钥")
@@ -99,9 +99,9 @@ class LLMSettings(BaseSettings):
         extra='ignore'
     )
     
-    def get_gpt_config(self) -> GPTConfig:
-        """获取GPT配置"""
-        return GPTConfig()
+    def get_openai_config(self) -> OpenAIConfig:
+        """获取OpenAI配置"""
+        return OpenAIConfig()
     
     def get_gemini_config(self) -> GeminiConfig:
         """获取Gemini配置"""
@@ -114,7 +114,7 @@ class LLMSettings(BaseSettings):
     def get_current_llm_config(self):
         """获取当前LLM配置"""
         if self.type == "gpt":
-            return self.get_gpt_config()
+            return self.get_openai_config()
         elif self.type == "gemini":
             return self.get_gemini_config()
         elif self.type == "anthropic":

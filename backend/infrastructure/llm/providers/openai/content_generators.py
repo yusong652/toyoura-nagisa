@@ -28,7 +28,8 @@ class TitleGenerator:
     @staticmethod
     async def generate_title_from_messages(
         client,  # OpenAI client instance
-        latest_messages: List[BaseMessage]
+        latest_messages: List[BaseMessage],
+        debug: bool = False
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
@@ -36,6 +37,7 @@ class TitleGenerator:
         Args:
             client: OpenAI client instance for API calls
             latest_messages: Recent conversation messages to generate title from
+            debug: Enable debug logging for API calls
             
         Returns:
             Generated title string, or None if generation fails
@@ -62,13 +64,26 @@ class TitleGenerator:
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
             
+            # Prepare API kwargs for debugging
+            api_kwargs = {
+                "model": DEFAULT_TITLE_MODEL,
+                "messages": api_messages,
+                "temperature": TITLE_GENERATION_TEMPERATURE,
+                "max_tokens": 100
+            }
+            
+            # Debug payload printing (similar to Gemini)
+            if debug:
+                print("[DEBUG] Title generation API call:")
+                OpenAIDebugger.print_debug_request_payload(api_kwargs)
+            
             # Use smaller model for title generation
-            response = client.chat.completions.create(
-                model=DEFAULT_TITLE_MODEL,
-                messages=api_messages,
-                temperature=TITLE_GENERATION_TEMPERATURE,
-                max_tokens=100
-            )
+            response = client.chat.completions.create(**api_kwargs)
+            
+            # Debug response printing (similar to Gemini)
+            if debug:
+                print("[DEBUG] Title generation response:")
+                OpenAIDebugger.log_raw_response(response)
             
             if not response.choices:
                 return None
@@ -177,6 +192,11 @@ class ImagePromptGenerator:
                 temperature=IMAGE_PROMPT_TEMPERATURE,
                 max_tokens=1024
             )
+            
+            # Debug response printing (similar to Gemini)
+            if debug:
+                print("[DEBUG] Image prompt generation response:")
+                OpenAIDebugger.log_raw_response(response)
             
             if not response.choices:
                 return None

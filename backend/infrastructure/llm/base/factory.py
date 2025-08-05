@@ -187,14 +187,15 @@ class LLMFactory:
                 "debug": llm_settings.debug,
             })
         elif name in ["gpt", "openai"]:
-            gpt_config = llm_settings.get_gpt_config()
-            client_config["api_key"] = gpt_config.openai_api_key
+            openai_config = llm_settings.get_openai_config()
+            client_config["api_key"] = openai_config.openai_api_key
             client_config["extra_config"].update({
-                "model": gpt_config.model,
-                "temperature": gpt_config.temperature,
-                "top_p": gpt_config.top_p,
-                "top_k": gpt_config.top_k,
-                "max_tokens": gpt_config.max_tokens,
+                "model": openai_config.model,
+                "temperature": openai_config.temperature,
+                "top_p": openai_config.top_p,
+                "top_k": openai_config.top_k,
+                "max_tokens": openai_config.max_tokens,
+                "debug": llm_settings.debug,
             })
         elif name == "local_llm":
             local_llm_config = llm_settings.get_local_llm_config()

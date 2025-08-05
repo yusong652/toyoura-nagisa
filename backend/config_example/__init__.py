@@ -161,14 +161,14 @@ def get_llm_config() -> Dict[str, Any]:
     
     # 只有当前使用的LLM才包含完整配置，并且会触发验证
     if settings.type == "gpt":
-        gpt_config = settings.get_gpt_config()  # 这里会触发fail fast验证
+        openai_config = settings.get_openai_config()  # 这里会触发fail fast验证
         config["gpt"] = {
-            "api_key": gpt_config.openai_api_key,
-            "model": gpt_config.model,
-            "temperature": gpt_config.temperature,
-            "top_p": gpt_config.top_p,
-            "top_k": gpt_config.top_k,
-            "max_tokens": gpt_config.max_tokens,
+            "api_key": openai_config.openai_api_key,
+            "model": openai_config.model,
+            "temperature": openai_config.temperature,
+            "top_p": openai_config.top_p,
+            "top_k": openai_config.top_k,
+            "max_tokens": openai_config.max_tokens,
         }
     elif settings.type == "gemini":
         gemini_config = settings.get_gemini_config()  # 这里会触发fail fast验证

@@ -284,6 +284,15 @@ aiNagisa/
 - **UI Framework**: Material-UI for consistent React component styling
 - **TTS Flexibility**: Support for both local (GPT-SoVITS) and remote (Fish Audio) TTS providers
 
+## Code Quality Guidelines
+
+### Type Validation and Logic Redundancy
+- **Avoid Redundant Validation**: Do not add type validation or existence checks for data structures that are already validated by our established logic flow
+- **Trust Internal APIs**: Internal function calls within our controlled codebase should not re-validate data that has already been processed and validated
+- **Readability Priority**: Excessive type checking and defensive programming significantly reduces code readability and maintainability
+- **Focus on Business Logic**: Code should focus on the core business logic rather than redundant defensive checks
+- **Example**: If a ToolResult object is passed from our standardized tool pipeline, trust that it contains the expected structure rather than re-validating every field
+
 ## Configuration
 
 ### Environment Setup

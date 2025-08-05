@@ -8,6 +8,9 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.domain.models.messages import BaseMessage
+from backend.infrastructure.llm.base.context_manager import BaseContextManager
+from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor    
 
 
 class LLMClientBase(ABC):
@@ -209,7 +212,7 @@ class LLMClientBase(ABC):
 
     async def _streaming_tool_calling_loop(
         self,
-        context_manager: Any,
+        context_manager: BaseContextManager,
         session_id: Optional[str],
         max_iterations: int,
         metadata: Dict[str, Any],
@@ -396,7 +399,7 @@ class LLMClientBase(ABC):
         """
         pass
 
-    def _log_context_state(self, context_manager: Any):
+    def _log_context_state(self, context_manager: BaseContextManager) -> None:
         """
         Log context manager state for debugging (optional override).
         
@@ -460,19 +463,12 @@ class LLMClientBase(ABC):
             return result
             
         except Exception as e:
-            # If the tool manager raises an exception, we need to handle it gracefully
-            # and return a standardized error structure
+            # Tool execution failed - log and re-raise to stop execution
             if debug:
                 print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
             
-            # Return standardized error structure that matches tool manager format
-            return {
-                "status": "error",
-                "message": f"Tool execution failed: {str(e)}",
-                "llm_content": f"Tool execution failed: {str(e)}",
-                "error": str(e),
-                "is_error": True
-            }
+            # Re-raise the exception to stop tool calling loop
+            raise e
 
     # ========== SHARED UTILITY METHODS ==========
 

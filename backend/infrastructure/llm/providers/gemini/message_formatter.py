@@ -155,11 +155,11 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         
         # Create function response part
         # Filter out inline_data to avoid duplication in function response
-        filtered_result = {k: v for k, v in result.items() if k != 'inline_data'} if isinstance(result, dict) else result
+        text_result = result["llm_content"]
         
         function_response = types.FunctionResponse(
             name=tool_name,
-            response=filtered_result if filtered_result else result
+            response=text_result if text_result else result
         )
         parts.append(types.Part(function_response=function_response))
         
