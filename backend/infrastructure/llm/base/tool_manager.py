@@ -399,17 +399,36 @@ class BaseToolManager(ABC):
         # Extract inline_data from data.processing_result.content
         return tool_result["data"]["processing_result"]["content"]["inline_data"]
     
-    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Any:
+    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
         """
         Handle LLM-generated function_call requests, gracefully dispatch to corresponding tool handlers.
         
+        Dispatches to either _handle_meta_tool or _handle_regular_tool based on tool type,
+        returning their respective result structures.
+        
         Args:
-            function_call: Function call dictionary containing name, arguments, etc.
-            session_id: Optional session ID for context-aware tools
+            function_call: Function call dictionary containing:
+                - name: str - Tool name to execute
+                - arguments: Dict[str, Any] - Tool arguments (optional, defaults to {})
+                - id: str - Tool call ID for tracking (optional, defaults to "")
+            session_id: Optional session ID for context-aware tools (required for execution)
             debug: Whether to enable debug output
             
         Returns:
-            Any: Tool execution result or error information
+            Dict[str, Any]: Tool execution result with structure dependent on tool type:
+            
+            For meta tools (e.g., search_tools):
+                - ToolResult dictionary as documented in _handle_meta_tool
+                
+            For regular tools:
+                - Unified structure as documented in _handle_regular_tool:
+                    - inline_data: Dict with multimodal content or empty {}
+                    - llm_content: Tool's response
+                - Or complete ToolResult dict when is_error=True
+                
+        Raises:
+            RuntimeError: When tool execution fails due to infrastructure errors
+            ValueError: When required session_id is not provided
         """
         tool_name = function_call["name"]
         tool_args = function_call.get("arguments", {})
