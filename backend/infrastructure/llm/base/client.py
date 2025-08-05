@@ -265,12 +265,12 @@ class LLMClientBase(ABC):
         session_id: Optional[str],
         execution_id: str,
         debug: bool
-    ) -> Any:
+    ) -> Dict[str, Any]:
         """
         Execute single tool call with comprehensive error handling.
         
-        Unified implementation for all providers. Returns error strings for compatibility
-        with existing error handling patterns.
+        Unified implementation for all providers. Returns standardized tool result dictionaries
+        from the tool manager layer.
         
         Args:
             tool_call: Tool call specification with structure:
@@ -282,19 +282,27 @@ class LLMClientBase(ABC):
             debug: Enable detailed debug logging and error tracing
             
         Returns:
-            Any: Tool execution result in standardized ToolResult format:
-                - Success: Tool-specific result data from tool layer
-                - Error: Error string "Tool execution failed: {error_message}"
+            Dict[str, Any]: Tool execution result from tool manager with structure:
+                
+                For meta tools:
+                    - Standard ToolResult dictionary (status, message, llm_content, data, etc.)
+                
+                For regular tools:
+                    - inline_data: Dict - Multimodal content or empty {}
+                    - llm_content: Any - Tool's textual/structured response
+                    
+                For error cases:
+                    - Complete ToolResult dict with is_error=True
                       
         Note:
-            All providers use this unified implementation. Debug logging should be
-            added here if needed for all providers, not in individual implementations.
+            All providers use this unified implementation. The tool manager handles
+            all error cases and returns proper dictionaries, not error strings.
         """
         try:
             if debug:
                 print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')} in execution {execution_id}")
-                # Could add more debug info here if needed for all providers
             
+            # Tool manager always returns Dict[str, Any]
             result = await self.tool_manager.handle_function_call(
                 tool_call, session_id, debug
             )
@@ -305,13 +313,19 @@ class LLMClientBase(ABC):
             return result
             
         except Exception as e:
-            # Return error string for unified error handling
-            error_result = f"Tool execution failed: {str(e)}"
-            
+            # If the tool manager raises an exception, we need to handle it gracefully
+            # and return a standardized error structure
             if debug:
                 print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
             
-            return error_result
+            # Return standardized error structure that matches tool manager format
+            return {
+                "status": "error",
+                "message": f"Tool execution failed: {str(e)}",
+                "llm_content": f"Tool execution failed: {str(e)}",
+                "error": str(e),
+                "is_error": True
+            }
 
     # ========== SHARED UTILITY METHODS ==========
 
