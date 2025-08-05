@@ -333,124 +333,20 @@ class GeminiClient(LLMClientBase):
         debug = self.gemini_config.debug
         return await GeminiWebSearchGenerator.perform_web_search(self.client, query, debug, **kwargs)
 
-    # ========== PRIVATE HELPER METHODS ==========
+    # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
-    async def _streaming_tool_calling_loop(
-        self,
-        context_manager: GeminiContextManager,
-        session_id: Optional[str],
-        max_iterations: int,
-        metadata: Dict[str, Any],
-        debug: bool,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
-        """
-        Streaming tool calling loop - core real-time notification engine.
-        
-        This is the core method implementing real-time tool calling notifications using event-driven architecture:
-        1. Real-time yield notification for each tool calling phase
-        2. Maintain complete state tracking and error handling
-        3. Fully compatible with existing tool calling logic
-        """
-        execution_id = metadata['execution_id']
-        
-        # Get initial response
-        working_contents = context_manager.get_working_contents()
-        current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id, **kwargs
-        )
-        metadata['api_calls'] += 1
-        
-        # Tool calling state machine
-        iteration = 0
-        while iteration < max_iterations:
-            metadata['iterations'] = iteration + 1
-            
-            # State check: whether to continue tool calling
-            if not GeminiResponseProcessor.should_continue_tool_calling(current_response):
-                break
-            
-            # Set flag and send notification when first tool call is detected
-            if not metadata['tool_calls_detected']:
-                metadata['tool_calls_detected'] = True
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': 'gemini_tools',
-                    'action_text': "I am using tools to help you..."
-                }
-            
-            # Add current response to context
-            context_manager.add_response(current_response)
-            
-            # Extract and execute tool calls
-            tool_calls = GeminiResponseProcessor.extract_tool_calls(current_response)
-            
-            # Batch execute tool calls - real-time notification for each tool call
-            for tool_call in tool_calls:
-                metadata['tool_calls_executed'] += 1
-                
-                # Tool start notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Using {tool_call.get('name', 'tool')}..."
-                }
-                
-                # Execute single tool call
-                tool_result = await self._execute_single_tool_call(
-                    tool_call, session_id, execution_id, debug
-                )
-                
-                # Tool completion notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Completed {tool_call.get('name', 'tool')}"
-                }
-                
-                # Add tool response to context
-                context_manager.add_tool_result(
-                    tool_call['id'],
-                    tool_call['name'],
-                    tool_result
-                )
-            
-            # Get next round response
-            working_contents = context_manager.get_working_contents()
-            current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id, **kwargs
-            )
-            metadata['api_calls'] += 1
-            
-            iteration += 1
-        
-        # Check if maximum iterations reached
-        if iteration >= max_iterations:
-            yield {
-                'type': 'error',
-                'error': f"Execution {execution_id} exceeded max iterations ({max_iterations})"
-            }
-            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
-        
-        # Tool calling end notification
-        if metadata['tool_calls_detected']:
-            if metadata['tool_calls_executed'] == 1:
-                complete_text = "I have completed the requested action."
-            else:
-                complete_text = f"I used {metadata['tool_calls_executed']} tools to help you."
-            
-            yield {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': 'gemini_tools',
-                'action_text': complete_text
-            }
-        
-        # Final notification
-        yield {
-            'type': 'NAGISA_TOOL_USE_CONCLUDED'
-        }
-        
-        # Return final response
-        yield current_response
+    def _should_continue_tool_calling(self, response: Any) -> bool:
+        """Check if Gemini response contains tool calls that require execution."""
+        return GeminiResponseProcessor.should_continue_tool_calling(response)
 
+    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
+        """Extract tool calls from Gemini response."""
+        return GeminiResponseProcessor.extract_tool_calls(response)
+
+    def _log_context_state(self, context_manager: Any):
+        """Log Gemini context manager state for debugging."""
+        # Gemini uses default logging from base class
+        super()._log_context_state(context_manager)
+
+    # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _execute_single_tool_call is inherited from LLMClientBase

@@ -207,7 +207,6 @@ class LLMClientBase(ABC):
 
     # ========== ABSTRACT TOOL CALLING METHODS ==========
 
-    @abstractmethod
     async def _streaming_tool_calling_loop(
         self,
         context_manager: Any,
@@ -221,7 +220,8 @@ class LLMClientBase(ABC):
         Core streaming tool calling loop with real-time notifications.
         
         Implements the tool calling state machine with event-driven architecture for
-        real-time status updates during tool execution sequences.
+        real-time status updates during tool execution sequences. This unified implementation
+        works across all LLM providers by leveraging provider-specific components.
         
         Args:
             context_manager: Provider-specific context manager for conversation state:
@@ -257,7 +257,154 @@ class LLMClientBase(ABC):
             3. Maintain execution state and handle iteration limits
             4. Return final response for downstream processing
         """
+        execution_id = metadata['execution_id']
+        provider_name = self.__class__.__name__.replace('Client', '').lower()
+        
+        # Get initial response using provider-specific context
+        working_contents = context_manager.get_working_contents()
+        current_response = await self.call_api_with_context(
+            working_contents, session_id=session_id, **kwargs
+        )
+        metadata['api_calls'] += 1
+        
+        # Tool calling state machine
+        iteration = 0
+        while iteration < max_iterations:
+            metadata['iterations'] = iteration + 1
+            
+            # State check: whether to continue tool calling (provider-specific)
+            if not self._should_continue_tool_calling(current_response):
+                break
+            
+            # Set flag and send notification when first tool call is detected
+            if not metadata['tool_calls_detected']:
+                metadata['tool_calls_detected'] = True
+                yield {
+                    'type': 'NAGISA_IS_USING_TOOL',
+                    'tool_name': f'{provider_name}_tools',
+                    'action_text': "I am using tools to help you..."
+                }
+            
+            # Add current response to context
+            context_manager.add_response(current_response)
+            
+            # Extract and execute tool calls (provider-specific)
+            tool_calls = self._extract_tool_calls(current_response)
+            
+            # Execute tool calls - real-time notification for each tool call
+            for tool_call in tool_calls:
+                metadata['tool_calls_executed'] += 1
+                
+                # Tool start notification
+                yield {
+                    'type': 'NAGISA_IS_USING_TOOL',
+                    'tool_name': tool_call.get('name', 'unknown_tool'),
+                    'action_text': f"Using {tool_call.get('name', 'tool')}..."
+                }
+                
+                # Execute single tool call
+                tool_result = await self._execute_single_tool_call(
+                    tool_call, session_id, execution_id, debug
+                )
+                
+                # Tool completion notification
+                yield {
+                    'type': 'NAGISA_IS_USING_TOOL',
+                    'tool_name': tool_call.get('name', 'unknown_tool'),
+                    'action_text': f"Completed {tool_call.get('name', 'tool')}"
+                }
+                
+                # Add tool result to context
+                context_manager.add_tool_result(
+                    tool_call['id'],
+                    tool_call['name'],
+                    tool_result
+                )
+            
+            # Get next round response
+            working_contents = context_manager.get_working_contents()
+            
+            if debug:
+                print(f"[DEBUG] Tool calling iteration {iteration + 1} context state:")
+                self._log_context_state(context_manager)
+            
+            current_response = await self.call_api_with_context(
+                working_contents, session_id=session_id, **kwargs
+            )
+            metadata['api_calls'] += 1
+            
+            iteration += 1
+        
+        # Check if maximum iterations reached
+        if iteration >= max_iterations:
+            yield {
+                'type': 'error',
+                'error': f"Execution {execution_id} exceeded max iterations ({max_iterations})"
+            }
+            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
+        
+        # Tool calling end notification
+        if metadata['tool_calls_detected']:
+            if metadata['tool_calls_executed'] == 1:
+                complete_text = "I have completed the requested action."
+            else:
+                complete_text = f"I used {metadata['tool_calls_executed']} tools to help you."
+            
+            yield {
+                'type': 'NAGISA_IS_USING_TOOL',
+                'tool_name': f'{provider_name}_tools',
+                'action_text': complete_text
+            }
+        
+        # Final notification
+        yield {
+            'type': 'NAGISA_TOOL_USE_CONCLUDED',
+            'execution_id': execution_id
+        }
+        
+        # Return final response
+        yield current_response
+
+    # ========== ABSTRACT HELPER METHODS FOR PROVIDER-SPECIFIC LOGIC ==========
+
+    @abstractmethod
+    def _should_continue_tool_calling(self, response: Any) -> bool:
+        """
+        Check if response contains tool calls that require execution.
+        
+        Args:
+            response: Provider-specific response object to check
+            
+        Returns:
+            bool: True if tool calls are present and execution should continue
+        """
         pass
+
+    @abstractmethod
+    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
+        """
+        Extract tool calls from provider-specific response.
+        
+        Args:
+            response: Provider-specific response object
+            
+        Returns:
+            List[Dict[str, Any]]: List of tool call dictionaries with structure:
+                - id: str - Tool call identifier
+                - name: str - Tool name
+                - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
+        """
+        pass
+
+    def _log_context_state(self, context_manager: Any):
+        """
+        Log context manager state for debugging (optional override).
+        
+        Args:
+            context_manager: Provider-specific context manager
+        """
+        # Default implementation - providers can override for detailed logging
+        print(f"[DEBUG] Context manager state: {type(context_manager).__name__}")
 
     async def _execute_single_tool_call(
         self,

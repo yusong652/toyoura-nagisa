@@ -151,124 +151,22 @@ class AnthropicClient(LLMClientBase):
             raise Exception(f"Anthropic execution {execution_id} failed: {e}")
 
 
-    async def _streaming_tool_calling_loop(
-        self,
-        context_manager: AnthropicContextManager,
-        session_id: Optional[str],
-        max_iterations: int,
-        metadata: Dict[str, Any],
-        debug: bool,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
-        """
-        流式工具调用循环 - 与Gemini完全对齐的核心实时通知引擎
-        
-        这是实现实时工具调用通知的核心方法，采用事件驱动架构：
-        1. 每个工具调用阶段都实时yield通知
-        2. 保持完整的状态追踪和错误处理
-        3. 与现有工具调用逻辑完全兼容
-        """
-        execution_id = metadata['execution_id']
-        
-        # 获取初始响应
-        anthropic_messages = context_manager.get_working_contents()
-        current_response = await self.call_api_with_context(
-            anthropic_messages, session_id=session_id, **kwargs
-        )
-        metadata['api_calls'] += 1
-        
-        # 工具调用状态机
-        iteration = 0
-        while iteration < max_iterations:
-            metadata['iterations'] = iteration + 1
-            
-            # 状态检查：是否需要继续工具调用
-            if not AnthropicResponseProcessor.has_tool_calls(current_response):
-                break
-            
-            # 首次检测到工具调用时设置标志并发送通知
-            if not metadata['tool_calls_detected']:
-                metadata['tool_calls_detected'] = True
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': 'anthropic_tools',
-                    'action_text': "I am using tools to help you..."
-                }
-            
-            # 添加当前响应到上下文
-            context_manager.add_response(current_response)
-            
-            # 提取并执行工具调用
-            tool_calls = AnthropicResponseProcessor.extract_tool_calls(current_response)
-            
-            # 执行工具调用 - 每个工具调用都实时通知并立即添加到上下文
-            for tool_call in tool_calls:
-                metadata['tool_calls_executed'] += 1
-                
-                # 工具开始通知
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Using {tool_call.get('name', 'tool')}..."
-                }
-                
-                # 执行单个工具调用
-                tool_result = await self._execute_single_tool_call(
-                    tool_call, session_id, execution_id, debug
-                )
-                
-                # 工具完成通知
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Completed {tool_call.get('name', 'tool')}"
-                }
-                
-                # 立即添加工具结果到上下文 - 简化实现
-                context_manager.add_tool_result(
-                    tool_call['id'],
-                    tool_call['name'],
-                    tool_result
-                )
-            
-            # 获取下一轮响应
-            anthropic_messages = context_manager.get_working_contents()
-            current_response = await self.call_api_with_context(
-                anthropic_messages, session_id=session_id, **kwargs
-            )
-            metadata['api_calls'] += 1
-            
-            iteration += 1
-        
-        # 检查是否达到最大迭代次数
-        if iteration >= max_iterations:
-            yield {
-                'type': 'error',
-                'error': f"Execution {execution_id} exceeded max iterations ({max_iterations})"
-            }
-            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
-        
-        # 工具调用结束通知
-        if metadata['tool_calls_detected']:
-            if metadata['tool_calls_executed'] == 1:
-                complete_text = "I have completed the requested action."
-            else:
-                complete_text = f"I used {metadata['tool_calls_executed']} tools to help you."
-            
-            yield {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': 'anthropic_tools',
-                'action_text': complete_text
-            }
-        
-        # 最终通知
-        yield {
-            'type': 'NAGISA_TOOL_USE_CONCLUDED',
-            'execution_id': execution_id
-        }
-        
-        # 返回最终响应
-        yield current_response
+    # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
+
+    def _should_continue_tool_calling(self, response: Any) -> bool:
+        """Check if Anthropic response contains tool calls that require execution."""
+        return AnthropicResponseProcessor.has_tool_calls(response)
+
+    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
+        """Extract tool calls from Anthropic response."""
+        return AnthropicResponseProcessor.extract_tool_calls(response)
+
+    def _log_context_state(self, context_manager: Any):
+        """Log Anthropic context manager state for debugging."""
+        # Anthropic uses default logging from base class
+        super()._log_context_state(context_manager)
+
+    # _streaming_tool_calling_loop is inherited from LLMClientBase
 
     async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
         """

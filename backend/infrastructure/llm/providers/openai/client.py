@@ -292,134 +292,24 @@ class OpenAIClient(LLMClientBase):
             
             raise Exception(f"OpenAI execution {execution_id} failed: {e}")
 
-    async def _streaming_tool_calling_loop(
-        self,
-        context_manager: OpenAIContextManager,
-        session_id: Optional[str],
-        max_iterations: int,
-        metadata: Dict[str, Any],
-        debug: bool,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
-        """
-        Streaming tool calling loop - core real-time notification engine.
-        
-        This is the core method implementing real-time tool calling notifications using event-driven architecture:
-        1. Real-time yield notification for each tool calling phase
-        2. Maintain complete state tracking and error handling
-        3. Fully compatible with existing tool calling logic
-        """
-        execution_id = metadata['execution_id']
-        
-        # Get initial response
-        openai_messages = context_manager.get_working_contents()
-        
-        if debug:
-            OpenAIDebugger.log_context_state(context_manager)
-        
-        current_response = await self.call_api_with_context(
-            openai_messages, session_id=session_id, **kwargs
-        )
-        metadata['api_calls'] += 1
-        
-        # Tool calling state machine
-        iteration = 0
-        while iteration < max_iterations:
-            metadata['iterations'] = iteration + 1
-            
-            # State check: whether to continue tool calling
-            if not OpenAIResponseProcessor.should_continue_tool_calling(current_response):
-                break
-            
-            # Set flag and send notification when first tool call is detected
-            if not metadata['tool_calls_detected']:
-                metadata['tool_calls_detected'] = True
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': 'openai_tools',
-                    'action_text': "I am using tools to help you..."
-                }
-            
-            # Add current response to context
-            context_manager.add_response(current_response)
-            
-            # Extract and execute tool calls
-            tool_calls = OpenAIResponseProcessor.extract_tool_calls(current_response)
-            
-            # Execute tool calls - real-time notification for each tool call
-            for tool_call in tool_calls:
-                metadata['tool_calls_executed'] += 1
-                
-                # Tool start notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Using {tool_call.get('name', 'tool')}..."
-                }
-                
-                # Execute single tool call
-                tool_result = await self._execute_single_tool_call(
-                    tool_call, session_id, execution_id, debug
-                )
-                
-                # Tool completion notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Completed {tool_call.get('name', 'tool')}"
-                }
-                
-                # Immediately add tool result to context
-                context_manager.add_tool_result(
-                    tool_call['id'],
-                    tool_call['name'],
-                    tool_result
-                )
-            
-            # Get next round response
-            openai_messages = context_manager.get_working_contents()
-            
-            if debug:
-                print(f"[DEBUG] Tool calling iteration {iteration + 1} context state:")
-                OpenAIDebugger.log_context_state(context_manager)
-            
-            current_response = await self.call_api_with_context(
-                openai_messages, session_id=session_id, **kwargs
-            )
-            metadata['api_calls'] += 1
-            
-            iteration += 1
-        
-        # Check if maximum iterations reached
-        if iteration >= max_iterations:
-            yield {
-                'type': 'error',
-                'error': f"Execution {execution_id} exceeded max iterations ({max_iterations})"
-            }
-            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
-        
-        # Tool calling end notification
-        if metadata['tool_calls_detected']:
-            if metadata['tool_calls_executed'] == 1:
-                complete_text = "I have completed the requested action."
-            else:
-                complete_text = f"I used {metadata['tool_calls_executed']} tools to help you."
-            
-            yield {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': 'openai_tools',
-                'action_text': complete_text
-            }
-        
-        # Final notification
-        yield {
-            'type': 'NAGISA_TOOL_USE_CONCLUDED',
-            'execution_id': execution_id
-        }
-        
-        # Return final response
-        yield current_response
+    # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
+    def _should_continue_tool_calling(self, response: Any) -> bool:
+        """Check if OpenAI response contains tool calls that require execution."""
+        return OpenAIResponseProcessor.should_continue_tool_calling(response)
+
+    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
+        """Extract tool calls from OpenAI response."""
+        return OpenAIResponseProcessor.extract_tool_calls(response)
+
+    def _log_context_state(self, context_manager: Any):
+        """Log OpenAI context manager state for debugging."""
+        if hasattr(context_manager, '__class__') and 'OpenAI' in context_manager.__class__.__name__:
+            OpenAIDebugger.log_context_state(context_manager)
+        else:
+            super()._log_context_state(context_manager)
+
+    # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _execute_single_tool_call is inherited from LLMClientBase
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
