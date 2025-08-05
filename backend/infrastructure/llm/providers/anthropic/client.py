@@ -338,51 +338,7 @@ class AnthropicClient(LLMClientBase):
             # 重新抛出异常
             raise
 
-    async def _execute_single_tool_call(
-        self,
-        tool_call: Dict[str, Any],
-        session_id: Optional[str],
-        execution_id: str,
-        debug: bool
-    ) -> Any:
-        """
-        执行单个工具调用 - 原子性操作
-        
-        专为流式架构设计的工具执行方法，支持：
-        1. 原子性工具调用执行
-        2. 完整的错误处理和恢复
-        3. 调试信息输出
-        4. 会话级别的上下文管理
-        
-        Args:
-            tool_call: 工具调用字典，包含 name, arguments, id
-            session_id: 会话ID，用于上下文管理
-            execution_id: 执行ID，用于调试追踪
-            debug: 调试模式开关
-            
-        Returns:
-            工具执行结果，或错误信息字符串
-        """
-        try:
-            if debug:
-                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')} in execution {execution_id}")
-            
-            result = await self.tool_manager.handle_function_call(
-                tool_call, session_id, debug
-            )
-            
-            if debug:
-                print(f"[DEBUG] Tool execution completed: {tool_call.get('name', 'unknown')}")
-            
-            return result
-            
-        except Exception as e:
-            error_result = f"Tool execution failed: {str(e)}"
-            
-            if debug:
-                print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
-            
-            return error_result
+    # _execute_single_tool_call is inherited from LLMClientBase
 
     async def generate_title_from_messages(
         self,

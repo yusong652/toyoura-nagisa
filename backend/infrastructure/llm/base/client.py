@@ -259,7 +259,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    @abstractmethod
     async def _execute_single_tool_call(
         self,
         tool_call: Dict[str, Any],
@@ -270,33 +269,49 @@ class LLMClientBase(ABC):
         """
         Execute single tool call with comprehensive error handling.
         
-        Performs atomic tool execution with proper separation between business logic
-        errors (handled by tool layer) and system-level errors (propagated to caller).
+        Unified implementation for all providers. Returns error strings for compatibility
+        with existing error handling patterns.
         
         Args:
             tool_call: Tool call specification with structure:
                 - id: str - Unique tool call identifier
                 - name: str - Tool name to execute
-                - args: Dict[str, Any] - Tool parameters and arguments
+                - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
             session_id: Session ID for context-specific tool execution
             execution_id: Unique execution identifier for debugging and tracking
             debug: Enable detailed debug logging and error tracing
             
         Returns:
             Any: Tool execution result in standardized ToolResult format:
-                - Business logic errors: Formatted error ToolResult from tool layer
-                - Successful execution: Tool-specific result data and metadata
-                
-        Raises:
-            Exception: System-level errors (network, memory, code bugs) that cannot be
-                      handled by the tool layer and should not be passed to LLM
+                - Success: Tool-specific result data from tool layer
+                - Error: Error string "Tool execution failed: {error_message}"
                       
         Note:
-            Business logic errors are handled by the tool layer and returned as formatted
-            ToolResult objects. Only unexpected system errors are raised as exceptions.
-            This ensures proper error boundaries between tool logic and system infrastructure.
+            All providers use this unified implementation. Debug logging should be
+            added here if needed for all providers, not in individual implementations.
         """
-        pass
+        try:
+            if debug:
+                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')} in execution {execution_id}")
+                # Could add more debug info here if needed for all providers
+            
+            result = await self.tool_manager.handle_function_call(
+                tool_call, session_id, debug
+            )
+            
+            if debug:
+                print(f"[DEBUG] Tool execution completed: {tool_call.get('name', 'unknown')}")
+            
+            return result
+            
+        except Exception as e:
+            # Return error string for unified error handling
+            error_result = f"Tool execution failed: {str(e)}"
+            
+            if debug:
+                print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
+            
+            return error_result
 
     # ========== SHARED UTILITY METHODS ==========
 

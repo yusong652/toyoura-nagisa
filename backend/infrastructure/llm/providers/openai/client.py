@@ -6,7 +6,6 @@ full OpenAI GPT integration with streaming, tool calling, and content generation
 """
 
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
-import json
 from openai import OpenAI
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
@@ -207,9 +206,18 @@ class OpenAIClient(LLMClientBase):
         execution_id = self._generate_execution_id()
         debug = self.openai_config.debug
 
+        if debug:
+            print(f"[DEBUG] Starting OpenAI execution {execution_id}")
+            print(f"[DEBUG] Session ID: {session_id}")
+            print(f"[DEBUG] Input messages: {len(messages)}")
+
         # Create independent context manager - ensure state isolation
         context_manager = OpenAIContextManager()
         context_manager.initialize_from_messages(messages)
+        
+        if debug:
+            print(f"[DEBUG] Initial context state:")
+            OpenAIDebugger.log_context_state(context_manager)
         
         # Execution metadata - complete tracking
         metadata = {
@@ -241,6 +249,10 @@ class OpenAIClient(LLMClientBase):
             metadata['status'] = 'completed'
             metadata['end_time'] = self._get_timestamp()
             
+            if debug:
+                print(f"[DEBUG] Execution {execution_id} completed successfully")
+                OpenAIDebugger.print_formatted_dict(metadata, "Final Execution Metadata")
+            
             # Extract keyword - extract from original response before formatting
             original_text = OpenAIResponseProcessor.extract_text_content(final_response)
             from backend.shared.utils.text_parser import parse_llm_output
@@ -250,6 +262,9 @@ class OpenAIClient(LLMClientBase):
             # Create final storage message - use ResponseProcessor instead of context_manager
             final_message = OpenAIResponseProcessor.format_response_for_storage(final_response)
             
+            if debug:
+                print(f"[DEBUG] Final message formatted for storage")
+            
             # Yield final result
             yield (final_message, metadata)
             
@@ -257,6 +272,10 @@ class OpenAIClient(LLMClientBase):
             metadata['status'] = 'failed'
             metadata['error'] = str(e)
             metadata['end_time'] = self._get_timestamp()
+            
+            if debug:
+                print(f"[DEBUG] Execution {execution_id} failed with error: {str(e)}")
+                OpenAIDebugger.print_formatted_dict(metadata, "Failed Execution Metadata")
             
             # Yield error notification
             yield {
@@ -294,6 +313,10 @@ class OpenAIClient(LLMClientBase):
         
         # Get initial response
         openai_messages = context_manager.get_working_contents()
+        
+        if debug:
+            OpenAIDebugger.log_context_state(context_manager)
+        
         current_response = await self.call_api_with_context(
             openai_messages, session_id=session_id, **kwargs
         )
@@ -355,6 +378,11 @@ class OpenAIClient(LLMClientBase):
             
             # Get next round response
             openai_messages = context_manager.get_working_contents()
+            
+            if debug:
+                print(f"[DEBUG] Tool calling iteration {iteration + 1} context state:")
+                OpenAIDebugger.log_context_state(context_manager)
+            
             current_response = await self.call_api_with_context(
                 openai_messages, session_id=session_id, **kwargs
             )
@@ -392,57 +420,7 @@ class OpenAIClient(LLMClientBase):
         # Return final response
         yield current_response
 
-    async def _execute_single_tool_call(
-        self,
-        tool_call: Dict[str, Any],
-        session_id: Optional[str],
-        execution_id: str,
-        debug: bool
-    ) -> Any:
-        """
-        Execute single tool call with comprehensive error handling.
-        
-        Performs atomic tool execution with proper separation between business logic
-        errors (handled by the tool layer) and system-level errors (propagated to caller).
-        
-        Args:
-            tool_call: Tool call specification with structure:
-                - id: str - Unique tool call identifier
-                - name: str - Tool name to execute
-                - arguments: Dict[str, Any] - Tool parameters
-            session_id: Session ID for context-specific tool execution
-            execution_id: Unique execution identifier for debugging and tracking
-            debug: Enable detailed debug logging
-            
-        Returns:
-            Any: Tool execution result in standardized ToolResult format:
-                - Business logic errors: Formatted error ToolResult from tool layer
-                - Successful execution: Tool-specific result data
-                
-        Raises:
-            Exception: System-level errors (network, memory, code bugs) that cannot be
-                      handled by the tool layer and should not be passed to LLM
-        """
-        try:
-            if debug:
-                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')} in execution {execution_id}")
-            
-            result = await self.tool_manager.handle_function_call(
-                tool_call, session_id, debug
-            )
-            
-            if debug:
-                print(f"[DEBUG] Tool execution completed: {tool_call.get('name', 'unknown')}")
-            
-            return result
-            
-        except Exception as e:
-            error_result = f"Tool execution failed: {str(e)}"
-            
-            if debug:
-                print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
-            
-            return error_result
+    # _execute_single_tool_call is inherited from LLMClientBase
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
@@ -459,9 +437,11 @@ class OpenAIClient(LLMClientBase):
         Returns:
             Generated title string, or None if failed
         """
+        debug = self.openai_config.debug
         return await TitleGenerator.generate_title_from_messages(
             self.client,
-            latest_messages
+            latest_messages,
+            debug
         )
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
