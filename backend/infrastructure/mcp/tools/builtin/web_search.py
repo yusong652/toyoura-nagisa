@@ -56,9 +56,9 @@ async def web_search(
             max_uses=max_uses
         )
         
-        # Check if search was successful
-        if search_result.get("status") == "error" or "error" in search_result:
-            error_msg = search_result.get("error", "Unknown search error")
+        # Check if search was successful - only treat as error if error field has actual content
+        error_msg = search_result.get("error")
+        if search_result.get("status") == "error" or (error_msg is not None and error_msg != ""):
             return ToolResult(
                 status="error",
                 message=f"Web search failed: {error_msg}",
