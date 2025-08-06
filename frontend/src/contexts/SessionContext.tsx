@@ -210,7 +210,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
             text,
             files: files.length > 0 ? files : undefined,
             timestamp: new Date(msg.timestamp || Date.now()).getTime(),
-            status: sender === 'user' ? MessageStatus.read : undefined,
+            status: sender === 'user' ? MessageStatus.READ : undefined,
             streaming: false,
             isLoading: false,
             isRead: true,

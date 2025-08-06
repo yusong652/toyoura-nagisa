@@ -4,6 +4,7 @@ import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, Mess
 import { useAudio } from './AudioContext.tsx'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
+import { SessionProvider } from './SessionContext'
 import { playMotion } from '../utils/live2d'
 import { chatService, sessionService } from '../services/api'
 
@@ -21,7 +22,8 @@ interface ChatProviderProps {
   children: ReactNode
 }
 
-export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
+// 内部核心ChatProvider
+const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -42,6 +44,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setToolState
   } = useTools()
   const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false)
+
 
   // Connect to WebSocket when session changes
   useEffect(() => {
@@ -1061,5 +1064,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }}>
       {children}
     </ChatContext.Provider>
+  )
+}
+
+// 外部ChatProvider包装，包含SessionProvider
+export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
+  const handleSessionMessagesLoaded = useCallback((messages: Message[]) => {
+    // 这个回调会在SessionContext加载消息时被调用
+    // 我们需要将这些消息传递给ChatProviderCore
+    console.log('SessionContext loaded messages:', messages.length)
+  }, [])
+
+  return (
+    <SessionProvider onSessionMessagesLoaded={handleSessionMessagesLoaded}>
+      <ChatProviderCore>
+        {children}
+      </ChatProviderCore>
+    </SessionProvider>
   )
 }
