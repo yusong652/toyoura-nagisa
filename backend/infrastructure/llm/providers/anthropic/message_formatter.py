@@ -123,9 +123,10 @@ class MessageFormatter(BaseMessageFormatter):
         # Handle standardized ToolResult - extract llm_content
         if isinstance(result, dict) and 'llm_content' in result:
             content = result['llm_content']
+            # Convert to JSON string for API compatibility
             if isinstance(content, (dict, list)):
                 return MessageFormatter.safe_json_serialize(content, ensure_ascii=False, indent=2)
-            return str(content)
+            return str(content) if content is not None else str(result)
             
         # Handle regular structured data
         if isinstance(result, (dict, list)):
@@ -149,9 +150,10 @@ class MessageFormatter(BaseMessageFormatter):
         content_parts = []
         
         # Add text content from llm_content field
+        llm_content = content['llm_content']
         content_parts.append({
             "type": "text",
-            "text": MessageFormatter.safe_json_serialize(content['llm_content'], ensure_ascii=False)
+            "text": llm_content if isinstance(llm_content, str) else MessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False)
         })
         
         # Add image content
@@ -227,7 +229,7 @@ class MessageFormatter(BaseMessageFormatter):
         
         Creates complete working context entry with proper tool_result block
         formatting for Anthropic API.
-        
+            
         Args:
             tool_call_id: Tool call unique identifier
             tool_name: Name of the tool that was executed  
