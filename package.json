@@ -4,8 +4,8 @@
   "description": "An AI-powered chat assistant with multi-turn conversation memory and voice output capabilities",
   "main": "index.js",
   "scripts": {
-    "install:frontend": "cd frontend-react && npm install",
-    "start:frontend": "cd frontend-react && npm run dev",
+    "install:frontend": "cd frontend && npm install",
+    "start:frontend": "cd frontend && npm run dev",
     "install:backend": "cd backend && uv pip install -r requirements.txt",
     "lint:backend": "cd backend && ruff check .",
     "format:backend": "cd backend && ruff format .",

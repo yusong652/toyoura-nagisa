@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend-react/public/Nagisa.png" alt="aiNagisa Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/Nagisa.png" alt="aiNagisa Logo" width="200"/>
 </p>
 
 <h1 align="center">aiNagisa</h1>
@@ -129,7 +129,7 @@ aiNagisa/
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                    # Configuration management
 │   └── shared/                    # Common utilities and exceptions
-├── frontend-react/
+├── frontend/
 │   ├── src/
 │   │   ├── App.tsx               # Main React application component
 │   │   ├── components/           # UI components (ChatBox, Live2DCanvas, etc.)
@@ -201,7 +201,7 @@ uv run python backend/app.py
 #### Frontend Setup
 ```bash
 # Navigate to frontend directory
-cd frontend-react
+cd frontend
 
 # Install dependencies
 npm install

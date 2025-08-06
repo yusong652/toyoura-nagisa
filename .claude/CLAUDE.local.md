@@ -25,7 +25,7 @@ uv sync
 
 ### Frontend Development
 ```bash
-cd frontend-react
+cd frontend
 
 # Start development server
 npm run dev
@@ -243,7 +243,7 @@ aiNagisa/
 │   ├── memory_db/                  # ChromaDB persistence
 │   ├── tool_db/                    # Tool vectorization database
 │   └── workspace/                  # Development workspace
-├── frontend-react/
+├── frontend/
 │   ├── src/
 │   │   ├── components/            # React components
 │   │   ├── contexts/              # React contexts
