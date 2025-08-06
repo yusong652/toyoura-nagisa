@@ -168,12 +168,6 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     await sessionRefreshTitle(sessionId)
   }, [sessionRefreshTitle])
 
-
-
-
-
-
-
   // 删除消息
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
@@ -217,9 +211,6 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
       throw error;
     }
   }, [currentSessionId, connectionStatus, checkConnection, connectionError, refreshSessions, messages, switchSession]);
-
-
-
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
   const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
@@ -822,8 +813,44 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 一键生成图片
   const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
-    return await chatService.generateImage(sessionId);
-  }, []);
+    const result = await chatService.generateImage(sessionId);
+    
+    // 如果图片生成成功，重新获取会话历史以获取最新的图片消息
+    if (result.success && sessionId === currentSessionId) {
+      try {
+        // 获取最新的会话历史
+        const historyData = await sessionService.getSessionHistory(sessionId);
+        if (historyData.history && Array.isArray(historyData.history)) {
+          // 找到最后一条图片消息
+          const lastImageMessage = historyData.history
+            .filter((msg: any) => msg.role === 'image')
+            .pop();
+
+          if (lastImageMessage) {
+            // 创建图片消息对象
+            const imageMessage: Message = {
+              id: lastImageMessage.id || uuidv4(),
+              sender: 'bot',
+              text: lastImageMessage.content || '',
+              timestamp: new Date(lastImageMessage.timestamp || Date.now()).getTime(),
+              files: [{
+                name: 'generated_image',
+                type: 'image/png',
+                data: `/api/images/${lastImageMessage.image_path}`
+              }]
+            };
+
+            // 添加图片消息到当前消息列表
+            setMessages(prev => [...prev, imageMessage]);
+          }
+        }
+      } catch (error) {
+        console.error('获取生成的图片消息失败:', error);
+      }
+    }
+    
+    return result;
+  }, [currentSessionId]);
 
   return (
     <ChatContext.Provider value={{

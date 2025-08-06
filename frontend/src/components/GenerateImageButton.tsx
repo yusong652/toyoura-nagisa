@@ -3,7 +3,7 @@ import './GenerateImageButton.css';
 import { useChat } from '../contexts/ChatContext';
 
 const GenerateImageButton: React.FC = () => {
-  const { generateImage, currentSessionId, switchSession } = useChat();
+  const { generateImage, currentSessionId } = useChat();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -15,7 +15,7 @@ const GenerateImageButton: React.FC = () => {
       const res = await generateImage(currentSessionId);
       if (res.success) {
         setShowSuccess(true);
-        await switchSession(currentSessionId);
+        // 不再需要 switchSession，因为图片已在 generateImage 中直接添加到消息列表
         setTimeout(() => setShowSuccess(false), 2000);
       }
     } catch (e: any) {
