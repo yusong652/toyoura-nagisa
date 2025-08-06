@@ -5,10 +5,8 @@ import requests
 import asyncio
 from typing import Optional, Dict, Any
 from datetime import datetime
-from fastmcp.server.context import Context  # type: ignore
 
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
-from backend.infrastructure.mcp.utils.location_utils import get_user_location, get_user_city
 
 
 def _error(message: str, error_details: Optional[str] = None) -> dict:
@@ -61,13 +59,12 @@ def register_weather_tools(mcp: FastMCP):
         annotations={"category": "weather", "tags": ["weather", "forecast", "openweather", "climate", "temperature", "location"]}
     )
     async def get_weather(
-        context: Context,
-        city: Optional[str] = Field(None, description="City name in English. If not provided, will auto-detect from user location"),
+        city: str = Field(..., description="City name in English (e.g., 'Tokyo', 'New York', 'London')"),
         forecast_days: int = Field(0, ge=0, le=5, description="Number of days forecast (0-5). 0 for current only")
     ) -> dict:
-        """Fetch current weather or forecast with automatic location detection.
+        """Fetch current weather or forecast for a specified city.
         
-        Retrieves weather from OpenWeatherMap API. Auto-detects user location when city is not specified.
+        Retrieves weather from OpenWeatherMap API for the specified city name.
         Supports current conditions and multi-day forecasts with temperature, humidity, and wind data.
         """
         API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
@@ -77,15 +74,6 @@ def register_weather_tools(mcp: FastMCP):
         try:
             determined_city = city
             location_source = "manual_input"
-
-            # If no city specified, try to detect from user location
-            if not city:
-                detected_city = await get_user_city(context, wait_time=8)
-                if detected_city:
-                    determined_city = detected_city
-                    location_source = "auto_detected"
-                else:
-                    return _error("Location detection failed", "No location information available")
 
             # Fetch weather data
             if forecast_days and forecast_days > 0:

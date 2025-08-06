@@ -318,42 +318,11 @@ class LLMClientBase(ABC):
                         'action_text': f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
                     }
                 
-                # Create async tasks for parallel execution
-                async def execute_tool_with_context(tool_call):
-                    """Execute tool and return with its context."""
-                    try:
-                        result = await self._execute_single_tool_call(
-                            tool_call, session_id, execution_id, debug
-                        )
-                        return tool_call, result, None
-                    except Exception as e:
-                        # Return error as structured result following ToolResult format
-                        tool_name = tool_call.get('name', 'unknown')
-                        error_message = str(e)
-                        
-                        error_result = {
-                            'status': 'error',
-                            'message': f"Tool '{tool_name}' execution failed: {error_message}",
-                            'llm_content': {
-                                'operation': tool_name,
-                                'result': {
-                                    'error': error_message,
-                                    'tool_call': tool_call  # Include original tool call for debugging
-                                },
-                                'summary': f"Failed to execute {tool_name}: {error_message}"
-                            },
-                            'data': {
-                                'error': error_message,
-                                'tool_name': tool_name,
-                                'tool_call': tool_call,
-                                'exception_type': type(e).__name__
-                            },
-                            'error': error_message
-                        }
-                        return tool_call, error_result, e
-                
                 # Execute all tools in parallel
-                tasks = [execute_tool_with_context(tc) for tc in tool_calls]
+                tasks = [
+                    self._execute_tool_for_parallel_batch(tc, session_id, execution_id, debug) 
+                    for tc in tool_calls
+                ]
                 results = await asyncio.gather(*tasks, return_exceptions=False)
                 
                 # Process results and add to context
@@ -534,6 +503,83 @@ class LLMClientBase(ABC):
             
             # Re-raise the exception to stop tool calling loop
             raise e
+
+    async def _execute_tool_for_parallel_batch(
+        self,
+        tool_call: Dict[str, Any],
+        session_id: Optional[str],
+        execution_id: str,
+        debug: bool
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[Exception]]:
+        """
+        Execute a single tool as part of a parallel batch execution.
+        
+        Wraps tool execution with error handling for parallel processing context.
+        Returns a tuple containing the tool call, result, and error for proper
+        tracking in parallel execution scenarios.
+        
+        Args:
+            tool_call: Tool call specification with structure:
+                - id: str - Unique tool call identifier
+                - name: str - Tool name to execute
+                - args/arguments: Dict[str, Any] - Tool parameters
+            session_id: Session ID for context-specific tool execution
+            execution_id: Unique execution identifier for debugging
+            debug: Enable detailed debug logging
+            
+        Returns:
+            Tuple[Dict[str, Any], Dict[str, Any], Optional[Exception]]:
+                - tool_call: Original tool call for reference
+                - result: Tool execution result or error result
+                - error: Exception if error occurred, None otherwise
+                
+        Note:
+            This method ensures errors in one tool don't prevent other tools
+            from executing in a parallel batch. Error results follow the
+            standardized ToolResult format for consistent LLM understanding.
+        """
+        try:
+            # Debug tool call structure to identify parameter issues
+            if debug:
+                tool_name = tool_call.get('name', 'unknown')
+                print(f"[DEBUG] Parallel batch tool call for {tool_name}:")
+                print(f"[DEBUG] - Tool call structure: {tool_call}")
+                
+            result = await self._execute_single_tool_call(
+                tool_call, session_id, execution_id, debug
+            )
+            return tool_call, result, None
+        except Exception as e:
+            # Build structured error result following ToolResult format
+            tool_name = tool_call.get('name', 'unknown')
+            error_message = str(e)
+            
+            if debug:
+                print(f"[DEBUG] Tool execution failed in parallel batch:")
+                print(f"[DEBUG] - Tool: {tool_name}")
+                print(f"[DEBUG] - Error: {error_message}")
+                print(f"[DEBUG] - Tool call: {tool_call}")
+            
+            error_result = {
+                'status': 'error',
+                'message': f"Tool '{tool_name}' execution failed: {error_message}",
+                'llm_content': {
+                    'operation': tool_name,
+                    'result': {
+                        'error': error_message,
+                        'tool_call': tool_call  # Include original tool call for debugging
+                    },
+                    'summary': f"Failed to execute {tool_name}: {error_message}"
+                },
+                'data': {
+                    'error': error_message,
+                    'tool_name': tool_name,
+                    'tool_call': tool_call,
+                    'exception_type': type(e).__name__
+                },
+                'error': error_message
+            }
+            return tool_call, error_result, e
 
     # ========== SHARED UTILITY METHODS ==========
 
