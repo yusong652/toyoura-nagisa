@@ -5,6 +5,7 @@ This module provides the foundational LLMClientBase class that all provider-spec
 clients inherit from, implementing common patterns extracted from the Gemini implementation.
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.domain.models.messages import BaseMessage
@@ -294,35 +295,99 @@ class LLMClientBase(ABC):
             # Extract and execute tool calls (provider-specific)
             tool_calls = self._extract_tool_calls(current_response)
             
-            # Execute tool calls - real-time notification for each tool call
-            for tool_call in tool_calls:
-                metadata['tool_calls_executed'] += 1
+            # Execute tool calls - parallel execution when multiple tools requested
+            if tool_calls:
+                num_tools = len(tool_calls)
+                metadata['tool_calls_executed'] += num_tools
                 
-                # Tool start notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Using {tool_call.get('name', 'tool')}..."
-                }
+                # Notification for parallel execution
+                if num_tools == 1:
+                    # Single tool - use original notification
+                    tool_name = tool_calls[0].get('name', 'unknown_tool')
+                    yield {
+                        'type': 'NAGISA_IS_USING_TOOL',
+                        'tool_name': tool_name,
+                        'action_text': f"Using {tool_name}..."
+                    }
+                else:
+                    # Multiple tools - batch notification
+                    tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
+                    yield {
+                        'type': 'NAGISA_IS_USING_TOOL',
+                        'tool_name': 'parallel_tools',
+                        'action_text': f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+                    }
                 
-                # Execute single tool call
-                tool_result = await self._execute_single_tool_call(
-                    tool_call, session_id, execution_id, debug
-                )
+                # Create async tasks for parallel execution
+                async def execute_tool_with_context(tool_call):
+                    """Execute tool and return with its context."""
+                    try:
+                        result = await self._execute_single_tool_call(
+                            tool_call, session_id, execution_id, debug
+                        )
+                        return tool_call, result, None
+                    except Exception as e:
+                        # Return error as structured result following ToolResult format
+                        tool_name = tool_call.get('name', 'unknown')
+                        error_message = str(e)
+                        
+                        error_result = {
+                            'status': 'error',
+                            'message': f"Tool '{tool_name}' execution failed: {error_message}",
+                            'llm_content': {
+                                'operation': tool_name,
+                                'result': {
+                                    'error': error_message,
+                                    'tool_call': tool_call  # Include original tool call for debugging
+                                },
+                                'summary': f"Failed to execute {tool_name}: {error_message}"
+                            },
+                            'data': {
+                                'error': error_message,
+                                'tool_name': tool_name,
+                                'tool_call': tool_call,
+                                'exception_type': type(e).__name__
+                            },
+                            'error': error_message
+                        }
+                        return tool_call, error_result, e
                 
-                # Tool completion notification
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': tool_call.get('name', 'unknown_tool'),
-                    'action_text': f"Completed {tool_call.get('name', 'tool')}"
-                }
+                # Execute all tools in parallel
+                tasks = [execute_tool_with_context(tc) for tc in tool_calls]
+                results = await asyncio.gather(*tasks, return_exceptions=False)
                 
-                # Add tool result to context
-                context_manager.add_tool_result(
-                    tool_call['id'],
-                    tool_call['name'],
-                    tool_result
-                )
+                # Process results and add to context
+                failed_tools = []
+                for tool_call, result, error in results:
+                    context_manager.add_tool_result(
+                        tool_call['id'],
+                        tool_call['name'],
+                        result
+                    )
+                    if error:
+                        failed_tools.append(tool_call.get('name', 'unknown'))
+                
+                # Completion notification
+                if num_tools == 1:
+                    tool_name = tool_calls[0].get('name', 'unknown_tool')
+                    yield {
+                        'type': 'NAGISA_IS_USING_TOOL',
+                        'tool_name': tool_name,
+                        'action_text': f"Completed {tool_name}"
+                    }
+                else:
+                    if failed_tools:
+                        yield {
+                            'type': 'NAGISA_IS_USING_TOOL',
+                            'tool_name': 'parallel_tools',
+                            'action_text': f"Completed {num_tools} tools ({len(failed_tools)} failed: {', '.join(failed_tools)})"
+                        }
+                    else:
+                        yield {
+                            'type': 'NAGISA_IS_USING_TOOL',
+                            'tool_name': 'parallel_tools',
+                            'action_text': f"Successfully completed all {num_tools} tools"
+                        }
             
             # Get next round response
             working_contents = context_manager.get_working_contents()
