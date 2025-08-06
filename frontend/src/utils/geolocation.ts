@@ -10,11 +10,6 @@ interface LocationData {
   timestamp?: number;
 }
 
-interface LocationResponse {
-  success: boolean;
-  message?: string;
-  location?: LocationData;
-}
 
 class GeolocationService {
   private static instance: GeolocationService;
@@ -101,42 +96,19 @@ class GeolocationService {
   }
 
   /**
-   * 更新位置信息到后端
-   */
-  async updateLocationToBackend(locationData: LocationData): Promise<boolean> {
-    try {
-      const response = await fetch('/api/location/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(locationData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result: LocationResponse = await response.json();
-      return result.success;
-    } catch (error) {
-      console.error('Failed to update location to backend:', error);
-      return false;
-    }
-  }
-
-  /**
-   * 获取并更新位置信息
+   * 获取位置信息（不再上传到后端，仅用于浏览器端获取）
+   * 位置信息现在通过 WebSocket 由后端主动请求
    */
   async getAndUpdateLocation(): Promise<boolean> {
     try {
       const locationData = await this.requestLocation();
       if (locationData) {
-        return await this.updateLocationToBackend(locationData);
+        console.log('Location acquired successfully:', locationData);
+        return true;
       }
       return false;
     } catch (error) {
-      console.error('Failed to get and update location:', error);
+      console.error('Failed to get location:', error);
       return false;
     }
   }
