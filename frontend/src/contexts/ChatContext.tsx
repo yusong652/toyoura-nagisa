@@ -3,7 +3,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
 import { useConnection } from './ConnectionContext'
+import { useTools } from './ToolsContext'
 import { playMotion } from '../utils/live2d'
+import { chatService, sessionService } from '../services/api'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -29,21 +31,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     connectionStatus, 
     connectionError, 
     connectToSession, 
-    sendWebSocketMessage, 
-    onLocationRequest,
     checkConnection 
   } = useConnection()
-  const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false);
-  // 添加工具状态
-  const [toolState, setToolState] = useState<{
-    type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
-    tool_name?: string;
-    parameters?: Record<string, any>;
-    action_text?: string;
-  } | null>(null);
-  // 添加工具开关状态
-  const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
-  const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
+  const {
+    toolState,
+    toolsEnabled,
+    ttsEnabled,
+    updateToolsEnabled,
+    updateTtsEnabled,
+    setToolState
+  } = useTools()
+  const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false)
 
   // Connect to WebSocket when session changes
   useEffect(() => {
@@ -52,63 +50,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [currentSessionId, connectToSession])
 
-  // 添加更新工具状态的函数
-  const updateToolsEnabled = useCallback(async (enabled: boolean) => {
-    try {
-      const response = await fetch('/api/chat/tools-enabled', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        setToolsEnabled(data.tools_enabled);
-      }
-    } catch (error) {
-      console.error('更新工具状态失败:', error);
-      throw error;
-    }
-  }, []);
-
-  // 更新 TTS 状态
-  const updateTtsEnabled = useCallback(async (enabled: boolean) => {
-    try {
-      const response = await fetch('/api/chat/tts-enabled', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update TTS status');
-      }
-
-      const data = await response.json();
-      setTtsEnabled(data.tts_enabled);
-    } catch (error) {
-      console.error('Error updating TTS status:', error);
-      throw error;
-    }
-  }, []);
 
 
   // 刷新会话列表
   const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
     try {
-      const response = await fetch('/api/history/sessions')
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await sessionService.getSessions();
       setSessions(data)
       return data;
     } catch (error) {
@@ -130,20 +77,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
     try {
       console.log('Sending create session request...');
-      const response = await fetch('/api/history/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name }),
-      });
-      
-      if (!response.ok) {
-        console.error('Create session request failed:', response.status);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const data = await sessionService.createSession(name);
       console.log('Create session response:', data);
       const newSessionId = data.session_id;
       
@@ -153,13 +87,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
       // 同步 TTS 状态到后端
       try {
-        await fetch('/api/chat/tts-enabled', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ enabled: ttsEnabled }),
-        });
+        await updateTtsEnabled(ttsEnabled);
       } catch (error) {
         console.error('同步 TTS 状态失败:', error);
       }
@@ -170,7 +98,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       console.error('Error in createNewSession:', error);
       throw error;
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled]);
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled]);
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -181,40 +109,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     }
     try {
-      const response = await fetch('/api/history/switch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+      await sessionService.switchSession(sessionId);
       
       localStorage.setItem('session_id', sessionId)
       setCurrentSessionId(sessionId)
 
       // 同步 TTS 状态到后端
       try {
-        await fetch('/api/chat/tts-enabled', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ enabled: ttsEnabled }),
-        });
+        await updateTtsEnabled(ttsEnabled);
       } catch (error) {
         console.error('同步 TTS 状态失败:', error);
       }
       
-      const historyResponse = await fetch(`/api/history/${sessionId}`)
-      if (!historyResponse.ok) {
-        throw new Error(`获取历史记录失败: ${historyResponse.status}`)
-      }
-      
-      const historyData = await historyResponse.json()
+      const historyData = await sessionService.getSessionHistory(sessionId);
       if (!historyData.history || !Array.isArray(historyData.history)) {
         console.error('Invalid history data format:', historyData);
         setMessages([]);
@@ -229,7 +136,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           if (msg.role === 'image') return true;
           return false;
         })
-        .map((msg: any) => {
+        .map((msg: any): Message | null => {
           // sender 判断更精确
           let sender: 'user' | 'bot';
           if (msg.role === 'user' && !msg.tool_request) {
@@ -309,7 +216,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       console.error('切换会话失败:', error);
       throw error;
     }
-  }, [connectionStatus, checkConnection, connectionError, ttsEnabled]);
+  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled]);
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -320,12 +227,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     }
     try {
-      const response = await fetch(`/api/history/${sessionId}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+      await sessionService.deleteSession(sessionId);
 
       // 用最新的 sessions 判断
       const latestSessions = await refreshSessions();
@@ -370,28 +272,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
       
       // 调用后端API删除消息
-      const response = await fetch('/api/messages/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: currentSessionId,
-          message_id: messageId
-        }),
-      });
+      const responseData = await chatService.deleteMessage(currentSessionId, messageId);
       
-      const responseData = await response.json();
-      
-      if (!response.ok) {
+      if (!responseData.success) {
         console.error('删除消息失败:', responseData);
         
         // 如果后端删除失败但前端已移除，恢复被删除的消息
-        if (response.status === 404) {
-          // 恢复被删除的消息列表
-          await switchSession(currentSessionId);
-          throw new Error(`删除消息失败: ${responseData.detail}`);
-        }
+        await switchSession(currentSessionId);
+        throw new Error(`删除消息失败: ${responseData.detail}`);
       }
       
       // 删除成功后刷新会话列表
@@ -528,31 +416,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 创建聊天API请求
   const createChatRequest = useCallback(async (text: string, files: FileData[] = [], userMessageId: string): Promise<Response> => {
-    // 构造请求数据
-    const messageData = JSON.stringify({
-      id: userMessageId,
-      text,
-      timestamp: Date.now(),
-      files: files.map(file => ({
-        name: file.name,
-        type: file.type,
-        data: file.data
-      }))
-    })
-    
-    const response = await fetch('/api/chat/stream', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messageData,
-        session_id: currentSessionId || localStorage.getItem('session_id') || "default_session",
-        tts_enabled: ttsEnabled,
-      }),
-    })
-    
-    if (!response.ok) {
+    try {
+      const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session";
+      return await chatService.sendMessage(text, files, sessionId, userMessageId, ttsEnabled);
+    } catch (error) {
       // 更新消息为错误状态
       setMessages(prev => 
         prev.map(msg => 
@@ -561,10 +428,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             : msg
         )
       )
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw error;
     }
-    
-    return response
   }, [currentSessionId, ttsEnabled])
 
   // 处理聊天API响应
@@ -1146,19 +1011,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         throw new Error('会话ID不能为空');
       }
 
-      const response = await fetch('/api/history/generate-title', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await sessionService.generateTitle(sessionId);
 
       // 如果成功生成了新标题，更新会话列表
       if (data.success && data.title) {
@@ -1179,17 +1032,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 一键生成图片
   const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
-    try {
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId })
-      });
-      const data = await response.json();
-      return data;
-    } catch (error: any) {
-      return { success: false, error: error.message || 'Network error' };
-    }
+    return await chatService.generateImage(sessionId);
   }, []);
 
   return (

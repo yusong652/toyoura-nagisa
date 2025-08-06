@@ -8,6 +8,8 @@ import ThemeToggle from './components/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
 import { AudioProvider } from './contexts/AudioContext'
 import { ConnectionProvider } from './contexts/ConnectionContext'
+import { ToolsProvider } from './contexts/ToolsContext'
+import { SessionProvider } from './contexts/SessionContext'
 import { ChatProvider, useChat } from './contexts/ChatContext'
 import { ConnectionStatus } from './types/chat'
 
@@ -45,10 +47,14 @@ function App(): React.ReactElement {
     <>
       <AudioProvider>
         <ConnectionProvider>
-          <ChatProvider>
-            <AppContent />
-            <Live2DCanvas />
-          </ChatProvider>
+          <ToolsProvider>
+            <SessionProvider>
+              <ChatProvider>
+                <AppContent />
+                <Live2DCanvas />
+              </ChatProvider>
+            </SessionProvider>
+          </ToolsProvider>
         </ConnectionProvider>
       </AudioProvider>
     </>
