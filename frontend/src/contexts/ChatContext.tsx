@@ -4,7 +4,7 @@ import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, Mess
 import { useAudio } from './AudioContext.tsx'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
-import { SessionProvider } from './SessionContext'
+import { SessionProvider, useSession } from './SessionContext'
 import { playMotion } from '../utils/live2d'
 import { chatService, sessionService } from '../services/api'
 
@@ -26,13 +26,10 @@ interface ChatProviderProps {
 const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const { 
     connectionStatus, 
     connectionError, 
-    connectToSession, 
     checkConnection 
   } = useConnection()
   const {
@@ -43,211 +40,139 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     updateTtsEnabled,
     setToolState
   } = useTools()
-  const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false)
+  
+  // 从SessionContext获取会话相关状态和方法
+  const {
+    sessions,
+    currentSessionId,
+    refreshSessions: sessionRefreshSessions,
+    createNewSession: sessionCreateNewSession,
+    switchSession: sessionSwitchSession,
+    deleteSession: sessionDeleteSession,
+    refreshTitle: sessionRefreshTitle
+  } = useSession()
 
 
-  // Connect to WebSocket when session changes
+  // 当会话变化时，重新加载消息
   useEffect(() => {
     if (currentSessionId) {
-      connectToSession(currentSessionId)
-    }
-  }, [currentSessionId, connectToSession])
+      // 直接调用内部消息加载逻辑，而不是通过 switchSession 包装器
+      const loadMessages = async () => {
+        try {
+          const historyData = await sessionService.getSessionHistory(currentSessionId)
+          if (historyData.history && Array.isArray(historyData.history)) {
+            const convertedMessages: Message[] = historyData.history
+              .filter((msg: any) => {
+                if (msg.role === 'user' && !msg.tool_request) return true
+                if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true
+                if (msg.role === 'image') return true
+                return false
+              })
+              .map((msg: any): Message | null => {
+                let sender: 'user' | 'bot'
+                if (msg.role === 'user' && !msg.tool_request) {
+                  sender = 'user'
+                } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
+                  sender = 'bot'
+                } else if (msg.role === 'image') {
+                  sender = 'bot'
+                } else {
+                  return null
+                }
 
+                let text = ''
+                let files: any[] = []
 
+                if (msg.role === 'image') {
+                  text = msg.content || ''
+                  files.push({
+                    name: 'generated_image',
+                    type: 'image/png',
+                    data: `/api/images/${msg.image_path}`
+                  })
+                } else if (typeof msg.content === 'string') {
+                  text = msg.content
+                } else if (Array.isArray(msg.content)) {
+                  const textContents = msg.content
+                    .filter((item: any) => item.text)
+                    .map((item: any) => item.text)
+                  text = textContents.join('\n')
+                  
+                  msg.content.forEach((item: any) => {
+                    if (item.inline_data) {
+                      files.push({
+                        name: `image_${files.length + 1}`,
+                        type: item.inline_data.mime_type,
+                        data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
+                      })
+                    }
+                  })
+                }
 
-  // 刷新会话列表
-  const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
-    try {
-      const data = await sessionService.getSessions();
-      setSessions(data)
-      return data;
-    } catch (error) {
-      console.error('获取会话列表失败:', error);
-      throw error;
-    }
-  }, [])
-
-  // 创建新会话
-  const createNewSession = useCallback(async (name?: string): Promise<string> => {
-    console.log('createNewSession called with name:', name);
-    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
-      console.log('Checking connection...');
-      const canConnect = await checkConnection();
-      if (!canConnect) {
-        console.error('Connection check failed:', connectionError);
-        throw new Error(connectionError || "无法连接到服务器，请重试。");
-      }
-    }
-    try {
-      console.log('Sending create session request...');
-      const data = await sessionService.createSession(name);
-      console.log('Create session response:', data);
-      const newSessionId = data.session_id;
-      
-      localStorage.setItem('session_id', newSessionId);
-      setCurrentSessionId(newSessionId);
-      setMessages([]);
-
-      // 同步 TTS 状态到后端
-      try {
-        await updateTtsEnabled(ttsEnabled);
-      } catch (error) {
-        console.error('同步 TTS 状态失败:', error);
-      }
-
-      await refreshSessions();
-      return newSessionId;
-    } catch (error) {
-      console.error('Error in createNewSession:', error);
-      throw error;
-    }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled]);
-
-  // 切换会话
-  const switchSession = useCallback(async (sessionId: string): Promise<void> => {
-    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
-      const canConnect = await checkConnection();
-      if (!canConnect) {
-        throw new Error(connectionError || "无法连接到服务器，请重试。");
-      }
-    }
-    try {
-      await sessionService.switchSession(sessionId);
-      
-      localStorage.setItem('session_id', sessionId)
-      setCurrentSessionId(sessionId)
-
-      // 同步 TTS 状态到后端
-      try {
-        await updateTtsEnabled(ttsEnabled);
-      } catch (error) {
-        console.error('同步 TTS 状态失败:', error);
-      }
-      
-      const historyData = await sessionService.getSessionHistory(sessionId);
-      if (!historyData.history || !Array.isArray(historyData.history)) {
-        console.error('Invalid history data format:', historyData);
-        setMessages([]);
-        return;
-      }
-
-      const convertedMessages: Message[] = historyData.history
-        .filter((msg: any) => {
-          // 只保留真正的用户发言、AI文本和图片消息
-          if (msg.role === 'user' && !msg.tool_request) return true;
-          if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true;
-          if (msg.role === 'image') return true;
-          return false;
-        })
-        .map((msg: any): Message | null => {
-          // sender 判断更精确
-          let sender: 'user' | 'bot';
-          if (msg.role === 'user' && !msg.tool_request) {
-            sender = 'user';
-          } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
-            sender = 'bot';
-          } else if (msg.role === 'image') {
-            sender = 'bot';  // 图片消息也作为bot的消息显示
-          } else {
-            console.warn('Unexpected message format:', msg);
-            return null;
-          }
-
-          let text = '';
-          let files: FileData[] = [];
-          
-          // 处理消息内容
-          if (msg.role === 'image') {
-            // 处理图片消息
-            text = msg.content || '';
-            files.push({
-              name: 'generated_image',
-              type: 'image/png',
-              data: `/api/images/${msg.image_path}`  // 通过API路由访问图片
-            });
-          } else if (typeof msg.content === 'string') {
-            text = msg.content;
-          } else if (Array.isArray(msg.content)) {
-            // 合并所有文本内容
-            const textContents = msg.content
-              .filter((item: any) => item.text)
-              .map((item: any) => item.text);
-            text = textContents.join('\n');
+                return {
+                  id: msg.id || uuidv4(),
+                  sender,
+                  text,
+                  files: files.length > 0 ? files : undefined,
+                  timestamp: new Date(msg.timestamp || Date.now()).getTime(),
+                  status: sender === 'user' ? MessageStatus.READ : undefined,
+                  streaming: false,
+                  isLoading: false,
+                  isRead: true,
+                  toolState: msg.tool_state ? {
+                    isUsingTool: msg.tool_state.is_using_tool || false,
+                    toolName: msg.tool_state.tool_name,
+                    action: msg.tool_state.action
+                  } : undefined
+                }
+              })
+              .filter((msg: Message | null): msg is Message => msg !== null)
             
-            // 处理所有文件
-            msg.content.forEach((item: any) => {
-              if (item.inline_data) {
-                files.push({
-                  name: `image_${files.length + 1}`,
-                  type: item.inline_data.mime_type,
-                  data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
-                });
-              }
-            });
+            setMessages(convertedMessages)
           } else {
-            console.warn('Invalid message content format:', msg.content);
-            text = '消息格式错误';
+            setMessages([])
           }
-
-          // 处理工具状态
-          let toolState = undefined;
-          if (msg.tool_state) {
-            toolState = {
-              isUsingTool: msg.tool_state.is_using_tool || false,
-              toolName: msg.tool_state.tool_name,
-              action: msg.tool_state.action
-            };
-          }
-
-          return {
-            id: msg.id || uuidv4(),
-            sender,
-            text,
-            files: files.length > 0 ? files : undefined,
-            timestamp: new Date(msg.timestamp || Date.now()).getTime(),
-            status: sender === 'user' ? MessageStatus.READ : undefined,
-            streaming: false,
-            isLoading: false,
-            isRead: true,
-            toolState
-          };
-        })
-        .filter((msg: Message | null): msg is Message => msg !== null);
-
-      setMessages(convertedMessages);
-    } catch (error) {
-      console.error('切换会话失败:', error);
-      throw error;
-    }
-  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled]);
-
-  // 删除会话
-  const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
-    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
-      const canConnect = await checkConnection();
-      if (!canConnect) {
-        throw new Error(connectionError || "无法连接到服务器，请重试。");
-      }
-    }
-    try {
-      await sessionService.deleteSession(sessionId);
-
-      // 用最新的 sessions 判断
-      const latestSessions = await refreshSessions();
-
-      if (sessionId === currentSessionId) {
-        if (latestSessions.length > 0) {
-          await switchSession(latestSessions[0].id);
-        } else {
-          await createNewSession();
+        } catch (error) {
+          console.error('加载会话消息失败:', error)
+          setMessages([])
         }
       }
-
-    } catch (error) {
-      console.error('删除会话失败:', error);
-      throw error;
+      loadMessages()
+    } else {
+      setMessages([])
     }
-  }, [currentSessionId, createNewSession, refreshSessions, switchSession, connectionStatus, checkConnection, connectionError]);
+  }, [currentSessionId])
+
+  // 包装SessionContext的函数以保持接口兼容性
+  const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
+    return await sessionRefreshSessions()
+  }, [sessionRefreshSessions])
+
+  const createNewSession = useCallback(async (name?: string): Promise<string> => {
+    const newSessionId = await sessionCreateNewSession(name)
+    setMessages([]) // 创建新会话时清空消息
+    return newSessionId
+  }, [sessionCreateNewSession])
+
+  const switchSession = useCallback(async (sessionId: string): Promise<void> => {
+    await sessionSwitchSession(sessionId)
+    // 消息加载由 useEffect 自动处理
+  }, [sessionSwitchSession])
+
+  const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
+    await sessionDeleteSession(sessionId)
+    // SessionContext会自动处理切换到其他会话
+  }, [sessionDeleteSession])
+
+  const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
+    await sessionRefreshTitle(sessionId)
+  }, [sessionRefreshTitle])
+
+
+
+
+
+
 
   // 删除消息
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
@@ -293,107 +218,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [currentSessionId, connectionStatus, checkConnection, connectionError, refreshSessions, messages, switchSession]);
 
-  // 初始化 Effect: ComponentDidMount
-  useEffect(() => {
-    const initLoad = async () => {
-      // Attempt to establish connection and load initial data
-      const connected = await checkConnection();
-      if (!connected) {
-        setSessionLoadAttempted(true); // Mark that an initial load attempt failed due to connection
-        return;
-      }
 
-      // Connection successful, now try to load session list and then the active session
-      try {
-        await refreshSessions(); // Load all session details first
-
-        const storedSessionId = localStorage.getItem('session_id');
-        if (storedSessionId) {
-          try {
-            await switchSession(storedSessionId); // This loads messages for the session
-            setSessionLoadAttempted(false); // Successfully loaded a session
-          } catch (switchError) {
-            console.error('初始化时无法切换到已存储会话，尝试创建新会话:', switchError);
-            if (connectionStatus === ConnectionStatus.CONNECTED) {
-              try {
-                await createNewSession(); // This loads messages for new session & refreshes list
-                setSessionLoadAttempted(false); // Successfully created a new session
-              } catch (createError) {
-                console.error('初始化时创建新会话失败（切换会话后）:', createError);
-                setSessionLoadAttempted(true); // Failed to establish a session
-              }
-            } else {
-              setSessionLoadAttempted(true); // Connection lost during switchSession attempt
-            }
-          }
-        } else {
-          // No stored session, create a new one
-          try {
-            await createNewSession();
-            setSessionLoadAttempted(false); // Successfully created a new session
-          } catch (createError) {
-            console.error('初始化时创建新会话失败（无存储ID）:', createError);
-            setSessionLoadAttempted(true); // Failed to establish a session
-          }
-        }
-      } catch (refreshError) {
-        // Error from refreshSessions()
-        console.error('初始化时加载会话列表失败:', refreshError);
-        setSessionLoadAttempted(true); // Mark that the load was attempted and failed
-      }
-    };
-
-    initLoad();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
-
-  // 尝试在重新连接后加载会话
-  useEffect(() => {
-    const loadSessionOnReconnect = async () => {
-      if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId) {
-        console.log("检测到重新连接，尝试加载/刷新会话...");
-        setSessionLoadAttempted(false); // We are attempting to load now
-
-        try {
-          await refreshSessions(); // Load all session details first
-
-          const storedSessionId = localStorage.getItem('session_id');
-          if (storedSessionId) {
-            try {
-              await switchSession(storedSessionId);
-              // Successfully loaded session on reconnect
-            } catch (switchError) {
-              console.error('重新连接后无法切换到已存储会话，尝试创建新会话:', switchError);
-              if (connectionStatus === ConnectionStatus.CONNECTED) {
-                try {
-                  await createNewSession();
-                } catch (createError) {
-                  console.error('重新连接后创建新会话也失败（切换会话后）:', createError);
-                  setSessionLoadAttempted(true); // Mark failed attempt
-                }
-              } else {
-                 setSessionLoadAttempted(true); // Connection lost during switch
-              }
-            }
-          } else {
-            // No stored session, create a new one
-            try {
-              await createNewSession();
-            } catch (createError) {
-              console.error('重新连接后创建新会话失败（无存储ID）:', createError);
-              setSessionLoadAttempted(true); // Mark failed attempt
-            }
-          }
-        } catch (refreshError) {
-          // Error from refreshSessions() during reconnect
-          console.error('重新连接后加载会话列表失败:', refreshError);
-          setSessionLoadAttempted(true); // Mark failed attempt so it can retry if connection cycles
-        }
-      }
-    };
-
-    loadSessionOnReconnect();
-  }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession]);
 
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
@@ -657,23 +482,10 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     const handleTitleUpdate = (data: any) => {
       // 确保payload存在并包含必要的字段
       if (data.payload && data.payload.session_id && data.payload.title) {
-        const { session_id: updatedSessionId, title: newTitle } = data.payload;
-        
-        // 更新会话列表中的会话标题
-        setSessions(prevSessions => 
-          prevSessions.map(session => 
-            session.id === updatedSessionId 
-              ? { ...session, name: newTitle }
-              : session
-          )
-        );
-        
-        // 如果更新的是当前活跃会话，立即刷新会话列表
-        if (updatedSessionId === currentSessionId) {
-          refreshSessions().catch(error => {
-            console.error('刷新会话列表失败:', error);
-          });
-        }
+        // 刷新会话列表以获取最新状态
+        refreshSessions().catch(error => {
+          console.error('刷新会话列表失败:', error);
+        });
       }
     };
 
@@ -937,7 +749,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [processAudioData, refreshSessions, playMotion, setSessions, currentSessionId, ttsEnabled])
+  }, [processAudioData, refreshSessions, playMotion, currentSessionId, ttsEnabled])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -1007,31 +819,6 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages([])
   }, [])
 
-  // 添加刷新标题方法
-  const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
-    try {
-      if (!sessionId) {
-        throw new Error('会话ID不能为空');
-      }
-
-      const data = await sessionService.generateTitle(sessionId);
-
-      // 如果成功生成了新标题，更新会话列表
-      if (data.success && data.title) {
-        // 更新本地状态中的会话标题
-        setSessions(prevSessions => 
-          prevSessions.map(session => 
-            session.id === sessionId 
-              ? { ...session, name: data.title }
-              : session
-          )
-        );
-      }
-    } catch (error) {
-      console.error('刷新标题失败:', error);
-      throw error;
-    }
-  }, [setSessions]);
 
   // 一键生成图片
   const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
@@ -1069,14 +856,8 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
 
 // 外部ChatProvider包装，包含SessionProvider
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
-  const handleSessionMessagesLoaded = useCallback((messages: Message[]) => {
-    // 这个回调会在SessionContext加载消息时被调用
-    // 我们需要将这些消息传递给ChatProviderCore
-    console.log('SessionContext loaded messages:', messages.length)
-  }, [])
-
   return (
-    <SessionProvider onSessionMessagesLoaded={handleSessionMessagesLoaded}>
+    <SessionProvider>
       <ChatProviderCore>
         {children}
       </ChatProviderCore>

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { ChatSession, ConnectionStatus, Message, FileData, MessageStatus } from '../types/chat'
+import { ChatSession, ConnectionStatus } from '../types/chat'
 import { sessionService } from '../services/api'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
@@ -17,9 +16,6 @@ export interface SessionContextType {
   switchSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   refreshTitle: (sessionId: string) => Promise<void>
-
-  // Session message operations
-  onSessionMessagesLoaded: (messages: Message[]) => void
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
@@ -34,12 +30,10 @@ export const useSession = (): SessionContextType => {
 
 interface SessionProviderProps {
   children: ReactNode
-  onSessionMessagesLoaded?: (messages: Message[]) => void
 }
 
 export const SessionProvider: React.FC<SessionProviderProps> = ({ 
-  children, 
-  onSessionMessagesLoaded 
+  children
 }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
@@ -94,17 +88,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
 
       await refreshSessions()
       
-      // 通知外部组件新会话已创建，消息列表应为空
-      if (onSessionMessagesLoaded) {
-        onSessionMessagesLoaded([])
-      }
-      
       return newSessionId
     } catch (error) {
       console.error('Error in createNewSession:', error)
       throw error
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled, onSessionMessagesLoaded])
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled])
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -127,107 +116,13 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
         console.error('同步 TTS 状态失败:', error)
       }
       
-      const historyData = await sessionService.getSessionHistory(sessionId)
-      if (!historyData.history || !Array.isArray(historyData.history)) {
-        console.error('Invalid history data format:', historyData)
-        if (onSessionMessagesLoaded) {
-          onSessionMessagesLoaded([])
-        }
-        return
-      }
-
-      const convertedMessages: Message[] = historyData.history
-        .filter((msg: any) => {
-          // 只保留真正的用户发言、AI文本和图片消息
-          if (msg.role === 'user' && !msg.tool_request) return true
-          if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true
-          if (msg.role === 'image') return true
-          return false
-        })
-        .map((msg: any): Message | null => {
-          // sender 判断更精确
-          let sender: 'user' | 'bot'
-          if (msg.role === 'user' && !msg.tool_request) {
-            sender = 'user'
-          } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
-            sender = 'bot'
-          } else if (msg.role === 'image') {
-            sender = 'bot'  // 图片消息也作为bot的消息显示
-          } else {
-            console.warn('Unexpected message format:', msg)
-            return null
-          }
-
-          let text = ''
-          let files: FileData[] = []
-          
-          // 处理消息内容
-          if (msg.role === 'image') {
-            // 处理图片消息
-            text = msg.content || ''
-            files.push({
-              name: 'generated_image',
-              type: 'image/png',
-              data: `/api/images/${msg.image_path}`  // 通过API路由访问图片
-            })
-          } else if (typeof msg.content === 'string') {
-            text = msg.content
-          } else if (Array.isArray(msg.content)) {
-            // 合并所有文本内容
-            const textContents = msg.content
-              .filter((item: any) => item.text)
-              .map((item: any) => item.text)
-            text = textContents.join('\n')
-            
-            // 处理所有文件
-            msg.content.forEach((item: any) => {
-              if (item.inline_data) {
-                files.push({
-                  name: `image_${files.length + 1}`,
-                  type: item.inline_data.mime_type,
-                  data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
-                })
-              }
-            })
-          } else {
-            console.warn('Invalid message content format:', msg.content)
-            text = '消息格式错误'
-          }
-
-          // 处理工具状态
-          let toolState = undefined
-          if (msg.tool_state) {
-            toolState = {
-              isUsingTool: msg.tool_state.is_using_tool || false,
-              toolName: msg.tool_state.tool_name,
-              action: msg.tool_state.action
-            }
-          }
-
-          return {
-            id: msg.id || uuidv4(),
-            sender,
-            text,
-            files: files.length > 0 ? files : undefined,
-            timestamp: new Date(msg.timestamp || Date.now()).getTime(),
-            status: sender === 'user' ? MessageStatus.READ : undefined,
-            streaming: false,
-            isLoading: false,
-            isRead: true,
-            toolState
-          }
-        })
-        .filter((msg: Message | null): msg is Message => msg !== null)
-
-      // 通知外部组件会话消息已加载
-      if (onSessionMessagesLoaded) {
-        onSessionMessagesLoaded(convertedMessages)
-      }
+      // SessionContext 不再负责加载消息，这个责任完全交给 ChatContext
+      // 这样避免重复加载，职责更清晰
     } catch (error) {
       console.error('切换会话失败:', error)
       throw error
     }
-  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled, onSessionMessagesLoaded])
+  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled])
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -392,12 +287,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     loadSessionOnReconnect()
   }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession])
 
-  const onSessionMessagesLoadedCallback = useCallback((messages: Message[]) => {
-    if (onSessionMessagesLoaded) {
-      onSessionMessagesLoaded(messages)
-    }
-  }, [onSessionMessagesLoaded])
-
   return (
     <SessionContext.Provider value={{
       sessions,
@@ -407,8 +296,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       createNewSession,
       switchSession,
       deleteSession,
-      refreshTitle,
-      onSessionMessagesLoaded: onSessionMessagesLoadedCallback
+      refreshTitle
     }}>
       {children}
     </SessionContext.Provider>
