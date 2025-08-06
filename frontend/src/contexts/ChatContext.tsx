@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
 import { useAudio } from './AudioContext.tsx'
+import { useConnection } from './ConnectionContext'
 import { playMotion } from '../utils/live2d'
-import GeolocationService from '../utils/geolocation'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -24,9 +24,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CONNECTING)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
+  const { 
+    connectionStatus, 
+    connectionError, 
+    connectToSession, 
+    sendWebSocketMessage, 
+    onLocationRequest,
+    checkConnection 
+  } = useConnection()
   const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false);
   // 添加工具状态
   const [toolState, setToolState] = useState<{
@@ -39,102 +45,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [toolsEnabled, setToolsEnabled] = useState<boolean>(false);
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(true)
 
-  // 处理位置请求的函数
-  const handleLocationRequest = useCallback(async (data: any) => {
-    console.log('收到位置请求:', data);
-    
-    try {
-      // 获取地理位置服务实例
-      const geolocationService = GeolocationService.getInstance();
-      
-      // 确保服务已初始化
-      if (!geolocationService.isServiceInitialized()) {
-        await geolocationService.initialize();
-      }
-      
-      // 获取位置信息
-      const locationData = await geolocationService.requestLocation();
-      
-      if (locationData) {
-        // 通过WebSocket直接回复位置数据
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          const locationResponse = {
-            type: 'LOCATION_RESPONSE',
-            session_id: currentSessionId,
-            location_data: locationData,
-            timestamp: Date.now()
-          };
-          
-          wsRef.current.send(JSON.stringify(locationResponse));
-          console.log('位置信息已通过WebSocket发送到后端:', locationData);
-        } else {
-          console.warn('WebSocket连接不可用，无法发送位置信息');
-        }
-      } else {
-        console.warn('无法获取位置信息');
-        
-        // 发送位置获取失败的响应
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          const errorResponse = {
-            type: 'LOCATION_RESPONSE',
-            session_id: currentSessionId,
-            error: 'Failed to get location',
-            timestamp: Date.now()
-          };
-          
-          wsRef.current.send(JSON.stringify(errorResponse));
-        }
-      }
-    } catch (error) {
-      console.error('处理位置请求时出错:', error);
-    }
-  }, [currentSessionId]);
-
-  // --- WebSocket connection for server push (e.g., REQUEST_LOCATION) ---
-  const wsRef = useRef<WebSocket | null>(null);
-
-  // Establish /ws/{session_id} connection whenever currentSessionId changes
+  // Connect to WebSocket when session changes
   useEffect(() => {
-    // Close previous ws if any
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch (_) {}
-      wsRef.current = null;
+    if (currentSessionId) {
+      connectToSession(currentSessionId)
     }
-
-    if (!currentSessionId) return;
-
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${currentSessionId}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => console.log("[WebSocket] connected for session", currentSessionId);
-    ws.onclose = () => console.log("[WebSocket] closed for session", currentSessionId);
-    ws.onerror = (e) => console.error("[WebSocket] error", e);
-    
-    // Handle incoming WebSocket messages
-    ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("[WebSocket] received message:", data);
-        
-        // Handle location requests
-        if (data.type === 'REQUEST_LOCATION') {
-          console.log('WebSocket received location request');
-          await handleLocationRequest(data);
-        }
-      } catch (error) {
-        console.error("[WebSocket] failed to parse message:", error);
-      }
-    };
-
-    return () => {
-      try {
-        ws.close();
-      } catch (_) {}
-    };
-  }, [currentSessionId, handleLocationRequest]);
+  }, [currentSessionId, connectToSession])
 
   // 添加更新工具状态的函数
   const updateToolsEnabled = useCallback(async (enabled: boolean) => {
@@ -184,51 +100,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // 检查与后端的连接
-  const checkConnection = useCallback(async (): Promise<boolean> => {
-    try {
-      setConnectionStatus(ConnectionStatus.CONNECTING)
-      setConnectionError(null)
-      
-      const response = await fetch('/api/history/sessions', { 
-        signal: AbortSignal.timeout(5000) // 5秒超时
-      })
-      
-      if (response.ok) {
-        setConnectionStatus(ConnectionStatus.CONNECTED)
-        return true
-      } else {
-        setConnectionStatus(ConnectionStatus.ERROR)
-        setConnectionError(`服务器返回错误: ${response.status}`)
-        return false
-      }
-    } catch (error) {
-      console.error('连接检查失败:', error)
-      setConnectionStatus(ConnectionStatus.DISCONNECTED)
-      setConnectionError(error instanceof Error ? error.message : '无法连接到服务器')
-      return false
-    }
-  }, [])
 
   // 刷新会话列表
   const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
     try {
       const response = await fetch('/api/history/sessions')
       if (!response.ok) {
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`获取会话列表失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
       setSessions(data)
-      setConnectionStatus(ConnectionStatus.CONNECTED); // Successfully fetched
       return data;
     } catch (error) {
       console.error('获取会话列表失败:', error);
-      if (!(error instanceof DOMException && error.name === 'AbortError')) { // Don't set error if it's an abort
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(error instanceof Error ? error.message : '获取会话列表失败');
-      }
       throw error;
     }
   }, [])
@@ -256,8 +140,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       if (!response.ok) {
         console.error('Create session request failed:', response.status);
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`创建新会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -283,12 +165,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
 
       await refreshSessions();
-      setConnectionStatus(ConnectionStatus.CONNECTED);
       return newSessionId;
     } catch (error) {
       console.error('Error in createNewSession:', error);
-      setConnectionStatus(ConnectionStatus.ERROR);
-      setConnectionError(error instanceof Error ? error.message : '创建新会话失败');
       throw error;
     }
   }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled]);
@@ -311,8 +190,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       })
       
       if (!response.ok) {
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`切换会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
@@ -334,8 +211,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       const historyResponse = await fetch(`/api/history/${sessionId}`)
       if (!historyResponse.ok) {
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`获取历史记录失败: ${historyResponse.status}`);
         throw new Error(`获取历史记录失败: ${historyResponse.status}`)
       }
       
@@ -430,11 +305,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         .filter((msg: Message | null): msg is Message => msg !== null);
 
       setMessages(convertedMessages);
-      setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
       console.error('切换会话失败:', error);
-      setConnectionStatus(ConnectionStatus.ERROR);
-      setConnectionError(error instanceof Error ? error.message : '切换会话失败');
       throw error;
     }
   }, [connectionStatus, checkConnection, connectionError, ttsEnabled]);
@@ -452,8 +324,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         method: 'DELETE',
       })
       if (!response.ok) {
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`删除会话失败: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
@@ -468,11 +338,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
 
-      setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
       console.error('删除会话失败:', error);
-      setConnectionStatus(ConnectionStatus.ERROR);
-      setConnectionError(error instanceof Error ? error.message : '删除会话失败');
       throw error;
     }
   }, [currentSessionId, createNewSession, refreshSessions, switchSession, connectionStatus, checkConnection, connectionError]);
@@ -518,8 +385,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       if (!response.ok) {
         console.error('删除消息失败:', responseData);
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(`删除消息失败: ${responseData.detail || response.status}`);
         
         // 如果后端删除失败但前端已移除，恢复被删除的消息
         if (response.status === 404) {
@@ -531,11 +396,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       // 删除成功后刷新会话列表
       await refreshSessions();
-      setConnectionStatus(ConnectionStatus.CONNECTED);
     } catch (error) {
       console.error('删除消息失败:', error);
-      setConnectionStatus(ConnectionStatus.ERROR);
-      setConnectionError(error instanceof Error ? error.message : '删除消息失败');
       throw error;
     }
   }, [currentSessionId, connectionStatus, checkConnection, connectionError, refreshSessions, messages, switchSession]);
@@ -699,14 +561,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             : msg
         )
       )
-      
-      setConnectionStatus(ConnectionStatus.ERROR);
-      setConnectionError(`发送消息失败: ${response.status}`);
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     
     return response
-  }, [currentSessionId, setConnectionStatus, setConnectionError, ttsEnabled])
+  }, [currentSessionId, ttsEnabled])
 
   // 处理聊天API响应
   const processStreamResponse = useCallback(async (
@@ -1030,8 +889,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               : msg
           )
         );
-        setConnectionStatus(ConnectionStatus.ERROR);
-        setConnectionError(data.error || '发送消息失败');
       }
     };
 
@@ -1212,7 +1069,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [processAudioData, refreshSessions, setConnectionError, setConnectionStatus, playMotion, setSessions, currentSessionId, ttsEnabled])
+  }, [processAudioData, refreshSessions, playMotion, setSessions, currentSessionId, ttsEnabled])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -1273,13 +1130,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         )
       )
       
-      setConnectionStatus(ConnectionStatus.ERROR);
-      const errorMsg = error instanceof Error ? error.message : '发送消息失败';
-      setConnectionError(errorMsg);
     } finally {
       setIsLoading(false)
     }
-  }, [connectionStatus, checkConnection, createChatRequest, processStreamResponse, resetAudioState, setConnectionStatus, setConnectionError])
+  }, [connectionStatus, checkConnection, createChatRequest, processStreamResponse, resetAudioState])
 
   const clearChat = useCallback(() => {
     setMessages([])

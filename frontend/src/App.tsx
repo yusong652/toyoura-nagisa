@@ -7,6 +7,7 @@ import ChatHistorySidebar from './components/ChatHistorySidebar'
 import ThemeToggle from './components/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
 import { AudioProvider } from './contexts/AudioContext'
+import { ConnectionProvider } from './contexts/ConnectionContext'
 import { ChatProvider, useChat } from './contexts/ChatContext'
 import { ConnectionStatus } from './types/chat'
 import GeolocationService from './utils/geolocation'
@@ -61,10 +62,12 @@ function App(): React.ReactElement {
   return (
     <>
       <AudioProvider>
-        <ChatProvider>
-          <AppContent />
-          <Live2DCanvas />
-        </ChatProvider>
+        <ConnectionProvider>
+          <ChatProvider>
+            <AppContent />
+            <Live2DCanvas />
+          </ChatProvider>
+        </ConnectionProvider>
       </AudioProvider>
     </>
   )
