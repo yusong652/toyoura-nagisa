@@ -98,7 +98,7 @@ class LocalLLMClient(LLMClientBase):
                 response = await client.post(
                     endpoint,
                     headers=headers,
-                    data=json.dumps(payload),
+                    content=json.dumps(payload),
                     timeout=self.timeout
                 )
                 

@@ -74,7 +74,7 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
             response = await client.post(
                 endpoint,
                 headers={"Content-Type": "application/json"},
-                data=json.dumps(payload),
+                content=json.dumps(payload),
                 timeout=120.0
             )
             
@@ -90,7 +90,7 @@ async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: D
                 fetch_payload = {"key": models_lab_config.get("key", ""), "request_id": result["id"]}
                 
                 for attempt in range(max_retries):
-                    fetch_resp = await client.post(fetch_url, headers={"Content-Type": "application/json"}, data=json.dumps(fetch_payload), timeout=30.0)
+                    fetch_resp = await client.post(fetch_url, headers={"Content-Type": "application/json"}, content=json.dumps(fetch_payload), timeout=30.0)
                     fetch_result = fetch_resp.json()
                     fetch_status = fetch_result.get("status")
                     
@@ -156,7 +156,7 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
             response = await client.post(
                 endpoint,
                 headers={"Content-Type": "application/json"},
-                data=json.dumps(payload),
+                content=json.dumps(payload),
                 timeout=300.0 
             )
 

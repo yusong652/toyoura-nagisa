@@ -186,7 +186,7 @@ async def delete_session(session_id: str):
         # 清除对应session的工具缓存
         llm_client: LLMClientBase = app.state.llm_client
         if hasattr(llm_client, '_clear_session_tool_cache'):
-            llm_client._clear_session_tool_cache(session_id)
+            await llm_client._clear_session_tool_cache(session_id)
             print(f"[DEBUG] Cleared tool cache for deleted session: {session_id}")
         
         # 删除向量数据库中的相关记忆
@@ -221,7 +221,7 @@ async def switch_session(request: SwitchSessionRequest):
         # 清除对应session的工具缓存
         llm_client: LLMClientBase = app.state.llm_client
         if hasattr(llm_client, '_clear_session_tool_cache'):
-            llm_client._clear_session_tool_cache(request.session_id)
+            await llm_client._clear_session_tool_cache(request.session_id)
             print(f"[DEBUG] Cleared tool cache for session: {request.session_id}")
         
         # 加载指定会话的历史记录
