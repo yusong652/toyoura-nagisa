@@ -24,7 +24,23 @@ def register_location_tools(mcp: FastMCP):
 
     # Helper functions for consistent responses
     def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+        return ToolResult(
+            status="error", 
+            message=message, 
+            error=message,
+            llm_content={
+                "operation": {
+                    "type": "get_location",
+                    "location_source": "error",
+                },
+                "result": None,
+                "summary": {
+                    "operation_type": "get_location",
+                    "success": False,
+                    "error": message
+                }
+            }
+        ).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
         return ToolResult(
@@ -37,11 +53,14 @@ def register_location_tools(mcp: FastMCP):
     def _fetch_server_location() -> LocationData | None:
         """Fallback: geolocate server IP via ip-api.com"""
         try:
+            print(f"[DEBUG] Attempting server IP geolocation via ip-api.com")
             resp = requests.get("http://ip-api.com/json", timeout=5)
             resp.raise_for_status()
             data = resp.json()
+            print(f"[DEBUG] IP geolocation response: {data}")
+            
             if data.get("status") == "success":
-                return LocationData(
+                location_data = LocationData(
                     latitude=data["lat"],
                     longitude=data["lon"],
                     source="server_ip_geolocation",
@@ -49,8 +68,12 @@ def register_location_tools(mcp: FastMCP):
                     country=data.get("country"),
                     region=data.get("regionName"),
                 )
-        except Exception:
-            pass
+                print(f"[DEBUG] Server location success: lat={location_data.latitude}, lng={location_data.longitude}, city={location_data.city}")
+                return location_data
+            else:
+                print(f"[DEBUG] IP geolocation failed with status: {data.get('status')}")
+        except Exception as e:
+            print(f"[DEBUG] IP geolocation error: {str(e)}")
         return None
 
     @mcp.tool(**common_kwargs_location)
@@ -84,7 +107,7 @@ def register_location_tools(mcp: FastMCP):
                 
                 # Check if WebSocket connection exists
                 cm = app.state.connection_manager  
-                if session_id in cm.active_connections:
+                if session_id in cm.connections:
                     print(f"[DEBUG] WebSocket connection found for session {session_id}")
                     
                     # Send location request via WebSocket
@@ -139,10 +162,13 @@ def register_location_tools(mcp: FastMCP):
                 print(f"[DEBUG] App or connection manager not available - using fallback immediately")
                 
             # Fallback to server IP geolocation
+            print(f"[DEBUG] Falling back to server IP geolocation")
             loc = _fetch_server_location()
             if loc:
+                print(f"[DEBUG] Server IP geolocation succeeded, building response")
                 return _build_location_response(loc, session_id, "server_ip_fallback")
 
+            print(f"[DEBUG] All location methods failed, returning error")
             return _error("Unable to determine location - browser location unavailable, server IP geolocation failed")
 
         except Exception as e:
@@ -180,7 +206,7 @@ def register_location_tools(mcp: FastMCP):
         
         message = f"Location determined: {location_desc} ({accuracy} accuracy)"
         
-        return _success(
+        result = _success(
             message,
             llm_content,
             latitude=loc.latitude,
@@ -190,4 +216,7 @@ def register_location_tools(mcp: FastMCP):
             country=loc.country,
             source=source_type,
             accuracy=accuracy
-        ) 
+        )
+        
+        print(f"[DEBUG] Final location tool result: {result}")
+        return result 

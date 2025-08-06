@@ -733,16 +733,19 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
 
     const decoder = new TextDecoder()
-    let buffer = ''
+    let buffer = '' // 每次新请求都重新初始化buffer
     let currentKeyword: string | null = null
     let audioCount = 0
     let firstResponseReceived = false
     let finalAiMessageId: string | null = null // 存储后端返回的最终AI消息ID
     
-    // 标记是否正在播放音频，用于同步控制
+    // 标记是否正在播放音频，用于同步控制 - 每次新请求都重置
     let isProcessingChunk = false
-    // 音频队列 - 存储待处理的数据
-    let chunkQueue: {text: string, audio?: string, next?: any}[] = []
+    // 音频队列 - 存储待处理的数据 - 每次新请求都清空
+    let chunkQueue: {text: string, audio?: string, index?: number, next?: any}[] = []
+    // 排序缓存 - 确保chunk按正确顺序处理
+    let chunkBuffer: Map<number, {text: string, audio?: string, next?: any}> = new Map()
+    let expectedChunkIndex = 0
     
     // 处理文本和音频内容
     const handleContentUpdate = (data: any) => {
@@ -750,6 +753,60 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       console.log(`收到新的文本和音频chunk:`, data);
       
+      // 检查是否有index字段用于排序
+      if (data.index !== undefined && typeof data.index === 'number') {
+        // 使用排序缓存处理有序的chunk
+        handleOrderedChunk(data);
+      } else {
+        // 对于没有index的chunk，直接处理（保持兼容性）
+        handleUnorderedChunk(data);
+      }
+    };
+
+    // 处理有序chunk（带index字段）
+    const handleOrderedChunk = (data: any) => {
+      const chunkIndex = data.index;
+      
+      // 将chunk添加到缓存
+      chunkBuffer.set(chunkIndex, {
+        text: data.text || '',
+        audio: data.audio,
+        next: data.next
+      });
+      
+      console.log(`缓存chunk #${chunkIndex}，期望index: ${expectedChunkIndex}`);
+      
+      // 处理所有连续的chunk
+      while (chunkBuffer.has(expectedChunkIndex)) {
+        const chunk = chunkBuffer.get(expectedChunkIndex)!;
+        chunkBuffer.delete(expectedChunkIndex);
+        
+        console.log(`处理有序chunk #${expectedChunkIndex}`);
+        
+        // 添加到处理队列
+        chunkQueue.push({
+          text: chunk.text,
+          audio: chunk.audio,
+          index: expectedChunkIndex,
+          next: chunk.next
+        });
+        
+        expectedChunkIndex++;
+        
+        // 如果当前没有处理中的chunk，开始处理队列
+        if (!isProcessingChunk) {
+          console.log('开始处理有序chunk队列');
+          isProcessingChunk = true;
+          processNextChunk(chunkQueue.shift()).catch(err => {
+            console.error('处理有序chunk队列时出错:', err);
+            isProcessingChunk = false;
+          });
+        }
+      }
+    };
+
+    // 处理无序chunk（兼容旧格式）
+    const handleUnorderedChunk = (data: any) => {
       // 将文本和音频作为一个完整的chunk添加到队列
       chunkQueue.push({
         text: data.text || '',
@@ -759,10 +816,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       // 如果当前没有处理中的chunk，开始处理队列
       if (!isProcessingChunk) {
-        console.log('当前没有正在处理的chunk，开始处理新的chunk');
+        console.log('开始处理无序chunk队列');
         isProcessingChunk = true;
         processNextChunk(chunkQueue.shift()).catch(err => {
-          console.error('处理chunk队列时出错:', err);
+          console.error('处理无序chunk队列时出错:', err);
           isProcessingChunk = false;
         });
       } else {
@@ -1119,6 +1176,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
+        // 显式清理状态，确保不会影响下一次请求
+        chunkQueue = [];
+        chunkBuffer.clear();
+        expectedChunkIndex = 0;
+        isProcessingChunk = false;
+        buffer = '';
+        console.log('[DEBUG] Stream processing completed, all state cleared including ordering buffer');
+        
         // After streaming all sentences, only update streaming flag
         setMessages(prev => 
           prev.map(msg => {
@@ -1174,8 +1239,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     }
     
-    // 重置音频状态
+    // 重置音频状态 - 确保清理上一次请求的残留状态
     await resetAudioState()
+    console.log('[DEBUG] Starting new message request, audio state reset');
     
     // 创建用户消息
     const userMessage: Message = {
