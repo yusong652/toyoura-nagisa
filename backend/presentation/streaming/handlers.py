@@ -1,6 +1,7 @@
 import json
 import uuid
 import asyncio
+import logging
 from typing import Dict, Any, List, AsyncGenerator, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
@@ -16,6 +17,13 @@ from backend.shared.utils.helpers import (
 )
 from backend.infrastructure.storage.session_manager import update_session_title
 from backend.config import get_llm_settings
+from backend.presentation.models.websocket_messages import (
+    create_error_message, create_status_message, create_tool_use_message
+)
+
+# TTS处理优化
+TTS_PROCESSING_POOL = asyncio.BoundedSemaphore(5)  # 限制并发TTS处理数量
+logger = logging.getLogger(__name__)
 
 
 # 全局状态管理
@@ -42,11 +50,17 @@ async def handle_llm_response(
     # ========== PHASE 1: 请求初始化和防重复 ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
     
+    # 优化的防重复机制 - 减少锁竞争
     async with ACTIVE_REQUESTS_LOCK:
         if session_id in ACTIVE_REQUESTS:
             existing_request = ACTIVE_REQUESTS[session_id]
             error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            error_data = create_error_message(
+                error=error_msg,
+                session_id=session_id,
+                recoverable=False
+            )
+            yield f"data: {json.dumps(error_data)}\n\n"
             return
         ACTIVE_REQUESTS[session_id] = request_id
 
@@ -56,12 +70,22 @@ async def handle_llm_response(
         supported_clients = ['GeminiClient', 'LocalLLMClient', 'AnthropicClient', 'OpenAIClient']
         if type(llm_client).__name__ not in supported_clients:
             error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            error_data = create_error_message(
+                error=error_msg,
+                session_id=session_id,
+                details={"client_type": type(llm_client).__name__, "supported": supported_clients}
+            )
+            yield f"data: {json.dumps(error_data)}\n\n"
             return
         
         if not hasattr(llm_client, 'get_response'):
             error_msg = f"{type(llm_client).__name__} missing get_response method"
-            yield f"data: {json.dumps({'type': 'error', 'error': error_msg})}\n\n"
+            error_data = create_error_message(
+                error=error_msg,
+                session_id=session_id,
+                details={"client_type": type(llm_client).__name__}
+            )
+            yield f"data: {json.dumps(error_data)}\n\n"
             return
 
         # ========== PHASE 3: 流式处理 - 实时工具调用通知 ==========
@@ -99,8 +123,14 @@ async def handle_llm_response(
         traceback.print_exc()
         
         # 确保工具使用结束信号被发送
-        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        error_data = {'type': 'error', 'error': f"Request processing failed: {str(e)}"}
+        tool_end_msg = create_tool_use_message(is_using=False, session_id=session_id)
+        yield f"data: {json.dumps(tool_end_msg)}\n\n"
+        
+        error_data = create_error_message(
+            error=f"Request processing failed: {str(e)}",
+            session_id=session_id,
+            details={"request_id": request_id, "traceback": traceback.format_exc()}
+        )
         yield f"data: {json.dumps(error_data)}\n\n"
         
     finally:
@@ -182,21 +212,65 @@ async def _process_tts_pipeline(
     """
     TTS处理流水线 - 专门处理语音合成
     
-    分句处理，支持表情符号和颜文字
+    分句处理，支持表情符号和颜文字，采用并发处理优化性能
     """
-    # 处理表情和颜文字
-    text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
-    
-    # 分句处理
-    sentences = split_text_by_punctuations(text_with_placeholders)
-    
-    for sentence in sentences:
-        tts_text = clean_text_for_tts(sentence)
-        tts_result = await process_tts_sentence(tts_text, tts_engine)
+    async with TTS_PROCESSING_POOL:  # 限制并发数量
+        # 处理表情和颜文字
+        text_with_placeholders, kaomoji_list, emoji_list = extract_and_replace_emoticons(content)
         
+        # 分句处理
+        sentences = split_text_by_punctuations(text_with_placeholders)
+        
+        # 并发处理多个句子的TTS
+        tts_tasks = []
+        for i, sentence in enumerate(sentences):
+            tts_text = clean_text_for_tts(sentence)
+            if tts_text.strip():  # 只处理非空句子
+                task = _process_single_sentence_tts(tts_text, sentence, kaomoji_list, emoji_list, i, tts_engine)
+                tts_tasks.append(task)
+        
+        # 按顺序产出结果
+        for task in asyncio.as_completed(tts_tasks):
+            try:
+                result = await task
+                if result:
+                    yield f"data: {json.dumps(result)}\n\n"
+            except Exception as e:
+                # TTS错误不应影响主流程
+                logger.warning(f"TTS processing error: {e}")
+
+
+async def _process_single_sentence_tts(
+    tts_text: str, 
+    original_sentence: str, 
+    kaomoji_list: list, 
+    emoji_list: list,
+    index: int,
+    tts_engine: BaseTTS
+) -> Optional[Dict[str, Any]]:
+    """
+    处理单个句子的TTS
+    
+    Args:
+        tts_text: 清理后的TTS文本
+        original_sentence: 原始句子
+        kaomoji_list: 颜文字列表
+        emoji_list: 表情符号列表
+        index: 句子索引
+        tts_engine: TTS引擎
+        
+    Returns:
+        TTS结果字典
+    """
+    try:
+        tts_result = await process_tts_sentence(tts_text, tts_engine)
         if tts_result:
-            tts_result['text'] = restore_emoticons(sentence, kaomoji_list, emoji_list)
-            yield f"data: {json.dumps(tts_result)}\n\n"
+            tts_result['text'] = restore_emoticons(original_sentence, kaomoji_list, emoji_list)
+            tts_result['index'] = index  # 添加索引用于排序
+            return tts_result
+    except Exception as e:
+        logger.error(f"TTS processing failed for sentence '{tts_text[:50]}...': {e}")
+    return None
 
 
 async def _process_post_pipeline(

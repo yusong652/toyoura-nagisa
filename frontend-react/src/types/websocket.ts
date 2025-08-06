@@ -1,0 +1,209 @@
+/**
+ * WebSocket Message Type Definitions
+ * Mirrors the Python backend WebSocket message models for type consistency
+ */
+
+export enum MessageType {
+  // System messages
+  CONNECTION_ESTABLISHED = "CONNECTION_ESTABLISHED",
+  CONNECTION_CLOSED = "CONNECTION_CLOSED",
+  HEARTBEAT = "HEARTBEAT",
+  HEARTBEAT_ACK = "HEARTBEAT_ACK",
+  ERROR = "error",
+  
+  // Chat messages
+  CHAT_MESSAGE = "CHAT_MESSAGE",
+  CHAT_RESPONSE = "CHAT_RESPONSE",
+  STATUS_UPDATE = "STATUS_UPDATE",
+  
+  // Tool related
+  NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL",
+  NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED",
+  
+  // Title updates
+  TITLE_UPDATE = "TITLE_UPDATE",
+  
+  // Location related
+  REQUEST_LOCATION = "REQUEST_LOCATION",
+  LOCATION_RESPONSE = "LOCATION_RESPONSE",
+  
+  // TTS related
+  TTS_CHUNK = "TTS_CHUNK",
+  TTS_COMPLETE = "TTS_COMPLETE"
+}
+
+export interface BaseWebSocketMessage {
+  type: MessageType;
+  timestamp?: string;
+  session_id?: string;
+}
+
+export interface ConnectionMessage extends BaseWebSocketMessage {
+  type: MessageType.CONNECTION_ESTABLISHED | MessageType.CONNECTION_CLOSED;
+  code?: number;
+  reason?: string;
+}
+
+export interface HeartbeatMessage extends BaseWebSocketMessage {
+  type: MessageType.HEARTBEAT | MessageType.HEARTBEAT_ACK;
+}
+
+export interface ErrorMessage extends BaseWebSocketMessage {
+  type: MessageType.ERROR;
+  error: string;
+  details?: Record<string, any>;
+  recoverable?: boolean;
+}
+
+export interface StatusMessage extends BaseWebSocketMessage {
+  type: MessageType.STATUS_UPDATE;
+  status: "sent" | "read" | "typing" | "thinking" | "complete";
+  message_id?: string;
+}
+
+export interface ToolUseMessage extends BaseWebSocketMessage {
+  type: MessageType.NAGISA_IS_USING_TOOL | MessageType.NAGISA_TOOL_USE_CONCLUDED;
+  tool_name?: string;
+  parameters?: Record<string, any>;
+  action_text?: string;
+  result?: Record<string, any>;
+}
+
+export interface TitleUpdateMessage extends BaseWebSocketMessage {
+  type: MessageType.TITLE_UPDATE;
+  payload: {
+    session_id: string;
+    title: string;
+  };
+}
+
+export interface LocationRequestMessage extends BaseWebSocketMessage {
+  type: MessageType.REQUEST_LOCATION;
+  reason?: string;
+}
+
+export interface LocationResponseMessage extends BaseWebSocketMessage {
+  type: MessageType.LOCATION_RESPONSE;
+  location_data?: Record<string, any>;
+  error?: string;
+}
+
+export interface TTSMessage extends BaseWebSocketMessage {
+  type: MessageType.TTS_CHUNK | MessageType.TTS_COMPLETE;
+  audio_url?: string;
+  text?: string;
+  chunk_index?: number;
+  total_chunks?: number;
+  index?: number; // For ordering
+}
+
+export interface ChatMessage extends BaseWebSocketMessage {
+  type: MessageType.CHAT_MESSAGE | MessageType.CHAT_RESPONSE;
+  content: string | Record<string, any> | any[];
+  message_id: string;
+  role: "user" | "assistant" | "system";
+  keyword?: string;
+  metadata?: Record<string, any>;
+}
+
+export type WebSocketMessage = 
+  | ConnectionMessage
+  | HeartbeatMessage
+  | ErrorMessage
+  | StatusMessage
+  | ToolUseMessage
+  | TitleUpdateMessage
+  | LocationRequestMessage
+  | LocationResponseMessage
+  | TTSMessage
+  | ChatMessage;
+
+// Message validation helpers
+export function isValidMessageType(type: string): type is MessageType {
+  return Object.values(MessageType).includes(type as MessageType);
+}
+
+export function validateWebSocketMessage(data: any): WebSocketMessage {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Message must be an object');
+  }
+  
+  if (!data.type || !isValidMessageType(data.type)) {
+    throw new Error(`Invalid message type: ${data.type}`);
+  }
+  
+  // Basic validation passed - TypeScript will handle the rest
+  return data as WebSocketMessage;
+}
+
+// Message creation helpers
+export function createErrorMessage(
+  error: string,
+  session_id?: string,
+  details?: Record<string, any>,
+  recoverable: boolean = true
+): ErrorMessage {
+  return {
+    type: MessageType.ERROR,
+    error,
+    session_id,
+    details,
+    recoverable,
+    timestamp: new Date().toISOString()
+  };
+}
+
+export function createStatusMessage(
+  status: "sent" | "read" | "typing" | "thinking" | "complete",
+  session_id?: string,
+  message_id?: string
+): StatusMessage {
+  return {
+    type: MessageType.STATUS_UPDATE,
+    status,
+    session_id,
+    message_id,
+    timestamp: new Date().toISOString()
+  };
+}
+
+export function createToolUseMessage(
+  isUsing: boolean,
+  tool_name?: string,
+  parameters?: Record<string, any>,
+  action_text?: string,
+  result?: Record<string, any>,
+  session_id?: string
+): ToolUseMessage {
+  return {
+    type: isUsing ? MessageType.NAGISA_IS_USING_TOOL : MessageType.NAGISA_TOOL_USE_CONCLUDED,
+    tool_name,
+    parameters,
+    action_text,
+    result,
+    session_id,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Legacy compatibility
+export interface LegacyWebSocketMessage {
+  type: string;
+  [key: string]: any;
+}
+
+export function convertLegacyMessage(legacyMsg: LegacyWebSocketMessage): WebSocketMessage {
+  try {
+    return validateWebSocketMessage(legacyMsg);
+  } catch (error) {
+    // Return as generic message if validation fails
+    return {
+      type: MessageType.ERROR,
+      error: `Legacy message conversion failed: ${error}`,
+      details: { originalMessage: legacyMsg },
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+export default WebSocketMessage;
