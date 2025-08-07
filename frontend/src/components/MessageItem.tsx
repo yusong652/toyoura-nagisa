@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './MessageItem.css'
 import { Message, MessageStatus } from '../types/chat'
-import { useChat } from '../contexts/ChatContext'
+import { useChat } from '../contexts/chat/ChatContext'
 import MessageToolState from './MessageToolState'
 import ImagePreview from './ImagePreview'
 import ReactMarkdown from 'react-markdown'

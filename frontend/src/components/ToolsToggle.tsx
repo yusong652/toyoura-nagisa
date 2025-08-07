@@ -1,5 +1,5 @@
 import React from 'react';
-import { useChat } from '../contexts/ChatContext';
+import { useChat } from '../contexts/chat/ChatContext';
 
 export const ToolsToggle: React.FC = () => {
   const { toolsEnabled, updateToolsEnabled } = useChat();

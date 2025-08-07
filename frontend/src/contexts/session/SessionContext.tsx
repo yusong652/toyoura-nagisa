@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { ConnectionStatus } from '../types/connection'
-import { ChatSession, SessionContextType } from '../types/session'
-import { sessionService } from '../services/api'
-import { useConnection } from './ConnectionContext'
-import { useTools } from './ToolsContext'
+import { ConnectionStatus } from '../../types/connection'
+import { ChatSession, SessionContextType } from '../../types/session'
+import { sessionService } from '../../services/api'
+import { useConnection } from '../connection/ConnectionContext'
+import { useTools } from '../tools/ToolsContext'
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
 

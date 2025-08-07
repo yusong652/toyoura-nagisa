@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { toolService } from '../services/api'
-import { ToolState, ToolsContextType } from '../types/tools'
+import { toolService } from '../../services/api'
+import { ToolState, ToolsContextType } from '../../types/tools'
 
 const ToolsContext = createContext<ToolsContextType | undefined>(undefined)
 

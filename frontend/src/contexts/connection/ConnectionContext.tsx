@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
-import { ConnectionStatus, ConnectionContextType } from '../types/connection'
-import GeolocationService from '../utils/geolocation'
+import { ConnectionStatus, ConnectionContextType } from '../../types/connection'
+import GeolocationService from '../../utils/geolocation'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
 

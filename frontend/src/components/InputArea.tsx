@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useChat } from '../contexts/ChatContext'
+import { useChat } from '../contexts/chat/ChatContext'
 import { FileData } from '../types/chat'
 import './InputArea.css'
 import { ToolsToggle } from './ToolsToggle'

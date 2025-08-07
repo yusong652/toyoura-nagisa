@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
-import { useChat } from '../contexts/ChatContext'
-import { useSession } from '../contexts/SessionContext'
+import { useChat } from '../contexts/chat/ChatContext'
+import { useSession } from '../contexts/session/SessionContext'
 import { ChatSession } from '../types/session'
 
 const ChatHistorySidebar: React.FC = () => {

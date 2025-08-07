@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
-import { startLipSync, stopLipSync } from '../utils/live2d'
-import { AudioQueueItem, AudioContextType } from '../types/audio'
+import { startLipSync, stopLipSync } from '../../utils/live2d'
+import { AudioQueueItem, AudioContextType } from '../../types/audio'
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
 

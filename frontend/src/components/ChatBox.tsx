@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { useChat } from '../contexts/ChatContext'
-import { useSession } from '../contexts/SessionContext'
+import { useChat } from '../contexts/chat/ChatContext'
+import { useSession } from '../contexts/session/SessionContext'
 import MessageItem from './MessageItem.tsx'
 import './ChatBox.css'
 import GenerateImageButton from './GenerateImageButton'

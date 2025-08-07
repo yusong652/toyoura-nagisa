@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType, MessageStatus } from '../types/chat'
-import { useAudio } from './AudioContext.tsx'
-import { useTools } from './ToolsContext'
-import { useSession } from './SessionContext'
-import { playMotion } from '../utils/live2d'
-import { chatService, sessionService } from '../services/api'
+import { Message, FileData, ChatContextType, MessageStatus } from '../../types/chat'
+import { useAudio } from '../audio/AudioContext'
+import { useTools } from '../tools/ToolsContext'
+import { useSession } from '../session/SessionContext'
+import { playMotion } from '../../utils/live2d'
+import { chatService, sessionService } from '../../services/api'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -40,7 +40,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     refreshSessions: sessionRefreshSessions,
     switchSession: sessionSwitchSession
   } = useSession()
-
 
   // 当会话变化时，重新加载消息
   useEffect(() => {

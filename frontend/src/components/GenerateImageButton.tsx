@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './GenerateImageButton.css';
-import { useChat } from '../contexts/ChatContext';
-import { useSession } from '../contexts/SessionContext';
+import { useChat } from '../contexts/chat/ChatContext';
+import { useSession } from '../contexts/session/SessionContext';
 
 const GenerateImageButton: React.FC = () => {
   const { generateImage } = useChat();

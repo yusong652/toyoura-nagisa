@@ -1,6 +1,6 @@
 import React from 'react';
 import './TTSControl.css';
-import { useChat } from '../contexts/ChatContext';
+import { useChat } from '../contexts/chat/ChatContext';
 
 const TTSControl: React.FC = () => {
   const { ttsEnabled, updateTtsEnabled } = useChat();
