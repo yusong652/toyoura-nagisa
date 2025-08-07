@@ -286,6 +286,21 @@ aiNagisa/
 
 ## Code Quality Guidelines
 
+### TypeScript Development Guidelines
+
+When creating or refactoring TypeScript code in the frontend, provide explanations to help the user learn TypeScript principles:
+
+- **Type System Explanations**: Explain TypeScript type concepts when implementing them (interfaces, types, generics, unions, etc.)
+- **React TypeScript Patterns**: Explain React-specific TypeScript patterns (FC types, hook typing, event handlers, etc.)
+- **Type Inference**: Explain when TypeScript can infer types vs when explicit typing is needed
+- **Best Practices**: Explain why certain TypeScript patterns are preferred over others
+- **Common Pitfalls**: Point out common TypeScript mistakes and how to avoid them
+
+Example explanations:
+- When using `React.FC<Props>`: "React.FC automatically provides children prop typing and return type"
+- When using generics: "Generic type `<T>` allows this function to work with any data type while maintaining type safety"
+- When using union types: "Union type `string | null` indicates this value can be either a string or null"
+
 ### Type Validation and Logic Redundancy
 - **Avoid Redundant Validation**: Do not add type validation or existence checks for data structures that are already validated by our established logic flow
 - **Trust Internal APIs**: Internal function calls within our controlled codebase should not re-validate data that has already been processed and validated
