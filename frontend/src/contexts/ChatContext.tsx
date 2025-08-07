@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { Message, FileData, ChatContextType, MessageStatus } from '../types/chat'
-import { ConnectionStatus } from '../types/connection'
 import { useAudio } from './AudioContext.tsx'
-import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
 import { useSession } from './SessionContext'
 import { playMotion } from '../utils/live2d'
@@ -27,11 +25,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
-  const { 
-    connectionStatus, 
-    connectionError, 
-    checkConnection 
-  } = useConnection()
   const {
     toolState,
     toolsEnabled,
@@ -143,13 +136,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // 删除消息
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
-    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
-      const canConnect = await checkConnection();
-      if (!canConnect) {
-        throw new Error(connectionError || "无法连接到服务器，请重试。");
-      }
-    }
-    
     // 确保有当前会话ID
     if (!currentSessionId) {
       throw new Error("没有活动的会话");
@@ -183,7 +169,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       console.error('删除消息失败:', error);
       throw error;
     }
-  }, [currentSessionId, connectionStatus, checkConnection, connectionError, sessionRefreshSessions, messages, sessionSwitchSession]);
+  }, [currentSessionId, sessionRefreshSessions, messages, sessionSwitchSession]);
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
   const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
@@ -719,27 +705,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
     
-    // 检查连接状态
-    if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
-      const canConnect = await checkConnection();
-      if (!canConnect) {
-        setMessages(prev => {
-          // 找到最后一条机器人消息，如果是加载状态的话，更新它为错误消息
-          const botMessages = prev.filter(msg => msg.sender === 'bot' && msg.isLoading);
-          if (botMessages.length > 0) {
-            const lastBotMessage = botMessages[botMessages.length - 1];
-            return prev.map(msg => 
-              msg.id === lastBotMessage.id 
-                ? { ...msg, text: "错误: 无法连接到服务器。请检查网络连接或稍后重试。", isLoading: false }
-                : msg
-            );
-          }
-          return prev;
-        });
-        return;
-      }
-    }
-    
     // 重置音频状态 - 确保清理上一次请求的残留状态
     await resetAudioState()
     console.log('[DEBUG] Starting new message request, audio state reset');
@@ -777,7 +742,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-  }, [connectionStatus, checkConnection, createChatRequest, processStreamResponse, resetAudioState])
+  }, [createChatRequest, processStreamResponse, resetAudioState])
 
   const clearChat = useCallback(() => {
     setMessages([])
