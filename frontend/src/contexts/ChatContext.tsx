@@ -4,7 +4,7 @@ import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, Mess
 import { useAudio } from './AudioContext.tsx'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
-import { SessionProvider, useSession } from './SessionContext'
+import { useSession } from './SessionContext'
 import { playMotion } from '../utils/live2d'
 import { chatService, sessionService } from '../services/api'
 
@@ -22,8 +22,7 @@ interface ChatProviderProps {
   children: ReactNode
 }
 
-// 内部核心ChatProvider
-const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
+export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
@@ -844,16 +843,5 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     }}>
       {children}
     </ChatContext.Provider>
-  )
-}
-
-// 外部ChatProvider包装，包含SessionProvider
-export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
-  return (
-    <SessionProvider>
-      <ChatProviderCore>
-        {children}
-      </ChatProviderCore>
-    </SessionProvider>
   )
 }

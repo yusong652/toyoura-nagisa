@@ -48,10 +48,12 @@ function App(): React.ReactElement {
       <AudioProvider>
         <ConnectionProvider>
           <ToolsProvider>
-            <ChatProvider>
-              <AppContent />
-              <Live2DCanvas />
-            </ChatProvider>
+            <SessionProvider>
+              <ChatProvider>
+                <AppContent />
+                <Live2DCanvas />
+              </ChatProvider>
+            </SessionProvider>
           </ToolsProvider>
         </ConnectionProvider>
       </AudioProvider>
