@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType, MessageStatus } from '../../types/chat'
+import { FileData, ChatContextType} from '../../types/chat'
 import { useAudio } from '../audio/AudioContext'
 import { useTools } from '../tools/ToolsContext'
 import { useSession } from '../session/SessionContext'
-import { playMotion } from '../../utils/live2d'
-import { chatService, sessionService } from '../../services/api'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
+import { useImageGenerator } from './useImageGenerator'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -50,7 +48,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     clearChat,
     sendMessage: createAndSendMessage,
     updateMessageStatus,
-    updateBotMessage
   } = useChatMessage({
     currentSessionId,
     sessionRefreshSessions,
@@ -91,6 +88,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setToolState
   })
 
+  // 使用图片生成钩子
+  const { generateImage } = useImageGenerator({
+    currentSessionId,
+    setMessages
+  })
+
 
   // 注意：会话相关的功能已经移至 SessionContext，组件应直接使用 useSession()
   // 消息管理功能已经移至 useChatMessage 钩子
@@ -118,46 +121,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [createAndSendMessage, handleStreamResponse, resetAudioState])
 
-  // 一键生成图片
-  const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
-    const result = await chatService.generateImage(sessionId);
-    
-    // 如果图片生成成功，重新获取会话历史以获取最新的图片消息
-    if (result.success && sessionId === currentSessionId) {
-      try {
-        // 获取最新的会话历史
-        const historyData = await sessionService.getSessionHistory(sessionId);
-        if (historyData.history && Array.isArray(historyData.history)) {
-          // 找到最后一条图片消息
-          const lastImageMessage = historyData.history
-            .filter((msg: any) => msg.role === 'image')
-            .pop();
-
-          if (lastImageMessage) {
-            // 创建图片消息对象
-            const imageMessage: Message = {
-              id: lastImageMessage.id || uuidv4(),
-              sender: 'bot',
-              text: lastImageMessage.content || '',
-              timestamp: new Date(lastImageMessage.timestamp || Date.now()).getTime(),
-              files: [{
-                name: 'generated_image',
-                type: 'image/png',
-                data: `/api/images/${lastImageMessage.image_path}`
-              }]
-            };
-
-            // 添加图片消息到当前消息列表
-            setMessages(prev => [...prev, imageMessage]);
-          }
-        }
-      } catch (error) {
-        console.error('获取生成的图片消息失败:', error);
-      }
-    }
-    
-    return result;
-  }, [currentSessionId]);
 
   return (
     <ChatContext.Provider value={{
