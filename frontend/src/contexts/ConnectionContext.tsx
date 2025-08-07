@@ -1,17 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
-import { ConnectionStatus } from '../types/connection'
+import { ConnectionStatus, ConnectionContextType } from '../types/connection'
 import GeolocationService from '../utils/geolocation'
-
-export interface ConnectionContextType {
-  connectionStatus: ConnectionStatus
-  connectionError: string | null
-  wsRef: React.RefObject<WebSocket | null>
-  connectToSession: (sessionId: string) => void
-  disconnect: () => void
-  sendWebSocketMessage: (message: any) => void
-  onLocationRequest: (handler: (data: any) => void) => void
-  checkConnection: () => Promise<boolean>
-}
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
 

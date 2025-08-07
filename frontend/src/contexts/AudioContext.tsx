@@ -1,16 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
 import { startLipSync, stopLipSync } from '../utils/live2d'
-
-// 定义音频队列项的接口
-interface AudioQueueItem {
-  data: string;
-  onComplete: (value: void | PromiseLike<void>) => void;
-}
-
-interface AudioContextType {
-  queueAndPlayAudio: (audioBase64: string) => Promise<void>
-  resetAudioState: () => Promise<void>
-}
+import { AudioQueueItem, AudioContextType } from '../types/audio'
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
 

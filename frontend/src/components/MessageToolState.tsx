@@ -1,14 +1,9 @@
 import React from 'react';
 import './MessageToolState.css';
-
-interface ToolState {
-  isUsingTool: boolean;
-  toolName?: string;
-  action?: string;
-}
+import { MessageToolState as MessageToolStateType } from '../types/chat';
 
 interface MessageToolStateProps {
-  toolState: ToolState;
+  toolState: MessageToolStateType;
 }
 
 const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {

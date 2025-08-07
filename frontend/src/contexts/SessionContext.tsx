@@ -1,23 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { ConnectionStatus } from '../types/connection'
-import { ChatSession } from '../types/session'
+import { ChatSession, SessionContextType } from '../types/session'
 import { sessionService } from '../services/api'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
-
-export interface SessionContextType {
-  // Session state
-  sessions: ChatSession[]
-  currentSessionId: string | null
-  sessionLoadAttempted: boolean
-
-  // Session operations
-  refreshSessions: () => Promise<ChatSession[]>
-  createNewSession: (name?: string) => Promise<string>
-  switchSession: (sessionId: string) => Promise<void>
-  deleteSession: (sessionId: string) => Promise<void>
-  refreshTitle: (sessionId: string) => Promise<void>
-}
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
 

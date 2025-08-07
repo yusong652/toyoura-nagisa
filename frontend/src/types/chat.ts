@@ -10,11 +10,7 @@ export interface Message {
   isRead?: boolean; // 标记用户消息是否已读
   newText?: string; // 新增的文本部分，用于流式显示
   onRenderComplete?: () => void; // 渲染完成的回调函数
-  toolState?: {
-    isUsingTool: boolean;
-    toolName?: string;
-    action?: string;
-  };
+  toolState?: MessageToolState;
 }
 
 // 消息状态枚举
@@ -23,6 +19,13 @@ export enum MessageStatus {
   SENT = 'sent',       // 已发送到后端
   READ = 'read',       // 后端已传给LLM API
   ERROR = 'error'      // 发送出错
+}
+
+// 消息中的工具状态
+export interface MessageToolState {
+  isUsingTool: boolean;
+  toolName?: string;
+  action?: string;
 }
 
 export interface FileData {
