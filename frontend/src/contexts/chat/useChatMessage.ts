@@ -1,22 +1,25 @@
 /**
  * useChatMessage Hook
  * 
- * 负责聊天消息的 CRUD 操作和会话历史加载
+ * 负责聊天消息的完整管理
  * - 消息状态管理 (messages, setMessages)
+ * - 发送消息 (包括创建用户消息和机器人消息)
  * - 会话历史加载和转换
  * - 删除消息
  * - 清空聊天
+ * - 消息状态更新
  */
 
 import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, MessageStatus } from '../../types/chat'
+import { Message, MessageStatus, FileData } from '../../types/chat'
 import { sessionService, chatService } from '../../services/api'
 
 export interface UseChatMessageOptions {
   currentSessionId: string | null
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
+  ttsEnabled?: boolean
 }
 
 export interface UseChatMessageReturn {
@@ -24,12 +27,22 @@ export interface UseChatMessageReturn {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   deleteMessage: (messageId: string) => Promise<void>
   clearChat: () => void
+  sendMessage: (text: string, files?: FileData[]) => Promise<{
+    userMessageId: string
+    botMessageId: string
+    response: Response
+  }>
+  addUserMessage: (text: string, files?: FileData[]) => string
+  addBotMessage: () => string
+  updateMessageStatus: (messageId: string, status: MessageStatus) => void
+  updateBotMessage: (messageId: string, updates: Partial<Message>) => void
 }
 
 export const useChatMessage = ({
   currentSessionId,
   sessionRefreshSessions,
-  sessionSwitchSession
+  sessionSwitchSession,
+  ttsEnabled = false
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -165,10 +178,126 @@ export const useChatMessage = ({
     setMessages([])
   }, [])
 
+  // 添加用户消息
+  const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
+    const userMessage: Message = {
+      id: uuidv4(),
+      sender: 'user',
+      text,
+      files: files.length > 0 ? files : undefined,
+      timestamp: Date.now(),
+      status: MessageStatus.SENDING
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    return userMessage.id
+  }, [])
+
+  // 添加机器人消息占位符
+  const addBotMessage = useCallback((): string => {
+    const botMessageId = uuidv4()
+    const botMessage: Message = {
+      id: botMessageId,
+      sender: 'bot',
+      text: '',
+      timestamp: Date.now(),
+      streaming: true,
+      isLoading: true,
+      toolState: undefined
+    }
+    
+    setMessages(prev => [...prev, botMessage])
+    return botMessageId
+  }, [])
+
+  // 更新消息状态
+  const updateMessageStatus = useCallback((messageId: string, status: MessageStatus) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId
+          ? { ...msg, status }
+          : msg
+      )
+    )
+  }, [])
+
+  // 更新机器人消息
+  const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
+    setMessages(prev => {
+      const updatedMessages = prev.map(msg => {
+        if (msg.id === messageId) {
+          const updatedMsg = { ...msg, ...updates }
+          // 如果更新包含新的ID，确保保持消息的完整性
+          if (updates.id && updates.id !== messageId) {
+            console.log(`[updateBotMessage] 更新消息ID: ${messageId} -> ${updates.id}`)
+          }
+          return updatedMsg
+        }
+        return msg
+      })
+      
+      // 验证消息是否存在
+      const messageFound = updatedMessages.some(msg => 
+        msg.id === messageId || (updates.id && msg.id === updates.id)
+      )
+      if (!messageFound) {
+        console.warn(`[updateBotMessage] 警告: 未找到ID为 ${messageId} 的消息`)
+      }
+      
+      return updatedMessages
+    })
+  }, [])
+
+  // 创建并发送消息的基础函数
+  // 职责：创建用户消息 -> 调用后端API -> 创建机器人消息占位符
+  // 不包含：音频处理、流式响应处理、Live2D动作等高级功能
+  const sendMessage = useCallback(async (
+    text: string, 
+    files: FileData[] = []
+  ): Promise<{
+    userMessageId: string
+    botMessageId: string
+    response: Response
+  }> => {
+    if (text.trim() === '' && files.length === 0) {
+      throw new Error('消息内容不能为空')
+    }
+    
+    // 创建用户消息
+    const userMessageId = addUserMessage(text, files)
+    
+    try {
+      // 创建API请求
+      const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
+      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, ttsEnabled)
+      
+      // 更新用户消息状态为已发送
+      updateMessageStatus(userMessageId, MessageStatus.SENT)
+      
+      // 创建机器人消息占位符
+      const botMessageId = addBotMessage()
+      
+      return {
+        userMessageId,
+        botMessageId,
+        response
+      }
+    } catch (error) {
+      // 更新消息为错误状态
+      updateMessageStatus(userMessageId, MessageStatus.ERROR)
+      throw error
+    }
+  }, [currentSessionId, ttsEnabled, addUserMessage, addBotMessage, updateMessageStatus])
+
   return {
     messages,
     setMessages,
     deleteMessage,
-    clearChat
+    clearChat,
+    sendMessage,
+    addUserMessage,
+    addBotMessage,
+    updateMessageStatus,
+    updateBotMessage
   }
 }

@@ -46,11 +46,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     messages,
     setMessages,
     deleteMessage,
-    clearChat
+    clearChat,
+    sendMessage: createAndSendMessage,
+    updateMessageStatus,
+    updateBotMessage
   } = useChatMessage({
     currentSessionId,
     sessionRefreshSessions,
-    sessionSwitchSession
+    sessionSwitchSession,
+    ttsEnabled
   })
 
 
@@ -78,41 +82,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [queueAndPlayAudio])
 
-  // 创建聊天API请求
-  const createChatRequest = useCallback(async (text: string, files: FileData[] = [], userMessageId: string): Promise<Response> => {
-    try {
-      const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session";
-      return await chatService.sendMessage(text, files, sessionId, userMessageId, ttsEnabled);
-    } catch (error) {
-      // 更新消息为错误状态
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessageId
-            ? { ...msg, status: MessageStatus.ERROR }
-            : msg
-        )
-      )
-      throw error;
-    }
-  }, [currentSessionId, ttsEnabled])
 
-  // 处理聊天API响应
+  // 处理聊天API响应 - 现在接收botMessageId作为参数
   const processStreamResponse = useCallback(async (
     response: Response, 
-    userMessageId: string
+    userMessageId: string,
+    botMessageId: string
   ) => {
-    // 直接添加一个Bot Message，初始状态为加载中
-    const botMessageId = uuidv4();
-    const botMessage = {
-      id: botMessageId,
-      sender: 'bot' as const,
-      text: '',
-      timestamp: Date.now(),
-      streaming: true,
-      isLoading: true,
-      toolState: undefined
-    };
-    setMessages(prev => [...prev, botMessage]);
 
     // 处理流式响应
     const reader = response.body?.getReader();
@@ -236,25 +212,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           if (newText.length > 0) {
             // 创建一个 Promise 来等待文本渲染完成
             const renderPromise = new Promise<void>((resolve) => {
+              // 使用函数式状态更新来获取最新的消息状态
               setMessages(prev => {
-                const newMessages = prev.map(msg => {
+                const currentMsg = prev.find(msg => msg.id === (finalAiMessageId || botMessageId));
+                const existingText = currentMsg?.text && typeof currentMsg.text === 'string' ? currentMsg.text : '';
+                const updatedText = existingText + newText;
+                
+                return prev.map(msg => {
                   if (msg.id === (finalAiMessageId || botMessageId)) {
-                    // 确保现有文本是字符串
-                    const existingText = typeof msg.text === 'string' ? msg.text : '';
-                    const updatedText = existingText + newText;
                     return {
                       ...msg,
                       text: updatedText,
                       newText, // 添加新文本用于流式渲染
                       streaming: true,
-                      // 保持加载状态，直到收到足够的文本内容
                       isLoading: updatedText.length < 10,
                       onRenderComplete: resolve
                     };
                   }
                   return msg;
                 });
-                return newMessages;
               });
             });
 
@@ -290,8 +266,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             setMessages(prev => 
               prev.map(msg => {
                 if (msg.id === (finalAiMessageId || botMessageId)) {
-                  // 确保最终文本是字符串
-                  const finalText = typeof msg.text === 'string' ? msg.text : '';
+                  const finalText = msg.text && typeof msg.text === 'string' ? msg.text : '';
                   return {
                     ...msg,
                     text: finalText,
@@ -379,44 +354,31 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const handleStatusUpdate = (data: any) => {
       if (data.status === 'sent') {
         // 后端确认消息已发送
-        setMessages(prev => {
-          return prev.map(msg => 
-            msg.id === userMessageId
-              ? { ...msg, status: MessageStatus.SENT }
-              : msg
-          );
-        });
+        updateMessageStatus(userMessageId, MessageStatus.SENT);
       } else if (data.status === 'read') {
         // 后端确认消息已读（已传递给LLM）
-        setMessages(prev => {
-          return prev.map(msg => 
-            msg.id === userMessageId
-              ? { ...msg, status: MessageStatus.READ }
-              : msg
-          );
-        });
+        updateMessageStatus(userMessageId, MessageStatus.READ);
       } else if (data.status === 'error') {
         // 处理错误状态
         console.error('消息处理错误:', data.error);
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === userMessageId
-              ? { ...msg, status: MessageStatus.ERROR }
-              : msg
-          )
-        );
+        updateMessageStatus(userMessageId, MessageStatus.ERROR);
       }
     };
 
     // 处理AI消息ID
     const handleAiMessageId = (data: any) => {
       if (data.message_id && !finalAiMessageId) {
-        finalAiMessageId = data.message_id;
+        const newAiMessageId = data.message_id;
+        finalAiMessageId = newAiMessageId;
+        
         // Immediately update the message ID to match the backend
-        console.log(`Updating bot message ID from ${botMessageId} to ${finalAiMessageId}`);
+        console.log(`[handleAiMessageId] 更新消息ID: ${botMessageId} -> ${finalAiMessageId}`);
+        
+        // 直接使用 setMessages 确保原子性更新
         setMessages(prev => 
           prev.map(msg => {
             if (msg.id === botMessageId) {
+              console.log(`[handleAiMessageId] 找到并更新消息: ${botMessageId} -> ${finalAiMessageId}`);
               return { ...msg, id: finalAiMessageId! };
             }
             return msg;
@@ -449,7 +411,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                 toolState: {
                   isUsingTool: true,
                   toolName: data.tool_name,
-                  toolParams: data.parameters,
                   action: data.action_text
                 }
               };
@@ -585,9 +546,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [processAudioData, sessionRefreshSessions, playMotion, currentSessionId, ttsEnabled, sessionSwitchSession])
+  }, [processAudioData, sessionRefreshSessions, playMotion, currentSessionId, ttsEnabled, sessionSwitchSession, updateMessageStatus, updateBotMessage, setMessages, messages])
 
-  // 主发送消息函数
+  // 主发送消息函数 - 现在只负责协调消息发送和流处理
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
     
@@ -595,42 +556,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     await resetAudioState()
     console.log('[DEBUG] Starting new message request, audio state reset');
     
-    // 创建用户消息
-    const userMessage: Message = {
-      id: uuidv4(),
-      sender: 'user',
-      text,
-      files,
-      timestamp: Date.now(),
-      status: MessageStatus.SENDING
-    }
-    
-    // 添加到消息列表
-    setMessages(prev => [...prev, userMessage])
-    
     try {
-      // 创建并发送API请求
-      const response = await createChatRequest(text, files, userMessage.id)
+      // 使用useChatMessage提供的基础消息创建和发送功能
+      const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files)
       
-      // 处理流式响应
-      await processStreamResponse(response, userMessage.id)
+      // 处理流式响应（包括音频、Live2D、工具状态等）
+      await processStreamResponse(response, userMessageId, botMessageId)
     } catch (error) {
       console.error('Error sending message:', error)
-      // 更新用户消息为错误状态
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === userMessage.id
-            ? { ...msg, status: MessageStatus.ERROR }
-            : msg
-        )
-      )
-      
     } finally {
       setIsLoading(false)
     }
-  }, [createChatRequest, processStreamResponse, resetAudioState])
-
-
+  }, [createAndSendMessage, processStreamResponse, resetAudioState])
 
   // 一键生成图片
   const generateImage = useCallback(async (sessionId: string): Promise<{success: boolean, image_path?: string, error?: string}> => {
