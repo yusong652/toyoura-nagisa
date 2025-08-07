@@ -6,7 +6,7 @@
  */
 
 import { apiClient } from './httpClient'
-import { ChatSession } from '../../types/chat'
+import { ChatSession } from '../../types/session'
 
 export interface CreateSessionRequest {
   name?: string

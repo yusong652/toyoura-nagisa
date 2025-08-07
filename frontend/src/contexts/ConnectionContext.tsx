@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
-import { ConnectionStatus } from '../types/chat'
+import { ConnectionStatus } from '../types/connection'
 import GeolocationService from '../utils/geolocation'
 
 export interface ConnectionContextType {

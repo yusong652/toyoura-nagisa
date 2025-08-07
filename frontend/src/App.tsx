@@ -10,11 +10,12 @@ import { AudioProvider } from './contexts/AudioContext'
 import { ConnectionProvider } from './contexts/ConnectionContext'
 import { ToolsProvider } from './contexts/ToolsContext'
 import { SessionProvider } from './contexts/SessionContext'
-import { ChatProvider, useChat } from './contexts/ChatContext'
-import { ConnectionStatus } from './types/chat'
+import { ChatProvider } from './contexts/ChatContext'
+import { useConnection } from './contexts/ConnectionContext'
+import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
-  const { connectionStatus, connectionError, checkConnection } = useChat()
+  const { connectionStatus, connectionError, checkConnection } = useConnection()
 
   return (
     <div className="app-container">

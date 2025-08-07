@@ -31,32 +31,15 @@ export interface FileData {
   data: string; // Base64编码的文件数据
 }
 
-export interface ChatSession {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export enum ConnectionStatus {
-  CONNECTED = 'connected',
-  CONNECTING = 'connecting',
-  DISCONNECTED = 'disconnected',
-  ERROR = 'error'
-}
-
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
-  connectionStatus: ConnectionStatus;
-  connectionError: string | null;
 }
 
 export interface ChatContextType extends ChatState {
   sendMessage: (text: string, files?: FileData[]) => Promise<void>;
   clearChat: () => void;
   deleteMessage: (messageId: string) => Promise<void>;
-  checkConnection: () => Promise<boolean>;
   toolState: {
     type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
     tool_name?: string;

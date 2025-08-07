@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
 import { useChat } from '../contexts/ChatContext'
 import { useSession } from '../contexts/SessionContext'
-import { ChatSession } from '../types/chat'
+import { ChatSession } from '../types/session'
 
 const ChatHistorySidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)

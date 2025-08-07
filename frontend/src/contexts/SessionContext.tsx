@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { ChatSession, ConnectionStatus } from '../types/chat'
+import { ConnectionStatus } from '../types/connection'
+import { ChatSession } from '../types/session'
 import { sessionService } from '../services/api'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'

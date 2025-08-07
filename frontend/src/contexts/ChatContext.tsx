@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, FileData, ChatContextType, ChatSession, ConnectionStatus, MessageStatus } from '../types/chat'
+import { Message, FileData, ChatContextType, MessageStatus } from '../types/chat'
+import { ConnectionStatus } from '../types/connection'
 import { useAudio } from './AudioContext.tsx'
 import { useConnection } from './ConnectionContext'
 import { useTools } from './ToolsContext'
@@ -828,12 +829,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     <ChatContext.Provider value={{
       messages,
       isLoading,
-      connectionStatus,
-      connectionError,
       sendMessage,
       clearChat,
       deleteMessage,
-      checkConnection,
       toolState,
       toolsEnabled,
       updateToolsEnabled,
