@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import './GenerateImageButton.css';
 import { useChat } from '../contexts/ChatContext';
+import { useSession } from '../contexts/SessionContext';
 
 const GenerateImageButton: React.FC = () => {
-  const { generateImage, currentSessionId } = useChat();
+  const { generateImage } = useChat();
+  const { currentSessionId } = useSession();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 

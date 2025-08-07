@@ -43,13 +43,9 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
   
   // 从SessionContext获取会话相关状态和方法
   const {
-    sessions,
     currentSessionId,
     refreshSessions: sessionRefreshSessions,
-    createNewSession: sessionCreateNewSession,
-    switchSession: sessionSwitchSession,
-    deleteSession: sessionDeleteSession,
-    refreshTitle: sessionRefreshTitle
+    switchSession: sessionSwitchSession
   } = useSession()
 
 
@@ -143,30 +139,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [currentSessionId])
 
-  // 包装SessionContext的函数以保持接口兼容性
-  const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
-    return await sessionRefreshSessions()
-  }, [sessionRefreshSessions])
-
-  const createNewSession = useCallback(async (name?: string): Promise<string> => {
-    const newSessionId = await sessionCreateNewSession(name)
-    setMessages([]) // 创建新会话时清空消息
-    return newSessionId
-  }, [sessionCreateNewSession])
-
-  const switchSession = useCallback(async (sessionId: string): Promise<void> => {
-    await sessionSwitchSession(sessionId)
-    // 消息加载由 useEffect 自动处理
-  }, [sessionSwitchSession])
-
-  const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
-    await sessionDeleteSession(sessionId)
-    // SessionContext会自动处理切换到其他会话
-  }, [sessionDeleteSession])
-
-  const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
-    await sessionRefreshTitle(sessionId)
-  }, [sessionRefreshTitle])
+  // 注意：会话相关的功能已经移至 SessionContext，组件应直接使用 useSession()
 
   // 删除消息
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
@@ -200,17 +173,17 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
         console.error('删除消息失败:', responseData);
         
         // 如果后端删除失败但前端已移除，恢复被删除的消息
-        await switchSession(currentSessionId);
+        await sessionSwitchSession(currentSessionId);
         throw new Error(`删除消息失败: ${responseData.detail}`);
       }
       
       // 删除成功后刷新会话列表
-      await refreshSessions();
+      await sessionRefreshSessions();
     } catch (error) {
       console.error('删除消息失败:', error);
       throw error;
     }
-  }, [currentSessionId, connectionStatus, checkConnection, connectionError, refreshSessions, messages, switchSession]);
+  }, [currentSessionId, connectionStatus, checkConnection, connectionError, sessionRefreshSessions, messages, sessionSwitchSession]);
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
   const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
@@ -474,7 +447,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
       // 确保payload存在并包含必要的字段
       if (data.payload && data.payload.session_id && data.payload.title) {
         // 刷新会话列表以获取最新状态
-        refreshSessions().catch(error => {
+        sessionRefreshSessions().catch(error => {
           console.error('刷新会话列表失败:', error);
         });
       }
@@ -524,7 +497,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
           } catch (error) {
             console.error('刷新会话内容失败:', error);
             // 如果获取历史失败，回退到完整的会话切换
-            await switchSession(refreshSessionId);
+            await sessionSwitchSession(refreshSessionId);
           }
         }
       }
@@ -727,7 +700,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
         );
         
         // Refresh session list to update latest state
-        refreshSessions();
+        sessionRefreshSessions();
         break;
       }
       
@@ -740,7 +713,7 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
         processLine(line);
       }
     }
-  }, [processAudioData, refreshSessions, playMotion, currentSessionId, ttsEnabled])
+  }, [processAudioData, sessionRefreshSessions, playMotion, currentSessionId, ttsEnabled, sessionSwitchSession])
 
   // 主发送消息函数
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
@@ -856,19 +829,12 @@ const ChatProviderCore: React.FC<ChatProviderProps> = ({ children }) => {
     <ChatContext.Provider value={{
       messages,
       isLoading,
-      sessions,
-      currentSessionId,
       connectionStatus,
       connectionError,
       sendMessage,
       clearChat,
-      createNewSession,
-      switchSession,
-      deleteSession,
       deleteMessage,
-      refreshSessions,
       checkConnection,
-      refreshTitle,
       toolState,
       toolsEnabled,
       updateToolsEnabled,

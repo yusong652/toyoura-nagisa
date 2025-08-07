@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
 import { useChat } from '../contexts/ChatContext'
+import { useSession } from '../contexts/SessionContext'
 import { ChatSession } from '../types/chat'
 
 const ChatHistorySidebar: React.FC = () => {
@@ -13,9 +14,10 @@ const ChatHistorySidebar: React.FC = () => {
     currentSessionId, 
     createNewSession, 
     switchSession, 
-    deleteSession,
-    clearChat
-  } = useChat()
+    deleteSession
+  } = useSession()
+  
+  const { clearChat } = useChat()
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen)

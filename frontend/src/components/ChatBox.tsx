@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useChat } from '../contexts/ChatContext'
+import { useSession } from '../contexts/SessionContext'
 import MessageItem from './MessageItem.tsx'
 import './ChatBox.css'
 import GenerateImageButton from './GenerateImageButton'
 import TTSControl from './TTSControl'
 
 const ChatBox: React.FC = () => {
-  const { messages, sessions, currentSessionId, refreshTitle } = useChat()
+  const { messages } = useChat()
+  const { sessions, currentSessionId, refreshTitle } = useSession()
   const chatboxRef = useRef<HTMLDivElement>(null)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const prevLastMessageId = useRef(messages[messages.length - 1]?.id);

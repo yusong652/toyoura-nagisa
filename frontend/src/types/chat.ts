@@ -48,8 +48,6 @@ export enum ConnectionStatus {
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
-  sessions: ChatSession[];
-  currentSessionId: string | null;
   connectionStatus: ConnectionStatus;
   connectionError: string | null;
 }
@@ -57,13 +55,8 @@ export interface ChatState {
 export interface ChatContextType extends ChatState {
   sendMessage: (text: string, files?: FileData[]) => Promise<void>;
   clearChat: () => void;
-  createNewSession: (name?: string) => Promise<string>;
-  switchSession: (sessionId: string) => Promise<void>;
-  deleteSession: (sessionId: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
-  refreshSessions: () => Promise<ChatSession[]>;
   checkConnection: () => Promise<boolean>;
-  refreshTitle: (sessionId: string) => Promise<void>;
   toolState: {
     type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
     tool_name?: string;
