@@ -1,0 +1,186 @@
+import { useCallback, useRef } from 'react'
+
+interface UseStreamProcessorProps {
+  handleTitleUpdate: (data: any) => void
+  handleSessionRefresh: (data: any) => Promise<void>
+  handleStatusUpdate: (data: any, userMessageId: string) => void
+  handleAiMessageId: (data: any, botMessageId: string) => string | null
+  handleKeyword: (data: any) => void
+  handleToolEvent: (data: any, messageId: string) => void
+  handleContentUpdate: (data: any, messageId: string) => Promise<void>
+  sessionRefreshSessions: () => Promise<any>
+  finalizeMessage: (messageId: string) => void
+  resetProcessor: () => void
+}
+
+interface StreamProcessor {
+  processStream: (response: Response, options: {
+    userMessageId: string
+    botMessageId: string
+  }) => Promise<void>
+}
+
+/**
+ * Hook for processing SSE stream responses.
+ * 
+ * Handles stream reading, line parsing, and event dispatching.
+ * Core stream processing logic extracted from useStreamHandler.
+ */
+export const useStreamProcessor = ({
+  handleTitleUpdate,
+  handleSessionRefresh,
+  handleStatusUpdate,
+  handleAiMessageId,
+  handleKeyword,
+  handleToolEvent,
+  handleContentUpdate,
+  sessionRefreshSessions,
+  finalizeMessage,
+  resetProcessor
+}: UseStreamProcessorProps): StreamProcessor => {
+  
+  // Track final AI message ID
+  const finalAiMessageIdRef = useRef<string | null>(null)
+  
+  /**
+   * Process a single line from the SSE stream.
+   * 
+   * Parses JSON data and routes to appropriate handlers.
+   */
+  const processLine = useCallback((
+    line: string,
+    userMessageId: string,
+    botMessageId: string
+  ) => {
+    if (line.trim() === '') return
+    
+    if (line.startsWith('data: ')) {
+      const jsonData = line.slice(6)
+      
+      try {
+        const data = JSON.parse(jsonData)
+        const currentMessageId = finalAiMessageIdRef.current || botMessageId
+        
+        // Route to specific handlers based on event type
+        if (data.type === 'TITLE_UPDATE') {
+          handleTitleUpdate(data)
+          return
+        }
+        
+        if (data.type === 'SESSION_REFRESH') {
+          handleSessionRefresh(data)
+          return
+        }
+        
+        if (data.status) {
+          handleStatusUpdate(data, userMessageId)
+          return
+        }
+        
+        // Handle AI message ID update
+        if (data.message_id && !finalAiMessageIdRef.current) {
+          const newId = handleAiMessageId(data, botMessageId)
+          if (newId) {
+            finalAiMessageIdRef.current = newId
+          }
+        }
+        
+        // Handle keyword/motion
+        handleKeyword(data)
+        
+        // Handle tool events
+        if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
+          handleToolEvent(data, currentMessageId)
+          return
+        }
+        
+        // Handle content updates (text/audio)
+        handleContentUpdate(data, currentMessageId)
+      } catch (e) {
+        console.error('[StreamProcessor] Error parsing response:', e)
+      }
+    }
+  }, [
+    handleTitleUpdate,
+    handleSessionRefresh,
+    handleStatusUpdate,
+    handleAiMessageId,
+    handleKeyword,
+    handleToolEvent,
+    handleContentUpdate
+  ])
+  
+  /**
+   * Process the entire SSE stream.
+   * 
+   * Reads stream, parses lines, and coordinates event handling.
+   */
+  const processStream = useCallback(async (
+    response: Response,
+    options: {
+      userMessageId: string
+      botMessageId: string
+    }
+  ) => {
+    const { userMessageId, botMessageId } = options
+    
+    // Reset state for new stream
+    finalAiMessageIdRef.current = null
+    resetProcessor()
+    
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Unable to read response stream')
+    }
+    
+    const decoder = new TextDecoder()
+    let buffer = ''
+    
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) {
+          // Wait for any pending chunk processing
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // Finalize the message
+          const finalMessageId = finalAiMessageIdRef.current || botMessageId
+          finalizeMessage(finalMessageId)
+          
+          // Refresh sessions
+          sessionRefreshSessions()
+          
+          console.log('[StreamProcessor] Stream processing completed')
+          break
+        }
+        
+        // Decode and buffer
+        buffer += decoder.decode(value, { stream: true })
+        
+        // Split by double newline (SSE format)
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+        
+        // Process each complete line
+        for (const line of lines) {
+          processLine(line, userMessageId, botMessageId)
+        }
+      }
+    } catch (error) {
+      console.error('[StreamProcessor] Stream processing error:', error)
+      throw error
+    } finally {
+      reader.releaseLock()
+    }
+  }, [
+    processLine,
+    resetProcessor,
+    finalizeMessage,
+    sessionRefreshSessions
+  ])
+  
+  return {
+    processStream
+  }
+}

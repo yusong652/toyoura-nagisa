@@ -36,7 +36,7 @@ export const ToolsProvider: React.FC<ToolsProviderProps> = ({ children }) => {
   }, [])
 
   // 更新 TTS 状态
-  const updateTtsEnabled = useCallback(async (enabled: boolean): Promise<void> => {
+  const updateTTSEnabled = useCallback(async (enabled: boolean): Promise<void> => {
     try {
       const data = await toolService.updateTtsEnabled(enabled)
       setTtsEnabled(data.tts_enabled)
@@ -52,7 +52,7 @@ export const ToolsProvider: React.FC<ToolsProviderProps> = ({ children }) => {
       toolsEnabled,
       ttsEnabled,
       updateToolsEnabled,
-      updateTtsEnabled,
+      updateTtsEnabled: updateTTSEnabled,
       setToolState
     }}>
       {children}
