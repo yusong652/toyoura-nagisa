@@ -36,12 +36,15 @@
   text-align: left;
 }
 
-.message-tool-action {
-  font-weight: 500;
+.message-tool-thinking {
+  font-weight: 400;
   margin-bottom: 4px;
-  color: #102040;
-  letter-spacing: 0.3px;
+  color: #5a6b7d;
+  letter-spacing: 0.2px;
   text-align: left;
+  font-style: italic;
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .message-tool-name {
@@ -107,8 +110,8 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
-  .message-tool-action {
-    color: var(--tool-state-action-dark, #64b4ff);
+  .message-tool-thinking {
+    color: var(--tool-state-thinking-dark, #8fb5d6);
   }
 
   .message-tool-name {

@@ -26,6 +26,7 @@ export interface MessageToolState {
   isUsingTool: boolean;
   toolName?: string;
   action?: string;
+  thinking?: string; // AI thinking content
 }
 
 export interface FileData {

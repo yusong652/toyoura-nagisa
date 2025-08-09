@@ -12,22 +12,11 @@ interface MessageItemProps {
   selectedMessageId: string | null
 }
 
-interface FileData {
-  type: string
-  data: string
-  name: string
-}
-
-interface ToolState {
-  // Add appropriate properties for ToolState
-}
 
 const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
   const { sender, text, files, streaming, isLoading, status, id, toolState, newText, onRenderComplete } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
-  const textRef = useRef(text)
-  const charIndexRef = useRef(0)
   const { deleteMessage } = useChat()
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [chunks, setChunks] = useState<string[]>([])
@@ -111,19 +100,24 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   
   // 为流式文本添加渐变效果
   const renderStreamingText = () => {
+    // 如果有工具状态和action，显示action text
+    const textToDisplay = (toolState?.isUsingTool && toolState?.action) 
+      ? toolState.action 
+      : displayText;
+    
     if (!streaming || sender !== 'bot') {
-      return (
+      return textToDisplay ? (
         <div className="message-text">
-          <ReactMarkdown>{displayText}</ReactMarkdown>
+          <ReactMarkdown>{textToDisplay}</ReactMarkdown>
         </div>
-      )
+      ) : null
     }
     
     // 流式渲染，使用完整文本进行渲染，但保持块级淡入效果
-    const renderedText = displayText
+    const renderedText = textToDisplay
     const lastChunkStart = renderedText.length - (chunks[chunks.length - 1]?.length || 0)
     
-    return (
+    return renderedText ? (
       <div className="message-text streaming-text">
         {/* 渲染已完成的部分 */}
         {lastChunkStart > 0 && (
@@ -138,7 +132,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           </div>
         )}
       </div>
-    )
+    ) : null
   }
   
   // 渲染消息状态
@@ -223,11 +217,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
         {sender === 'bot' ? (
           <div className="message-wrapper">
             {toolState && <MessageToolState toolState={toolState} />}
-            <div className="message-content">
-              {renderStreamingText()}
-              
-              {files && files.length > 0 && !isLoading && (
-                <div className="message-files">
+            {(renderStreamingText() || (files && files.length > 0 && !isLoading)) && (
+              <div className="message-content">
+                {renderStreamingText()}
+                
+                {files && files.length > 0 && !isLoading && (
+                  <div className="message-files">
                   {files.map((file, index) => (
                     <div key={index} className="file-preview">
                       {file.type.startsWith('image/') ? (
@@ -252,6 +247,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
               )}
               <span className="message-time">{formatTime(message.timestamp)}</span>
             </div>
+            )}
           </div>
         ) : (
           <div className="message-content">

@@ -374,6 +374,9 @@ class LLMClientBase(ABC):
                 # Extract LLM text content from current response
                 extracted_text = self._extract_text_from_response(current_response)
                 
+                # Extract thinking content if available
+                thinking_content = self._extract_thinking_content(current_response)
+                
                 # Determine action text: use extracted LLM text or fallback to generic message
                 if extracted_text and len(extracted_text.strip()) > 0:
                     action_text = extracted_text.strip()
@@ -388,20 +391,26 @@ class LLMClientBase(ABC):
                         tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
                         action_text = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
                 
-                # Send notification with LLM content or fallback message
+                # Send notification with LLM content, thinking, or fallback message
                 if num_tools == 1:
                     tool_name = tool_calls[0].get('name', 'unknown_tool')
-                    yield {
+                    notification = {
                         'type': 'NAGISA_IS_USING_TOOL',
                         'tool_name': tool_name,
                         'action_text': action_text
                     }
+                    if thinking_content:
+                        notification['thinking'] = thinking_content
+                    yield notification
                 else:
-                    yield {
+                    notification = {
                         'type': 'NAGISA_IS_USING_TOOL',
                         'tool_name': 'parallel_tools',
                         'action_text': action_text
                     }
+                    if thinking_content:
+                        notification['thinking'] = thinking_content
+                    yield notification
                 
                 # Execute all tools in parallel
                 tasks = [
