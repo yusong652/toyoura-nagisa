@@ -49,13 +49,7 @@ export const useChunkProcessor = ({
     chunk: ChunkData,
     messageId: string
   ): Promise<void> => {
-    console.log('[ChunkProcessor] processSingleChunk called with:', {
-      hasText: chunk.text !== undefined,
-      textType: typeof chunk.text,
-      textValue: chunk.text,
-      messageId
-    })
-    
+
     // Process text if present
     if (chunk.text !== undefined && chunk.text !== null) {
       let newText = ''
@@ -65,21 +59,8 @@ export const useChunkProcessor = ({
         newText = chunk.text.filter((t) => typeof t === 'string').join('')
       }
 
-      console.log('[ChunkProcessor] Processed text:', {
-        newTextLength: newText.length,
-        newText,
-        currentTotal: currentMessageRef.current.length
-      })
-
       if (newText.length > 0) {
         currentMessageRef.current += newText
-        
-        console.log('[ChunkProcessor] Updating message text:', {
-          messageId,
-          totalText: currentMessageRef.current,
-          newText,
-          ttsEnabled
-        })
         
         // Update message text immediately
         // When TTS is disabled, we pass the full text without newText to avoid duplication
@@ -104,9 +85,7 @@ export const useChunkProcessor = ({
     // Process audio if TTS is enabled
     if (ttsEnabled && chunk.audio && typeof chunk.audio === 'string' && chunk.audio.length > 0) {
       try {
-        console.log(`[ChunkProcessor] Processing audio #${audioCountRef.current}`)
         await processAudioData(chunk.audio, audioCountRef.current++)
-        console.log(`[ChunkProcessor] Audio #${audioCountRef.current - 1} completed`)
       } catch (error) {
         console.error('[ChunkProcessor] Audio processing failed:', error)
       }
@@ -150,14 +129,10 @@ export const useChunkProcessor = ({
     // Buffer the chunk
     chunkBufferRef.current.set(chunkIndex, chunk)
     
-    console.log(`[ChunkProcessor] Buffered chunk #${chunkIndex}, expecting #${expectedIndexRef.current}`)
-    
     // Process all sequential chunks available
     while (chunkBufferRef.current.has(expectedIndexRef.current)) {
       const bufferedChunk = chunkBufferRef.current.get(expectedIndexRef.current)!
       chunkBufferRef.current.delete(expectedIndexRef.current)
-      
-      console.log(`[ChunkProcessor] Processing ordered chunk #${expectedIndexRef.current}`)
       
       chunkQueueRef.current.push(bufferedChunk)
       expectedIndexRef.current++
@@ -182,15 +157,6 @@ export const useChunkProcessor = ({
   ): Promise<void> => {
     if (!chunk) return
     
-    console.log('[ChunkProcessor] Processing chunk:', {
-      hasText: chunk.text !== undefined,
-      textContent: chunk.text,
-      hasAudio: chunk.audio !== undefined,
-      hasIndex: chunk.index !== undefined,
-      index: chunk.index,
-      ttsEnabled
-    })
-    
     // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await handleOrderedChunk(chunk, messageId)
@@ -201,12 +167,10 @@ export const useChunkProcessor = ({
       await handleOrderedChunk(chunk, messageId)
     } else {
       // Ignore chunks without content or index (e.g., keyword-only chunks)
-      console.log('[ChunkProcessor] Ignoring chunk without content or index')
     }
     
     // Check if processing is complete
     if (!isProcessingRef.current && chunkQueueRef.current.length === 0) {
-      console.log('[ChunkProcessor] All chunks processed, finalizing message with text:', currentMessageRef.current)
       finalizeMessage(messageId)
     }
   }, [handleOrderedChunk, finalizeMessage, ttsEnabled])
@@ -223,7 +187,6 @@ export const useChunkProcessor = ({
     expectedIndexRef.current = 0
     audioCountRef.current = 0
     currentMessageRef.current = ''
-    console.log('[ChunkProcessor] Processor reset')
   }, [])
 
   return {
