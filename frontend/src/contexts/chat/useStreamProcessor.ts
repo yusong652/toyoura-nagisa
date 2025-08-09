@@ -162,7 +162,6 @@ export const useStreamProcessor = ({
           // Refresh sessions
           sessionRefreshSessions()
           
-          console.log('[StreamProcessor] Stream processing completed')
           break
         }
         

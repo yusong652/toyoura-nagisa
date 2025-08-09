@@ -9,8 +9,6 @@ interface MessageToolStateProps {
 const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
   const { isUsingTool, toolName, action } = toolState;
 
-  console.log('[MessageToolState] Rendering with:', { isUsingTool, toolName, action });
-
   if (!isUsingTool) return null;
 
   return (

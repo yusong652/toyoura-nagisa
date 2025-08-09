@@ -127,11 +127,8 @@ export const useStreamHandler = ({
     response: Response, 
     options: StreamHandlerOptions
   ) => {
-    console.log('[StreamHandler] Starting stream processing')
-    
     try {
       await processStream(response, options)
-      console.log('[StreamHandler] Stream processing completed successfully')
     } catch (error) {
       console.error('[StreamHandler] Stream processing failed:', error)
       throw error

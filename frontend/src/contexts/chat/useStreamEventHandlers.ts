@@ -117,7 +117,6 @@ export const useStreamEventHandlers = ({
   const handleAiMessageId = useCallback((data: any, botMessageId: string): string | null => {
     if (data.message_id) {
       const newAiMessageId = data.message_id
-      console.log(`[EventHandlers] Updating AI message ID: ${botMessageId} -> ${newAiMessageId}`)
       updateMessageId(botMessageId, newAiMessageId)
       return newAiMessageId
     }
@@ -131,7 +130,6 @@ export const useStreamEventHandlers = ({
    */
   const handleKeyword = useCallback((data: any) => {
     if (data.keyword) {
-      console.log(`[EventHandlers] Playing motion: ${data.keyword}`)
       playMotion(data.keyword)
     }
   }, [])
@@ -157,14 +155,6 @@ export const useStreamEventHandlers = ({
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
     if (!data) return
     
-    console.log('[EventHandlers] Processing content update:', {
-      dataKeys: Object.keys(data),
-      hasText: 'text' in data,
-      hasAudio: 'audio' in data,
-      hasIndex: 'index' in data,
-      fullData: data,
-      messageId
-    })
     await processChunk(data, messageId)
   }, [processChunk])
 
