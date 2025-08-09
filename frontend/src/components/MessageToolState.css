@@ -33,6 +33,7 @@
   backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+  text-align: left;
 }
 
 .message-tool-action {
@@ -40,6 +41,7 @@
   margin-bottom: 4px;
   color: #102040;
   letter-spacing: 0.3px;
+  text-align: left;
 }
 
 .message-tool-name {
@@ -49,6 +51,7 @@
   color: #133f87;
   font-weight: 600;
   opacity: 1;
+  text-align: center;
 }
 
 .message-tool-params {
