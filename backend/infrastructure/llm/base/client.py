@@ -46,7 +46,6 @@ class LLMClientBase(ABC):
 
     # ========== CORE STREAMING INTERFACE ==========
 
-    @abstractmethod     
     async def get_response(
         self,
         messages: List[BaseMessage],
@@ -56,14 +55,9 @@ class LLMClientBase(ABC):
         """
         [Core Interface] Get LLM response with real-time tool calling notifications.
         
-        Architecture designed for real-time tool calling notifications using streaming state machine pattern:
-        1. Real-time yield tool call start/progress/completion notifications
-        2. Real-time yield tool execution progress and status updates
-        3. Final yield complete response and execution metadata
-        4. Complete error handling and recovery mechanisms
-        
-        This method is the core of the new architecture, solving traditional batch notification latency issues,
-        allowing frontend to perceive tool calling status in real-time, significantly improving user experience.
+        Unified implementation for all providers using provider-specific components.
+        This method centralizes the common workflow while delegating provider-specific
+        operations to abstract methods implemented by each provider.
         
         Args:
             messages: Input message list
@@ -74,16 +68,101 @@ class LLMClientBase(ABC):
             Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
             - Dict[str, Any]: Intermediate notifications (tool calling status updates)
             - Tuple[BaseMessage, Dict[str, Any]]: Final result (final_message, execution_metadata)
-            
-        Note:
-            Notification format examples:
-            - Tool start: {'type': 'NAGISA_IS_USING_TOOL', 'tool_name': 'search', 'action_text': 'Searching...'}
-            - Tool progress: {'type': 'NAGISA_IS_USING_TOOL', 'tool_name': 'search', 'action_text': 'Using search tool...'}
-            - Tool completion: {'type': 'NAGISA_IS_USING_TOOL', 'tool_name': 'search', 'action_text': 'Completed search'}
-            - Sequence end: {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
-            - Final result: (final_message, {'execution_id': '...', 'tool_calls_executed': 3, ...})
         """
-        pass
+        # === INITIALIZATION PHASE ===
+        execution_id = self._generate_execution_id()
+        provider_config = self._get_provider_config()
+        debug = getattr(provider_config, 'debug', False)
+        
+        if debug:
+            provider_name = self.__class__.__name__.replace('Client', '')
+            print(f"[DEBUG] Starting {provider_name} execution {execution_id}")
+            print(f"[DEBUG] Session ID: {session_id}")
+            print(f"[DEBUG] Input messages: {len(messages)}")
+
+        # Create provider-specific context manager
+        context_manager_class = self._get_context_manager()
+        context_manager = context_manager_class()
+        context_manager.initialize_from_messages(messages)
+        
+        # Execution metadata - unified across all providers
+        metadata = {
+            'execution_id': execution_id,
+            'session_id': session_id,
+            'start_time': self._get_timestamp(),
+            'end_time': None,
+            'iterations': 0,
+            'api_calls': 0,
+            'tool_calls_executed': 0,
+            'status': 'running'
+        }
+        
+        try:
+            # === EXECUTION PHASE - Streaming tool calling loop ===
+            from backend.config import get_llm_settings
+            max_iterations = get_llm_settings().max_tool_iterations
+            
+            final_response = None
+            async for item in self._streaming_tool_calling_loop(
+                context_manager, session_id, max_iterations, metadata, debug, **kwargs
+            ):
+                if isinstance(item, dict):
+                    # Intermediate notification - yield directly to API layer
+                    yield item
+                else:
+                    # Final response - save for subsequent processing
+                    final_response = item
+            
+            # === FINALIZATION PHASE ===
+            metadata['status'] = 'completed'
+            metadata['end_time'] = self._get_timestamp()
+            
+            # Extract thinking content if supported
+            thinking_content = self._extract_thinking_content(final_response)
+            if thinking_content:
+                metadata['thinking_preserved'] = True
+            
+            # Extract keyword using shared utility
+            processor = self._get_response_processor()
+            original_text = processor.extract_text_content(final_response)
+            if original_text:
+                from backend.shared.utils.text_parser import parse_llm_output
+                _, extracted_keyword = parse_llm_output(original_text)
+                metadata['keyword'] = extracted_keyword
+            
+            # Send tool use concluded notification if tools were used
+            if metadata['tool_calls_executed'] > 0:
+                yield {
+                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
+                    'execution_id': execution_id
+                }
+            
+            # Create final storage message using provider-specific processor
+            final_message = processor.format_response_for_storage(final_response)
+            
+            if debug:
+                print(f"[DEBUG] Final message formatted for storage")
+            
+            # Yield final result
+            yield (final_message, metadata)
+            
+        except Exception as e:
+            metadata['status'] = 'failed'
+            metadata['error'] = str(e)
+            metadata['end_time'] = self._get_timestamp()
+            
+            if debug:
+                provider_name = self.__class__.__name__.replace('Client', '')
+                print(f"[DEBUG] {provider_name} execution {execution_id} failed: {e}")
+            
+            # Yield error notification
+            yield {
+                'type': 'error',
+                'error': f"Execution {execution_id} failed: {e}",
+                'execution_id': execution_id
+            }
+            
+            raise Exception(f"Execution {execution_id} failed: {e}")
 
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
@@ -411,6 +490,45 @@ class LLMClientBase(ABC):
             Provider-specific response processor class (e.g., GeminiResponseProcessor)
         """
         pass
+
+    @abstractmethod
+    def _get_context_manager(self):
+        """
+        Get provider-specific context manager instance.
+        
+        Returns:
+            Provider-specific context manager class (e.g., GeminiContextManager)
+        """
+        pass
+
+    @abstractmethod
+    def _get_provider_config(self):
+        """
+        Get provider-specific configuration object.
+        
+        Returns:
+            Provider-specific config object with debug flag and other settings
+        """
+        pass
+
+    def _extract_thinking_content(self, response) -> Optional[str]:
+        """
+        Extract thinking content from provider response (optional override).
+        
+        Args:
+            response: Provider-specific response object
+            
+        Returns:
+            Optional[str]: Thinking content if available, None otherwise
+        """
+        # Default implementation - providers can override if they support thinking
+        try:
+            processor = self._get_response_processor()
+            if hasattr(processor, 'extract_thinking_content'):
+                return processor.extract_thinking_content(response)
+        except Exception:
+            pass
+        return None
 
     def _extract_text_from_response(self, response: Any) -> str:
         """

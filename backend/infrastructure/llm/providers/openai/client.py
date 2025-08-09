@@ -175,128 +175,7 @@ class OpenAIClient(LLMClientBase):
 
     # ========== CORE STREAMING INTERFACE ==========
 
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        max_iterations: int = 10,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
-        """
-        Streaming OpenAI API call with real-time tool calling notifications.
-        
-        Streaming processor designed for real-time tool calling notifications using event-driven pattern:
-        1. Real-time yield tool call start/progress/completion notifications
-        2. Maintain complete execution tracking and error handling
-        3. Final return of complete response and metadata
-        4. Fully compatible with existing architecture
-        
-        Args:
-            messages: Input message history
-            session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations
-            **kwargs: Additional API configuration parameters
-            
-        Yields:
-            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
-            - Intermediate notifications: tool calling status updates
-            - Final result: (final_message, execution_metadata)
-        """
-        # === INITIALIZATION PHASE ===
-        execution_id = self._generate_execution_id()
-        debug = self.openai_config.debug
-
-        if debug:
-            print(f"[DEBUG] Starting OpenAI execution {execution_id}")
-            print(f"[DEBUG] Session ID: {session_id}")
-            print(f"[DEBUG] Input messages: {len(messages)}")
-
-        # Create independent context manager - ensure state isolation
-        context_manager = OpenAIContextManager()
-        context_manager.initialize_from_messages(messages)
-        
-        if debug:
-            print(f"[DEBUG] Initial context state:")
-            OpenAIDebugger.log_context_state(context_manager)
-        
-        # Execution metadata - complete tracking
-        metadata = {
-            'execution_id': execution_id,
-            'session_id': session_id,
-            'start_time': self._get_timestamp(),
-            'end_time': None,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'status': 'running'
-        }
-        
-        try:
-            # === EXECUTION PHASE - Streaming tool calling loop ===
-            final_response = None
-            async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, **kwargs
-            ):
-                if isinstance(item, dict):
-                    # Intermediate notification - yield directly to API layer
-                    yield item
-                else:
-                    # Final response - save for subsequent processing
-                    final_response = item
-            
-            # === FINALIZATION PHASE ===
-            metadata['status'] = 'completed'
-            metadata['end_time'] = self._get_timestamp()
-            
-            if debug:
-                print(f"[DEBUG] Execution {execution_id} completed successfully")
-                OpenAIDebugger.print_formatted_dict(metadata, "Final Execution Metadata")
-            
-            # Extract keyword - extract from original response before formatting
-            original_text = OpenAIResponseProcessor.extract_text_content(final_response)
-            from backend.shared.utils.text_parser import parse_llm_output
-            _, extracted_keyword = parse_llm_output(original_text)
-            metadata['keyword'] = extracted_keyword
-            
-            # Send tool use concluded notification if tools were used
-            if metadata['tool_calls_executed'] > 0:
-                yield {
-                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
-                    'execution_id': execution_id
-                }
-            
-            # Create final storage message - use ResponseProcessor instead of context_manager
-            final_message = OpenAIResponseProcessor.format_response_for_storage(final_response)
-            
-            if debug:
-                print(f"[DEBUG] Final message formatted for storage")
-            
-            # Yield final result
-            yield (final_message, metadata)
-            
-        except Exception as e:
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
-            metadata['end_time'] = self._get_timestamp()
-            
-            if debug:
-                print(f"[DEBUG] Execution {execution_id} failed with error: {str(e)}")
-                OpenAIDebugger.print_formatted_dict(metadata, "Failed Execution Metadata")
-            
-            # Yield error notification
-            yield {
-                'type': 'error',
-                'error': f"OpenAI execution {execution_id} failed: {e}",
-                'execution_id': execution_id
-            }
-            
-            # Send tool use conclusion notification
-            yield {
-                'type': 'NAGISA_TOOL_USE_CONCLUDED',
-                'execution_id': execution_id
-            }
-            
-            raise Exception(f"OpenAI execution {execution_id} failed: {e}")
+    # get_response is now implemented in base class using provider-specific components
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
@@ -311,6 +190,14 @@ class OpenAIClient(LLMClientBase):
     def _get_response_processor(self):
         """Get OpenAI-specific response processor."""
         return OpenAIResponseProcessor
+
+    def _get_context_manager(self):
+        """Get OpenAI-specific context manager."""
+        return OpenAIContextManager
+
+    def _get_provider_config(self):
+        """Get OpenAI-specific configuration object."""
+        return self.openai_config
 
     def _log_context_state(self, context_manager: Any):
         """Log OpenAI context manager state for debugging."""

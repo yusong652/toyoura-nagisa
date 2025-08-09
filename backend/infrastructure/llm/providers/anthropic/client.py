@@ -59,102 +59,7 @@ class AnthropicClient(LLMClientBase):
             tools_enabled=self.tools_enabled
         )
 
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        max_iterations: int = 10,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
-        """
-        流式Anthropic API调用 - 与GeminiClient架构完全对齐
-        
-        专为实时工具调用通知设计的流式处理器，采用事件驱动模式：
-        1. 实时yield工具调用开始/进行/完成通知
-        2. 保持完整的执行追踪和错误处理
-        3. 最终返回完整的响应和元数据
-        4. 与现有架构完全兼容
-        
-        Args:
-            messages: Input message history
-            session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations
-            **kwargs: Additional API configuration parameters
-            
-        Yields:
-            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
-            - 中间通知: 工具调用状态更新
-            - 最终结果: (final_message, execution_metadata)
-        """
-        # === INITIALIZATION PHASE ===
-        execution_id = self._generate_execution_id()
-        debug = self.anthropic_config.debug
-
-        # 创建独立的上下文管理器 - 确保状态隔离
-        context_manager = AnthropicContextManager()
-        context_manager.initialize_from_messages(messages)
-        
-        # 执行元数据 - 完整追踪
-        metadata = {
-            'execution_id': execution_id,
-            'session_id': session_id,
-            'start_time': self._get_timestamp(),
-            'end_time': None,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'status': 'running'
-        }
-        
-        try:
-            # === EXECUTION PHASE - 流式工具调用循环 ===
-            final_response = None
-            async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, **kwargs
-            ):
-                if isinstance(item, dict):
-                    # 中间通知 - 直接yield给API层
-                    yield item
-                else:
-                    # 最终响应 - 保存用于后续处理
-                    final_response = item
-            
-            # === FINALIZATION PHASE ===
-            metadata['status'] = 'completed'
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Send tool use concluded notification if tools were used
-            if metadata['tool_calls_executed'] > 0:
-                yield {
-                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
-                    'execution_id': execution_id
-                }
-            
-            # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
-            final_message = AnthropicResponseProcessor.format_response_for_storage(final_response)
-            
-            # Yield最终结果
-            yield (final_message, metadata)
-            
-        except Exception as e:
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Yield错误通知
-            yield {
-                'type': 'error',
-                'error': f"Anthropic execution {execution_id} failed: {e}",
-                'execution_id': execution_id
-            }
-            
-            # 发送工具使用结束通知
-            yield {
-                'type': 'NAGISA_TOOL_USE_CONCLUDED',
-                'execution_id': execution_id
-            }
-            
-            raise Exception(f"Anthropic execution {execution_id} failed: {e}")
+    # get_response is now implemented in base class using provider-specific components
 
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
@@ -170,6 +75,14 @@ class AnthropicClient(LLMClientBase):
     def _get_response_processor(self):
         """Get Anthropic-specific response processor."""
         return AnthropicResponseProcessor
+
+    def _get_context_manager(self):
+        """Get Anthropic-specific context manager."""
+        return AnthropicContextManager
+
+    def _get_provider_config(self):
+        """Get Anthropic-specific configuration object."""
+        return self.anthropic_config
 
     def _log_context_state(self, context_manager: Any):
         """Log Anthropic context manager state for debugging."""
