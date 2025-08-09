@@ -80,6 +80,19 @@ class AnthropicResponseProcessor:
         )
 
     @staticmethod
+    def extract_text_content(response: Any) -> str:
+        """
+        Extract text content from Claude API response.
+        
+        Args:
+            response: Raw response from Anthropic Claude API
+            
+        Returns:
+            str: Extracted text content
+        """
+        return AnthropicResponseProcessor.extract_text_from_response(response)
+
+    @staticmethod
     def extract_text_from_response(response: Any) -> str:
         """
         Extract plain text content from Claude API response.

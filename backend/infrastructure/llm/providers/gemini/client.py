@@ -80,103 +80,7 @@ class GeminiClient(LLMClientBase):
         # Initialize component managers with unified architecture
         self.tool_manager = GeminiToolManager(tools_enabled=self.tools_enabled)
 
-    # ========== CORE STREAMING INTERFACE ==========
-
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
-        """
-        Streaming LLM response processor with real-time notifications.
-        
-        Streaming processor designed for real-time tool calling notifications using event-driven pattern:
-        1. Real-time yield tool call start/progress/completion notifications
-        2. Maintain complete execution tracking and error handling
-        3. Final return of complete response and metadata
-        4. Fully compatible with existing architecture
-        
-        Args:
-            messages: Input message history
-            session_id: Session ID for tool and context management
-            **kwargs: Additional API configuration parameters
-            
-        Yields:
-            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
-            - Intermediate notifications: tool calling status updates
-            - Final result: (final_message, execution_metadata)
-        """
-        # === INITIALIZATION PHASE ===
-        execution_id = self._generate_execution_id()
-        debug = self.gemini_config.debug
-
-        # Create independent context manager - ensure state isolation
-        context_manager = GeminiContextManager()
-        context_manager.initialize_from_messages(messages)
-        
-        # Execution metadata - complete tracking
-        metadata = {
-            'execution_id': execution_id,
-            'session_id': session_id,
-            'start_time': self._get_timestamp(),
-            'end_time': None,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'tool_calls_detected': False,
-            'thinking_preserved': False,
-            'status': 'running'
-        }
-        
-        try:
-            # === EXECUTION PHASE - Streaming tool calling loop ===
-            # Get max tool calling iterations from configuration
-            max_iterations = get_llm_settings().max_tool_iterations
-            
-            final_response = None
-            async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, **kwargs
-            ):
-                if isinstance(item, dict):
-                    # Intermediate notification - yield directly to API layer
-                    yield item
-                else:
-                    # Final response - save for subsequent processing
-                    final_response = item
-            
-            # === FINALIZATION PHASE ===
-            metadata['status'] = 'completed'
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Extract thinking content
-            thinking_content = GeminiResponseProcessor.extract_thinking_content(final_response)
-            metadata['thinking_preserved'] = thinking_content is not None
-            
-            # Extract keyword - extract from original response before formatting
-            original_text = GeminiResponseProcessor.extract_text_content(final_response)
-            from backend.shared.utils.text_parser import parse_llm_output
-            _, extracted_keyword = parse_llm_output(original_text)
-            metadata['keyword'] = extracted_keyword
-            
-            # Create final storage message - use ResponseProcessor instead of context_manager
-            final_message = GeminiResponseProcessor.format_response_for_storage(final_response)
-            
-            # Yield final result
-            yield (final_message, metadata)
-            
-        except Exception as e:
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
-            metadata['end_time'] = self._get_timestamp()
-            
-            # Yield error notification
-            yield {
-                'type': 'error',
-                'error': f"Tool calling sequence {execution_id} failed: {e}"
-            }
-            
-            raise Exception(f"Tool calling sequence {execution_id} failed: {e}")
+    # get_response is now implemented in base class using provider-specific components
 
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
@@ -342,6 +246,22 @@ class GeminiClient(LLMClientBase):
     def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
         """Extract tool calls from Gemini response."""
         return GeminiResponseProcessor.extract_tool_calls(response)
+
+    def _get_response_processor(self):
+        """Get Gemini-specific response processor."""
+        return GeminiResponseProcessor
+
+    def _get_context_manager(self):
+        """Get Gemini-specific context manager."""
+        return GeminiContextManager
+
+    def _get_provider_config(self):
+        """Get Gemini-specific configuration object."""
+        return self.gemini_config
+
+    def _extract_thinking_content(self, response) -> Optional[str]:
+        """Extract thinking content from Gemini response."""
+        return GeminiResponseProcessor.extract_thinking_content(response)
 
     def _log_context_state(self, context_manager: Any):
         """Log Gemini context manager state for debugging."""

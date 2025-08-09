@@ -157,7 +157,14 @@ export const useStreamEventHandlers = ({
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
     if (!data) return
     
-    console.log('[EventHandlers] Processing content update:', data)
+    console.log('[EventHandlers] Processing content update:', {
+      dataKeys: Object.keys(data),
+      hasText: 'text' in data,
+      hasAudio: 'audio' in data,
+      hasIndex: 'index' in data,
+      fullData: data,
+      messageId
+    })
     await processChunk(data, messageId)
   }, [processChunk])
 

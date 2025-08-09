@@ -95,36 +95,63 @@ def process_ai_text_message(content: List[Dict[str, Any]], keyword: str, history
     Returns:
         tuple[str, str]: (消息ID, 处理后的消息内容)
     """
-    ai_msg_id = str(uuid.uuid4())
+    message_id = str(uuid.uuid4())
     
-    # 创建助手消息
-    ai_msg = AssistantMessage(
-        content=content,  # 直接使用结构化内容
-        id=ai_msg_id
+    # 提取当前文本内容用于检查
+    extracted_text = ""
+    for content_item in content:
+        if isinstance(content_item, dict) and content_item.get("type") == "text":
+            extracted_text += content_item.get("text", "") + " "
+    
+    # 处理只有关键词的情况：确保关键词信息被保存到历史记录
+    processed_content = content.copy() if isinstance(content, list) else content
+    if keyword and not extracted_text.strip():
+        # 在content中添加keyword标记，确保历史记录中保留keyword信息
+        if isinstance(processed_content, list):
+            # 尝试找到现有的text项并更新
+            text_item_found = False
+            for content_item in processed_content:
+                if isinstance(content_item, dict) and content_item.get('type') == 'text':
+                    # 保留keyword标记在text中，前端可以解析
+                    content_item['text'] = f"[[{keyword}]]"
+                    text_item_found = True
+                    break
+            
+            # 如果没有找到text类型的项，添加一个新的
+            if not text_item_found:
+                processed_content.append({
+                    "type": "text",
+                    "text": f"[[{keyword}]]"
+                })
+    
+    # 创建助手消息对象
+    assistant_message = AssistantMessage(
+        content=processed_content,
+        id=message_id
     )
-    history_msgs.append(ai_msg)
+    history_msgs.append(assistant_message)
     save_history(session_id, history_msgs)
 
-    # 提取纯文本内容用于向量数据库存储
-    text_content = ""
-    for item in content:
-        if isinstance(item, dict) and item.get("type") == "text":
-            text_content += item.get("text", "") + " "
+    # 重新提取处理后的文本内容用于向量数据库存储
+    processed_text = ""
+    for content_item in processed_content:
+        if isinstance(content_item, dict) and content_item.get("type") == "text":
+            processed_text += content_item.get("text", "") + " "
     
     # 保存到向量数据库
     memory_manager.add_conversation_memory(
         user_id="default",
         conversation_id=session_id,
-        content=text_content.strip(),
+        content=processed_text.strip(),
         additional_metadata={
-            "message_id": ai_msg_id,
+            "message_id": message_id,
             "timestamp": datetime.now().isoformat(),
             "type": "ai_message",
             "keyword": keyword
         }
     )
 
-    return ai_msg_id, text_content.strip()
+    return message_id, processed_text.strip()
 
 # 移除过时的工具处理函数 - 现在工具调用在LLM客户端内部处理
 # def process_tool_call_message() - REMOVED (过时 - 为旧递归架构设计)

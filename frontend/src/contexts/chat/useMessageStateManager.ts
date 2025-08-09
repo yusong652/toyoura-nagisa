@@ -40,7 +40,16 @@ export const useMessageStateManager = ({
       prev.map(msg => {
         if (msg.id === oldId) {
           console.log(`[MessageStateManager] Found and updated message: ${oldId} -> ${newId}`)
-          return { ...msg, id: newId }
+          // 保持所有现有状态，只更新ID
+          return { 
+            ...msg, 
+            id: newId,
+            // 保持streaming和text状态
+            streaming: msg.streaming,
+            text: msg.text,
+            isLoading: msg.isLoading,
+            newText: msg.newText
+          }
         }
         return msg
       })
@@ -62,9 +71,11 @@ export const useMessageStateManager = ({
       onRenderComplete?: () => void
     }
   ) => {
-    setMessages(prev => 
-      prev.map(msg => {
+    setMessages(prev => {
+      let messageFound = false
+      const updatedMessages = prev.map(msg => {
         if (msg.id === messageId) {
+          messageFound = true
           return {
             ...msg,
             text,
@@ -73,7 +84,13 @@ export const useMessageStateManager = ({
         }
         return msg
       })
-    )
+      
+      if (!messageFound) {
+        console.warn(`[MessageStateManager] Message not found with ID: ${messageId}`)
+      }
+      
+      return updatedMessages
+    })
   }, [setMessages])
 
   /**
