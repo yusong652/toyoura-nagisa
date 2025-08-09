@@ -228,7 +228,6 @@ class OpenAIClient(LLMClientBase):
             'iterations': 0,
             'api_calls': 0,
             'tool_calls_executed': 0,
-            'tool_calls_detected': False,
             'status': 'running'
         }
         
@@ -258,6 +257,13 @@ class OpenAIClient(LLMClientBase):
             from backend.shared.utils.text_parser import parse_llm_output
             _, extracted_keyword = parse_llm_output(original_text)
             metadata['keyword'] = extracted_keyword
+            
+            # Send tool use concluded notification if tools were used
+            if metadata['tool_calls_executed'] > 0:
+                yield {
+                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
+                    'execution_id': execution_id
+                }
             
             # Create final storage message - use ResponseProcessor instead of context_manager
             final_message = OpenAIResponseProcessor.format_response_for_storage(final_response)
@@ -301,6 +307,10 @@ class OpenAIClient(LLMClientBase):
     def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
         """Extract tool calls from OpenAI response."""
         return OpenAIResponseProcessor.extract_tool_calls(response)
+
+    def _get_response_processor(self):
+        """Get OpenAI-specific response processor."""
+        return OpenAIResponseProcessor
 
     def _log_context_state(self, context_manager: Any):
         """Log OpenAI context manager state for debugging."""

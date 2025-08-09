@@ -103,7 +103,6 @@ class AnthropicClient(LLMClientBase):
             'iterations': 0,
             'api_calls': 0,
             'tool_calls_executed': 0,
-            'tool_calls_detected': False,
             'status': 'running'
         }
         
@@ -123,6 +122,13 @@ class AnthropicClient(LLMClientBase):
             # === FINALIZATION PHASE ===
             metadata['status'] = 'completed'
             metadata['end_time'] = self._get_timestamp()
+            
+            # Send tool use concluded notification if tools were used
+            if metadata['tool_calls_executed'] > 0:
+                yield {
+                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
+                    'execution_id': execution_id
+                }
             
             # 创建最终存储消息 - 使用 ResponseProcessor 而非 context_manager
             final_message = AnthropicResponseProcessor.format_response_for_storage(final_response)
@@ -160,6 +166,10 @@ class AnthropicClient(LLMClientBase):
     def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
         """Extract tool calls from Anthropic response."""
         return AnthropicResponseProcessor.extract_tool_calls(response)
+
+    def _get_response_processor(self):
+        """Get Anthropic-specific response processor."""
+        return AnthropicResponseProcessor
 
     def _log_context_state(self, context_manager: Any):
         """Log Anthropic context manager state for debugging."""

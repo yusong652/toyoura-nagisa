@@ -27,11 +27,19 @@ export const useToolStateManager = ({
    * Updates both global tool state and message-specific tool state.
    */
   const handleToolStart = useCallback((messageId: string, data: any) => {
+    console.log('[ToolStateManager] Received NAGISA_IS_USING_TOOL:', {
+      tool_name: data.tool_name,
+      action_text: data.action_text,
+      fullData: data
+    })
+    
     const toolState = {
       isUsingTool: true,
       toolName: data.tool_name,
       action: data.action_text
     }
+    
+    console.log('[ToolStateManager] Setting toolState:', toolState)
     
     // Update message-specific tool state
     updateMessageToolState(messageId, toolState)

@@ -124,7 +124,6 @@ class GeminiClient(LLMClientBase):
             'iterations': 0,
             'api_calls': 0,
             'tool_calls_executed': 0,
-            'tool_calls_detected': False,
             'thinking_preserved': False,
             'status': 'running'
         }
@@ -158,6 +157,13 @@ class GeminiClient(LLMClientBase):
             from backend.shared.utils.text_parser import parse_llm_output
             _, extracted_keyword = parse_llm_output(original_text)
             metadata['keyword'] = extracted_keyword
+            
+            # Send tool use concluded notification if tools were used
+            if metadata['tool_calls_executed'] > 0:
+                yield {
+                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
+                    'execution_id': execution_id
+                }
             
             # Create final storage message - use ResponseProcessor instead of context_manager
             final_message = GeminiResponseProcessor.format_response_for_storage(final_response)
@@ -342,6 +348,10 @@ class GeminiClient(LLMClientBase):
     def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
         """Extract tool calls from Gemini response."""
         return GeminiResponseProcessor.extract_tool_calls(response)
+
+    def _get_response_processor(self):
+        """Get Gemini-specific response processor."""
+        return GeminiResponseProcessor
 
     def _log_context_state(self, context_manager: Any):
         """Log Gemini context manager state for debugging."""

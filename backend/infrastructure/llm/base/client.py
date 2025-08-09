@@ -239,7 +239,6 @@ class LLMClientBase(ABC):
                 - iterations: int - Current iteration count
                 - api_calls: int - Total API calls made
                 - tool_calls_executed: int - Number of tool calls executed
-                - tool_calls_detected: bool - Whether any tool calls were found
             debug: Enable detailed debug logging and tracing
             **kwargs: Additional API configuration parameters
             
@@ -280,14 +279,7 @@ class LLMClientBase(ABC):
             if not self._should_continue_tool_calling(current_response):
                 break
             
-            # Set flag and send notification when first tool call is detected
-            if not metadata['tool_calls_detected']:
-                metadata['tool_calls_detected'] = True
-                yield {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_name': f'{provider_name}_tools',
-                    'action_text': "I am using tools to help you..."
-                }
+            # Tool calls detected - no flag needed, tool_calls_executed will track this
             
             # Add current response to context
             context_manager.add_response(current_response)
@@ -300,22 +292,36 @@ class LLMClientBase(ABC):
                 num_tools = len(tool_calls)
                 metadata['tool_calls_executed'] += num_tools
                 
-                # Notification for parallel execution
+                # Extract LLM text content from current response
+                extracted_text = self._extract_text_from_response(current_response)
+                
+                # Determine action text: use extracted LLM text or fallback to generic message
+                if extracted_text and len(extracted_text.strip()) > 0:
+                    action_text = extracted_text.strip()
+                    # Limit text length for display purposes
+                    if len(action_text) > 150:
+                        action_text = action_text[:147] + "..."
+                else:
+                    # Fallback to tool-specific message
+                    if num_tools == 1:
+                        action_text = f"Using {tool_calls[0].get('name', 'unknown_tool')}..."
+                    else:
+                        tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
+                        action_text = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+                
+                # Send notification with LLM content or fallback message
                 if num_tools == 1:
-                    # Single tool - use original notification
                     tool_name = tool_calls[0].get('name', 'unknown_tool')
                     yield {
                         'type': 'NAGISA_IS_USING_TOOL',
                         'tool_name': tool_name,
-                        'action_text': f"Using {tool_name}..."
+                        'action_text': action_text
                     }
                 else:
-                    # Multiple tools - batch notification
-                    tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
                     yield {
                         'type': 'NAGISA_IS_USING_TOOL',
                         'tool_name': 'parallel_tools',
-                        'action_text': f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+                        'action_text': action_text
                     }
                 
                 # Execute all tools in parallel
@@ -336,27 +342,7 @@ class LLMClientBase(ABC):
                     if error:
                         failed_tools.append(tool_call.get('name', 'unknown'))
                 
-                # Completion notification
-                if num_tools == 1:
-                    tool_name = tool_calls[0].get('name', 'unknown_tool')
-                    yield {
-                        'type': 'NAGISA_IS_USING_TOOL',
-                        'tool_name': tool_name,
-                        'action_text': f"Completed {tool_name}"
-                    }
-                else:
-                    if failed_tools:
-                        yield {
-                            'type': 'NAGISA_IS_USING_TOOL',
-                            'tool_name': 'parallel_tools',
-                            'action_text': f"Completed {num_tools} tools ({len(failed_tools)} failed: {', '.join(failed_tools)})"
-                        }
-                    else:
-                        yield {
-                            'type': 'NAGISA_IS_USING_TOOL',
-                            'tool_name': 'parallel_tools',
-                            'action_text': f"Successfully completed all {num_tools} tools"
-                        }
+                # Skip completion notifications - let LLM response show naturally
             
             # Get next round response
             working_contents = context_manager.get_working_contents()
@@ -380,24 +366,7 @@ class LLMClientBase(ABC):
             }
             raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
         
-        # Tool calling end notification
-        if metadata['tool_calls_detected']:
-            if metadata['tool_calls_executed'] == 1:
-                complete_text = "I have completed the requested action."
-            else:
-                complete_text = f"I used {metadata['tool_calls_executed']} tools to help you."
-            
-            yield {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_name': f'{provider_name}_tools',
-                'action_text': complete_text
-            }
-        
-        # Final notification
-        yield {
-            'type': 'NAGISA_TOOL_USE_CONCLUDED',
-            'execution_id': execution_id
-        }
+        # Tool calling loop completed - let get_response handle final notifications
         
         # Return final response
         yield current_response
@@ -432,6 +401,42 @@ class LLMClientBase(ABC):
                 - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
         """
         pass
+
+    @abstractmethod
+    def _get_response_processor(self):
+        """
+        Get provider-specific response processor instance.
+        
+        Returns:
+            Provider-specific response processor class (e.g., GeminiResponseProcessor)
+        """
+        pass
+
+    def _extract_text_from_response(self, response: Any) -> str:
+        """
+        Extract text content from provider-specific response using response processor.
+        
+        This method provides a unified interface for extracting text content from
+        LLM responses across all providers. It delegates to provider-specific
+        response processors to handle format differences.
+        
+        Args:
+            response: Provider-specific response object
+            
+        Returns:
+            str: Extracted text content for display and processing
+            
+        Note:
+            This method is used to generate better action_text in tool calling
+            notifications by extracting the actual LLM response text instead
+            of using generic messages.
+        """
+        try:
+            processor = self._get_response_processor()
+            return processor.extract_text_content(response)
+        except Exception:
+            # Fallback to empty string on extraction failure
+            return ""
 
     def _log_context_state(self, context_manager: BaseContextManager) -> None:
         """
