@@ -56,10 +56,9 @@ export const useChatMessage = ({
           if (historyData.history && Array.isArray(historyData.history)) {
             const convertedMessages: Message[] = historyData.history
               .filter((msg: any) => {
-                if (msg.role === 'user' && !msg.tool_request) return true
-                if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) return true
-                if (msg.role === 'image') return true
-                return false
+                return (msg.role === 'user' && !msg.tool_request) ||
+                       (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) ||
+                       (msg.role === 'image')
               })
               .map((msg: any): Message | null => {
                 let sender: 'user' | 'bot'
@@ -85,11 +84,48 @@ export const useChatMessage = ({
                   })
                 } else if (typeof msg.content === 'string') {
                   text = msg.content
+                  // 如果assistant消息为空（可能只有表情），添加占位符
+                  if (msg.role === 'assistant' && !text) {
+                    text = '...'  // 使用省略号作为占位符，表示只有表情动作
+                  }
                 } else if (Array.isArray(msg.content)) {
+                  // 处理content数组，兼容直接text和type字段
                   const textContents = msg.content
-                    .filter((item: any) => item.text)
+                    .filter((item: any) => {
+                      // 兼容两种格式：直接有text字段，或者type为text
+                      return item.text || (item.type === 'text' && item.text)
+                    })
                     .map((item: any) => item.text)
-                  text = textContents.join('\n')
+                  
+                  let rawText = textContents.join('\n')
+                  
+                  // 解析并处理[[keyword]]标记
+                  if (msg.role === 'assistant') {
+                    const keywordMatch = rawText.match(/\[\[(\w+)\]\]/);
+                    if (keywordMatch) {
+                      // 移除keyword标记
+                      const textWithoutKeyword = rawText.replace(/\[\[\w+\]\]/g, '').trim();
+                      
+                      if (!textWithoutKeyword) {
+                        // 只有keyword，显示占位符
+                        text = '...';
+                      } else {
+                        // 有keyword和文本，只显示文本
+                        text = textWithoutKeyword;
+                      }
+                    } else {
+                      // 没有keyword标记
+                      text = rawText;
+                      
+                      // 兜底：如果assistant消息为空，添加占位符
+                      if (!text.trim()) {
+                        text = '...';
+                      }
+                    }
+                  } else {
+                    // 非assistant消息，直接使用原文本
+                    text = rawText;
+                  }
                   
                   msg.content.forEach((item: any) => {
                     if (item.inline_data) {
@@ -120,7 +156,6 @@ export const useChatMessage = ({
                 }
               })
               .filter((msg: Message | null): msg is Message => msg !== null)
-            
             setMessages(convertedMessages)
           } else {
             setMessages([])

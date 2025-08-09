@@ -169,10 +169,8 @@ async def _process_content_pipeline(
     else:
         text_content = str(content)
     
-    if not text_content.strip():
-        return 
-    
     # 处理AI文本消息 - 保存到历史记录，包含完整content（包括thinking）
+    # 注意：即使text_content为空，也要处理，因为可能只有关键词
     loaded_history = load_all_message_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
     
@@ -201,9 +199,13 @@ async def _process_content_pipeline(
     if extracted_keyword:
         yield f"data: {json.dumps({'keyword': extracted_keyword})}\n\n"
     
-    # TTS处理流水线 - 使用过滤后的纯文本内容（不包含thinking）
-    async for chunk in _process_tts_pipeline(text_content, tts_engine):
-        yield chunk
+    # TTS处理流水线 - 仅在有文本内容时处理（不包含thinking）
+    if text_content.strip():
+        async for chunk in _process_tts_pipeline(text_content, tts_engine):
+            yield chunk
+    else:
+        # 只有关键词的情况，发送一个空的文本块以保持流的完整性
+        yield f"data: {json.dumps({'text': '', 'audio': None, 'index': 0})}\n\n"
 
 
 async def _process_tts_pipeline(

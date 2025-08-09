@@ -85,8 +85,14 @@ export const useStreamProcessor = ({
           }
         }
         
-        // Handle keyword/motion
-        handleKeyword(data)
+        // Handle keyword/motion (doesn't need content processing)
+        if (data.keyword) {
+          handleKeyword(data)
+          // Skip content update if this is only a keyword
+          if (!data.text && !data.audio) {
+            return
+          }
+        }
         
         // Handle tool events
         if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
@@ -95,7 +101,12 @@ export const useStreamProcessor = ({
         }
         
         // Handle content updates (text/audio)
-        handleContentUpdate(data, currentMessageId)
+        // Only process if there's actual content
+        if (data.text !== undefined || data.audio !== undefined) {
+          // Always use the most current message ID
+          const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
+          handleContentUpdate(data, messageIdForUpdate)
+        }
       } catch (e) {
         console.error('[StreamProcessor] Error parsing response:', e)
       }

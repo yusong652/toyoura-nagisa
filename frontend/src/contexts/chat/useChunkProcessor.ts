@@ -49,6 +49,13 @@ export const useChunkProcessor = ({
     chunk: ChunkData,
     messageId: string
   ): Promise<void> => {
+    console.log('[ChunkProcessor] processSingleChunk called with:', {
+      hasText: chunk.text !== undefined,
+      textType: typeof chunk.text,
+      textValue: chunk.text,
+      messageId
+    })
+    
     // Process text if present
     if (chunk.text !== undefined && chunk.text !== null) {
       let newText = ''
@@ -58,20 +65,38 @@ export const useChunkProcessor = ({
         newText = chunk.text.filter((t) => typeof t === 'string').join('')
       }
 
+      console.log('[ChunkProcessor] Processed text:', {
+        newTextLength: newText.length,
+        newText,
+        currentTotal: currentMessageRef.current.length
+      })
+
       if (newText.length > 0) {
         currentMessageRef.current += newText
         
-        // Create render promise for smooth UI updates
-        const renderPromise = new Promise<void>((resolve) => {
+        console.log('[ChunkProcessor] Updating message text:', {
+          messageId,
+          totalText: currentMessageRef.current,
+          newText,
+          ttsEnabled
+        })
+        
+        // Update message text immediately
+        // When TTS is disabled, we pass the full text without newText to avoid duplication
+        if (!ttsEnabled) {
+          updateMessageText(messageId, currentMessageRef.current, {
+            streaming: true,
+            isLoading: false
+          })
+        } else {
           updateMessageText(messageId, currentMessageRef.current, {
             newText,
             streaming: true,
-            isLoading: currentMessageRef.current.length < 10,
-            onRenderComplete: resolve
+            isLoading: false
           })
-        })
-
-        await renderPromise
+        }
+        
+        // Small delay for smooth rendering
         await new Promise(resolve => setTimeout(resolve, 10))
       }
     }
@@ -144,28 +169,12 @@ export const useChunkProcessor = ({
     }
   }, [processQueuedChunks])
 
-  /**
-   * Handle unordered chunk (legacy format).
-   * 
-   * Processes chunks immediately without ordering.
-   */
-  const handleUnorderedChunk = useCallback(async (
-    chunk: ChunkData,
-    messageId: string
-  ): Promise<void> => {
-    chunkQueueRef.current.push(chunk)
-    
-    if (!isProcessingRef.current) {
-      console.log('[ChunkProcessor] Processing unordered chunk')
-      isProcessingRef.current = true
-      await processQueuedChunks(messageId)
-    }
-  }, [processQueuedChunks])
 
   /**
    * Main chunk processing entry point.
    * 
-   * Routes chunks to ordered or unordered processing based on presence of index.
+   * All text/audio chunks should have an index for ordered processing.
+   * Chunks without index and without content are ignored.
    */
   const processChunk = useCallback(async (
     chunk: ChunkData,
@@ -173,20 +182,34 @@ export const useChunkProcessor = ({
   ): Promise<void> => {
     if (!chunk) return
     
-    console.log('[ChunkProcessor] Processing chunk:', chunk)
+    console.log('[ChunkProcessor] Processing chunk:', {
+      hasText: chunk.text !== undefined,
+      textContent: chunk.text,
+      hasAudio: chunk.audio !== undefined,
+      hasIndex: chunk.index !== undefined,
+      index: chunk.index,
+      ttsEnabled
+    })
     
+    // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await handleOrderedChunk(chunk, messageId)
+    } else if (chunk.text !== undefined || chunk.audio !== undefined) {
+      // Log warning if we receive content without index (shouldn't happen)
+      console.warn('[ChunkProcessor] Received content chunk without index, treating as ordered chunk #0')
+      chunk.index = 0
+      await handleOrderedChunk(chunk, messageId)
     } else {
-      await handleUnorderedChunk(chunk, messageId)
+      // Ignore chunks without content or index (e.g., keyword-only chunks)
+      console.log('[ChunkProcessor] Ignoring chunk without content or index')
     }
     
     // Check if processing is complete
     if (!isProcessingRef.current && chunkQueueRef.current.length === 0) {
-      console.log('[ChunkProcessor] All chunks processed, finalizing message')
+      console.log('[ChunkProcessor] All chunks processed, finalizing message with text:', currentMessageRef.current)
       finalizeMessage(messageId)
     }
-  }, [handleOrderedChunk, handleUnorderedChunk, finalizeMessage])
+  }, [handleOrderedChunk, finalizeMessage, ttsEnabled])
 
   /**
    * Reset processor state for new stream.

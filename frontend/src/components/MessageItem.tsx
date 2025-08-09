@@ -39,11 +39,23 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   useEffect(() => {
     if (streaming && sender === 'bot') {
       if (newText) {
-        // 添加新的文本块，同时更新完整文本
+        // 有newText时，增量更新
         setChunks(prev => [...prev, newText])
         setDisplayText(prev => prev + newText)
         // 调用渲染完成回调
         onRenderComplete?.()
+      } else if (text) {
+        // 没有newText但有text（TTS关闭时的情况）
+        // 使用函数式更新避免依赖displayText
+        setDisplayText(prev => {
+          // 只在text实际变化时更新
+          if (prev !== text) {
+            // 设置一个虚拟chunk以避免显示loading
+            setChunks(current => current.length === 0 ? [''] : current)
+            return text
+          }
+          return prev
+        })
       }
     } else {
       // 非流式情况，直接设置文本
