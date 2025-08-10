@@ -1,7 +1,6 @@
 ---
 name: frontend-ux-expert
 description: Use this agent when you need expert frontend development guidance, React/TypeScript code review, UI/UX optimization, or when working on user interface components that require high aesthetic standards and modern development practices. Examples: <example>Context: User is working on a React component and wants expert review for performance and aesthetics. user: 'I just created this React component for user profiles, can you review it?' assistant: 'I'll use the frontend-ux-expert agent to provide comprehensive review of your React component focusing on performance, aesthetics, and user experience best practices.'</example> <example>Context: User needs guidance on implementing complex async operations in a React app. user: 'How should I handle multiple API calls with loading states in this dashboard component?' assistant: 'Let me use the frontend-ux-expert agent to provide expert guidance on async patterns and optimal user experience for loading states.'</example>
-tools: Glob, Grep, LS, Read, WebFetch, TodoWrite, WebSearch, BashOutput, KillBash
 model: inherit
 color: pink
 ---
