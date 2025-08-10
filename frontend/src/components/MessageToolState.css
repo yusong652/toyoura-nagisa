@@ -96,9 +96,44 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 
-/* Scrolling animation for long text */
+/* Thinking dots animation for continuous thinking indication */
+.thinking-dots {
+  display: inline-block;
+  margin-left: 4px;
+  font-style: normal;
+  color: rgba(120, 130, 145, 0.6);
+}
+
+.dot {
+  display: inline-block;
+  margin: 0 1px;
+  animation: dotBlink 1.5s infinite;
+}
+
+.dot-1 {
+  animation-delay: 0s;
+}
+
+.dot-2 {
+  animation-delay: 0.3s;
+}
+
+.dot-3 {
+  animation-delay: 0.6s;
+}
+
+@keyframes dotBlink {
+  0%, 60% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+/* Scrolling animation for long text - mimicking natural thinking progression */
 .message-tool-thinking-content.scrolling {
-  animation: scrollUp linear infinite;
+  animation: scrollUp cubic-bezier(0.25, 0.1, 0.4, 1) 1;
+  animation-fill-mode: forwards;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* Enhanced gradient overlays for premium fade effect */
@@ -140,10 +175,10 @@
 
 @keyframes scrollUp {
   0% {
-    transform: translateY(0);
+    transform: translateY(0) translateZ(0);
   }
   100% {
-    transform: translateY(-50%); /* Scroll through half the content for smooth loop */
+    transform: translateY(var(--scroll-end, -50%)) translateZ(0);
   }
 }
 
@@ -355,6 +390,10 @@
 
   .message-tool-thinking-content {
     color: var(--tool-state-thinking-dark, #94a3b8);
+  }
+
+  .thinking-dots {
+    color: rgba(147, 197, 253, 0.6);
   }
 
   .message-tool-thinking-viewport::before {
