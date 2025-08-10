@@ -25,17 +25,17 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
     // Split content into words for better line wrapping
     const words = thinkingContent.split(' ');
     
-    // Create "lines" by grouping words (approximately 6-8 words per line)
+    // Create "lines" by grouping words (approximately 7-9 words per line for larger viewport)
     const linesData: string[] = [];
-    const wordsPerLine = 6;
+    const wordsPerLine = 8; // Increased for better utilization of larger viewport
     
     for (let i = 0; i < words.length; i += wordsPerLine) {
       const lineWords = words.slice(i, i + wordsPerLine);
       linesData.push(lineWords.join(' '));
     }
 
-    // For short content, just display it
-    if (linesData.length <= 3) {
+    // For short content, just display it (show up to 5 lines before scrolling)
+    if (linesData.length <= 5) {
       setDisplayedText(linesData.join('\n'));
       setIsScrolling(false);
       return;
@@ -43,7 +43,7 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
 
     // For long content, create continuous scrolling text
     // Create multiple repetitions with separators for smooth scrolling
-    const repetitions = Math.max(4, Math.ceil(15 / linesData.length)); // Ensure enough content height
+    const repetitions = Math.max(4, Math.ceil(20 / linesData.length)); // Ensure enough content height for larger viewport
     const extendedLines: string[] = [];
     
     for (let i = 0; i < repetitions; i++) {
@@ -56,23 +56,22 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
     setDisplayedText(extendedLines.join('\n'));
     setIsScrolling(true);
     
-    // Calculate animation duration: faster for testing, slower for production
-    const duration = Math.max(3, linesData.length * 1); // 1 second per line for visible effect
+    // Calculate animation duration: optimized for larger viewport
+    const duration = Math.max(4, linesData.length * 1.2); // 1.2 seconds per line for smooth, premium feel
     setAnimationDuration(duration);
   }, [thinkingContent]);
 
   return (
     <div className="message-tool-state">
       <div className="message-tool-state-content">
-        {toolName && (
-          <div className="message-tool-name">
-            <div className="tool-name-icon"></div>
-            <span className="tool-name-text">{toolName}</span>
-          </div>
-        )}
-        
         <div className="message-tool-thinking-container">
           <div className="message-tool-thinking-viewport">
+            {toolName && (
+              <div className="message-tool-name">
+                <div className="tool-name-icon"></div>
+                <span className="tool-name-text">{toolName}</span>
+              </div>
+            )}
             <div 
               className={`message-tool-thinking-content ${isScrolling ? 'scrolling' : ''}`}
               style={{
