@@ -54,19 +54,16 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
     
     setScrollDistance(`-${Math.min(scrollPercentage, 85)}%`); // Cap at 85% to always show some content
     
-    // Calculate faster animation duration with accelerating effect based on content length
+    // Calculate animation duration purely based on content length - no minimum
     const totalWords = words.length;
     const totalChars = thinkingContent.length;
     
-    // Much faster base duration
-    const baseDuration = 2; // Reduced from 4 to 2 seconds
+    // Dynamic duration based purely on content complexity
+    const contentFactor = totalWords * 0.08; // 0.08 seconds per word
+    const charFactor = totalChars * 0.015; // 0.015 seconds per character
     
-    // Faster content-based factors
-    const contentFactor = Math.min(totalWords * 0.05, 3); // Max 3 seconds from content (was 8)
-    const charFactor = Math.min(totalChars * 0.01, 2); // Max 2 seconds from characters (was 4)
-    
-    // Total duration: much faster overall, capped at 8 seconds
-    const duration = Math.min(baseDuration + contentFactor + charFactor, 8); // Max 8 seconds total (was 15)
+    // Total duration: no minimum, capped at 8 seconds for very long content
+    const duration = Math.min(contentFactor + charFactor, 8);
     setAnimationDuration(duration);
   }, [thinkingContent]);
 

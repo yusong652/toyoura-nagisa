@@ -31,8 +31,8 @@
 .message-tool-state-content {
   background: linear-gradient(
     135deg,
-    var(--tool-state-bg, rgba(120, 130, 145, 0.12)) 0%,
-    var(--tool-state-bg-secondary, rgba(110, 120, 135, 0.08)) 100%
+    var(--tool-state-bg, rgba(140, 145, 150, 0.12)) 0%,
+    var(--tool-state-bg-secondary, rgba(130, 135, 140, 0.08)) 100%
   );
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px; /* More generous rounded corners */
@@ -41,7 +41,7 @@
   color: var(--text-color);
   backdrop-filter: blur(16px) saturate(1.2);
   box-shadow: 
-    0 8px 32px rgba(120, 130, 145, 0.15),
+    0 8px 32px rgba(140, 145, 150, 0.15),
     0 2px 8px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -81,7 +81,7 @@
 
 .message-tool-thinking-content {
   font-weight: 400;
-  color: #4a5968;
+  color: #5a6068;
   letter-spacing: 0.3px;
   text-align: left;
   font-style: italic;
@@ -101,7 +101,7 @@
   display: inline-block;
   margin-left: 4px;
   font-style: normal;
-  color: rgba(120, 130, 145, 0.6);
+  color: rgba(140, 145, 150, 0.6);
 }
 
 .dot {
@@ -192,7 +192,7 @@
   gap: 10px;
   font-size: 15px;
   letter-spacing: 0.4px;
-  color: rgba(120, 130, 145, 0.85);
+  color: rgba(140, 145, 150, 0.85);
   font-weight: 600;
   opacity: 1;
   text-align: left;
@@ -207,10 +207,10 @@
 .tool-name-icon {
   width: 14px; /* Larger icon for premium feel */
   height: 14px;
-  border: 2.5px solid rgba(120, 130, 145, 0.7);
+  border: 2.5px solid rgba(140, 145, 150, 0.7);
   border-radius: 50%;
   border-top-color: transparent;
-  border-right-color: rgba(120, 130, 145, 0.4);
+  border-right-color: rgba(140, 145, 150, 0.4);
   animation: rotateAndPulse 3.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   flex-shrink: 0;
   position: relative;
@@ -223,7 +223,7 @@
   left: 50%;
   width: 6px;
   height: 6px;
-  background: rgba(120, 130, 145, 0.3);
+  background: rgba(140, 145, 150, 0.3);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   animation: pulse 2s ease-in-out infinite alternate;
@@ -291,17 +291,17 @@
 
 @keyframes breathe {
   0%, 100% {
-    border-color: rgba(120, 130, 145, 0.2);
+    border-color: rgba(140, 145, 150, 0.2);
     box-shadow: 
-      0 8px 32px rgba(120, 130, 145, 0.15),
+      0 8px 32px rgba(140, 145, 150, 0.15),
       0 2px 8px rgba(0, 0, 0, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.15);
     transform: scale(1);
   }
   50% {
-    border-color: rgba(120, 130, 145, 0.35);
+    border-color: rgba(140, 145, 150, 0.35);
     box-shadow: 
-      0 12px 48px rgba(120, 130, 145, 0.25),
+      0 12px 48px rgba(140, 145, 150, 0.25),
       0 4px 16px rgba(0, 0, 0, 0.15),
       inset 0 1px 0 rgba(255, 255, 255, 0.25);
     transform: scale(1.005);
@@ -310,42 +310,42 @@
 
 @keyframes toolNameBreathe {
   0%, 100% {
-    color: rgba(120, 130, 145, 0.85);
+    color: rgba(140, 145, 150, 0.85);
     opacity: 0.95;
-    text-shadow: 0 0 8px rgba(120, 130, 145, 0.1);
+    text-shadow: 0 0 8px rgba(140, 145, 150, 0.1);
   }
   50% {
-    color: rgba(120, 130, 145, 1);
+    color: rgba(140, 145, 150, 1);
     opacity: 1;
-    text-shadow: 0 0 12px rgba(120, 130, 145, 0.2);
+    text-shadow: 0 0 12px rgba(140, 145, 150, 0.2);
   }
 }
 
 @keyframes rotateAndPulse {
   0% {
     transform: rotate(0deg) scale(1);
-    border-color: rgba(120, 130, 145, 0.7);
-    filter: drop-shadow(0 0 4px rgba(120, 130, 145, 0.2));
+    border-color: rgba(140, 145, 150, 0.7);
+    filter: drop-shadow(0 0 4px rgba(140, 145, 150, 0.2));
   }
   25% {
     transform: rotate(90deg) scale(1.08);
-    border-color: rgba(120, 130, 145, 0.85);
-    filter: drop-shadow(0 0 6px rgba(120, 130, 145, 0.3));
+    border-color: rgba(140, 145, 150, 0.85);
+    filter: drop-shadow(0 0 6px rgba(140, 145, 150, 0.3));
   }
   50% {
     transform: rotate(180deg) scale(1.12);
-    border-color: rgba(120, 130, 145, 1);
-    filter: drop-shadow(0 0 8px rgba(120, 130, 145, 0.4));
+    border-color: rgba(140, 145, 150, 1);
+    filter: drop-shadow(0 0 8px rgba(140, 145, 150, 0.4));
   }
   75% {
     transform: rotate(270deg) scale(1.08);
-    border-color: rgba(120, 130, 145, 0.85);
-    filter: drop-shadow(0 0 6px rgba(120, 130, 145, 0.3));
+    border-color: rgba(140, 145, 150, 0.85);
+    filter: drop-shadow(0 0 6px rgba(140, 145, 150, 0.3));
   }
   100% {
     transform: rotate(360deg) scale(1);
-    border-color: rgba(120, 130, 145, 0.7);
-    filter: drop-shadow(0 0 4px rgba(120, 130, 145, 0.2));
+    border-color: rgba(140, 145, 150, 0.7);
+    filter: drop-shadow(0 0 4px rgba(140, 145, 150, 0.2));
   }
 }
 
@@ -365,13 +365,13 @@
   .message-tool-state-content {
     background: linear-gradient(
       135deg,
-      var(--tool-state-bg-dark, rgba(120, 130, 145, 0.18)) 0%,
-      var(--tool-state-bg-secondary-dark, rgba(120, 130, 145, 0.12)) 100%
+      var(--tool-state-bg-dark, rgba(140, 145, 150, 0.18)) 0%,
+      var(--tool-state-bg-secondary-dark, rgba(140, 145, 150, 0.12)) 100%
     );
-    border-color: var(--tool-state-border-dark, rgba(120, 130, 145, 0.35));
+    border-color: var(--tool-state-border-dark, rgba(140, 145, 150, 0.35));
     color: var(--tool-state-text-dark, #e2e8f0);
     box-shadow: 
-      0 8px 32px rgba(120, 130, 145, 0.2),
+      0 8px 32px rgba(140, 145, 150, 0.2),
       0 2px 8px rgba(0, 0, 0, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
@@ -471,17 +471,17 @@
 
   @keyframes breathe {
     0%, 100% {
-      border-color: rgba(120, 130, 145, 0.35);
+      border-color: rgba(140, 145, 150, 0.35);
       box-shadow: 
-        0 8px 32px rgba(120, 130, 145, 0.2),
+        0 8px 32px rgba(140, 145, 150, 0.2),
         0 2px 8px rgba(0, 0, 0, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
       transform: scale(1);
     }
     50% {
-      border-color: rgba(120, 130, 145, 0.5);
+      border-color: rgba(140, 145, 150, 0.5);
       box-shadow: 
-        0 12px 48px rgba(120, 130, 145, 0.3),
+        0 12px 48px rgba(140, 145, 150, 0.3),
         0 4px 16px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.15);
       transform: scale(1.005);
