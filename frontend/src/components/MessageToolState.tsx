@@ -19,7 +19,6 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
   useEffect(() => {
     if (!thinkingContent) {
       setDisplayedText('Processing...');
-      setProgress(100);
       return;
     }
 
@@ -72,13 +71,15 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
         )}
         
         <div className="message-tool-thinking-container">
-          <div 
-            className={`message-tool-thinking-scroll ${isScrolling ? 'scrolling' : ''}`}
-            style={{
-              animationDuration: `${animationDuration}s`
-            }}
-          >
-            {displayedText}
+          <div className="message-tool-thinking-viewport">
+            <div 
+              className={`message-tool-thinking-content ${isScrolling ? 'scrolling' : ''}`}
+              style={{
+                animationDuration: `${animationDuration}s`
+              }}
+            >
+              {displayedText}
+            </div>
           </div>
         </div>
       </div>
