@@ -1,11 +1,11 @@
 .message-tool-state {
-  margin-bottom: 8px;
-  width: 100%;
-  max-width: 400px; /* Limit maximum width */
+  margin-bottom: 6px;
+  width: 380px; /* Fixed width instead of following content */
+  min-width: 380px; /* Ensure consistent size */
   animation: fadeIn 0.3s ease-out;
   position: relative;
   overflow: hidden;
-  max-height: 125px; /* Limit maximum height - accommodate larger thinking area */
+  max-height: 95px; /* Reduced maximum height for compact design */
 }
 
 .message-tool-state::before {
@@ -28,8 +28,8 @@
 .message-tool-state-content {
   background-color: var(--tool-state-bg, rgba(74, 144, 226, 0.08));
   border: 1px solid var(--tool-state-border, rgba(74, 144, 226, 0.15));
-  border-radius: 8px;
-  padding: 10px 14px;
+  border-radius: 6px; /* Reduced for more refined look */
+  padding: 6px 10px; /* Reduced padding for compact design */
   font-size: 13px;
   color: var(--text-color);
   backdrop-filter: blur(8px);
@@ -39,8 +39,8 @@
   animation: breathe 3s ease-in-out infinite;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  max-height: 105px; /* Fixed content height - accommodate larger thinking area */
+  gap: 2px; /* Reduced gap for tighter layout */
+  max-height: 83px; /* Reduced content height for compact design */
 }
 
 /* New thinking container and scrolling styles */
@@ -54,10 +54,10 @@
 .message-tool-thinking-viewport {
   position: relative;
   overflow: hidden;
-  height: 65px; /* Increased viewport height */
+  height: 52px; /* Reduced viewport height for compact design */
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  padding: 4px 6px;
+  border-radius: 3px; /* Slightly reduced for refinement */
+  padding: 3px 5px; /* Reduced padding */
 }
 
 .message-tool-thinking-content {
@@ -69,15 +69,15 @@
   font-style: italic;
   font-size: 12px;
   opacity: 0.9;
-  line-height: 1.4;
+  line-height: 1.35; /* Slightly tighter line height */
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
   position: absolute;
   top: 0;
-  left: 8px;
-  right: 8px;
-  padding-top: 4px;
+  left: 6px; /* Reduced horizontal spacing */
+  right: 6px;
+  padding-top: 3px; /* Reduced top padding */
 }
 
 /* Scrolling animation for long text */
@@ -92,7 +92,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 12px;
+  height: 10px; /* Reduced fade height */
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), transparent);
   z-index: 1;
   pointer-events: none;
@@ -104,7 +104,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 12px;
+  height: 10px; /* Reduced fade height */
   background: linear-gradient(to top, rgba(255, 255, 255, 0.05), transparent);
   z-index: 1;
   pointer-events: none;
@@ -120,16 +120,38 @@
 }
 
 .message-tool-name {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px; /* Reduced gap for compact design */
+  font-size: 13px; /* Slightly reduced font size */
   letter-spacing: 0.2px;
-  color: #133f87;
-  font-weight: 600;
+  color: rgba(74, 144, 226, 0.7);
+  font-weight: 500;
   opacity: 1;
-  text-align: center;
+  text-align: left;
   margin: 0;
-  padding: 2px 0;
+  padding: 1px 0 2px 0; /* Reduced top padding */
   border-bottom: 1px solid rgba(74, 144, 226, 0.1);
   flex-shrink: 0;
+  animation: toolNameBreathe 3s ease-in-out infinite;
+}
+
+.tool-name-icon {
+  width: 11px; /* Slightly smaller for compact design */
+  height: 11px;
+  border: 2px solid rgba(74, 144, 226, 0.6);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: rotateAndPulse 3s linear infinite;
+  flex-shrink: 0;
+}
+
+.tool-name-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 
@@ -188,6 +210,40 @@
   }
 }
 
+@keyframes toolNameBreathe {
+  0%, 100% {
+    color: rgba(74, 144, 226, 0.7);
+    opacity: 0.9;
+  }
+  50% {
+    color: rgba(74, 144, 226, 0.9);
+    opacity: 1;
+  }
+}
+
+@keyframes rotateAndPulse {
+  0% {
+    transform: rotate(0deg) scale(1);
+    border-color: rgba(74, 144, 226, 0.6);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.1);
+    border-color: rgba(74, 144, 226, 0.8);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+    border-color: rgba(74, 144, 226, 1);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+    border-color: rgba(74, 144, 226, 0.8);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    border-color: rgba(74, 144, 226, 0.6);
+  }
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .message-tool-state-content {
@@ -214,7 +270,46 @@
   }
 
   .message-tool-name {
-    color: #93c5fd;
+    color: rgba(147, 197, 253, 0.8);
+  }
+
+  .tool-name-icon {
+    border-color: rgba(147, 197, 253, 0.7);
+    border-top-color: transparent;
+  }
+
+  @keyframes toolNameBreathe {
+    0%, 100% {
+      color: rgba(147, 197, 253, 0.8);
+      opacity: 0.9;
+    }
+    50% {
+      color: rgba(147, 197, 253, 1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes rotateAndPulse {
+    0% {
+      transform: rotate(0deg) scale(1);
+      border-color: rgba(147, 197, 253, 0.7);
+    }
+    25% {
+      transform: rotate(90deg) scale(1.1);
+      border-color: rgba(147, 197, 253, 0.85);
+    }
+    50% {
+      transform: rotate(180deg) scale(1.2);
+      border-color: rgba(147, 197, 253, 1);
+    }
+    75% {
+      transform: rotate(270deg) scale(1.1);
+      border-color: rgba(147, 197, 253, 0.85);
+    }
+    100% {
+      transform: rotate(360deg) scale(1);
+      border-color: rgba(147, 197, 253, 0.7);
+    }
   }
 
   .message-tool-state::before {

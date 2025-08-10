@@ -66,7 +66,8 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
       <div className="message-tool-state-content">
         {toolName && (
           <div className="message-tool-name">
-            {toolName}
+            <div className="tool-name-icon"></div>
+            <span className="tool-name-text">{toolName}</span>
           </div>
         )}
         
