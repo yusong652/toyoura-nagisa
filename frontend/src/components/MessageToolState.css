@@ -1,9 +1,11 @@
 .message-tool-state {
   margin-bottom: 8px;
   width: 100%;
+  max-width: 400px; /* Limit maximum width */
   animation: fadeIn 0.3s ease-out;
   position: relative;
   overflow: hidden;
+  max-height: 115px; /* Limit maximum height - accommodate 3-line thinking area */
 }
 
 .message-tool-state::before {
@@ -27,35 +29,102 @@
   background-color: var(--tool-state-bg, rgba(74, 144, 226, 0.08));
   border: 1px solid var(--tool-state-border, rgba(74, 144, 226, 0.15));
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 13px;
   color: var(--text-color);
   backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   text-align: left;
+  animation: breathe 3s ease-in-out infinite;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 95px; /* Fixed content height - accommodate 3-line thinking area */
 }
 
-.message-tool-thinking {
+/* New thinking container and scrolling styles */
+.message-tool-thinking-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.message-tool-thinking-scroll {
+  flex: 1;
   font-weight: 400;
-  margin-bottom: 4px;
   color: #5a6b7d;
   letter-spacing: 0.2px;
   text-align: left;
   font-style: italic;
   font-size: 12px;
   opacity: 0.9;
+  line-height: 1.4;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 6px 8px;
+  white-space: pre-line;
+  word-break: break-word;
+  height: 50px; /* Fixed height for exactly 3 lines */
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Scrolling content with long text */
+.message-tool-thinking-scroll.scrolling {
+  animation: scrollUp linear infinite;
+  animation-fill-mode: none;
+}
+
+.message-tool-thinking-scroll::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.message-tool-thinking-scroll::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.1), transparent);
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes scrollUp {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-75%); /* Move up by 75% to account for multiple repetitions */
+  }
 }
 
 .message-tool-name {
-  margin-bottom: 4px;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.2px;
   color: #133f87;
   font-weight: 600;
   opacity: 1;
   text-align: center;
+  margin: 0;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(74, 144, 226, 0.1);
+  flex-shrink: 0;
 }
+
 
 .message-tool-params {
   display: flex;
@@ -101,6 +170,17 @@
   }
 }
 
+@keyframes breathe {
+  0%, 100% {
+    border-color: rgba(74, 144, 226, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+  50% {
+    border-color: rgba(74, 144, 226, 0.25);
+    box-shadow: 0 2px 12px rgba(74, 144, 226, 0.15);
+  }
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .message-tool-state-content {
@@ -110,8 +190,17 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
-  .message-tool-thinking {
+  .message-tool-thinking-scroll {
     color: var(--tool-state-thinking-dark, #8fb5d6);
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .message-tool-thinking-scroll::before {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent);
+  }
+
+  .message-tool-thinking-scroll::after {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.2), transparent);
   }
 
   .message-tool-name {
