@@ -5,7 +5,7 @@
   animation: fadeIn 0.3s ease-out;
   position: relative;
   overflow: hidden;
-  max-height: 115px; /* Limit maximum height - accommodate 3-line thinking area */
+  max-height: 125px; /* Limit maximum height - accommodate larger thinking area */
 }
 
 .message-tool-state::before {
@@ -39,8 +39,8 @@
   animation: breathe 3s ease-in-out infinite;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 95px; /* Fixed content height - accommodate 3-line thinking area */
+  gap: 3px;
+  max-height: 105px; /* Fixed content height - accommodate larger thinking area */
 }
 
 /* New thinking container and scrolling styles */
@@ -54,7 +54,7 @@
 .message-tool-thinking-viewport {
   position: relative;
   overflow: hidden;
-  height: 50px; /* Fixed viewport height for exactly 3 lines */
+  height: 65px; /* Increased viewport height */
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   padding: 6px 8px;
@@ -64,13 +64,15 @@
   font-weight: 400;
   color: #5a6b7d;
   letter-spacing: 0.2px;
-  text-align: left;
+  text-align: justify;
+  text-align-last: justify;
   font-style: italic;
   font-size: 12px;
   opacity: 0.9;
   line-height: 1.4;
-  white-space: pre-line;
-  word-break: break-word;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   position: absolute;
   top: 0;
   left: 8px;

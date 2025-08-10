@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MessageToolState.css';
 import { MessageToolState as MessageToolStateType } from '../types/chat';
 

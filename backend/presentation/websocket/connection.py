@@ -154,13 +154,19 @@ class ConnectionManager:
         
         conn_info = self.connections[session_id]
         
-        # 如果连接不可用，添加到待处理队列
+        # 如果连接不可用，添加到待处理队列（心跳消息除外）
         if conn_info.state != ConnectionState.CONNECTED:
-            conn_info.pending_messages.append(data)
-            logger.debug(f"Queued message for session {session_id} (state: {conn_info.state})")
+            if data.get("type") != "HEARTBEAT":
+                conn_info.pending_messages.append(data)
+                logger.debug(f"Queued message for session {session_id} (state: {conn_info.state})")
             return False
         
         try:
+            # 双重检查连接状态和WebSocket是否仍然打开
+            if conn_info.websocket.client_state.name != "CONNECTED":
+                logger.debug(f"WebSocket client state is {conn_info.websocket.client_state.name}, skipping send")
+                return False
+                
             await conn_info.websocket.send_json(data)
             conn_info.update_activity()
             logger.debug(f"Sent message to session {session_id}")
@@ -175,12 +181,19 @@ class ConnectionManager:
             conn_info.error_count += 1
             logger.error(f"Failed to send message to session {session_id}: {e}")
             
+            # 如果是ASGI WebSocket错误，立即断开连接
+            if "websocket.send" in str(e) and "websocket.close" in str(e):
+                logger.warning(f"WebSocket already closed for session {session_id}, cleaning up")
+                await self.disconnect(session_id)
+                return False
+            
             # 如果错误次数过多，断开连接
             if conn_info.error_count >= 3:
                 await self.disconnect(session_id)
             else:
-                # 否则添加到待处理队列
-                conn_info.pending_messages.append(data)
+                # 心跳消息失败不加入待处理队列
+                if data.get("type") != "HEARTBEAT":
+                    conn_info.pending_messages.append(data)
             
             return False
 

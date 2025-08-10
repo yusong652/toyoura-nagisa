@@ -443,6 +443,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             try:
                 message = json.loads(data)
                 
+                # 处理心跳响应消息
+                if message.get("type") == "HEARTBEAT_ACK":
+                    connection_manager.handle_heartbeat_response(session_id)
+                    continue
+                
                 # 处理位置响应消息
                 if message.get("type") == "LOCATION_RESPONSE":
                     print(f"[DEBUG] Received location response for session {session_id}: {message}")
