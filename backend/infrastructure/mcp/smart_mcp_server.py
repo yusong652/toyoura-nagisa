@@ -19,7 +19,6 @@ from backend.infrastructure.mcp.tools.text_to_image import register_text_to_imag
 from backend.infrastructure.mcp.tools.contact_tools import register_contact_tools
 from backend.infrastructure.mcp.tools.places_tools import register_places_tools
 from backend.infrastructure.mcp.tools.location_tool import register_location_tools
-from backend.infrastructure.mcp.tools.memory_tools import register_memory_tools
 from backend.infrastructure.mcp.tools.weather_tool import register_weather_tools
 from backend.infrastructure.mcp.tools.time_tool import register_time_tools
 from backend.infrastructure.mcp.tools.calculator_tool import register_calculator_tools
@@ -46,7 +45,6 @@ register_text_to_image_tools(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
 register_location_tools(mcp)
-register_memory_tools(mcp)
 register_weather_tools(mcp)
 register_time_tools(mcp)
 register_calculator_tools(mcp)
