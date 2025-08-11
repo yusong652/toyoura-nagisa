@@ -36,7 +36,6 @@ from fastmcp import Client, Context
 import threading
 from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
 from backend.presentation.api import images
-from backend.infrastructure.memory.memory_manager import MemoryManager
 
 
 # 加载环境变量
@@ -190,8 +189,6 @@ async def delete_session(session_id: str):
             print(f"[DEBUG] Cleared tool cache for deleted session: {session_id}")
         
         # 删除向量数据库中的相关记忆
-        memory_manager = MemoryManager()
-        memory_manager.delete_conversation_memories(session_id)
         
         if not success:
             raise HTTPException(status_code=500, detail=f"删除会话 {session_id} 失败")
