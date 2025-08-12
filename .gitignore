@@ -86,6 +86,9 @@ backend/infrastructure/mcp/tools/google_auth/tokens/
 # Ignore tool vector database
 backend/tool_db/
 
+# Memory database (Mem0/Qdrant storage)
+memory_db/
+
 # Persona prompt (user-specific)
 backend/chat/persona_prompt.md
 

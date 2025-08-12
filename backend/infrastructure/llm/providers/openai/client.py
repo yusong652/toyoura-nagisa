@@ -90,6 +90,7 @@ class OpenAIClient(LLMClientBase):
         self,
         context_contents: List[Dict[str, Any]],
         session_id: Optional[str] = None,
+        enhanced_system_prompt: Optional[str] = None,
         **kwargs
     ):
         """
@@ -126,7 +127,14 @@ class OpenAIClient(LLMClientBase):
         # Get tool schemas for the session
         tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
         tools_enabled = bool(tools)
-        system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        
+        # Use enhanced system prompt if provided, otherwise use base system prompt
+        if enhanced_system_prompt:
+            system_prompt = enhanced_system_prompt
+            print(f"[DEBUG] Using enhanced system prompt ({len(system_prompt)} chars)")
+        else:
+            system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+            print(f"[DEBUG] Using base system prompt ({len(system_prompt)} chars)")
         
         # Build API configuration
         kwargs_api = self.openai_config.get_api_call_kwargs(

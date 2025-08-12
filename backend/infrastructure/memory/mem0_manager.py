@@ -6,6 +6,8 @@ replacing the legacy ChromaDB-based implementation.
 """
 
 import os
+import time
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import math
@@ -14,6 +16,8 @@ from backend.domain.models.memory_context import (
     EnhancedMemory, MemoryType, MemoryTier, MemoryContext
 )
 from backend.config import MEMORY_DB_PATH
+
+logger = logging.getLogger(__name__)
 
 
 class Mem0MemoryManager:
@@ -34,31 +38,50 @@ class Mem0MemoryManager:
         Args:
             config: Optional Mem0 configuration override
         """
-        # Default configuration for Mem0
+        # Default configuration for Mem0 with Google Gemini embeddings
         default_config = {
             "vector_store": {
                 "provider": "qdrant",
                 "config": {
                     "collection_name": "ainagisa_memories",
                     "path": os.path.join(MEMORY_DB_PATH, "qdrant"),
-                    "embedding_model_dims": 1536,  # OpenAI ada-002 dimensions
+                    "embedding_model_dims": 768,  # Google text-embedding-004 dimensions
                 }
             },
             "embedder": {
-                "provider": "openai",
+                "provider": "gemini",
                 "config": {
-                    "model": "text-embedding-ada-002"
+                    "model": "models/text-embedding-004",  # Latest Google embedding model
+                    "embedding_dims": 768,
+                    "api_key": os.getenv("GOOGLE_API_KEY")  # Add API key
                 }
             },
             "version": "v1.1"
         }
+        
+        # Check if API key is available
+        if not os.getenv("GOOGLE_API_KEY"):
+            logger.warning("[Mem0 Init] GOOGLE_API_KEY not found, Mem0 may fail to initialize")
+            # Fallback to a simpler embedding provider that doesn't need API keys
+            default_config["embedder"] = {
+                "provider": "huggingface",
+                "config": {
+                    "model": "sentence-transformers/all-MiniLM-L6-v2"
+                }
+            }
         
         # Merge with provided config
         if config:
             default_config.update(config)
         
         # Initialize Mem0
-        self.memory = Memory.from_config(default_config)
+        try:
+            self.memory = Memory.from_config(default_config)
+            print(f"[Mem0 Init] Successfully initialized Mem0 with config")
+        except Exception as e:
+            print(f"[Mem0 Init] Failed to initialize Mem0: {e}")
+            # Create a mock memory object that returns empty results
+            self.memory = None
         
         # Memory type decay rates (per day)
         self.decay_rates = {
@@ -97,11 +120,22 @@ class Mem0MemoryManager:
         })
         
         # Add memory using Mem0
-        result = self.memory.add(
-            messages=content,
-            user_id=user_id,
-            metadata=metadata
-        )
+        if self.memory is None:
+            logger.warning(f"[Mem0 Debug] Cannot add memory, Mem0 not initialized")
+            return "mock_memory_id"
+            
+        print(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
+        
+        try:
+            result = self.memory.add(
+                messages=content,
+                user_id=user_id,
+                metadata=metadata
+            )
+            print(f"[Mem0 Debug] Add result type: {type(result)}, value: {result}")
+        except Exception as e:
+            print(f"[Mem0 Debug] Add failed: {e}")
+            return "error_memory_id"
         
         # Return the memory ID
         if isinstance(result, dict) and "id" in result:
@@ -129,19 +163,67 @@ class Mem0MemoryManager:
         Returns:
             List of memory dictionaries
         """
-        # Search using Mem0
-        results = self.memory.search(
-            query=query,
-            user_id=user_id,
-            limit=limit
-        )
+        # Start timing for vectorization and search
+        search_start_time = time.time()
+        print(f"[Mem0 Timing] Starting vector search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
+        
+        # Search using Mem0 - this includes vectorization + semantic search
+        vectorization_start = time.time()
+        try:
+            # Handle case where Mem0 initialization failed
+            if self.memory is None:
+                print(f"[Mem0 Debug] Memory object is None, returning empty results")
+                results = []
+            else:
+                results = self.memory.search(
+                    query=query,
+                    user_id=user_id,
+                    limit=limit
+                )
+            
+            # Handle case where Mem0 returns None or non-list results on empty DB
+            if results is None:
+                print(f"[Mem0 Debug] Search returned None for empty database")
+                results = []
+            elif isinstance(results, dict):
+                # Mem0 returns dict with 'results' key containing the actual list
+                if 'results' in results:
+                    actual_results = results['results']
+                    print(f"[Mem0 Debug] Extracted results from dict: {len(actual_results)} items")
+                    results = actual_results if isinstance(actual_results, list) else []
+                else:
+                    print(f"[Mem0 Debug] Dict response missing 'results' key: {results}")
+                    results = []
+            elif isinstance(results, str):
+                print(f"[Mem0 Debug] Search returned string instead of list: {results}")
+                results = []
+            elif not isinstance(results, list):
+                print(f"[Mem0 Debug] Search returned unexpected type {type(results)}: {results}")
+                results = []
+            
+            vectorization_time_ms = (time.time() - vectorization_start) * 1000
+            print(f"[Mem0 Timing] Mem0 vectorization + search: {vectorization_time_ms:.2f}ms, found {len(results)} results")
+            print(f"[Mem0 Debug] Search results type: {type(results)}, sample: {results[:2] if results else 'empty'}")
+            
+        except Exception as e:
+            vectorization_time_ms = (time.time() - vectorization_start) * 1000
+            print(f"[Mem0 Debug] Search failed after {vectorization_time_ms:.2f}ms: {e}")
+            # Return empty list on search failure
+            results = []
         
         # Filter by session if specified
         if session_id:
+            filter_start = time.time()
+            original_count = len(results)
             results = [
                 r for r in results 
                 if r.get("metadata", {}).get("session_id") == session_id
             ]
+            filter_time_ms = (time.time() - filter_start) * 1000
+            print(f"[Mem0 Timing] Session filtering: {filter_time_ms:.2f}ms, {original_count} -> {len(results)} results")
+        
+        total_search_time_ms = (time.time() - search_start_time) * 1000
+        print(f"[Mem0 Timing] Total search operation: {total_search_time_ms:.2f}ms")
         
         return results
     
@@ -176,16 +258,31 @@ class Mem0MemoryManager:
         time_threshold = datetime.now() - timedelta(minutes=exclude_recent_minutes)
         
         # Search memories with Mem0
+        context_search_start = time.time()
+        logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k}, exclude_recent: {exclude_recent_minutes}min)")
+        
         raw_memories = await self.search_memories(
             query=query_text,
             user_id=user_id,
             limit=top_k * 2  # Get extra for filtering
         )
         
+        context_search_time_ms = (time.time() - context_search_start) * 1000
+        logger.info(f"[Mem0 Timing] Context search completed: {context_search_time_ms:.2f}ms, processing {len(raw_memories)} raw memories")
+        
         # Convert to EnhancedMemory objects
+        processing_start = time.time()
         enhanced_memories = []
         
-        for mem in raw_memories:
+        logger.info(f"[Mem0 Debug] Processing {len(raw_memories)} raw memories")
+        logger.info(f"[Mem0 Debug] Raw memories sample: {raw_memories[:1] if raw_memories else 'empty'}")
+        
+        for i, mem in enumerate(raw_memories):
+            logger.debug(f"[Mem0 Debug] Processing memory {i}: type={type(mem)}, keys={list(mem.keys()) if isinstance(mem, dict) else 'not_dict'}")
+            
+            if not isinstance(mem, dict):
+                logger.error(f"[Mem0 Debug] Memory {i} is not dict: {type(mem)} - {mem}")
+                continue
             metadata = mem.get("metadata", {})
             
             # Parse timestamp
@@ -234,8 +331,20 @@ class Mem0MemoryManager:
             enhanced_memories.append(enhanced_memory)
         
         # Sort by relevance and return top_k
+        sort_start = time.time()
         enhanced_memories.sort(key=lambda m: m.relevance_score, reverse=True)
-        return enhanced_memories[:top_k]
+        sort_time_ms = (time.time() - sort_start) * 1000
+        
+        processing_time_ms = (time.time() - processing_start) * 1000
+        final_memories = enhanced_memories[:top_k]
+        
+        logger.info(
+            f"[Mem0 Timing] Memory processing: {processing_time_ms:.2f}ms "
+            f"(Sort: {sort_time_ms:.2f}ms), "
+            f"final count: {len(final_memories)}"
+        )
+        
+        return final_memories
     
     async def get_all_memories(
         self,

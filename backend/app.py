@@ -43,7 +43,7 @@ load_dotenv()
 
 # ========== 导入重构后的模块 ==========
 from backend.presentation.websocket.connection import ConnectionManager
-from backend.presentation.streaming.handlers import generate_chat_stream
+from backend.presentation.streaming.chat_stream import generate_chat_stream
 
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)

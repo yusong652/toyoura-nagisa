@@ -1,7 +1,7 @@
 """WebSocket消息模型定义 - 确保前后端消息类型一致性"""
 
 from typing import Optional, Dict, Any, Literal, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from enum import Enum
 
@@ -42,8 +42,7 @@ class BaseWebSocketMessage(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     session_id: Optional[str] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ConnectionMessage(BaseWebSocketMessage):
@@ -69,8 +68,9 @@ class ErrorMessage(BaseWebSocketMessage):
 class StatusMessage(BaseWebSocketMessage):
     """状态更新消息"""
     type: Literal[MessageType.STATUS_UPDATE]
-    status: Literal["sent", "read", "typing", "thinking", "complete"]
+    status: Literal["sent", "read", "typing", "thinking", "complete", "retrieving_memories", "memory_injected", "memory_injection_skipped", "memory_error"]
     message_id: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
 
 
 class ToolUseMessage(BaseWebSocketMessage):
@@ -205,7 +205,8 @@ def create_error_message(
 def create_status_message(
     status: str,
     session_id: Optional[str] = None,
-    message_id: Optional[str] = None
+    message_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """创建状态消息
     
@@ -213,6 +214,7 @@ def create_status_message(
         status: 状态值
         session_id: 会话ID
         message_id: 消息ID
+        details: 额外的状态详情
         
     Returns:
         状态消息字典
@@ -221,7 +223,8 @@ def create_status_message(
         type=MessageType.STATUS_UPDATE,
         status=status,
         session_id=session_id,
-        message_id=message_id
+        message_id=message_id,
+        details=details
     )
     return msg.model_dump(mode="json")
 

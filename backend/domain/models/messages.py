@@ -22,6 +22,19 @@ class BaseMessage(BaseModel):
     content: Union[str, List[dict]]
     id: Optional[str] = None
     timestamp: Optional[datetime] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert message to dictionary format.
+        
+        Returns:
+            Dict containing message data with role field
+        """
+        result = self.model_dump()
+        # Add role field if it exists as a class attribute
+        if hasattr(self, 'role'):
+            result['role'] = self.role
+        return result
 
 
 # =====================

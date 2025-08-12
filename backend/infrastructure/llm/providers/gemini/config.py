@@ -132,6 +132,9 @@ class GeminiClientConfig(BaseModel):
         Returns:
             Dict[str, Any]: GenerateContentConfig parameters
         """
+        # Debug: Print system instruction
+        print(f"[DEBUG] 🟢 GEMINI SYSTEM INSTRUCTION: {system_prompt}")
+        
         config_kwargs = {
             "system_instruction": system_prompt,
             "safety_settings": self.safety_settings.to_gemini_format(),
