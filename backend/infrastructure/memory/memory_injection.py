@@ -14,6 +14,7 @@ from backend.infrastructure.memory.mem0_manager import Mem0MemoryManager
 from backend.domain.models.memory_context import (
     MemoryContext, MemoryInjectionResult, MemoryType
 )
+from backend.config.memory import MemoryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -29,23 +30,22 @@ class MemoryInjectionMiddleware:
     def __init__(
         self,
         memory_manager: Optional[Mem0MemoryManager] = None,
-        max_injection_time_ms: int = 200,
-        max_context_tokens: int = 1000,
-        enable_injection: bool = True
+        config: Optional[MemoryConfig] = None
     ):
         """
         Initialize memory injection middleware.
         
         Args:
             memory_manager: Memory manager instance (creates new if None)
-            max_injection_time_ms: Maximum time for injection operation
-            max_context_tokens: Maximum tokens for memory context
-            enable_injection: Global flag to enable/disable injection
+            config: Memory configuration (creates default if None)
         """
-        self.memory_manager = memory_manager or Mem0MemoryManager()
-        self.max_injection_time_ms = max_injection_time_ms
-        self.max_context_tokens = max_context_tokens
-        self.enable_injection = enable_injection
+        self.config = config or MemoryConfig()
+        self.memory_manager = memory_manager or Mem0MemoryManager(config=self.config)
+        
+        # Use config values
+        self.max_injection_time_ms = self.config.memory_search_timeout_ms
+        self.max_context_tokens = self.config.max_memories_to_inject * 200  # Estimate tokens per memory
+        self.enable_injection = self.config.enabled
     
     async def inject_memory_context(
         self,
@@ -73,14 +73,14 @@ class MemoryInjectionMiddleware:
         start_time = time.time()
         print(f"[Memory Injection] Starting inject_memory_context for session {session_id} with {len(messages)} messages")
         
-        # Check if injection is enabled
-        if not self.enable_injection:
-            print(f"[Memory Injection] Memory injection disabled, returning original messages")
+        # Check if injection is enabled and auto-inject is on
+        if not self.config.should_inject_memory():
+            print(f"[Memory Injection] Memory injection disabled or auto-inject off, returning original messages")
             return messages, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
                 injection_time_ms=0,
-                error="Memory injection disabled"
+                error="Memory injection disabled or auto-inject off"
             )
         
         try:
@@ -99,12 +99,12 @@ class MemoryInjectionMiddleware:
                     error="No user query found"
                 )
             
-            # Parse options
+            # Parse options with config defaults
             opts = options or {}
-            top_k = opts.get("top_k", 5)
-            exclude_recent = opts.get("exclude_recent_minutes", 10)
+            top_k = opts.get("top_k", self.config.max_memories_to_inject)
+            exclude_recent = opts.get("exclude_recent_minutes", self.config.get_time_filter_minutes())
             memory_types = opts.get("memory_types")
-            relevance_threshold = opts.get("relevance_threshold", 0.5)
+            relevance_threshold = opts.get("relevance_threshold", self.config.memory_relevance_threshold)
             
             # Create memory context
             memory_context = MemoryContext(
@@ -375,12 +375,12 @@ class MemoryInjectionMiddleware:
         """
         start_time = time.time()
         
-        if not self.enable_injection:
+        if not self.config.should_inject_memory():
             return base_system_prompt, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
                 injection_time_ms=0,
-                error="Memory injection disabled"
+                error="Memory injection disabled or auto-inject off"
             )
         
         try:
@@ -397,14 +397,14 @@ class MemoryInjectionMiddleware:
                     error="No user query found"
                 )
             
-            # Create memory context - search all sessions for better context
+            # Create memory context with config values
             memory_context = MemoryContext(
                 session_id=session_id,
                 query=query_text,
-                top_k=5,
-                exclude_recent_minutes=0,  # Don't exclude recent memories for better context
+                top_k=self.config.max_memories_to_inject,
+                exclude_recent_minutes=self.config.get_time_filter_minutes(),
                 memory_types=None,
-                relevance_threshold=0.5
+                relevance_threshold=self.config.memory_relevance_threshold
             )
             
             # Retrieve relevant memories without session filtering
@@ -528,6 +528,11 @@ Use the above context to provide more personalized and contextually aware respon
             user_id: User ID
             metadata: Additional metadata
         """
+        # Check if saving is enabled
+        if not self.config.should_save_memory():
+            print(f"[DEBUG] Memory saving disabled, skipping conversation turn")
+            return
+            
         print(f"[DEBUG] Saving conversation turn: user='{user_message[:50]}...' assistant='{assistant_response[:50]}...'")
         # Save conversation using direct memory manager
         await self._save_conversation_direct(
@@ -583,9 +588,12 @@ class MemoryPerformanceGuard:
     Ensures memory operations don't degrade system performance.
     """
     
-    MAX_INJECTION_TIME_MS = 200
-    MAX_MEMORY_CONTEXT_TOKENS = 1000
-    FALLBACK_ON_TIMEOUT = True
+    def __init__(self, config: Optional[MemoryConfig] = None):
+        """Initialize with config."""
+        self.config = config or MemoryConfig()
+        self.MAX_INJECTION_TIME_MS = self.config.memory_search_timeout_ms
+        self.MAX_MEMORY_CONTEXT_TOKENS = self.config.max_memories_to_inject * 200
+        self.FALLBACK_ON_TIMEOUT = True
     
     @classmethod
     async def safe_inject_memory(

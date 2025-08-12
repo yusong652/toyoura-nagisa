@@ -15,7 +15,7 @@ from mem0 import Memory
 from backend.domain.models.memory_context import (
     EnhancedMemory, MemoryType, MemoryTier, MemoryContext
 )
-from backend.config import MEMORY_DB_PATH
+from backend.config.memory import MemoryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -31,20 +31,23 @@ class Mem0MemoryManager:
     - Time-aware memory retrieval
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[MemoryConfig] = None):
         """
         Initialize Mem0 memory manager.
         
         Args:
-            config: Optional Mem0 configuration override
+            config: Optional MemoryConfig instance
         """
+        # Use provided config or create default
+        self.config = config or MemoryConfig()
+        
         # Default configuration for Mem0 with Google Gemini embeddings
         default_config = {
             "vector_store": {
                 "provider": "qdrant",
                 "config": {
-                    "collection_name": "ainagisa_memories",
-                    "path": os.path.join(MEMORY_DB_PATH, "qdrant"),
+                    "collection_name": self.config.mem0_collection_name,
+                    "path": os.path.join(self.config.vector_db_path, "qdrant"),
                     "embedding_model_dims": 768,  # Google text-embedding-004 dimensions
                 }
             },
@@ -94,7 +97,7 @@ class Mem0MemoryManager:
     async def add_memory(
         self,
         content: str,
-        user_id: str = "default",
+        user_id: Optional[str] = None,
         session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
@@ -103,13 +106,20 @@ class Mem0MemoryManager:
         
         Args:
             content: Memory content
-            user_id: User identifier
+            user_id: User identifier (uses config default if None)
             session_id: Session identifier
             metadata: Additional metadata
         
         Returns:
             Memory ID
         """
+        # Use config defaults
+        user_id = user_id or self.config.mem0_user_id
+        
+        # Check if saving is enabled
+        if not self.config.should_save_memory():
+            logger.info("[Mem0] Memory saving disabled, skipping")
+            return "disabled_memory_id"
         # Prepare metadata
         if metadata is None:
             metadata = {}
@@ -231,10 +241,10 @@ class Mem0MemoryManager:
         self,
         query_text: str,
         session_id: str,
-        top_k: int = 5,
-        exclude_recent_minutes: int = 10,
+        top_k: Optional[int] = None,
+        exclude_recent_minutes: Optional[int] = None,
         memory_types: Optional[List[MemoryType]] = None,
-        user_id: str = "default"
+        user_id: Optional[str] = None
     ) -> List[EnhancedMemory]:
         """
         Get relevant memories for LLM context injection.
@@ -246,14 +256,24 @@ class Mem0MemoryManager:
         Args:
             query_text: Current user message for semantic search
             session_id: Current session ID
-            top_k: Maximum memories to retrieve
-            exclude_recent_minutes: Exclude recent memories
+            top_k: Maximum memories to retrieve (uses config default if None)
+            exclude_recent_minutes: Exclude recent memories (uses config default if None)
             memory_types: Filter by memory types
-            user_id: User identifier
+            user_id: User identifier (uses config default if None)
         
         Returns:
             List of EnhancedMemory objects with relevance scores
         """
+        # Use config defaults if not provided
+        top_k = top_k if top_k is not None else self.config.max_memories_to_inject
+        exclude_recent_minutes = exclude_recent_minutes if exclude_recent_minutes is not None else self.config.get_time_filter_minutes()
+        user_id = user_id or self.config.mem0_user_id
+        
+        # Check if memory is enabled
+        if not self.config.is_memory_active():
+            logger.info("[Mem0] Memory system disabled, returning empty list")
+            return []
+        
         # Calculate time threshold
         time_threshold = datetime.now() - timedelta(minutes=exclude_recent_minutes)
         
@@ -292,6 +312,12 @@ class Mem0MemoryManager:
                 # Skip if too recent
                 if exclude_recent_minutes > 0 and timestamp > time_threshold:
                     continue
+                # Skip if too old (if max age is configured)
+                max_age_minutes = self.config.get_max_age_minutes()
+                if max_age_minutes is not None:
+                    max_age_threshold = datetime.now() - timedelta(minutes=max_age_minutes)
+                    if timestamp < max_age_threshold:
+                        continue
             else:
                 timestamp = datetime.now()
             

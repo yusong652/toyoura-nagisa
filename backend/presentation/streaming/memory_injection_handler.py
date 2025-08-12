@@ -13,6 +13,7 @@ from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.memory import (
     MemoryInjectionMiddleware
 )
+from backend.config.memory import MemoryConfig
 from backend.presentation.models.websocket_messages import create_status_message
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ async def get_system_prompt_with_memory_context(
     user_query: str,
     base_system_prompt: str,
     user_id: str = "default",
-    enable_memory: bool = True
+    enable_memory: Optional[bool] = None
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """
     Get system prompt with integrated memory context for a session.
@@ -39,12 +40,17 @@ async def get_system_prompt_with_memory_context(
         user_query: User's query text
         base_system_prompt: Base system prompt
         user_id: User identifier
-        enable_memory: Flag to enable/disable memory injection
+        enable_memory: Flag to enable/disable memory injection (uses config default if None)
         
     Returns:
         Tuple of (system_prompt_with_memory, status_updates)
     """
     status_updates = []
+    
+    # Use config if enable_memory not explicitly provided
+    if enable_memory is None:
+        config = MemoryConfig()
+        enable_memory = config.should_inject_memory()
     
     if not enable_memory:
         return base_system_prompt, status_updates
@@ -122,9 +128,9 @@ def get_memory_middleware() -> MemoryInjectionMiddleware:
     """
     global _memory_middleware
     if _memory_middleware is None:
-        _memory_middleware = MemoryInjectionMiddleware(
-            enable_injection=True  # Can be configured from settings
-        )
+        # Create with MemoryConfig from settings
+        config = MemoryConfig()
+        _memory_middleware = MemoryInjectionMiddleware(config=config)
     return _memory_middleware
 
 
