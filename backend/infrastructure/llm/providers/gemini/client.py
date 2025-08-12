@@ -78,7 +78,10 @@ class GeminiClient(LLMClientBase):
         print(f"Enhanced Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
         # Initialize component managers with unified architecture
-        self.tool_manager = GeminiToolManager(tools_enabled=self.tools_enabled)
+        self.tool_manager = GeminiToolManager(tools_enabled=self._init_tools_enabled)
+        
+        # Clean up temporary initialization attribute
+        del self._init_tools_enabled
 
     # get_response is now implemented in base class using provider-specific components
 
@@ -142,7 +145,8 @@ class GeminiClient(LLMClientBase):
         """
         # Get tool schemas for the session
         tool_schemas = await self.get_function_call_schemas(session_id)
-        tools_enabled = bool(tool_schemas)
+        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
+        tools_enabled = self.tool_manager.tools_enabled
         
         # Use enhanced system prompt if provided, otherwise use base system prompt
         if enhanced_system_prompt:
@@ -150,7 +154,7 @@ class GeminiClient(LLMClientBase):
             print(f"[DEBUG] Using enhanced system prompt ({len(system_prompt)} chars)")
         else:
             system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-            print(f"[DEBUG] Using base system prompt ({len(system_prompt)} chars)")
+            print(f"[DEBUG] Using base system prompt with tools_enabled={tools_enabled} ({len(system_prompt)} chars)")
         
         debug = self.gemini_config.debug
         

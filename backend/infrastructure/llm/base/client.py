@@ -29,15 +29,17 @@ class LLMClientBase(ABC):
     - Consistent: unified streaming interface avoiding redundant wrappers
     """
     
-    def __init__(self, tools_enabled: bool = True, extra_config: Dict[str, Any] = None):
+    def __init__(self, tools_enabled: bool = False, extra_config: Dict[str, Any] = None):
         """
         Initialize LLM client base class.
         
         Args:
-            tools_enabled: Whether to enable tool calling functionality
+            tools_enabled: Whether to enable tool calling functionality (passed to tool_manager)
             extra_config: Additional configuration parameters
         """
-        self.tools_enabled = tools_enabled
+        # Store tools_enabled temporarily for subclass tool_manager initialization
+        # Each subclass should use this to initialize their tool_manager, then this can be discarded
+        self._init_tools_enabled = tools_enabled
         self.extra_config = extra_config or {}
         
         # Common client attributes that all implementations should have
@@ -737,7 +739,17 @@ class LLMClientBase(ABC):
         Args:
             **kwargs: Configuration parameters to update
         """
-        # Provide default implementation, subclasses can override
+        # Handle tools_enabled specially - only update tool_manager
+        if 'tools_enabled' in kwargs:
+            if self.tool_manager:
+                self.tool_manager.tools_enabled = kwargs['tools_enabled']
+                print(f"[DEBUG] Updated tool_manager.tools_enabled to {kwargs['tools_enabled']}")
+            # Also update extra_config for consistency
+            self.extra_config['tools_enabled'] = kwargs['tools_enabled']
+            # Don't set on self since we don't have this attribute anymore
+            kwargs = {k: v for k, v in kwargs.items() if k != 'tools_enabled'}
+        
+        # Handle other configuration parameters
         for key, value in kwargs.items():
             setattr(self, key, value)
             # Also update extra_config

@@ -56,8 +56,11 @@ class AnthropicClient(LLMClientBase):
        
         # 初始化统一工具管理器
         self.tool_manager = AnthropicToolManager(
-            tools_enabled=self.tools_enabled
+            tools_enabled=self._init_tools_enabled
         )
+        
+        # Clean up temporary initialization attribute
+        del self._init_tools_enabled
 
     # get_response is now implemented in base class using provider-specific components
 
@@ -119,7 +122,8 @@ class AnthropicClient(LLMClientBase):
         
         # 获取工具schemas
         tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
-        tools_enabled = bool(tools)
+        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
+        tools_enabled = self.tool_manager.tools_enabled
         
         # Use enhanced system prompt if provided, otherwise use base system prompt
         if enhanced_system_prompt:
@@ -127,7 +131,7 @@ class AnthropicClient(LLMClientBase):
             print(f"[DEBUG] Using enhanced system prompt ({len(system_prompt)} chars)")
         else:
             system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-            print(f"[DEBUG] Using base system prompt ({len(system_prompt)} chars)")
+            print(f"[DEBUG] Using base system prompt with tools_enabled={tools_enabled} ({len(system_prompt)} chars)")
         
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(

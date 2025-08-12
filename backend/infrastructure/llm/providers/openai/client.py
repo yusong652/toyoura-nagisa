@@ -68,7 +68,10 @@ class OpenAIClient(LLMClientBase):
         self.client = OpenAI(api_key=self.api_key)
         
         # Initialize unified tool manager
-        self.tool_manager = OpenAIToolManager(tools_enabled=self.tools_enabled)
+        self.tool_manager = OpenAIToolManager(tools_enabled=self._init_tools_enabled)
+        
+        # Clean up temporary initialization attribute
+        del self._init_tools_enabled
 
     # ========== CORE API METHODS ==========
 
@@ -126,7 +129,8 @@ class OpenAIClient(LLMClientBase):
         
         # Get tool schemas for the session
         tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
-        tools_enabled = bool(tools)
+        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
+        tools_enabled = self.tool_manager.tools_enabled
         
         # Use enhanced system prompt if provided, otherwise use base system prompt
         if enhanced_system_prompt:
@@ -134,7 +138,7 @@ class OpenAIClient(LLMClientBase):
             print(f"[DEBUG] Using enhanced system prompt ({len(system_prompt)} chars)")
         else:
             system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-            print(f"[DEBUG] Using base system prompt ({len(system_prompt)} chars)")
+            print(f"[DEBUG] Using base system prompt with tools_enabled={tools_enabled} ({len(system_prompt)} chars)")
         
         # Build API configuration
         kwargs_api = self.openai_config.get_api_call_kwargs(

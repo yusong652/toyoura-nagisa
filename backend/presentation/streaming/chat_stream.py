@@ -101,7 +101,10 @@ async def generate_chat_stream(
             
             if user_query:
                 from backend.config import get_system_prompt
-                base_system_prompt = get_system_prompt(tools_enabled=True)
+                # Use the LLM client's actual tools_enabled setting
+                tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
+                base_system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+                print(f"[DEBUG] Using tools_enabled={tools_enabled} for system prompt generation")
                 
                 print(f"[DEBUG] Getting enhanced system prompt for query: {user_query[:50]}...")
                 enhanced_system_prompt, memory_status_updates = await get_system_prompt_with_memory_context(

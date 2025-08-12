@@ -153,7 +153,7 @@ class LLMFactory:
             Configuration dictionary
         """
         client_config = {
-            "tools_enabled": getattr(llm_settings, 'tools_enabled', True),
+            "tools_enabled": llm_settings.tools_enabled,
             "extra_config": kwargs
         }
         
