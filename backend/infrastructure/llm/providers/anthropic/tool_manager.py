@@ -52,13 +52,13 @@ class AnthropicToolManager(BaseToolManager):
             "input_schema": input_schema
         }
     
-    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
         """
-        获取所有MCP工具的schema，返回Anthropic格式
-        只返回meta tools + cached tools，不返回所有regular tools
+        获取MCP工具的schema，返回Anthropic格式，支持agent profile过滤
         
         Args:
-            session_id: 可选的会话ID，用于工具缓存
+            session_id: 会话ID，用于工具缓存
+            agent_profile: Agent profile名称，用于工具过滤
             debug: 是否启用调试输出
             
         Returns:
@@ -68,7 +68,7 @@ class AnthropicToolManager(BaseToolManager):
             return []
         
         # 使用基类的标准化工具获取方法
-        tools_dict = await self.get_standardized_tools(session_id, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
         
         if not tools_dict:
             return []

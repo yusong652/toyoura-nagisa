@@ -21,15 +21,16 @@ class OpenAIToolManager(BaseToolManager):
         """Initialize OpenAI tool manager"""
         super().__init__(tools_enabled)
     
-    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
         """
         Get MCP tools formatted for OpenAI function calling
         
-        Returns only meta tools + cached tools in OpenAI tools format.
         Uses get_standardized_tools() from base class, then converts to OpenAI format.
+        Supports agent profile filtering.
         
         Args:
             session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name for tool filtering
             debug: Enable debug output
             
         Returns:
@@ -39,7 +40,7 @@ class OpenAIToolManager(BaseToolManager):
             return None
         
         # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
         
         if not tools_dict:
             return None

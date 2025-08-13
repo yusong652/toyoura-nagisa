@@ -15,6 +15,7 @@ from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.shared.utils.tool_utils import is_meta_tool
+from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager, AgentProfile
 # Security imports removed - all tools now require session ID
 
 
@@ -145,13 +146,13 @@ class BaseToolManager(ABC):
         if session_id in self.session_tool_cache:
             del self.session_tool_cache[session_id]
     
-    async def get_standardized_tools(self, session_id: str, debug: bool = False) -> Dict[str, ToolSchema]:
+    async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
         """
-        Get standardized ToolSchema objects for meta tools + cached tools.
-        This method provides the unified tool data that providers can then format.
+        Get standardized ToolSchema objects based on agent profile.
         
         Args:
             session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", or None for all tools)
             debug: Whether to enable debug output
             
         Returns:
@@ -168,17 +169,37 @@ class BaseToolManager(ABC):
                 # Get all MCP tools - list_tools() always returns a list
                 mcp_tools = await mcp_async_client.list_tools()
                 
-                # Add meta tools first (never vectorized, always available)
-                for mcp_tool in mcp_tools:
-                    if self.is_meta_tool(mcp_tool.name):
-                        tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
-                        tools_dict[tool_schema.name] = tool_schema
+                # 确定要加载的工具集合
+                if agent_profile:
+                    profile_enum = ToolProfileManager.validate_profile(agent_profile)
+                    if profile_enum and not ToolProfileManager.should_load_all_tools(profile_enum):
+                        # 使用指定profile的工具集合
+                        allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
+                        if debug:
+                            print(f"[DEBUG] Loading tools for profile '{agent_profile}': {len(allowed_tools)} tools")
+                    else:
+                        # Profile无效或为general，加载所有工具
+                        allowed_tools = None
+                        if debug:
+                            print(f"[DEBUG] Loading all tools (profile: {agent_profile})")
+                else:
+                    # 未指定profile，加载所有工具
+                    allowed_tools = None
+                    if debug:
+                        print("[DEBUG] Loading all tools (no profile specified)")
                 
-                # Add cached tools (no conflict possible since meta tools are never cached)
-                cached_tools = self.get_cached_tools_for_session(session_id)
-                for cached_tool in cached_tools:
-                    tools_dict[cached_tool.name] = cached_tool
+                # 添加工具到字典
+                for mcp_tool in mcp_tools:
+                    # 如果设置了allowed_tools，只加载允许的工具
+                    if allowed_tools is not None and mcp_tool.name not in allowed_tools:
+                        continue
+                        
+                    tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
+                    tools_dict[tool_schema.name] = tool_schema
 
+                if debug:
+                    print(f"[DEBUG] Loaded {len(tools_dict)} tools for session {session_id}")
+                
                 return tools_dict
                 
         except Exception as e:
@@ -187,13 +208,14 @@ class BaseToolManager(ABC):
             return {}
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> Any:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Any:
         """
         Get tool schemas formatted for the specific LLM provider.
         Uses get_standardized_tools() internally, then converts to provider format.
         
         Args:
             session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name for tool filtering
             debug: Whether to enable debug output
             
         Returns:

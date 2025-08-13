@@ -18,20 +18,21 @@ class GeminiToolManager(BaseToolManager):
     Gemini-specific schema formatting and tool execution.
     """
     
-    async def get_function_call_schemas(self, session_id: str, debug: bool = False) -> List[types.Tool]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[types.Tool]:
         """
-        Get all MCP tool schemas in Gemini format.
+        Get MCP tool schemas in Gemini format based on agent profile.
         Uses get_standardized_tools() from base class, then converts to Gemini format.
         
         Args:
             session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name for tool filtering
             debug: Whether to enable debug output
             
         Returns:
             List[types.Tool]: Tool schemas formatted for Gemini API
         """
         # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
         
         if not tools_dict:
             return []
