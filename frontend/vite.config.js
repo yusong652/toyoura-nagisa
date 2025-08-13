@@ -15,7 +15,20 @@ export default defineConfig({
       },
       '/ws': {
         target: 'ws://localhost:8000',
-        ws: true
+        ws: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('WebSocket proxy error:', err);
+          });
+          proxy.on('proxyReqWs', (_proxyReq, _req, socket) => {
+            socket.on('error', (err) => {
+              console.log('WebSocket socket error:', err);
+            });
+          });
+          proxy.on('close', () => {
+            console.log('WebSocket proxy closed');
+          });
+        }
       }
     }
   }
