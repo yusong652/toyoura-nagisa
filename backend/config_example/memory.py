@@ -18,6 +18,7 @@ from backend.config.memory import MemoryConfig
 default_config = MemoryConfig(
     # Feature toggles
     enabled=True,
+    debug_mode=False,  # Quiet operation (only errors)
     auto_inject=True,
     save_conversations=True,
     
@@ -39,6 +40,7 @@ default_config = MemoryConfig(
 # Example 2: High Performance Mode (minimal latency)
 high_performance_config = MemoryConfig(
     enabled=True,
+    debug_mode=False,  # No debug logging for speed
     auto_inject=True,
     save_conversations=False,  # Don't save new memories for speed
     max_memories_to_inject=5,  # Fewer memories = faster
@@ -55,6 +57,7 @@ high_performance_config = MemoryConfig(
 # Example 3: High Quality Mode (best memory extraction)
 high_quality_config = MemoryConfig(
     enabled=True,
+    debug_mode=False,  # Production settings
     auto_inject=True,
     save_conversations=True,
     max_memories_to_inject=20,  # More context
@@ -72,6 +75,7 @@ high_quality_config = MemoryConfig(
 # Example 4: OpenAI Configuration
 openai_config = MemoryConfig(
     enabled=True,
+    debug_mode=False,
     auto_inject=True,
     save_conversations=True,
     
@@ -86,6 +90,7 @@ openai_config = MemoryConfig(
 # Example 5: Anthropic Configuration
 anthropic_config = MemoryConfig(
     enabled=True,
+    debug_mode=False,
     auto_inject=True,
     save_conversations=True,
     
@@ -99,9 +104,9 @@ anthropic_config = MemoryConfig(
 # Example 6: Development/Debug Mode
 debug_config = MemoryConfig(
     enabled=True,
+    debug_mode=True,  # Enable detailed debug logging (injected/embedded memory info)
     auto_inject=True,
     save_conversations=True,
-    debug_mode=True,  # Verbose logging
     show_memory_in_response=True,  # See what memories were used
     enable_performance_logging=True,
     memory_search_timeout_ms=2000,  # Generous timeout for debugging
@@ -115,6 +120,7 @@ debug_config = MemoryConfig(
 # Example 7: Memory Disabled (for testing)
 disabled_config = MemoryConfig(
     enabled=False,  # Turn off all memory functionality
+    debug_mode=False,  # No debug output when disabled
 )
 
 
@@ -124,6 +130,7 @@ You can also configure via environment variables in .env file:
 
 # Basic settings
 MEMORY_ENABLED=true
+MEMORY_DEBUG_MODE=false
 MEMORY_AUTO_INJECT=true
 MEMORY_SAVE_CONVERSATIONS=true
 
@@ -140,8 +147,7 @@ MEMORY_MEMORY_RELEVANCE_THRESHOLD=0.3
 # Performance
 MEMORY_MEMORY_SEARCH_TIMEOUT_MS=500
 
-# Debug
-MEMORY_DEBUG_MODE=false
+# Debug (debug_mode moved to basic settings above)
 MEMORY_SHOW_MEMORY_IN_RESPONSE=false
 
 # API Keys (required based on provider)
@@ -184,6 +190,7 @@ Configuration Tips:
 - Set max_tokens=500 for balanced summaries
 - Enable safety blocking only if needed
 - Use seed values for reproducible results (OpenAI)
+- Set debug_mode=True to see injected and embedded memory details
 """
 
 

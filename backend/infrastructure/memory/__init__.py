@@ -6,10 +6,7 @@ with automatic context injection capabilities.
 """
 
 from .mem0_manager import Mem0MemoryManager
-from .memory_injection import (
-    MemoryInjectionMiddleware,
-    MemoryPerformanceGuard
-)
+from .memory_injection import MemoryInjectionMiddleware
 
 # Convenience alias for backward compatibility
 MemoryManager = Mem0MemoryManager
@@ -17,6 +14,5 @@ MemoryManager = Mem0MemoryManager
 __all__ = [
     "Mem0MemoryManager",
     "MemoryManager",
-    "MemoryInjectionMiddleware", 
-    "MemoryPerformanceGuard"
+    "MemoryInjectionMiddleware"
 ]

@@ -45,12 +45,16 @@ At the heart of aiNagisa is the **Master Control Program (MCP)**, a powerful too
 - **Dynamic Tool Loading**: Tools are categorized and can be loaded on-demand, making the system lightweight and scalable. The LLM can request tool categories based on the task, and the MCP will provide the necessary tools.
 - **Chain of Thought (CoT) and Tool Use**: The system supports complex, multi-step tasks by allowing the LLM to chain together multiple tool calls. The LLM can reason about the results of one tool and use them as input for another, enabling sophisticated workflows.
 
-### 📚 **Persistent, Vectorized Long-Term Memory**
+### 📚 **Intelligent Long-Term Memory with Mem0**
 
-aiNagisa has a sophisticated long-term memory system that allows it to learn from past conversations and build a persistent model of the user and their preferences.
+aiNagisa features an advanced long-term memory system powered by Mem0 that automatically learns from conversations and builds a persistent understanding of users and their preferences.
 
-- **ChromaDB Integration**: We use `ChromaDB` to store and retrieve memories based on semantic similarity. This means that Nagisa can recall relevant information from past conversations even if the user's wording is different.
-- **Context-Aware Memory**: The memory system is integrated with the chat flow, allowing Nagisa to inject relevant memories into the conversation at the right time, creating a more personalized and contextually rich experience.
+- **Mem0 Integration**: Uses the modern Mem0 framework for intelligent memory extraction and management, automatically determining what information is worth remembering from conversations
+- **Semantic Memory Search**: Vector-based memory retrieval using ChromaDB/Qdrant backend ensures relevant context is found even with different phrasing
+- **Automatic Context Injection**: Seamlessly injects relevant memories into system prompts and conversations without explicit user requests
+- **Multi-Provider LLM Support**: Memory extraction works with Gemini, OpenAI, and Anthropic models for optimal quality and cost balance
+- **Smart Debug Controls**: Clean logging with optional debug mode to monitor memory injection and embedding processes
+- **Configurable Behavior**: Fine-tune memory relevance thresholds, search timeouts, and injection strategies through comprehensive configuration options
 
 ### 🗣️ **Unified Multi-Provider LLM Architecture**
 
@@ -92,8 +96,8 @@ The user experience is a top priority. We've built a modern, responsive frontend
 | | |  Base Client   |  |   Execution (MCP)  | | |
 | | +----------------+  +--------------------+ | |
 | | +----------------+  +--------------------+ | |
-| | | Tool Vectorizer|  |   Memory & Storage | | |
-| | |  (ChromaDB)    |  |   (ChromaDB)       | | |
+| | | Tool Vectorizer|  |  Mem0 Memory Mgmt  | | |
+| | |  (ChromaDB)    |  | (ChromaDB/Qdrant)  | | |
 | | +----------------+  +--------------------+ | |
 | +------------------------------------------+ |
 +------------------------------------------------+
@@ -124,7 +128,7 @@ aiNagisa/
 │   │   │   ├── smart_mcp_server.py # Main MCP server
 │   │   │   ├── tool_vectorizer.py  # Semantic tool search
 │   │   │   └── tools/             # Tool implementations by category
-│   │   ├── memory/                # ChromaDB memory system
+│   │   ├── memory/                # Mem0-powered long-term memory system
 │   │   ├── storage/               # File and session storage
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                    # Configuration management
@@ -217,6 +221,12 @@ Configure your preferred LLM providers in `backend/config/llm.py`:
 - **Anthropic**: Claude integration with tool calling
 - **OpenAI**: GPT models with comprehensive API integration
 - **Local**: vLLM and Ollama support for self-hosted models
+
+Configure memory system behavior in `backend/config/memory.py`:
+- **Memory Features**: Enable/disable memory saving and auto-injection
+- **LLM Selection**: Choose extraction model (Gemini Flash, GPT-4o mini, Claude Haiku)
+- **Performance Tuning**: Adjust search timeouts, relevance thresholds, and context limits
+- **Debug Mode**: Enable detailed logging to monitor memory operations with `debug_mode=True`
 
 ### Key Features to Explore
 

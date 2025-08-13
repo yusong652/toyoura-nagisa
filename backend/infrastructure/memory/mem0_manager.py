@@ -50,15 +50,14 @@ class Mem0MemoryManager:
         
         # Initialize Mem0
         try:
-            print(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
+            if self.config.debug_mode:
+                logger.info(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
             self.memory = Memory.from_config(mem0_config)
-            print(f"[Mem0 Init] Successfully initialized Mem0")
-            logger.info(f"[Mem0 LLM Config] Using {self.config.mem0_llm_provider} with model {self.config.mem0_llm_model}")
+            if self.config.debug_mode:
+                logger.info(f"[Mem0 Init] Successfully initialized Mem0")
+                logger.info(f"[Mem0 LLM Config] Using {self.config.mem0_llm_provider} with model {self.config.mem0_llm_model}")
         except Exception as e:
-            print(f"[Mem0 Init] Failed to initialize Mem0: {e}")
-            print(f"[Mem0 Init] Exception type: {type(e)}")
-            import traceback
-            print(f"[Mem0 Init] Full traceback: {traceback.format_exc()}")
+            logger.error(f"[Mem0 Init] Failed to initialize Mem0: {e}")
             # Create a mock memory object that returns empty results
             self.memory = None
         
@@ -94,7 +93,8 @@ class Mem0MemoryManager:
         
         # Check if saving is enabled
         if not self.config.should_save_memory():
-            logger.info("[Mem0] Memory saving disabled, skipping")
+            if self.config.debug_mode:
+                logger.info("[Mem0] Memory saving disabled, skipping")
             return "disabled_memory_id"
         # Prepare metadata
         if metadata is None:
@@ -107,10 +107,11 @@ class Mem0MemoryManager:
         
         # Add memory using Mem0
         if self.memory is None:
-            logger.warning(f"[Mem0 Debug] Cannot add memory, Mem0 not initialized")
+            logger.warning("[Mem0] Cannot add memory, Mem0 not initialized")
             return "mock_memory_id"
             
-        print(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
         
         try:
             result = self.memory.add(
@@ -118,9 +119,10 @@ class Mem0MemoryManager:
                 user_id=user_id,
                 metadata=metadata
             )
-            print(f"[Mem0 Debug] Add result type: {type(result)}, value: {result}")
+            if self.config.debug_mode:
+                logger.info(f"[Mem0 Debug] Add result type: {type(result)}, value: {result}")
         except Exception as e:
-            print(f"[Mem0 Debug] Add failed: {e}")
+            logger.error(f"[Mem0] Add failed: {e}")
             return "error_memory_id"
         
         # Return the memory ID
@@ -134,7 +136,8 @@ class Mem0MemoryManager:
                         return first_result["id"]
                 else:
                     # Empty results - Mem0 decided not to save this memory
-                    print(f"[Mem0 Debug] No memory saved - Mem0 filtered out content as non-memorable")
+                    if self.config.debug_mode:
+                        logger.info(f"[Mem0 Debug] No memory saved - Mem0 filtered out content as non-memorable")
                     return "filtered_by_mem0"
             elif "id" in result:
                 return result["id"]
@@ -163,14 +166,16 @@ class Mem0MemoryManager:
         """
         # Start timing for vectorization and search
         search_start_time = time.time()
-        print(f"[Mem0 Timing] Starting vector search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Timing] Starting vector search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
         
         # Search using Mem0 - this includes vectorization + semantic search
         vectorization_start = time.time()
         try:
             # Handle case where Mem0 initialization failed
             if self.memory is None:
-                print(f"[Mem0 Debug] Memory object is None, returning empty results")
+                if self.config.debug_mode:
+                    logger.info(f"[Mem0 Debug] Memory object is None, returning empty results")
                 results = []
             else:
                 results = self.memory.search(
@@ -181,31 +186,37 @@ class Mem0MemoryManager:
             
             # Handle case where Mem0 returns None or non-list results on empty DB
             if results is None:
-                print(f"[Mem0 Debug] Search returned None for empty database")
+                if self.config.debug_mode:
+                    logger.info(f"[Mem0 Debug] Search returned None for empty database")
                 results = []
             elif isinstance(results, dict):
                 # Mem0 returns dict with 'results' key containing the actual list
                 if 'results' in results:
                     actual_results = results['results']
-                    print(f"[Mem0 Debug] Extracted results from dict: {len(actual_results)} items")
+                    if self.config.debug_mode:
+                        logger.info(f"[Mem0 Debug] Extracted results from dict: {len(actual_results)} items")
                     results = actual_results if isinstance(actual_results, list) else []
                 else:
-                    print(f"[Mem0 Debug] Dict response missing 'results' key: {results}")
+                    if self.config.debug_mode:
+                        logger.info(f"[Mem0 Debug] Dict response missing 'results' key: {results}")
                     results = []
             elif isinstance(results, str):
-                print(f"[Mem0 Debug] Search returned string instead of list: {results}")
+                if self.config.debug_mode:
+                    logger.info(f"[Mem0 Debug] Search returned string instead of list: {results}")
                 results = []
             elif not isinstance(results, list):
-                print(f"[Mem0 Debug] Search returned unexpected type {type(results)}: {results}")
+                if self.config.debug_mode:
+                    logger.info(f"[Mem0 Debug] Search returned unexpected type {type(results)}: {results}")
                 results = []
             
             vectorization_time_ms = (time.time() - vectorization_start) * 1000
-            print(f"[Mem0 Timing] Mem0 vectorization + search: {vectorization_time_ms:.2f}ms, found {len(results)} results")
-            print(f"[Mem0 Debug] Search results type: {type(results)}, sample: {results[:2] if results else 'empty'}")
+            if self.config.debug_mode:
+                logger.info(f"[Mem0 Timing] Mem0 vectorization + search: {vectorization_time_ms:.2f}ms, found {len(results)} results")
+                logger.info(f"[Mem0 Debug] Search results type: {type(results)}, sample: {results[:2] if results else 'empty'}")
             
         except Exception as e:
             vectorization_time_ms = (time.time() - vectorization_start) * 1000
-            print(f"[Mem0 Debug] Search failed after {vectorization_time_ms:.2f}ms: {e}")
+            logger.error(f"[Mem0] Search failed after {vectorization_time_ms:.2f}ms: {e}")
             # Return empty list on search failure
             results = []
         
@@ -218,10 +229,12 @@ class Mem0MemoryManager:
                 if r.get("metadata", {}).get("session_id") == session_id
             ]
             filter_time_ms = (time.time() - filter_start) * 1000
-            print(f"[Mem0 Timing] Session filtering: {filter_time_ms:.2f}ms, {original_count} -> {len(results)} results")
+            if self.config.debug_mode:
+                logger.info(f"[Mem0 Timing] Session filtering: {filter_time_ms:.2f}ms, {original_count} -> {len(results)} results")
         
         total_search_time_ms = (time.time() - search_start_time) * 1000
-        print(f"[Mem0 Timing] Total search operation: {total_search_time_ms:.2f}ms")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Timing] Total search operation: {total_search_time_ms:.2f}ms")
         
         return results
     
@@ -259,7 +272,8 @@ class Mem0MemoryManager:
         
         # Check if memory is enabled
         if not self.config.is_memory_active():
-            logger.info("[Mem0] Memory system disabled, returning empty list")
+            if self.config.debug_mode:
+                logger.info("[Mem0] Memory system disabled, returning empty list")
             return []
         
         # Calculate time threshold
@@ -267,7 +281,8 @@ class Mem0MemoryManager:
         
         # Search memories with Mem0
         context_search_start = time.time()
-        logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k}, exclude_recent: {exclude_recent_minutes}min)")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k}, exclude_recent: {exclude_recent_minutes}min)")
         
         raw_memories = await self.search_memories(
             query=query_text,
@@ -276,14 +291,16 @@ class Mem0MemoryManager:
         )
         
         context_search_time_ms = (time.time() - context_search_start) * 1000
-        logger.info(f"[Mem0 Timing] Context search completed: {context_search_time_ms:.2f}ms, processing {len(raw_memories)} raw memories")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Timing] Context search completed: {context_search_time_ms:.2f}ms, processing {len(raw_memories)} raw memories")
         
         # Convert to EnhancedMemory objects
         processing_start = time.time()
         enhanced_memories = []
         
-        logger.info(f"[Mem0 Debug] Processing {len(raw_memories)} raw memories")
-        logger.info(f"[Mem0 Debug] Raw memories sample: {raw_memories[:1] if raw_memories else 'empty'}")
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Debug] Processing {len(raw_memories)} raw memories")
+            logger.info(f"[Mem0 Debug] Raw memories sample: {raw_memories[:1] if raw_memories else 'empty'}")
         
         for i, mem in enumerate(raw_memories):
             logger.debug(f"[Mem0 Debug] Processing memory {i}: type={type(mem)}, keys={list(mem.keys()) if isinstance(mem, dict) else 'not_dict'}")
@@ -352,11 +369,12 @@ class Mem0MemoryManager:
         processing_time_ms = (time.time() - processing_start) * 1000
         final_memories = enhanced_memories[:top_k]
         
-        logger.info(
-            f"[Mem0 Timing] Memory processing: {processing_time_ms:.2f}ms "
-            f"(Sort: {sort_time_ms:.2f}ms), "
-            f"final count: {len(final_memories)}"
-        )
+        if self.config.debug_mode:
+            logger.info(
+                f"[Mem0 Timing] Memory processing: {processing_time_ms:.2f}ms "
+                f"(Sort: {sort_time_ms:.2f}ms), "
+                f"final count: {len(final_memories)}"
+            )
         
         return final_memories
     
@@ -386,37 +404,6 @@ class Mem0MemoryManager:
             ]
         
         return all_memories
-    
-    async def update_memory(
-        self,
-        memory_id: str,
-        content: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> bool:
-        """
-        Update an existing memory.
-        
-        Args:
-            memory_id: Memory ID to update
-            content: New content (optional)
-            metadata: New metadata (optional)
-        
-        Returns:
-            Success status
-        """
-        try:
-            # Mem0 update API
-            update_data = {}
-            if content:
-                update_data["memory"] = content
-            if metadata:
-                update_data["metadata"] = metadata
-            
-            self.memory.update(memory_id=memory_id, data=update_data)
-            return True
-        except Exception as e:
-            print(f"Error updating memory: {e}")
-            return False
     
     async def delete_memory(
         self,
@@ -451,33 +438,8 @@ class Mem0MemoryManager:
             
             return True
         except Exception as e:
-            print(f"Error deleting memory: {e}")
+            logger.error(f"Error deleting memory: {e}")
             return False
-    
-    async def get_memory_history(
-        self,
-        user_id: str = "default",
-        memory_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Get memory history (if supported by Mem0 version).
-        
-        Args:
-            user_id: User identifier
-            memory_id: Specific memory ID
-        
-        Returns:
-            Memory history
-        """
-        try:
-            # This depends on Mem0 version
-            return self.memory.history(
-                user_id=user_id,
-                memory_id=memory_id
-            )
-        except AttributeError:
-            # Method not available in this version
-            return []
     
     def _classify_memory_type(
         self,
