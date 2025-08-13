@@ -36,6 +36,7 @@ from fastmcp import Client, Context
 import threading
 from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
 from backend.presentation.api import images
+from backend.presentation.api import agent_profiles
 
 
 # 加载环境变量
@@ -124,6 +125,7 @@ app.add_middleware(
 )
 
 app.include_router(images.router)
+app.include_router(agent_profiles.router)
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -330,14 +332,34 @@ async def generate_title_endpoint(request: Request):
 
 @app.post("/api/chat/tools-enabled", response_model=dict)
 async def update_tools_enabled(request: UpdateToolsEnabledRequest):
-    """更新LLM客户端的tools_enabled状态"""
+    """
+    更新LLM客户端的tools_enabled状态 (已弃用)
+    
+    注意：此接口已弃用，推荐使用 /api/agent/profile 接口进行Agent身份切换
+    为了向后兼容暂时保留，但建议迁移到新的Agent Profile系统
+    """
     try:
         print(f"[DEBUG] /api/chat/tools-enabled received enabled: {request.enabled} (type: {type(request.enabled)})")
+        print(f"[DEPRECATED] 此接口已弃用，推荐使用 /api/agent/profile")
+        
         llm_client: LLMClientBase = app.state.llm_client
         llm_client.update_config(tools_enabled=request.enabled)
+        
+        # 更新全局Agent profile状态以保持一致性
+        from backend.presentation.models.agent_profile_models import AgentProfileType
+        import backend.presentation.api.agent_profiles as agent_api
+        
+        if request.enabled:
+            # 启用工具时默认为通用助手模式
+            agent_api._current_agent_profile = AgentProfileType.GENERAL
+        else:
+            # 禁用工具时设为禁用模式  
+            agent_api._current_agent_profile = AgentProfileType.DISABLED
+        
         return {
             "success": True,
-            "tools_enabled": request.enabled
+            "tools_enabled": request.enabled,
+            "message": "建议使用新的 /api/agent/profile 接口进行更精细的工具控制"
         }
     except Exception as e:
         import traceback

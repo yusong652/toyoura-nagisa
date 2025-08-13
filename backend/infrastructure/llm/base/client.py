@@ -737,7 +737,7 @@ class LLMClientBase(ABC):
         Update client configuration.
         
         Args:
-            **kwargs: Configuration parameters to update
+            **kwargs: Configuration parameters to update (tools_enabled, agent_profile, etc.)
         """
         # Handle tools_enabled specially - only update tool_manager
         if 'tools_enabled' in kwargs:
@@ -749,8 +749,23 @@ class LLMClientBase(ABC):
             # Don't set on self since we don't have this attribute anymore
             kwargs = {k: v for k, v in kwargs.items() if k != 'tools_enabled'}
         
+        # Handle agent_profile specially - store for tool loading
+        if 'agent_profile' in kwargs:
+            self.extra_config['agent_profile'] = kwargs['agent_profile']
+            print(f"[DEBUG] Updated agent_profile to {kwargs['agent_profile']}")
+            kwargs = {k: v for k, v in kwargs.items() if k != 'agent_profile'}
+        
         # Handle other configuration parameters
         for key, value in kwargs.items():
             setattr(self, key, value)
             # Also update extra_config
             self.extra_config[key] = value
+    
+    def update_agent_profile(self, profile: str):
+        """
+        Update agent profile for tool filtering.
+        
+        Args:
+            profile: Agent profile name ("coding", "lifestyle", "general", etc.)
+        """
+        self.update_config(agent_profile=profile)

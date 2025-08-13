@@ -96,8 +96,7 @@ class AnthropicClient(LLMClientBase):
 
     async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
         """
-        Get all MCP tool schemas in Anthropic format.
-        Only return meta tools + cached tools, not all regular tools.
+        Get MCP tool schemas in Anthropic format based on current agent profile.
         
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
@@ -106,7 +105,8 @@ class AnthropicClient(LLMClientBase):
             List[Dict[str, Any]]: Tool schemas in Anthropic format
         """
         debug = self.anthropic_config.debug
-        return await self.tool_manager.get_function_call_schemas(session_id, debug)
+        agent_profile = self.extra_config.get('agent_profile')
+        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
 
     async def call_api_with_context(
         self,
