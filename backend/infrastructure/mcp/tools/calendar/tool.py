@@ -720,8 +720,8 @@ def register_calendar_tools(mcp: FastMCP):
     def update_calendar_event(
         event_id: str = Field(..., description="ID of the event to update."),
         summary: Optional[str] = Field(None, description="New event summary/title."),
-        start: Optional[str] = Field(None, description="New start time in RFC3339 format."),
-        end: Optional[str] = Field(None, description="New end time in RFC3339 format."),
+        start: Optional[Dict[str, int]] = Field(None, description="New start time. Provide a simple object with year, month, day, hour, minute. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 10, 'minute': 0}"),
+        end: Optional[Dict[str, int]] = Field(None, description="New end time. Provide a simple object with year, month, day, hour, minute. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 11, 'minute': 0}"),
         location: Optional[str] = Field(None, description="New event location."),
         description: Optional[str] = Field(None, description="New event description."),
     ) -> Dict[str, Any]:
@@ -744,17 +744,37 @@ def register_calendar_tools(mcp: FastMCP):
                 data=data,
             ).model_dump()
 
-        # Parameter validation and normalization
-        if isinstance(summary, FieldInfo):
-            summary = None
-        if isinstance(start, FieldInfo):
-            start = None
-        if isinstance(end, FieldInfo):
-            end = None
-        if isinstance(location, FieldInfo):
-            location = None
-        if isinstance(description, FieldInfo):
-            description = None
+        # Parameter processing
+        try:
+            # Handle FieldInfo objects (default values)
+            if isinstance(summary, FieldInfo):
+                summary = None
+            if isinstance(start, FieldInfo):
+                start = None
+            if isinstance(end, FieldInfo):
+                end = None
+            if isinstance(location, FieldInfo):
+                location = None
+            if isinstance(description, FieldInfo):
+                description = None
+
+            # Convert simple datetime parameters to ISO strings
+            processed_params = parse_calendar_datetime_params(
+                summary=summary,
+                start=start,
+                end=end,
+                location=location,
+                description=description
+            )
+            
+            summary = processed_params.get('summary', summary)
+            start = processed_params.get('start', start)
+            end = processed_params.get('end', end)
+            location = processed_params.get('location', location)
+            description = processed_params.get('description', description)
+            
+        except ValueError as e:
+            return _error(f"Invalid parameters: {str(e)}")
 
         # Validate required fields
         if not event_id or not event_id.strip():
