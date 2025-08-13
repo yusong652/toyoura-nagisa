@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import math
 from mem0 import Memory
 from backend.domain.models.memory_context import (
-    EnhancedMemory, MemoryType, MemoryTier, MemoryContext
+    EnhancedMemory, MemoryType, MemoryTier
 )
 from backend.config.memory import MemoryConfig
 
@@ -41,48 +41,24 @@ class Mem0MemoryManager:
         # Use provided config or create default
         self.config = config or MemoryConfig()
         
-        # Default configuration for Mem0 with Google Gemini embeddings
-        default_config = {
-            "vector_store": {
-                "provider": "qdrant",
-                "config": {
-                    "collection_name": self.config.mem0_collection_name,
-                    "path": os.path.join(self.config.vector_db_path, "qdrant"),
-                    "embedding_model_dims": 768,  # Google text-embedding-004 dimensions
-                }
-            },
-            "embedder": {
-                "provider": "gemini",
-                "config": {
-                    "model": "models/text-embedding-004",  # Latest Google embedding model
-                    "embedding_dims": 768,
-                    "api_key": os.getenv("GOOGLE_API_KEY")  # Add API key
-                }
-            },
-            "version": "v1.1"
-        }
+        # Build complete Mem0 configuration from MemoryConfig
+        mem0_config = self.config.build_mem0_config()
         
-        # Check if API key is available
+        # Log API key status
         if not os.getenv("GOOGLE_API_KEY"):
-            logger.warning("[Mem0 Init] GOOGLE_API_KEY not found, Mem0 may fail to initialize")
-            # Fallback to a simpler embedding provider that doesn't need API keys
-            default_config["embedder"] = {
-                "provider": "huggingface",
-                "config": {
-                    "model": "sentence-transformers/all-MiniLM-L6-v2"
-                }
-            }
-        
-        # Merge with provided config
-        if config:
-            default_config.update(config)
+            logger.warning("[Mem0 Init] GOOGLE_API_KEY not found, using HuggingFace fallback")
         
         # Initialize Mem0
         try:
-            self.memory = Memory.from_config(default_config)
-            print(f"[Mem0 Init] Successfully initialized Mem0 with config")
+            print(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
+            self.memory = Memory.from_config(mem0_config)
+            print(f"[Mem0 Init] Successfully initialized Mem0")
+            logger.info(f"[Mem0 LLM Config] Using {self.config.mem0_llm_provider} with model {self.config.mem0_llm_model}")
         except Exception as e:
             print(f"[Mem0 Init] Failed to initialize Mem0: {e}")
+            print(f"[Mem0 Init] Exception type: {type(e)}")
+            import traceback
+            print(f"[Mem0 Init] Full traceback: {traceback.format_exc()}")
             # Create a mock memory object that returns empty results
             self.memory = None
         
@@ -148,8 +124,20 @@ class Mem0MemoryManager:
             return "error_memory_id"
         
         # Return the memory ID
-        if isinstance(result, dict) and "id" in result:
-            return result["id"]
+        # Handle Mem0's response format: {'results': [{'id': '...', 'memory': '...', 'event': 'ADD'}]}
+        if isinstance(result, dict):
+            if "results" in result and isinstance(result["results"], list):
+                if len(result["results"]) > 0:
+                    # Extract ID from first result
+                    first_result = result["results"][0]
+                    if isinstance(first_result, dict) and "id" in first_result:
+                        return first_result["id"]
+                else:
+                    # Empty results - Mem0 decided not to save this memory
+                    print(f"[Mem0 Debug] No memory saved - Mem0 filtered out content as non-memorable")
+                    return "filtered_by_mem0"
+            elif "id" in result:
+                return result["id"]
         elif isinstance(result, list) and len(result) > 0:
             return result[0].get("id", "")
         return ""

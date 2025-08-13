@@ -560,25 +560,27 @@ Use the above context to provide more personalized and contextually aware respon
         if metadata:
             turn_metadata.update(metadata)
         
-        # Save user message
-        print(f"[DEBUG] Adding user memory: 'User said: {user_message[:30]}...'")
-        user_memory_id = await self.memory_manager.add_memory(
-            content=f"User said: {user_message}",
-            user_id=user_id,
-            session_id=session_id,
-            metadata={**turn_metadata, "role": "user"}
-        )
-        print(f"[DEBUG] User memory saved with ID: {user_memory_id}")
+        # Save complete conversation turn as a single memory
+        # This helps Mem0 understand the context better
+        conversation_content = f"""User: {user_message}
+Assistant: {assistant_response[:500]}"""
         
-        # Save assistant response (extract key points)
-        print(f"[DEBUG] Adding assistant memory: 'Assistant responded: {assistant_response[:30]}...'")
-        assistant_memory_id = await self.memory_manager.add_memory(
-            content=f"Assistant responded: {assistant_response[:500]}",  # Truncate long responses
+        print(f"[DEBUG] Adding conversation memory for turn")
+        conversation_memory_id = await self.memory_manager.add_memory(
+            content=conversation_content,
             user_id=user_id,
             session_id=session_id,
-            metadata={**turn_metadata, "role": "assistant"}
+            metadata={**turn_metadata, "role": "conversation"}
         )
-        print(f"[DEBUG] Assistant memory saved with ID: {assistant_memory_id}")
+        
+        if conversation_memory_id in ["filtered_by_mem0", ""]:
+            # Mem0 filtered this as non-memorable - this is expected for technical/temporary discussions
+            print(f"[DEBUG] Conversation not saved by Mem0 (filtered as non-memorable - likely technical/temporary content)")
+        else:
+            print(f"[DEBUG] Conversation memory saved with ID: {conversation_memory_id}")
+            # Log what was actually saved
+            if conversation_memory_id != "filtered_by_mem0":
+                print(f"[DEBUG] Mem0 extracted memorable content from conversation")
 
 
 class MemoryPerformanceGuard:

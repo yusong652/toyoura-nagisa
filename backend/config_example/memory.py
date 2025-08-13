@@ -1,134 +1,212 @@
 """
-Memory system configuration module.
+Memory system configuration examples for aiNagisa.
 
-Controls memory feature toggles, time limits, and Mem0 integration settings.
+This file demonstrates how to configure the memory system, including:
+- Feature toggles
+- Performance settings  
+- Mem0 integration
+- LLM provider selection for memory extraction
 """
-from __future__ import annotations
-from typing import Optional
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Import the actual configuration class
+from backend.config.memory import MemoryConfig
 
 
-class MemoryConfig(BaseSettings):
-    """Memory system configuration for aiNagisa."""
-    
+# ===== Example Configurations for Different Use Cases =====
+
+# Example 1: Default Configuration (Balanced)
+default_config = MemoryConfig(
     # Feature toggles
-    enabled: bool = Field(
-        default=True, 
-        description="Global toggle for memory system. When False, disables all memory features."
-    )
+    enabled=True,
+    auto_inject=True,
+    save_conversations=True,
     
-    auto_inject: bool = Field(
-        default=True,
-        description="Automatically inject relevant memories into system prompt. When False, memory must be manually queried."
-    )
+    # Search parameters  
+    max_memories_to_inject=16,
+    memory_relevance_threshold=0.3,
     
-    save_conversations: bool = Field(
-        default=True,
-        description="Save conversation turns to memory after each response. When False, no new memories are created."
-    )
+    # Embedding model (latest Gemini)
+    embedding_model="models/gemini-embedding-001",
     
-    # Time constraints
-    min_memory_age_minutes: int = Field(
-        default=0,
-        description="Minimum age in minutes for memories to be activated. 0 means all memories are active. Use to exclude very recent memories."
-    )
+    # LLM for memory extraction
+    mem0_llm_provider="gemini",
+    mem0_llm_model="gemini-1.5-flash",
+    mem0_llm_temperature=0.0,
+    mem0_llm_max_tokens=500,
+    mem0_gemini_safety_block_none=True,
+)
+
+# Example 2: High Performance Mode (minimal latency)
+high_performance_config = MemoryConfig(
+    enabled=True,
+    auto_inject=True,
+    save_conversations=False,  # Don't save new memories for speed
+    max_memories_to_inject=5,  # Fewer memories = faster
+    memory_relevance_threshold=0.5,  # Stricter filtering
+    memory_search_timeout_ms=100,  # Tight timeout
     
-    max_memory_age_days: Optional[int] = Field(
-        default=None,
-        description="Maximum age in days for memories to be considered. None means no upper limit. Use to exclude very old memories."
-    )
+    # Use fastest model
+    mem0_llm_provider="gemini",
+    mem0_llm_model="gemini-1.5-flash",
+    mem0_llm_temperature=0.0,
+    mem0_llm_max_tokens=200,  # Shorter summaries
+)
+
+# Example 3: High Quality Mode (best memory extraction)
+high_quality_config = MemoryConfig(
+    enabled=True,
+    auto_inject=True,
+    save_conversations=True,
+    max_memories_to_inject=20,  # More context
+    memory_relevance_threshold=0.2,  # Include more memories
+    memory_search_timeout_ms=1000,  # Allow more time
     
-    # Search parameters
-    max_memories_to_inject: int = Field(
-        default=5,
-        description="Maximum number of memories to inject into system prompt. Prevents context overflow."
-    )
+    # Use best quality model
+    mem0_llm_provider="openai",
+    mem0_llm_model="gpt-4o",
+    mem0_llm_temperature=0.1,  # Slight creativity
+    mem0_llm_max_tokens=800,  # More detailed summaries
+    mem0_openai_seed=42,  # Reproducible results
+)
+
+# Example 4: OpenAI Configuration
+openai_config = MemoryConfig(
+    enabled=True,
+    auto_inject=True,
+    save_conversations=True,
     
-    memory_relevance_threshold: float = Field(
-        default=0.3,
-        description="Minimum relevance score (0-1) for memories to be included. Higher values = stricter filtering."
-    )
+    # OpenAI LLM settings
+    mem0_llm_provider="openai",
+    mem0_llm_model="gpt-4o-mini",  # Cost-effective option
+    mem0_llm_temperature=0.0,
+    mem0_llm_max_tokens=500,
+    mem0_openai_seed=42,
+)
+
+# Example 5: Anthropic Configuration
+anthropic_config = MemoryConfig(
+    enabled=True,
+    auto_inject=True,
+    save_conversations=True,
     
-    # Performance settings
-    memory_search_timeout_ms: int = Field(
-        default=200,
-        description="Maximum milliseconds to wait for memory search. Prevents blocking on slow searches."
-    )
+    # Anthropic LLM settings
+    mem0_llm_provider="anthropic",
+    mem0_llm_model="claude-3-haiku-20240307",  # Fast and efficient
+    mem0_llm_temperature=0.0,
+    mem0_llm_max_tokens=500,
+)
+
+# Example 6: Development/Debug Mode
+debug_config = MemoryConfig(
+    enabled=True,
+    auto_inject=True,
+    save_conversations=True,
+    debug_mode=True,  # Verbose logging
+    show_memory_in_response=True,  # See what memories were used
+    enable_performance_logging=True,
+    memory_search_timeout_ms=2000,  # Generous timeout for debugging
     
-    enable_performance_logging: bool = Field(
-        default=True,
-        description="Log memory system performance metrics (search time, hit rate, etc)."
-    )
-    
-    # Mem0 specific settings
-    mem0_user_id: str = Field(
-        default="default_user",
-        description="Default user ID for Mem0 memory storage. Can be overridden per session."
-    )
-    
-    mem0_collection_name: str = Field(
-        default="nagisa_memories",
-        description="Mem0 collection name for memory storage."
-    )
-    
-    # Vector database settings
-    vector_db_path: str = Field(
-        default="memory_db",
-        description="Path to vector database storage directory."
-    )
-    
-    embedding_model: str = Field(
-        default="models/text-embedding-004",
-        description="Google Gemini embedding model for memory vectorization."
-    )
-    
-    # Debug settings
-    debug_mode: bool = Field(
-        default=False,
-        description="Enable detailed debug logging for memory system."
-    )
-    
-    show_memory_in_response: bool = Field(
-        default=False,
-        description="Include injected memories in response metadata for debugging."
-    )
-    
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_file_encoding='utf-8',
-        case_sensitive=False,
-        env_prefix='MEMORY_',
-        extra='ignore'
-    )
-    
-    def is_memory_active(self) -> bool:
-        """Check if memory system should be active based on configuration."""
-        return self.enabled
-    
-    def should_inject_memory(self) -> bool:
-        """Check if memories should be automatically injected."""
-        return self.enabled and self.auto_inject
-    
-    def should_save_memory(self) -> bool:
-        """Check if conversations should be saved to memory."""
-        return self.enabled and self.save_conversations
-    
-    def get_time_filter_minutes(self) -> int:
-        """Get the minimum age filter in minutes for memory activation."""
-        return max(0, self.min_memory_age_minutes)
-    
-    def get_max_age_minutes(self) -> Optional[int]:
-        """Get the maximum age filter in minutes for memory consideration."""
-        if self.max_memory_age_days is not None:
-            return self.max_memory_age_days * 24 * 60
-        return None
+    # Use reliable model for debugging
+    mem0_llm_provider="gemini",
+    mem0_llm_model="gemini-1.5-flash",
+    mem0_llm_temperature=0.0,
+)
+
+# Example 7: Memory Disabled (for testing)
+disabled_config = MemoryConfig(
+    enabled=False,  # Turn off all memory functionality
+)
 
 
-# Example environment variables in .env file:
-# MEMORY_ENABLED=true
-# MEMORY_AUTO_INJECT=true
-# MEMORY_MIN_MEMORY_AGE_MINUTES=5
-# MEMORY_MAX_MEMORIES_TO_INJECT=10
-# MEMORY_MEMORY_RELEVANCE_THRESHOLD=0.4
-# MEMORY_DEBUG_MODE=false
+# ===== Environment Variables Configuration =====
+"""
+You can also configure via environment variables in .env file:
+
+# Basic settings
+MEMORY_ENABLED=true
+MEMORY_AUTO_INJECT=true
+MEMORY_SAVE_CONVERSATIONS=true
+
+# LLM configuration
+MEMORY_MEM0_LLM_PROVIDER=gemini
+MEMORY_MEM0_LLM_MODEL=gemini-1.5-flash
+MEMORY_MEM0_LLM_TEMPERATURE=0.0
+MEMORY_MEM0_LLM_MAX_TOKENS=500
+
+# Search parameters
+MEMORY_MAX_MEMORIES_TO_INJECT=16
+MEMORY_MEMORY_RELEVANCE_THRESHOLD=0.3
+
+# Performance
+MEMORY_MEMORY_SEARCH_TIMEOUT_MS=500
+
+# Debug
+MEMORY_DEBUG_MODE=false
+MEMORY_SHOW_MEMORY_IN_RESPONSE=false
+
+# API Keys (required based on provider)
+GOOGLE_API_KEY=your_google_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+"""
+
+
+# ===== Model Comparison Guide =====
+"""
+LLM Provider Recommendations for Memory Extraction:
+
+1. **Gemini Flash** (gemini-1.5-flash)
+   - ✅ Fast and cheap (~$0.075 per 1M tokens)
+   - ✅ Good for general conversations
+   - ✅ Excellent for most use cases
+   - ❌ May miss nuanced details
+
+2. **GPT-4o mini** (gpt-4o-mini)  
+   - ✅ Good balance of quality and cost
+   - ✅ Reliable memory extraction
+   - ✅ Better at nuanced understanding
+   - ❌ More expensive than Gemini
+
+3. **GPT-4o** (gpt-4o)
+   - ✅ Best quality memory extraction
+   - ✅ Excellent at identifying important details
+   - ✅ Great for complex conversations
+   - ❌ Most expensive option
+
+4. **Claude Haiku** (claude-3-haiku-20240307)
+   - ✅ Good for structured information
+   - ✅ Fast processing
+   - ✅ Good privacy practices
+   - ❌ May be overly conservative
+
+Configuration Tips:
+- Use temperature=0.0 for consistent memory extraction
+- Set max_tokens=500 for balanced summaries
+- Enable safety blocking only if needed
+- Use seed values for reproducible results (OpenAI)
+"""
+
+
+# ===== What Gets Remembered =====
+"""
+Mem0 with LLM assistance typically remembers:
+
+✅ WILL BE REMEMBERED:
+- User preferences ("I like coffee")
+- Personal information ("I'm a software engineer")
+- Important events ("I'm moving next month") 
+- Relationships ("My sister lives in Tokyo")
+- Skills and expertise ("I know Python")
+- Goals and plans ("I want to learn guitar")
+
+❌ USUALLY FILTERED OUT:
+- Greetings and pleasantries
+- Technical troubleshooting discussions  
+- Meta-conversations about the system
+- Temporary requests
+- Generic responses
+- Weather or news discussions
+
+The LLM analyzes each conversation and decides what information
+would be valuable for future interactions with the user.
+"""
