@@ -263,6 +263,7 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   z-index: 10001;
+  scroll-behavior: smooth;
 }
 
 .thumbnail-strip::-webkit-scrollbar {

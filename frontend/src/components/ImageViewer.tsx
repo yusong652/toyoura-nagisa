@@ -34,8 +34,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isLoading, setIsLoading] = useState(true);
   
+  // Touch gesture states
+  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
+  const [lastTouchDistance, setLastTouchDistance] = useState(0);
+  const [swipeThreshold] = useState(50);
+  
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const thumbnailStripRef = useRef<HTMLDivElement>(null);
+  const activeThumbnailRef = useRef<HTMLButtonElement>(null);
 
   // Reset state when opening/closing or changing image
   useEffect(() => {
@@ -53,6 +60,34 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setPan({ x: 0, y: 0 });
     setIsLoading(true);
   }, [currentIndex]);
+
+  // Auto-scroll thumbnail strip to current image
+  useEffect(() => {
+    if (open && activeThumbnailRef.current && thumbnailStripRef.current && images.length > 1) {
+      const thumbnail = activeThumbnailRef.current;
+      const strip = thumbnailStripRef.current;
+      
+      // Use a small delay to ensure the DOM is fully rendered
+      const scrollToThumbnail = () => {
+        const thumbnailRect = thumbnail.getBoundingClientRect();
+        const stripRect = strip.getBoundingClientRect();
+        
+        // Calculate scroll position to center the thumbnail
+        const scrollLeft = thumbnail.offsetLeft - stripRect.width / 2 + thumbnailRect.width / 2;
+        
+        // Smooth scroll to the calculated position
+        strip.scrollTo({
+          left: Math.max(0, scrollLeft),
+          behavior: open ? 'smooth' : 'auto' // No animation on initial load
+        });
+      };
+      
+      // Small delay to ensure proper rendering
+      const timeoutId = setTimeout(scrollToThumbnail, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentIndex, open, images.length]);
 
   // Keyboard event handlers
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -146,6 +181,85 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setIsDragging(false);
   };
 
+  // Touch event handlers
+  const getTouchDistance = (touches: React.TouchList) => {
+    if (touches.length < 2) return 0;
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      // Single touch - potential swipe
+      const touch = e.touches[0];
+      setTouchStart({ x: touch.clientX, y: touch.clientY });
+    } else if (e.touches.length === 2) {
+      // Two fingers - zoom gesture
+      const distance = getTouchDistance(e.touches);
+      setLastTouchDistance(distance);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    if (e.touches.length === 1) {
+      // Single touch - check for swipe or pan
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStart.x;
+      const deltaY = touch.clientY - touchStart.y;
+      
+      if (zoom > 1) {
+        // Pan when zoomed
+        setPan({
+          x: pan.x + deltaX,
+          y: pan.y + deltaY
+        });
+        setTouchStart({ x: touch.clientX, y: touch.clientY });
+      }
+    } else if (e.touches.length === 2) {
+      const currentDistance = getTouchDistance(e.touches);
+      
+      // Check for zoom gesture
+      const distanceChange = Math.abs(currentDistance - lastTouchDistance);
+      
+      // If distance change is significant, it's a zoom gesture
+      if (distanceChange > 10) {
+        const scale = currentDistance / lastTouchDistance;
+        const newZoom = Math.min(Math.max(zoom * scale, 0.1), 5);
+        setZoom(newZoom);
+        setLastTouchDistance(currentDistance);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Handle single finger swipe
+    if (e.changedTouches.length === 1 && e.touches.length === 0) {
+      const touch = e.changedTouches[0];
+      const deltaX = touch.clientX - touchStart.x;
+      const deltaY = touch.clientY - touchStart.y;
+      
+      // Only trigger swipe if horizontal movement is dominant and exceeds threshold
+      if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaX) > Math.abs(deltaY) * 2 && zoom <= 1) {
+        if (deltaX > 0 && images.length > 1) {
+          // Swipe right - previous image
+          handlePrevImage();
+        } else if (deltaX < 0 && images.length > 1) {
+          // Swipe left - next image
+          handleNextImage();
+        }
+      }
+    }
+    
+    // Reset touch states
+    setLastTouchDistance(0);
+  };
+
   const handleImageLoad = () => {
     setIsLoading(false);
   };
@@ -203,7 +317,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ 
+            cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            touchAction: 'none' // Prevent default touch behaviors
+          }}
         >
           {isLoading && (
             <div className="image-loading">
@@ -298,10 +418,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
         {/* Thumbnail strip for multiple images */}
         {hasMultipleImages && images.length > 1 && (
-          <div className="thumbnail-strip">
+          <div className="thumbnail-strip" ref={thumbnailStripRef}>
             {images.map((image, index) => (
               <button
                 key={index}
+                ref={index === currentIndex ? activeThumbnailRef : null}
                 className={`thumbnail ${index === currentIndex ? 'active' : ''}`}
                 onClick={() => setCurrentIndex(index)}
                 aria-label={`View image ${index + 1}`}
