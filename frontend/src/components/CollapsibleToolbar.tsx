@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentProfileToggle } from './AgentProfileToggle';
 import { TTSToggle } from './TTSToggle';
+import { SlideToggle } from './SlideToggle';
 import './CollapsibleToolbar.css';
 
 export const CollapsibleToolbar: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [settingsEnabled, setSettingsEnabled] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   const toggleExpanded = () => {
@@ -48,33 +50,44 @@ export const CollapsibleToolbar: React.FC = () => {
       {isExpanded && (
         <div className="toolbar-content">
           <div className="toolbar-section">
-            <span className="toolbar-label">Agent设置</span>
-            <AgentProfileToggle />
+            <div className="toolbar-item">
+              <div className="toolbar-icon-label">
+                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span className="toolbar-label">Agent Profile</span>
+              </div>
+              <AgentProfileToggle />
+            </div>
           </div>
           
           <div className="toolbar-section">
-            <span className="toolbar-label">语音控制</span>
-            <div className="toolbar-options">
+            <div className="toolbar-item">
+              <div className="toolbar-icon-label">
+                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+                <span className="toolbar-label">Text-to-Speech</span>
+              </div>
               <TTSToggle />
             </div>
           </div>
           
           <div className="toolbar-section">
-            <span className="toolbar-label">更多选项</span>
-            <div className="toolbar-options">
-              <button className="toolbar-option-btn" title="设置">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <div className="toolbar-item">
+              <div className="toolbar-icon-label">
+                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M12 1v6m0 10v6m11-7h-6M6 12H0" />
                 </svg>
-              </button>
-              <button className="toolbar-option-btn" title="帮助">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </button>
+                <span className="toolbar-label">Settings</span>
+              </div>
+              <SlideToggle
+                checked={settingsEnabled}
+                onChange={setSettingsEnabled}
+              />
             </div>
           </div>
         </div>
