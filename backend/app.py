@@ -9,17 +9,11 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
-from backend.infrastructure.storage.session_manager import load_history, save_history, load_all_message_history
+from backend.infrastructure.storage.session_manager import load_history, save_history
 # Image storage imports removed - now handled in content service
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_settings, LOCATION_DB_PATH
-from backend.shared.utils.helpers import (
-    parse_message_data,
-    process_user_message,
-    generate_title_for_session,
-)
-from backend.domain.models.message_factory import message_factory
 # API models imports removed - now handled in specific service modules
 from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
@@ -31,6 +25,7 @@ from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
 from backend.presentation.api import settings
+from backend.presentation.api import chat
 
 
 # 加载环境变量
@@ -38,7 +33,6 @@ load_dotenv()
 
 # ========== 导入重构后的模块 ==========
 from backend.presentation.websocket.connection import ConnectionManager
-from backend.presentation.streaming.chat_stream import generate_chat_stream
 
 # 使用已初始化的 MCP 实例
 mcp_client = Client(mcp)
@@ -124,6 +118,7 @@ app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 # Create session endpoint moved to backend/presentation/api/sessions.py
 
@@ -135,33 +130,7 @@ app.include_router(settings.router, prefix="/api")
 
 # Switch session endpoint moved to backend/presentation/api/sessions.py
 
-# 注意：流式处理逻辑已移动到 backend/core/streaming.py
-
-@app.post("/api/chat/stream")
-async def chat_stream_endpoint(request: Request):
-    """聊天流式端点 - 使用重构后的流式处理模块"""
-    data = await request.json()
-    parsed_data, session_id = parse_message_data(data)
-    if not parsed_data:
-        return ErrorResponse(detail="无效的消息数据")
-    
-    # 处理用户消息
-    loaded_history = load_all_message_history(session_id)
-    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    process_user_message(parsed_data, session_id, history_msgs)
-    
-    # 获取服务组件
-    llm_client: LLMClientBase = request.app.state.llm_client
-    tts_engine: BaseTTS = request.app.state.tts_engine
-    
-    try:
-        # 使用重构后的流式处理模块
-        return StreamingResponse(
-            generate_chat_stream(session_id, [], llm_client, tts_engine),
-            media_type="text/event-stream"
-        )
-    except Exception as e:
-        return ErrorResponse(detail=str(e))
+# Chat stream endpoint moved to backend/presentation/api/chat.py
 
 # Delete message endpoint moved to backend/presentation/api/messages.py
 
