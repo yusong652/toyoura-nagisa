@@ -1,16 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AgentProfileToggle } from './AgentProfileToggle';
 import './CollapsibleToolbar.css';
 
 export const CollapsibleToolbar: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
 
+  // Handle clicks outside the toolbar to collapse it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+
+    if (isExpanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isExpanded]);
+
   return (
-    <div className="collapsible-toolbar">
+    <div className="collapsible-toolbar" ref={toolbarRef}>
       <button
         type="button"
         onClick={toggleExpanded}
