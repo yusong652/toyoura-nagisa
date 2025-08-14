@@ -12,66 +12,88 @@
 .theme-toggle-label {
   position: relative;
   display: inline-block;
-  width: 60px;
-  height: 30px;
-  background-color: var(--secondary-color);
-  border-radius: 15px;
+  width: 56px;
+  height: 28px;
+  background: rgba(128, 128, 128, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(var(--secondary-color-rgb, 100, 100, 100), 0.3);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
 }
 
 .theme-toggle-slider {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 26px;
-  height: 26px;
-  background-color: white;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
+  border-radius: 11px;
+  transition: all 0.2s ease;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 
 .theme-toggle-icon {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
-  transition: all 0.3s ease;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.2s ease;
+  color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .theme-toggle-icon.light {
-  left: 8px;
+  left: 13px;
   opacity: 1;
 }
 
 .theme-toggle-icon.dark {
-  right: 8px;
-  opacity: 0.5;
+  left: 41px;
+  opacity: 0.3;
 }
 
+/* 暗色模式状态 */
 .theme-toggle-input:checked + .theme-toggle-label {
-  background-color: var(--primary-color);
+  background: rgba(64, 64, 64, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-slider {
-  transform: translateX(30px);
+  transform: translateX(28px);
+  background: linear-gradient(145deg, #404040, #2a2a2a);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon.light {
-  opacity: 0.5;
+  opacity: 0.3;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-icon.dark {
   opacity: 1;
+  color: rgba(255, 255, 255, 0.8);
 }
 
+/* 悬停效果 */
 .theme-toggle-label:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(var(--secondary-color-rgb, 100, 100, 100), 0.4);
+  background: rgba(128, 128, 128, 0.3);
+  border-color: rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.theme-toggle-input:checked + .theme-toggle-label:hover {
+  background: rgba(64, 64, 64, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .theme-toggle-label:active {
-  transform: scale(0.95);
+  transform: translateY(0);
 } 
