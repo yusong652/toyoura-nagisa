@@ -36,7 +36,7 @@ export const CollapsibleToolbar: React.FC = () => {
         type="button"
         onClick={toggleExpanded}
         className={`toolbar-toggle-btn${isExpanded ? ' expanded' : ''}`}
-        title={isExpanded ? '收起工具栏' : '展开工具栏'}
+        title={isExpanded ? 'Collapse Toolbar' : 'Expand Toolbar'}
         aria-expanded={isExpanded}
       >
         {/* Hamburger menu icon */}

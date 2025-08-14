@@ -144,20 +144,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     let statusClass = '';
     
     if (status === MessageStatus.SENDING) {
-      statusText = '发送中';
+      statusText = 'Sending';
       statusClass = 'status-sending';
     } else if (status === MessageStatus.SENT) {
-      statusText = '已发送';
+      statusText = 'Sent';
       statusClass = 'status-sent';
     } else if (status === MessageStatus.READ) {
-      statusText = '已读';
+      statusText = 'Read';
       statusClass = 'status-read';
     } else if (status === MessageStatus.ERROR) {
-      statusText = '发送失败';
+      statusText = 'Failed';
       statusClass = 'status-error';
     } else {
-      // 没有状态信息的消息（如历史消息）默认显示为已读
-      statusText = '已读';
+      // No status info messages (like history messages) default to read
+      statusText = 'Read';
       statusClass = 'status-read';
     }
     
@@ -176,7 +176,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     if (sender === 'user') {
       tooltip.textContent = 'User\nName：yusong\nIntroduction： developer of aiNagisa.'
     } else {
-      tooltip.textContent = 'Toyoura Nagisa\n性格：元气、可爱、黏人\n爱好：和你聊天、卖萌撒娇\n简介：Nagisa是你的AI虚拟伙伴，喜欢陪伴你、和你互动！'
+      tooltip.textContent = 'Toyoura Nagisa\nPersonality: Energetic, cute, clingy\nHobbies: Chatting with you, being adorable\nBio: Nagisa is your AI virtual companion who loves to keep you company and interact with you!'
     }
     
     document.body.appendChild(tooltip)

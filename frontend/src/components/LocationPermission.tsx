@@ -61,8 +61,8 @@ const LocationPermission: React.FC<LocationPermissionProps> = ({ onLocationGrant
       <div className="location-permission-content">
         <div className="location-permission-icon">📍</div>
         <div className="location-permission-text">
-          <h4>位置权限</h4>
-          <p>为了提供更精确的位置服务，我们需要获取您的地理位置信息。</p>
+          <h4>Location Permission</h4>
+          <p>To provide more accurate location services, we need to access your geographic location information.</p>
         </div>
         <div className="location-permission-actions">
           <button
@@ -70,14 +70,14 @@ const LocationPermission: React.FC<LocationPermissionProps> = ({ onLocationGrant
             onClick={handleRequestPermission}
             disabled={isRequesting}
           >
-            {isRequesting ? '请求中...' : '允许'}
+            {isRequesting ? 'Requesting...' : 'Allow'}
           </button>
           <button
             className="location-permission-button secondary"
             onClick={handleDismiss}
             disabled={isRequesting}
           >
-            稍后
+            Later
           </button>
         </div>
       </div>

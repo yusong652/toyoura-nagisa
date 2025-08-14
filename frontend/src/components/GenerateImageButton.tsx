@@ -33,7 +33,7 @@ const GenerateImageButton: React.FC = () => {
         className={`generate-image-btn ${showSuccess ? 'success' : ''}`}
         onClick={handleClick}
         disabled={loading || !currentSessionId}
-        title="生成图片"
+        title="Generate Image"
       >
         {loading ? (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="generate-image-spinner">

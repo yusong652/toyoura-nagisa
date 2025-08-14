@@ -15,10 +15,10 @@ const ConnectionError: React.FC<ConnectionErrorProps> = ({ message, onRetry }) =
           <path d="M12 8V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M12 16H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <h3>连接错误</h3>
-        <p>{message || '无法连接到服务器，请检查后端服务是否正常运行。'}</p>
+        <h3>Connection Error</h3>
+        <p>{message || 'Unable to connect to server. Please check if the backend service is running properly.'}</p>
         <button className="retry-button" onClick={onRetry}>
-          重试连接
+          Retry Connection
         </button>
       </div>
     </div>

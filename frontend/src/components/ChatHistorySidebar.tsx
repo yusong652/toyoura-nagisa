@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
-import { useChat } from '../contexts/chat/ChatContext'
 import { useSession } from '../contexts/session/SessionContext'
 import { ChatSession } from '../types/session'
 
@@ -17,7 +16,6 @@ const ChatHistorySidebar: React.FC = () => {
     deleteSession
   } = useSession()
   
-  const { clearChat } = useChat()
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen)
@@ -61,7 +59,7 @@ const ChatHistorySidebar: React.FC = () => {
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation()
-    if (window.confirm('确定要删除这个会话吗？')) {
+    if (window.confirm('Are you sure you want to delete this session?')) {
       await deleteSession(sessionId)
     }
   }
@@ -83,11 +81,11 @@ const ChatHistorySidebar: React.FC = () => {
       
       <div className={`chat-history-sidebar ${isOpen ? 'open' : ''}`}>
         <div className="chat-history-header">
-          <div className="chat-history-title">聊天记录</div>
+          <div className="chat-history-title">Chat History</div>
           <button 
             className="chat-history-close"
             onClick={closeSidebar}
-            aria-label="关闭聊天记录"
+            aria-label="Close Chat History"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M2 2L12 12M2 12L12 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -99,7 +97,7 @@ const ChatHistorySidebar: React.FC = () => {
           <div className="new-session-input-container">
             <input
               type="text"
-              placeholder="新会话名称"
+              placeholder="New Session Name"
               value={newSessionName}
               onChange={(e) => setNewSessionName(e.target.value)}
               className="new-session-input"
@@ -109,14 +107,14 @@ const ChatHistorySidebar: React.FC = () => {
               onClick={handleCreateSession}
               disabled={isCreating}
             >
-              {isCreating ? '创建中...' : '新建'}
+              {isCreating ? 'Creating...' : 'New'}
             </button>
           </div>
         </div>
         
         <div className="chat-history-list">
           {sessions.length === 0 ? (
-            <div className="no-sessions-message">暂无聊天记录</div>
+            <div className="no-sessions-message">No chat history</div>
           ) : (
             sessions.map((session: ChatSession) => (
               <div 

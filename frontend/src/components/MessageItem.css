@@ -245,6 +245,8 @@
   z-index: 1000;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.2s ease-out;
+  max-width: 330px;
+  width: max-content;
 }
 
 @keyframes fadeIn {

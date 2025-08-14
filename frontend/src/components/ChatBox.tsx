@@ -14,7 +14,7 @@ const ChatBox: React.FC = () => {
   const [isRefreshingTitle, setIsRefreshingTitle] = useState(false);
   
   // 获取当前会话标题
-  const currentSessionTitle = sessions.find(session => session.id === currentSessionId)?.name || '新会话'
+  const currentSessionTitle = sessions.find(session => session.id === currentSessionId)?.name || 'New Chat'
   
   // 判断是否有足够的消息来生成标题
   const hasEnoughMessages = messages.length >= 2;
@@ -93,8 +93,8 @@ const ChatBox: React.FC = () => {
               className={`refresh-title-button ${isRefreshingTitle ? 'loading' : ''} ${!canRefreshTitle ? 'disabled' : ''}`}
               onClick={handleRefreshTitle}
               disabled={isRefreshingTitle || !canRefreshTitle}
-              title={canRefreshTitle ? "刷新标题" : "需要至少一条用户消息和一条AI回复才能刷新标题"}
-              aria-label="刷新标题"
+              title={canRefreshTitle ? "Refresh Title" : "Need at least one user message and one AI reply to refresh title"}
+              aria-label="Refresh Title"
             >
               {isRefreshingTitle ? (
                 // 加载中图标
