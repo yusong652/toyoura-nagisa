@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
-from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, get_all_sessions, delete_session_data, delete_message, update_session_title, load_all_message_history
+from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, delete_message, update_session_title, load_all_message_history, get_all_sessions
 from backend.infrastructure.storage.image_storage import save_image_from_url, save_image_from_base64
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
@@ -23,8 +23,6 @@ from backend.domain.models.message_factory import message_factory
 from backend.presentation.models.api_models import (
     NewHistoryRequest,
     HistorySessionResponse,
-    SwitchSessionRequest,
-    DeleteSessionRequest,
     DeleteMessageRequest,
     GenerateTitleRequest,
     UpdateToolsEnabledRequest,
@@ -37,6 +35,7 @@ import threading
 from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
 from backend.presentation.api import images
 from backend.presentation.api import agent_profiles
+from backend.presentation.api import sessions
 
 
 # 加载环境变量
@@ -126,6 +125,7 @@ app.add_middleware(
 
 app.include_router(images.router)
 app.include_router(agent_profiles.router)
+app.include_router(sessions.router, prefix="/api")
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -136,111 +136,13 @@ async def create_history_endpoint(request: NewHistoryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"创建历史记录失败: {str(e)}")
 
-@app.get("/api/history/sessions", response_model=List[dict])
-async def get_history_sessions():
-    """获取所有可用的聊天会话"""
-    try:
-        sessions = get_all_sessions()
-        return sessions
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取会话列表失败: {str(e)}")
+# Session management endpoints moved to backend/presentation/api/sessions.py
 
-@app.get("/api/history/{session_id}", response_model=dict)
-async def get_session_history(session_id: str):
-    """获取指定会话的完整历史记录"""
-    try:
-        # 验证会话ID是否存在
-        sessions = get_all_sessions()
-        session = next((s for s in sessions if s['id'] == session_id), None)
-        
-        if not session:
-            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
-        
-        # 加载指定会话的历史记录
-        history = load_all_message_history(session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-        
-        return {
-            "session": session,
-            "history": [msg.model_dump() | {"role": msg.role} for msg in history_msgs],
-            "message_count": len(history_msgs)
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取会话历史记录失败: {str(e)}")
+# Get session history endpoint moved to backend/presentation/api/sessions.py
 
-@app.delete("/api/history/{session_id}", response_model=dict)
-async def delete_session(session_id: str):
-    """删除指定的聊天会话"""
-    try:
-        # 验证会话ID是否存在
-        sessions = get_all_sessions()
-        session = next((s for s in sessions if s['id'] == session_id), None)
-        
-        if not session:
-            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
-        
-        # 删除会话历史和元数据
-        success = delete_session_data(session_id)
-        
-        # 清除对应session的工具缓存
-        llm_client: LLMClientBase = app.state.llm_client
-        if hasattr(llm_client, '_clear_session_tool_cache'):
-            await llm_client._clear_session_tool_cache(session_id)
-            print(f"[DEBUG] Cleared tool cache for deleted session: {session_id}")
-        
-        # 删除向量数据库中的相关记忆
-        
-        if not success:
-            raise HTTPException(status_code=500, detail=f"删除会话 {session_id} 失败")
-        
-        return {
-            "session_id": session_id,
-            "success": True,
-            "message": f"会话 '{session.get('name', session_id)}' 已成功删除"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Delete session error: {e}")
-        raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
+# Delete session endpoint moved to backend/presentation/api/sessions.py
 
-@app.post("/api/history/switch", response_model=dict)
-async def switch_session(request: SwitchSessionRequest):
-    """切换到指定的聊天会话"""
-    try:
-        # 验证会话ID是否存在
-        sessions = get_all_sessions()
-        session_exists = any(session['id'] == request.session_id for session in sessions)
-        
-        if not session_exists:
-            raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
-        
-        # 清除对应session的工具缓存
-        llm_client: LLMClientBase = app.state.llm_client
-        if hasattr(llm_client, '_clear_session_tool_cache'):
-            await llm_client._clear_session_tool_cache(request.session_id)
-            print(f"[DEBUG] Cleared tool cache for session: {request.session_id}")
-        
-        # 加载指定会话的历史记录
-        history = load_all_message_history(request.session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-        
-        # 返回会话信息和最近的消息
-        recent_messages_length = get_llm_settings().recent_messages_length
-        recent_messages = history_msgs[-recent_messages_length:] if len(history_msgs) > recent_messages_length else history_msgs
-        
-        return {
-            "session_id": request.session_id,
-            "success": True,
-            "message_count": len(history_msgs),
-            "recent_messages": [msg.model_dump() | {"role": msg.role} for msg in recent_messages]
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"切换会话失败: {str(e)}")
+# Switch session endpoint moved to backend/presentation/api/sessions.py
 
 # 注意：流式处理逻辑已移动到 backend/core/streaming.py
 
