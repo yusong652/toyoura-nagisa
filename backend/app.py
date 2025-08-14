@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
-from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, delete_message, update_session_title, load_all_message_history, get_all_sessions
-from backend.infrastructure.storage.image_storage import save_image_from_url, save_image_from_base64
+from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, load_all_message_history, get_all_sessions
+# Image storage imports removed - now handled in content service
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.config import get_llm_settings, LOCATION_DB_PATH
@@ -23,19 +23,18 @@ from backend.domain.models.message_factory import message_factory
 from backend.presentation.models.api_models import (
     NewHistoryRequest,
     HistorySessionResponse,
-    GenerateTitleRequest,
     UpdateToolsEnabledRequest,
-    UpdateTTSEnabledRequest,
-    GenerateImageRequest
+    UpdateTTSEnabledRequest
 )
 from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
-from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_description
+# Text-to-image import removed - now handled in content service
 from backend.presentation.api import images
-from backend.presentation.api import agent_profiles
+from backend.presentation.api import agent_profiles  
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
+from backend.presentation.api import content
 
 
 # 加载环境变量
@@ -127,6 +126,7 @@ app.include_router(images.router)
 app.include_router(agent_profiles.router)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
+app.include_router(content.router, prefix="/api")
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -175,37 +175,7 @@ async def chat_stream_endpoint(request: Request):
 
 # Delete message endpoint moved to backend/presentation/api/messages.py
 
-@app.post("/api/history/generate-title", response_model=dict)
-async def generate_title_endpoint(request: Request):
-    """根据会话历史生成一个新的标题"""
-    try:
-        data = await request.json()
-        session_id = data.get('session_id')
-        if not session_id:
-            raise HTTPException(status_code=400, detail="请求中未提供会话ID")
-        sessions = get_all_sessions()
-        session = next((s for s in sessions if s['id'] == session_id), None)
-        if not session:
-            raise HTTPException(status_code=404, detail=f"会话ID {session_id} 不存在")
-        llm_client: LLMClientBase = request.app.state.llm_client
-        new_title = await generate_title_for_session(session_id, llm_client)
-        if new_title is None:
-            raise HTTPException(status_code=400, detail="No valid user message or pure text assistant message found for title generation.")
-        if not new_title:
-            raise HTTPException(status_code=500, detail="标题生成失败")
-        update_success = update_session_title(session_id, new_title)
-        if not update_success:
-            raise HTTPException(status_code=500, detail="标题更新失败")
-        return {
-            "session_id": session_id,
-            "title": new_title,
-            "success": True
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"生成标题失败: {str(e)}")
+# Title generation endpoint moved to backend/presentation/api/content.py
 
 @app.post("/api/chat/tools-enabled", response_model=dict)
 async def update_tools_enabled(request: UpdateToolsEnabledRequest):
@@ -259,68 +229,7 @@ async def update_tts_enabled(request: UpdateTTSEnabledRequest):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"更新TTS状态失败: {str(e)}")
 
-@app.post("/api/generate-image", response_model=dict)
-async def generate_image_endpoint(request: GenerateImageRequest):
-    """One-click generate image from recent session messages."""
-    try:
-        session_id = request.session_id
-        llm_client: LLMClientBase = app.state.llm_client
-        # 1. Generate prompts from LLM client
-        prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
-        if not prompt_result:
-            return {"success": False, "error": "Failed to generate image prompts from conversation."}
-        # 2. Generate image from description
-        print(f"[DEBUG] Generating image for session {session_id}")
-        print(f"[DEBUG] Text prompt: {prompt_result['text_prompt'][:100]}...")
-        print(f"[DEBUG] Negative prompt: {prompt_result['negative_prompt'][:100]}...")
-        
-        image_result = await generate_image_from_description(
-            prompt=prompt_result["text_prompt"],
-            negative_prompt=prompt_result["negative_prompt"]
-        )
-        
-        print(f"[DEBUG] Image generation result type: {type(image_result)}")
-        print(f"[DEBUG] Image generation result keys: {list(image_result.keys()) if isinstance(image_result, dict) else 'Not a dict'}")
-        
-        if not image_result:
-            print("[ERROR] Image generation returned empty result")
-            return {"success": False, "error": "Image generation failed."}
-        
-        # 3. Check for error type first
-        if image_result.get("type") == "error":
-            error_message = image_result.get("message", "Unknown error occurred during image generation")
-            print(f"[ERROR] Image generation failed: {error_message}")
-            return {"success": False, "error": error_message}
-        
-        # 4. Save image to session folder based on result type
-        local_path = None
-        if image_result.get("type") == "image_url" and image_result.get("image_url"):
-            print("[DEBUG] Processing image_url result type")
-            local_path = save_image_from_url(image_result["image_url"], session_id)
-        elif image_result.get("type") == "image_base64" and image_result.get("image"):
-            print("[DEBUG] Processing image_base64 result type")
-            print(f"[DEBUG] Base64 data length: {len(image_result['image'])}")
-            try:
-                local_path = save_image_from_base64(image_result["image"], session_id)
-                print(f"[DEBUG] Successfully saved base64 image to: {local_path}")
-            except Exception as e:
-                print(f"[ERROR] Failed to save base64 image in endpoint: {e}")
-                return {"success": False, "error": f"Failed to save image: {str(e)}"}
-        else:
-            print(f"[ERROR] Unknown image result type: {image_result.get('type')}")
-            print(f"[ERROR] Available keys in result: {list(image_result.keys())}")
-            return {"success": False, "error": f"Unknown result type: {image_result.get('type')}"}
-        
-        if not local_path:
-            print("[ERROR] No local path returned from image saving")
-            return {"success": False, "error": "Failed to save generated image."}
-        
-        print(f"[DEBUG] Image successfully processed and saved to: {local_path}")
-        return {"success": True, "image_path": local_path}
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        return {"success": False, "error": str(e)}
+# Image generation endpoint moved to backend/presentation/api/content.py
 
 # Location update API removed - now handled via WebSocket LOCATION_RESPONSE messages
 

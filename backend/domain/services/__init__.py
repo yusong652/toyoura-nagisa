@@ -6,5 +6,6 @@ domain operations following Clean Architecture principles.
 """
 from .session_service import SessionService
 from .message_service import MessageService
+from .content_service import ContentService
 
-__all__ = ['SessionService', 'MessageService']
+__all__ = ['SessionService', 'MessageService', 'ContentService']
