@@ -6,51 +6,48 @@
 }
 
 .toolbar-toggle-btn {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
   border: none;
-  background: var(--primary-color, #4a90e2);
-  color: white;
+  background: transparent;
+  color: var(--text-color, #333);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
   margin: 0;
   padding: 0;
   position: relative;
 }
 
 .toolbar-toggle-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .toolbar-toggle-btn:hover {
-  background: var(--primary-hover, #3a7bc8);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+  background: var(--button-secondary-hover, rgba(0, 0, 0, 0.05));
+  transform: translateY(-1px);
 }
 
 .toolbar-toggle-btn.expanded {
-  background: #fff;
+  background: rgba(0, 0, 0, 0.1);
   color: var(--primary-color, #4a90e2);
-  border: 2px solid var(--primary-color, #4a90e2);
 }
 
-.toolbar-content {
+.collapsible-toolbar .toolbar-content {
   position: absolute;
   bottom: 100%;
   left: 0;
   margin-bottom: 8px;
-  background: var(--toolbar-bg, #333);
-  border: 1px solid var(--border-color, #555);
+  background: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   padding: 12px;
   min-width: 200px;
   z-index: 1000;
@@ -92,12 +89,12 @@
 .toolbar-section-icon {
   width: 16px;
   height: 16px;
-  color: var(--text-secondary, #aaa);
+  color: #666 !important;
 }
 
 .toolbar-label {
   font-size: 14px;
-  color: var(--text-color, #eee);
+  color: #333 !important;
   font-weight: 500;
 }
 
@@ -112,8 +109,8 @@
   height: 32px;
   border-radius: 8px;
   border: none;
-  background: var(--button-secondary-bg, #444);
-  color: var(--text-color, #eee);
+  background: #f5f5f5 !important;
+  color: #333 !important;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -122,7 +119,7 @@
 }
 
 .toolbar-option-btn:hover {
-  background: var(--button-secondary-hover, #555);
+  background: #e5e5e5 !important;
   transform: scale(1.05);
 }
 
@@ -167,6 +164,42 @@
 .tts-toggle-btn svg {
   width: 18px;
   height: 18px;
+}
+
+/* 暗色主题样式 - 只在应用设置为暗色主题时应用 */
+[data-theme="dark"] .collapsible-toolbar .toolbar-content {
+  background: #333 !important;
+  border: 1px solid #555 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .toolbar-section-icon {
+  color: #aaa !important;
+}
+
+[data-theme="dark"] .toolbar-label {
+  color: #eee !important;
+}
+
+[data-theme="dark"] .toolbar-option-btn {
+  background: #444 !important;
+  color: #eee !important;
+}
+
+[data-theme="dark"] .toolbar-option-btn:hover {
+  background: #555 !important;
+}
+
+[data-theme="dark"] .toolbar-toggle-btn {
+  color: #eee !important;
+}
+
+[data-theme="dark"] .toolbar-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .toolbar-toggle-btn.expanded {
+  background: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* 确保工具栏内容在小屏幕上的适配 */

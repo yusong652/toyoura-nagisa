@@ -60,37 +60,34 @@
 }
 
 .add-file-btn, .agent-profile-toggle-btn {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
   border: none;
-  background: var(--primary-color, #4a90e2);
-  color: white;
+  background: transparent;
+  color: var(--text-color, #eee);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
   margin: 0;
   padding: 0;
   position: relative;
 }
 .add-file-btn svg, .agent-profile-toggle-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .add-file-btn:hover, .agent-profile-toggle-btn:hover {
-  background: var(--primary-hover, #3a7bc8);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+  background: var(--button-secondary-hover, rgba(255, 255, 255, 0.1));
+  transform: translateY(-1px);
 }
 .agent-profile-toggle-btn.active {
-  background: #fff;
+  background: var(--button-secondary-hover, rgba(255, 255, 255, 0.15));
   color: var(--primary-color, #4a90e2);
-  border: 2px solid var(--primary-color, #4a90e2);
 }
 
 .send-button {
