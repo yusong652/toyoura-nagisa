@@ -126,6 +126,7 @@ const ChatBox: React.FC = () => {
               message={message} 
               selectedMessageId={selectedMessageId}
               onMessageSelect={setSelectedMessageId}
+              allMessages={messages}
             />
           ))}
           {/* Add scroll anchor element that will always be at the bottom */}

@@ -3,22 +3,28 @@ import './MessageItem.css'
 import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/chat/ChatContext'
 import MessageToolState from './MessageToolState'
-import ImagePreview from './ImagePreview'
+import ImageViewer from './ImageViewer'
 import ReactMarkdown from 'react-markdown'
+import { useImageNavigation } from '../hooks/useImageNavigation'
 
 interface MessageItemProps {
   message: Message
   onMessageSelect: (id: string | null) => void
   selectedMessageId: string | null
+  allMessages: Message[] // 新增：用于图片导航
 }
 
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, selectedMessageId, allMessages }) => {
   const { sender, text, files, streaming, isLoading, status, id, toolState, newText, onRenderComplete } = message
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const { deleteMessage } = useChat()
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('')
+  
+  // Use image navigation hook
+  const { allImages, getImageIndex } = useImageNavigation(allMessages)
   const [chunks, setChunks] = useState<string[]>([])
   
   // 检查当前消息是否被选中
@@ -197,7 +203,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   }
 
   const handleImageClick = (imageUrl: string) => {
-    setPreviewImage(imageUrl);
+    setCurrentImageUrl(imageUrl);
+    setViewerOpen(true);
   };
 
   return (
@@ -221,30 +228,33 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
               <div className="message-content">
                 {renderStreamingText()}
                 
-                {files && files.length > 0 && !isLoading && (
-                  <div className="message-files">
-                  {files.map((file, index) => (
-                    <div key={index} className="file-preview">
-                      {file.type.startsWith('image/') ? (
-                        <img 
-                          src={file.data} 
-                          alt={file.name} 
-                          className="file-image" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleImageClick(file.data);
-                          }}
-                        />
-                      ) : (
-                        <div className="file-info">
-                          <span className="file-name">{file.name}</span>
-                          <span className="file-size">{(file.data.length / 1024).toFixed(1)} KB</span>
+                {files && files.length > 0 && !isLoading && (() => {
+                      
+                  return (
+                    <div className="message-files">
+                      {files.map((file, index) => (
+                        <div key={index} className="file-preview">
+                          {file.type.startsWith('image/') ? (
+                            <img 
+                              src={file.data} 
+                              alt={file.name} 
+                              className="file-image" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleImageClick(file.data);
+                              }}
+                            />
+                          ) : (
+                            <div className="file-info">
+                              <span className="file-name">{file.name}</span>
+                              <span className="file-size">{(file.data.length / 1024).toFixed(1)} KB</span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })()}
               <span className="message-time">{formatTime(message.timestamp)}</span>
             </div>
             )}
@@ -253,22 +263,33 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           <div className="message-content">
             {renderStreamingText()}
             
-            {files && files.length > 0 && !isLoading && (
-              <div className="message-files">
-                {files.map((file, index) => (
-                  <div key={index} className="file-preview">
-                    {file.type.startsWith('image/') ? (
-                      <img src={file.data} alt={file.name} className="file-image" />
-                    ) : (
-                      <div className="file-info">
-                        <span className="file-icon">📄</span>
-                        <span className="file-name">{file.name}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            {files && files.length > 0 && !isLoading && (() => {
+              
+              return (
+                <div className="message-files">
+                  {files.map((file, index) => (
+                    <div key={index} className="file-preview">
+                      {file.type.startsWith('image/') ? (
+                        <img 
+                          src={file.data} 
+                          alt={file.name} 
+                          className="file-image"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleImageClick(file.data);
+                          }}
+                        />
+                      ) : (
+                        <div className="file-info">
+                          <span className="file-icon">📄</span>
+                          <span className="file-name">{file.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             <span className="message-time">{formatTime(message.timestamp)}</span>
           </div>
         )}
@@ -284,11 +305,13 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           </div>
         )}
       </div>
-      {previewImage && (
-        <ImagePreview
-          open={true}
-          onClose={() => setPreviewImage(null)}
-          imageUrl={previewImage}
+      {viewerOpen && currentImageUrl && allImages.length > 0 && (
+        <ImageViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          images={allImages.map(img => img.url)}
+          initialIndex={getImageIndex(currentImageUrl)}
+          imageNames={allImages.map(img => img.name)}
         />
       )}
     </>
