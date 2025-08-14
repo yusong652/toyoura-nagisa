@@ -130,13 +130,42 @@ class Mem0MemoryManager:
         if isinstance(result, dict):
             if "results" in result and isinstance(result["results"], list):
                 if len(result["results"]) > 0:
-                    # Extract ID and memory content from first result
+                    # Process each result item (might include ADD, UPDATE, DELETE events)
+                    for item in result["results"]:
+                        if isinstance(item, dict):
+                            event_type = item.get("event", "ADD")
+                            memory_id = item.get("id", "")
+                            memory_text = item.get("memory", item.get("text", ""))
+                            
+                            # Handle potential errors in result items first
+                            if "error" in item:
+                                logger.warning(f"[MEMORY] Error in {event_type} event for memory {memory_id}: {item['error']}")
+                                continue
+                            
+                            # Log different event types with consistent formatting
+                            if self.config.debug_mode:
+                                if event_type == "UPDATE":
+                                    old_memory = item.get("old_memory", "")
+                                    print(f"[MEMORY] {event_type}: Memory {memory_id} updated")
+                                    print(f"  OLD: {old_memory}")
+                                    print(f"  NEW: {memory_text}")
+                                elif event_type == "DELETE":
+                                    print(f"[MEMORY] {event_type}: Memory {memory_id} deleted")
+                                    print(f"  Content: {memory_text}")
+                                elif event_type == "ADD":
+                                    print(f"[MEMORY] {event_type}: Memory {memory_id} added")
+                                    print(f"  Content: {memory_text}")
+                                else:
+                                    # Unknown event type
+                                    print(f"[MEMORY] {event_type}: Unknown event for memory {memory_id}")
+                            else:
+                                # Non-debug mode: only show essential info
+                                if event_type == "ADD":
+                                    print(f"[MEMORY] Stored: {memory_text}")
+                    
+                    # Return the ID from the first result with an ID
                     first_result = result["results"][0]
                     if isinstance(first_result, dict) and "id" in first_result:
-                        # Display the actual memory content that Mem0 extracted/summarized
-                        if "memory" in first_result:
-                            extracted_memory = first_result["memory"]
-                            print(f"[MEMORY] Stored: {extracted_memory}")
                         return first_result["id"]
                 else:
                     # Empty results - Mem0 decided not to save this memory
