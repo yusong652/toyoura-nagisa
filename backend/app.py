@@ -23,7 +23,6 @@ from backend.domain.models.message_factory import message_factory
 from backend.presentation.models.api_models import (
     NewHistoryRequest,
     HistorySessionResponse,
-    DeleteMessageRequest,
     GenerateTitleRequest,
     UpdateToolsEnabledRequest,
     UpdateTTSEnabledRequest,
@@ -36,6 +35,7 @@ from backend.infrastructure.mcp.tools.text_to_image import generate_image_from_d
 from backend.presentation.api import images
 from backend.presentation.api import agent_profiles
 from backend.presentation.api import sessions
+from backend.presentation.api import messages
 
 
 # 加载环境变量
@@ -126,6 +126,7 @@ app.add_middleware(
 app.include_router(images.router)
 app.include_router(agent_profiles.router)
 app.include_router(sessions.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -172,33 +173,7 @@ async def chat_stream_endpoint(request: Request):
     except Exception as e:
         return ErrorResponse(detail=str(e))
 
-@app.post("/api/messages/delete", response_model=dict)
-async def delete_message_endpoint(request: DeleteMessageRequest):
-    """删除指定会话中的特定消息"""
-    try:
-        # 验证会话ID是否存在
-        sessions = get_all_sessions()
-        session = next((s for s in sessions if s['id'] == request.session_id), None)
-        
-        if not session:
-            raise HTTPException(status_code=404, detail=f"会话ID {request.session_id} 不存在")
-        
-        # 删除消息
-        success = delete_message(request.session_id, request.message_id)
-        
-        if not success:
-            raise HTTPException(status_code=404, detail=f"未找到消息ID {request.message_id} 或删除失败")
-        
-        return {
-            "session_id": request.session_id,
-            "message_id": request.message_id,
-            "success": True,
-            "message": "消息已成功删除"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"删除消息失败: {str(e)}")
+# Delete message endpoint moved to backend/presentation/api/messages.py
 
 @app.post("/api/history/generate-title", response_model=dict)
 async def generate_title_endpoint(request: Request):
