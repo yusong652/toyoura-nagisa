@@ -59,7 +59,7 @@
   z-index: 2;
 }
 
-.add-file-btn, .tools-toggle-btn {
+.add-file-btn, .agent-profile-toggle-btn {
   width: 24px;
   height: 24px;
   min-width: 24px;
@@ -78,16 +78,16 @@
   padding: 0;
   position: relative;
 }
-.add-file-btn svg, .tools-toggle-btn svg {
+.add-file-btn svg, .agent-profile-toggle-btn svg {
   width: 14px;
   height: 14px;
 }
-.add-file-btn:hover, .tools-toggle-btn:hover {
+.add-file-btn:hover, .agent-profile-toggle-btn:hover {
   background: var(--primary-hover, #3a7bc8);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
 }
-.tools-toggle-btn.active {
+.agent-profile-toggle-btn.active {
   background: #fff;
   color: var(--primary-color, #4a90e2);
   border: 2px solid var(--primary-color, #4a90e2);

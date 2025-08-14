@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useChat } from '../contexts/chat/ChatContext'
 import { FileData } from '../types/chat'
 import './InputArea.css'
-import { ToolsToggle } from './ToolsToggle'
+import { CollapsibleToolbar } from './CollapsibleToolbar'
 
 const InputArea: React.FC = () => {
   const [message, setMessage] = useState('')
@@ -136,7 +136,7 @@ const InputArea: React.FC = () => {
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
-          <ToolsToggle />
+          <CollapsibleToolbar />
           <input
             type="file"
             ref={fileInputRef}
