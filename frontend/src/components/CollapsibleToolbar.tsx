@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentProfileToggle } from './AgentProfileToggle';
 import { TTSToggle } from './TTSToggle';
+import { Live2DToggle } from './Live2DToggle';
 import { SlideToggle } from './SlideToggle';
 import './CollapsibleToolbar.css';
 
@@ -72,6 +73,26 @@ export const CollapsibleToolbar: React.FC = () => {
                 <span className="toolbar-label">Text-to-Speech</span>
               </div>
               <TTSToggle />
+            </div>
+          </div>
+          
+          <div className="toolbar-section">
+            <div className="toolbar-item">
+              <div className="toolbar-icon-label">
+                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  {/* Cat face with ears and whiskers */}
+                  <path d="M4 8C4 8 4 3 7 3C7 3 8 5 9 6" strokeLinecap="round"/>
+                  <path d="M20 8C20 8 20 3 17 3C17 3 16 5 15 6" strokeLinecap="round"/>
+                  <ellipse cx="12" cy="13" rx="8" ry="7"/>
+                  <circle cx="9" cy="12" r="1" fill="currentColor"/>
+                  <circle cx="15" cy="12" r="1" fill="currentColor"/>
+                  <path d="M12 14v2" strokeLinecap="round"/>
+                  <path d="M10 15C10 15 11 16 12 16C13 16 14 15 14 15" strokeLinecap="round"/>
+                  <path d="M6 13L2 12M6 15L2 16M18 13L22 12M18 15L22 16" strokeLinecap="round"/>
+                </svg>
+                <span className="toolbar-label">Live2D Character</span>
+              </div>
+              <Live2DToggle />
             </div>
           </div>
           

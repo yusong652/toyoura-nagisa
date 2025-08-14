@@ -11,6 +11,7 @@ import { ConnectionProvider } from './contexts/connection/ConnectionContext'
 import { ToolsProvider } from './contexts/tools/ToolsContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
+import { Live2DProvider } from './contexts/live2d/Live2DContext'
 import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
 
@@ -51,8 +52,10 @@ function App(): React.ReactElement {
           <ToolsProvider>
             <SessionProvider>
               <ChatProvider>
-                <AppContent />
-                <Live2DCanvas />
+                <Live2DProvider>
+                  <AppContent />
+                  <Live2DCanvas />
+                </Live2DProvider>
               </ChatProvider>
             </SessionProvider>
           </ToolsProvider>

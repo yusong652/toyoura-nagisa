@@ -1,21 +1,26 @@
 #live2d-canvas {
-  /* 设置尺寸 */
-  width: 400px;  /* 示例宽度 */
-  height: 600px; /* 示例高度 */
+  /* Optimized size - narrower to match character better */
+  width: 200px;  /* Reduced width to minimize overlap */
+  height: 450px; /* Proportionally reduced height */
 
-  /* 定位 */
-  position: fixed; /* 固定在视口 */
-  right: 10px;    /* 离右边 10px */
-  bottom: 10px;   /* 离底部 10px */
-  z-index: 99;    /* 确保在其他元素上层 */
+  /* Positioning */
+  position: fixed; /* Fixed in viewport */
+  right: 10px;    /* Distance from right */
+  bottom: 10px;   /* Distance from bottom */
+  z-index: 10;    /* Lowered priority - below UI elements but above content */
 
-  /* 其他样式 */
+  /* Interaction optimization */
   background-color: transparent;
   border: none;
-  pointer-events: auto;
+  pointer-events: none; /* Disable pointer events by default */
   object-fit: contain;
   filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.2));
-  transition: filter 0.3s ease;
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+/* Only enable pointer events when hovering over the actual character area */
+#live2d-canvas.interactive {
+  pointer-events: auto;
 }
 
 #live2d-canvas:hover {
