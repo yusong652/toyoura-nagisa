@@ -138,6 +138,16 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         const data = JSON.parse(event.data)
         console.log("[WebSocket] received message:", data)
         
+        // Handle heartbeat messages
+        if (data.type === 'HEARTBEAT') {
+          console.log('WebSocket received heartbeat, sending ACK')
+          const heartbeatAck = {
+            type: 'HEARTBEAT_ACK',
+            timestamp: Date.now()
+          }
+          ws.send(JSON.stringify(heartbeatAck))
+        }
+        
         // Handle location requests
         if (data.type === 'REQUEST_LOCATION') {
           console.log('WebSocket received location request')

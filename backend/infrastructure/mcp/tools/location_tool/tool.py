@@ -93,12 +93,13 @@ def register_location_tools(mcp: FastMCP):
             
             if app and hasattr(app.state, "connection_manager"):
                 print(f"[DEBUG] Connection manager available: {hasattr(app.state, 'connection_manager')}")
-                # Import here to avoid circular imports
-                from backend.app import _location_response_events
+                # Import location response events storage
+                from backend.presentation.websocket.router import _location_response_events
+                location_events = _location_response_events
                 
                 # Create event for this location request
                 location_event = asyncio.Event()
-                _location_response_events[session_id] = {
+                location_events[session_id] = {
                     "event": location_event,
                     "location_data": None,
                     "success": False,
@@ -121,7 +122,7 @@ def register_location_tools(mcp: FastMCP):
                         print(f"[DEBUG] WebSocket location event received")
                         
                         # Get the response data
-                        event_info = _location_response_events.get(session_id, {})
+                        event_info = location_events.get(session_id, {})
                         if event_info.get("success") and event_info.get("location_data"):
                             location_data = event_info["location_data"]
                             
@@ -155,7 +156,7 @@ def register_location_tools(mcp: FastMCP):
                         
                     finally:
                         # Clean up the event
-                        _location_response_events.pop(session_id, None)
+                        location_events.pop(session_id, None)
                 else:
                     print(f"[DEBUG] No WebSocket connection for session {session_id} - using fallback immediately")
             else:
