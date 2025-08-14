@@ -37,3 +37,6 @@ export type {
   UpdateTtsEnabledRequest,
   UpdateTtsEnabledResponse
 } from './toolService'
+
+// Agent Service
+export { agentService, AgentService } from './agentService'

@@ -1,0 +1,175 @@
+.agent-profile-toggle {
+  position: relative;
+  display: inline-block;
+}
+
+.agent-profile-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(224, 224, 224, 0.6);
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  position: relative;
+  white-space: nowrap;
+  width: 120px;
+  justify-content: space-between;
+}
+
+.agent-profile-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.agent-profile-button.loading {
+  opacity: 0.7;
+}
+
+.agent-profile-button.open {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.agent-profile-button:not(.open) {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.agent-profile-button:hover:not(:disabled):not(.open) {
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.agent-profile-button:hover:not(:disabled).open {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.agent-profile-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-profile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-profile-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  animation: agent-profile-spin 1s linear infinite;
+}
+
+.agent-profile-arrow {
+  transition: transform 0.2s ease;
+}
+
+.agent-profile-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.agent-profile-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(224, 224, 224, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  overflow: hidden;
+  animation: agent-profile-dropdown-slide 0.2s ease-out;
+  transform-origin: top;
+  width: 120px;
+}
+
+.agent-profile-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.agent-profile-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.agent-profile-option:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.agent-profile-option.active {
+  background-color: var(--primary-color);
+  color: var(--primary-contrast);
+  font-weight: 500;
+}
+
+.agent-profile-option:not(.active):not(:disabled):hover {
+  background-color: var(--hover-color, rgba(0, 0, 0, 0.05));
+}
+
+.agent-profile-option-name {
+  font-weight: inherit;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes agent-profile-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes agent-profile-dropdown-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .agent-profile-button {
+  background-color: rgba(51, 51, 51, 0.9);
+  border: 1px solid rgba(85, 85, 85, 0.6);
+}
+
+[data-theme="dark"] .agent-profile-dropdown {
+  background-color: rgba(51, 51, 51, 0.95);
+  border: 1px solid rgba(85, 85, 85, 0.7);
+}

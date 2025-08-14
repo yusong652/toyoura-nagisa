@@ -43,8 +43,8 @@ def _create_profile_info(profile_type: AgentProfileType) -> AgentProfileInfo:
     if profile_type == AgentProfileType.DISABLED:
         return AgentProfileInfo(
             profile_type=profile_type,
-            name="工具禁用",
-            description="禁用所有工具，纯文本对话模式",
+            name="Disabled",
+            description="All tools disabled, pure text conversation mode",
             tool_count=0,
             estimated_tokens=0,
             color="#9E9E9E",  # 灰色

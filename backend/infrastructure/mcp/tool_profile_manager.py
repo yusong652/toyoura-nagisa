@@ -72,8 +72,8 @@ class ToolProfileManager:
     # 工具分类定义
     TOOL_PROFILES: Dict[AgentProfile, ToolProfile] = {
         AgentProfile.CODING: ToolProfile(
-            name="编程助手",
-            description="专注于代码开发、文件操作和编程相关任务",
+            name="Coding",
+            description="Specialized in code development, file operations and programming tasks",
             tools=CODING_TOOLS,
             estimated_tokens=len(CODING_TOOLS) * 282,  # 12个工具
             color="#4CAF50",  # 绿色
@@ -81,8 +81,8 @@ class ToolProfileManager:
         ),
         
         AgentProfile.LIFESTYLE: ToolProfile(
-            name="生活助手", 
-            description="专注于日常生活、沟通、娱乐和信息服务",
+            name="Lifestyle", 
+            description="Focused on daily life, communication, entertainment and information services",
             tools=LIFESTYLE_TOOLS,
             estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 18个工具
             color="#FF9800",  # 橙色
@@ -90,8 +90,8 @@ class ToolProfileManager:
         ),
         
         AgentProfile.GENERAL: ToolProfile(
-            name="通用助手",
-            description="具备全部工具能力，适用于复杂任务",
+            name="General",
+            description="Full tool capabilities, suitable for complex tasks",
             tools=[],  # 空列表表示加载所有工具
             estimated_tokens=8479,  # 所有30个工具
             color="#607D8B",  # 灰蓝色
