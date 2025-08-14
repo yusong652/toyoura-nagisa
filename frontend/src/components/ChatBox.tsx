@@ -4,7 +4,6 @@ import { useSession } from '../contexts/session/SessionContext'
 import MessageItem from './MessageItem.tsx'
 import './ChatBox.css'
 import GenerateImageButton from './GenerateImageButton'
-import TTSControl from './TTSControl'
 
 const ChatBox: React.FC = () => {
   const { messages } = useChat()
@@ -133,7 +132,6 @@ const ChatBox: React.FC = () => {
           <div className="scroll-anchor"></div>
         </div>
         <div className="chatbox-controls">
-          <TTSControl />
           <GenerateImageButton />
         </div>
         {/* 添加固定的底部阴影 */}
