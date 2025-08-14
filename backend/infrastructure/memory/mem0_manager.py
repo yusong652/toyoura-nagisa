@@ -130,14 +130,17 @@ class Mem0MemoryManager:
         if isinstance(result, dict):
             if "results" in result and isinstance(result["results"], list):
                 if len(result["results"]) > 0:
-                    # Extract ID from first result
+                    # Extract ID and memory content from first result
                     first_result = result["results"][0]
                     if isinstance(first_result, dict) and "id" in first_result:
+                        # Display the actual memory content that Mem0 extracted/summarized
+                        if "memory" in first_result:
+                            extracted_memory = first_result["memory"]
+                            print(f"[MEMORY] Stored: {extracted_memory}")
                         return first_result["id"]
                 else:
                     # Empty results - Mem0 decided not to save this memory
-                    if self.config.debug_mode:
-                        logger.info(f"[Mem0 Debug] No memory saved - Mem0 filtered out content as non-memorable")
+                    print(f"[MEMORY] Content filtered by Mem0 (not memorable)")
                     return "filtered_by_mem0"
             elif "id" in result:
                 return result["id"]

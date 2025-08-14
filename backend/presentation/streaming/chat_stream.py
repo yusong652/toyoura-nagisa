@@ -51,7 +51,6 @@ async def generate_chat_stream(
     """
     # Generate unique request ID for debugging
     request_id = str(uuid.uuid4())[:8]
-    print(f"[DEBUG] API Request {request_id} started - Session: {session_id}")
     
     yield f"data: {json.dumps({'status': 'sent'})}\n\n"
     
@@ -69,8 +68,7 @@ async def generate_chat_stream(
         enhanced_system_prompt = None
         memory_status_updates = []
         
-        print(f"[DEBUG] Memory injection enabled: {enable_memory}")
-        print(f"[DEBUG] Recent messages count: {len(recent_msgs)}")
+        # Memory injection processing
         
         if enable_memory:
             # Extract latest user message for memory query
@@ -78,8 +76,7 @@ async def generate_chat_stream(
             for msg in reversed(recent_msgs):
                 if getattr(msg, "role", None) == "user":
                     content = getattr(msg, "content", "")
-                    print(f"[DEBUG] User message content type: {type(content)}")
-                    print(f"[DEBUG] User message content: {content}")
+                    # Extract user query for memory enhancement
                     
                     # Handle multimodal content (list format) or simple string content
                     if isinstance(content, list):
@@ -96,7 +93,7 @@ async def generate_chat_stream(
                         # Simple string content
                         user_query = str(content)
                     
-                    print(f"[DEBUG] Extracted user query: {user_query}")
+                    # Use extracted query for memory retrieval
                     break
             
             if user_query:
@@ -104,9 +101,7 @@ async def generate_chat_stream(
                 # Use the LLM client's actual tools_enabled setting
                 tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
                 base_system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-                print(f"[DEBUG] Using tools_enabled={tools_enabled} for system prompt generation")
-                
-                print(f"[DEBUG] Getting enhanced system prompt for query: {user_query[:50]}...")
+                # Get enhanced system prompt with memory context
                 enhanced_system_prompt, memory_status_updates = await get_system_prompt_with_memory_context(
                     session_id=session_id,
                     user_query=user_query,
@@ -114,14 +109,14 @@ async def generate_chat_stream(
                     user_id=user_id,
                     enable_memory=enable_memory
                 )
-                print(f"[DEBUG] Enhanced system prompt length: {len(enhanced_system_prompt) if enhanced_system_prompt else 0}")
-                print(f"[DEBUG] Memory status updates: {len(memory_status_updates)}")
+                # Memory context processing complete
                 
                 # Send memory status updates
                 for status_update in memory_status_updates:
                     yield f"data: {json.dumps(status_update)}\n\n"
             else:
-                print(f"[DEBUG] No user query found for memory enhancement")
+                # No user query available for memory enhancement
+                pass
         
         # Process LLM response with messages and enhanced system prompt
         assistant_response = None

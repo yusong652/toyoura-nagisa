@@ -134,9 +134,7 @@ class MemoryInjectionMiddleware:
                 )
             
             # Compose enhanced system prompt
-            print(f"[DEBUG] Formatted context preview: {formatted_context[:200]}...")
             enhanced_prompt = self._compose_enhanced_system_prompt(base_system_prompt, formatted_context)
-            print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}, base length: {len(base_system_prompt)}")
             
             elapsed_ms = (time.time() - start_time) * 1000
             context_tokens = self._estimate_tokens(formatted_context)
@@ -225,15 +223,12 @@ Use the above context to provide more personalized and contextually aware respon
         """
         # Check if saving is enabled
         if not self.config.should_save_memory():
-            print(f"[DEBUG] Memory saving disabled, skipping conversation turn")
             return
             
-        print(f"[DEBUG] Saving conversation turn: user='{user_message[:50]}...' assistant='{assistant_response[:50]}...'")
         # Save conversation using direct memory manager
         await self._save_conversation_direct(
             user_message, assistant_response, session_id, user_id, metadata
         )
-        print(f"[DEBUG] Conversation turn saved successfully")
     
     async def _save_conversation_direct(
         self,
@@ -260,23 +255,12 @@ Use the above context to provide more personalized and contextually aware respon
         conversation_content = f"""User: {user_message}
 Assistant: {assistant_response[:500]}"""
         
-        print(f"[DEBUG] Adding conversation memory for turn")
+        # Add conversation memory (detailed output handled by Mem0 manager)
         conversation_memory_id = await self.memory_manager.add_memory(
             content=conversation_content,
             user_id=user_id,
             session_id=session_id,
             metadata={**turn_metadata, "role": "conversation"}
         )
-        
-        if conversation_memory_id in ["filtered_by_mem0", ""]:
-            # Mem0 filtered this as non-memorable - this is expected for technical/temporary discussions
-            if self.config.debug_mode:
-                logger.info(f"[Memory Debug] Conversation not saved by Mem0 (filtered as non-memorable - likely technical/temporary content)")
-        else:
-            if self.config.debug_mode:
-                logger.info(f"[Memory Debug] Conversation memory saved with ID: {conversation_memory_id}")
-                # Log what was actually saved
-                if conversation_memory_id != "filtered_by_mem0":
-                    logger.info(f"[Memory Debug] Mem0 extracted memorable content from conversation")
 
 

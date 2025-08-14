@@ -84,6 +84,13 @@ async def get_system_prompt_with_memory_context(
         
         # Create success status based on injection result
         if injection_result.success and injection_result.injected_count > 0:
+            # Print useful memory context information
+            print(f"[MEMORY] Injected {injection_result.injected_count} memories ({injection_result.context_tokens} tokens) in {total_retrieval_time_ms:.1f}ms")
+            if injection_result.formatted_context:
+                # Show the actual injected context (first 200 chars)
+                context_preview = injection_result.formatted_context[:200] + "..." if len(injection_result.formatted_context) > 200 else injection_result.formatted_context
+                print(f"[MEMORY] Context: {context_preview}")
+            
             memory_complete = create_status_message(
                 status="memory_injected",
                 session_id=session_id,
@@ -96,6 +103,9 @@ async def get_system_prompt_with_memory_context(
                 }
             )
         else:
+            # Print debug information for 0 memory case
+            print(f"[MEMORY] Found 0 memories in {total_retrieval_time_ms:.1f}ms - {injection_result.error or 'No relevant memories found'}")
+            
             memory_complete = create_status_message(
                 status="memory_injection_skipped",
                 session_id=session_id,
@@ -188,6 +198,7 @@ async def save_conversation_memory(
                 session_id=session_id,
                 user_id=user_id
             )
+            # Memory saving handled by Mem0 manager with detailed output
             return True
             
     except Exception as e:

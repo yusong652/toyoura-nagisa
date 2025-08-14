@@ -78,9 +78,8 @@ class LLMClientBase(ABC):
         
         if debug:
             provider_name = self.__class__.__name__.replace('Client', '')
-            print(f"[DEBUG] Starting {provider_name} execution {execution_id}")
-            print(f"[DEBUG] Session ID: {session_id}")
-            print(f"[DEBUG] Input messages: {len(messages)}")
+            # Simplified debug output
+            print(f"[LLM] {provider_name} execution started - Session: {session_id[:8]}, Messages: {len(messages)}")
 
         # Create provider-specific context manager
         context_manager_class = self._get_context_manager()

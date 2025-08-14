@@ -95,7 +95,7 @@ async def handle_llm_response(
             return
 
         # ========== PHASE 3: Streaming processing - Real-time tool call notifications ==========
-        print(f"[DEBUG] Processing streaming request {request_id} for session {session_id}")
+        # Processing streaming request
         
         final_message = None
         execution_metadata = None
@@ -105,14 +105,15 @@ async def handle_llm_response(
             if hasattr(msg, 'to_dict'):
                 msg_dict = msg.to_dict()
                 if msg_dict.get('role') == 'system':
-                    print(f"[DEBUG] SYSTEM PROMPT: {msg_dict.get('content', '')}")
+                    # System prompt configured
+                    pass
         
         # Use new streaming method - Real-time tool call notifications
         # Pass enhanced system prompt if available
         get_response_kwargs = {"session_id": session_id}
         if enhanced_system_prompt:
             get_response_kwargs["enhanced_system_prompt"] = enhanced_system_prompt
-            print(f"[DEBUG] Using enhanced system prompt: {len(enhanced_system_prompt)} characters")
+            # Enhanced system prompt active
         
         async for item in llm_client.get_response(
             recent_msgs, 
@@ -159,7 +160,7 @@ async def handle_llm_response(
         async with ACTIVE_REQUESTS_LOCK:
             if session_id in ACTIVE_REQUESTS and ACTIVE_REQUESTS[session_id] == request_id:
                 del ACTIVE_REQUESTS[session_id]
-                print(f"[DEBUG] Released streaming request {request_id} for session {session_id}")
+                # Streaming request completed
 
 
 async def process_post_pipeline(
