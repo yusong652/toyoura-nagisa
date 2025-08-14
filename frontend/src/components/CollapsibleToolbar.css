@@ -141,7 +141,7 @@
 }
 
 .tts-toggle-btn.enabled {
-  color: var(--primary-color, #4a90e2);
+  color: var(--text-color, #fff);
 }
 
 .tts-toggle-btn.disabled {
