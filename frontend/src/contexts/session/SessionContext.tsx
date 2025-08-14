@@ -3,7 +3,7 @@ import { ConnectionStatus } from '../../types/connection'
 import { ChatSession, SessionContextType } from '../../types/session'
 import { sessionService } from '../../services/api'
 import { useConnection } from '../connection/ConnectionContext'
-import { useTools } from '../tools/ToolsContext'
+import { useTtsEnable } from '../audio/TtsEnableContext'
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
 
@@ -32,7 +32,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     connectToSession, 
     checkConnection 
   } = useConnection()
-  const { ttsEnabled, updateTtsEnabled } = useTools()
+  const { ttsEnabled, updateTTSEnabled } = useTtsEnable()
 
   // 刷新会话列表
   const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
@@ -68,7 +68,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
 
       // 同步 TTS 状态到后端
       try {
-        await updateTtsEnabled(ttsEnabled)
+        await updateTTSEnabled(ttsEnabled)
       } catch (error) {
         console.error('同步 TTS 状态失败:', error)
       }
@@ -80,7 +80,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       console.error('Error in createNewSession:', error)
       throw error
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled])
+  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
   // 切换会话
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -98,7 +98,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
 
       // 同步 TTS 状态到后端
       try {
-        await updateTtsEnabled(ttsEnabled)
+        await updateTTSEnabled(ttsEnabled)
       } catch (error) {
         console.error('同步 TTS 状态失败:', error)
       }
@@ -109,7 +109,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       console.error('切换会话失败:', error)
       throw error
     }
-  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTtsEnabled])
+  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
   // 删除会话
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {

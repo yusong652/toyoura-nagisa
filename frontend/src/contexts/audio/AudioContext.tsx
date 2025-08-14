@@ -405,7 +405,10 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
   }, [playNextAudio])
 
   return (
-    <AudioContext.Provider value={{ queueAndPlayAudio, resetAudioState }}>
+    <AudioContext.Provider value={{ 
+      queueAndPlayAudio, 
+      resetAudioState
+    }}>
       {children}
     </AudioContext.Provider>
   )

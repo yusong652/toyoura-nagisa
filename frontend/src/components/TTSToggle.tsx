@@ -1,15 +1,15 @@
 import React from 'react';
-import { useChat } from '../contexts/chat/ChatContext';
+import { useTtsEnable } from '../contexts/audio/TtsEnableContext';
 import { SlideToggle } from './SlideToggle';
 
 export const TTSToggle: React.FC = () => {
-  const { ttsEnabled, updateTtsEnabled } = useChat();
+  const { ttsEnabled, updateTTSEnabled } = useTtsEnable();
 
   const handleToggle = async (checked: boolean) => {
     try {
-      await updateTtsEnabled(checked);
+      await updateTTSEnabled(checked);
     } catch (error) {
-      console.error('切换TTS状态失败:', error);
+      console.error('Failed to toggle TTS status:', error);
     }
   };
 

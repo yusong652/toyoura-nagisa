@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { FileData, ChatContextType} from '../../types/chat'
 import { useAudio } from '../audio/AudioContext'
-import { useTools } from '../tools/ToolsContext'
+import { useTtsEnable } from '../audio/TtsEnableContext'
+import { useAgent } from '../agent/AgentContext'
 import { useSession } from '../session/SessionContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
@@ -24,14 +25,12 @@ interface ChatProviderProps {
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
+  const { ttsEnabled } = useTtsEnable()
   const {
     toolState,
     toolsEnabled,
-    ttsEnabled,
-    updateToolsEnabled,
-    updateTtsEnabled,
     setToolState
-  } = useTools()
+  } = useAgent()
   
   // 从SessionContext获取会话相关状态和方法
   const {
@@ -129,12 +128,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       sendMessage,
       clearChat,
       deleteMessage,
-      toolState,
-      toolsEnabled,
-      updateToolsEnabled,
-      generateImage,
-      ttsEnabled,
-      updateTtsEnabled
+      generateImage
     }}>
       {children}
     </ChatContext.Provider>

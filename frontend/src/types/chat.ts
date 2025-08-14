@@ -44,15 +44,5 @@ export interface ChatContextType extends ChatState {
   sendMessage: (text: string, files?: FileData[]) => Promise<void>;
   clearChat: () => void;
   deleteMessage: (messageId: string) => Promise<void>;
-  toolState: {
-    type: 'NAGISA_IS_USING_TOOL' | 'NAGISA_TOOL_USE_CONCLUDED';
-    tool_name?: string;
-    parameters?: Record<string, any>;
-    action_text?: string;
-  } | null;
-  toolsEnabled: boolean;
-  updateToolsEnabled: (enabled: boolean) => Promise<void>;
   generateImage: (sessionId: string) => Promise<{ success: boolean; image_path?: string; error?: string }>;
-  ttsEnabled: boolean;
-  updateTtsEnabled: (enabled: boolean) => Promise<void>;
 } 
