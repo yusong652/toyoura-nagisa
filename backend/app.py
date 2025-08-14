@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.infrastructure.tts.base import BaseTTS, TTSRequest
 from backend.infrastructure.llm import LLMClientBase, ErrorResponse
-from backend.infrastructure.storage.session_manager import load_history, save_history, create_new_history, load_all_message_history, get_all_sessions
+from backend.infrastructure.storage.session_manager import load_history, save_history, load_all_message_history
 # Image storage imports removed - now handled in content service
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
@@ -20,10 +20,7 @@ from backend.shared.utils.helpers import (
     generate_title_for_session,
 )
 from backend.domain.models.message_factory import message_factory
-from backend.presentation.models.api_models import (
-    NewHistoryRequest,
-    HistorySessionResponse
-)
+# API models imports removed - now handled in specific service modules
 from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
 import threading
@@ -128,14 +125,7 @@ app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 
-@app.post("/api/history/create", response_model=dict)
-async def create_history_endpoint(request: NewHistoryRequest):
-    """创建新的聊天历史记录"""
-    try:
-        session_id = create_new_history(request.name)
-        return {"session_id": session_id, "success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建历史记录失败: {str(e)}")
+# Create session endpoint moved to backend/presentation/api/sessions.py
 
 # Session management endpoints moved to backend/presentation/api/sessions.py
 

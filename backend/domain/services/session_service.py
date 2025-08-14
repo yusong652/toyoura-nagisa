@@ -10,7 +10,8 @@ from backend.infrastructure.storage.session_manager import (
     get_all_sessions,
     delete_session_data,
     load_all_message_history,
-    load_history
+    load_history,
+    create_new_history
 )
 from backend.domain.models.message_factory import message_factory
 from backend.config import get_llm_settings
@@ -23,6 +24,30 @@ class SessionService:
     This class provides high-level business operations for managing
     chat sessions, abstracting away infrastructure details.
     """
+    
+    async def create_session(self, session_name: str) -> Dict[str, Any]:
+        """
+        Create a new chat session.
+        
+        This operation:
+        1. Generates a new unique session ID
+        2. Creates session metadata and storage structure
+        3. Initializes empty chat history
+        
+        Args:
+            session_name: Display name for the new session
+            
+        Returns:
+            Dict[str, Any]: Creation result:
+                - session_id: str - UUID of the newly created session
+                - success: bool - Always True if successful
+        """
+        session_id = create_new_history(session_name)
+        
+        return {
+            "session_id": session_id,
+            "success": True
+        }
     
     async def get_all_sessions(self) -> List[Dict[str, Any]]:
         """

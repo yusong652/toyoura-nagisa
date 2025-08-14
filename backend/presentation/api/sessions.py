@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.presentation.models.api_models import (
     SwitchSessionRequest,
     DeleteSessionRequest,
+    NewHistoryRequest,
 )
 from backend.domain.services.session_service import SessionService
 from backend.infrastructure.llm.base.client import LLMClientBase
@@ -37,6 +38,40 @@ def get_llm_client(request: Request) -> LLMClientBase:
         LLMClientBase: LLM client instance
     """
     return request.app.state.llm_client
+
+
+@router.post("/history/create", response_model=dict)
+async def create_session(
+    request: NewHistoryRequest,
+    service: SessionService = Depends(get_session_service)
+) -> dict:
+    """
+    Create a new chat session.
+    
+    This endpoint:
+    1. Creates a new session with the provided name
+    2. Initializes session metadata and storage
+    3. Returns the new session ID for client use
+    
+    Args:
+        request: New history request with session name
+        
+    Returns:
+        dict: Creation result with structure:
+            - session_id: str - UUID of the newly created session
+            - success: bool - Always True if successful
+    
+    Raises:
+        HTTPException: 500 if session creation fails
+    """
+    try:
+        result = await service.create_session(session_name=request.name)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create session: {str(e)}"
+        )
 
 
 @router.get("/history/sessions", response_model=List[dict])
