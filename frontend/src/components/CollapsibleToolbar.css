@@ -86,6 +86,12 @@
   margin-bottom: 4px;
 }
 
+.toolbar-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .toolbar-option-btn {
   width: 32px;
   height: 32px;
@@ -98,7 +104,6 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  margin-right: 8px;
 }
 
 .toolbar-option-btn:hover {
@@ -106,9 +111,47 @@
   transform: scale(1.05);
 }
 
+.toolbar-option-btn.active {
+  background: var(--primary-color, #4a90e2);
+  color: white;
+}
+
 .toolbar-option-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* TTS Toggle specific styles */
+.tts-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.tts-toggle-btn:hover {
+  transform: scale(1.07);
+}
+
+.tts-toggle-btn.enabled {
+  color: var(--primary-color, #4a90e2);
+}
+
+.tts-toggle-btn.disabled {
+  color: var(--text-secondary, #aaa);
+  opacity: 0.7;
+}
+
+.tts-toggle-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* 确保工具栏内容在小屏幕上的适配 */
