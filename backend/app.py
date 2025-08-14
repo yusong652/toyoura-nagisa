@@ -22,9 +22,7 @@ from backend.shared.utils.helpers import (
 from backend.domain.models.message_factory import message_factory
 from backend.presentation.models.api_models import (
     NewHistoryRequest,
-    HistorySessionResponse,
-    UpdateToolsEnabledRequest,
-    UpdateTTSEnabledRequest
+    HistorySessionResponse
 )
 from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client, Context
@@ -35,6 +33,7 @@ from backend.presentation.api import agent_profiles
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
+from backend.presentation.api import settings
 
 
 # 加载环境变量
@@ -127,6 +126,7 @@ app.include_router(agent_profiles.router)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 @app.post("/api/history/create", response_model=dict)
 async def create_history_endpoint(request: NewHistoryRequest):
@@ -177,57 +177,9 @@ async def chat_stream_endpoint(request: Request):
 
 # Title generation endpoint moved to backend/presentation/api/content.py
 
-@app.post("/api/chat/tools-enabled", response_model=dict)
-async def update_tools_enabled(request: UpdateToolsEnabledRequest):
-    """
-    更新LLM客户端的tools_enabled状态 (已弃用)
-    
-    注意：此接口已弃用，推荐使用 /api/agent/profile 接口进行Agent身份切换
-    为了向后兼容暂时保留，但建议迁移到新的Agent Profile系统
-    """
-    try:
-        print(f"[DEBUG] /api/chat/tools-enabled received enabled: {request.enabled} (type: {type(request.enabled)})")
-        print(f"[DEPRECATED] 此接口已弃用，推荐使用 /api/agent/profile")
-        
-        llm_client: LLMClientBase = app.state.llm_client
-        llm_client.update_config(tools_enabled=request.enabled)
-        
-        # 更新全局Agent profile状态以保持一致性
-        from backend.presentation.models.agent_profile_models import AgentProfileType
-        import backend.presentation.api.agent_profiles as agent_api
-        
-        if request.enabled:
-            # 启用工具时默认为通用助手模式
-            agent_api._current_agent_profile = AgentProfileType.GENERAL
-        else:
-            # 禁用工具时设为禁用模式  
-            agent_api._current_agent_profile = AgentProfileType.DISABLED
-        
-        return {
-            "success": True,
-            "tools_enabled": request.enabled,
-            "message": "建议使用新的 /api/agent/profile 接口进行更精细的工具控制"
-        }
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())  # 打印详细堆栈
-        raise HTTPException(status_code=500, detail=f"更新工具状态失败: {str(e)}")
+# Tools enabled endpoint moved to backend/presentation/api/settings.py
 
-@app.post("/api/chat/tts-enabled", response_model=dict)
-async def update_tts_enabled(request: UpdateTTSEnabledRequest):
-    """更新TTS引擎的enabled状态"""
-    try:
-        print(f"[DEBUG] /api/chat/tts-enabled received enabled: {request.enabled} (type: {type(request.enabled)})")
-        tts_engine: BaseTTS = app.state.tts_engine
-        tts_engine.enabled = request.enabled
-        return {
-            "success": True,
-            "tts_enabled": request.enabled
-        }
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"更新TTS状态失败: {str(e)}")
+# TTS enabled endpoint moved to backend/presentation/api/settings.py
 
 # Image generation endpoint moved to backend/presentation/api/content.py
 
