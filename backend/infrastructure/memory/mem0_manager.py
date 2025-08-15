@@ -49,17 +49,17 @@ class Mem0MemoryManager:
             logger.warning("[Mem0 Init] GOOGLE_API_KEY not found, using HuggingFace fallback")
         
         # Initialize Mem0
+        if self.config.debug_mode:
+            logger.info(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
+        
         try:
-            if self.config.debug_mode:
-                logger.info(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
             self.memory = Memory.from_config(mem0_config)
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Init] Successfully initialized Mem0")
                 logger.info(f"[Mem0 LLM Config] Using {self.config.mem0_llm_provider} with model {self.config.mem0_llm_model}")
         except Exception as e:
             logger.error(f"[Mem0 Init] Failed to initialize Mem0: {e}")
-            # Create a mock memory object that returns empty results
-            self.memory = None
+            raise RuntimeError(f"Memory system initialization failed: {e}") from e
         
         # Memory type decay rates (per day)
         self.decay_rates = {
@@ -106,10 +106,6 @@ class Mem0MemoryManager:
         })
         
         # Add memory using Mem0
-        if self.memory is None:
-            logger.warning("[Mem0] Cannot add memory, Mem0 not initialized")
-            return "mock_memory_id"
-            
         if self.config.debug_mode:
             logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
         
@@ -127,55 +123,49 @@ class Mem0MemoryManager:
         
         # Return the memory ID
         # Handle Mem0's response format: {'results': [{'id': '...', 'memory': '...', 'event': 'ADD'}]}
-        if isinstance(result, dict):
-            if "results" in result and isinstance(result["results"], list):
-                if len(result["results"]) > 0:
-                    # Process each result item (might include ADD, UPDATE, DELETE events)
-                    for item in result["results"]:
-                        if isinstance(item, dict):
-                            event_type = item.get("event", "ADD")
-                            memory_id = item.get("id", "")
-                            memory_text = item.get("memory", item.get("text", ""))
-                            
-                            # Handle potential errors in result items first
-                            if "error" in item:
-                                logger.warning(f"[MEMORY] Error in {event_type} event for memory {memory_id}: {item['error']}")
-                                continue
-                            
-                            # Log different event types with consistent formatting
-                            if self.config.debug_mode:
-                                if event_type == "UPDATE":
-                                    old_memory = item.get("old_memory", "")
-                                    print(f"[MEMORY] {event_type}: Memory {memory_id} updated")
-                                    print(f"  OLD: {old_memory}")
-                                    print(f"  NEW: {memory_text}")
-                                elif event_type == "DELETE":
-                                    print(f"[MEMORY] {event_type}: Memory {memory_id} deleted")
-                                    print(f"  Content: {memory_text}")
-                                elif event_type == "ADD":
-                                    print(f"[MEMORY] {event_type}: Memory {memory_id} added")
-                                    print(f"  Content: {memory_text}")
-                                else:
-                                    # Unknown event type
-                                    print(f"[MEMORY] {event_type}: Unknown event for memory {memory_id}")
-                            else:
-                                # Non-debug mode: only show essential info
-                                if event_type == "ADD":
-                                    print(f"[MEMORY] Stored: {memory_text}")
-                    
-                    # Return the ID from the first result with an ID
-                    first_result = result["results"][0]
-                    if isinstance(first_result, dict) and "id" in first_result:
-                        return first_result["id"]
+        # mem0.add() always returns {'results': [...]} where results is always a list
+        results_list = result["results"]
+        
+        if len(results_list) > 0:
+            # Process each result item (might include ADD, UPDATE, DELETE events)
+            for item in results_list:
+                event_type = item.get("event", "ADD")
+                memory_id = item.get("id", "")
+                memory_text = item.get("memory", item.get("text", ""))
+                
+                # Handle potential errors in result items first
+                if "error" in item:
+                    logger.warning(f"[MEMORY] Error in {event_type} event for memory {memory_id}: {item['error']}")
+                    continue
+                
+                # Log different event types with consistent formatting
+                if self.config.debug_mode:
+                    if event_type == "UPDATE":
+                        old_memory = item.get("old_memory", "")
+                        print(f"[MEMORY] {event_type}: Memory {memory_id} updated")
+                        print(f"  OLD: {old_memory}")
+                        print(f"  NEW: {memory_text}")
+                    elif event_type == "DELETE":
+                        print(f"[MEMORY] {event_type}: Memory {memory_id} deleted")
+                        print(f"  Content: {memory_text}")
+                    elif event_type == "ADD":
+                        print(f"[MEMORY] {event_type}: Memory {memory_id} added")
+                        print(f"  Content: {memory_text}")
+                    else:
+                        # Unknown event type
+                        print(f"[MEMORY] {event_type}: Unknown event for memory {memory_id}")
                 else:
-                    # Empty results - Mem0 decided not to save this memory
-                    print(f"[MEMORY] Content filtered by Mem0 (not memorable)")
-                    return "filtered_by_mem0"
-            elif "id" in result:
-                return result["id"]
-        elif isinstance(result, list) and len(result) > 0:
-            return result[0].get("id", "")
-        return ""
+                    # Non-debug mode: only show essential info
+                    if event_type == "ADD":
+                        print(f"[MEMORY] Stored: {memory_text}")
+            
+            # Return the ID from the first result with an ID
+            first_result = results_list[0]
+            return first_result.get("id", "")
+        else:
+            # Empty results - Mem0 decided not to save this memory
+            print(f"[MEMORY] Content filtered by Mem0 (not memorable)")
+            return "filtered_by_mem0"
     
     async def search_memories(
         self,
@@ -204,47 +194,18 @@ class Mem0MemoryManager:
         # Search using Mem0 - this includes vectorization + semantic search
         vectorization_start = time.time()
         try:
-            # Handle case where Mem0 initialization failed
-            if self.memory is None:
-                if self.config.debug_mode:
-                    logger.info(f"[Mem0 Debug] Memory object is None, returning empty results")
-                results = []
-            else:
-                results = self.memory.search(
-                    query=query,
-                    user_id=user_id,
-                    limit=limit
-                )
+            search_result = self.memory.search(
+                query=query,
+                user_id=user_id,
+                limit=limit
+            )
             
-            # Handle case where Mem0 returns None or non-list results on empty DB
-            if results is None:
-                if self.config.debug_mode:
-                    logger.info(f"[Mem0 Debug] Search returned None for empty database")
-                results = []
-            elif isinstance(results, dict):
-                # Mem0 returns dict with 'results' key containing the actual list
-                if 'results' in results:
-                    actual_results = results['results']
-                    if self.config.debug_mode:
-                        logger.info(f"[Mem0 Debug] Extracted results from dict: {len(actual_results)} items")
-                    results = actual_results if isinstance(actual_results, list) else []
-                else:
-                    if self.config.debug_mode:
-                        logger.info(f"[Mem0 Debug] Dict response missing 'results' key: {results}")
-                    results = []
-            elif isinstance(results, str):
-                if self.config.debug_mode:
-                    logger.info(f"[Mem0 Debug] Search returned string instead of list: {results}")
-                results = []
-            elif not isinstance(results, list):
-                if self.config.debug_mode:
-                    logger.info(f"[Mem0 Debug] Search returned unexpected type {type(results)}: {results}")
-                results = []
+            # mem0.search() always returns {'results': [...]} where results is always a list
+            results = search_result["results"]
             
             vectorization_time_ms = (time.time() - vectorization_start) * 1000
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Timing] Mem0 vectorization + search: {vectorization_time_ms:.2f}ms, found {len(results)} results")
-                logger.info(f"[Mem0 Debug] Search results type: {type(results)}, sample: {results[:2] if results else 'empty'}")
             
         except Exception as e:
             vectorization_time_ms = (time.time() - vectorization_start) * 1000

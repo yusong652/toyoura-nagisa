@@ -209,10 +209,7 @@ Use the above context to provide more personalized and contextually aware respon
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Save a conversation turn to memory using SessionMemoryContextManager.
-        
-        Delegates to the SessionMemoryContextManager for consistent memory handling
-        and cache invalidation.
+        Save a conversation turn to memory.
         
         Args:
             user_message: User's message
@@ -224,23 +221,7 @@ Use the above context to provide more personalized and contextually aware respon
         # Check if saving is enabled
         if not self.config.should_save_memory():
             return
-            
-        # Save conversation using direct memory manager
-        await self._save_conversation_direct(
-            user_message, assistant_response, session_id, user_id, metadata
-        )
-    
-    async def _save_conversation_direct(
-        self,
-        user_message: str,
-        assistant_response: str,
-        session_id: str,
-        user_id: str = "default",
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
-        """
-        Direct method for saving conversation to memory manager.
-        """
+        
         # Prepare metadata
         turn_metadata = {
             "type": "conversation_turn",
@@ -256,7 +237,7 @@ Use the above context to provide more personalized and contextually aware respon
 Assistant: {assistant_response[:500]}"""
         
         # Add conversation memory (detailed output handled by Mem0 manager)
-        conversation_memory_id = await self.memory_manager.add_memory(
+        await self.memory_manager.add_memory(
             content=conversation_content,
             user_id=user_id,
             session_id=session_id,

@@ -71,42 +71,8 @@ async def handle_llm_response(
         ACTIVE_REQUESTS[session_id] = request_id
 
     try:
-        # ========== PHASE 2: Client validation ==========
-        # Support all implemented LLM clients
-        supported_clients = ['GeminiClient', 'LocalLLMClient', 'AnthropicClient', 'OpenAIClient']
-        if type(llm_client).__name__ not in supported_clients:
-            error_msg = f"Unsupported LLM client: {type(llm_client).__name__}. Supported clients: {supported_clients}"
-            error_data = create_error_message(
-                error=error_msg,
-                session_id=session_id,
-                details={"client_type": type(llm_client).__name__, "supported": supported_clients}
-            )
-            yield f"data: {json.dumps(error_data)}\n\n"
-            return
-        
-        if not hasattr(llm_client, 'get_response'):
-            error_msg = f"{type(llm_client).__name__} missing get_response method"
-            error_data = create_error_message(
-                error=error_msg,
-                session_id=session_id,
-                details={"client_type": type(llm_client).__name__}
-            )
-            yield f"data: {json.dumps(error_data)}\n\n"
-            return
-
-        # ========== PHASE 3: Streaming processing - Real-time tool call notifications ==========
-        # Processing streaming request
-        
         final_message = None
         execution_metadata = None
-        
-        # Debug: Print system messages
-        for msg in recent_msgs:
-            if hasattr(msg, 'to_dict'):
-                msg_dict = msg.to_dict()
-                if msg_dict.get('role') == 'system':
-                    # System prompt configured
-                    pass
         
         # Use new streaming method - Real-time tool call notifications
         # Pass enhanced system prompt if available
