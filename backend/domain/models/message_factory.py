@@ -1,8 +1,8 @@
 """
-消息工厂
+Message Factory
 
-提供消息对象的创建和转换逻辑。
-包含消息的业务规则和处理逻辑。
+Provides message object creation and conversion logic.
+Contains business rules and processing logic for messages.
 """
 
 from typing import Dict, Any, List
@@ -12,23 +12,24 @@ from backend.shared.utils.text_clean import extract_response_without_think
 
 def message_factory(data: dict) -> BaseMessage:
     """
-    根据输入字典自动实例化正确的消息类型。
+    Automatically instantiate the correct message type based on input dictionary.
     
-    这是领域服务，负责根据数据创建适当的消息实体。
-    简化版本 - 工具调用在LLM客户端内部处理，消息存储只需要用户、助手、图片三种类型。
+    This is a domain service responsible for creating appropriate message entities from data.
+    Simplified version - tool calls are handled internally by LLM client, 
+    message storage only needs user, assistant, and image message types.
     
     Args:
-        data: 消息数据字典
+        data: Message data dictionary
         
     Returns:
-        BaseMessage: 对应类型的消息对象
+        BaseMessage: Corresponding message object type
         
     Raises:
-        ValueError: 当图片消息缺少必要字段时
+        ValueError: When image message lacks required fields
     """
     role = data.get('role')
     
-    # 处理图片消息
+    # Handle image messages
     if role == 'image':
         if 'image_path' not in data:
             raise ValueError("Image message must have an image_path")
@@ -39,64 +40,92 @@ def message_factory(data: dict) -> BaseMessage:
             timestamp=data.get('timestamp')
         )
     
-    # 处理普通消息
+    # Handle regular messages
     filtered_data = {k: v for k, v in data.items() if k != 'role'}
     
     if role == 'assistant':
         return AssistantMessage(**filtered_data)
     else:
-        # 用户消息或默认情况
+        # User message or default case
         return UserMessage(**filtered_data)
 
 
 def message_factory_no_thinking(data: dict) -> BaseMessage:
     """
-    创建用于历史记录的消息对象，过滤掉 thinking 和 redacted_thinking 块。
+    Create message objects for history records, filtering out thinking and redacted_thinking blocks.
     
-    这个函数主要用于构造发送给 LLM 的历史消息，以减少不必要的 token 消耗。
-    这是领域服务，处理消息内容的业务规则。
+    This function is mainly used to construct historical messages sent to LLM,
+    reducing unnecessary token consumption.
+    This is a domain service that handles business rules for message content.
 
     Args:
-        data: 消息数据字典
+        data: Message data dictionary
         
     Returns:
-        BaseMessage: 过滤后的消息对象
+        BaseMessage: Filtered message object
     """
     role = data.get('role')
     
-    # 图片消息保持不变
+    # Image messages remain unchanged
     if role == 'image':
         return message_factory(data)
     
-    # 处理需要过滤thinking的消息
+    # Handle messages that need thinking filtering
     filtered_data = {k: v for k, v in data.items() if k != 'role'}
     
-    # 处理结构化内容
+    # Handle structured content
     if isinstance(data.get('content'), list):
         filtered_content = _filter_thinking_blocks(data['content'])
         filtered_data['content'] = filtered_content
-    # 处理字符串内容
+    # Handle string content
     elif isinstance(filtered_data.get('content'), str):
         filtered_data['content'] = extract_response_without_think(filtered_data['content'])
     
-    # 创建消息对象
+    # Create message object
     if role == 'assistant':
         return AssistantMessage(**filtered_data)
     else:
         return UserMessage(**filtered_data)
 
 
-def _filter_thinking_blocks(content_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def extract_text_from_message(message: BaseMessage) -> str:
     """
-    过滤掉thinking和redacted_thinking块。
+    Extract pure text content from message object for search and memory queries.
     
-    这是内部的业务逻辑，处理消息内容的特殊格式。
+    Handles multimodal message content, extracting only text parts while ignoring images and other content.
+    This is a domain service that handles business logic for message content extraction.
     
     Args:
-        content_list: 消息内容列表
+        message: Message object
         
     Returns:
-        List: 过滤后的内容列表
+        str: Extracted pure text content
+    """
+    content = message.content
+    
+    # Handle structured content (multimodal)
+    if isinstance(content, list):
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text_parts.append(item.get("text", ""))
+        return " ".join(text_parts)
+    
+    # Handle simple string content
+    return str(content) if content else ""
+
+
+def _filter_thinking_blocks(content_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter out thinking and redacted_thinking blocks.
+    
+    This is internal business logic that handles special formats of message content.
+    
+    Args:
+        content_list: Message content list
+        
+    Returns:
+        List: Filtered content list
     """
     filtered_content = []
     for item in content_list:
@@ -106,7 +135,7 @@ def _filter_thinking_blocks(content_list: List[Dict[str, Any]]) -> List[Dict[str
         else:
             filtered_content.append(item)
     
-    # 如果过滤后没有内容，添加一个空的文本块
+    # If no content after filtering, add an empty text block
     if not filtered_content:
         filtered_content = [{"type": "text", "text": ""}]
     

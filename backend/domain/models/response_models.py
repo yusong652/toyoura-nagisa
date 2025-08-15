@@ -1,8 +1,8 @@
 """
-LLM 响应处理模型
+LLM Response Processing Models
 
-定义LLM客户端层的响应处理逻辑和数据结构。
-这些模型专门用于处理LLM的输出和响应格式转换。
+Defines response processing logic and data structures for the LLM client layer.
+These models are specifically designed to handle LLM output and response format conversion.
 """
 
 from typing import Union, List, Dict, Any, Optional
@@ -10,12 +10,12 @@ from typing import Union, List, Dict, Any, Optional
 
 class LLMResponse:
     """
-    简化的LLM响应类 - 专为新架构设计
+    Simplified LLM response class - designed for new architecture
     
-    由于工具调用现在在LLM客户端内部处理，这个类只需要处理最终的文本响应。
-    移除了所有过时的工具调用相关字段和ResponseType依赖。
+    Since tool calls are now handled internally within the LLM client, this class only needs to handle final text responses.
+    Removed all outdated tool call related fields and ResponseType dependencies.
     
-    这是基础设施层的模型，专门处理LLM客户端的响应数据。
+    This is an infrastructure layer model specifically for handling LLM client response data.
     """
     
     def __init__(
@@ -25,17 +25,17 @@ class LLMResponse:
         error: Optional[str] = None,
     ):
         """
-        初始化LLM响应对象
+        Initialize LLM response object
         
         Args:
-            content: 响应内容，可以是字符串或结构化列表
-            keyword: 表情关键词
-            error: 错误信息（如果有）
+            content: Response content, can be string or structured list
+            keyword: Emotion keyword
+            error: Error message (if any)
         """
-        # 确保 content 总是列表格式
+        # Ensure content is always in list format
         if isinstance(content, str):
             if error:
-                # 错误情况下，content可能是错误信息字符串
+                # In error cases, content might be error message string
                 self.content = [{"type": "text", "text": content}]
                 self.is_error = True
             else:
@@ -50,12 +50,12 @@ class LLMResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        将 LLMResponse 转换为字典格式。
+        Convert LLMResponse to dictionary format.
         
-        主要用于序化和API响应。
+        Mainly used for serialization and API responses.
         
         Returns:
-            Dict: 响应数据的字典表示
+            Dict: Dictionary representation of response data
         """
         result = {
             "content": self.content,
@@ -67,10 +67,10 @@ class LLMResponse:
     
     def get_text_content(self) -> str:
         """
-        提取纯文本内容
+        Extract pure text content
         
         Returns:
-            str: 合并后的文本内容
+            str: Merged text content
         """
         text_parts = []
         for item in self.content:
@@ -80,9 +80,9 @@ class LLMResponse:
     
     def has_error(self) -> bool:
         """
-        检查是否包含错误
+        Check if contains error
         
         Returns:
-            bool: 是否有错误
+            bool: Whether there's an error
         """
         return self.is_error

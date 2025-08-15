@@ -1,8 +1,8 @@
 """
-消息领域模型
+Message Domain Models
 
-定义聊天应用中的核心消息实体，包括用户消息、助手消息和图片消息。
-这些是纯粹的领域对象，不包含任何基础设施或表示层的依赖。
+Defines core message entities in the chat application, including user messages, assistant messages and image messages.
+These are pure domain objects with no infrastructure or presentation layer dependencies.
 """
 
 from pydantic import BaseModel
@@ -11,13 +11,13 @@ from datetime import datetime
 
 
 # =====================
-# 消息模型基类
+# Base Message Model
 # =====================
 class BaseMessage(BaseModel):
     """
-    所有消息类型的基类。
+    Base class for all message types.
     
-    这是领域层的核心实体，表示聊天中的基本消息概念。
+    This is the core entity in the domain layer, representing the basic message concept in chat.
     """
     content: Union[str, List[dict]]
     id: Optional[str] = None
@@ -38,31 +38,31 @@ class BaseMessage(BaseModel):
 
 
 # =====================
-# 具体消息类型
+# Concrete Message Types
 # =====================
 class UserMessage(BaseMessage):
     """
-    用户的普通文本消息。
+    User's regular text message.
     
-    表示来自用户的输入消息，是聊天对话的一方。
+    Represents input messages from the user, one side of the chat conversation.
     """
     role: Literal["user"] = "user"
 
 
 class AssistantMessage(BaseMessage):
     """
-    助手的普通文本消息。
+    Assistant's regular text message.
     
-    表示AI助手的回复消息，是聊天对话的另一方。
+    Represents reply messages from the AI assistant, the other side of the chat conversation.
     """
     role: Literal["assistant"] = "assistant"
 
 
 class ImageMessage(BaseModel):
     """
-    生成的图片消息。
+    Generated image message.
     
-    表示系统生成或处理的图片内容，包含图片路径信息。
+    Represents system-generated or processed image content, containing image path information.
     """
     content: Union[str, List[dict]]
     id: Optional[str] = None
@@ -72,7 +72,7 @@ class ImageMessage(BaseModel):
 
 
 # =====================
-# 类型定义
+# Type Definitions
 # =====================
 MessageType = Union[UserMessage, AssistantMessage, ImageMessage]
-Message = MessageType  # 兼容原有类型提示
+Message = MessageType  # Compatible with existing type hints

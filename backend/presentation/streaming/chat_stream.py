@@ -10,7 +10,7 @@ import uuid
 from typing import List, AsyncGenerator
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory_no_thinking
+from backend.domain.models.message_factory import message_factory_no_thinking, message_factory, extract_text_from_message
 from backend.infrastructure.storage.session_manager import load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.config import get_llm_settings
@@ -77,19 +77,8 @@ async def generate_chat_stream(
             
             if recent_msgs and getattr(recent_msgs[-1], "role", None) == "user":
                 latest_user_message = recent_msgs[-1]
-                content = getattr(latest_user_message, "content", "")
-                
-                # Extract text for memory query (Mem0 supports multimodal but we need text for search)
-                if isinstance(content, list):
-                    # Extract text from multimodal content for memory search
-                    text_parts = []
-                    for item in content:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            text_parts.append(item.get("text", ""))
-                    user_query = " ".join(text_parts)
-                else:
-                    # Simple string content
-                    user_query = str(content)
+                # Use message factory to properly extract text content
+                user_query = extract_text_from_message(latest_user_message)
             
             if user_query and latest_user_message:
                 from backend.config import get_system_prompt
