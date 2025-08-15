@@ -1,6 +1,6 @@
 """
-邮件配置模块
-包含邮件发送和接收相关的配置
+Email Configuration Module
+Contains configurations for email sending and receiving
 """
 from __future__ import annotations
 from typing import Optional
@@ -9,23 +9,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class EmailConfig(BaseSettings):
-    """邮件配置"""
+    """Email Configuration"""
     
-    # SMTP配置 - 必需的敏感信息
-    smtp_server: str = Field(description="SMTP服务器地址", env="EMAIL_SMTP_SERVER")
-    smtp_port: int = Field(default=587, ge=1, le=65535, description="SMTP端口", env="EMAIL_SMTP_PORT")
-    username: str = Field(description="邮箱用户名", env="EMAIL_USERNAME")
-    password: str = Field(description="邮箱密码或应用密码", env="EMAIL_PASSWORD")
+    # SMTP configuration - required sensitive information
+    smtp_server: str = Field(description="SMTP server address", env="EMAIL_SMTP_SERVER")
+    smtp_port: int = Field(default=587, ge=1, le=65535, description="SMTP port", env="EMAIL_SMTP_PORT")
+    username: str = Field(description="Email username", env="EMAIL_USERNAME")
+    password: str = Field(description="Email password or app password", env="EMAIL_PASSWORD")
     
-    # IMAP配置 - 必需的敏感信息
-    imap_server: str = Field(description="IMAP服务器地址", env="EMAIL_IMAP_SERVER")
-    imap_port: int = Field(default=993, ge=1, le=65535, description="IMAP端口", env="EMAIL_IMAP_PORT")
+    # IMAP configuration - required sensitive information
+    imap_server: str = Field(description="IMAP server address", env="EMAIL_IMAP_SERVER")
+    imap_port: int = Field(default=993, ge=1, le=65535, description="IMAP port", env="EMAIL_IMAP_PORT")
     
-    # 邮件配置
-    use_tls: bool = Field(default=True, description="是否使用TLS")
-    use_ssl: bool = Field(default=False, description="是否使用SSL")
-    sender_name: str = Field(default="Nagisa Assistant", description="发件人名称")
-    timeout: int = Field(default=30, ge=1, description="连接超时时间(秒)")
+    # Email configuration
+    use_tls: bool = Field(default=True, description="Whether to use TLS")
+    use_ssl: bool = Field(default=False, description="Whether to use SSL")
+    sender_name: str = Field(default="Nagisa Assistant", description="Sender name")
+    timeout: int = Field(default=30, ge=1, description="Connection timeout (seconds)")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -36,27 +36,25 @@ class EmailConfig(BaseSettings):
     )
     
 
-
-
 class AuthConfig(BaseSettings):
-    """Google Auth配置"""
+    """Google Auth Configuration"""
     
-    # Google OAuth配置 - 必需的敏感信息
-    client_id: str = Field(description="Google OAuth客户端ID")
-    client_secret: str = Field(description="Google OAuth客户端密钥")
+    # Google OAuth configuration - required sensitive information
+    client_id: str = Field(description="Google OAuth client ID")
+    client_secret: str = Field(description="Google OAuth client secret")
     
-    # Google Maps API配置 - 必需的敏感信息
-    google_maps_api_key: str = Field(description="Google Maps API密钥", env="GOOGLE_MAPS_API_KEY")
+    # Google Maps API configuration - required sensitive information
+    google_maps_api_key: str = Field(description="Google Maps API key", env="GOOGLE_MAPS_API_KEY")
     
-    # 可选配置
-    redirect_uri: str = Field(default="urn:ietf:wg:oauth:2.0:oob", description="重定向URI")
+    # Optional configuration
+    redirect_uri: str = Field(default="urn:ietf:wg:oauth:2.0:oob", description="Redirect URI")
     scopes: list[str] = Field(
         default=[
             "https://www.googleapis.com/auth/gmail.readonly",
             "https://www.googleapis.com/auth/gmail.send",
             "https://www.googleapis.com/auth/calendar"
         ],
-        description="OAuth权限范围"
+        description="OAuth scope list"
     )
     
     model_config = SettingsConfigDict(
@@ -66,16 +64,14 @@ class AuthConfig(BaseSettings):
         env_prefix='AUTH_',
         extra='ignore'
     )
-    
-
 
 
 class SearchConfig(BaseSettings):
-    """搜索配置"""
+    """Search Configuration"""
     
-    # Google Custom Search API配置 - 必需的敏感信息
-    google_api_key: str = Field(description="Google Custom Search API密钥")
-    google_search_engine_id: str = Field(description="Google Custom Search引擎ID")
+    # Google Custom Search API configuration - required sensitive information
+    google_api_key: str = Field(description="Google Custom Search API key")
+    google_search_engine_id: str = Field(description="Google Custom Search engine ID")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -86,19 +82,17 @@ class SearchConfig(BaseSettings):
     )
     
 
-
-
-# 全局配置实例
+# Global configuration instances
 def get_email_config() -> EmailConfig:
-    """获取邮件配置实例"""
+    """Get email configuration instance"""
     return EmailConfig()
 
 
 def get_auth_config() -> AuthConfig:
-    """获取认证配置实例"""
+    """Get authentication configuration instance"""
     return AuthConfig()
 
 
 def get_search_config() -> SearchConfig:
-    """获取搜索配置实例"""
+    """Get search configuration instance"""
     return SearchConfig() 

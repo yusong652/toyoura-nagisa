@@ -1,60 +1,60 @@
-# 🔧 配置文件示例
+# 🔧 Configuration Examples
 
-这个文件夹包含了 Nagisa AI 配置系统的示例文件，用于版本控制和新环境部署。
+This folder contains example configuration files for the Nagisa AI configuration system, used for version control and new environment deployment.
 
-## 📋 使用方法
+## 📋 Usage
 
-### 1. 首次部署
+### 1. Initial Deployment
 ```bash
-# 复制示例配置到实际配置目录
+# Copy example configurations to actual config directory
 cp -r backend/config_example backend/config
 ```
 
-### 2. 配置环境变量
-创建 `backend/.env` 文件并填入您的API密钥：
+### 2. Configure Environment Variables
+Create a `backend/.env` file and fill in your API keys:
 
 ```bash
-# 必需 - LLM配置
+# Required - LLM Configuration
 LLM__TYPE=gemini
 GOOGLE_API_KEY=your_actual_google_api_key_here
 # OPENAI_API_KEY=your_actual_openai_api_key_here  
 # ANTHROPIC_API_KEY=your_actual_anthropic_api_key_here
 
-# 可选 - TTS配置
+# Optional - TTS Configuration
 TTS__TYPE=gpt_sovits
 # FISH_AUDIO_API_KEY=your_fish_audio_api_key_here
 # FISH_AUDIO_REFERENCE_ID=your_reference_id_here
 
-# 可选 - 其他服务
+# Optional - Other Services
 # GOOGLE_CUSTOM_SEARCH_API_KEY=your_search_api_key_here
 # GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your_search_engine_id_here
 ```
 
-### 3. 验证配置
+### 3. Validate Configuration
 ```bash
 cd backend
-python -c "from config import get_llm_config; print('✅ 配置验证成功')"
+python -c "from config import get_llm_config; print('✅ Configuration validation successful')"
 ```
 
-## ⚠️ 安全注意事项
+## ⚠️ Security Considerations
 
-- ✅ **config_example/** - 版本控制，不包含敏感信息
-- ❌ **config/** - 在 .gitignore 中，包含真实API密钥
-- ❌ **.env** - 在 .gitignore 中，包含敏感信息
+- ✅ **config_example/** - Version controlled, contains no sensitive information
+- ❌ **config/** - In .gitignore, contains real API keys
+- ❌ **.env** - In .gitignore, contains sensitive information
 
-## 📁 文件说明
+## 📁 File Descriptions
 
-- `__init__.py` - 主配置入口，提供向后兼容的接口
-- `llm.py` - GPT、Gemini、Anthropic 配置
-- `tts.py` - Fish Audio、GPT-SoVITS 配置  
-- `email.py` - 邮件、认证、搜索配置
-- `text_to_image.py` - Stable Diffusion 配置
-- `base.py` - 基础路径和通用配置
+- `__init__.py` - Main configuration entry point, provides backward compatible interface
+- `llm.py` - GPT, Gemini, Anthropic configurations
+- `tts.py` - Fish Audio, GPT-SoVITS configurations  
+- `email.py` - Email, authentication, search configurations
+- `text_to_image.py` - Stable Diffusion configurations
+- `base.py` - Base paths and common configurations
 
-## 🔄 更新配置
+## 🔄 Updating Configurations
 
-当添加新的配置项时：
+When adding new configuration items:
 
-1. 更新 `config/` 中的实际配置文件
-2. 同步更新 `config_example/` 中的示例文件（移除敏感信息）
-3. 提交 `config_example/` 的更改到版本控制 
+1. Update actual configuration files in `config/`
+2. Synchronously update example files in `config_example/` (remove sensitive information)
+3. Commit changes to `config_example/` to version control 
