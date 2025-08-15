@@ -7,28 +7,22 @@ new SessionMemoryContextManager approach.
 """
 
 import logging
-import time
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Optional, Dict, Any
 from backend.domain.models.messages import BaseMessage
-from backend.infrastructure.memory import (
-    MemoryInjectionMiddleware
-)
-from backend.config.memory import MemoryConfig
-from backend.presentation.models.websocket_messages import create_status_message
+from backend.shared.utils.memory_logging import log_memory_injection_result
+from backend.shared.utils.performance import measure_time
+from backend.shared.utils.memory_factory import get_memory_middleware
 
 logger = logging.getLogger(__name__)
 
-# Global memory injection middleware instance
-_memory_middleware: Optional[MemoryInjectionMiddleware] = None
 
 
 async def get_system_prompt_with_memory_context(
     session_id: str,
-    user_query: str,
+    user_message: BaseMessage,
     base_system_prompt: str,
-    user_id: str = "default",
-    enable_memory: Optional[bool] = None
-) -> Tuple[str, List[Dict[str, Any]]]:
+    user_id: str = "default"
+) -> str:
     """
     Get system prompt with integrated memory context for a session.
     
@@ -37,111 +31,41 @@ async def get_system_prompt_with_memory_context(
     
     Args:
         session_id: Current session ID
-        user_query: User's query text
+        user_message: User's message object
         base_system_prompt: Base system prompt
         user_id: User identifier
-        enable_memory: Flag to enable/disable memory injection (uses config default if None)
         
     Returns:
-        Tuple of (system_prompt_with_memory, status_updates)
+        str: Enhanced system prompt with memory context
     """
-    status_updates = []
-    
-    # Use config if enable_memory not explicitly provided
-    if enable_memory is None:
-        config = MemoryConfig()
-        enable_memory = config.should_inject_memory()
-    
-    if not enable_memory:
-        return base_system_prompt, status_updates
-    
     try:
-        # Start timing for memory retrieval
-        retrieval_start_time = time.time()
-        
-        # Add status update about memory retrieval
-        memory_status = create_status_message(
-            status="retrieving_memories",
-            session_id=session_id,
-            details={"message": "Retrieving relevant memories...", "start_time": retrieval_start_time}
-        )
-        status_updates.append(memory_status)
-        
-        # Get memory middleware (uses SessionMemoryContextManager internally)
-        middleware = get_memory_middleware()
-        
-        # Get system prompt with memory context
-        system_prompt_with_memory, injection_result = await middleware.get_enhanced_system_prompt(
-            base_system_prompt=base_system_prompt,
-            user_query=user_query,
-            session_id=session_id,
-            user_id=user_id
-        )
-        
-        # Calculate timing
-        retrieval_end_time = time.time()
-        total_retrieval_time_ms = (retrieval_end_time - retrieval_start_time) * 1000
-        
-        # Create success status based on injection result
-        if injection_result.success and injection_result.injected_count > 0:
-            # Print useful memory context information
-            print(f"[MEMORY] Injected {injection_result.injected_count} memories ({injection_result.context_tokens} tokens) in {total_retrieval_time_ms:.1f}ms")
-            if injection_result.formatted_context:
-                # Show the actual injected context (first 200 chars)
-                context_preview = injection_result.formatted_context[:200] + "..." if len(injection_result.formatted_context) > 200 else injection_result.formatted_context
-                print(f"[MEMORY] Context: {context_preview}")
+        # Define memory retrieval operation
+        @measure_time
+        async def get_memory_enhanced_prompt():
+            # Get memory middleware (uses SessionMemoryContextManager internally)
+            middleware = get_memory_middleware()
             
-            memory_complete = create_status_message(
-                status="memory_injected",
+            # Get system prompt with memory context
+            return await middleware.get_enhanced_system_prompt(
+                base_system_prompt=base_system_prompt,
+                user_message=user_message,
                 session_id=session_id,
-                details={
-                    "injected_count": injection_result.injected_count,
-                    "injection_time_ms": injection_result.injection_time_ms,
-                    "total_retrieval_time_ms": total_retrieval_time_ms,
-                    "context_tokens": injection_result.context_tokens,
-                    "message": f"System prompt enhanced with {injection_result.injected_count} relevant memories in {total_retrieval_time_ms:.1f}ms"
-                }
-            )
-        else:
-            # Print debug information for 0 memory case
-            print(f"[MEMORY] Found 0 memories in {total_retrieval_time_ms:.1f}ms - {injection_result.error or 'No relevant memories found'}")
-            
-            memory_complete = create_status_message(
-                status="memory_injection_skipped",
-                session_id=session_id,
-                details={
-                    "total_retrieval_time_ms": total_retrieval_time_ms,
-                    "message": injection_result.error or "No relevant memories found"
-                }
+                user_id=user_id
             )
         
-        status_updates.append(memory_complete)
-        return system_prompt_with_memory, status_updates
+        # Execute with timing
+        (system_prompt_with_memory, injection_result), total_retrieval_time_ms = await get_memory_enhanced_prompt()
+        
+        # Log memory injection results
+        log_memory_injection_result(injection_result, total_retrieval_time_ms)
+        
+        return system_prompt_with_memory
         
     except Exception as e:
         logger.warning(f"Memory-enhanced system prompt failed: {e}")
-        error_status = create_status_message(
-            status="memory_error",
-            session_id=session_id,
-            details={"message": "Memory retrieval failed, using base prompt", "error": str(e)}
-        )
-        status_updates.append(error_status)
-        return base_system_prompt, status_updates
+        return base_system_prompt
 
 
-def get_memory_middleware() -> MemoryInjectionMiddleware:
-    """
-    Get or create the global memory injection middleware.
-    
-    Returns:
-        MemoryInjectionMiddleware instance
-    """
-    global _memory_middleware
-    if _memory_middleware is None:
-        # Create with MemoryConfig from settings
-        config = MemoryConfig()
-        _memory_middleware = MemoryInjectionMiddleware(config=config)
-    return _memory_middleware
 
 
 # Old inject_memory_context method removed - use get_system_prompt_with_memory_context instead

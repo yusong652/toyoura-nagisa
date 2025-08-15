@@ -8,6 +8,7 @@ relevant memories into LLM conversations without explicit tool calls.
 import time
 import logging
 from typing import Dict, Any, Optional
+from backend.domain.models.messages import BaseMessage
 from datetime import datetime
 from backend.infrastructure.memory.mem0_manager import Mem0MemoryManager
 from backend.domain.models.memory_context import (
@@ -50,7 +51,7 @@ class MemoryInjectionMiddleware:
     async def get_enhanced_system_prompt(
         self,
         base_system_prompt: str,
-        user_query: str,
+        user_message: BaseMessage,
         session_id: str,
         user_id: str = "default"
     ) -> tuple[str, MemoryInjectionResult]:
@@ -62,7 +63,7 @@ class MemoryInjectionMiddleware:
         
         Args:
             base_system_prompt: Base system prompt
-            user_query: User's query text
+            user_message: User's message (BaseMessage object)
             session_id: Session ID
             user_id: User ID
             
@@ -80,9 +81,10 @@ class MemoryInjectionMiddleware:
             )
         
         try:
-            # Extract query from user query text
+            # Extract text from user message
             query_extraction_start = time.time()
-            query_text = user_query
+            from backend.domain.models.message_factory import extract_text_from_message
+            query_text = extract_text_from_message(user_message)
             query_extraction_time_ms = (time.time() - query_extraction_start) * 1000
             
             if not query_text:

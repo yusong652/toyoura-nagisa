@@ -10,7 +10,7 @@ import uuid
 from typing import List, AsyncGenerator
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory_no_thinking, message_factory, extract_text_from_message
+from backend.domain.models.message_factory import message_factory_no_thinking, message_factory
 from backend.infrastructure.storage.session_manager import load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.config import get_llm_settings
@@ -66,38 +66,25 @@ async def generate_chat_stream(
         
         # Get enhanced system prompt with memory context if enabled
         enhanced_system_prompt = None
-        memory_status_updates = []
         
         # Memory injection processing
         
         if enable_memory:
-            # Extract latest user message (should be the last message in recent_msgs)
-            latest_user_message = None
-            user_query = None
-            
-            if recent_msgs and getattr(recent_msgs[-1], "role", None) == "user":
+            # Use the latest user message (last message in recent_msgs)
+            if recent_msgs:
                 latest_user_message = recent_msgs[-1]
-                # Use message factory to properly extract text content
-                user_query = extract_text_from_message(latest_user_message)
-            
-            if user_query and latest_user_message:
                 from backend.config import get_system_prompt
                 # Use the LLM client's actual tools_enabled setting
                 tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
                 base_system_prompt = get_system_prompt(tools_enabled=tools_enabled)
                 # Get enhanced system prompt with memory context
-                enhanced_system_prompt, memory_status_updates = await get_system_prompt_with_memory_context(
+                enhanced_system_prompt = await get_system_prompt_with_memory_context(
                     session_id=session_id,
-                    user_query=user_query,
+                    user_message=latest_user_message,
                     base_system_prompt=base_system_prompt,
-                    user_id=user_id,
-                    enable_memory=enable_memory
+                    user_id=user_id
                 )
                 # Memory context processing complete
-                
-                # Send memory status updates
-                for status_update in memory_status_updates:
-                    yield f"data: {json.dumps(status_update)}\n\n"
             else:
                 # No user query available for memory enhancement
                 pass
