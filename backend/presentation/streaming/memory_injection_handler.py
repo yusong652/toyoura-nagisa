@@ -66,11 +66,6 @@ async def get_system_prompt_with_memory_context(
         return base_system_prompt
 
 
-
-
-# Old inject_memory_context method removed - use get_system_prompt_with_memory_context instead
-
-
 async def save_conversation_memory(
     user_message: BaseMessage,
     assistant_response: str,
@@ -92,51 +87,19 @@ async def save_conversation_memory(
         bool: True if save successful, False otherwise
     """
     try:
-        # Convert user message to format suitable for Mem0
-        user_msg_for_memory = None
-        if user_message and getattr(user_message, "role", None) == "user":
-            content = getattr(user_message, "content", "")
-            
-            if isinstance(content, list):
-                # Multimodal content - convert to proper Mem0 format
-                # Mem0 expects OpenAI-compatible format with proper structure
-                formatted_content = []
-                for item in content:
-                    if isinstance(item, dict):
-                        if item.get("type") == "text":
-                            formatted_content.append({
-                                "type": "text",
-                                "text": item.get("text", "")
-                            })
-                        elif item.get("type") == "image_url":
-                            formatted_content.append({
-                                "type": "image_url",
-                                "image_url": item.get("image_url", {})
-                            })
-                        # Handle legacy format where 'text' is direct key
-                        elif "text" in item and "type" not in item:
-                            formatted_content.append({
-                                "type": "text", 
-                                "text": item["text"]
-                            })
-                
-                user_msg_for_memory = {
-                    "role": "user",
-                    "content": formatted_content
-                }
-            else:
-                # Simple string content
-                user_msg_for_memory = {
-                    "role": "user", 
-                    "content": str(content)
-                }
-        
         # Save to memory if we have user message - use middleware for consistency
-        if user_msg_for_memory and assistant_response:
+        if user_message and assistant_response:
+            # Create assistant message object from response string
+            from backend.domain.models.message_factory import message_factory_no_thinking
+            assistant_message = message_factory_no_thinking({
+                "role": "assistant",
+                "content": assistant_response
+            })
+            
             middleware = get_memory_middleware()
             await middleware.save_conversation_turn(
-                user_message=user_msg_for_memory,  # Pass dict for multimodal or str for text
-                assistant_response=assistant_response,
+                user_message=user_message,
+                assistant_message=assistant_message,
                 session_id=session_id,
                 user_id=user_id
             )

@@ -5,7 +5,6 @@ This module provides the middleware layer that automatically injects
 relevant memories into LLM conversations without explicit tool calls.
 """
 
-import time
 import logging
 from typing import Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
@@ -15,6 +14,8 @@ from backend.domain.models.memory_context import (
     MemoryContext, MemoryInjectionResult
 )
 from backend.config.memory import MemoryConfig
+from backend.shared.utils.token_utils import estimate_tokens
+from backend.shared.utils.prompt_templates import format_memory_context_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -70,28 +71,23 @@ class MemoryInjectionMiddleware:
         Returns:
             Tuple of (enhanced_system_prompt, injection_result)
         """
-        start_time = time.time()
         
         if not self.config.should_inject_memory():
             return base_system_prompt, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
-                injection_time_ms=0,
                 error="Memory injection disabled or auto-inject off"
             )
         
         try:
             # Extract text from user message
-            query_extraction_start = time.time()
             from backend.domain.models.message_factory import extract_text_from_message
             query_text = extract_text_from_message(user_message)
-            query_extraction_time_ms = (time.time() - query_extraction_start) * 1000
             
             if not query_text:
                 return base_system_prompt, MemoryInjectionResult(
                     success=False,
                     injected_count=0,
-                    injection_time_ms=query_extraction_time_ms,
                     error="No user query found"
                 )
             
@@ -106,7 +102,6 @@ class MemoryInjectionMiddleware:
             )
             
             # Retrieve relevant memories without session filtering
-            memory_retrieval_start = time.time()
             memories = await self.memory_manager.get_relevant_memories_for_context(
                 query_text=query_text,
                 session_id=None,  # Don't filter by session - search all user memories
@@ -116,9 +111,8 @@ class MemoryInjectionMiddleware:
                 user_id=user_id
             )
             
-            memory_retrieval_time_ms = (time.time() - memory_retrieval_start) * 1000
             if self.config.debug_mode:
-                logger.info(f"[Memory Timing] Memory retrieval: {memory_retrieval_time_ms:.2f}ms, Found {len(memories)} memories")
+                logger.info(f"[Memory Debug] Found {len(memories)} memories for query")
             
             memory_context.memories = memories
             
@@ -127,85 +121,38 @@ class MemoryInjectionMiddleware:
             
             if not formatted_context:
                 # No relevant memories found
-                elapsed_ms = (time.time() - start_time) * 1000
                 return base_system_prompt, MemoryInjectionResult(
                     success=True,
                     injected_count=0,
-                    injection_time_ms=elapsed_ms,
                     formatted_context=""
                 )
             
-            # Compose enhanced system prompt
-            enhanced_prompt = self._compose_enhanced_system_prompt(base_system_prompt, formatted_context)
+            # Compose enhanced system prompt using template
+            enhanced_prompt = format_memory_context_prompt(base_system_prompt, formatted_context)
             
-            elapsed_ms = (time.time() - start_time) * 1000
-            context_tokens = self._estimate_tokens(formatted_context)
+            context_tokens = estimate_tokens(formatted_context)
             
             return enhanced_prompt, MemoryInjectionResult(
                 success=True,
                 injected_count=len(memory_context.filter_by_relevance()),
-                injection_time_ms=elapsed_ms,
                 context_tokens=context_tokens,
                 formatted_context=formatted_context
             )
             
         except Exception as e:
-            elapsed_ms = (time.time() - start_time) * 1000
             logger.error(f"Enhanced system prompt failed: {e}")
             return base_system_prompt, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
-                injection_time_ms=elapsed_ms,
                 error=f"Enhancement error: {str(e)}"
             )
     
-    def _compose_enhanced_system_prompt(self, base_prompt: str, memory_context: str) -> str:
-        """
-        Compose enhanced system prompt with memory context.
-        
-        Args:
-            base_prompt: Base system prompt
-            memory_context: Formatted memory context
-            
-        Returns:
-            str: Enhanced system prompt
-        """
-        if not memory_context or not memory_context.strip():
-            return base_prompt
-        
-        # Compose enhanced prompt with clear separation
-        enhanced_prompt = f"""{base_prompt}
-
-## Relevant Context from Previous Conversations
-
-{memory_context}
-
-## Instructions
-
-Use the above context to provide more personalized and contextually aware responses. Reference specific information from previous conversations when relevant, but don't explicitly mention that you're using memory unless asked."""
-        
-        return enhanced_prompt
     
-    def _estimate_tokens(self, text: str) -> int:
-        """
-        Estimate token count for text.
-        
-        This is a simple estimation. For production, use proper
-        tokenizer for the target LLM.
-        
-        Args:
-            text: Text to estimate
-        
-        Returns:
-            Estimated token count
-        """
-        # Simple estimation: ~4 characters per token
-        return len(text) // 4
     
     async def save_conversation_turn(
         self,
-        user_message,  # Can be str or Dict[str, Any] for multimodal content
-        assistant_response: str,
+        user_message: BaseMessage,
+        assistant_message: BaseMessage,
         session_id: str,
         user_id: str = "default",
         metadata: Optional[Dict[str, Any]] = None
@@ -214,8 +161,8 @@ Use the above context to provide more personalized and contextually aware respon
         Save a conversation turn to memory with support for multimodal content.
         
         Args:
-            user_message: User's message (str for text, dict for multimodal)
-            assistant_response: Assistant's response
+            user_message: User's BaseMessage object
+            assistant_message: Assistant's BaseMessage object
             session_id: Session ID
             user_id: User ID
             metadata: Additional metadata
@@ -233,34 +180,14 @@ Use the above context to provide more personalized and contextually aware respon
         if metadata:
             turn_metadata.update(metadata)
         
-        # Process user message based on its type
-        if isinstance(user_message, dict):
-            # Multimodal message - extract content and describe media
-            user_content = user_message.get("content", "")
-            if isinstance(user_content, list):
-                # Handle multimodal content list
-                text_parts = []
-                image_count = 0
-                for item in user_content:
-                    if isinstance(item, dict):
-                        if item.get("type") == "text":
-                            text_parts.append(item.get("text", ""))
-                        elif item.get("type") == "image_url":
-                            image_count += 1
-                            text_parts.append(f"[User sent an image{f' {image_count}' if image_count > 1 else ''}]")
-                user_text = " ".join(text_parts)
-                turn_metadata["has_multimodal"] = True
-                turn_metadata["image_count"] = image_count
-            else:
-                # Simple content in dict format
-                user_text = str(user_content)
-        else:
-            # Simple string message
-            user_text = str(user_message)
+        # Extract text from standard BaseMessage objects
+        from backend.domain.models.message_factory import extract_text_from_message
+        user_text = extract_text_from_message(user_message)
+        assistant_text = extract_text_from_message(assistant_message)
         
         # Create conversation content for memory
         conversation_content = f"""User: {user_text}
-Assistant: {assistant_response[:500]}"""
+Assistant: {assistant_text[:500]}"""
         
         # Add conversation memory (detailed output handled by Mem0 manager)
         await self.memory_manager.add_memory(

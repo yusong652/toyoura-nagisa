@@ -152,7 +152,6 @@ class MemoryInjectionResult:
     """Result of memory injection operation."""
     success: bool
     injected_count: int
-    injection_time_ms: float
     error: Optional[str] = None
     context_tokens: Optional[int] = None
     formatted_context: Optional[str] = None
