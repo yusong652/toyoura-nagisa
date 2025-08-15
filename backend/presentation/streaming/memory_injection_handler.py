@@ -148,7 +148,7 @@ def get_memory_middleware() -> MemoryInjectionMiddleware:
 
 
 async def save_conversation_memory(
-    recent_msgs: List[BaseMessage],
+    user_message: BaseMessage,
     assistant_response: str,
     session_id: str,
     user_id: str = "default"
@@ -159,7 +159,7 @@ async def save_conversation_memory(
     Uses the new SessionMemoryContextManager for consistent memory handling.
     
     Args:
-        recent_msgs: Recent conversation messages
+        user_message: The user's message object
         assistant_response: The assistant's response
         session_id: Current session ID
         user_id: User identifier
@@ -168,32 +168,50 @@ async def save_conversation_memory(
         bool: True if save successful, False otherwise
     """
     try:
-        # Extract last user message
-        user_msg = None
-        for msg in reversed(recent_msgs):
-            if getattr(msg, "role", None) == "user":
-                content = getattr(msg, "content", "")
-                # Handle multimodal content (list format) or simple string content
-                if isinstance(content, list):
-                    # Extract text from list of content items
-                    text_parts = []
-                    for item in content:
-                        if isinstance(item, dict):
-                            if "text" in item:
-                                text_parts.append(item["text"])
-                            elif item.get("type") == "text":
-                                text_parts.append(item.get("text", ""))
-                    user_msg = " ".join(text_parts)
-                else:
-                    # Simple string content
-                    user_msg = str(content)
-                break
+        # Convert user message to format suitable for Mem0
+        user_msg_for_memory = None
+        if user_message and getattr(user_message, "role", None) == "user":
+            content = getattr(user_message, "content", "")
+            
+            if isinstance(content, list):
+                # Multimodal content - convert to proper Mem0 format
+                # Mem0 expects OpenAI-compatible format with proper structure
+                formatted_content = []
+                for item in content:
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            formatted_content.append({
+                                "type": "text",
+                                "text": item.get("text", "")
+                            })
+                        elif item.get("type") == "image_url":
+                            formatted_content.append({
+                                "type": "image_url",
+                                "image_url": item.get("image_url", {})
+                            })
+                        # Handle legacy format where 'text' is direct key
+                        elif "text" in item and "type" not in item:
+                            formatted_content.append({
+                                "type": "text", 
+                                "text": item["text"]
+                            })
+                
+                user_msg_for_memory = {
+                    "role": "user",
+                    "content": formatted_content
+                }
+            else:
+                # Simple string content
+                user_msg_for_memory = {
+                    "role": "user", 
+                    "content": str(content)
+                }
         
         # Save to memory if we have user message - use middleware for consistency
-        if user_msg and assistant_response:
+        if user_msg_for_memory and assistant_response:
             middleware = get_memory_middleware()
             await middleware.save_conversation_turn(
-                user_message=user_msg,
+                user_message=user_msg_for_memory,  # Pass dict for multimodal or str for text
                 assistant_response=assistant_response,
                 session_id=session_id,
                 user_id=user_id

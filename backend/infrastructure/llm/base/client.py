@@ -141,9 +141,6 @@ class LLMClientBase(ABC):
             # Create final storage message using provider-specific processor
             final_message = processor.format_response_for_storage(final_response)
             
-            if debug:
-                print(f"[DEBUG] Final message formatted for storage")
-            
             # Yield final result
             yield (final_message, metadata)
             

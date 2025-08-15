@@ -71,32 +71,27 @@ async def generate_chat_stream(
         # Memory injection processing
         
         if enable_memory:
-            # Extract latest user message for memory query
+            # Extract latest user message (should be the last message in recent_msgs)
+            latest_user_message = None
             user_query = None
-            for msg in reversed(recent_msgs):
-                if getattr(msg, "role", None) == "user":
-                    content = getattr(msg, "content", "")
-                    # Extract user query for memory enhancement
-                    
-                    # Handle multimodal content (list format) or simple string content
-                    if isinstance(content, list):
-                        # Extract text from list of content items
-                        text_parts = []
-                        for item in content:
-                            if isinstance(item, dict):
-                                if "text" in item:
-                                    text_parts.append(item["text"])
-                                elif item.get("type") == "text":
-                                    text_parts.append(item.get("text", ""))
-                        user_query = " ".join(text_parts)
-                    else:
-                        # Simple string content
-                        user_query = str(content)
-                    
-                    # Use extracted query for memory retrieval
-                    break
             
-            if user_query:
+            if recent_msgs and getattr(recent_msgs[-1], "role", None) == "user":
+                latest_user_message = recent_msgs[-1]
+                content = getattr(latest_user_message, "content", "")
+                
+                # Extract text for memory query (Mem0 supports multimodal but we need text for search)
+                if isinstance(content, list):
+                    # Extract text from multimodal content for memory search
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            text_parts.append(item.get("text", ""))
+                    user_query = " ".join(text_parts)
+                else:
+                    # Simple string content
+                    user_query = str(content)
+            
+            if user_query and latest_user_message:
                 from backend.config import get_system_prompt
                 # Use the LLM client's actual tools_enabled setting
                 tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
@@ -144,9 +139,9 @@ async def generate_chat_stream(
             yield chunk
         
         # Save conversation to memory after successful response
-        if enable_memory and assistant_response:
+        if enable_memory and assistant_response and latest_user_message:
             await save_conversation_memory(
-                recent_msgs=recent_msgs,
+                user_message=latest_user_message,  # Use already extracted user message
                 assistant_response=assistant_response,
                 session_id=session_id,
                 user_id=user_id

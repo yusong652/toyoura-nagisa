@@ -202,17 +202,17 @@ Use the above context to provide more personalized and contextually aware respon
     
     async def save_conversation_turn(
         self,
-        user_message: str,
+        user_message,  # Can be str or Dict[str, Any] for multimodal content
         assistant_response: str,
         session_id: str,
         user_id: str = "default",
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Save a conversation turn to memory.
+        Save a conversation turn to memory with support for multimodal content.
         
         Args:
-            user_message: User's message
+            user_message: User's message (str for text, dict for multimodal)
             assistant_response: Assistant's response
             session_id: Session ID
             user_id: User ID
@@ -231,9 +231,33 @@ Use the above context to provide more personalized and contextually aware respon
         if metadata:
             turn_metadata.update(metadata)
         
-        # Save complete conversation turn as a single memory
-        # This helps Mem0 understand the context better
-        conversation_content = f"""User: {user_message}
+        # Process user message based on its type
+        if isinstance(user_message, dict):
+            # Multimodal message - extract content and describe media
+            user_content = user_message.get("content", "")
+            if isinstance(user_content, list):
+                # Handle multimodal content list
+                text_parts = []
+                image_count = 0
+                for item in user_content:
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            text_parts.append(item.get("text", ""))
+                        elif item.get("type") == "image_url":
+                            image_count += 1
+                            text_parts.append(f"[User sent an image{f' {image_count}' if image_count > 1 else ''}]")
+                user_text = " ".join(text_parts)
+                turn_metadata["has_multimodal"] = True
+                turn_metadata["image_count"] = image_count
+            else:
+                # Simple content in dict format
+                user_text = str(user_content)
+        else:
+            # Simple string message
+            user_text = str(user_message)
+        
+        # Create conversation content for memory
+        conversation_content = f"""User: {user_text}
 Assistant: {assistant_response[:500]}"""
         
         # Add conversation memory (detailed output handled by Mem0 manager)
