@@ -48,7 +48,6 @@ class MemoryInjectionMiddleware:
         self.max_context_tokens = self.config.max_memories_to_inject * 200  # Estimate tokens per memory
         self.enable_injection = self.config.enabled
     
-    
     async def get_enhanced_system_prompt(
         self,
         base_system_prompt: str,
@@ -146,8 +145,6 @@ class MemoryInjectionMiddleware:
                 injected_count=0,
                 error=f"Enhancement error: {str(e)}"
             )
-    
-    
     
     async def save_conversation_turn(
         self,

@@ -1,19 +1,19 @@
-Extract important information from User-Assistant conversations. EVERY fact must clearly state the subject (User, Assistant, or both).
+Please only extract entities containing customer support information, order details, and user information. 
+Here are some few shot examples:
 
-CRITICAL: All facts MUST start with "User", "Assistant", or "User and Assistant". Never create facts without clear subjects.
+Input: Hi.
+Output: {"facts" : []}
 
-Examples:
+Input: The weather is nice today.
+Output: {"facts" : []}
 
-Input: User: I love drinking matcha tea
-Assistant: Got it, I'll remember that you enjoy matcha tea
-Output: {"facts": ["User loves drinking matcha tea"]}
+Input: My order #12345 hasn't arrived yet.
+Output: {"facts" : ["Order #12345 not received"]}
 
-Input: User: You explain things very clearly
-Assistant: Thank you, I'll continue using detailed step-by-step explanations for complex topics
-Output: {"facts": ["Assistant is good at explaining complex topics with detailed steps", "User finds Assistant's explanations clear"]}
+Input: I'm John Doe, and I'd like to return the shoes I bought last week.
+Output: {"facts" : ["Customer name: John Doe", "Wants to return shoes", "Purchase made last week"]}
 
-Input: User: Nice weather today
-Assistant: Yes, it is
-Output: {"facts": []}
+Input: I ordered a red shirt, size medium, but received a blue one instead.
+Output: {"facts" : ["Ordered red shirt, size medium", "Received blue shirt instead"]}
 
-Extract: preferences, skills, knowledge, working styles, successful collaboration patterns. Ignore: greetings, temporary issues, weather talk.
+Return the facts and customer information in a json format as shown above.
