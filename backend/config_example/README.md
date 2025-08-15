@@ -28,7 +28,6 @@ TTS__TYPE=gpt_sovits
 # 可选 - 其他服务
 # GOOGLE_CUSTOM_SEARCH_API_KEY=your_search_api_key_here
 # GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your_search_engine_id_here
-# MODELS_LAB_API_KEY=your_models_lab_api_key_here
 ```
 
 ### 3. 验证配置
@@ -49,7 +48,7 @@ python -c "from config import get_llm_config; print('✅ 配置验证成功')"
 - `llm.py` - GPT、Gemini、Anthropic 配置
 - `tts.py` - Fish Audio、GPT-SoVITS 配置  
 - `email.py` - 邮件、认证、搜索配置
-- `text_to_image.py` - Models Lab、Stable Diffusion 配置
+- `text_to_image.py` - Stable Diffusion 配置
 - `base.py` - 基础路径和通用配置
 
 ## 🔄 更新配置

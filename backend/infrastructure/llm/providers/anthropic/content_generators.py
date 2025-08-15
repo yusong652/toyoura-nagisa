@@ -11,7 +11,7 @@ from typing import Optional, Dict, List, Any
 import anthropic
 from backend.domain.models.messages import BaseMessage, UserMessage
 from .message_formatter import MessageFormatter
-from backend.config import get_text_to_image_config
+from backend.config import get_text_to_image_settings, get_llm_settings
 from .config import get_anthropic_client_config
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from .debug import AnthropicDebugger
@@ -223,7 +223,9 @@ class WebSearchGenerator:
             return {"error": error_msg, "query": query}
 
 
-class ImagePromptGenerator:
+from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
+
+class ImagePromptGenerator(BaseImagePromptGenerator):
     """
     Handles text-to-image prompt generation using Anthropic Claude API.
     
@@ -232,7 +234,7 @@ class ImagePromptGenerator:
     """
 
     @staticmethod
-    def generate_text_to_image_prompt(
+    async def generate_text_to_image_prompt(
         client: anthropic.Anthropic,
         session_id: Optional[str] = None,
         debug: bool = False
@@ -249,44 +251,21 @@ class ImagePromptGenerator:
             Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
         """
         try:
-            config = get_text_to_image_config()
-            system_prompt = config.get(
-                "text_to_image_system_prompt", 
-                "You are a professional prompt engineer. Please generate a detailed and creative "
-                "text-to-image prompt based on the following conversation. The prompt should be "
-                "suitable for high-quality image generation. Format your response with "
-                "<text_to_image_prompt>your prompt here</text_to_image_prompt> and optionally "
-                "<negative_prompt>negative prompt here</negative_prompt>."
+            # Get Anthropic configuration for model info
+            llm_settings = get_llm_settings()
+            llm_anthropic_config = llm_settings.get_anthropic_config()  # This has the 'model' attribute
+            
+            # Prepare generation context using inherited method with provider info
+            context = ImagePromptGenerator.prepare_generation_context(
+                session_id=session_id,
+                llm_provider="anthropic",
+                llm_model=llm_anthropic_config.model
             )
             
-            # 获取最新的对话消息
-            n = config.get("context_message_count", 4)
-            latest_messages = get_latest_n_messages(session_id, n) if session_id else tuple([None] * n)
-            if not any(latest_messages):
-                error_msg = f"Missing conversation context for session {session_id}"
-                if debug:
-                    print(f"[text_to_image] Error: {error_msg}")
-                return None
+            # Build messages using inherited method
+            messages = ImagePromptGenerator.build_messages_for_generation(context)
             
-            # 构造消息序列
-            conversation_text = "Please generate text to image prompt based on the following conversation:\n\n"
-            for msg in latest_messages:
-                if msg is not None:
-                    # Handle different content formats
-                    if isinstance(msg.content, list):
-                        # Extract text from list content
-                        text_parts = []
-                        for item in msg.content:
-                            if isinstance(item, dict) and "text" in item:
-                                text_parts.append(item["text"])
-                        content = " ".join(text_parts)
-                    else:
-                        content = str(msg.content)
-                    conversation_text += f"{msg.role}: {content}\n"
-            
-            messages = [UserMessage(role="user", content=conversation_text)]
-            
-            # 使用MessageFormatter进行消息格式转换
+            # Use MessageFormatter for message format conversion
             formatted_messages = MessageFormatter.format_messages(messages)
             
             if debug:
@@ -297,79 +276,26 @@ class ImagePromptGenerator:
                 pprint.pprint(formatted_messages)
             
             if debug:
-                print(f"\n[Anthropic][text_to_image] System prompt: {system_prompt}")
+                print(f"\n[Anthropic][text_to_image] System prompt: {context['system_prompt']}")
+            
+            # Use the model from context (which now correctly uses Anthropic's model)
+            model_for_text_to_image = context.get('model', llm_anthropic_config.model)
             
             response = client.messages.create(
-                model=config.get("model_for_text_to_image", "claude-3-5-sonnet-20241022"),
+                model=model_for_text_to_image,
                 max_tokens=4096,
-                temperature=1.0,
-                system=system_prompt,
+                temperature=context.get('temperature', 1.0),
+                system=context['system_prompt'],
                 messages=formatted_messages
             )
 
             if response.content and len(response.content) > 0:
                 prompt_text = response.content[0].text
-                text_prompt_match = re.search(r'<text_to_image_prompt>(.*?)</text_to_image_prompt>', prompt_text, re.DOTALL)
-                negative_prompt_match = re.search(r'<negative_prompt>(.*?)</negative_prompt>', prompt_text, re.DOTALL)
                 
-                if not text_prompt_match:
-                    if debug:
-                        print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {prompt_text}")
-                    return None
-                
-                text_prompt = text_prompt_match.group(1).strip()
-                negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else (
-                    "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+                # Process response using inherited method
+                return ImagePromptGenerator.process_generation_response(
+                    prompt_text, context, session_id, debug
                 )
-                
-                if not text_prompt:
-                    if debug:
-                        print(f"[text_to_image] Error: Extracted text prompt is empty")
-                    return None
-
-                # 获取默认关键词并补充
-                text_to_image_default_positive_prompt = config.get("text_to_image_default_positive_prompt", "")
-                text_to_image_default_negative_prompt = config.get("text_to_image_default_negative_prompt", "")
-
-                # 检查并补充默认关键词
-                if text_to_image_default_positive_prompt:
-                    # 用逗号分隔关键词
-                    default_keywords = text_to_image_default_positive_prompt.split(",")
-                    existing_keywords = text_prompt.split(",")
-                    # 找出缺失的关键词
-                    missing_keywords = [
-                        kw for kw in default_keywords 
-                        if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]
-                    ]
-                    if missing_keywords:
-                        # 清理原始提示词
-                        text_prompt = text_prompt.strip().lstrip(",").strip()
-                        # 用逗号连接所有关键词
-                        text_prompt = ", ".join(missing_keywords) + (", " + text_prompt if text_prompt else "")
-
-                if text_to_image_default_negative_prompt:
-                    # 用逗号分隔关键词
-                    default_keywords = text_to_image_default_negative_prompt.split(",")
-                    existing_keywords = negative_prompt.split(",")
-                    # 找出缺失的关键词
-                    missing_keywords = [
-                        kw for kw in default_keywords 
-                        if kw.strip() and kw.strip() not in [ek.strip() for ek in existing_keywords]
-                    ]
-                    if missing_keywords:
-                        # 清理原始提示词
-                        negative_prompt = negative_prompt.strip().lstrip(",").strip()
-                        # 用逗号连接所有关键词，确保没有前导空格
-                        negative_prompt = ", ".join(missing_keywords) + (", " + negative_prompt.lstrip() if negative_prompt else "")
-
-                if debug:
-                    print(f"[Anthropic][text_to_image] Final text_prompt: {text_prompt}")
-                    print(f"[Anthropic][text_to_image] Final negative_prompt: {negative_prompt}")
-                
-                return {
-                    "text_prompt": text_prompt,
-                    "negative_prompt": negative_prompt
-                }
             return None
             
         except Exception as e:

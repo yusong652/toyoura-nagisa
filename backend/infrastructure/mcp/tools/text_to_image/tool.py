@@ -52,62 +52,6 @@ def _success(image_type: str, generation_time: Optional[str] = None) -> dict:
         }
     ).model_dump()
 
-async def _generate_with_models_lab(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Internal function to generate an image using the ModelsLab API.
-    """
-    try:
-        models_lab_config = config.get("models_lab", {})
-        debug = models_lab_config.get("debug", False)
-
-        payload = {**models_lab_config, "prompt": prompt, "negative_prompt": negative_prompt}
-
-        async with httpx.AsyncClient() as client:
-            if models_lab_config.get("realtime", False):
-                endpoint = "https://modelslab.com/api/v6/realtime/text2img"
-            else:
-                endpoint = "https://modelslab.com/api/v6/images/text2img"
-            
-            max_retries = 60
-            retry_interval = 4  # seconds
-            
-            response = await client.post(
-                endpoint,
-                headers={"Content-Type": "application/json"},
-                content=json.dumps(payload),
-                timeout=120.0
-            )
-            
-            response.raise_for_status()
-            result = response.json()
-            status = result.get("status")
-
-            if status == "success" and "output" in result and result["output"]:
-                return {"type": "image_url", "image_url": result["output"][0]}
-            
-            if status == "processing" and result.get("fetch_result") and result.get("id"):
-                fetch_url = result["fetch_result"]
-                fetch_payload = {"key": models_lab_config.get("key", ""), "request_id": result["id"]}
-                
-                for attempt in range(max_retries):
-                    fetch_resp = await client.post(fetch_url, headers={"Content-Type": "application/json"}, content=json.dumps(fetch_payload), timeout=30.0)
-                    fetch_result = fetch_resp.json()
-                    fetch_status = fetch_result.get("status")
-                    
-                    if fetch_status == "success" and "output" in fetch_result and fetch_result["output"]:
-                        return {"type": "image_url", "image_url": fetch_result["output"][0]}
-                    elif fetch_status == "processing":
-                        await asyncio.sleep(retry_interval)
-                    else:
-                        error_message = fetch_result.get("messege") or fetch_result.get("message") or "Image generation failed, please try again."
-                        return {"type": "error", "message": error_message}
-                
-                return {"type": "error", "message": "Image generation timed out after processing."}
-            
-            return {"type": "error", "message": "Image generation failed after processing."}
-            
-    except Exception as e:
-        return {"type": "error", "message": str(e)}
 
 async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -180,9 +124,7 @@ async def generate_image_from_description(prompt: str, negative_prompt: str):
         config = get_text_to_image_config()
         provider = config.get("provider")
         
-        if provider == "models_lab":
-            return await _generate_with_models_lab(prompt, negative_prompt, config)
-        elif provider == "stable_diffusion_webui":
+        if provider == "stable_diffusion_webui":
             return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
         else:
             return {"type": "error", "message": f"Unsupported image generation provider: {provider}"}

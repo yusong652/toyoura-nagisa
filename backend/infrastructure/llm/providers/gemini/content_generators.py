@@ -200,30 +200,39 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using shared context preparation.
         """
         try:
-            # Prepare generation context using inherited method
+            # Get Gemini configuration for model info
+            from backend.config import get_llm_settings
+            llm_settings = get_llm_settings()
+            llm_gemini_config = llm_settings.get_gemini_config()  # This has the 'model' attribute
+            
+            # Prepare generation context using inherited method with provider info
             context = GeminiImagePromptGenerator.prepare_generation_context(
-                session_id=session_id
+                session_id=session_id,
+                llm_provider="gemini",
+                llm_model=llm_gemini_config.model
             )
             
             # Note: Context preparation already handles empty conversation validation
             
-            # Read Gemini configuration
-            gemini_config = get_gemini_client_config()
+            # Read Gemini client configuration for detailed settings
+            gemini_client_config = get_gemini_client_config()
             
             # Create API call configuration
             config_kwargs = {
                 "system_instruction": context['system_prompt'],
-                "safety_settings": gemini_config.safety_settings.to_gemini_format(),
+                "safety_settings": gemini_client_config.safety_settings.to_gemini_format(),
                 "temperature": context['temperature'],
-                "max_output_tokens": gemini_config.model_settings.max_output_tokens
+                "max_output_tokens": gemini_client_config.model_settings.max_output_tokens
             }
             
+            # Use the model from context (which now correctly uses Gemini's model)
+            model_for_text_to_image = context.get('model', llm_gemini_config.model)
+            
             # Add thinking configuration if applicable
-            model_for_text_to_image = context.get('model', gemini_config.model_settings.model)
             if (model_for_text_to_image.startswith("gemini-2.5") and 
-                gemini_config.model_settings.enable_thinking_for_gemini_2_5):
+                gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=gemini_config.model_settings.include_thoughts_in_response
+                    include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
                 )
             
             prompt_config = types.GenerateContentConfig(**config_kwargs)

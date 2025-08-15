@@ -259,7 +259,9 @@ class BaseImagePromptGenerator(BaseContentGenerator):
     def prepare_generation_context(
         session_id: Optional[str] = None,
         few_shot_max_length: int = DEFAULT_FEW_SHOT_MAX_LENGTH,
-        context_message_count: int = DEFAULT_CONTEXT_MESSAGE_COUNT
+        context_message_count: int = DEFAULT_CONTEXT_MESSAGE_COUNT,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Prepare context data for image prompt generation.
@@ -288,12 +290,19 @@ class BaseImagePromptGenerator(BaseContentGenerator):
                 text_content = extract_text_content(msg.content)
                 conversation_text += f"{msg.role}: {text_content}\n"
         
+        # Get the appropriate model for prompt generation
+        if llm_provider and llm_model:
+            prompt_model = text_to_image_settings.get_prompt_generation_model(llm_provider, llm_model)
+        else:
+            # Fallback to configured model or None
+            prompt_model = getattr(text_to_image_settings, 'model_for_text_to_image', None)
+        
         return {
             'system_prompt': text_to_image_settings.text_to_image_system_prompt or DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT,
             'conversation_text': conversation_text,
             'few_shot_history': few_shot_history[-few_shot_max_length:],  # Use most recent examples
             'temperature': getattr(text_to_image_settings, 'text_to_image_temperature', 1.0),
-            'model': getattr(text_to_image_settings, 'model_for_text_to_image', None)
+            'model': prompt_model
         }
     
     @staticmethod

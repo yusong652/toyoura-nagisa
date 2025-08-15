@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List
 import re
 import json
 from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.config import get_text_to_image_settings
+from backend.config import get_text_to_image_settings, get_llm_settings
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from .message_formatter import OpenAIMessageFormatter
 from .debug import OpenAIDebugger
@@ -109,7 +109,9 @@ class TitleGenerator:
             return None
 
 
-class ImagePromptGenerator:
+from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
+
+class ImagePromptGenerator(BaseImagePromptGenerator):
     """
     Handles text-to-image prompt generation using OpenAI API.
     
@@ -135,49 +137,25 @@ class ImagePromptGenerator:
             Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
         """
         try:
-            # Get configuration
-            text_to_image_settings = get_text_to_image_settings()
+            # Get OpenAI configuration for model info
+            llm_settings = get_llm_settings()
+            llm_openai_config = llm_settings.get_openai_config()  # This has the 'model' attribute
             
-            system_prompt = text_to_image_settings.text_to_image_system_prompt or (
-                "You are a professional prompt engineer. Generate a detailed and creative text-to-image prompt "
-                "based on the following conversation. The prompt should be suitable for high-quality image generation. "
-                "Format your response with <text_to_image_prompt>...</text_to_image_prompt> and "
-                "<negative_prompt>...</negative_prompt> tags."
+            # Prepare generation context using inherited method with provider info
+            context = ImagePromptGenerator.prepare_generation_context(
+                session_id=session_id,
+                llm_provider="openai",
+                llm_model=llm_openai_config.model
             )
             
-            context_message_count = text_to_image_settings.context_message_count
+            # Build messages using inherited method
+            messages = ImagePromptGenerator.build_messages_for_generation(context)
             
-            # Get recent conversation context
-            latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
-            if not any(latest_messages):
-                if debug:
-                    print(f"[text_to_image] No context messages for session {session_id}")
-                return None
-            
-            # Build conversation text
-            conversation_text = "Please generate a text-to-image prompt based on the following conversation:\n\n"
-            for msg in latest_messages:
-                if msg is not None:
-                    # Extract text content from multimodal messages
-                    if isinstance(msg.content, list):
-                        text_parts = []
-                        for block in msg.content:
-                            if isinstance(block, dict) and block.get("type") == "text":
-                                text_parts.append(block.get("text", ""))
-                            elif isinstance(block, dict) and "text" in block:
-                                text_parts.append(block["text"])
-                        content_text = "".join(text_parts)
-                    else:
-                        content_text = str(msg.content)
-                    
-                    conversation_text += f"{msg.role}: {content_text}\n"
-            
-            # Create user message
-            user_message = UserMessage(role="user", content=conversation_text)
-            formatted_messages = OpenAIMessageFormatter.format_messages([user_message])
+            # Format messages using OpenAI formatter
+            formatted_messages = OpenAIMessageFormatter.format_messages(messages)
             
             # Add system prompt
-            api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
+            api_messages = [{"role": "system", "content": context['system_prompt']}] + formatted_messages
             
             if debug:
                 OpenAIDebugger.print_debug_request_payload({
@@ -185,11 +163,14 @@ class ImagePromptGenerator:
                     'messages': api_messages
                 })
             
+            # Use the model from context (which now correctly uses OpenAI's model)
+            model_for_text_to_image = context.get('model', llm_openai_config.model)
+            
             # Call OpenAI API
             response = client.chat.completions.create(
-                model=DEFAULT_IMAGE_PROMPT_MODEL,
+                model=model_for_text_to_image,
                 messages=api_messages,
-                temperature=IMAGE_PROMPT_TEMPERATURE,
+                temperature=context.get('temperature', 1.0),
                 max_tokens=1024
             )
             
@@ -206,53 +187,10 @@ class ImagePromptGenerator:
             if debug:
                 print(f"[text_to_image] Raw response: {prompt_text[:200]}...")
             
-            # Parse response
-            text_match = re.search(r"<text_to_image_prompt>(.*?)</text_to_image_prompt>", prompt_text, re.DOTALL)
-            neg_match = re.search(r"<negative_prompt>(.*?)</negative_prompt>", prompt_text, re.DOTALL)
-            
-            if not text_match:
-                if debug:
-                    print("[text_to_image] Failed to parse prompt tags")
-                return None
-            
-            text_prompt = text_match.group(1).strip()
-            negative_prompt = (
-                neg_match.group(1).strip() if neg_match 
-                else "blurry, low quality, distorted, extra limbs, bad anatomy, text, watermark, ugly"
+            # Process response using inherited method
+            return ImagePromptGenerator.process_generation_response(
+                prompt_text, context, session_id, debug
             )
-            
-            # Enhance with defaults
-            default_positive = text_to_image_settings.text_to_image_default_positive_prompt
-            default_negative = text_to_image_settings.text_to_image_default_negative_prompt
-            
-            if default_positive:
-                # Add missing positive keywords
-                existing_keywords = set(kw.strip().lower() for kw in text_prompt.split(","))
-                default_keywords = set(kw.strip().lower() for kw in default_positive.split(","))
-                missing_keywords = default_keywords - existing_keywords
-                
-                if missing_keywords:
-                    missing_text = ", ".join(missing_keywords)
-                    text_prompt = f"{missing_text}, {text_prompt}"
-            
-            if default_negative:
-                # Add missing negative keywords
-                existing_neg_keywords = set(kw.strip().lower() for kw in negative_prompt.split(","))
-                default_neg_keywords = set(kw.strip().lower() for kw in default_negative.split(","))
-                missing_neg_keywords = default_neg_keywords - existing_neg_keywords
-                
-                if missing_neg_keywords:
-                    missing_neg_text = ", ".join(missing_neg_keywords)
-                    negative_prompt = f"{missing_neg_text}, {negative_prompt}"
-            
-            if debug:
-                print(f"[text_to_image] Final text_prompt: {text_prompt}")
-                print(f"[text_to_image] Final negative_prompt: {negative_prompt}")
-            
-            return {
-                "text_prompt": text_prompt,
-                "negative_prompt": negative_prompt
-            }
             
         except Exception as e:
             if debug:
