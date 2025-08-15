@@ -292,10 +292,17 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         
         # Get the appropriate model for prompt generation
         if llm_provider and llm_model:
-            prompt_model = text_to_image_settings.get_prompt_generation_model(llm_provider, llm_model)
+            # Use just the model name, not provider:model format
+            prompt_model = llm_model
         else:
-            # Fallback to configured model or None
-            prompt_model = getattr(text_to_image_settings, 'model_for_text_to_image', None)
+            # Fallback to default text-to-image model or None
+            try:
+                from backend.config import get_llm_settings
+                llm_settings = get_llm_settings()
+                prompt_model = llm_settings.get_current_model()
+            except Exception:
+                # Safe fallback if configuration is incomplete
+                prompt_model = None
         
         return {
             'system_prompt': text_to_image_settings.text_to_image_system_prompt or DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT,
