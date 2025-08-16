@@ -1,7 +1,8 @@
 """
-Agent Profile API Endpoints - Agent身份切换相关的API接口
+Agent Profile API Endpoints - Agent profile management and switching functionality.
 
-提供Agent身份管理功能，包括切换、获取列表、推荐等。
+Provides agent profile management features including switching profiles,
+getting available profiles list, and profile status information.
 """
 
 from fastapi import APIRouter, HTTPException, Request
@@ -19,15 +20,15 @@ from backend.infrastructure.llm import LLMClientBase
 
 router = APIRouter(prefix="/api/agent", tags=["agent-profiles"])
 
-# 全局状态：当前的Agent Profile
+# Global state: current agent profile
 _current_agent_profile: AgentProfileType = AgentProfileType.GENERAL
 
 
 
 def _convert_profile_type_to_enum(profile_type: AgentProfileType) -> AgentProfile:
-    """转换API枚举到内部枚举"""
+    """Convert API enum to internal enum."""
     if profile_type == AgentProfileType.DISABLED:
-        # 禁用工具时返回None，在业务逻辑中特殊处理
+        # DISABLED profile should be handled separately in business logic
         raise ValueError("DISABLED profile should be handled separately")
     
     mapping = {
@@ -39,7 +40,7 @@ def _convert_profile_type_to_enum(profile_type: AgentProfileType) -> AgentProfil
 
 
 def _create_profile_info(profile_type: AgentProfileType) -> AgentProfileInfo:
-    """创建Agent身份信息"""
+    """Create agent profile information."""
     if profile_type == AgentProfileType.DISABLED:
         return AgentProfileInfo(
             profile_type=profile_type,
@@ -47,7 +48,7 @@ def _create_profile_info(profile_type: AgentProfileType) -> AgentProfileInfo:
             description="All tools disabled, pure text conversation mode",
             tool_count=0,
             estimated_tokens=0,
-            color="#9E9E9E",  # 灰色
+            color="#9E9E9E",  # Gray color
             icon="🚫"
         )
     
@@ -65,34 +66,34 @@ def _create_profile_info(profile_type: AgentProfileType) -> AgentProfileInfo:
             icon=profile_config.icon
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"无效的Profile类型: {profile_type}")
+        raise HTTPException(status_code=400, detail=f"Invalid profile type: {profile_type}")
 
 
 @router.post("/profile", response_model=AgentProfileResponse)
 async def update_agent_profile(request: UpdateAgentProfileRequest, api_request: Request):
     """
-    切换Agent身份
+    Switch agent profile.
     
-    支持的身份类型：
-    - coding: 编程助手 (12个工具，专注代码开发)
-    - lifestyle: 生活助手 (19个工具，专注日常服务)  
-    - general: 通用助手 (30个工具，完整能力)
-    - disabled: 禁用工具 (0个工具，纯文本模式)
+    Supported profile types:
+    - coding: Coding assistant (focused development tools)
+    - lifestyle: Lifestyle assistant (daily life tools)  
+    - general: General assistant (all available tools)
+    - disabled: Tools disabled (pure text conversation mode)
     """
     global _current_agent_profile
     
     try:
         print(f"[DEBUG] Agent profile switch request: {request.profile}")
         
-        # 获取LLM客户端
+        # Get LLM client
         llm_client: LLMClientBase = api_request.app.state.llm_client
         
-        # 处理工具禁用情况
+        # Handle tools disabled case
         if request.profile == AgentProfileType.DISABLED:
             llm_client.update_config(tools_enabled=False)
             _current_agent_profile = AgentProfileType.DISABLED
             
-            # 清除工具缓存
+            # Clear tool cache
             if request.session_id and hasattr(llm_client, '_clear_session_tool_cache'):
                 await llm_client._clear_session_tool_cache(request.session_id)
             
@@ -103,25 +104,25 @@ async def update_agent_profile(request: UpdateAgentProfileRequest, api_request: 
                 current_profile=AgentProfileType.DISABLED,
                 profile_info=profile_info,
                 tools_enabled=False,
-                message="已切换到纯文本对话模式，所有工具已禁用"
+                message="Switched to pure text conversation mode, all tools disabled"
             )
         
-        # 启用工具并设置profile
+        # Enable tools and set profile
         llm_client.update_config(tools_enabled=True)
         
-        # 更新LLM客户端的agent_profile (需要在LLM客户端中添加支持)
+        # Update LLM client agent_profile (requires LLM client support)
         if hasattr(llm_client, 'update_agent_profile'):
             llm_client.update_agent_profile(request.profile.value)
         
-        # 清除工具缓存以应用新的profile设置
+        # Clear tool cache to apply new profile settings
         if request.session_id and hasattr(llm_client, '_clear_session_tool_cache'):
             await llm_client._clear_session_tool_cache(request.session_id)
             print(f"[DEBUG] Cleared tool cache for session: {request.session_id}")
         
-        # 更新全局状态
+        # Update global state
         _current_agent_profile = request.profile
         
-        # 创建响应信息
+        # Create response information
         profile_info = _create_profile_info(request.profile)
         
         print(f"[DEBUG] Agent profile switched to: {request.profile} ({profile_info.tool_count} tools)")
@@ -131,25 +132,25 @@ async def update_agent_profile(request: UpdateAgentProfileRequest, api_request: 
             current_profile=request.profile,
             profile_info=profile_info,
             tools_enabled=True,
-            message=f"已切换到{profile_info.name}模式，加载{profile_info.tool_count}个工具"
+            message=f"Switched to {profile_info.name} mode, loaded {profile_info.tool_count} tools"
         )
         
     except Exception as e:
         import traceback
         print(f"[ERROR] Agent profile switch failed: {e}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"切换Agent身份失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to switch agent profile: {str(e)}")
 
 
 @router.get("/profiles", response_model=GetAgentProfilesResponse)
 async def get_available_profiles():
-    """获取所有可用的Agent身份列表"""
+    """Get all available agent profiles list."""
     global _current_agent_profile
     
     try:
         available_profiles = []
         
-        # 添加所有支持的profile类型
+        # Add all supported profile types
         for profile_type in AgentProfileType:
             profile_info = _create_profile_info(profile_type)
             available_profiles.append(profile_info)
@@ -158,18 +159,18 @@ async def get_available_profiles():
             success=True,
             current_profile=_current_agent_profile,
             available_profiles=available_profiles,
-            message=f"当前Agent身份: {_current_agent_profile.value}"
+            message=f"Current agent profile: {_current_agent_profile.value}"
         )
         
     except Exception as e:
         print(f"[ERROR] Get available profiles failed: {e}")
-        raise HTTPException(status_code=500, detail=f"获取Agent身份列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get agent profiles list: {str(e)}")
 
 
 
 @router.get("/status", response_model=dict)
 async def get_agent_status(api_request: Request):
-    """获取当前Agent状态信息"""
+    """Get current agent status information."""
     global _current_agent_profile
     
     try:
@@ -183,9 +184,9 @@ async def get_agent_status(api_request: Request):
             "current_profile": _current_agent_profile,
             "profile_info": current_profile_info.model_dump(),
             "tools_enabled": tools_enabled,
-            "message": f"当前模式: {current_profile_info.name}"
+            "message": f"Current mode: {current_profile_info.name}"
         }
         
     except Exception as e:
         print(f"[ERROR] Get agent status failed: {e}")
-        raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")

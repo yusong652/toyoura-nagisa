@@ -109,7 +109,7 @@ Modular tool architecture with categories in `backend/infrastructure/mcp/tools/`
 - **Python**: Backend with FastAPI, uvicorn, ChromaDB
 - **React**: Frontend with TypeScript, Material-UI
 - **FastMCP**: Model Context Protocol implementation
-- **ChromaDB**: Vector database for memory and tool vectorization
+- **ChromaDB**: Vector database for long-term memory
 - **WebSocket**: Real-time communication
 - **Live2D**: Interactive character animations
 
@@ -131,11 +131,11 @@ The system supports multiple LLM providers with a pluggable architecture:
 
 ## Tool System
 
-### Tool Vectorization
-The system uses ChromaDB to vectorize tool descriptions for semantic search and dynamic tool selection:
-- Tools are embedded into vector space for semantic matching
-- LLM can query tool database to find relevant tools for tasks
-- Dynamic tool loading based on user requests
+### Agent-Based Tool Loading
+The system uses agent types to automatically load appropriate tool sets:
+- Tools are organized by category (coding, communication, media, etc.)
+- Agent types determine which tool categories to load
+- Dynamic tool activation based on agent specialization
 
 ### Tool Categories
 Tools are organized into categories and can be loaded on-demand:
@@ -169,7 +169,6 @@ Many tools integrate with Google services via OAuth:
 
 ### Memory Database Location
 - ChromaDB files stored in `backend/memory_db/`
-- Tool vectorization DB in `backend/tool_db/`
 - Session data in `backend/chat/data/`
 
 ## Development Patterns
@@ -196,14 +195,6 @@ Many tools integrate with Google services via OAuth:
 # Run all tests
 uv run pytest
 
-# Run tool vectorization tests
-uv run python backend/infrastructure/mcp/test_vectorizer_search.py
-
-# Check tool vectorization status
-uv run python backend/infrastructure/mcp/check_tool_vectorization.py
-
-# Initialize tool vectorization
-uv run python backend/infrastructure/mcp/init_tool_vectorization.py
 ```
 
 ### Frontend Testing
@@ -224,7 +215,7 @@ The frontend uses standard React testing practices with Vite.
 - MCP server runs on port 9000 for tool communication
 
 ### Memory Management
-- ChromaDB handles both conversation memory and tool vectorization
+- ChromaDB handles conversation memory and long-term context
 - Session-based memory isolation
 - Memory cleanup on session deletion
 
@@ -251,7 +242,6 @@ aiNagisa/
 │   │   │   └── shared/            # Common utilities
 │   │   ├── mcp/                   # Model Context Protocol system
 │   │   │   ├── smart_mcp_server.py # Main MCP server
-│   │   │   ├── tool_vectorizer.py  # Tool semantic search
 │   │   │   ├── tools/             # Tool implementations
 │   │   │   └── utils/             # MCP utilities
 │   │   ├── memory/                # ChromaDB memory system
@@ -260,7 +250,6 @@ aiNagisa/
 │   ├── config/                     # Configuration management
 │   ├── shared/                     # Common utilities and exceptions
 │   ├── memory_db/                  # ChromaDB persistence
-│   ├── tool_db/                    # Tool vectorization database
 │   └── workspace/                  # Development workspace
 ├── frontend/
 │   ├── src/
@@ -279,7 +268,7 @@ aiNagisa/
 - **Real-time Communication**: WebSocket for streaming responses and real-time features
 - **LLM Flexibility**: Pluggable architecture supports multiple LLM providers seamlessly
 - **Tool System**: Asynchronous MCP-based tools with semantic search and dynamic loading
-- **Memory Architecture**: Multi-layer memory with ChromaDB for both conversation and tool vectorization
+- **Memory Architecture**: Multi-layer memory with ChromaDB for conversation history and context
 - **Character Animation**: Live2D integration using PIXI.js for interactive UI
 - **UI Framework**: Material-UI for consistent React component styling
 - **TTS Flexibility**: Support for both local (GPT-SoVITS) and remote (Fish Audio) TTS providers
@@ -315,7 +304,6 @@ Example explanations:
 - Main config files: `base.py`, `llm.py`, `tts.py`, `email.py`, `text_to_image.py`
 - Database locations:
   - Memory DB: `backend/memory_db/`
-  - Tool vectorization DB: `backend/tool_db/`
   - Session data: `backend/chat/data/`
 
 ## Code Documentation Standards

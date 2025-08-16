@@ -32,12 +32,11 @@ class ToolProfileManager:
     
     # 编程类工具 (coding + web_search)
     CODING_TOOLS = [
-        "execute_python_script",
         "read_many_files", 
         "write_file",
         "read_file",
-        "run_shell_command",
-        "list_directory",
+        "bash",  # Updated from run_shell_command
+        "ls",    # Updated from list_directory
         "glob",
         "grep",
         "replace",
@@ -61,10 +60,7 @@ class ToolProfileManager:
         "get_location",
         "get_weather",
         "web_search",  # 生活中也需要搜索
-        "search_tools",
-        "get_available_tool_categories", 
-        "get_current_time",
-        "calculate"
+        "get_current_time"
     ]
     
     # 工具分类定义
@@ -73,7 +69,7 @@ class ToolProfileManager:
             name="Coding",
             description="Specialized in code development, file operations and programming tasks",
             tools=CODING_TOOLS,
-            estimated_tokens=len(CODING_TOOLS) * 282,  # 12个工具
+            estimated_tokens=len(CODING_TOOLS) * 282,  # 9个工具
             color="#4CAF50",  # 绿色
             icon="💻"
         ),
@@ -82,7 +78,7 @@ class ToolProfileManager:
             name="Lifestyle", 
             description="Focused on daily life, communication, entertainment and information services",
             tools=LIFESTYLE_TOOLS,
-            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 18个工具
+            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 16个工具
             color="#FF9800",  # 橙色
             icon="🌟"
         ),
@@ -91,7 +87,7 @@ class ToolProfileManager:
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=[],  # 空列表表示加载所有工具
-            estimated_tokens=8479,  # 所有30个工具
+            estimated_tokens=24 * 282,  # 所有24个工具
             color="#607D8B",  # 灰蓝色
             icon="🤖"
         )
@@ -121,7 +117,7 @@ class ToolProfileManager:
                 "name": config.name,
                 "description": config.description, 
                 "estimated_tokens": config.estimated_tokens,
-                "tool_count": len(config.tools) if config.tools else 30,
+                "tool_count": len(config.tools) if config.tools else 24,
                 "color": config.color,
                 "icon": config.icon
             }

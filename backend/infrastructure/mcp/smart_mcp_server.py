@@ -21,16 +21,13 @@ from backend.infrastructure.mcp.tools.places_tools import register_places_tools
 from backend.infrastructure.mcp.tools.location_tool import register_location_tools
 from backend.infrastructure.mcp.tools.weather_tool import register_weather_tools
 from backend.infrastructure.mcp.tools.time_tool import register_time_tools
-from backend.infrastructure.mcp.tools.calculator_tool import register_calculator_tools
-from backend.infrastructure.mcp.tools.meta_tool import register_meta_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
     instructions="""
-    This is a Smart MCP Server for Nagisa with dynamic tool selection capabilities.
-    The server can automatically select and register relevant tools based on user requests.
-    Use get_available_tool_categories() to see what tool categories are available.
-    Use request_tools_for_task() to request specific tools for a task.
+    This is a Smart MCP Server for Nagisa with comprehensive tool support.
+    The server provides various tool categories for different tasks including coding,
+    communication, information retrieval, media generation, and utilities.
     """
 )
 
@@ -47,8 +44,6 @@ register_places_tools(mcp)
 register_location_tools(mcp)
 register_weather_tools(mcp)
 register_time_tools(mcp)
-register_calculator_tools(mcp)
-register_meta_tools(mcp)  # 注册 meta tools
 
 # 启动服务器
 if __name__ == "__main__":

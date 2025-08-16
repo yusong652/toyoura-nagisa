@@ -78,7 +78,6 @@ def get_base_config() -> BaseConfig:
 # Base paths
 BASE_DIR = Path(__file__).parent.parent
 CHAT_DIR = BASE_DIR / "chat"
-TOOL_DB_PATH = BASE_DIR / "tool_db"
 LOCATION_DB_PATH = BASE_DIR / "location_data"
 MEMORY_DB_PATH = BASE_DIR / "memory_db"
 
@@ -196,7 +195,6 @@ __all__ = [
     # Path constants
     "BASE_DIR",
     "CHAT_DIR",
-    "TOOL_DB_PATH",
     "LOCATION_DB_PATH",
     "MEMORY_DB_PATH",
 ] 
