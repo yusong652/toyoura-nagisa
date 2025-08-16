@@ -19,7 +19,7 @@ from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP
 
-from backend.infrastructure.mcp.tools.google_auth.google_calendar import build_google_calendar_service
+from backend.infrastructure.auth.google.google_calendar import build_google_calendar_service
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
 from backend.infrastructure.mcp.utils import ensure_future_datetime
 from backend.infrastructure.mcp.utils.datetime_builder import (

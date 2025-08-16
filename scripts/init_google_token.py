@@ -1,17 +1,24 @@
 import os
+import sys
+from pathlib import Path
+
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from backend.config import get_auth_config
-from backend.infrastructure.mcp.tools.google_auth.oauth import SCOPES
+from backend.infrastructure.auth.google.oauth import SCOPES
 
 def main():
     """
     Run this script to complete Google OAuth2 flow in your browser and save token.json for each account.
     Token will be saved as tokens/token_{email}.json
     """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    credentials_path = os.path.join(script_dir, 'credentials.json')  # Google Cloud下载的credentials.json
-    tokens_dir = os.path.join(script_dir, 'tokens')
+    # Use the secure credentials directory for credentials and tokens
+    credentials_dir = project_root / 'credentials' / 'google'
+    credentials_path = credentials_dir / 'credentials.json'
+    tokens_dir = credentials_dir / 'tokens'
     os.makedirs(tokens_dir, exist_ok=True)
 
     if not os.path.exists(credentials_path):
@@ -36,6 +43,12 @@ def main():
     safe_email = email.replace('@', '_at_').replace('.', '_')
     token_path = os.path.join(tokens_dir, f'token_{safe_email}.json')
 
+    # Check if token already exists and inform user
+    if os.path.exists(token_path):
+        print(f"Updating existing token for {email}")
+    else:
+        print(f"Creating new token for {email}")
+    
     with open(token_path, 'w') as token_file:
         token_file.write(creds.to_json())
     print(f"Token saved to {token_path} for account: {email}")

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 import os
 
-from backend.infrastructure.mcp.tools.google_auth.google_contacts import build_google_contacts_service
+from backend.infrastructure.auth.google.google_contacts import build_google_contacts_service
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
 
 class Contact(BaseModel):

@@ -10,7 +10,7 @@ import os
 from email.mime.text import MIMEText
 import base64
 
-from backend.infrastructure.mcp.tools.google_auth.gmail_service import get_gmail_service
+from backend.infrastructure.auth.google.gmail_service import get_gmail_service
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
 
 class EmailMessage(BaseModel):
