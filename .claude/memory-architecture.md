@@ -4,7 +4,7 @@
 
 **目标**: 将aiNagisa从"工具调用器"升级为"认知Agent"，记忆系统从可选工具升级为认知基础设施
 
-**核心理念**: 
+**核心理念**:
 > "记忆不应该是可选的工具，而应该是Agent的认知基础设施。就像人类不会'选择'是否使用记忆，Agent的记忆应该始终在线、自动激活。"
 
 ## 🏗️ 总体架构设计
@@ -12,11 +12,13 @@
 ### 现状分析
 
 **当前实现 (Tool-Based Memory):**
+
 ```
 用户消息 → LLM推理 → [用户选择调用记忆工具] → 记忆检索 → 响应
 ```
 
 **目标架构 (Infrastructure Memory):**
+
 ```
 用户消息 → 记忆自动注入 → 增强上下文 → LLM推理 → 响应 → 记忆更新
 ```
@@ -85,6 +87,7 @@ async def inject_memory_context(
 ```
 
 **核心逻辑:**
+
 1. 提取用户最新消息的语义向量
 2. 检索相关记忆（TOP-5，排除最近对话）
 3. 格式化记忆为系统消息
@@ -95,6 +98,7 @@ async def inject_memory_context(
 **文件位置**: `backend/infrastructure/memory/memory_manager.py`
 
 **新增方法:**
+
 ```python
 async def get_relevant_memories_for_context(
     self, 
@@ -115,6 +119,7 @@ async def get_relevant_memories_for_context(
 ```
 
 **记忆数据结构增强:**
+
 ```python
 @dataclass
 class EnhancedMemory:
@@ -134,6 +139,7 @@ class EnhancedMemory:
 **修改位置**: `backend/presentation/streaming/handlers.py`
 
 **当前流程:**
+
 ```python
 async def handle_llm_response(messages, session_id, ...):
     # 直接调用LLM
@@ -141,6 +147,7 @@ async def handle_llm_response(messages, session_id, ...):
 ```
 
 **增强流程:**
+
 ```python
 async def handle_llm_response(messages, session_id, ...):
     # 1. 记忆注入
@@ -245,7 +252,7 @@ class MemoryConflictResolver:
 
 ### 技术方案对比
 
-| 指标 | 现有ChromaDB增强 | Mem0集成 | Zep/Graphiti | 
+| 指标 | 现有ChromaDB增强 | Mem0集成 | Zep/Graphiti |
 |------|------------------|----------|--------------|
 | **开发成本** | 低 (2周) | 中 (3-4周) | 高 (6-8周) |
 | **维护复杂度** | 低 | 中 | 高 |
@@ -280,16 +287,19 @@ class HybridMemoryManager:
 ## 📊 预期收益
 
 ### 用户体验提升
+
 - **减少重复解释**: 记忆自动激活，用户无需重复说明偏好
 - **上下文连续性**: Agent展现明显的"记忆连续性"
 - **个性化响应**: 基于历史偏好提供个性化建议
 
 ### 系统性能优化
+
 - **记忆命中率**: 目标 >80% 相关记忆成功检索
 - **响应延迟**: 记忆注入增加 <200ms
 - **Token效率**: 相比全量上下文减少60-80% token消耗
 
 ### 技术指标
+
 ```python
 class MemorySystemMetrics:
     """记忆系统监控指标"""
@@ -304,11 +314,13 @@ class MemorySystemMetrics:
 ## 🛡️ 风险控制
 
 ### 向后兼容策略
+
 1. **保留现有工具**: search_memory工具保持可用
 2. **渐进式启用**: 通过配置开关控制记忆自动注入
 3. **降级机制**: 记忆服务异常时自动降级到无记忆模式
 
 ### 性能保障
+
 ```python
 # 性能保护机制
 class MemoryPerformanceGuard:
@@ -329,22 +341,26 @@ class MemoryPerformanceGuard:
 ## 📝 实施路线图
 
 ### Week 1: 核心基础设施
+
 - [x] 架构设计文档
 - [ ] inject_memory_context 函数实现
 - [ ] memory_manager 增强
 - [ ] handle_llm_response 流程修改
 
 ### Week 2: 集成测试
+
 - [ ] 记忆注入功能测试
 - [ ] 性能基准测试
 - [ ] 用户体验验证
 
 ### Week 3-4: 时间感知
+
 - [ ] 记忆分层系统
 - [ ] 时间衰减机制
 - [ ] 冲突解决策略
 
 ### Week 5-6: 架构评估
+
 - [ ] Mem0/Zep 技术预研
 - [ ] 性能对比测试
 - [ ] 迁移方案设计
@@ -370,7 +386,8 @@ backend/
 
 ---
 
-**设计原则**: 
+**设计原则**:
+
 1. **渐进式演进** - 避免大爆炸式重写
 2. **向后兼容** - 保持现有功能稳定
 3. **性能优先** - 记忆注入不能显著影响响应速度
