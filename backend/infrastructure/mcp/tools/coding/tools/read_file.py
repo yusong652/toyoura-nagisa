@@ -457,13 +457,16 @@ Usage:
         # Build structured LLM content
         rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
         
-        # Handle content based on file type
+        # Handle content based on file type and ensure llm_content is always a dict
         if processing_result.content_format == ContentFormat.INLINE_DATA:
             # For binary files, return the inline_data structure directly for multimodal LLM
-            llm_content = processing_result.content
+            if isinstance(processing_result.content, dict):
+                llm_content = processing_result.content
+            else:
+                llm_content = {"content": processing_result.content}
         else:
-            # For text files, include the actual content
-            llm_content = processing_result.content
+            # For text files, wrap content in a dictionary structure
+            llm_content = {"content": processing_result.content}
 
         return _success(
             message,

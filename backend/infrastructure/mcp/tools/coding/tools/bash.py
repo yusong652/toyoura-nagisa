@@ -82,11 +82,11 @@ Usage notes:
     def _error(message: str) -> Dict[str, Any]:
         return ToolResult(status="error", message=message, error=message).model_dump()
 
-    def _success(message: str, output: str, **data: Any) -> Dict[str, Any]:
+    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
         return ToolResult(
             status="success",
             message=message,
-            llm_content=output,
+            llm_content=llm_content,
             data=data
         ).model_dump()
 
