@@ -6,10 +6,6 @@ structure used by Google's gemini-cli project.
 """
 
 from ..utils.path_security import validate_path_in_workspace
-from .python_executor import (
-    execute_python_script,
-    register_python_executor_tools,
-)
 from .read_many_files import (
     read_many_files,
     register_read_many_files_tool,
@@ -31,7 +27,6 @@ __all__ = [
     "read_many_files",
     "write_file",
     "read_file",
-    "execute_python_script",
     "run_shell_command",
     "grep",
     "replace",
@@ -45,7 +40,6 @@ def register_coding_tools(mcp):
     one by one, callers can simply invoke `register_coding_tools(mcp)` once.
     """
     # workspace tools removed (stateful cd no longer needed)
-    register_python_executor_tools(mcp)
     register_read_many_files_tool(mcp)
     register_write_file_tool(mcp)
     register_ls_tool(mcp)  # New simplified ls tool
