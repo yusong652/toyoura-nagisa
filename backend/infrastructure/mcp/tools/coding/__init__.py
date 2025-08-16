@@ -1,17 +1,16 @@
 # This package has been refactored – individual tools now live in
 # `coding.tools.*`. The imports below provide backward-compatibility for external
-# callers that still rely on the previous public interface (e.g. `from
-# nagisa_mcp.tools.coding import list_directory`).
+# callers that still rely on the previous public interface.
 
 from .tools import (
     # Public tool functions
-    list_directory,
+    ls,  # New simplified directory listing tool
+    glob,  # New simplified glob pattern matching tool
     read_many_files,
     write_file,
     delete_file,
     execute_python_script,
     run_shell_command,
-    glob,
     grep,
     replace,
     # Registration helper
@@ -24,15 +23,13 @@ from .tools import (
 
 __all__ = [
     'register_coding_tools',
-    'list_directory',
+    'ls',  # New simplified directory listing tool
+    'glob',  # New simplified glob pattern matching tool
     'read_many_files',
     'write_file',
     'delete_file',
-    'get_current_workspace',
-    'change_workspace',
     'execute_python_script',
     'run_shell_command',
-    'glob',
     'grep',
     'replace',
 ]

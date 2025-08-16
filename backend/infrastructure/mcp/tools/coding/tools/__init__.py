@@ -15,12 +15,12 @@ from .read_many_files import (
     register_read_many_files_tool,
 )
 from .write_file import write_file, register_write_file_tool
-from .list_directory import list_directory, register_list_directory_tool
+from .ls import ls, register_ls_tool
 from .delete_file import delete_file, register_delete_file_tool
 from .delete_directory import delete_directory, register_delete_directory_tool
 from .read_file import read_file, register_read_file_tool
 from .shell_command import run_shell_command, register_shell_command_tool
-from .glob import glob, register_glob_tool
+from .glob import glob, register_glob_tool  # New simplified glob tool
 from .grep import grep, register_grep_tool
 from .replace import replace, register_replace_tool
 from ...builtin.web_search import web_search, register_web_search_tool
@@ -28,7 +28,8 @@ from . import constants
 
 __all__ = [
     "register_coding_tools",
-    "list_directory",
+    "ls",
+    "glob",
     "read_many_files",
     "write_file",
     "read_file",
@@ -36,7 +37,6 @@ __all__ = [
     "delete_directory",
     "execute_python_script",
     "run_shell_command",
-    "glob",
     "grep",
     "replace",
     "web_search",
@@ -52,12 +52,12 @@ def register_coding_tools(mcp):
     register_python_executor_tools(mcp)
     register_read_many_files_tool(mcp)
     register_write_file_tool(mcp)
-    register_list_directory_tool(mcp)
+    register_ls_tool(mcp)  # New simplified ls tool
     register_delete_file_tool(mcp)
     register_delete_directory_tool(mcp)
     register_read_file_tool(mcp)
     register_shell_command_tool(mcp)
-    register_glob_tool(mcp)
+    register_glob_tool(mcp)  # New simplified glob tool
     register_grep_tool(mcp)
     register_replace_tool(mcp)
     register_web_search_tool(mcp) 
