@@ -116,12 +116,21 @@ class MessageFormatter(BaseMessageFormatter):
             result = {"text": "chart", "inline_data": {"data": "base64..."}}
             # Returns: [{"type": "text", "text": '{"text": "chart"}'}, {"type": "image", ...}]
         """
-        # Handle multimodal content with images (only if inline_data has actual data)
-        if isinstance(result, dict) and 'inline_data' in result and result['inline_data']:
+        # Handle multimodal content with images
+        # Check new format: inline_data inside llm_content
+        if isinstance(result, dict) and 'llm_content' in result and isinstance(result['llm_content'], dict) and 'inline_data' in result['llm_content']:
+            # New format: prepare data for _format_multimodal_content
+            multimodal_data = {
+                'llm_content': result['llm_content'],
+                'inline_data': result['llm_content']['inline_data']
+            }
+            return MessageFormatter._format_multimodal_content(multimodal_data)
+        # Check legacy format: inline_data at root level
+        elif isinstance(result, dict) and 'inline_data' in result and result['inline_data']:
             return MessageFormatter._format_multimodal_content(result)
         
         # Handle standardized ToolResult - extract llm_content
-        if isinstance(result, dict) and 'llm_content' in result:
+        elif isinstance(result, dict) and 'llm_content' in result:
             content = result['llm_content']
             # Convert to JSON string for API compatibility
             if isinstance(content, (dict, list)):

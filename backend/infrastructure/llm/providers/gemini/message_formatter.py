@@ -144,22 +144,39 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         
         parts = []
         
+        # Extract llm_content for processing
+        llm_content = result.get("llm_content") if isinstance(result, dict) else None
+        
         # Handle multimodal content (inline_data) if present
-        if isinstance(result, dict) and 'inline_data' in result:
+        inline_data = None
+        if isinstance(llm_content, dict) and 'inline_data' in llm_content:
+            # New format: inline_data is inside llm_content
+            inline_data = llm_content['inline_data']
+        elif isinstance(result, dict) and 'inline_data' in result:
+            # Legacy format: inline_data at root level (for backwards compatibility)
             inline_data = result['inline_data']
-            # Check if inline_data actually contains data
-            if inline_data and 'data' in inline_data and inline_data['data']:
-                blob = GeminiMessageFormatter._process_inline_data(inline_data)
-                if blob:
-                    parts.append(types.Part(inline_data=blob))
+        
+        # Process inline_data if found
+        if inline_data and 'data' in inline_data and inline_data['data']:
+            blob = GeminiMessageFormatter._process_inline_data(inline_data)
+            if blob:
+                parts.append(types.Part(inline_data=blob))
         
         # Create function response part
-        # Filter out inline_data to avoid duplication in function response
-        text_result = result["llm_content"]
+        # For response field, ensure it's always a dictionary
+        if llm_content is not None:
+            # If llm_content exists, use it (ensuring dictionary format)
+            if isinstance(llm_content, dict):
+                response_data = llm_content
+            else:
+                response_data = {"content": llm_content}
+        else:
+            # Fallback to the full result
+            response_data = result
         
         function_response = types.FunctionResponse(
             name=tool_name,
-            response=text_result if text_result else result
+            response=response_data
         )
         parts.append(types.Part(function_response=function_response))
         

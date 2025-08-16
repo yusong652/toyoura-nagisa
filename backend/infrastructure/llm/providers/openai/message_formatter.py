@@ -188,9 +188,18 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             result = {"llm_content": {"text": "chart"}, "inline_data": {"data": "base64..."}}
             # Returns: [{"type": "text", "text": '{"text": "chart"}'}, {"type": "image_url", ...}]
         """
-        # Handle multimodal content (llm_content + inline_data)
-        # Note: OpenAI tool messages only support text content, so we extract llm_content
-        if isinstance(content, dict) and 'llm_content' in content and 'inline_data' in content:
+        # Handle multimodal content
+        # Check new format: inline_data inside llm_content
+        if isinstance(content, dict) and 'llm_content' in content and isinstance(content['llm_content'], dict) and 'inline_data' in content['llm_content']:
+            # New format: OpenAI tool messages only support text, so extract non-image content
+            llm_content = content['llm_content'].copy()
+            # Remove inline_data from the response
+            llm_content.pop('inline_data', None)
+            if llm_content:
+                return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
+            return '{"status": "image processed"}'
+        # Check legacy format: inline_data at root level
+        elif isinstance(content, dict) and 'llm_content' in content and 'inline_data' in content:
             llm_content = content['llm_content']
             if isinstance(llm_content, (dict, list)):
                 return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
