@@ -13,7 +13,7 @@ from backend.infrastructure.storage.image_storage import (
     save_image_from_url,
     save_image_from_base64
 )
-from backend.infrastructure.mcp.tools.text_to_image import (
+from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import (
     generate_image_from_description
 )
 from backend.shared.utils.helpers import generate_title_for_session as generate_title_helper

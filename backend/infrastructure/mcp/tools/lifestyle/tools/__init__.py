@@ -1,0 +1,3 @@
+"""
+Lifestyle tools implementation module.
+"""

@@ -12,15 +12,15 @@ sys.path.insert(0, str(_PROJECT_ROOT))
 import asyncio
 from fastmcp import FastMCP
 from backend.infrastructure.mcp.tools.builtin import register_builtin_tools
-from backend.infrastructure.mcp.tools.email_tools import register_email_tools
-from backend.infrastructure.mcp.tools.calendar import register_calendar_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.email import register_email_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.calendar import register_calendar_tools
 from backend.infrastructure.mcp.tools.coding import register_coding_tools
-from backend.infrastructure.mcp.tools.text_to_image import register_text_to_image_tools
-from backend.infrastructure.mcp.tools.contact_tools import register_contact_tools
-from backend.infrastructure.mcp.tools.places_tools import register_places_tools
-from backend.infrastructure.mcp.tools.location_tool import register_location_tools
-from backend.infrastructure.mcp.tools.weather_tool import register_weather_tools
-from backend.infrastructure.mcp.tools.time_tool import register_time_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import register_text_to_image_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.contacts import register_contact_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_places_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.weather import register_weather_tools
+from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
