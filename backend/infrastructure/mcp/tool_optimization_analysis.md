@@ -37,7 +37,7 @@ Meta工具流程:
 #### Agent身份分类:
 ```
 1. Coding Agent (6 tools, ~1,692 tokens)
-   - 文件操作: read_file, write_file, delete_file, read_many_files
+   - 文件操作: read_file, write_file, read_many_files
    - 代码执行: execute_python_script, run_shell_command
 
 2. Communication Agent (9 tools, ~2,538 tokens)  

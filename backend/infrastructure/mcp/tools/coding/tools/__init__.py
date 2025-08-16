@@ -16,8 +16,6 @@ from .read_many_files import (
 )
 from .write_file import write_file, register_write_file_tool
 from .ls import ls, register_ls_tool
-from .delete_file import delete_file, register_delete_file_tool
-from .delete_directory import delete_directory, register_delete_directory_tool
 from .read_file import read_file, register_read_file_tool
 from .shell_command import run_shell_command, register_shell_command_tool
 from .glob import glob, register_glob_tool  # New simplified glob tool
@@ -33,8 +31,6 @@ __all__ = [
     "read_many_files",
     "write_file",
     "read_file",
-    "delete_file",
-    "delete_directory",
     "execute_python_script",
     "run_shell_command",
     "grep",
@@ -53,8 +49,6 @@ def register_coding_tools(mcp):
     register_read_many_files_tool(mcp)
     register_write_file_tool(mcp)
     register_ls_tool(mcp)  # New simplified ls tool
-    register_delete_file_tool(mcp)
-    register_delete_directory_tool(mcp)
     register_read_file_tool(mcp)
     register_shell_command_tool(mcp)
     register_glob_tool(mcp)  # New simplified glob tool

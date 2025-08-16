@@ -8,7 +8,6 @@ from .tools import (
     glob,  # New simplified glob pattern matching tool
     read_many_files,
     write_file,
-    delete_file,
     execute_python_script,
     run_shell_command,
     grep,
@@ -27,7 +26,6 @@ __all__ = [
     'glob',  # New simplified glob pattern matching tool
     'read_many_files',
     'write_file',
-    'delete_file',
     'execute_python_script',
     'run_shell_command',
     'grep',
