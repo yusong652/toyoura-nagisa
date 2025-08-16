@@ -13,7 +13,7 @@ from .read_many_files import (
 from .write_file import write_file, register_write_file_tool
 from .ls import ls, register_ls_tool
 from .read_file import read_file, register_read_file_tool
-from .shell_command import run_shell_command, register_shell_command_tool
+from .bash import bash, register_bash_tool
 from .glob import glob, register_glob_tool  # New simplified glob tool
 from .grep import grep, register_grep_tool
 from .replace import replace, register_replace_tool
@@ -27,7 +27,7 @@ __all__ = [
     "read_many_files",
     "write_file",
     "read_file",
-    "run_shell_command",
+    "bash",
     "grep",
     "replace",
     "web_search",
@@ -44,7 +44,7 @@ def register_coding_tools(mcp):
     register_write_file_tool(mcp)
     register_ls_tool(mcp)  # New simplified ls tool
     register_read_file_tool(mcp)
-    register_shell_command_tool(mcp)
+    register_bash_tool(mcp)
     register_glob_tool(mcp)  # New simplified glob tool
     register_grep_tool(mcp)
     register_replace_tool(mcp)

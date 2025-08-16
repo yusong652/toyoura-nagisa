@@ -8,8 +8,7 @@ from .tools import (
     glob,  # New simplified glob pattern matching tool
     read_many_files,
     write_file,
-    execute_python_script,
-    run_shell_command,
+    bash,
     grep,
     replace,
     # Registration helper
@@ -27,7 +26,7 @@ __all__ = [
     'read_many_files',
     'write_file',
     'execute_python_script',
-    'run_shell_command',
+    'bash',
     'grep',
     'replace',
 ]
