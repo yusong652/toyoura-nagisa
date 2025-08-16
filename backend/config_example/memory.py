@@ -150,6 +150,10 @@ MEMORY_MEMORY_SEARCH_TIMEOUT_MS=500
 # Debug (debug_mode moved to basic settings above)
 MEMORY_SHOW_MEMORY_IN_RESPONSE=false
 
+# Custom prompts (these override markdown files if set)
+MEMORY_CUSTOM_FACT_EXTRACTION_PROMPT="Extract customer support information, order details..."
+MEMORY_CUSTOM_UPDATE_MEMORY_PROMPT="You are a smart memory manager which controls..."
+
 # API Keys (required based on provider)
 GOOGLE_API_KEY=your_google_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
