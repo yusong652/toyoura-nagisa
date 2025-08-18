@@ -34,7 +34,6 @@ __all__ = ["read", "register_read_tool"]
 
 # File size limits
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50MB maximum file size
-LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MB considered large
 INLINE_MAX_BYTES = 1024 * 1024  # 1MB maximum for inline binary data
 
 # Text processing limits
@@ -58,19 +57,6 @@ IMAGE_EXTENSIONS = {
     '.svg', '.webp', '.ico', '.psd', '.ai', '.eps'
 }
 
-DOCUMENT_EXTENSIONS = {
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-    '.odt', '.ods', '.odp', '.rtf', '.pages', '.numbers', '.keynote'
-}
-
-BINARY_EXTENSIONS = {
-    '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
-    '.exe', '.dll', '.so', '.dylib', '.lib', '.a',
-    '.class', '.jar', '.war', '.ear', '.apk', '.dex',
-    '.o', '.obj', '.bin', '.dat', '.db', '.sqlite',
-    '.pyc', '.pyo', '.wasm', '.node', '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus',
-    '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.dmg', '.iso'
-}
 
 # Encoding detection order
 ENCODING_CANDIDATES = [
@@ -84,19 +70,13 @@ ENCODING_CANDIDATES = [
 class FileType(str, Enum):
     """File type categories."""
     TEXT = "text"
-    BINARY = "binary"
     IMAGE = "image"
-    DOCUMENT = "document"
-    AUDIO = "audio"
-    VIDEO = "video"
-    ARCHIVE = "archive"
-    UNKNOWN = "unknown"
+    BINARY = "binary"
 
 
 class ContentFormat(str, Enum):
     """Content format options."""
     TEXT = "text"
-    BASE64 = "base64"
     METADATA = "metadata"
     INLINE_DATA = "inline_data"
 
@@ -116,16 +96,6 @@ class ProcessingResult:
     processed_size: int
     lines_shown: Tuple[int, int]
     
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "content": self.content,
-            "content_format": self.content_format.value,
-            "truncated": self.truncated,
-            "truncation_reason": self.truncation_reason,
-            "original_size": self.original_size,
-            "processed_size": self.processed_size,
-            "lines_shown": list(self.lines_shown),
-        }
 
 # -----------------------------------------------------------------------------
 # Helper utilities
@@ -139,29 +109,9 @@ def _detect_file_type(file_path: Path) -> FileType:
         return FileType.TEXT
     elif ext in IMAGE_EXTENSIONS:
         return FileType.IMAGE
-    elif ext in DOCUMENT_EXTENSIONS:
-        return FileType.DOCUMENT
-    elif ext in BINARY_EXTENSIONS:
+    else:
+        # For all other files, treat as binary
         return FileType.BINARY
-    
-    # Content-based detection for unknown extensions
-    try:
-        with file_path.open('rb') as f:
-            sample = f.read(SAMPLE_SIZE_BINARY)
-        
-        # Check for null bytes (binary indicator)
-        if b'\x00' in sample:
-            return FileType.BINARY
-        
-        # Try to decode as text
-        try:
-            sample.decode('utf-8')
-            return FileType.TEXT
-        except UnicodeDecodeError:
-            return FileType.BINARY
-            
-    except Exception:
-        return FileType.UNKNOWN
 
 def _detect_encoding(file_path: Path) -> Tuple[Optional[str], bool]:
     """Detect file encoding and BOM presence."""
@@ -200,7 +150,7 @@ def _read_text_content(
     offset: Optional[int] = None, 
     limit: Optional[int] = None
 ) -> ProcessingResult:
-    """Read and process text content with simple truncation."""
+    """Read and process text content with Claude Code format (cat -n style)."""
     try:
         with file_path.open('r', encoding=encoding, errors='replace') as f:
             content = f.read()
@@ -214,19 +164,18 @@ def _read_text_content(
         
         selected_lines = lines[start_line:end_line]
         
-        # Process lines with length limits
+        # Process lines with Claude Code format (cat -n style with line numbers)
         processed_lines = []
-        for line in selected_lines:
+        for i, line in enumerate(selected_lines, start=start_line + 1):
+            # Truncate long lines
             if len(line) > MAX_LINE_LENGTH:
-                processed_lines.append(line[:MAX_LINE_LENGTH] + "... [line truncated]")
-            else:
-                processed_lines.append(line)
+                line = line[:MAX_LINE_LENGTH] + "... [line truncated]"
+            
+            # Format with line number and arrow separator (Claude Code style)
+            processed_lines.append(f"{i:6}→{line}")
         
         result_content = '\n'.join(processed_lines)
         truncated = end_line < total_lines
-        
-        if truncated:
-            result_content = f"[Showing lines {start_line + 1}-{end_line} of {total_lines} total]\n" + result_content
         
         return ProcessingResult(
             content=result_content,
@@ -451,17 +400,21 @@ Usage:
         if processing_result.truncated:
             message = f"Read {file_type.value} file: {file_path.name} (lines {processing_result.lines_shown[0]}-{processing_result.lines_shown[1]})"
         else:
-            lines = len(processing_result.content.splitlines()) if isinstance(processing_result.content, str) else 0
-            message = f"Read {file_type.value} file: {file_path.name} ({lines} lines)"
+            # For text files, calculate lines from the range shown
+            if processing_result.content_format == ContentFormat.TEXT:
+                lines = processing_result.lines_shown[1] - processing_result.lines_shown[0] + 1
+                message = f"Read {file_type.value} file: {file_path.name} ({lines} lines)"
+            else:
+                message = f"Read {file_type.value} file: {file_path.name} (0 lines)"
 
         # Build structured LLM content
         rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
         
-        # Handle content based on file type and ensure llm_content is always a dict
+        # Handle content based on file type - align with Claude Code format
         if processing_result.content_format == ContentFormat.INLINE_DATA:
-            # For binary files, include both metadata and inline_data for multimodal LLM
+            # For binary/multimodal files, include metadata and inline_data for LLM provider compatibility
             if isinstance(processing_result.content, dict) and "inline_data" in processing_result.content:
-                # Include file metadata alongside inline_data
+                # Include file metadata alongside inline_data for multimodal LLM consumption
                 llm_content = {
                     "file_path": str(rel_display),
                     "file_type": file_type.value,
@@ -470,8 +423,8 @@ Usage:
             else:
                 llm_content = {"content": processing_result.content}
         else:
-            # For text files, wrap content in a dictionary structure
-            llm_content = {"content": processing_result.content}
+            # For text files, return content directly (Claude Code format)
+            llm_content = processing_result.content
 
         return _success(
             message,
