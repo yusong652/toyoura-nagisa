@@ -199,15 +199,15 @@ def grep(
     ),
     path: Optional[str] = Field(
         None,
-        description="File or directory to search in (rg PATH). Defaults to current working directory.",
+        description="File or directory to search in (git grep PATH). Defaults to current working directory.",
     ),
     glob: Optional[str] = Field(
         None,
-        description="Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\") - maps to rg --glob",
+        description="Glob pattern to filter files (e.g. \"*.js\", \"*.{ts,tsx}\") - maps to git grep pathspec",
     ),
     type: Optional[str] = Field(
         None,
-        description="File type to search. Common types: js, py, rust, go, java, etc. Converted to appropriate file extension patterns.",
+        description="File type to search (git grep --type). Common types: js, py, rust, go, java, etc. More efficient than include for standard file types.",
     ),
     output_mode: str = Field(
         "files_with_matches",
@@ -240,7 +240,7 @@ def grep(
     ),
     multiline: bool = Field(
         False,
-        description="Enable multiline mode (limited support in git grep). Default: false.",
+        description="Enable multiline mode where . matches newlines and patterns can span lines (git grep -U --multiline-dotall). Default: false.",
     ),
     head_limit: Optional[int] = Field(
         None,
@@ -248,11 +248,16 @@ def grep(
     ),
 ) -> Dict[str, Any]:
     """A powerful search tool built on git grep
-    
-    Supports regex syntax and filter files with glob parameter or type parameter.
-    Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts.
-    Requires a git repository.
-    """
+
+  Usage:
+  - ALWAYS use Grep for search tasks. NEVER invoke `grep` or `rg` as a Bash command. The Grep tool has been optimized for correct permissions and access.
+  - Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+")
+  - Filter files with glob parameter (e.g., "*.js", "**/*.tsx") or type parameter (e.g., "js", "py", "rust")
+  - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
+  - Use Task tool for open-ended searches requiring multiple rounds
+  - Pattern syntax: Uses git grep (not grep) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)
+  - Multiline matching: By default patterns match within single lines only. For cross-line patterns like `struct \\{[\\s\\S]*?field`, use `multiline: true`
+"""
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
     if isinstance(path, FieldInfo):
