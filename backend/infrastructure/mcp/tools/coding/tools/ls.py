@@ -63,6 +63,9 @@ def ls(
 
     # For workspace-relative paths, convert to absolute
     if not path.startswith('/'):
+        # Log warning about relative path usage
+        import logging
+        logging.warning(f"ls tool received relative path: '{path}'. Consider using absolute paths starting with workspace root.")
         # Convert relative path to absolute using workspace root
         abs_path = validate_path_in_workspace(path)
         if abs_path is None:

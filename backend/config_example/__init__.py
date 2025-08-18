@@ -110,8 +110,14 @@ def get_expression_prompt() -> str:
 
 
 def get_tool_prompt() -> str:
-    """Load tool usage guide prompt"""
-    return _load_prompt_file("tool_prompt.md")
+    """Load tool usage guide prompt with workspace root substitution"""
+    from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
+    
+    prompt = _load_prompt_file("tool_prompt.md")
+    if prompt:
+        # Replace {workspace_root} placeholder with actual workspace path
+        prompt = prompt.replace("{workspace_root}", str(WORKSPACE_ROOT))
+    return prompt
 
 
 def get_system_prompt(tools_enabled: bool = True) -> str:

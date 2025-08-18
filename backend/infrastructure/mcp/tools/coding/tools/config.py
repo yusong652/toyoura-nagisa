@@ -28,7 +28,8 @@ class ToolsConfig:
 # Global mutable instance (can be swapped by set_tools_config)
 # ---------------------------------------------------------------------------
 
-# By default assume repo layout: <repo_root>/workspace/default
+# By default use an isolated workspace directory for safety
+# This prevents the agent from accessing its own source code
 # "repo_root" is six levels up from this file:
 # config.py → tools → coding → tools → mcp → infrastructure → backend → <repo_root>
 _DEFAULT_ROOT = Path(__file__).resolve().parents[6] / "workspace" / "default"

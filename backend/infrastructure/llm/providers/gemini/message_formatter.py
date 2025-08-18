@@ -161,19 +161,32 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             blob = GeminiMessageFormatter._process_inline_data(inline_data)
             if blob:
                 parts.append(types.Part(inline_data=blob))
+            
+            # For multimodal content, prepare response without inline_data
+            # The inline_data has been added as a separate part above
+            if isinstance(llm_content, dict):
+                # Extract non-inline_data fields from llm_content (like file_path, file_type)
+                response_data = {k: v for k, v in llm_content.items() if k != 'inline_data'}
+                # Ensure we have some response data
+                if not response_data:
+                    response_data = {"status": result.get("status", "success")}
+            else:
+                # Use result metadata without inline_data
+                response_data = {k: v for k, v in result.items() 
+                               if k not in ['inline_data', 'llm_content']}
+        else:
+            # For non-multimodal content, prepare response data
+            if llm_content is not None:
+                # If llm_content exists, use it (ensuring dictionary format)
+                if isinstance(llm_content, dict):
+                    response_data = llm_content
+                else:
+                    response_data = {"content": llm_content}
+            else:
+                # Fallback to the full result
+                response_data = result
         
         # Create function response part
-        # For response field, ensure it's always a dictionary
-        if llm_content is not None:
-            # If llm_content exists, use it (ensuring dictionary format)
-            if isinstance(llm_content, dict):
-                response_data = llm_content
-            else:
-                response_data = {"content": llm_content}
-        else:
-            # Fallback to the full result
-            response_data = result
-        
         function_response = types.FunctionResponse(
             name=tool_name,
             response=response_data

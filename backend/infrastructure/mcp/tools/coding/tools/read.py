@@ -459,9 +459,14 @@ Usage:
         
         # Handle content based on file type and ensure llm_content is always a dict
         if processing_result.content_format == ContentFormat.INLINE_DATA:
-            # For binary files, return the inline_data structure directly for multimodal LLM
-            if isinstance(processing_result.content, dict):
-                llm_content = processing_result.content
+            # For binary files, include both metadata and inline_data for multimodal LLM
+            if isinstance(processing_result.content, dict) and "inline_data" in processing_result.content:
+                # Include file metadata alongside inline_data
+                llm_content = {
+                    "file_path": str(rel_display),
+                    "file_type": file_type.value,
+                    "inline_data": processing_result.content["inline_data"]
+                }
             else:
                 llm_content = {"content": processing_result.content}
         else:
