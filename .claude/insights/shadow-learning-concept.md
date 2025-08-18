@@ -2,7 +2,7 @@
 
 ## Shadow Learning Mode (影子学习模式)
 
-*Proposed: 2025-01-16*
+*Proposed: 2025-08-16*
 
 ### Concept
 

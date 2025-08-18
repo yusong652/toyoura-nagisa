@@ -1,4 +1,4 @@
-"""write_file tool - atomic text file creation and modification.
+"""write tool - atomic text file creation and modification.
 
 This tool provides atomic file writing functionality, focusing exclusively on 
 creating and modifying text files with comprehensive safety checks and encoding support.
@@ -13,7 +13,6 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from pydantic import Field
-from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
@@ -25,74 +24,39 @@ from ..utils.path_security import (
     check_parent_symlinks
 )
 
-__all__ = ["write_file", "register_write_file_tool"]
+__all__ = ["write", "register_write_tool"]
 
 # Constants for file size limits
 MAX_CONTENT_SIZE_BYTES = 20 * 1024 * 1024  # 20 MiB (same as read_file limit)
 MAX_CONTENT_SIZE_CHARS = MAX_CONTENT_SIZE_BYTES // 2  # Conservative estimate for UTF-8
 
 
-def write_file(
-    path: str = Field(
+def write(
+    file_path: str = Field(
         ..., 
-        description="File path relative to workspace root. Examples: 'src/app.py', 'config/settings.json', 'docs/README.md'. Parent directories are created automatically if needed."
+        description="The relative path to the file to write"
     ),
     content: str = Field(
         ..., 
-        description="Text content to write to the file. Can be any text: code, documentation, configuration files, etc. For code files, include proper indentation and formatting."
-    ),
-    encoding: str = Field(
-        "utf-8", 
-        description="Text encoding for the file. Use 'utf-8' for most files (default), 'ascii' for simple text, or 'latin-1' for legacy files. UTF-8 handles all Unicode characters."
-    ),
-    append: bool = Field(
-        False, 
-        description="Write mode: False (default) = overwrite entire file, True = append to end of existing file. Use append=True for logs or when adding to existing files."
+        description="The content to write to the file"
     ),
 ) -> Dict[str, Any]:
-    """Create new files or completely rewrite existing files with full content replacement.
+    """Writes a file to the local filesystem.
     
-    ## When to Use vs replace Tool
-    - **Use write_file for**: Creating new files, completely rewriting files, appending to files
-    - **Use replace tool for**: Making precise text edits within existing files
-    
-    ## Core Functionality
-    - **Create new files**: Automatically creates parent directories if needed
-    - **Complete file replacement**: Overwrites entire file content (default)
-    - **Append mode**: Adds content to end of existing file
-    - **Text content only**: For text files only, not binary data
-    
-    ## Key Usage Patterns
-    ```python
-    # Create new file
-    write_file(path="src/app.py", content="print('Hello')")
-    
-    # Completely rewrite existing file
-    write_file(path="config.json", content='{"debug": true}')
-    
-    # Append to logs or data files
-    write_file(path="logs/app.log", content="\nNew entry", append=True)
-    ```
-    
-    ## Important Notes
-    - **For precise edits**: Use `replace` tool instead for targeted text changes
-    - **For complete rewrites**: Use this tool when you want to replace entire file content
-    - **Safety**: Only works within workspace, prevents unsafe symlinks
-    - **Limits**: Maximum 20MB file size
-    
-    Returns structured data with operation details, file info, and contextual suggestions.
-    
+    Usage:
+    - This tool will overwrite the existing file if there is one at the provided path.
+    - If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
+    - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+    - NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+    - Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.
     """
 
     # ------------------------------------------------------------------
     # Parameter validation (manual to stay lightweight)
     # ------------------------------------------------------------------
     
-    # Handle Pydantic FieldInfo objects when invoked programmatically
-    if isinstance(encoding, FieldInfo):
-        encoding = "utf-8"
-    if isinstance(append, FieldInfo):
-        append = False
+    # Fixed encoding for simplicity
+    encoding = "utf-8"
 
     # Helper shortcuts for consistent results
     def _error(message: str, suggestion: str = None) -> Dict[str, Any]:
@@ -110,18 +74,11 @@ def write_file(
         ).model_dump()
 
     # Validate path security
-    abs_path = validate_path_in_workspace(path)
+    abs_path = validate_path_in_workspace(file_path)
     if abs_path is None:
         return _error(
-            f"Path is outside of workspace: {path}",
+            f"Path is outside of workspace: {file_path}",
             "Use paths relative to workspace root, e.g., 'src/app.py', 'config/settings.json', or 'docs/README.md'"
-        )
-
-    # Validate encoding parameter
-    if not isinstance(encoding, str) or not encoding.strip():
-        return _error(
-            "Encoding must be a non-empty string",
-            "Use 'utf-8' for most files, 'ascii' for simple text, or 'latin-1' for legacy files"
         )
 
     # Validate content size to prevent disk exhaustion
@@ -185,11 +142,8 @@ def write_file(
                 "Choose a different path that doesn't involve symlinks pointing outside the workspace"
             )
         
-        # Determine write mode
-        mode = "a" if append else "w"
-        
-        # Write the content
-        with abs_p.open(mode, encoding=encoding) as fh:
+        # Write the content (always overwrite)
+        with abs_p.open("w", encoding=encoding) as fh:
             fh.write(content)
 
         # Get file statistics and metadata
@@ -222,7 +176,7 @@ def write_file(
             "operation": {
                 "type": "write_file",
                 "path": str(rel_display),
-                "mode": "append" if append else "overwrite"
+                "mode": "overwrite"
             },
             "result": {
                 "file_created": not file_existed,
@@ -249,11 +203,6 @@ def write_file(
                 "action": "created_new_file",
                 "note": "File was created successfully with the provided content"
             }
-        elif append:
-            llm_content["context"] = {
-                "action": "appended_to_file",
-                "note": "Content was added to the end of the existing file"
-            }
         else:
             llm_content["context"] = {
                 "action": "overwrote_file",
@@ -272,16 +221,12 @@ def write_file(
         # Add tool selection guidance
         if not file_existed:
             llm_content["tool_usage"] = "Perfect for creating new files"
-        elif append:
-            llm_content["tool_usage"] = "Good for appending to logs and data files"
         else:
             llm_content["tool_usage"] = "Used for complete file replacement. For precise edits, consider the replace tool."
         
         # Create informative display message for LLM
         if not file_existed:
             display_msg = f"Created new file '{rel_display}' ({size_bytes} bytes, {lines_count} lines)"
-        elif append:
-            display_msg = f"Appended to '{rel_display}' ({size_bytes} bytes total, {lines_count} lines added)"
         else:
             display_msg = f"Completely rewrote '{rel_display}' ({size_bytes} bytes, {lines_count} lines). For precise edits, consider using replace tool."
 
@@ -290,7 +235,7 @@ def write_file(
             llm_content,
             path=str(abs_p),
             size=size_bytes,
-            mode="append" if append else "overwrite",
+            mode="overwrite",
             encoding=encoding,
             content_size=estimated_bytes,
             file_created=not file_existed,
@@ -345,8 +290,8 @@ def write_file(
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_write_file_tool(mcp: FastMCP):
-    """Register the write_file tool with comprehensive metadata."""
+def register_write_tool(mcp: FastMCP):
+    """Register the write tool with comprehensive metadata."""
     common = dict(
         tags={"coding", "filesystem", "write", "file", "create"}, 
         annotations={
@@ -356,4 +301,4 @@ def register_write_file_tool(mcp: FastMCP):
             "prompt_optimization": "Enhanced for LLM interaction with clear guidance and contextual feedback"
         }
     )
-    mcp.tool(**common)(write_file) 
+    mcp.tool(**common)(write) 

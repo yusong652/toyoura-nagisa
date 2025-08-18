@@ -32,9 +32,8 @@ class ToolProfileManager:
     
     # 编程类工具 (coding + web_search)
     CODING_TOOLS = [
-        "read_many_files", 
-        "write_file",
-        "read_file",
+        "write",
+        "read",
         "bash",  # Updated from run_shell_command
         "ls",    # Updated from list_directory
         "glob",
@@ -69,7 +68,7 @@ class ToolProfileManager:
             name="Coding",
             description="Specialized in code development, file operations and programming tasks",
             tools=CODING_TOOLS,
-            estimated_tokens=len(CODING_TOOLS) * 282,  # 9个工具
+            estimated_tokens=len(CODING_TOOLS) * 282,  # 8个工具
             color="#4CAF50",  # 绿色
             icon="💻"
         ),
@@ -87,7 +86,7 @@ class ToolProfileManager:
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=[],  # 空列表表示加载所有工具
-            estimated_tokens=24 * 282,  # 所有24个工具
+            estimated_tokens=23 * 282,  # 所有23个工具
             color="#607D8B",  # 灰蓝色
             icon="🤖"
         )
@@ -117,7 +116,7 @@ class ToolProfileManager:
                 "name": config.name,
                 "description": config.description, 
                 "estimated_tokens": config.estimated_tokens,
-                "tool_count": len(config.tools) if config.tools else 24,
+                "tool_count": len(config.tools) if config.tools else 23,
                 "color": config.color,
                 "icon": config.icon
             }

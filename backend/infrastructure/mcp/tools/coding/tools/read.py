@@ -26,7 +26,7 @@ from ..utils.path_security import (
 )
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
 
-__all__ = ["read_file", "register_read_file_tool"]
+__all__ = ["read", "register_read_tool"]
 
 # -----------------------------------------------------------------------------
 # Constants and file limits
@@ -342,7 +342,7 @@ def _read_file_safely(
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def read_file(
+def read(
     path: str = Field(
         ...,
         description="The absolute path to the file to read",
@@ -485,10 +485,10 @@ Usage:
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_read_file_tool(mcp: FastMCP):
-    """Register the read_file tool with proper tags synchronization."""
+def register_read_tool(mcp: FastMCP):
+    """Register the read tool with proper tags synchronization."""
     common = dict(
         tags={"coding", "filesystem", "read", "file", "content", "analysis", "metadata"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "file", "content", "analysis", "metadata"]}
     )
-    mcp.tool(**common)(read_file) 
+    mcp.tool(**common)(read) 

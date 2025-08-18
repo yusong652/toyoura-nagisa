@@ -60,7 +60,7 @@ def _create_profile_info(profile_type: AgentProfileType) -> AgentProfileInfo:
             profile_type=profile_type,
             name=profile_config.name,
             description=profile_config.description,
-            tool_count=len(profile_config.tools) if profile_config.tools else 30,
+            tool_count=len(profile_config.tools) if profile_config.tools else 23,
             estimated_tokens=profile_config.estimated_tokens,
             color=profile_config.color,
             icon=profile_config.icon

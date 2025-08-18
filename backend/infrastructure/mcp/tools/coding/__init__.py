@@ -6,8 +6,8 @@ from .tools import (
     # Public tool functions
     ls,  # New simplified directory listing tool
     glob,  # New simplified glob pattern matching tool
-    read_many_files,
-    write_file,
+    write,
+    read,
     bash,
     grep,
     replace,
@@ -23,9 +23,8 @@ __all__ = [
     'register_coding_tools',
     'ls',  # New simplified directory listing tool
     'glob',  # New simplified glob pattern matching tool
-    'read_many_files',
-    'write_file',
-    'execute_python_script',
+    'write',
+    'read',
     'bash',
     'grep',
     'replace',
