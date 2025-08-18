@@ -34,7 +34,7 @@ MAX_CONTENT_SIZE_CHARS = MAX_CONTENT_SIZE_BYTES // 2  # Conservative estimate fo
 def write(
     file_path: str = Field(
         ..., 
-        description="The relative path to the file to write"
+        description="The absolute path to the file to write"
     ),
     content: str = Field(
         ..., 
