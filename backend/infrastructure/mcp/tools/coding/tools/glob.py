@@ -27,7 +27,6 @@ __all__ = ["glob", "register_glob_tool"]
 # -----------------------------------------------------------------------------
 
 MAX_FILES_DEFAULT = 1000
-MAX_FILES_HARD_LIMIT = 10000
 
 # -----------------------------------------------------------------------------
 # Helper functions
@@ -162,16 +161,13 @@ def glob(
         
         # Security filtering
         safe_files = []
-        skipped_count = 0
         
         for file_path in matched_files:
             # Check symlink safety
             if file_path.is_symlink() and not is_safe_symlink(file_path):
-                skipped_count += 1
                 continue
             
             if not check_parent_symlinks(file_path):
-                skipped_count += 1
                 continue
             
             safe_files.append(file_path)
@@ -183,14 +179,7 @@ def glob(
         sorted_files = _sort_by_modification_time(safe_files)
         
         # Build Claude Code style response - simple file path list
-        file_paths = []
-        for file_path in sorted_files:
-            try:
-                # Convert to absolute path like Claude Code does
-                file_paths.append(str(file_path))
-            except Exception:
-                # Skip files we can't process
-                continue
+        file_paths = [str(file_path) for file_path in sorted_files]
         
         # Build Claude Code aligned response
         total_found = len(file_paths)
@@ -199,7 +188,7 @@ def glob(
         message = f"Found {total_found} matching files"
         
         # Simple LLM content - just the file paths, one per line
-        llm_content = "\n".join(file_paths) if file_paths else "No files found"
+        llm_content = "\n".join(file_paths)
         
         return _success(
             message,
