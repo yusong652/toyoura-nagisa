@@ -9,8 +9,6 @@ Fully aligned with Claude's Edit tool for consistency and improved usability.
 
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
-import difflib
-from datetime import datetime
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
@@ -37,8 +35,6 @@ MAX_EDIT_FILE_SIZE = 5 * 1024 * 1024  # 5MB max file size for editing
 MAX_OLD_STRING_LENGTH = 50000  # Maximum length of old_string parameter
 MAX_NEW_STRING_LENGTH = 50000  # Maximum length of new_string parameter
 
-# Context requirements for single replacements
-MIN_CONTEXT_LINES = 3  # Minimum lines of context required
 
 # -----------------------------------------------------------------------------
 # Helper utilities
@@ -109,20 +105,6 @@ def _normalize_line_endings(content: str) -> str:
     """Normalize line endings to LF for consistent processing."""
     return content.replace('\r\n', '\n').replace('\r', '\n')
 
-def _generate_diff(original: str, modified: str, filename: str = "file") -> str:
-    """Generate a unified diff between original and modified content."""
-    original_lines = original.splitlines(keepends=True)
-    modified_lines = modified.splitlines(keepends=True)
-    
-    diff = list(difflib.unified_diff(
-        original_lines,
-        modified_lines,
-        fromfile=f"{filename} (original)",
-        tofile=f"{filename} (modified)",
-        n=3  # 3 lines of context
-    ))
-    
-    return ''.join(diff)
 
 def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tuple[bool, Optional[str]]:
     """Validate that old_string is unique when replace_all is False."""
@@ -132,44 +114,13 @@ def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tu
     occurrences = _count_occurrences(content, old_string)
     if occurrences > 1:
         return False, (
-            f"The edit will FAIL if `old_string` is not unique in the file ({occurrences} occurrences found). "
-            "Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`."
+            f"Found {occurrences} matches of the string to replace, but replace_all is false. "
+            f"To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\n"
+            f"String: {old_string[:200]}{'...' if len(old_string) > 200 else ''}"
         )
     
     return True, None
 
-def _detect_potential_issues(old_string: str) -> list[str]:
-    """Detect potential issues with the replacement."""
-    issues = []
-    
-    if not old_string:
-        return issues
-        
-    # Check for whitespace issues
-    if old_string != old_string.strip():
-        if old_string.startswith(' ') or old_string.startswith('\t'):
-            issues.append("old_string starts with whitespace - ensure indentation matches exactly")
-        if old_string.endswith(' ') or old_string.endswith('\t'):
-            issues.append("old_string ends with whitespace - ensure trailing spaces match exactly")
-    
-    # Check for line ending issues
-    if '\r' in old_string:
-        issues.append("old_string contains carriage returns - line endings will be normalized to LF")
-    
-    return issues
-
-def _get_file_type(path: Path) -> str:
-    """Determine file type based on extension."""
-    ext = path.suffix.lower()
-    
-    if ext in {'.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.md', '.txt', '.json', '.xml', '.yaml', '.yml'}:
-        return "text"
-    elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'}:
-        return "image"
-    elif ext in {'.pdf', '.doc', '.docx'}:
-        return "document"
-    else:
-        return "unknown"
 
 # -----------------------------------------------------------------------------
 # Main implementation
@@ -218,13 +169,17 @@ Usage:
         replace_all = False
 
     # Helper shortcuts for consistent results
-    def _error(message: str, suggestion: str = None) -> Dict[str, Any]:
+    def _error(message: str, llm_content: str = None, suggestion: str = None) -> Dict[str, Any]:
         error_msg = message
         if suggestion:
             error_msg += f" {suggestion}"
-        return ToolResult(status="error", message=error_msg, error=message).model_dump()
+        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
+        if llm_content is None:
+            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
+        return ToolResult(status="error", message=error_msg, llm_content=llm_content, error=message).model_dump()
 
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
+        # For success, use the provided llm_content directly
         return ToolResult(
             status="success",
             message=message,
@@ -347,26 +302,15 @@ Usage:
             # Check if old_string exists
             occurrences = _count_occurrences(current_content, old_string)
             if occurrences == 0:
-                # Provide helpful error message with context
-                lines = current_content.split('\n')
-                snippet = ""
-                if len(lines) <= 10:
-                    snippet = "\n\nFile content:\n" + current_content
-                else:
-                    # Show first and last 5 lines for context
-                    first_lines = '\n'.join(lines[:5])
-                    last_lines = '\n'.join(lines[-5:])
-                    snippet = f"\n\nFile preview (first 5 lines):\n{first_lines}\n...\n(last 5 lines):\n{last_lines}"
-                
-                return _error(
-                    "old_string not found in file",
-                    f"Ensure old_string matches exactly including whitespace and indentation. Use read_file to examine the exact content.{snippet if len(snippet) < 500 else ''}"
-                )
+                error_msg = f"String to replace not found in file.\nString: {old_string[:200]}{'...' if len(old_string) > 200 else ''}"
+                llm_error = f"<error><tool_use_error>{error_msg}</tool_use_error></error>"
+                return _error(error_msg, llm_error)
 
             # Validate uniqueness for single replacement
             unique_valid, unique_error = _validate_uniqueness(current_content, old_string, replace_all)
             if not unique_valid:
-                return _error(unique_error)
+                llm_error = f"<error><tool_use_error>{unique_error}</tool_use_error></error>"
+                return _error(unique_error, llm_error)
 
             # Apply replacement based on replace_all flag
             if replace_all:
@@ -403,98 +347,39 @@ Usage:
         original_lines = (current_content or "").count('\n')
         new_lines = new_content.count('\n')
         line_change_count = new_lines - original_lines
-
-        # Generate diff for display (if not a new file)
-        diff_preview = ""
-        has_diff = False
-        if not is_new_file and current_content != new_content:
-            diff_preview = _generate_diff(
-                current_content or "", 
-                new_content, 
-                target_file.name
-            )
-            has_diff = True
-
-        # Detect potential issues for warnings
-        warnings = _detect_potential_issues(old_string)
-
-        # Get file metadata
-        file_type = _get_file_type(target_file)
-        file_extension = target_file.suffix.lower()
         
         # ------------------------------------------------------------------
-        # Build response structure aligned with Claude's Edit tool
+        # Build Claude Code aligned response  
         # ------------------------------------------------------------------
 
-        # Current timestamp for operation tracking
-        timestamp = datetime.now().isoformat()
-
-        # Build structured LLM content
-        llm_content = {
-            "operation": {
-                "type": "replace",
-                "file_path": str(target_file.relative_to(WORKSPACE_ROOT)),
-                "replacements_made": replacements_made,
-                "replace_all": replace_all,
-                "is_new_file": is_new_file,
-                "timestamp": timestamp
-            },
-            "edit_result": {
-                "success": True,
-                "content_changed": is_new_file or (current_content != new_content),
-                "size_change_bytes": size_change,
-                "line_change_count": line_change_count
-            },
-            "file_info": {
-                "size_bytes": new_size,
-                "file_type": file_type,
-                "extension": file_extension,
-                "encoding": TEXT_CHARSET_DEFAULT
-            },
-            "diff_info": {
-                "has_diff": has_diff,
-                "diff_preview": diff_preview[:1000] + "..." if len(diff_preview) > 1000 else diff_preview,
-                "diff_size": len(diff_preview)
-            },
-            "validation_info": {
-                "string_lengths": {
-                    "old": len(old_string),
-                    "new": len(new_string)
-                },
-                "warnings": warnings
-            },
-            "summary": {
-                "operation_type": "new_file_creation" if is_new_file else "text_replacement",
-                "mode": "replace_all" if replace_all else "replace_first",
-                "success": True
-            }
-        }
-
-        # Add conditional sections based on operation type
-        if not is_new_file:
-            llm_content["diff_info"]["lines_added"] = max(0, line_change_count)
-            llm_content["diff_info"]["lines_removed"] = max(0, -line_change_count)
-
-        # Build user-facing message
+        # Build user-facing message aligned with Claude Code format
         if is_new_file:
-            message = f"✅ Created new file: {target_file.name} ({new_size} bytes)"
+            message = f"File created successfully at: {target_file.relative_to(WORKSPACE_ROOT)}"
         else:
-            mode_text = "all" if replace_all else "first"
-            replacements_word = "occurrence" if replacements_made == 1 else "occurrences"
-            size_info = f"{'+' if size_change >= 0 else ''}{size_change} bytes"
-            message = f"✅ Successfully edited {target_file.name}: Replaced {mode_text} {replacements_made} {replacements_word} ({size_info})"
+            message = f"The file {target_file.relative_to(WORKSPACE_ROOT)} has been updated."
+
+        # Build Claude Code style llm_content with file preview
+        try:
+            with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT) as f:
+                lines = f.readlines()
+            preview_lines = []
+            for i, line in enumerate(lines[:10], 1):  # Show first 10 lines like Claude
+                preview_lines.append(f"{i:6}→{line.rstrip()}")
+            preview = "\n".join(preview_lines)
+            llm_content = f"{message} Here's the result of running `cat -n` on a snippet of the edited file:\n{preview}"
+        except Exception:
+            # Fallback to simple message if file preview fails
+            llm_content = message
 
         # Additional data for backend/UI
         response_data = {
-            "file_path": str(target_file),
+            "absolute_file_path": str(target_file),
             "relative_path": str(target_file.relative_to(WORKSPACE_ROOT)),
             "is_new_file": is_new_file,
             "replacements_made": replacements_made,
             "replace_all": replace_all,
             "size_change": size_change,
             "line_change_count": line_change_count,
-            "diff_preview": diff_preview,
-            "warnings": warnings,
         }
 
         return _success(
