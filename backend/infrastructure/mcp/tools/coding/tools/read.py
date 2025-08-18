@@ -150,7 +150,7 @@ def _read_text_content(
     offset: Optional[int] = None, 
     limit: Optional[int] = None
 ) -> ProcessingResult:
-    """Read and process text content with Claude Code format (cat -n style)."""
+    """Read and process text content with standard cat -n format."""
     try:
         with file_path.open('r', encoding=encoding, errors='replace') as f:
             content = f.read()
@@ -164,15 +164,15 @@ def _read_text_content(
         
         selected_lines = lines[start_line:end_line]
         
-        # Process lines with Claude Code format (cat -n style with line numbers)
+        # Process lines with cat -n format (standard line numbers with tab separator)
         processed_lines = []
         for i, line in enumerate(selected_lines, start=start_line + 1):
             # Truncate long lines
             if len(line) > MAX_LINE_LENGTH:
                 line = line[:MAX_LINE_LENGTH] + "... [line truncated]"
             
-            # Format with line number and arrow separator (Claude Code style)
-            processed_lines.append(f"{i:6}→{line}")
+            # Format with line number and tab separator (cat -n format)
+            processed_lines.append(f"{i:6}\t{line}")
         
         result_content = '\n'.join(processed_lines)
         truncated = end_line < total_lines
@@ -313,13 +313,14 @@ Usage:
 - By default, it reads up to 2000 lines starting from the beginning of the file
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
 - Any lines longer than 2000 characters will be truncated
-- Results are returned using cat -n format, with line numbers starting at 1
-- This tool allows you to read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually as you are a multimodal LLM.
-- This tool can read PDF files (.pdf). PDFs are processed page by page, extracting both text and visual content for analysis.
-- This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs, combining code, text, and visualizations.
-- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.
-- You will regularly be asked to read screenshots. If the user provides a path to a screenshot ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths like /var/folders/123/abc/T/TemporaryItems/NSIRD_screencaptureui_ZfB1tD/Screenshot.png
-- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents."""
+- Results are returned using cat -n format, with line numbers starting at 1 (format: "     1\t<content>")
+- The line numbers and tab character are for positioning reference - they are NOT part of the actual file content
+- This tool allows reading images (PNG, JPG, etc). When reading an image file the contents are presented as base64 data for multimodal LLM consumption
+- This tool can read PDF files (.pdf). PDFs are processed page by page, extracting both text and visual content for analysis
+- This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs, combining code, text, and visualizations
+- You can call multiple tools in a single response. It is better to speculatively read multiple files as a batch that are potentially useful
+- You may be asked to read screenshots. If provided a screenshot path, use this tool to view the file. This tool works with all temporary file paths
+- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents"""
 
     # ------------------------------------------------------------------
     # Parameter validation and normalization
@@ -423,7 +424,7 @@ Usage:
             else:
                 llm_content = {"content": processing_result.content}
         else:
-            # For text files, return content directly (Claude Code format)
+            # For text files, return content directly (cat -n format)
             llm_content = processing_result.content
 
         return _success(
