@@ -1,8 +1,12 @@
-"""glob tool – find files matching patterns."""
+"""glob tool – fast file pattern matching that works with any codebase size.
+
+Supports glob patterns like "**/*.js" or "src/**/*.ts" and returns matching
+file paths sorted by modification time. Use this tool when you need to find
+files by name patterns.
+"""
 
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
@@ -101,20 +105,27 @@ def glob(
     ),
     path: Optional[str] = Field(
         None,
-        description="The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory.",
+        description="The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter \"undefined\" or \"null\" - simply omit it for the default behavior. Must be a valid directory path if provided.",
     ),
 ) -> Dict[str, Any]:
-    """Fast file pattern matching tool that works with any codebase size"""
+    """- Fast file pattern matching tool that works with any codebase size
+- Supports glob patterns like "**/*.js" or "src/**/*.ts"
+- Returns matching file paths sorted by modification time
+- Use this tool when you need to find files by name patterns"""
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
     if isinstance(path, FieldInfo):
         path = None
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
+        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
+        if llm_content is None:
+            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
+        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
 
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
+        # For success, use the provided llm_content directly
         return ToolResult(
             status="success",
             message=message,
@@ -147,7 +158,7 @@ def glob(
         matched_files = _expand_glob_pattern(search_dir, pattern, MAX_FILES_DEFAULT)
         
         if not matched_files:
-            return _error(f"No files found matching pattern: {pattern}")
+            return _error("No files found")
         
         # Security filtering
         safe_files = []
@@ -166,62 +177,36 @@ def glob(
             safe_files.append(file_path)
         
         if not safe_files:
-            return _error(f"No accessible files found matching pattern: {pattern}")
+            return _error("No files found")
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
         
-        # Build file information
-        file_list = []
+        # Build Claude Code style response - simple file path list
+        file_paths = []
         for file_path in sorted_files:
             try:
-                stat = file_path.stat()
-                rel_path = file_path.relative_to(WORKSPACE_ROOT)
-                
-                file_info = {
-                    "path": str(rel_path),
-                    "size": stat.st_size,
-                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                }
-                file_list.append(file_info)
+                # Convert to absolute path like Claude Code does
+                file_paths.append(str(file_path))
             except Exception:
-                # Skip files we can't stat
+                # Skip files we can't process
                 continue
         
-        # Build response
-        total_found = len(file_list)
-        search_path_str = str(search_dir.relative_to(WORKSPACE_ROOT)) if search_dir != WORKSPACE_ROOT else "."
+        # Build Claude Code aligned response
+        total_found = len(file_paths)
         
-        # User-facing message
-        message = f"Found {total_found} file{'s' if total_found != 1 else ''} matching '{pattern}'"
-        if skipped_count > 0:
-            message += f" ({skipped_count} skipped)"
+        # Simple user-facing message
+        message = f"Found {total_found} matching files"
         
-        # Structured LLM content
-        llm_content = {
-            "operation": {
-                "type": "glob",
-                "pattern": pattern,
-                "search_path": search_path_str,
-            },
-            "result": {
-                "files": file_list,
-                "total_found": total_found,
-                "truncated": len(matched_files) >= MAX_FILES_DEFAULT,
-            }
-        }
-        
-        if skipped_count > 0:
-            llm_content["skipped"] = skipped_count
+        # Simple LLM content - just the file paths, one per line
+        llm_content = "\n".join(file_paths) if file_paths else "No files found"
         
         return _success(
             message,
             llm_content,
-            files=file_list,
+            files=file_paths,
             pattern=pattern,
-            search_path=search_path_str,
             total_found=total_found,
-            skipped=skipped_count,
         )
 
     except Exception as exc:
