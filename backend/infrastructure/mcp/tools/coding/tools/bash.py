@@ -79,14 +79,17 @@ Usage notes:
 """
     
     # Helper function for consistent error responses
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, error_output: str = None) -> Dict[str, Any]:
+        # For errors, wrap in <error> tags for llm_content to match Claude Code format
+        llm_error = f"<error>{error_output or message}</error>"
+        return ToolResult(status="error", message=message, llm_content=llm_error, error=message).model_dump()
 
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+    def _success(output: str, message: str, **data: Any) -> Dict[str, Any]:
+        # For success, llm_content is just the raw output to match Claude Code format
         return ToolResult(
             status="success",
             message=message,
-            llm_content=llm_content,
+            llm_content=output if output else "",  # Raw output for LLM
             data=data
         ).model_dump()
 
@@ -151,9 +154,17 @@ Usage notes:
             stdout, stderr = process.communicate()
             exit_code = -1
             execution_time = timeout_seconds
-            return _error(f"Command timed out after {timeout_seconds:.1f} seconds")
+            timeout_msg = f"Command timed out after {timeout_seconds:.1f} seconds"
+            # Get any partial output that was captured
+            partial_output = ""
+            if stdout:
+                partial_output = stdout
+            if stderr:
+                partial_output = f"{partial_output}\n{stderr}" if partial_output else stderr
+            error_output = f"{timeout_msg}\n{partial_output}" if partial_output else timeout_msg
+            return _error(timeout_msg, error_output)
 
-        # Combine output
+        # Combine output (stdout and stderr)
         combined_output = ""
         if stdout:
             combined_output += stdout
@@ -167,25 +178,28 @@ Usage notes:
         if len(combined_output) > MAX_OUTPUT_SIZE:
             combined_output = combined_output[:MAX_OUTPUT_SIZE] + f"\n\n... [OUTPUT TRUNCATED - exceeded {MAX_OUTPUT_SIZE} character limit] ..."
 
-        # Build message
+        # Build message for internal use
         if exit_code == 0:
             message = f"Command executed successfully (exit code {exit_code}, {execution_time:.1f}s)"
+            # Success: return raw output
+            return _success(
+                combined_output,  # Raw output for LLM
+                message,
+                exit_code=exit_code,
+                execution_time=execution_time,
+                stdout=stdout,
+                stderr=stderr,
+                command=command,
+                working_directory=str(work_dir)
+            )
         else:
             message = f"Command failed with exit code {exit_code} ({execution_time:.1f}s)"
-
-        return _success(
-            message,
-            combined_output,
-            exit_code=exit_code,
-            execution_time=execution_time,
-            stdout=stdout,
-            stderr=stderr,
-            command=command,
-            working_directory=str(work_dir)
-        )
+            # Error: return with error wrapper
+            return _error(message, combined_output)
 
     except Exception as e:
-        return _error(f"Command execution failed: {e}")
+        error_msg = f"Command execution failed: {e}"
+        return _error(error_msg, str(e))
 
 
 def register_bash_tool(mcp: FastMCP):
