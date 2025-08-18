@@ -39,29 +39,7 @@ def ls(
         description="List of glob patterns to ignore",
     ),
 ) -> Dict[str, Any]:
-    """List files and directories in a given path.
-    
-    Simple, Unix-like directory listing with optional ignore patterns.
-    The path parameter must be an absolute path, not a relative path.
-    
-    Args:
-        path: The absolute path to the directory to list
-        ignore: Optional list of glob patterns to ignore
-    
-    Returns:
-        Dict[str, Any]: ToolResult with directory contents:
-            - status: "success" or "error"
-            - message: User-facing summary
-            - llm_content: Structured data for LLM
-            - data: Raw directory listing data
-    
-    Example:
-        # List current directory
-        ls("/Users/username/project")
-        
-        # List with ignore patterns
-        ls("/Users/username/project", ignore=["*.pyc", "__pycache__", ".git"])
-    """
+    """Lists files and directories in a given path. The path parameter must be an absolute path, not a relative path. You can optionally provide an array of glob patterns to ignore with the ignore parameter. You should generally prefer the Glob and Grep tools, if you know which directories to search."""
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
     if isinstance(ignore, FieldInfo):
