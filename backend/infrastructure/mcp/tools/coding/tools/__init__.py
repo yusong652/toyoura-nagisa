@@ -12,7 +12,7 @@ from .read import read, register_read_tool
 from .bash import bash, register_bash_tool
 from .glob import glob, register_glob_tool  # New simplified glob tool
 from .grep import grep, register_grep_tool
-from .replace import replace, register_replace_tool
+from .edit import edit, register_edit_tool
 from ...builtin.web_search import web_search, register_web_search_tool
 from . import constants
 
@@ -24,7 +24,7 @@ __all__ = [
     "read",
     "bash",
     "grep",
-    "replace",
+    "edit",
     "web_search",
 ]
 
@@ -41,5 +41,5 @@ def register_coding_tools(mcp):
     register_bash_tool(mcp)
     register_glob_tool(mcp)  # New simplified glob tool
     register_grep_tool(mcp)
-    register_replace_tool(mcp)
+    register_edit_tool(mcp)
     register_web_search_tool(mcp) 

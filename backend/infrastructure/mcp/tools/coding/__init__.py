@@ -10,7 +10,7 @@ from .tools import (
     read,
     bash,
     grep,
-    replace,
+    edit,
     # Registration helper
     register_coding_tools,
 )
@@ -27,5 +27,5 @@ __all__ = [
     'read',
     'bash',
     'grep',
-    'replace',
+    'edit',
 ]

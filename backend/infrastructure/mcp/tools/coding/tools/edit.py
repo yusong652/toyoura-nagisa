@@ -1,10 +1,10 @@
-"""replace tool – precise text replacement within files with intelligent error handling.
+"""edit tool – precise text replacement within files with intelligent error handling.
 
 This tool provides atomic file editing functionality, focusing exclusively on 
 replacing specific text content within files. It does NOT list files or read 
 entire contents - use glob for file discovery and read_file for content examination.
 
-Modeled after gemini-cli's replace tool for consistency and interoperability.
+Fully aligned with Claude's Edit tool for consistency and improved usability.
 """
 
 from pathlib import Path
@@ -27,7 +27,7 @@ from .constants import (
     TEXT_CHARSET_DEFAULT,
 )
 
-__all__ = ["replace", "register_replace_tool"]
+__all__ = ["edit", "register_edit_tool"]
 
 # -----------------------------------------------------------------------------
 # Constants specific to file editing
@@ -36,7 +36,6 @@ __all__ = ["replace", "register_replace_tool"]
 MAX_EDIT_FILE_SIZE = 5 * 1024 * 1024  # 5MB max file size for editing
 MAX_OLD_STRING_LENGTH = 50000  # Maximum length of old_string parameter
 MAX_NEW_STRING_LENGTH = 50000  # Maximum length of new_string parameter
-MAX_EXPECTED_REPLACEMENTS = 1000  # Maximum number of replacements allowed
 
 # Context requirements for single replacements
 MIN_CONTEXT_LINES = 3  # Minimum lines of context required
@@ -72,11 +71,39 @@ def _count_occurrences(content: str, search_string: str) -> int:
         return 0
     return content.count(search_string)
 
-def _apply_replacement(content: str, old_string: str, new_string: str) -> str:
-    """Apply replacement of old_string with new_string in content."""
+def _apply_single_replacement(content: str, old_string: str, new_string: str) -> Tuple[str, int]:
+    """Apply replacement of first occurrence of old_string with new_string in content.
+    
+    Returns:
+        Tuple of (modified content, number of replacements made)
+    """
     if not old_string:
-        return content
-    return content.replace(old_string, new_string)
+        return content, 0
+    
+    # Find first occurrence
+    index = content.find(old_string)
+    if index == -1:
+        return content, 0
+    
+    # Replace only the first occurrence
+    new_content = content[:index] + new_string + content[index + len(old_string):]
+    return new_content, 1
+
+def _apply_all_replacements(content: str, old_string: str, new_string: str) -> Tuple[str, int]:
+    """Apply replacement of all occurrences of old_string with new_string in content.
+    
+    Returns:
+        Tuple of (modified content, number of replacements made)
+    """
+    if not old_string:
+        return content, 0
+    
+    count = content.count(old_string)
+    if count == 0:
+        return content, 0
+    
+    new_content = content.replace(old_string, new_string)
+    return new_content, count
 
 def _normalize_line_endings(content: str) -> str:
     """Normalize line endings to LF for consistent processing."""
@@ -97,25 +124,17 @@ def _generate_diff(original: str, modified: str, filename: str = "file") -> str:
     
     return ''.join(diff)
 
-def _validate_context_requirement(content: str, old_string: str, expected_replacements: int) -> Tuple[bool, Optional[str]]:
-    """Validate that old_string has sufficient context for ambiguous single replacements."""
-    if expected_replacements != 1:
-        return True, None  # Context validation only for single replacements
-        
-    if not old_string:
-        return True, None  # Empty string is valid for file creation
-    
-    # Skip context requirement for short, unique strings
-    if len(old_string.strip()) <= 50:  # Short strings likely unique
+def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tuple[bool, Optional[str]]:
+    """Validate that old_string is unique when replace_all is False."""
+    if replace_all or not old_string:
         return True, None
-        
-    # Check if replacement might be ambiguous
-    actual_occurrences = _count_occurrences(content, old_string)
-    if actual_occurrences > 1:
-        # Multiple occurrences require context for precision
-        lines = old_string.split('\n')
-        if len(lines) < MIN_CONTEXT_LINES:
-            return False, f"Multiple occurrences found ({actual_occurrences}). Include more context (3+ lines) to ensure precise replacement"
+    
+    occurrences = _count_occurrences(content, old_string)
+    if occurrences > 1:
+        return False, (
+            f"The edit will FAIL if `old_string` is not unique in the file ({occurrences} occurrences found). "
+            "Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`."
+        )
     
     return True, None
 
@@ -156,39 +175,33 @@ def _get_file_type(path: Path) -> str:
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def replace(
+def edit(
     file_path: str = Field(
         ...,
-        description="Relative path to file (e.g., 'src/app.py'). Use read_file first.",
+        description="The absolute path to the file to modify",
     ),
     old_string: str = Field(
         ...,
-        description="Exact text to replace. Include context if multiple matches exist.",
+        description="The text to replace",
     ),
     new_string: str = Field(
         ...,
-        description="Replacement text. Empty string deletes text.",
+        description="The text to replace it with (must be different from old_string)",
     ),
-    expected_replacements: int = Field(
-        1,
-        ge=1,
-        le=MAX_EXPECTED_REPLACEMENTS,
-        description="Expected replacement count (validates accuracy).",
+    replace_all: bool = Field(
+        False,
+        description="Replace all occurrences of old_string (default: false - replaces only first occurrence).",
     ),
 ) -> Dict[str, Any]:
-    """Make precise text replacements in files using exact string matching.
+    """Performs exact string replacements in files. 
 
-    Use replace for: targeted edits, bug fixes, specific line changes
-    Use write_file for: new files, complete rewrites, large content changes
-
-    Requirements:
-    - Use read_file first to examine content
-    - Include context only if multiple matches exist
-    - Exact whitespace/indentation matching required
-    - Max file size: 5MB
-
-    Returns structured data with diff preview and operation details.
-    """
+Usage:
+- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file. 
+- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
+- The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`. 
+- Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance."""
 
     # ------------------------------------------------------------------
     # Parameter validation and normalization
@@ -201,14 +214,14 @@ def replace(
         old_string = ""
     if isinstance(new_string, FieldInfo):
         new_string = ""
-    if isinstance(expected_replacements, FieldInfo):
-        expected_replacements = 1
+    if isinstance(replace_all, FieldInfo):
+        replace_all = False
 
     # Helper shortcuts for consistent results
     def _error(message: str, suggestion: str = None) -> Dict[str, Any]:
         error_msg = message
         if suggestion:
-            error_msg += f" Suggestion: {suggestion}"
+            error_msg += f" {suggestion}"
         return ToolResult(status="error", message=error_msg, error=message).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
@@ -226,6 +239,13 @@ def replace(
             "Provide a file path relative to workspace root, e.g., 'src/app.py'"
         )
 
+    # Check if old_string and new_string are the same
+    if old_string == new_string:
+        return _error(
+            "old_string and new_string must be different",
+            "The replacement would have no effect. Provide different values for old_string and new_string."
+        )
+
     if len(old_string) > MAX_OLD_STRING_LENGTH:
         return _error(
             f"old_string too long: {len(old_string)} chars (max: {MAX_OLD_STRING_LENGTH})",
@@ -236,12 +256,6 @@ def replace(
         return _error(
             f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})",
             "Break down the replacement into smaller chunks or use write_file for large content changes"
-        )
-
-    if expected_replacements < 1 or expected_replacements > MAX_EXPECTED_REPLACEMENTS:
-        return _error(
-            f"expected_replacements must be between 1 and {MAX_EXPECTED_REPLACEMENTS}",
-            "Use 1 for single replacements, or higher numbers for multiple occurrences"
         )
 
     # Validate workspace access
@@ -304,7 +318,7 @@ def replace(
         else:
             # File doesn't exist
             if old_string == "":
-                # Creating new file
+                # Creating new file (Claude Edit tool pattern)
                 is_new_file = True
                 current_content = ""
                 original_size = 0
@@ -326,38 +340,43 @@ def replace(
             # Editing existing file
             if old_string == "":
                 return _error(
-                    "Cannot use empty old_string with existing file. Use non-empty old_string or delete the file first.",
-                    "To edit existing files, provide the exact text to replace in old_string"
+                    "Cannot use empty old_string with existing file.",
+                    "To edit existing files, provide the exact text to replace in old_string. To overwrite the entire file, use write_file instead."
                 )
 
-            # Count occurrences
-            actual_occurrences = _count_occurrences(current_content, old_string)
-
-            if actual_occurrences == 0:
+            # Check if old_string exists
+            occurrences = _count_occurrences(current_content, old_string)
+            if occurrences == 0:
+                # Provide helpful error message with context
+                lines = current_content.split('\n')
+                snippet = ""
+                if len(lines) <= 10:
+                    snippet = "\n\nFile content:\n" + current_content
+                else:
+                    # Show first and last 5 lines for context
+                    first_lines = '\n'.join(lines[:5])
+                    last_lines = '\n'.join(lines[-5:])
+                    snippet = f"\n\nFile preview (first 5 lines):\n{first_lines}\n...\n(last 5 lines):\n{last_lines}"
+                
                 return _error(
-                    "Failed to edit: old_string not found in file",
-                    "Use read_file first to examine exact content, then ensure old_string matches exactly including whitespace and indentation"
+                    "old_string not found in file",
+                    f"Ensure old_string matches exactly including whitespace and indentation. Use read_file to examine the exact content.{snippet if len(snippet) < 500 else ''}"
                 )
 
-            if actual_occurrences != expected_replacements:
-                return _error(
-                    f"Failed to edit: expected {expected_replacements} occurrences but found {actual_occurrences}",
-                    f"Set expected_replacements={actual_occurrences} or refine old_string to match exactly {expected_replacements} occurrences"
-                )
+            # Validate uniqueness for single replacement
+            unique_valid, unique_error = _validate_uniqueness(current_content, old_string, replace_all)
+            if not unique_valid:
+                return _error(unique_error)
 
-            # Validate context requirements for single replacements
-            context_valid, context_error = _validate_context_requirement(
-                current_content, old_string, expected_replacements
-            )
-            if not context_valid:
-                return _error(
-                    context_error,
-                    "Include 3+ lines of context before and after the target text for single replacements"
+            # Apply replacement based on replace_all flag
+            if replace_all:
+                new_content, replacements_made = _apply_all_replacements(
+                    current_content, old_string, new_string
                 )
-
-            # Apply replacement
-            new_content = _apply_replacement(current_content, old_string, new_string)
-            replacements_made = actual_occurrences
+            else:
+                new_content, replacements_made = _apply_single_replacement(
+                    current_content, old_string, new_string
+                )
 
         # ------------------------------------------------------------------
         # Write file and generate results
@@ -404,19 +423,19 @@ def replace(
         file_extension = target_file.suffix.lower()
         
         # ------------------------------------------------------------------
-        # Build SOTA-level response structure (consistent with other tools)
+        # Build response structure aligned with Claude's Edit tool
         # ------------------------------------------------------------------
 
         # Current timestamp for operation tracking
         timestamp = datetime.now().isoformat()
 
-        # Build structured LLM content matching other tools' patterns
+        # Build structured LLM content
         llm_content = {
             "operation": {
                 "type": "replace",
                 "file_path": str(target_file.relative_to(WORKSPACE_ROOT)),
                 "replacements_made": replacements_made,
-                "expected_replacements": expected_replacements,
+                "replace_all": replace_all,
                 "is_new_file": is_new_file,
                 "timestamp": timestamp
             },
@@ -438,16 +457,15 @@ def replace(
                 "diff_size": len(diff_preview)
             },
             "validation_info": {
-                "context_validated": expected_replacements == 1,
                 "string_lengths": {
                     "old": len(old_string),
                     "new": len(new_string)
                 },
-                "warnings": warnings,
-                "issues_detected": []
+                "warnings": warnings
             },
             "summary": {
                 "operation_type": "new_file_creation" if is_new_file else "text_replacement",
+                "mode": "replace_all" if replace_all else "replace_first",
                 "success": True
             }
         }
@@ -459,11 +477,12 @@ def replace(
 
         # Build user-facing message
         if is_new_file:
-            message = f"Created new file: {target_file.name} ({new_size} bytes)"
+            message = f"✅ Created new file: {target_file.name} ({new_size} bytes)"
         else:
-            replacements_word = "replacement" if replacements_made == 1 else "replacements"
+            mode_text = "all" if replace_all else "first"
+            replacements_word = "occurrence" if replacements_made == 1 else "occurrences"
             size_info = f"{'+' if size_change >= 0 else ''}{size_change} bytes"
-            message = f"Successfully modified {target_file.name}: {replacements_made} {replacements_word} made ({size_info})"
+            message = f"✅ Successfully edited {target_file.name}: Replaced {mode_text} {replacements_made} {replacements_word} ({size_info})"
 
         # Additional data for backend/UI
         response_data = {
@@ -471,6 +490,7 @@ def replace(
             "relative_path": str(target_file.relative_to(WORKSPACE_ROOT)),
             "is_new_file": is_new_file,
             "replacements_made": replacements_made,
+            "replace_all": replace_all,
             "size_change": size_change,
             "line_change_count": line_change_count,
             "diff_preview": diff_preview,
@@ -493,10 +513,10 @@ def replace(
 # Registration helper
 # -----------------------------------------------------------------------------
 
-def register_replace_tool(mcp: FastMCP):
-    """Register the replace tool with proper tags synchronization."""
+def register_edit_tool(mcp: FastMCP):
+    """Register the edit tool with proper tags synchronization."""
     common = dict(
         tags={"coding", "filesystem", "edit", "replace", "modify"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "edit", "replace", "modify"]}
     )
-    mcp.tool(**common)(replace) 
+    mcp.tool(**common)(edit)
