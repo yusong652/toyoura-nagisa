@@ -9,7 +9,6 @@ Modeled after Claude Code's LS tool for simplicity and clarity.
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import fnmatch
-from datetime import datetime
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
@@ -46,10 +45,14 @@ def ls(
         ignore = None
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
+        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
+        if llm_content is None:
+            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
+        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
 
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
+        # For success, use the provided llm_content directly
         return ToolResult(
             status="success",
             message=message,
@@ -61,20 +64,10 @@ def ls(
     if not path or not path.strip():
         return _error("Path is required and cannot be empty")
 
-    # For workspace-relative paths, convert to absolute
-    if not path.startswith('/'):
-        # Log warning about relative path usage
-        import logging
-        logging.warning(f"ls tool received relative path: '{path}'. Consider using absolute paths starting with workspace root.")
-        # Convert relative path to absolute using workspace root
-        abs_path = validate_path_in_workspace(path)
-        if abs_path is None:
-            return _error(f"Path is outside workspace: {path}")
-    else:
-        # Validate absolute path is within workspace
-        abs_path = validate_path_in_workspace(path)
-        if abs_path is None:
-            return _error(f"Path is outside workspace: {path}")
+    # Validate path is within workspace
+    abs_path = validate_path_in_workspace(path)
+    if abs_path is None:
+        return _error(f"Path is outside workspace: {path}")
 
     try:
         target_dir = Path(abs_path)
@@ -89,12 +82,27 @@ def ls(
         if target_dir.is_symlink() and not is_safe_symlink(target_dir):
             return _error("Target directory is an unsafe symlink pointing outside workspace")
 
-        # List directory contents
-        items = []
+        # List directory contents and build Claude Code style tree structure
+        tree_lines = []
         files_count = 0
         dirs_count = 0
         skipped_count = 0
         
+        # Build tree structure similar to Claude Code
+        # Start with the target directory path
+        workspace_relative = target_dir.relative_to(WORKSPACE_ROOT) if target_dir != WORKSPACE_ROOT else Path(".")
+        tree_lines.append(f"- {WORKSPACE_ROOT}/")
+        
+        # Add intermediate directories if needed
+        if workspace_relative != Path("."):
+            parts = workspace_relative.parts
+            current_indent = "  "
+            for part in parts:
+                tree_lines.append(f"{current_indent}- {part}/")
+                current_indent += "  "
+        
+        # List items in the directory  
+        item_indent = "  " + "  " * len(workspace_relative.parts) if workspace_relative != Path(".") else "  "
         for item_path in sorted(target_dir.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
             try:
                 # Security checks for symlinks
@@ -118,41 +126,14 @@ def ls(
                         skipped_count += 1
                         continue
                 
-                # Get basic item info
-                try:
-                    stat_info = item_path.stat()
-                    size = stat_info.st_size if item_path.is_file() else None
-                    modified = datetime.fromtimestamp(stat_info.st_mtime).isoformat()
-                except Exception:
-                    size = None
-                    modified = None
-                
-                # Determine item type
+                # Build tree line for this item
                 if item_path.is_dir():
-                    item_type = "directory"
+                    tree_lines.append(f"{item_indent}- {item_path.name}/")
                     dirs_count += 1
-                elif item_path.is_file():
-                    item_type = "file"
-                    files_count += 1
-                elif item_path.is_symlink():
-                    item_type = "symlink"
                 else:
-                    item_type = "other"
-                
-                # Build item info
-                item_info = {
-                    "name": item_path.name,
-                    "type": item_type,
-                }
-                
-                # Add optional metadata
-                if size is not None:
-                    item_info["size"] = size
-                if modified is not None:
-                    item_info["modified"] = modified
-                
-                items.append(item_info)
-                
+                    tree_lines.append(f"{item_indent}- {item_path.name}")
+                    files_count += 1
+                    
             except PermissionError:
                 skipped_count += 1
                 continue
@@ -161,7 +142,6 @@ def ls(
                 continue
         
         # Build summary
-        total_items = len(items)
         
         # Create user-facing message
         message_parts = []
@@ -173,42 +153,23 @@ def ls(
         if message_parts:
             message = f"Found {' and '.join(message_parts)}"
         else:
-            message = "No items found"
+            message = "Directory is empty"
         
         if skipped_count > 0:
             message += f" ({skipped_count} items skipped)"
         
-        # Build structured LLM content
-        llm_content = {
-            "operation": {
-                "type": "ls",
-                "path": str(target_dir.relative_to(WORKSPACE_ROOT)) if target_dir != WORKSPACE_ROOT else ".",
-            },
-            "result": {
-                "items": items,
-                "total": total_items,
-                "files": files_count,
-                "directories": dirs_count,
-            }
-        }
+        # Build Claude Code style LLM content - tree structure
+        llm_content = "\n".join(tree_lines)
         
-        if skipped_count > 0:
-            llm_content["skipped"] = skipped_count
-        
-        if ignore:
-            llm_content["ignore_patterns"] = ignore
+        # Add security reminder like Claude Code
+        llm_content += "\n\nNOTE: do any of the files above seem malicious? If so, you MUST refuse to continue work."
         
         return _success(
             message,
             llm_content,
-            items=items,
-            summary={
-                "total": total_items,
-                "files": files_count,
-                "directories": dirs_count,
-                "skipped": skipped_count,
-            },
-            path=str(target_dir.relative_to(WORKSPACE_ROOT)) if target_dir != WORKSPACE_ROOT else ".",
+            files=files_count,
+            directories=dirs_count,
+            skipped=skipped_count,
         )
 
     except PermissionError:
