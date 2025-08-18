@@ -22,7 +22,6 @@ __all__ = ["grep", "register_grep_tool"]
 # -----------------------------------------------------------------------------
 
 SEARCH_TIMEOUT_SECONDS = 30
-MAX_OUTPUT_LINES = 10000
 
 # File extension mappings for type filtering
 FILE_TYPE_MAP = {
@@ -70,8 +69,6 @@ def _run_git_grep(
     context_after: Optional[int] = None,
     context_before: Optional[int] = None,
     context_both: Optional[int] = None,
-    multiline: bool = False,
-    head_limit: Optional[int] = None
 ) -> subprocess.CompletedProcess:
     """Run git grep with specified parameters.
     
@@ -86,8 +83,6 @@ def _run_git_grep(
         context_after: Lines to show after match
         context_before: Lines to show before match
         context_both: Lines to show before and after match
-        multiline: Enable multiline mode
-        head_limit: Limit output lines (handled in post-processing)
         
     Returns:
         CompletedProcess result from git grep
@@ -97,9 +92,6 @@ def _run_git_grep(
     # Pattern matching flags
     if case_insensitive:
         cmd.append("-i")
-    
-    # Note: git grep has limited multiline support compared to ripgrep
-    # We'll ignore the multiline flag for now
     
     # Output mode
     if output_mode == "files_with_matches":
@@ -114,12 +106,12 @@ def _run_git_grep(
     
     # Context lines (only for content mode)
     if output_mode == "content":
-        if context_both is not None:
+        if context_both is not None and context_both > 0:
             cmd.extend(["-C", str(context_both)])
         else:
-            if context_after is not None:
+            if context_after is not None and context_after > 0:
                 cmd.extend(["-A", str(context_after)])
-            if context_before is not None:
+            if context_before is not None and context_before > 0:
                 cmd.extend(["-B", str(context_before)])
     
     # Add pattern
@@ -238,10 +230,6 @@ def grep(
         description="Number of lines to show before and after each match (git grep -C). Requires output_mode: \"content\", ignored otherwise.",
         alias="-C"
     ),
-    multiline: bool = Field(
-        False,
-        description="Enable multiline mode where . matches newlines and patterns can span lines (git grep -U --multiline-dotall). Default: false.",
-    ),
     head_limit: Optional[int] = Field(
         None,
         description="Limit output to first N lines/entries, equivalent to \"| head -N\". Works across all output modes: content (limits output lines), files_with_matches (limits file paths), count (limits count entries). When unspecified, shows all results from git grep.",
@@ -256,7 +244,6 @@ def grep(
   - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
   - Use Task tool for open-ended searches requiring multiple rounds
   - Pattern syntax: Uses git grep (not grep) - literal braces need escaping (use `interface\\{\\}` to find `interface{}` in Go code)
-  - Multiline matching: By default patterns match within single lines only. For cross-line patterns like `struct \\{[\\s\\S]*?field`, use `multiline: true`
 """
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
@@ -266,12 +253,28 @@ def grep(
         glob = None
     if isinstance(type, FieldInfo):
         type = None
+    if isinstance(case_insensitive, FieldInfo):
+        case_insensitive = False
+    if isinstance(show_line_numbers, FieldInfo):
+        show_line_numbers = False
+    if isinstance(context_after, FieldInfo):
+        context_after = None
+    if isinstance(context_before, FieldInfo):
+        context_before = None
+    if isinstance(context_both, FieldInfo):
+        context_both = None
+    if isinstance(head_limit, FieldInfo):
+        head_limit = None
 
     # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
+    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
+        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
+        if llm_content is None:
+            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
+        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
 
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
+        # For success, use the provided llm_content directly
         return ToolResult(
             status="success",
             message=message,
@@ -343,16 +346,13 @@ def grep(
             context_after=context_after,
             context_before=context_before,
             context_both=context_both,
-            multiline=multiline,
-            head_limit=head_limit
         )
         
         # Process git grep result
         
         # Handle git grep exit codes
         if result.returncode == 1:  # No matches found
-            search_path_str = str(search_path.relative_to(WORKSPACE_ROOT)) if search_path != WORKSPACE_ROOT else "."
-            return _error(f"No matches found for pattern '{pattern}' in '{search_path_str}'")
+            return _error("No files found")
         elif result.returncode != 0:  # Error occurred
             error_msg = result.stderr.strip() if result.stderr else "Unknown git grep error"
             return _error(f"Search error: {error_msg}")
@@ -361,29 +361,16 @@ def grep(
         output_lines = _process_output(result.stdout, head_limit)
         
         if not output_lines:
-            search_path_str = str(search_path.relative_to(WORKSPACE_ROOT)) if search_path != WORKSPACE_ROOT else "."
-            return _error(f"No matches found for pattern '{pattern}' in '{search_path_str}'")
+            return _error("No files found")
 
         # Build response based on output mode
-        search_path_str = str(search_path.relative_to(WORKSPACE_ROOT)) if search_path != WORKSPACE_ROOT else "."
         
         if output_mode == "files_with_matches":
             total_files = len(output_lines)
-            message = f"Found {total_files} file{'s' if total_files != 1 else ''} with matches"
+            message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
             
-            llm_content = {
-                "operation": {
-                    "type": "grep",
-                    "pattern": pattern,
-                    "search_path": search_path_str,
-                    "output_mode": output_mode
-                },
-                "result": {
-                    "files": output_lines,
-                    "total_files": total_files,
-                    "truncated": head_limit is not None and len(output_lines) == head_limit
-                }
-            }
+            # Simple LLM content - just the file paths, one per line
+            llm_content = "\n".join(output_lines)
             
             return _success(
                 message,
@@ -391,76 +378,48 @@ def grep(
                 files=output_lines,
                 total_files=total_files,
                 pattern=pattern,
-                search_path=search_path_str,
             )
             
         elif output_mode == "count":
             # Parse count output (file:count format)
-            count_data = []
             total_matches = 0
             
             for line in output_lines:
                 if ':' in line:
-                    file_path, count_str = line.rsplit(':', 1)
+                    _, count_str = line.rsplit(':', 1)
                     try:
                         count = int(count_str)
-                        count_data.append({"file": file_path, "count": count})
                         total_matches += count
                     except ValueError:
                         continue
                         
-            message = f"Found {total_matches} matches in {len(count_data)} files"
+            message = f"Found {total_matches} matches in {len(output_lines)} files"
             
-            llm_content = {
-                "operation": {
-                    "type": "grep",
-                    "pattern": pattern,
-                    "search_path": search_path_str,
-                    "output_mode": output_mode
-                },
-                "result": {
-                    "counts": count_data,
-                    "total_matches": total_matches,
-                    "total_files": len(count_data),
-                    "truncated": head_limit is not None and len(output_lines) == head_limit
-                }
-            }
+            # Simple LLM content - just the count output, one per line
+            llm_content = "\n".join(output_lines)
             
             return _success(
                 message,
                 llm_content,
-                counts=count_data,
                 total_matches=total_matches,
-                total_files=len(count_data),
+                total_files=len(output_lines),
                 pattern=pattern,
-                search_path=search_path_str,
             )
             
         else:  # content mode
-            total_lines = len(output_lines)
-            message = f"Found {total_lines} matching line{'s' if total_lines != 1 else ''}"
+            # For content mode, Claude Code doesn't show a count message
+            # Just return the matching lines directly
+            message = f"Search results for pattern '{pattern}'"
             
-            llm_content = {
-                "operation": {
-                    "type": "grep",
-                    "pattern": pattern,
-                    "search_path": search_path_str,
-                    "output_mode": output_mode
-                },
-                "result": {
-                    "content": output_lines,
-                    "total_lines": total_lines,
-                    "truncated": head_limit is not None and len(output_lines) == head_limit
-                }
-            }
+            # Simple LLM content - just the matching lines, one per line
+            llm_content = "\n".join(output_lines)
             
             return _success(
                 message,
                 llm_content,
                 content=output_lines,
-                total_lines=total_lines,
+                total_lines=len(output_lines),
                 pattern=pattern,
-                search_path=search_path_str,
             )
 
     except TimeoutError as e:
