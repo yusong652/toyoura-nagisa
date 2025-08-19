@@ -1,10 +1,7 @@
 from fastmcp import FastMCP
 from datetime import datetime
-import time
 import pytz
 from typing import Optional
-import asyncio
-import requests
 from timezonefinder import TimezoneFinder
 from fastmcp.server.context import Context  # type: ignore
 
@@ -18,37 +15,26 @@ def _error(message: str, error_details: Optional[str] = None) -> dict:
     if error_details:
         data["details"] = error_details
     
+    error_msg = f"Time operation failed: {message}"
+    llm_content = f"<error>{error_msg}</error>"
+    
     return ToolResult(
         status="error",
-        message=f"Time operation failed: {message}",
-        llm_content={
-            "operation": "get_current_time",
-            "result": {
-                "error": message,
-                "details": error_details
-            },
-            "summary": f"Unable to retrieve time: {message}"
-        },
+        message=error_msg,
+        llm_content=llm_content,
+        error=message,
         data=data
     ).model_dump()
 
 def _success(formatted_time: str, timezone_name: str, additional_formats: dict, location_info: Optional[dict] = None) -> dict:
     """Create standardized success response."""
+    # Simple, natural string for LLM consumption
+    llm_content = f"Current time in {timezone_name}: {formatted_time}"
+    
     return ToolResult(
         status="success",
         message=f"Current time retrieved successfully ({timezone_name})",
-        llm_content={
-            "operation": "get_current_time",
-            "result": {
-                "current_time": formatted_time,
-                "timezone": timezone_name,
-                "location_source": location_info.get("source") if location_info else "manual_override"
-            },
-            "summary": {
-                "operation_type": "get_current_time",
-                "success": True
-            }
-        },
+        llm_content=llm_content,
         data={
             "primary_format": formatted_time,
             "timezone": timezone_name,
@@ -77,13 +63,15 @@ def register_time_tools(mcp: FastMCP):
     async def get_current_time(context: Context) -> dict:
         """Retrieve current time with automatic timezone detection from user location.
         
-        Auto-detects timezone from browser geolocation. Falls back to Asia/Tokyo if location detection fails.
+        Priority: Browser geolocation > Server IP location > Asia/Tokyo fallback.
         """
         try:
             location_info = None
+            determined_timezone = None
 
-            # Auto-detect timezone from user location
-            location_info = await get_user_location(context, wait_time=10)
+            # Get user location (prioritizes browser, falls back to server IP)
+            location_info = await get_user_location(context, wait_time=5, prefer_browser=True)
+            
             if location_info and location_info.get("latitude") and location_info.get("longitude"):
                 detected_tz = _get_timezone_from_location(
                     location_info["latitude"], 
@@ -92,13 +80,13 @@ def register_time_tools(mcp: FastMCP):
                 if detected_tz:
                     determined_timezone = detected_tz
                 else:
-                    # Fallback to Tokyo if timezone detection fails
+                    # Location found but timezone detection failed
                     determined_timezone = "Asia/Tokyo"
                     location_info["fallback_reason"] = "timezone_detection_failed"
             else:
-                # Fallback to Tokyo if location detection fails
+                # No location could be determined
                 determined_timezone = "Asia/Tokyo"
-                location_info = {"source": "fallback", "fallback_reason": "location_detection_failed"}
+                location_info = {"source": "fallback", "fallback_reason": "all_location_detection_failed"}
 
             # Get current time based on determined timezone
             try:

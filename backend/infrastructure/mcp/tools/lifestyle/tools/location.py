@@ -10,7 +10,7 @@ from fastmcp.server.context import Context
 
 from backend.infrastructure.mcp.location_manager import LocationData
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
-from backend.infrastructure.mcp.utils.location_utils import _reverse_geocode_full
+from backend.infrastructure.mcp.utils.location_utils import get_browser_location
 
 __all__ = ["register_location_tools"]
 
@@ -24,25 +24,17 @@ def register_location_tools(mcp: FastMCP):
 
     # Helper functions for consistent responses
     def _error(message: str) -> Dict[str, Any]:
+        """Create standardized error response following coding tools pattern."""
+        llm_content = f"<error>{message}</error>"
         return ToolResult(
             status="error", 
             message=message, 
             error=message,
-            llm_content={
-                "operation": {
-                    "type": "get_location",
-                    "location_source": "error",
-                },
-                "result": None,
-                "summary": {
-                    "operation_type": "get_location",
-                    "success": False,
-                    "error": message
-                }
-            }
+            llm_content=llm_content
         ).model_dump()
 
     def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
+        """Create standardized success response following coding tools pattern."""
         return ToolResult(
             status="success",
             message=message,
@@ -81,89 +73,36 @@ def register_location_tools(mcp: FastMCP):
         """Get the user's current geographic location.
         
         Returns latitude, longitude, city, region, and country information.
+        Priority: Browser geolocation > Server IP location.
         """
         try:
             session_id = context.client_id
             if not session_id:
                 return _error("Session ID missing")
 
-            # Request fresh location from browser using non-blocking event mechanism
-            app = getattr(getattr(context, "fastmcp", None), "app", None)
-            print(f"[DEBUG] App object: {app is not None}")
+            # Try to get browser location first
+            print(f"[DEBUG] Attempting to get browser location for session {session_id}")
+            browser_loc_data = await get_browser_location(context, timeout=5.0)
             
-            if app and hasattr(app.state, "connection_manager"):
-                print(f"[DEBUG] Connection manager available: {hasattr(app.state, 'connection_manager')}")
-                # Import location response events storage
-                from backend.presentation.websocket.router import _location_response_events
-                location_events = _location_response_events
+            if browser_loc_data:
+                # Create LocationData object from browser response
+                browser_loc = LocationData(
+                    latitude=browser_loc_data["latitude"],
+                    longitude=browser_loc_data["longitude"],
+                    accuracy=browser_loc_data.get("accuracy"),
+                    source="browser_geolocation",
+                    session_id=session_id,
+                    timestamp=browser_loc_data.get("timestamp", int(asyncio.get_event_loop().time())),
+                    city=browser_loc_data.get("city"),
+                    region=browser_loc_data.get("region"),
+                    country=browser_loc_data.get("country")
+                )
                 
-                # Create event for this location request
-                location_event = asyncio.Event()
-                location_events[session_id] = {
-                    "event": location_event,
-                    "location_data": None,
-                    "success": False,
-                    "timestamp": None
-                }
-                
-                # Check if WebSocket connection exists
-                cm = app.state.connection_manager  
-                if session_id in cm.connections:
-                    print(f"[DEBUG] WebSocket connection found for session {session_id}")
-                    
-                    # Send location request via WebSocket
-                    await cm.send_json(session_id, {"type": "REQUEST_LOCATION"})
-                    print(f"[DEBUG] WebSocket location request sent for session {session_id}")
-                    
-                    try:
-                        # Wait for response with shorter timeout (5s for WebSocket)
-                        print(f"[DEBUG] Waiting for WebSocket location response (5s timeout)...")
-                        await asyncio.wait_for(location_event.wait(), timeout=5.0)
-                        print(f"[DEBUG] WebSocket location event received")
-                        
-                        # Get the response data
-                        event_info = location_events.get(session_id, {})
-                        if event_info.get("success") and event_info.get("location_data"):
-                            location_data = event_info["location_data"]
-                            
-                            # Create LocationData object from browser response
-                            browser_loc = LocationData(
-                                latitude=location_data["latitude"],
-                                longitude=location_data["longitude"],
-                                accuracy=location_data.get("accuracy"),
-                                source="browser_geolocation",
-                                session_id=session_id,
-                                timestamp=event_info.get("timestamp", int(asyncio.get_event_loop().time()))
-                            )
-                            
-                            # Add reverse geocoding to get city, region, country
-                            try:
-                                geocode_data = _reverse_geocode_full(browser_loc.latitude, browser_loc.longitude)
-                                browser_loc.city = geocode_data.get("city")
-                                browser_loc.region = geocode_data.get("region")
-                                browser_loc.country = geocode_data.get("country")
-                                print(f"[DEBUG] Reverse geocoding successful: {geocode_data}")
-                            except Exception as e:
-                                print(f"[DEBUG] Reverse geocoding failed: {e}")
-                            
-                            print(f"[DEBUG] WebSocket browser location success: lat={browser_loc.latitude}, lng={browser_loc.longitude}, city={browser_loc.city}")
-                            return _build_location_response(browser_loc, session_id, "browser_geolocation")
-                        else:
-                            print(f"[DEBUG] WebSocket location failed: {event_info.get('error', 'No location data')}")
-                            
-                    except asyncio.TimeoutError:
-                        print(f"[DEBUG] WebSocket location request timeout - will fallback")
-                        
-                    finally:
-                        # Clean up the event
-                        location_events.pop(session_id, None)
-                else:
-                    print(f"[DEBUG] No WebSocket connection for session {session_id} - using fallback immediately")
-            else:
-                print(f"[DEBUG] App or connection manager not available - using fallback immediately")
+                print(f"[DEBUG] Browser location success: lat={browser_loc.latitude}, lng={browser_loc.longitude}, city={browser_loc.city}")
+                return _build_location_response(browser_loc, session_id, "browser_geolocation")
                 
             # Fallback to server IP geolocation
-            print(f"[DEBUG] Falling back to server IP geolocation")
+            print(f"[DEBUG] Browser location unavailable, falling back to server IP geolocation")
             loc = _fetch_server_location()
             if loc:
                 print(f"[DEBUG] Server IP geolocation succeeded, building response")
@@ -180,30 +119,23 @@ def register_location_tools(mcp: FastMCP):
         # Determine accuracy level
         accuracy = "high" if source_type == "browser_geolocation" else "low"
         
-        llm_content = {
-            "operation": {
-                "type": "get_location",
-                "location_source": source_type,
-            },
-            "result": {
-                "latitude": loc.latitude,
-                "longitude": loc.longitude,
-                "city": loc.city,
-                "region": loc.region,
-                "country": loc.country,
-                "accuracy": accuracy
-            },
-            "summary": {
-                "operation_type": "get_location",
-                "success": True
-            }
-        }
-        
-        location_desc = f"{loc.city or 'Unknown city'}"
+        # Build natural location description
+        location_parts = []
+        if loc.city:
+            location_parts.append(loc.city)
         if loc.region:
-            location_desc += f", {loc.region}"
+            location_parts.append(loc.region)
         if loc.country:
-            location_desc += f", {loc.country}"
+            location_parts.append(loc.country)
+        
+        location_desc = ", ".join(location_parts) if location_parts else "Unknown location"
+        
+        # Create simple, natural language content for LLM
+        llm_content = f"Location: {location_desc}\nCoordinates: {loc.latitude:.6f}, {loc.longitude:.6f}"
+        if accuracy == "high":
+            llm_content += " (high accuracy from browser)"
+        else:
+            llm_content += " (approximate from IP)"
         
         message = f"Location determined: {location_desc} ({accuracy} accuracy)"
         

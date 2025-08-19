@@ -2,6 +2,7 @@
 Location Utilities - Shared location detection and geocoding functions
 """
 
+import asyncio
 import requests
 from typing import Optional, Dict, Any
 from fastmcp.server.context import Context  # type: ignore
@@ -62,25 +63,116 @@ def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
     return {"city": None, "region": None, "country": None}
 
 
+async def get_browser_location(
+    context: Context,
+    timeout: float = 5.0
+) -> Optional[Dict[str, Any]]:
+    """
+    Get user location from browser via WebSocket.
+    
+    Args:
+        context: FastMCP context containing session information
+        timeout: Timeout in seconds for waiting for browser response
+    
+    Returns:
+        Location dictionary with latitude, longitude, and source='browser_geolocation'
+        Returns None if browser location is unavailable
+    """
+    try:
+        session_id = context.client_id
+        if not session_id:
+            return None
+
+        # Get app and connection manager
+        app = getattr(getattr(context, "fastmcp", None), "app", None)
+        if not app or not hasattr(app.state, "connection_manager"):
+            return None
+
+        # Import location response events storage
+        from backend.presentation.websocket.router import _location_response_events
+        location_events = _location_response_events
+        
+        # Check if WebSocket connection exists
+        cm = app.state.connection_manager
+        if session_id not in cm.connections:
+            return None
+        
+        # Create event for this location request
+        location_event = asyncio.Event()
+        location_events[session_id] = {
+            "event": location_event,
+            "location_data": None,
+            "success": False,
+            "timestamp": None
+        }
+        
+        try:
+            # Send location request via WebSocket
+            await cm.send_json(session_id, {"type": "REQUEST_LOCATION"})
+            
+            # Wait for response with timeout
+            await asyncio.wait_for(location_event.wait(), timeout=timeout)
+            
+            # Get the response data
+            event_info = location_events.get(session_id, {})
+            if event_info.get("success") and event_info.get("location_data"):
+                location_data = event_info["location_data"]
+                
+                # Get city/region/country via reverse geocoding
+                geocode_data = _reverse_geocode_full(
+                    location_data["latitude"],
+                    location_data["longitude"]
+                )
+                
+                return {
+                    "latitude": location_data["latitude"],
+                    "longitude": location_data["longitude"],
+                    "accuracy": location_data.get("accuracy"),
+                    "city": geocode_data.get("city"),
+                    "region": geocode_data.get("region"),
+                    "country": geocode_data.get("country"),
+                    "source": "browser_geolocation",
+                    "timestamp": event_info.get("timestamp")
+                }
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            # Clean up the event
+            location_events.pop(session_id, None)
+            
+    except Exception:
+        pass
+    
+    return None
+
+
 async def get_user_location(
     context: Context, 
     wait_time: int = 10,
-    include_reverse_geocoding: bool = False
+    include_reverse_geocoding: bool = False,
+    prefer_browser: bool = True
 ) -> Optional[Dict[str, Any]]:
     """
-    Get user location using server IP geolocation.
+    Get user location with browser priority.
     
     Args:
-        context: FastMCP context containing session information (not used)
-        wait_time: Not used (kept for compatibility)
+        context: FastMCP context containing session information
+        wait_time: Timeout for browser location (defaults to 10 seconds)
         include_reverse_geocoding: Not used (kept for compatibility)
+        prefer_browser: If True, try browser location first (default True)
     
     Returns:
         Location dictionary with latitude, longitude, city, country, source, etc.
         Returns None if no location could be determined
     """
     try:
-        # Use server IP geolocation
+        # Try browser location first if preferred
+        if prefer_browser:
+            browser_loc = await get_browser_location(context, timeout=wait_time)
+            if browser_loc:
+                return browser_loc
+        
+        # Fallback to server IP geolocation
         return _fetch_server_location()
 
     except Exception:
