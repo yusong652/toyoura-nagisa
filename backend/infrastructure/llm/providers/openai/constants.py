@@ -26,7 +26,7 @@ TOOL_CALL_TIMEOUT = 30.0
 
 # Content generation settings
 TITLE_GENERATION_TEMPERATURE = 1.0
-TITLE_MAX_LENGTH = 30
+TITLE_MAX_LENGTH = 50  # Aligned with DEFAULT_TITLE_MAX_LENGTH for consistency
 IMAGE_PROMPT_TEMPERATURE = 0.8
 
 # Debug settings

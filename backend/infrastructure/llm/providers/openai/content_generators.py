@@ -8,21 +8,28 @@ maintaining compatibility with the unified content generation interface.
 
 from typing import Optional, Dict, Any, List
 import re
-import json
 from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.config import get_text_to_image_settings, get_llm_settings
-from backend.infrastructure.storage.session_manager import get_latest_n_messages
+from backend.config import get_llm_settings
+from backend.infrastructure.llm.base.content_generators import (
+    BaseWebSearchGenerator, 
+    BaseTitleGenerator
+)
+from backend.infrastructure.llm.shared.constants import (
+    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
+    DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
+)
 from .message_formatter import OpenAIMessageFormatter
 from .debug import OpenAIDebugger
 from .constants import *
 
 
-class TitleGenerator:
+class TitleGenerator(BaseTitleGenerator):
     """
     Handles conversation title generation using OpenAI API.
     
     Generates concise, descriptive titles based on the first exchange
     in a conversation to help users identify and organize their chats.
+    Inherits from BaseTitleGenerator for consistency with other providers.
     """
 
     @staticmethod
@@ -46,12 +53,8 @@ class TitleGenerator:
             if not latest_messages or len(latest_messages) < 2:
                 return None
             
-            # Default system prompt for title generation
-            system_prompt = (
-                "You are a professional conversation title generator. Generate a concise title (5-15 words) "
-                "that accurately summarizes the main topic or intent of the conversation. "
-                "Put the title in <title></title> tags and output nothing else."
-            )
+            # Use shared system prompt for title generation
+            system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
             
             # Build conversation messages
             messages = list(latest_messages) + [
@@ -94,13 +97,32 @@ class TitleGenerator:
             title_match = re.search(r'<title>(.*?)</title>', title_response_text, re.DOTALL)
             if title_match:
                 title = title_match.group(1).strip()
-                if title and len(title) <= TITLE_MAX_LENGTH:
-                    return title
+                # If title is too long, truncate it intelligently
+                if title:
+                    if len(title) <= TITLE_MAX_LENGTH:
+                        return title
+                    else:
+                        # Truncate at word boundary if possible
+                        truncated = title[:TITLE_MAX_LENGTH]
+                        last_space = truncated.rfind(' ')
+                        if last_space > 20:  # Keep at least 20 chars
+                            truncated = truncated[:last_space]
+                        return truncated.strip()
             
             # Fallback: clean the response directly
             cleaned_title = title_response_text.strip().strip('"\'').strip()
-            if cleaned_title and len(cleaned_title) <= TITLE_MAX_LENGTH:
-                return cleaned_title
+            if cleaned_title:
+                # Remove <title> tags if present in fallback
+                cleaned_title = re.sub(r'</?title>', '', cleaned_title, flags=re.IGNORECASE).strip()
+                if len(cleaned_title) <= TITLE_MAX_LENGTH:
+                    return cleaned_title
+                else:
+                    # Truncate fallback title too
+                    truncated = cleaned_title[:TITLE_MAX_LENGTH]
+                    last_space = truncated.rfind(' ')
+                    if last_space > 20:
+                        truncated = truncated[:last_space]
+                    return truncated.strip()
             
             return None
             
@@ -198,13 +220,12 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             return None
 
 
-class WebSearchGenerator:
+class WebSearchGenerator(BaseWebSearchGenerator):
     """
-    Handles web search using OpenAI API.
+    Handles web search using OpenAI's native web search capabilities.
     
-    Note: OpenAI doesn't have built-in web search capabilities like Gemini.
-    This implementation provides a placeholder that should integrate with
-    MCP tools for actual web search functionality.
+    Uses the gpt-4o-search-preview model with web_search_options to perform
+    searches and return structured results with sources.
     """
 
     @staticmethod
@@ -212,27 +233,131 @@ class WebSearchGenerator:
         client,  # OpenAI client instance
         query: str,
         debug: bool = False,
-        **kwargs
+        **kwargs  # Accept additional parameters for compatibility (e.g., max_uses)
     ) -> Dict[str, Any]:
         """
-        Perform a web search using MCP tools (OpenAI doesn't have built-in search).
+        Perform a web search using OpenAI's native web search API.
         
         Args:
-            client: OpenAI client instance (not used for search)
-            query: The search query
+            client: OpenAI client instance for API calls
+            query: The search query to find information on the web
             debug: Enable debug output
+            **kwargs: Additional search parameters (accepted for compatibility but not used)
             
         Returns:
-            Dictionary indicating that OpenAI requires external tools for search
+            Dictionary containing search results with sources and metadata
         """
-        if debug:
-            print(f"[WebSearch] OpenAI client requested search for: {query}")
-            print("[WebSearch] Note: OpenAI requires external MCP tools for web search")
+        print(f"[WebSearchGenerator] perform_web_search called with query: {query}")
+        print(f"[WebSearchGenerator] Debug mode: {debug}")
+        print(f"[WebSearchGenerator] Client type: {type(client)}")
+        if kwargs:
+            print(f"[WebSearchGenerator] Additional params (ignored): {kwargs}")
         
-        return {
-            "error": "OpenAI client requires MCP web search tools",
-            "query": query,
-            "suggestion": "Use MCP tools like 'web_search' or 'google_search' for web search functionality",
-            "sources": [],
-            "total_sources": 0
-        }
+        try:
+            # Use base class debug method
+            BaseWebSearchGenerator.debug_search_start(query, debug)
+            
+            # Create user message using base class method
+            user_message = BaseWebSearchGenerator.create_search_user_message(query)
+            
+            # Format message for OpenAI API
+            formatted_messages = OpenAIMessageFormatter.format_messages([user_message])
+            
+            # Build API messages with system prompt
+            api_messages = [
+                {"role": "system", "content": DEFAULT_WEB_SEARCH_SYSTEM_PROMPT}
+            ] + formatted_messages
+            
+            # Prepare API kwargs for web search
+            # Note: gpt-4o-search-preview doesn't support temperature parameter
+            api_kwargs = {
+                "model": "gpt-4o-search-preview",  # Specific model for web search
+                "web_search_options": {},  # Enable web search
+                "messages": api_messages,
+                "max_tokens": 2048
+            }
+            
+            print(f"[WebSearchGenerator] About to call OpenAI API with model: {api_kwargs['model']}")
+            print(f"[WebSearchGenerator] Web search options: {api_kwargs.get('web_search_options', {})}")
+            
+            # Debug request
+            if debug:
+                print("[DEBUG] Web search API call:")
+                OpenAIDebugger.print_debug_request_payload(api_kwargs)
+            
+            # Perform the web search
+            print("[WebSearchGenerator] Making API call...")
+            # Check if client is async or sync
+            if hasattr(client, 'chat') and hasattr(client.chat, 'completions'):
+                response = client.chat.completions.create(**api_kwargs)     
+            # Debug response
+            if debug:
+                print("[DEBUG] Web search response:")
+                OpenAIDebugger.log_raw_response(response)
+            
+            # Use base class debug method
+            BaseWebSearchGenerator.debug_search_complete(debug)
+            
+            if response.choices and response.choices[0].message:
+                response_text = response.choices[0].message.content or ""
+                print(f"[WebSearchGenerator] Response text length: {len(response_text)}")
+                
+                # Extract sources from annotations in the response
+                sources = []
+                
+                # Check if the response has annotations with url_citations
+                print(f"[WebSearchGenerator] Checking for annotations...")
+                print(f"[WebSearchGenerator] Has 'annotations' attr: {hasattr(response.choices[0].message, 'annotations')}")
+                
+                if hasattr(response.choices[0].message, 'annotations') and response.choices[0].message.annotations:
+                    print(f"[WebSearchGenerator] Found {len(response.choices[0].message.annotations)} annotations")
+                    for i, annotation in enumerate(response.choices[0].message.annotations):
+                        print(f"[WebSearchGenerator] Annotation {i}: type={getattr(annotation, 'type', 'unknown')}")
+                        if annotation.type == 'url_citation' and hasattr(annotation, 'url_citation'):
+                            citation = annotation.url_citation
+                            sources.append({
+                                'title': citation.title if hasattr(citation, 'title') else '',
+                                'url': citation.url if hasattr(citation, 'url') else '',
+                                'snippet': response_text[citation.start_index:citation.end_index] if hasattr(citation, 'start_index') and hasattr(citation, 'end_index') else ''
+                            })
+                            print(f"[WebSearchGenerator] Added source: {citation.url if hasattr(citation, 'url') else 'no-url'}")
+                    
+                    if debug:
+                        print(f"[WebSearch] Found {len(sources)} URL citations in annotations")
+                else:
+                    print("[WebSearchGenerator] No annotations found in response")
+                
+                # If no sources found, log for debugging
+                if not sources:
+                    print(f"[WebSearchGenerator] No sources found in annotations, using response text only")
+                    if debug:
+                        print("[WebSearch] No sources found in annotations, using response text only")
+                
+                # Build structured result using base class method
+                result = BaseWebSearchGenerator.format_search_result(
+                    query=query,
+                    response_text=response_text,
+                    sources=sources
+                )
+                
+                # Use base class debug method
+                BaseWebSearchGenerator.debug_search_results(
+                    len(sources), len(response_text), debug
+                )
+                
+                return result
+            else:
+                if debug:
+                    print("[WebSearch] No response content found")
+                return BaseWebSearchGenerator.format_search_error(
+                    query, "No search results found"
+                )
+                
+        except Exception as e:
+            error_msg = f"An error occurred during web search: {str(e)}"
+            print(f"[WebSearchGenerator] ERROR: {error_msg}")
+            import traceback
+            print(f"[WebSearchGenerator] Traceback: {traceback.format_exc()}")
+            if debug:
+                print(f"[WebSearch] Error: {error_msg}")
+            return BaseWebSearchGenerator.format_search_error(query, error_msg)

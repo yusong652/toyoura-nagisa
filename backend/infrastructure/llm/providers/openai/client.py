@@ -128,8 +128,11 @@ class OpenAIClient(LLMClientBase):
         """
         debug = self.openai_config.debug
         
-        # Get tool schemas for the session
-        tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
+        # Get agent profile from extra config
+        agent_profile = self.extra_config.get('agent_profile')
+        
+        # Get tool schemas for the session with agent profile
+        tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
         # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
         tools_enabled = self.tool_manager.tools_enabled
         

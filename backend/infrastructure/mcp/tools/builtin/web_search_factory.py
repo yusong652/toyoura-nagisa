@@ -2,6 +2,7 @@
 
 from typing import Dict, Any, Optional
 from backend.config import get_llm_settings
+from backend.infrastructure.llm.base.client import LLMClientBase
 
 
 class WebSearchToolFactory:
@@ -13,7 +14,7 @@ class WebSearchToolFactory:
         Get the appropriate web search generator based on LLM type.
         
         Args:
-            llm_type: Type of LLM client ('gemini' or 'anthropic')
+            llm_type: Type of LLM client ('gemini', 'anthropic', or 'openai')
             
         Returns:
             WebSearchGenerator class for the specified LLM type
@@ -22,14 +23,17 @@ class WebSearchToolFactory:
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         elif llm_type.lower() == 'anthropic':
-            from backend.infrastructure.llm.anthropic.content_generators import WebSearchGenerator
+            from backend.infrastructure.llm.providers.anthropic.content_generators import AnthropicWebSearchGenerator as WebSearchGenerator
+            return WebSearchGenerator
+        elif llm_type.lower() == 'openai':
+            from backend.infrastructure.llm.providers.openai.content_generators import WebSearchGenerator
             return WebSearchGenerator
         else:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
     
     @staticmethod
     async def perform_web_search(
-        llm_client,
+        llm_client: LLMClientBase,
         llm_type: str,
         query: str,
         debug: bool = False,
@@ -63,6 +67,9 @@ class WebSearchToolFactory:
                 elif llm_type.lower() == 'anthropic':
                     anthropic_config = llm_settings.get_anthropic_config()
                     max_uses = anthropic_config.web_search_max_uses
+                elif llm_type.lower() == 'openai':
+                    # OpenAI doesn't use max_uses but we keep it for compatibility
+                    max_uses = 5
                 else:
                     max_uses = 5
             
@@ -89,6 +96,15 @@ class WebSearchToolFactory:
                     debug=debug,
                     max_uses=max_uses
                 )
+            elif llm_type.lower() == 'openai':
+                # OpenAI client expects the raw client
+                client = getattr(llm_client, 'client', llm_client)
+                return await WebSearchGenerator.perform_web_search(
+                    client=client,
+                    query=query,
+                    debug=debug,
+                    max_uses=max_uses  # Accepted for compatibility but not used
+                )
             else:
                 return {
                     "error": f"Unsupported LLM type: {llm_type}",
@@ -111,7 +127,7 @@ class WebSearchToolFactory:
             llm_client: The LLM client instance
             
         Returns:
-            LLM type string ('gemini' or 'anthropic')
+            LLM type string ('gemini', 'anthropic', or 'openai')
         """
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
@@ -120,6 +136,8 @@ class WebSearchToolFactory:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
             return 'anthropic'
+        elif 'openai' in client_type or 'openai' in client_module:
+            return 'openai'
         elif hasattr(llm_client, 'client'):
             # Try to detect from wrapped client
             return WebSearchToolFactory.detect_llm_type(llm_client.client)
@@ -129,5 +147,7 @@ class WebSearchToolFactory:
                 return 'gemini'
             elif hasattr(llm_client, 'messages') and hasattr(llm_client, 'create'):
                 return 'anthropic'
+            elif hasattr(llm_client, 'chat') and hasattr(llm_client.chat, 'completions'):
+                return 'openai'
             else:
                 raise ValueError(f"Unable to detect LLM type from client: {type(llm_client)}")

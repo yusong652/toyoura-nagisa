@@ -69,25 +69,8 @@ async def web_search(
         # Extract search results
         sources = search_result.get("sources", [])
         response_text = search_result.get("response_text", "")
-        
-        # Build structured response for LLM
-        llm_content = {
-            "operation": {
-                "type": "web_search",
-                "query": query
-            },
-            "result": {
-                "response_text": response_text,
-                "sources": sources,
-                "total_sources": len(sources)
-            },
-            "summary": {
-                "operation_type": "web_search",
-                "llm_type": llm_type,
-                "max_uses": max_uses,
-                "success": True
-            }
-        }
+
+        llm_content = response_text if response_text else f"No results found for query: {query}"
         
         # Get LLM type for message
         llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
@@ -95,11 +78,12 @@ async def web_search(
         if response_text:
             message += f" (Response: {len(response_text)} chars)"
         
+        # Store full search result in data for reference
         return ToolResult(
             status="success",
             message=message,
-            llm_content=llm_content,
-            data=search_result
+            llm_content=llm_content,  # Just the text, not structured data
+            data=search_result  # Full result with sources, response_text, etc.
         ).model_dump()
         
     except Exception as e:

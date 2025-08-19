@@ -10,19 +10,28 @@ import json
 from typing import Optional, Dict, List, Any
 import anthropic
 from backend.domain.models.messages import BaseMessage, UserMessage
+from backend.infrastructure.llm.base.content_generators import (
+    BaseTitleGenerator,
+    BaseWebSearchGenerator,
+    BaseImagePromptGenerator
+)
+from backend.infrastructure.llm.shared.constants import (
+    DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
+    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
+)
 from .message_formatter import MessageFormatter
-from backend.config import get_text_to_image_settings, get_llm_settings
+from backend.config import get_llm_settings
 from .config import get_anthropic_client_config
-from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from .debug import AnthropicDebugger
 
 
-class TitleGenerator:
+class TitleGenerator(BaseTitleGenerator):
     """
     Handles conversation title generation using Anthropic Claude API.
     
     Generates concise, descriptive titles based on the first exchange
     in a conversation to help users identify and organize their chats.
+    Inherits from BaseTitleGenerator for consistency with other providers.
     """
 
     @staticmethod
@@ -44,11 +53,8 @@ class TitleGenerator:
             if not latest_messages or len(latest_messages) < 2:
                 return None
             
-            system_prompt = (
-                "你是一个专业的对话标题生成助手。请根据提供的对话内容，生成一个简洁的标题（5-15个字）。"
-                "标题应准确概括对话的主要主题或意图。你必须将标题放在<title></title>标签中，"
-                "并且除了这些标签和标题本身外，不要输出任何其他内容。"
-            )
+            # Use shared system prompt for consistency
+            system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
             
             # 构造消息序列
             messages = list(latest_messages) + [
@@ -99,7 +105,7 @@ class TitleGenerator:
             return None
 
 
-class WebSearchGenerator:
+class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
     """
     Handles web search using Anthropic Claude API with web_search_20250305 tool.
 
@@ -136,19 +142,8 @@ class WebSearchGenerator:
             # Format message using MessageFormatter
             formatted_messages = MessageFormatter.format_messages([user_message])
             
-            # Configure web search system prompt
-            web_search_system_prompt = (
-                "You are a professional web search assistant. Your task is to search for and synthesize "
-                "information from the web to provide comprehensive, accurate, and up-to-date answers. "
-                "When searching:\n"
-                "1. Use the web search tool to find relevant and current information\n"
-                "2. Analyze multiple sources for accuracy and reliability\n"
-                "3. Synthesize information into a coherent, well-structured response\n"
-                "4. Prioritize recent and authoritative sources\n"
-                "5. Clearly indicate when information is uncertain or requires verification\n"
-                "6. Provide context and explain complex topics clearly\n"
-                "Focus on delivering factual, helpful information that directly addresses the user's query."
-            )
+            # Use shared web search system prompt for consistency
+            web_search_system_prompt = DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
             
             # Use the new Anthropic configuration system
             anthropic_config = get_anthropic_client_config()

@@ -219,8 +219,8 @@ class AnthropicClient(LLMClientBase):
         Returns:
             Dictionary containing search results with sources and metadata
         """
-        from .content_generators import WebSearchGenerator
-        return WebSearchGenerator.perform_web_search(
+        from .content_generators import AnthropicWebSearchGenerator
+        return AnthropicWebSearchGenerator.perform_web_search(
             self.client, 
             query, 
             self.anthropic_config.debug,
