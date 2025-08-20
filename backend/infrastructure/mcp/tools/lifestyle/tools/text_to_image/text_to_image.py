@@ -4,60 +4,28 @@ from dotenv import load_dotenv
 import json
 import logging
 import traceback
-from typing import Optional, Dict, Any, List
+from typing import Any
 import httpx
 from fastapi import FastAPI
 from fastmcp.server.context import Context  # type: ignore
 from backend.config import get_text_to_image_config
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 load_dotenv()
 
 app = FastAPI()
 
-def _error(message: str, error_details: Optional[str] = None) -> dict:
-    """Create standardized error response."""
-    data = {"error": message}
-    if error_details:
-        data["details"] = error_details
-    
-    return ToolResult(
-        status="error",
-        message=f"Image generation failed: {message}",
-        llm_content={
-            "operation": "generate_image",
-            "result": "failed",
-            "summary": f"Unable to generate image: {message}"
-        },
-        data=data
-    ).model_dump()
 
-def _success(image_type: str, generation_time: Optional[str] = None) -> dict:
-    """Create standardized success response."""
-    message_parts = ["Successfully generated image"]
-    if generation_time:
-        message_parts.append(f"in {generation_time}")
-    
-    return ToolResult(
-        status="success", 
-        message="Image generated successfully",
-        llm_content={
-            "operation": "generate_image",
-            "result": "success",
-            "summary": " ".join(message_parts)
-        },
-        data={
-            "image_type": image_type,
-            "generation_time": generation_time
-        }
-    ).model_dump()
-
-
-async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Internal function to generate an image using a Stable Diffusion WebUI API.
-    """
+async def generate_image_from_description(prompt: str, negative_prompt: str):
+    """Generate image from text prompts using Stable Diffusion WebUI API."""
     try:
+        # Get configuration
+        config = get_text_to_image_config()
+        provider = config.get("provider")
+        
+        if provider != "stable_diffusion_webui":
+            return {"type": "error", "message": f"Unsupported image generation provider: {provider}"}
+            
         sd_config = config.get("stable_diffusion_webui", {})
         server_url = sd_config.get("server_url")
 
@@ -116,22 +84,6 @@ async def _generate_with_stable_diffusion(prompt: str, negative_prompt: str, con
     except Exception as e:
         return {"type": "error", "message": str(e)}
 
-
-async def generate_image_from_description(prompt: str, negative_prompt: str):
-    """Generate image from text prompts using configured image generation service."""
-    try:
-        # Get configuration
-        config = get_text_to_image_config()
-        provider = config.get("provider")
-        
-        if provider == "stable_diffusion_webui":
-            return await _generate_with_stable_diffusion(prompt, negative_prompt, config)
-        else:
-            return {"type": "error", "message": f"Unsupported image generation provider: {provider}"}
-            
-    except Exception as e:
-        return {"type": "error", "message": str(e)}
-
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.
     
@@ -144,7 +96,10 @@ async def generate_image(context: Context) -> dict[str, Any]:
     # Resolve runtime dependencies (session ID, app, llm client)
     session_id: str | None = getattr(context, "client_id", None)
     if not session_id:
-        return _error("Session ID is missing", "client_id not provided in context")
+        return error_response(
+            message="Image generation failed: Session ID is missing",
+            error="client_id not provided in context"
+        )
 
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
     llm_client = None
@@ -152,16 +107,25 @@ async def generate_image(context: Context) -> dict[str, Any]:
         llm_client = fastapi_app.state.llm_client
 
     if llm_client is None:
-        return _error("LLM client unavailable", "Cannot access LLM client from application context")
+        return error_response(
+            message="Image generation failed: LLM client unavailable",
+            error="Cannot access LLM client from application context"
+        )
 
     # Build prompts using the LLM client
     try:
         prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
     except Exception as e:
-        return _error("Prompt generation failed", str(e))
+        return error_response(
+            message="Image generation failed: Prompt generation failed",
+            error=str(e)
+        )
 
     if not prompt_result or "text_prompt" not in prompt_result:
-        return _error("Empty prompt result", "Prompt generation returned no usable content")
+        return error_response(
+            message="Image generation failed: Empty prompt result",
+            error="Prompt generation returned no usable content"
+        )
 
     text_prompt = prompt_result["text_prompt"]
     negative_prompt = prompt_result["negative_prompt"]
@@ -170,29 +134,45 @@ async def generate_image(context: Context) -> dict[str, Any]:
     try:
         image_result = await generate_image_from_description(text_prompt, negative_prompt)
     except Exception as e:
-        return _error("Image generation failed", str(e))
+        return error_response(
+            message="Image generation failed",
+            error=str(e)
+        )
 
     if not image_result:
-        return _error("No image result", "Image generation returned empty result")
+        return error_response(
+            message="Image generation failed: No image result",
+            error="Image generation returned empty result"
+        )
 
     # Handle error response
     if image_result.get("type") == "error":
-        return _error(image_result.get("message", "Unknown error occurred"))
+        return error_response(
+            message=f"Image generation failed: {image_result.get('message', 'Unknown error occurred')}",
+            error=image_result.get("message", "Unknown error occurred")
+        )
     
     # Calculate generation time
     generation_time = f"{time.time() - start_time:.1f}s"
     
     # Handle successful image generation
-    if image_result.get("type") == "image_url" and image_result.get("image_url"):
-        success_response = _success("image", generation_time)
-        success_response["image_url"] = image_result["image_url"]
-        return success_response
-    elif image_result.get("type") == "image_base64" and image_result.get("image"):
-        success_response = _success("image", generation_time)
-        success_response["image_base64"] = image_result["image"]
-        return success_response
+    if image_result.get("type") == "image_base64" and image_result.get("image"):
+        return success_response(
+            message="Image generated successfully",
+            llm_content={
+                "operation": "generate_image",
+                "result": "success",
+                "summary": f"Successfully generated image in {generation_time}"
+            },
+            image_type="image_base64",
+            generation_time=generation_time,
+            image_base64=image_result["image"]
+        )
     else:
-        return _error("Unexpected result format", f"Got type: {image_result.get('type')}")
+        return error_response(
+            message="Image generation failed: Unexpected result format",
+            error=f"Got type: {image_result.get('type')}"
+        )
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
