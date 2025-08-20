@@ -60,6 +60,13 @@ def register_delete_event_tool(mcp: FastMCP):
             user_email = get_user_email()
             service = build_google_calendar_service(user_email, tokens_dir=CALENDAR_OAUTH_TOKEN_DIR)
             
+            # Get event summary before deletion
+            event_info = service.events().get(
+                calendarId='primary',
+                eventId=event_id
+            ).execute()
+            event_summary = event_info.get('summary', 'Untitled Event')
+            
             # Execute calendar operation
             def delete_operation():
                 service.events().delete(calendarId='primary', eventId=event_id).execute()
@@ -72,13 +79,13 @@ def register_delete_event_tool(mcp: FastMCP):
             
             # Build user-facing message
             if result["success"]:
-                message = f"Deleted event {event_id} from primary calendar"
+                message = f"Deleted event '{event_summary}' [ID: {event_id}]"
             else:
                 message = f"Failed to delete event: {result['error_message']}"
             
             # Build string-based LLM content (aligned with coding tools)
             if result["success"]:
-                llm_content = f"Deleted event: {event_id}"
+                llm_content = f"Deleted event: {event_summary} [ID: {event_id}]"
                 
                 # Add warnings if any
                 if result["warnings"]:

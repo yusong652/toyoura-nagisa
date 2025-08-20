@@ -96,31 +96,17 @@ def register_update_event_tool(mcp: FastMCP):
         warnings = []  # No warnings for now
 
         try:
-            # Validate and process time updates if provided
-            if start is not None or end is not None:
-                # Parse and validate time updates
-                if start is not None:
-                    try:
-                        start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                        # Use exact time as provided - no auto-correction
-                        start = start_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
-                    except ValueError as e:
-                        return error_response(f"Invalid start time format: {str(e)}. Please use RFC3339 format")
-                
-                if end is not None:
-                    try:
-                        end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
-                        # Use exact time as provided - no auto-correction
-                        end = end_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
-                    except ValueError as e:
-                        return error_response(f"Invalid end time format: {str(e)}. Please use RFC3339 format")
-                
-                # Validate time order if both times are provided
-                if start is not None and end is not None:
+            # Validate time order if both times are provided
+            if start is not None and end is not None and isinstance(start, str) and isinstance(end, str):
+                try:
+                    # Handle timezone offset in ISO format
                     start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
                     end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
                     if start_dt >= end_dt:
                         return error_response("Start time must be before end time")
+                except ValueError:
+                    # If parsing fails, skip validation
+                    pass
             
             # Get user email and build service
             user_email = get_user_email()
@@ -136,9 +122,17 @@ def register_update_event_tool(mcp: FastMCP):
             if summary is not None:
                 existing_event['summary'] = summary
             if start is not None:
-                existing_event['start']['dateTime'] = start
+                if isinstance(start, str):
+                    existing_event['start']['dateTime'] = start
+                    # Ensure timeZone is set
+                    if 'timeZone' not in existing_event['start']:
+                        existing_event['start']['timeZone'] = 'Asia/Tokyo'
             if end is not None:
-                existing_event['end']['dateTime'] = end
+                if isinstance(end, str):
+                    existing_event['end']['dateTime'] = end
+                    # Ensure timeZone is set
+                    if 'timeZone' not in existing_event['end']:
+                        existing_event['end']['timeZone'] = 'Asia/Tokyo'
             if location is not None:
                 existing_event['location'] = location
             if description is not None:
@@ -163,8 +157,8 @@ def register_update_event_tool(mcp: FastMCP):
             # Build simple success message
             if result["success"]:
                 updated_event = result["events"][0]
-                message = f"Updated event '{updated_event['summary']}'"
-                llm_content = message
+                message = f"Updated event '{updated_event['summary']}' [ID: {updated_event['id']}]"
+                llm_content = f"Updated event: {updated_event['summary']} [ID: {updated_event['id']}]"
             else:
                 message = result['error_message']
                 llm_content = f"<error>{message}</error>"
