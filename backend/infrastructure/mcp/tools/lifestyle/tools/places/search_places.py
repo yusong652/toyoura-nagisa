@@ -77,7 +77,7 @@ def register_search_places_tool(mcp: FastMCP):
                         place_line += f" [{types_str}]"
                     places_text.append(place_line)
                 
-                llm_content = f"Found places:\n\n" + "\n".join(places_text)
+                llm_content = "\n".join(places_text)
             
             return success_response(
                 message,
