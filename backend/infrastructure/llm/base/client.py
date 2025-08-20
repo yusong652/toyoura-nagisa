@@ -693,14 +693,7 @@ class LLMClientBase(ABC):
             error_result = {
                 'status': 'error',
                 'message': f"Tool '{tool_name}' execution failed: {error_message}",
-                'llm_content': {
-                    'operation': tool_name,
-                    'result': {
-                        'error': error_message,
-                        'tool_call': tool_call  # Include original tool call for debugging
-                    },
-                    'summary': f"Failed to execute {tool_name}: {error_message}"
-                },
+                'llm_content': f"<error>{error_message}</error>",
                 'data': {
                     'error': error_message,
                     'tool_name': tool_name,

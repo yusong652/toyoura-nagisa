@@ -37,10 +37,16 @@ class JSONSchema(BaseModel):
         return v
     
     @model_validator(mode='after')
-    def auto_infer_required(self):
-        """Auto-infer required fields if not explicitly set."""
-        if not self.required and self.properties:
-            self.required = list(self.properties.keys())
+    def validate_required(self):
+        """Validate that required fields exist in properties."""
+        # Don't auto-infer required fields - respect what the schema provides
+        # An empty required list means all fields are optional
+        if self.required:
+            # Only validate that required fields exist in properties
+            for field in self.required:
+                if field not in self.properties:
+                    # Remove invalid required field
+                    self.required.remove(field)
         return self
 
 

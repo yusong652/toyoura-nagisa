@@ -38,8 +38,11 @@ class AnthropicToolManager(BaseToolManager):
             for prop in input_schema["properties"].values():
                 if "description" not in prop:
                     prop["description"] = "Parameter value"
-            # 设置required字段
-            input_schema["required"] = list(input_schema["properties"].keys())
+            
+            # 保留原始的required字段，不要自动推断所有字段为必需
+            # 如果原始schema没有required字段，说明所有字段都是可选的
+            if "required" not in input_schema:
+                input_schema["required"] = []  # 空数组表示所有字段都是可选的
         
         if "type" not in input_schema:
             input_schema["type"] = "object"

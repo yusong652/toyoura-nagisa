@@ -21,7 +21,7 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-__all__ = ["ToolResult"]
+__all__ = ["ToolResult", "success_response", "error_response"]
 
 
 class ToolResult(BaseModel):
@@ -75,4 +75,58 @@ class ToolResult(BaseModel):
     )
 
     # Allow tools to attach extra fields without breaking validation
-    model_config = ConfigDict(extra="allow") 
+    model_config = ConfigDict(extra="allow")
+
+
+# -----------------------------------------------------------------------------
+# Convenience functions for creating tool responses
+# -----------------------------------------------------------------------------
+
+def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict[str, Any]:
+    """Create a success response for tools.
+    
+    Args:
+        message: User-facing success message
+        llm_content: Structured content for LLM conversation
+        **data: Additional data fields to include
+    
+    Returns:
+        Dict: ToolResult as dictionary ready for return
+        
+    Example:
+        return success_response(
+            "Event created successfully",
+            llm_content="Created meeting at 2pm",
+            event_id="abc123"
+        )
+    """
+    return ToolResult(
+        status="success",
+        message=message,
+        llm_content=llm_content,
+        data=data if data else None,
+    ).model_dump()
+
+
+def error_response(message: str, error: Optional[str] = None) -> Dict[str, Any]:
+    """Create an error response for tools.
+    
+    Args:
+        message: User-facing error message
+        error: Detailed error information (defaults to message if not provided)
+    
+    Returns:
+        Dict: ToolResult as dictionary ready for return
+        
+    Example:
+        return error_response(
+            "Failed to create event",
+            error="Invalid date format: expected YYYY-MM-DD"
+        )
+    """
+    return ToolResult(
+        status="error",
+        message=message,
+        error=error or message,
+        llm_content=f"<error>{message}</error>"
+    ).model_dump() 

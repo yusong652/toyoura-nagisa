@@ -12,6 +12,7 @@ import base64
 
 from backend.infrastructure.auth.google.gmail_service import get_gmail_service
 from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.user import get_user_email
 
 class EmailMessage(BaseModel):
     """Email message model for validation"""
@@ -49,9 +50,7 @@ def register_email_tools(mcp: FastMCP):
         email configuration for communication setup.
         """
         try:
-            user_email = os.getenv("USER_GMAIL_ADDRESS")
-            if not user_email:
-                return _error("USER_GMAIL_ADDRESS environment variable not set")
+            user_email = get_user_email()
             
             llm_content = {
                 "operation": {
@@ -99,10 +98,11 @@ def register_email_tools(mcp: FastMCP):
             
             # Handle default recipient logic
             if to is None:
-                user_addr = os.getenv("USER_GMAIL_ADDRESS")
-                if not user_addr:
+                try:
+                    user_addr = get_user_email()
+                    to = [user_addr]
+                except ValueError:
                     return _error("USER_GMAIL_ADDRESS environment variable not set and no 'to' provided")
-                to = [user_addr]
             
             # Get Gmail service and send email
             service = get_gmail_service(sender)

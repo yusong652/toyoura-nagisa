@@ -119,9 +119,8 @@ class GeminiToolManager(BaseToolManager):
             else:
                 cleaned[key] = value
         
-        # Auto-infer required fields for object type
-        if cleaned.get("type") == "object" and "required" not in cleaned and "properties" in cleaned:
-            cleaned["required"] = list(cleaned["properties"].keys())
+        # Don't auto-infer required fields - respect what the schema provides
+        # If "required" is not in the original schema, it means all fields are optional
         
         # Ensure type is set
         if "type" not in cleaned:

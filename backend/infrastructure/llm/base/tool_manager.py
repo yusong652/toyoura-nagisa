@@ -11,7 +11,6 @@ from typing import List, Dict, Any, Optional, Set
 from fastmcp import Client as MCPClient
 from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
-from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.shared.utils.tool_utils import is_meta_tool
@@ -34,6 +33,9 @@ class BaseToolManager(ABC):
     def __init__(self, tools_enabled: bool = True):
         """Initialize base state."""
         self.tools_enabled = tools_enabled
+        
+        # Lazy import to avoid circular dependency
+        from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
         
         # Single shared MCP client - FastMCP handles session isolation per request
         self._mcp_client = MCPClient(
@@ -292,11 +294,9 @@ class BaseToolManager(ABC):
                 - inline_data: Dict[str, Any] - Multimodal content when present:
                     - mime_type: str - Content MIME type (e.g., "image/png")
                     - data: str - Base64-encoded content
-                  Empty dict {} for non-multimodal results
+                  Empty dict {} for non-multimodal results and errors
                 - llm_content: Optional[Any] - Tool's textual/structured response
-                
-                Or for error cases (when MCP marks as error):
-                - Complete ToolResult dict with is_error=True
+                  For errors: "<error>Error message</error>" format
         """
         # tool_id is not used by MCP but preserved for LLM context managers
         # which need it to properly format tool results in conversation history
@@ -307,9 +307,20 @@ class BaseToolManager(ABC):
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
             
-            # Check MCP-level errors (is_error field) - return tool's original error structure
+            # Check MCP-level errors (is_error field) - return unified format with error info
             if tool_result.get("is_error"):
-                return tool_result
+                return {
+                    "inline_data": {},
+                    "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
+                }
+            
+            # Check tool-level errors (status="error") - return unified format with error info
+            if tool_result.get("status") == "error":
+                error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
+                return {
+                    "inline_data": {},
+                    "llm_content": f"<error>{error_message}</error>"
+                }
             
             # Unified handling: always return inline_data + llm_content structure
             if self._has_multimodal_content(tool_result):
