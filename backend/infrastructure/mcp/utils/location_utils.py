@@ -4,8 +4,11 @@ Location Utilities - Shared location detection and geocoding functions
 
 import asyncio
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from fastmcp.server.context import Context  # type: ignore
+
+if TYPE_CHECKING:
+    from backend.infrastructure.mcp.location_manager import LocationData
 
 def _fetch_server_location() -> Optional[Dict[str, Any]]:
     """Fallback: geolocate server IP via ip-api.com"""
@@ -62,7 +65,7 @@ def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
 async def get_browser_location(
     context: Context,
     timeout: float = 5.0
-) -> Optional[Dict[str, Any]]:
+) -> Optional['LocationData']:
     """
     Get user location from browser via WebSocket.
     
@@ -71,8 +74,7 @@ async def get_browser_location(
         timeout: Timeout in seconds for waiting for browser response
     
     Returns:
-        Location dictionary with latitude, longitude, and source='browser_geolocation'
-        Returns None if browser location is unavailable
+        LocationData object with browser location data or None if unavailable
     """
     try:
         session_id = context.client_id
@@ -120,16 +122,20 @@ async def get_browser_location(
                     location_data["longitude"]
                 )
                 
-                return {
-                    "latitude": location_data["latitude"],
-                    "longitude": location_data["longitude"],
-                    "accuracy": location_data.get("accuracy"),
-                    "city": geocode_data.get("city"),
-                    "region": geocode_data.get("region"),
-                    "country": geocode_data.get("country"),
-                    "source": "browser_geolocation",
-                    "timestamp": event_info.get("timestamp")
-                }
+                # Import here to avoid circular imports
+                from backend.infrastructure.mcp.location_manager import LocationData
+                
+                return LocationData(
+                    latitude=location_data["latitude"],
+                    longitude=location_data["longitude"],
+                    accuracy=location_data.get("accuracy"),
+                    source="browser_geolocation",
+                    session_id=session_id,
+                    timestamp=event_info.get("timestamp", int(asyncio.get_event_loop().time())),
+                    city=geocode_data.get("city"),
+                    region=geocode_data.get("region"),
+                    country=geocode_data.get("country")
+                )
         except asyncio.TimeoutError:
             pass
         finally:
@@ -145,21 +151,18 @@ async def get_browser_location(
 async def get_user_location(
     context: Context, 
     wait_time: int = 10,
-    include_reverse_geocoding: bool = False,
     prefer_browser: bool = True
-) -> Optional[Dict[str, Any]]:
+) -> Optional['LocationData']:
     """
     Get user location with browser priority.
     
     Args:
         context: FastMCP context containing session information
         wait_time: Timeout for browser location (defaults to 10 seconds)
-        include_reverse_geocoding: Not used (kept for compatibility)
         prefer_browser: If True, try browser location first (default True)
     
     Returns:
-        Location dictionary with latitude, longitude, city, country, source, etc.
-        Returns None if no location could be determined
+        LocationData object with location data or None if unavailable
     """
     try:
         # Try browser location first if preferred
@@ -169,32 +172,46 @@ async def get_user_location(
                 return browser_loc
         
         # Fallback to server IP geolocation
-        return _fetch_server_location()
+        server_data = _fetch_server_location()
+        if server_data:
+            # Import here to avoid circular imports
+            from backend.infrastructure.mcp.location_manager import LocationData
+            return LocationData(
+                latitude=server_data["latitude"],
+                longitude=server_data["longitude"],
+                source="server_ip_geolocation",
+                city=server_data.get("city"),
+                country=server_data.get("country"),
+                region=server_data.get("region"),
+                session_id=context.client_id
+            )
 
     except Exception:
-        return None
+        pass
+    
+    return None
 
 
 async def get_user_city(context: Context, wait_time: int = 8) -> Optional[str]:
     """
-    Get user's city name using server IP geolocation.
+    Get user's city name using location services.
     
     Args:
         context: FastMCP context containing session information
-        wait_time: Not used (kept for compatibility)
+        wait_time: Timeout for location retrieval (defaults to 8 seconds)
     
     Returns:
         City name string or None if could not be determined
     """
-    location_info = await get_user_location(context, wait_time, include_reverse_geocoding=True)
+    location_data = await get_user_location(context, wait_time)
     
-    if location_info and location_info.get("city"):
-        return location_info["city"]
-    elif location_info and location_info.get("latitude") and location_info.get("longitude"):
+    if location_data and location_data.city:
+        return location_data.city
+    elif location_data and location_data.latitude and location_data.longitude:
         # Try reverse geocoding if city not available
         return _reverse_geocode(
-            location_info["latitude"], 
-            location_info["longitude"]
+            location_data.latitude, 
+            location_data.longitude
         )
     
     return None 

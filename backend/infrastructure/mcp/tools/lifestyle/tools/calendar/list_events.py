@@ -151,34 +151,27 @@ def register_list_events_tool(mcp: FastMCP):
             if not result.get("success", False):
                 return error_response(f"Calendar operation failed: {result.get('error_message', 'Unknown error')}")
             
-            # Build user-facing message
-            if result["success"]:
-                message = "Retrieved events from primary calendar"
-            else:
-                message = f"Failed to retrieve events: {result['error_message']}"
+            # Build user-facing message and LLM content
+            message = "Retrieved events from primary calendar"
             
-            # Build string-based LLM content (aligned with coding tools)
-            if result["success"]:
-                if result["total_events"] == 0:
-                    llm_content = "No events found."
-                else:
-                    # Format events as readable text
-                    events_text = []
-                    for event in result["events"]:
-                        event_line = f"• {event['summary']} ({event['start']} - {event['end']}) [ID: {event['id']}]"
-                        if event.get('location'):
-                            event_line += f" at {event['location']}"
-                        if event.get('status') != "confirmed":
-                            event_line += f" [{event['status']}]"
-                        events_text.append(event_line)
-                    
-                    llm_content = "Found events:\n\n" + "\n".join(events_text)
-                    
-                    # Add warnings if any
-                    if result["warnings"]:
-                        llm_content += "\n\nWarnings:\n" + "\n".join(f"⚠️  {w}" for w in result['warnings'])
+            if result["total_events"] == 0:
+                llm_content = "No events found."
             else:
-                llm_content = f"<error>Failed to list events: {result['error_message']}</error>"
+                # Format events as readable text
+                events_text = []
+                for event in result["events"]:
+                    event_line = f"• {event['summary']} ({event['start']} - {event['end']}) [ID: {event['id']}]"
+                    if event.get('location'):
+                        event_line += f" at {event['location']}"
+                    if event.get('status') != "confirmed":
+                        event_line += f" [{event['status']}]"
+                    events_text.append(event_line)
+                
+                llm_content = "Found events:\n\n" + "\n".join(events_text)
+                
+                # Add warnings if any
+                if result["warnings"]:
+                    llm_content += "\n\nWarnings:\n" + "\n".join(f"⚠️  {w}" for w in result['warnings'])
             
             print(f"DEBUG: Returning success response - message: {message}")
             print(f"DEBUG: LLM content: {llm_content}")

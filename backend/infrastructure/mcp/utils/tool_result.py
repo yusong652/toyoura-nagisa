@@ -83,21 +83,25 @@ class ToolResult(BaseModel):
 # -----------------------------------------------------------------------------
 
 def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict[str, Any]:
-    """Create a success response for tools.
+    """Create a standardized success response for all MCP tools.
+    
+    This function provides a unified way for all tools to return success responses,
+    ensuring consistent structure across coding, lifestyle, communication, and other tool categories.
     
     Args:
-        message: User-facing success message
-        llm_content: Structured content for LLM conversation
-        **data: Additional data fields to include
+        message: Brief user-friendly success message for UI display
+        llm_content: Content for LLM conversation context (can be any type)
+        **data: Tool-specific data fields stored under the 'data' field
     
     Returns:
-        Dict: ToolResult as dictionary ready for return
+        Dict[str, Any]: ToolResult dictionary with status="success"
         
     Example:
         return success_response(
-            "Event created successfully",
-            llm_content="Created meeting at 2pm",
-            event_id="abc123"
+            "Operation completed successfully",
+            llm_content="Process finished with 3 items processed",
+            results=["item1", "item2", "item3"],
+            count=3
         )
     """
     return ToolResult(
@@ -109,19 +113,22 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
 
 
 def error_response(message: str, error: Optional[str] = None) -> Dict[str, Any]:
-    """Create an error response for tools.
+    """Create a standardized error response for all MCP tools.
+    
+    This function provides a unified way for all tools to return error responses,
+    ensuring consistent error handling across coding, lifestyle, communication, and other tool categories.
     
     Args:
-        message: User-facing error message
-        error: Detailed error information (defaults to message if not provided)
+        message: Brief user-friendly error message for UI display
+        error: Detailed error information for debugging (defaults to message if not provided)
     
     Returns:
-        Dict: ToolResult as dictionary ready for return
+        Dict[str, Any]: ToolResult dictionary with status="error"
         
     Example:
         return error_response(
-            "Failed to create event",
-            error="Invalid date format: expected YYYY-MM-DD"
+            "Operation failed", 
+            error="Connection timeout after 5 seconds"
         )
     """
     return ToolResult(
