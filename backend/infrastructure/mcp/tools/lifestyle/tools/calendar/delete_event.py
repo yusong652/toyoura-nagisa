@@ -43,9 +43,8 @@ def register_delete_event_tool(mcp: FastMCP):
     def delete_calendar_event(
         event_id: str = Field(..., description="ID of the event to delete."),
     ) -> Dict[str, Any]:
-        """Delete an event from Google Calendar with comprehensive validation and metadata.
-        
-        Returns structured deletion confirmation with operation tracking.
+        """Delete an event from Google Calendar.
+
         Warning: This operation is permanent and cannot be undone through the API.
         """
         

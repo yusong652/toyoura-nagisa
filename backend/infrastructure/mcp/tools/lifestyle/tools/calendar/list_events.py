@@ -165,7 +165,7 @@ def register_list_events_tool(mcp: FastMCP):
                     # Format events as readable text
                     events_text = []
                     for event in result["events"]:
-                        event_line = f"• {event['summary']} ({event['start']} - {event['end']})"
+                        event_line = f"• {event['summary']} ({event['start']} - {event['end']}) [ID: {event['id']}]"
                         if event.get('location'):
                             event_line += f" at {event['location']}"
                         if event.get('status') != "confirmed":
