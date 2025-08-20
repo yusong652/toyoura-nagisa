@@ -19,7 +19,6 @@ from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import regis
 from backend.infrastructure.mcp.tools.lifestyle.tools.contacts import register_contact_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_places_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.weather import register_weather_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_tools
 
 mcp = FastMCP(
@@ -42,7 +41,6 @@ register_text_to_image_tools(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
 register_location_tools(mcp)
-register_weather_tools(mcp)
 register_time_tools(mcp)
 
 # 启动服务器
