@@ -7,8 +7,6 @@ import requests
 from typing import Optional, Dict, Any
 from fastmcp.server.context import Context  # type: ignore
 
-
-
 def _fetch_server_location() -> Optional[Dict[str, Any]]:
     """Fallback: geolocate server IP via ip-api.com"""
     try:
@@ -27,7 +25,6 @@ def _fetch_server_location() -> Optional[Dict[str, Any]]:
     except Exception:
         pass
     return None
-
 
 def _reverse_geocode(lat: float, lon: float) -> Optional[str]:
     """Use OpenStreetMap Nominatim to reverse-geocode coordinates to city name"""
@@ -61,7 +58,6 @@ def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
     except Exception:
         pass
     return {"city": None, "region": None, "country": None}
-
 
 async def get_browser_location(
     context: Context,

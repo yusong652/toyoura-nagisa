@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from backend.config import get_auth_config
 
 SCOPES = [
@@ -39,7 +40,24 @@ def get_credentials(email, tokens_dir=None):
     token_path = Path(tokens_dir) / f'token_{safe_email}.json'
     if not token_path.exists():
         raise FileNotFoundError(f"Token file not found for {email}: {token_path}")
+    
     creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    
+    # Check if token is expired and try to refresh
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            # Save the refreshed token
+            import json
+            with open(token_path, 'w') as token_file:
+                token_file.write(creds.to_json())
+        except Exception as e:
+            raise ValueError(f"Failed to refresh token for {email}: {str(e)}. Please re-authenticate.")
+    
+    # Check if credentials are valid
+    if not creds or not creds.valid:
+        raise ValueError(f"Invalid credentials for {email}. Please re-authenticate.")
+    
     return creds
 
 # 可扩展：save_token, load_token等辅助函数

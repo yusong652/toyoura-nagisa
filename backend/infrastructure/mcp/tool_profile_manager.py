@@ -47,6 +47,7 @@ class ToolProfileManager:
         "get_user_email",
         "send_email", 
         "check_emails",
+        "read_email",  # 添加读取邮件工具
         "list_calendar_events",
         "create_calendar_event",
         "update_calendar_event", 
@@ -77,7 +78,7 @@ class ToolProfileManager:
             name="Lifestyle", 
             description="Focused on daily life, communication, entertainment and information services",
             tools=LIFESTYLE_TOOLS,
-            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 16个工具
+            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 17个工具
             color="#FF9800",  # 橙色
             icon="🌟"
         ),
@@ -86,7 +87,7 @@ class ToolProfileManager:
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=[],  # 空列表表示加载所有工具
-            estimated_tokens=23 * 282,  # 所有23个工具
+            estimated_tokens=24 * 282,  # 所有24个工具
             color="#607D8B",  # 灰蓝色
             icon="🤖"
         )
@@ -116,7 +117,7 @@ class ToolProfileManager:
                 "name": config.name,
                 "description": config.description, 
                 "estimated_tokens": config.estimated_tokens,
-                "tool_count": len(config.tools) if config.tools else 23,
+                "tool_count": len(config.tools) if config.tools else 24,
                 "color": config.color,
                 "icon": config.icon
             }
