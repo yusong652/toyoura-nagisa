@@ -24,7 +24,7 @@ from ..utils.path_security import (
     is_safe_symlink, 
     check_parent_symlinks
 )
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["read", "register_read_tool"]
 
@@ -332,28 +332,16 @@ Usage:
     if isinstance(limit, FieldInfo):
         limit = None
 
-    # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
-
-    def _success(message: str, llm_content: Any, **data: Any) -> Dict[str, Any]:
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=llm_content,
-            data=data,
-        ).model_dump()
-
     # Validate parameters
     if offset is not None and offset < 0:
-        return _error("offset must be non-negative")
+        return error_response("offset must be non-negative")
     
     if limit is not None and limit <= 0:
-        return _error("limit must be positive")
+        return error_response("limit must be positive")
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error("Cannot access workspace directory")
+        return error_response("Cannot access workspace directory")
 
     # ------------------------------------------------------------------
     # Path validation and security checks
@@ -362,29 +350,29 @@ Usage:
     # Validate file path
     abs_file_path = validate_path_in_workspace(path)
     if abs_file_path is None:
-        return _error(f"File path is outside workspace: {path}")
+        return error_response(f"File path is outside workspace: {path}")
 
     try:
         file_path = Path(abs_file_path)
         
         # Check file existence and type
         if not file_path.exists():
-            return _error(f"File does not exist: {path}")
+            return error_response(f"File does not exist: {path}")
         
         if not file_path.is_file():
-            return _error(f"Path is not a file: {path}")
+            return error_response(f"Path is not a file: {path}")
         
         # Check file size
         file_size = file_path.stat().st_size
         if file_size > MAX_FILE_SIZE_BYTES:
-            return _error(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit")
+            return error_response(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit")
         
         # Security checks
         if file_path.is_symlink() and not is_safe_symlink(file_path):
-            return _error("Cannot read unsafe symlink pointing outside workspace")
+            return error_response("Cannot read unsafe symlink pointing outside workspace")
         
         if not check_parent_symlinks(file_path):
-            return _error("Cannot read file with unsafe parent symlinks")
+            return error_response("Cannot read file with unsafe parent symlinks")
 
         # ------------------------------------------------------------------
         # File reading and analysis
@@ -427,7 +415,7 @@ Usage:
             # For text files, return content directly (cat -n format)
             llm_content = processing_result.content
 
-        return _success(
+        return success_response(
             message,
             llm_content,
             file_path=str(rel_display),
@@ -438,7 +426,7 @@ Usage:
         )
 
     except Exception as exc:
-        return _error(f"Unexpected error reading file: {exc}")
+        return error_response(f"Unexpected error reading file: {exc}")
 
 # -----------------------------------------------------------------------------
 # Registration helper
