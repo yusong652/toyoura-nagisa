@@ -159,21 +159,21 @@ Usage notes:
         # Build message for internal use
         if exit_code == 0:
             message = f"Command executed successfully (exit code {exit_code}, {execution_time:.1f}s)"
-            # Success: return raw output
-            return success_response(
-                message,
-                combined_output,  # Raw output for LLM
-                exit_code=exit_code,
-                execution_time=execution_time,
-                stdout=stdout,
-                stderr=stderr,
-                command=command,
-                working_directory=str(work_dir)
-            )
         else:
             message = f"Command failed with exit code {exit_code} ({execution_time:.1f}s)"
-            # Error: return with error wrapper
-            return error_response(message)
+        
+        # Always return complete terminal output for both success and failure
+        # This matches real terminal behavior where you see all output regardless of exit code
+        return success_response(
+            message,
+            combined_output,  # Complete terminal output for LLM
+            exit_code=exit_code,
+            execution_time=execution_time,
+            stdout=stdout,
+            stderr=stderr,
+            command=command,
+            working_directory=str(work_dir)
+        )
 
     except Exception as e:
         error_msg = f"Command execution failed: {e}"
