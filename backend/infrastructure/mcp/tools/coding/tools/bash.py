@@ -14,7 +14,7 @@ from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["bash", "register_bash_tool"]
 
@@ -78,24 +78,9 @@ Usage notes:
     </bad-example>
 """
     
-    # Helper function for consistent error responses
-    def _error(message: str, error_output: str = None) -> Dict[str, Any]:
-        # For errors, wrap in <error> tags for llm_content to match Claude Code format
-        llm_error = f"<error>{error_output or message}</error>"
-        return ToolResult(status="error", message=message, llm_content=llm_error, error=message).model_dump()
-
-    def _success(output: str, message: str, **data: Any) -> Dict[str, Any]:
-        # For success, llm_content is just the raw output to match Claude Code format
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=output if output else "",  # Raw output for LLM
-            data=data
-        ).model_dump()
-
     # Validate command
     if not command or not command.strip():
-        return _error("Command cannot be empty")
+        return error_response("Command cannot be empty")
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
     from pydantic.fields import FieldInfo
@@ -112,22 +97,22 @@ Usage notes:
     # Set timeout
     timeout_ms = timeout if timeout is not None else DEFAULT_TIMEOUT_MS
     if timeout_ms > MAX_TIMEOUT_MS:
-        return _error(f"Timeout cannot exceed {MAX_TIMEOUT_MS}ms (10 minutes)")
+        return error_response(f"Timeout cannot exceed {MAX_TIMEOUT_MS}ms (10 minutes)")
     if timeout_ms < 1000:
-        return _error("Timeout must be at least 1000ms (1 second)")
+        return error_response("Timeout must be at least 1000ms (1 second)")
 
     timeout_seconds = timeout_ms / 1000.0
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error("Cannot access workspace directory")
+        return error_response("Cannot access workspace directory")
 
     # Set working directory to workspace root
     work_dir = Path(str(WORKSPACE_ROOT))
 
     # Background execution not implemented in this simplified version
     if run_in_background:
-        return _error("Background execution not yet implemented")
+        return error_response("Background execution not yet implemented")
 
     try:
         # Execute command
@@ -155,14 +140,7 @@ Usage notes:
             exit_code = -1
             execution_time = timeout_seconds
             timeout_msg = f"Command timed out after {timeout_seconds:.1f} seconds"
-            # Get any partial output that was captured
-            partial_output = ""
-            if stdout:
-                partial_output = stdout
-            if stderr:
-                partial_output = f"{partial_output}\n{stderr}" if partial_output else stderr
-            error_output = f"{timeout_msg}\n{partial_output}" if partial_output else timeout_msg
-            return _error(timeout_msg, error_output)
+            return error_response(timeout_msg)
 
         # Combine output (stdout and stderr)
         combined_output = ""
@@ -182,9 +160,9 @@ Usage notes:
         if exit_code == 0:
             message = f"Command executed successfully (exit code {exit_code}, {execution_time:.1f}s)"
             # Success: return raw output
-            return _success(
-                combined_output,  # Raw output for LLM
+            return success_response(
                 message,
+                combined_output,  # Raw output for LLM
                 exit_code=exit_code,
                 execution_time=execution_time,
                 stdout=stdout,
@@ -195,11 +173,11 @@ Usage notes:
         else:
             message = f"Command failed with exit code {exit_code} ({execution_time:.1f}s)"
             # Error: return with error wrapper
-            return _error(message, combined_output)
+            return error_response(message)
 
     except Exception as e:
         error_msg = f"Command execution failed: {e}"
-        return _error(error_msg, str(e))
+        return error_response(error_msg)
 
 
 def register_bash_tool(mcp: FastMCP):

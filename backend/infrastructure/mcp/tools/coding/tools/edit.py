@@ -20,7 +20,7 @@ from ..utils.path_security import (
     is_safe_symlink, 
     check_parent_symlinks
 )
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from .constants import (
     TEXT_CHARSET_DEFAULT,
 )
@@ -168,81 +168,38 @@ Usage:
     if isinstance(replace_all, FieldInfo):
         replace_all = False
 
-    # Helper shortcuts for consistent results
-    def _error(message: str, llm_content: str = None, suggestion: str = None) -> Dict[str, Any]:
-        error_msg = message
-        if suggestion:
-            error_msg += f" {suggestion}"
-        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
-        if llm_content is None:
-            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
-        return ToolResult(status="error", message=error_msg, llm_content=llm_content, error=message).model_dump()
-
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        # For success, use the provided llm_content directly
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=llm_content,
-            data=data,
-        ).model_dump()
-
     # Validate inputs
     if not file_path or not file_path.strip():
-        return _error(
-            "file_path is required and cannot be empty",
-            "Provide a file path relative to workspace root, e.g., 'src/app.py'"
-        )
+        return error_response("file_path is required and cannot be empty")
 
     # Check if old_string and new_string are the same
     if old_string == new_string:
-        return _error(
-            "old_string and new_string must be different",
-            "The replacement would have no effect. Provide different values for old_string and new_string."
-        )
+        return error_response("old_string and new_string must be different")
 
     if len(old_string) > MAX_OLD_STRING_LENGTH:
-        return _error(
-            f"old_string too long: {len(old_string)} chars (max: {MAX_OLD_STRING_LENGTH})",
-            "Break down the replacement into smaller chunks or use write_file for large content changes"
-        )
+        return error_response(f"old_string too long: {len(old_string)} chars (max: {MAX_OLD_STRING_LENGTH})")
 
     if len(new_string) > MAX_NEW_STRING_LENGTH:
-        return _error(
-            f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})",
-            "Break down the replacement into smaller chunks or use write_file for large content changes"
-        )
+        return error_response(f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})")
 
     # Validate workspace access
     if not validate_path_in_workspace("."):
-        return _error(
-            "Cannot access workspace directory",
-            "Ensure you're running from within a valid workspace directory"
-        )
+        return error_response("Cannot access workspace directory")
 
     # Validate file path is within workspace
     validated_path = validate_path_in_workspace(file_path)
     if validated_path is None:
-        return _error(
-            f"File path is outside workspace: {file_path}",
-            "Use paths relative to workspace root, e.g., 'src/app.py', 'config/settings.json'"
-        )
+        return error_response(f"File path is outside workspace: {file_path}")
 
     target_file = Path(validated_path)
 
     # Security checks for existing files
     if target_file.exists():
         if target_file.is_symlink() and not is_safe_symlink(target_file):
-            return _error(
-                f"Unsafe symlink detected: {file_path}",
-                "Use a regular file path instead of a symlink pointing outside workspace"
-            )
+            return error_response(f"Unsafe symlink detected: {file_path}")
 
         if not check_parent_symlinks(target_file):
-            return _error(
-                f"Unsafe parent symlinks detected: {file_path}",
-                "Use a file path without parent symlinks pointing outside workspace"
-            )
+            return error_response(f"Unsafe parent symlinks detected: {file_path}")
 
     # ------------------------------------------------------------------
     # File validation and content analysis
@@ -252,7 +209,7 @@ Usage:
         # Validate file is suitable for editing
         can_edit, edit_error = _validate_file_for_editing(target_file)
         if not can_edit:
-            return _error(edit_error)
+            return error_response(edit_error)
 
         # Read current content or prepare for new file creation
         current_content = None
@@ -266,10 +223,7 @@ Usage:
                 current_content = _normalize_line_endings(current_content)
                 original_size = len(current_content.encode(TEXT_CHARSET_DEFAULT))
             except Exception as e:
-                return _error(
-                    f"Cannot read file: {e}",
-                    "Check file permissions and ensure the file is a readable text file"
-                )
+                return error_response(f"Cannot read file: {e}")
         else:
             # File doesn't exist
             if old_string == "":
@@ -278,10 +232,7 @@ Usage:
                 current_content = ""
                 original_size = 0
             else:
-                return _error(
-                    "File not found. Use empty old_string to create a new file.",
-                    "To create a new file, use old_string='' and provide the content in new_string"
-                )
+                return error_response("File not found. Use empty old_string to create a new file.")
 
         # ------------------------------------------------------------------
         # Replacement logic and validation
@@ -294,23 +245,18 @@ Usage:
         else:
             # Editing existing file
             if old_string == "":
-                return _error(
-                    "Cannot use empty old_string with existing file.",
-                    "To edit existing files, provide the exact text to replace in old_string. To overwrite the entire file, use write_file instead."
-                )
+                return error_response("Cannot use empty old_string with existing file.")
 
             # Check if old_string exists
             occurrences = _count_occurrences(current_content, old_string)
             if occurrences == 0:
                 error_msg = f"String to replace not found in file.\nString: {old_string[:200]}{'...' if len(old_string) > 200 else ''}"
-                llm_error = f"<error><tool_use_error>{error_msg}</tool_use_error></error>"
-                return _error(error_msg, llm_error)
+                return error_response(error_msg)
 
             # Validate uniqueness for single replacement
             unique_valid, unique_error = _validate_uniqueness(current_content, old_string, replace_all)
             if not unique_valid:
-                llm_error = f"<error><tool_use_error>{unique_error}</tool_use_error></error>"
-                return _error(unique_error, llm_error)
+                return error_response(unique_error)
 
             # Apply replacement based on replace_all flag
             if replace_all:
@@ -334,10 +280,7 @@ Usage:
             with target_file.open('w', encoding=TEXT_CHARSET_DEFAULT) as f:
                 f.write(new_content)
         except Exception as e:
-            return _error(
-                f"Failed to write file: {e}",
-                "Check file permissions and disk space, or try a different file path"
-            )
+            return error_response(f"Failed to write file: {e}")
 
         # Calculate file changes
         new_size = len(new_content.encode(TEXT_CHARSET_DEFAULT))
@@ -382,17 +325,14 @@ Usage:
             "line_change_count": line_change_count,
         }
 
-        return _success(
+        return success_response(
             message,
             llm_content,
             **response_data,
         )
 
     except Exception as exc:
-        return _error(
-            f"Unexpected error during file editing: {exc}",
-            "Verify the file path is correct and the content is valid text"
-        )
+        return error_response(f"Unexpected error during file editing: {exc}")
 
 # -----------------------------------------------------------------------------
 # Registration helper
