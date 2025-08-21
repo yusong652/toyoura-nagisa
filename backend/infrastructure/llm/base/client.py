@@ -338,7 +338,6 @@ class LLMClientBase(ABC):
             4. Return final response for downstream processing
         """
         execution_id = metadata['execution_id']
-        provider_name = self.__class__.__name__.replace('Client', '').lower()
         
         # Get initial response using provider-specific context
         working_contents = context_manager.get_working_contents()
@@ -411,22 +410,19 @@ class LLMClientBase(ABC):
                     yield notification
                 
                 # Execute all tools in parallel
-                tasks = [
-                    self._execute_tool_for_parallel_batch(tc, session_id, execution_id, debug) 
-                    for tc in tool_calls
-                ]
+                tasks = []
+                for tc in tool_calls:
+                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, execution_id, debug))
+                
                 results = await asyncio.gather(*tasks, return_exceptions=False)
                 
                 # Process results and add to context
-                failed_tools = []
-                for tool_call, result, error in results:
+                for tool_call, result in zip(tool_calls, results):
                     context_manager.add_tool_result(
                         tool_call['id'],
                         tool_call['name'],
                         result
                     )
-                    if error:
-                        failed_tools.append(tool_call.get('name', 'unknown'))
                 
                 # Skip completion notifications - let LLM response show naturally
             
@@ -640,13 +636,12 @@ class LLMClientBase(ABC):
         session_id: Optional[str],
         execution_id: str,
         debug: bool
-    ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[Exception]]:
+    ) -> Dict[str, Any]:
         """
         Execute a single tool as part of a parallel batch execution.
         
-        Wraps tool execution with error handling for parallel processing context.
-        Returns a tuple containing the tool call, result, and error for proper
-        tracking in parallel execution scenarios.
+        Thin wrapper around _execute_single_tool_call for parallel execution.
+        The tool manager handles all normal error cases and returns proper ToolResult dicts.
         
         Args:
             tool_call: Tool call specification with structure:
@@ -658,51 +653,16 @@ class LLMClientBase(ABC):
             debug: Enable detailed debug logging
             
         Returns:
-            Tuple[Dict[str, Any], Dict[str, Any], Optional[Exception]]:
-                - tool_call: Original tool call for reference
-                - result: Tool execution result or error result
-                - error: Exception if error occurred, None otherwise
-                
-        Note:
-            This method ensures errors in one tool don't prevent other tools
-            from executing in a parallel batch. Error results follow the
-            standardized ToolResult format for consistent LLM understanding.
+            Dict[str, Any]: Tool execution result with ToolResult structure
         """
-        try:
-            # Debug tool call structure to identify parameter issues
-            if debug:
-                tool_name = tool_call.get('name', 'unknown')
-                print(f"[DEBUG] Parallel batch tool call for {tool_name}:")
-                print(f"[DEBUG] - Tool call structure: {tool_call}")
-                
-            result = await self._execute_single_tool_call(
-                tool_call, session_id, execution_id, debug
-            )
-            return tool_call, result, None
-        except Exception as e:
-            # Build structured error result following ToolResult format
+        if debug:
             tool_name = tool_call.get('name', 'unknown')
-            error_message = str(e)
+            print(f"[DEBUG] Parallel batch tool call for {tool_name}:")
+            print(f"[DEBUG] - Tool call structure: {tool_call}")
             
-            if debug:
-                print(f"[DEBUG] Tool execution failed in parallel batch:")
-                print(f"[DEBUG] - Tool: {tool_name}")
-                print(f"[DEBUG] - Error: {error_message}")
-                print(f"[DEBUG] - Tool call: {tool_call}")
-            
-            error_result = {
-                'status': 'error',
-                'message': f"Tool '{tool_name}' execution failed: {error_message}",
-                'llm_content': f"<error>{error_message}</error>",
-                'data': {
-                    'error': error_message,
-                    'tool_name': tool_name,
-                    'tool_call': tool_call,
-                    'exception_type': type(e).__name__
-                },
-                'error': error_message
-            }
-            return tool_call, error_result, e
+        return await self._execute_single_tool_call(
+            tool_call, session_id, execution_id, debug
+        )
 
     # ========== SHARED UTILITY METHODS ==========
 
