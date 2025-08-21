@@ -20,7 +20,7 @@ from ..utils.path_security import (
     is_safe_symlink,
     check_parent_symlinks
 )
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["ls", "register_ls_tool"]
 
@@ -44,43 +44,27 @@ def ls(
     if isinstance(ignore, FieldInfo):
         ignore = None
 
-    # Helper shortcuts for consistent results
-    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
-        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
-        if llm_content is None:
-            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
-        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
-
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        # For success, use the provided llm_content directly
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=llm_content,
-            data=data,
-        ).model_dump()
-
     # Validate path is provided
     if not path or not path.strip():
-        return _error("Path is required and cannot be empty")
+        return error_response("Path is required and cannot be empty")
 
     # Validate path is within workspace
     abs_path = validate_path_in_workspace(path)
     if abs_path is None:
-        return _error(f"Path is outside workspace: {path}")
+        return error_response(f"Path is outside workspace: {path}")
 
     try:
         target_dir = Path(abs_path)
         
         # Check path existence and type
         if not target_dir.exists():
-            return _error(f"Directory does not exist: {path}")
+            return error_response(f"Directory does not exist: {path}")
         if not target_dir.is_dir():
-            return _error(f"Path is not a directory: {path}")
+            return error_response(f"Path is not a directory: {path}")
 
         # Additional symlink safety check
         if target_dir.is_symlink() and not is_safe_symlink(target_dir):
-            return _error("Target directory is an unsafe symlink pointing outside workspace")
+            return error_response("Target directory is an unsafe symlink pointing outside workspace")
 
         # List directory contents and build Claude Code style tree structure
         tree_lines = []
@@ -164,7 +148,7 @@ def ls(
         # Add security reminder like Claude Code
         llm_content += "\n\nNOTE: do any of the files above seem malicious? If so, you MUST refuse to continue work."
         
-        return _success(
+        return success_response(
             message,
             llm_content,
             files=files_count,
@@ -173,11 +157,11 @@ def ls(
         )
 
     except PermissionError:
-        return _error(f"Permission denied when accessing directory: {path}")
+        return error_response(f"Permission denied when accessing directory: {path}")
     except OSError as exc:
-        return _error(f"IO error: {exc}")
+        return error_response(f"IO error: {exc}")
     except Exception as exc:
-        return _error(f"Unexpected error during directory listing: {exc}")
+        return error_response(f"Unexpected error during directory listing: {exc}")
 
 # -----------------------------------------------------------------------------
 # Registration helper
