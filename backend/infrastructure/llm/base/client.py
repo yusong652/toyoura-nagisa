@@ -77,8 +77,6 @@ class LLMClientBase(ABC):
         
         if debug:
             provider_name = self.__class__.__name__.replace('Client', '')
-            # Simplified debug output
-            print(f"[LLM] {provider_name} execution started - Session: {session_id[:8]}, Messages: {len(messages)}")
 
         # Create provider-specific context manager
         context_manager_class = self._get_context_manager()
@@ -557,8 +555,8 @@ class LLMClientBase(ABC):
         """
         Execute single tool call with comprehensive error handling.
         
-        Unified implementation for all providers. Returns standardized tool result dictionaries
-        from the tool manager layer.
+        Unified implementation for all providers. Returns standardized tool result 
+        dictionaries from the tool manager layer.
         
         Args:
             tool_call: Tool call specification with structure:
@@ -570,16 +568,14 @@ class LLMClientBase(ABC):
             
         Returns:
             Dict[str, Any]: Tool execution result from tool manager with structure:
+                - inline_data: Dict - Multimodal content or empty {}
+                - llm_content: Any - Tool's textual/structured response
                 
-                For meta tools:
-                    - Standard ToolResult dictionary (status, message, llm_content, data, etc.)
-                
-                For regular tools:
-                    - inline_data: Dict - Multimodal content or empty {}
-                    - llm_content: Any - Tool's textual/structured response
-                    
-                For error cases:
-                    - Complete ToolResult dict with is_error=True
+                For error cases, the tool manager returns a ToolResult dict with:
+                - status: "error"
+                - message: User-facing error message
+                - llm_content: Formatted error for LLM
+                - data: Error details and metadata
                       
         Note:
             All providers use this unified implementation. The tool manager handles
