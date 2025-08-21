@@ -14,7 +14,7 @@ from .glob import glob, register_glob_tool  # New simplified glob tool
 from .grep import grep, register_grep_tool
 from .edit import edit, register_edit_tool
 from ...builtin.web_search import web_search, register_web_search_tool
-from . import constants
+from ..utils import constants
 
 __all__ = [
     "register_coding_tools",

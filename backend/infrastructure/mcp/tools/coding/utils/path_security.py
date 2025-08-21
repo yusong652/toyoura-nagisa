@@ -7,7 +7,7 @@ It includes workspace root configuration, path validation, and symlink safety ch
 
 from pathlib import Path
 from typing import Union
-from ..tools.config import get_tools_config
+from .config import get_tools_config
 
 __all__ = [
     "WORKSPACE_ROOT", 
