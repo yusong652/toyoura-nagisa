@@ -213,13 +213,6 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific configuration object."""
         return self.openai_config
 
-    def _log_context_state(self, context_manager: Any):
-        """Log OpenAI context manager state for debugging."""
-        if hasattr(context_manager, '__class__') and 'OpenAI' in context_manager.__class__.__name__:
-            OpenAIDebugger.log_context_state(context_manager)
-        else:
-            super()._log_context_state(context_manager)
-
     # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _execute_single_tool_call is inherited from LLMClientBase
 

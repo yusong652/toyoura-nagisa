@@ -72,7 +72,6 @@ class LLMClientBase(ABC):
             - Tuple[BaseMessage, Dict[str, Any]]: Final result (final_message, execution_metadata)
         """
         # === INITIALIZATION PHASE ===
-        execution_id = self._generate_execution_id()
         provider_config = self._get_provider_config()
         debug = getattr(provider_config, 'debug', False)
         
@@ -88,7 +87,6 @@ class LLMClientBase(ABC):
         
         # Execution metadata - unified across all providers
         metadata = {
-            'execution_id': execution_id,
             'session_id': session_id,
             'start_time': self._get_timestamp(),
             'end_time': None,
@@ -134,8 +132,7 @@ class LLMClientBase(ABC):
             # Send tool use concluded notification if tools were used
             if metadata['tool_calls_executed'] > 0:
                 yield {
-                    'type': 'NAGISA_TOOL_USE_CONCLUDED',
-                    'execution_id': execution_id
+                    'type': 'NAGISA_TOOL_USE_CONCLUDED'
                 }
             
             # Create final storage message using provider-specific processor
@@ -151,16 +148,15 @@ class LLMClientBase(ABC):
             
             if debug:
                 provider_name = self.__class__.__name__.replace('Client', '')
-                print(f"[DEBUG] {provider_name} execution {execution_id} failed: {e}")
+                print(f"[DEBUG] {provider_name} execution failed: {e}")
             
             # Yield error notification
             yield {
                 'type': 'error',
-                'error': f"Execution {execution_id} failed: {e}",
-                'execution_id': execution_id
+                'error': f"Execution failed: {e}"
             }
             
-            raise Exception(f"Execution {execution_id} failed: {e}")
+            raise Exception(f"Execution failed: {e}")
 
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
@@ -312,7 +308,6 @@ class LLMClientBase(ABC):
             session_id: Session ID for tool and context management
             max_iterations: Maximum number of tool calling iterations allowed
             metadata: Execution metadata dictionary with structure:
-                - execution_id: str - Unique execution identifier
                 - iterations: int - Current iteration count
                 - api_calls: int - Total API calls made
                 - tool_calls_executed: int - Number of tool calls executed
@@ -337,7 +332,6 @@ class LLMClientBase(ABC):
             3. Maintain execution state and handle iteration limits
             4. Return final response for downstream processing
         """
-        execution_id = metadata['execution_id']
         
         # Get initial response using provider-specific context
         working_contents = context_manager.get_working_contents()
@@ -412,7 +406,7 @@ class LLMClientBase(ABC):
                 # Execute all tools in parallel
                 tasks = []
                 for tc in tool_calls:
-                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, execution_id, debug))
+                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, debug))
                 
                 results = await asyncio.gather(*tasks, return_exceptions=False)
                 
@@ -430,8 +424,7 @@ class LLMClientBase(ABC):
             working_contents = context_manager.get_working_contents()
             
             if debug:
-                print(f"[DEBUG] Tool calling iteration {iteration + 1} context state:")
-                self._log_context_state(context_manager)
+                print(f"[DEBUG] Tool calling iteration {iteration + 1}")
             
             current_response = await self.call_api_with_context(
                 working_contents, session_id=session_id, **kwargs
@@ -444,9 +437,9 @@ class LLMClientBase(ABC):
         if iteration >= max_iterations:
             yield {
                 'type': 'error',
-                'error': f"Execution {execution_id} exceeded max iterations ({max_iterations})"
+                'error': f"Exceeded max iterations ({max_iterations})"
             }
-            raise Exception(f"Execution {execution_id} exceeded max iterations ({max_iterations})")
+            raise Exception(f"Exceeded max iterations ({max_iterations})")
         
         # Tool calling loop completed - let get_response handle final notifications
         
@@ -559,21 +552,10 @@ class LLMClientBase(ABC):
             # Fallback to empty string on extraction failure
             return ""
 
-    def _log_context_state(self, context_manager: BaseContextManager) -> None:
-        """
-        Log context manager state for debugging (optional override).
-        
-        Args:
-            context_manager: Provider-specific context manager
-        """
-        # Default implementation - providers can override for detailed logging
-        print(f"[DEBUG] Context manager state: {type(context_manager).__name__}")
-
     async def _execute_single_tool_call(
         self,
         tool_call: Dict[str, Any],
         session_id: Optional[str],
-        execution_id: str,
         debug: bool
     ) -> Dict[str, Any]:
         """
@@ -588,7 +570,6 @@ class LLMClientBase(ABC):
                 - name: str - Tool name to execute
                 - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
             session_id: Session ID for context-specific tool execution
-            execution_id: Unique execution identifier for debugging and tracking
             debug: Enable detailed debug logging and error tracing
             
         Returns:
@@ -610,7 +591,7 @@ class LLMClientBase(ABC):
         """
         try:
             if debug:
-                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')} in execution {execution_id}")
+                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')}")
             
             # Tool manager always returns Dict[str, Any]
             result = await self.tool_manager.handle_function_call(
@@ -634,7 +615,6 @@ class LLMClientBase(ABC):
         self,
         tool_call: Dict[str, Any],
         session_id: Optional[str],
-        execution_id: str,
         debug: bool
     ) -> Dict[str, Any]:
         """
@@ -649,7 +629,6 @@ class LLMClientBase(ABC):
                 - name: str - Tool name to execute
                 - args/arguments: Dict[str, Any] - Tool parameters
             session_id: Session ID for context-specific tool execution
-            execution_id: Unique execution identifier for debugging
             debug: Enable detailed debug logging
             
         Returns:
@@ -661,16 +640,11 @@ class LLMClientBase(ABC):
             print(f"[DEBUG] - Tool call structure: {tool_call}")
             
         return await self._execute_single_tool_call(
-            tool_call, session_id, execution_id, debug
+            tool_call, session_id, debug
         )
 
     # ========== SHARED UTILITY METHODS ==========
 
-    def _generate_execution_id(self) -> str:
-        """Generate unique execution ID."""
-        import uuid
-        return f"EXE_{str(uuid.uuid4())[:8]}"
-    
     def _get_timestamp(self) -> float:
         """Get current timestamp."""
         import time

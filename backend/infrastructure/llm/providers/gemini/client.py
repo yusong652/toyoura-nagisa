@@ -273,10 +273,5 @@ class GeminiClient(LLMClientBase):
         """Extract thinking content from Gemini response."""
         return GeminiResponseProcessor.extract_thinking_content(response)
 
-    def _log_context_state(self, context_manager: Any):
-        """Log Gemini context manager state for debugging."""
-        # Gemini uses default logging from base class
-        super()._log_context_state(context_manager)
-
     # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _execute_single_tool_call is inherited from LLMClientBase

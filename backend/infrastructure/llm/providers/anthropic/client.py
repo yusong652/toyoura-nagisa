@@ -87,11 +87,6 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific configuration object."""
         return self.anthropic_config
 
-    def _log_context_state(self, context_manager: Any):
-        """Log Anthropic context manager state for debugging."""
-        # Anthropic uses default logging from base class
-        super()._log_context_state(context_manager)
-
     # _streaming_tool_calling_loop is inherited from LLMClientBase
 
     async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
