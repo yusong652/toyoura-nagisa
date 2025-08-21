@@ -97,8 +97,7 @@ async def generate_image(context: Context) -> dict[str, Any]:
     session_id: str | None = getattr(context, "client_id", None)
     if not session_id:
         return error_response(
-            message="Image generation failed: Session ID is missing",
-            error="client_id not provided in context"
+            "Image generation failed: Session ID is missing"
         )
 
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
@@ -108,8 +107,7 @@ async def generate_image(context: Context) -> dict[str, Any]:
 
     if llm_client is None:
         return error_response(
-            message="Image generation failed: LLM client unavailable",
-            error="Cannot access LLM client from application context"
+            "Image generation failed: LLM client unavailable"
         )
 
     # Build prompts using the LLM client
@@ -117,14 +115,12 @@ async def generate_image(context: Context) -> dict[str, Any]:
         prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
     except Exception as e:
         return error_response(
-            message="Image generation failed: Prompt generation failed",
-            error=str(e)
+            "Image generation failed: Prompt generation failed"
         )
 
     if not prompt_result or "text_prompt" not in prompt_result:
         return error_response(
-            message="Image generation failed: Empty prompt result",
-            error="Prompt generation returned no usable content"
+            "Image generation failed: Empty prompt result"
         )
 
     text_prompt = prompt_result["text_prompt"]
@@ -135,21 +131,18 @@ async def generate_image(context: Context) -> dict[str, Any]:
         image_result = await generate_image_from_description(text_prompt, negative_prompt)
     except Exception as e:
         return error_response(
-            message="Image generation failed",
-            error=str(e)
+            "Image generation failed"
         )
 
     if not image_result:
         return error_response(
-            message="Image generation failed: No image result",
-            error="Image generation returned empty result"
+            "Image generation failed: No image result"
         )
 
     # Handle error response
     if image_result.get("type") == "error":
         return error_response(
-            message=f"Image generation failed: {image_result.get('message', 'Unknown error occurred')}",
-            error=image_result.get("message", "Unknown error occurred")
+            f"Image generation failed: {image_result.get('message', 'Unknown error occurred')}"
         )
     
     # Calculate generation time
@@ -170,8 +163,7 @@ async def generate_image(context: Context) -> dict[str, Any]:
         )
     else:
         return error_response(
-            message="Image generation failed: Unexpected result format",
-            error=f"Got type: {image_result.get('type')}"
+            "Image generation failed: Unexpected result format"
         )
 
 def register_text_to_image_tools(mcp: FastMCP):

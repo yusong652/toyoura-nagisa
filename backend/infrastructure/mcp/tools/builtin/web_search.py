@@ -31,8 +31,7 @@ async def web_search(
         
         if not llm_client:
             return error_response(
-                message="LLM client not available",
-                error="Cannot access LLM client from application context"
+                "LLM client not available"
             )
         
         # Auto-detect LLM type
@@ -40,8 +39,7 @@ async def web_search(
             llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
         except ValueError as e:
             return error_response(
-                message=f"Unable to detect LLM type: {str(e)}",
-                error=str(e)
+                f"Unable to detect LLM type: {str(e)}"
             )
         
         # Use WebSearchToolFactory to perform search with detected client type
@@ -56,8 +54,7 @@ async def web_search(
         error_msg = search_result.get("error")
         if search_result.get("status") == "error" or (error_msg is not None and error_msg != ""):
             return error_response(
-                message=f"Web search failed: {error_msg}",
-                error=error_msg
+                f"Web search failed: {error_msg}"
             )
         
         # Extract search results
@@ -81,8 +78,7 @@ async def web_search(
         
     except Exception as e:
         return error_response(
-            message=f"Web search error: {str(e)}",
-            error=str(e)
+            f"Web search error: {str(e)}"
         )
 
 def register_web_search_tool(mcp: FastMCP):

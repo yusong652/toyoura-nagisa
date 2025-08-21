@@ -50,7 +50,7 @@ def register_time_tools(mcp: FastMCP):
                 current_time = datetime.now(tz)
                 timezone_name = determined_timezone
             except pytz.exceptions.UnknownTimeZoneError:
-                return error_response("Invalid timezone", f"Unknown timezone: {determined_timezone}")
+                return error_response(f"Invalid timezone: {determined_timezone}")
 
             # Generate primary time format
             primary_format = current_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -80,4 +80,4 @@ def register_time_tools(mcp: FastMCP):
             )
             
         except Exception as e:
-            return error_response("Time retrieval failed", str(e)) 
+            return error_response("Time retrieval failed") 

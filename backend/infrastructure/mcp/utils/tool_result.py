@@ -69,10 +69,6 @@ class ToolResult(BaseModel):
         None, 
         description="Tool-specific payload and metadata for debugging/extension"
     )
-    error: Optional[str] = Field(
-        None, 
-        description="Detailed error information when status='error'"
-    )
 
     # Allow tools to attach extra fields without breaking validation
     model_config = ConfigDict(extra="allow")
@@ -112,7 +108,7 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
     ).model_dump()
 
 
-def error_response(message: str, error: Optional[str] = None) -> Dict[str, Any]:
+def error_response(message: str) -> Dict[str, Any]:
     """Create a standardized error response for all MCP tools.
     
     This function provides a unified way for all tools to return error responses,
@@ -120,20 +116,15 @@ def error_response(message: str, error: Optional[str] = None) -> Dict[str, Any]:
     
     Args:
         message: Brief user-friendly error message for UI display
-        error: Detailed error information for debugging (defaults to message if not provided)
     
     Returns:
         Dict[str, Any]: ToolResult dictionary with status="error"
         
     Example:
-        return error_response(
-            "Operation failed", 
-            error="Connection timeout after 5 seconds"
-        )
+        return error_response("Operation failed")
     """
     return ToolResult(
         status="error",
         message=message,
-        error=error or message,
         llm_content=f"<error>{message}</error>"
     ).model_dump() 
