@@ -13,7 +13,7 @@ from ..utils.path_security import (
     validate_path_in_workspace, 
     WORKSPACE_ROOT
 )
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["grep", "register_grep_tool"]
 
@@ -266,34 +266,18 @@ def grep(
     if isinstance(head_limit, FieldInfo):
         head_limit = None
 
-    # Helper shortcuts for consistent results
-    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
-        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
-        if llm_content is None:
-            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
-        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
-
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        # For success, use the provided llm_content directly
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=llm_content,
-            data=data,
-        ).model_dump()
-
     # Validate pattern
     if not pattern or not pattern.strip():
-        return _error("Search pattern is required and cannot be empty")
+        return error_response("Search pattern is required and cannot be empty")
 
     # Validate output mode
     valid_modes = ["content", "files_with_matches", "count"]
     if output_mode not in valid_modes:
-        return _error(f"Invalid output_mode. Must be one of: {', '.join(valid_modes)}")
+        return error_response(f"Invalid output_mode. Must be one of: {', '.join(valid_modes)}")
 
     # Check if git is available
     if not shutil.which("git"):
-        return _error("git is not installed or not available in PATH")
+        return error_response("git is not installed or not available in PATH")
     
     # Find git repository root
     git_root = None
@@ -314,21 +298,21 @@ def grep(
                 break
         
         if git_root is None:
-            return _error("Not in a git repository - git grep requires a git repository")
+            return error_response("Not in a git repository - git grep requires a git repository")
             
     except Exception:
-        return _error("Unable to check git repository status")
+        return error_response("Unable to check git repository status")
 
     # Determine search path
     if path:
         # Validate provided path
         search_path_abs = validate_path_in_workspace(path)
         if search_path_abs is None:
-            return _error(f"Path is outside workspace: {path}")
+            return error_response(f"Path is outside workspace: {path}")
         
         search_path = Path(search_path_abs)
         if not search_path.exists():
-            return _error(f"Path does not exist: {path}")
+            return error_response(f"Path does not exist: {path}")
     else:
         # Default to workspace root
         search_path = WORKSPACE_ROOT
@@ -352,16 +336,16 @@ def grep(
         
         # Handle git grep exit codes
         if result.returncode == 1:  # No matches found
-            return _error("No files found")
+            return error_response("No files found")
         elif result.returncode != 0:  # Error occurred
             error_msg = result.stderr.strip() if result.stderr else "Unknown git grep error"
-            return _error(f"Search error: {error_msg}")
+            return error_response(f"Search error: {error_msg}")
 
         # Process output
         output_lines = _process_output(result.stdout, head_limit)
         
         if not output_lines:
-            return _error("No files found")
+            return error_response("No files found")
 
         # Build response based on output mode
         
@@ -372,7 +356,7 @@ def grep(
             # Simple LLM content - just the file paths, one per line
             llm_content = "\n".join(output_lines)
             
-            return _success(
+            return success_response(
                 message,
                 llm_content,
                 files=output_lines,
@@ -398,7 +382,7 @@ def grep(
             # Simple LLM content - just the count output, one per line
             llm_content = "\n".join(output_lines)
             
-            return _success(
+            return success_response(
                 message,
                 llm_content,
                 total_matches=total_matches,
@@ -414,7 +398,7 @@ def grep(
             # Simple LLM content - just the matching lines, one per line
             llm_content = "\n".join(output_lines)
             
-            return _success(
+            return success_response(
                 message,
                 llm_content,
                 content=output_lines,
@@ -423,9 +407,9 @@ def grep(
             )
 
     except TimeoutError as e:
-        return _error(str(e))
+        return error_response(str(e))
     except Exception as exc:
-        return _error(f"Unexpected error during search: {exc}")
+        return error_response(f"Unexpected error during search: {exc}")
 
 # -----------------------------------------------------------------------------
 # Registration helper
