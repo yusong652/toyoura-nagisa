@@ -16,7 +16,7 @@ from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from ..utils.path_security import (
     WORKSPACE_ROOT, 
     validate_path_in_workspace, 
@@ -58,34 +58,22 @@ def write(
     # Fixed encoding for simplicity
     encoding = "utf-8"
 
-    # Helper shortcuts for consistent results
-    def _error(message: str) -> Dict[str, Any]:
-        return ToolResult(status="error", message=message, error=message).model_dump()
-
-    def _success(message: str, **data: Any) -> Dict[str, Any]:
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=message,  # Simple message content like Claude Code
-            data=data,
-        ).model_dump()
-
     # Validate path security
     abs_path = validate_path_in_workspace(file_path)
     if abs_path is None:
-        return _error(f"Path is outside of workspace: {file_path}")
+        return error_response(f"Path is outside of workspace: {file_path}")
 
     # Validate content size to prevent disk exhaustion
     content_size_chars = len(content)
     if content_size_chars > MAX_CONTENT_SIZE_CHARS:
         size_mb = content_size_chars / (1024 * 1024)
-        return _error(f"Content exceeds maximum size limit (20 MB): {size_mb:.2f} MB")
+        return error_response(f"Content exceeds maximum size limit (20 MB): {size_mb:.2f} MB")
 
     # Estimate byte size for UTF-8 content (conservative)
     estimated_bytes = len(content.encode(encoding))
     if estimated_bytes > MAX_CONTENT_SIZE_BYTES:
         size_mb = estimated_bytes / (1024 * 1024)
-        return _error(f"Content exceeds maximum size limit (20 MB): {size_mb:.2f} MB")
+        return error_response(f"Content exceeds maximum size limit (20 MB): {size_mb:.2f} MB")
 
     try:
         abs_p = Path(abs_path)
@@ -97,18 +85,18 @@ def write(
         if file_existed:
             # Check if target file itself is an unsafe symlink
             if abs_p.is_symlink() and not is_safe_symlink(abs_p):
-                return _error("Cannot write to symlink pointing outside workspace")
+                return error_response("Cannot write to symlink pointing outside workspace")
         
         # Check if any parent directory is an unsafe symlink
         if not check_parent_symlinks(abs_p):
-            return _error("Cannot write to path with parent symlink pointing outside workspace")
+            return error_response("Cannot write to path with parent symlink pointing outside workspace")
         
         # Create parent directories if they don't exist
         abs_p.parent.mkdir(parents=True, exist_ok=True)
         
         # Additional check after mkdir - ensure created directories are safe
         if not check_parent_symlinks(abs_p):
-            return _error("Parent directory creation resulted in unsafe symlink structure")
+            return error_response("Parent directory creation resulted in unsafe symlink structure")
         
         # Write the content (always overwrite)
         with abs_p.open("w", encoding=encoding) as fh:
@@ -130,8 +118,9 @@ def write(
         else:
             display_msg = f"File updated successfully at: {str(rel_display)}"
 
-        return _success(
+        return success_response(
             display_msg,
+            display_msg,  # Simple message content like Claude Code
             file_path=str(rel_display),
             size_bytes=size_bytes,
             lines_count=lines_count,
@@ -139,23 +128,23 @@ def write(
         )
 
     except PermissionError:
-        return _error("Permission denied when writing file")
+        return error_response("Permission denied when writing file")
     except IsADirectoryError:
-        return _error("Specified path is a directory, not a file")
+        return error_response("Specified path is a directory, not a file")
     except UnicodeEncodeError as exc:
-        return _error(f"Encoding error: {exc}")
+        return error_response(f"Encoding error: {exc}")
     except OSError as exc:
         # Handle specific disk space errors
         if exc.errno == errno.ENOSPC:
-            return _error("Insufficient disk space (ENOSPC) - cannot write file")
+            return error_response("Insufficient disk space (ENOSPC) - cannot write file")
         elif exc.errno == errno.EDQUOT:
-            return _error("Disk quota exceeded (EDQUOT) - cannot write file")
+            return error_response("Disk quota exceeded (EDQUOT) - cannot write file")
         elif exc.errno == errno.EFBIG:
-            return _error("File too large (EFBIG) - exceeds filesystem limits")
+            return error_response("File too large (EFBIG) - exceeds filesystem limits")
         else:
-            return _error(f"IO error: {exc}")
+            return error_response(f"IO error: {exc}")
     except Exception as exc:  # pylint: disable=broad-except
-        return _error(f"Unexpected error: {exc}")
+        return error_response(f"Unexpected error: {exc}")
 
 
 # -----------------------------------------------------------------------------
