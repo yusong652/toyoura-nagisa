@@ -88,8 +88,6 @@ class LLMClientBase(ABC):
         # Execution metadata - unified across all providers
         metadata = {
             'session_id': session_id,
-            'start_time': self._get_timestamp(),
-            'end_time': None,
             'iterations': 0,
             'api_calls': 0,
             'tool_calls_executed': 0,
@@ -114,7 +112,6 @@ class LLMClientBase(ABC):
             
             # === FINALIZATION PHASE ===
             metadata['status'] = 'completed'
-            metadata['end_time'] = self._get_timestamp()
             
             # Extract thinking content if supported
             thinking_content = self._extract_thinking_content(final_response)
@@ -144,7 +141,6 @@ class LLMClientBase(ABC):
         except Exception as e:
             metadata['status'] = 'failed'
             metadata['error'] = str(e)
-            metadata['end_time'] = self._get_timestamp()
             
             if debug:
                 provider_name = self.__class__.__name__.replace('Client', '')
@@ -644,11 +640,6 @@ class LLMClientBase(ABC):
         )
 
     # ========== SHARED UTILITY METHODS ==========
-
-    def _get_timestamp(self) -> float:
-        """Get current timestamp."""
-        import time
-        return time.time()
 
     async def _clear_session_tool_cache(self, session_id: str):
         """Clear session tool cache - shared implementation."""
