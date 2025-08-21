@@ -4,7 +4,7 @@ from typing import Dict, Any
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from .web_search_factory import WebSearchToolFactory
 from backend.config import get_llm_settings
 
@@ -30,23 +30,19 @@ async def web_search(
             llm_client = fastapi_app.state.llm_client
         
         if not llm_client:
-            return ToolResult(
-                status="error",
+            return error_response(
                 message="LLM client not available",
-                error="Cannot access LLM client from application context",
-                data={"query": query, "max_uses": max_uses}
-            ).model_dump()
+                error="Cannot access LLM client from application context"
+            )
         
         # Auto-detect LLM type
         try:
             llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
         except ValueError as e:
-            return ToolResult(
-                status="error",
+            return error_response(
                 message=f"Unable to detect LLM type: {str(e)}",
-                error=str(e),
-                data={"query": query, "max_uses": max_uses}
-            ).model_dump()
+                error=str(e)
+            )
         
         # Use WebSearchToolFactory to perform search with detected client type
         search_result = await WebSearchToolFactory.perform_web_search(
@@ -59,12 +55,10 @@ async def web_search(
         # Check if search was successful - only treat as error if error field has actual content
         error_msg = search_result.get("error")
         if search_result.get("status") == "error" or (error_msg is not None and error_msg != ""):
-            return ToolResult(
-                status="error",
+            return error_response(
                 message=f"Web search failed: {error_msg}",
-                error=error_msg,
-                data={"query": query}
-            ).model_dump()
+                error=error_msg
+            )
         
         # Extract search results
         sources = search_result.get("sources", [])
@@ -79,20 +73,17 @@ async def web_search(
             message += f" (Response: {len(response_text)} chars)"
         
         # Store full search result in data for reference
-        return ToolResult(
-            status="success",
+        return success_response(
             message=message,
             llm_content=llm_content,  # Just the text, not structured data
-            data=search_result  # Full result with sources, response_text, etc.
-        ).model_dump()
+            **search_result  # Full result with sources, response_text, etc.
+        )
         
     except Exception as e:
-        return ToolResult(
-            status="error",
+        return error_response(
             message=f"Web search error: {str(e)}",
-            error=str(e),
-            data={"query": query, "max_uses": max_uses}
-        ).model_dump()
+            error=str(e)
+        )
 
 def register_web_search_tool(mcp: FastMCP):
     """Register the Web Search tool with MCP server."""
