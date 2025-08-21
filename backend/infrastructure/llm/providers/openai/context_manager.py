@@ -5,7 +5,7 @@ Manages conversation context and message history for OpenAI API calls.
 Handles message formatting, tool result integration, and state management.
 """
 
-from typing import List, Dict, Any
+from typing import Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import OpenAIMessageFormatter
 from .response_processor import OpenAIResponseProcessor
@@ -78,13 +78,3 @@ class OpenAIContextManager(BaseContextManager):
         }
         
         self.working_contents.append(tool_message)
-    
-    def get_working_contents(self) -> List[Dict[str, Any]]:
-        """
-        Get current working messages in OpenAI format
-        
-        Returns:
-            List of OpenAI-formatted messages
-        """
-        return self.working_contents.copy()
-    

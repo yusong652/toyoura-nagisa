@@ -9,7 +9,7 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 2. 专注于工具调用期间的上下文状态管理
 """
 
-from typing import List, Dict, Any
+from typing import Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import GeminiMessageFormatter
 
@@ -55,15 +55,6 @@ class GeminiContextManager(BaseContextManager):
         
         # 添加到工作上下文
         self.working_contents.append(raw_content)
-    
-    def get_working_contents(self) -> List[Dict[str, Any]]:
-        """
-        获取工作上下文（原始Gemini API格式）
-        
-        Returns:
-            原始格式的上下文列表，用于API调用
-        """
-        return self.working_contents
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """

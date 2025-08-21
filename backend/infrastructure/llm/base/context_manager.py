@@ -80,6 +80,14 @@ class BaseContextManager(ABC):
         """
         pass
     
+    def get_working_contents(self) -> List[Dict[str, Any]]:
+        """
+        Get working context contents for API calls.
+        
+        Returns:
+            List[Dict[str, Any]]: Current working contents in provider-specific format
+        """
+        return self.working_contents
     
     # === Common utility methods ===
     

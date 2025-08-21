@@ -5,7 +5,7 @@ AnthropicContextManager - Anthropic Claude特化的上下文管理器
 采用与Gemini相同的双轨制设计：保持原始API格式用于工作上下文，标准化格式用于存储。
 """
 
-from typing import List, Dict, Any
+from typing import Any
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
 
@@ -63,13 +63,3 @@ class AnthropicContextManager(BaseContextManager):
         
         # 添加到工作上下文
         self.working_contents.append(working_content)
-    
-    def get_working_contents(self) -> List[Dict[str, Any]]:
-        """
-        获取工作上下文（原始Anthropic API格式）
-        
-        Returns:
-            原始格式的消息列表，用于API调用
-        """
-        return self.working_contents
-    
