@@ -18,7 +18,7 @@ from ..utils.path_security import (
     is_safe_symlink,
     check_parent_symlinks
 )
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["glob", "register_glob_tool"]
 
@@ -116,38 +116,22 @@ def glob(
     if isinstance(path, FieldInfo):
         path = None
 
-    # Helper shortcuts for consistent results
-    def _error(message: str, llm_content: str = None) -> Dict[str, Any]:
-        # For errors, use provided llm_content or wrap in <error><tool_use_error> tags to match Claude Code format
-        if llm_content is None:
-            llm_content = f"<error><tool_use_error>{message}</tool_use_error></error>"
-        return ToolResult(status="error", message=message, llm_content=llm_content, error=message).model_dump()
-
-    def _success(message: str, llm_content: str, **data: Any) -> Dict[str, Any]:
-        # For success, use the provided llm_content directly
-        return ToolResult(
-            status="success",
-            message=message,
-            llm_content=llm_content,
-            data=data,
-        ).model_dump()
-
     # Validate pattern
     if not pattern or not pattern.strip():
-        return _error("Pattern is required and cannot be empty")
+        return error_response("Pattern is required and cannot be empty")
 
     # Determine search directory
     if path:
         # Validate provided path
         search_path = validate_path_in_workspace(path)
         if search_path is None:
-            return _error(f"Path is outside workspace: {path}")
+            return error_response(f"Path is outside workspace: {path}")
         
         search_dir = Path(search_path)
         if not search_dir.exists():
-            return _error(f"Directory does not exist: {path}")
+            return error_response(f"Directory does not exist: {path}")
         if not search_dir.is_dir():
-            return _error(f"Path is not a directory: {path}")
+            return error_response(f"Path is not a directory: {path}")
     else:
         # Default to workspace root
         search_dir = WORKSPACE_ROOT
@@ -157,7 +141,7 @@ def glob(
         matched_files = _expand_glob_pattern(search_dir, pattern, MAX_FILES_DEFAULT)
         
         if not matched_files:
-            return _error("No files found")
+            return error_response("No files found")
         
         # Security filtering
         safe_files = []
@@ -173,7 +157,7 @@ def glob(
             safe_files.append(file_path)
         
         if not safe_files:
-            return _error("No files found")
+            return error_response("No files found")
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
@@ -190,7 +174,7 @@ def glob(
         # Simple LLM content - just the file paths, one per line
         llm_content = "\n".join(file_paths)
         
-        return _success(
+        return success_response(
             message,
             llm_content,
             files=file_paths,
@@ -199,7 +183,7 @@ def glob(
         )
 
     except Exception as exc:
-        return _error(f"Unexpected error during glob search: {exc}")
+        return error_response(f"Unexpected error during glob search: {exc}")
 
 # -----------------------------------------------------------------------------
 # Registration helper
