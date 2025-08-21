@@ -58,11 +58,11 @@ def register_list_events_tool(mcp: FastMCP):
         ),
         time_min: Optional[Dict[str, int]] = Field(
             None,
-            description="Start time filter. If not provided, defaults to current time to show upcoming events. Example: {'year': 2025, 'month': 7, 'day': 30}",
+            description="Start time filter. If not provided, defaults to current time to show upcoming events. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 9, 'minute': 0}",
         ),
         time_max: Optional[Dict[str, int]] = Field(
             None,
-            description="End time filter. If not provided, defaults to 1 year from start time to limit recurring events like birthdays. Example: {'year': 2025, 'month': 7, 'day': 31}",
+            description="End time filter. If not provided, defaults to 1 year from start time to limit recurring events like birthdays. Example: {'year': 2025, 'month': 7, 'day': 31, 'hour': 23, 'minute': 59}",
         ),
     ) -> Dict[str, Any]:
         """List events from Google Calendar. Automatically limits recurring events like birthdays to within 1 year. If no time filter is provided, shows upcoming events from current time."""
