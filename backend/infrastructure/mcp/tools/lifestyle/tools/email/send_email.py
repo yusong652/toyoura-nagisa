@@ -27,8 +27,8 @@ def register_send_email_tool(mcp: FastMCP):
     def send_email(
         subject: str = Field(..., description="Email subject line."),
         body: str = Field(..., description="Email body content in plain text."),
-        to: Optional[List[str]] = Field(None, description="Array of recipient email addresses, e.g. ['user@example.com']. If not provided, uses USER_GMAIL_ADDRESS."),
-        cc: Optional[List[str]] = Field(None, description="Array of CC email addresses, e.g. ['cc@example.com']."),
+        to: Optional[List[str]] = Field(None, description="Array of recipient email addresses. Provide actual email addresses like ['alice@company.com', 'bob@domain.org']. If not provided, uses USER_GMAIL_ADDRESS."),
+        cc: Optional[List[str]] = Field(None, description="Array of CC email addresses. Provide actual email addresses like ['manager@company.com']."),
     ) -> Dict[str, Any]:
         """Send an email using Gmail."""
 
