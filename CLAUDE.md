@@ -86,17 +86,14 @@ npm run preview
 Modular tool architecture with categories in `backend/infrastructure/mcp/tools/`:
 - `builtin`: Web search and core system tools
 - `coding`: File operations, shell commands, Python execution
-- `calendar`: Google Calendar integration
-- `email_tools`: Email management via Gmail
-- `contact_tools`: Google Contacts management
-- `text_to_image`: Image generation tools
-- `memory_tools`: Memory management operations
-- `weather_tool`: Weather information services
-- `time_tool`: Time and date utilities
-- `calculator_tool`: Mathematical calculations
-- `location_tool`: Geolocation services
-- `places_tools`: Location and places services
-- `meta_tool`: Tool discovery and management
+- `lifestyle`: Lifestyle and productivity tools including:
+  - `calendar`: Google Calendar integration
+  - `contacts`: Google Contacts management
+  - `email`: Email management via Gmail
+  - `location`: Geolocation services
+  - `places`: Location and places services
+  - `text_to_image`: Image generation tools
+  - `time`: Time and date utilities
 
 ### Frontend Architecture
 - **React 19**: Modern React with TypeScript
@@ -140,18 +137,15 @@ The system uses agent types to automatically load appropriate tool sets:
 ### Tool Categories
 Tools are organized into categories and can be loaded on-demand:
 - `builtin`: Web search tools
-- `calculator_tool`: Mathematical calculations
-- `calendar`: Google Calendar integration
 - `coding`: File operations, shell commands, Python execution
-- `contact_tools`: Contact management
-- `email_tools`: Email operations
-- `location_tool`: Geolocation services
-- `memory_tools`: Memory management
-- `meta_tool`: Tool discovery and management
-- `places_tools`: Location and places services
-- `text_to_image`: Image generation
-- `time_tool`: Time utilities
-- `weather_tool`: Weather information
+- `lifestyle`: Lifestyle and productivity tools including:
+  - `calendar`: Google Calendar integration
+  - `contacts`: Contact management
+  - `email`: Email operations
+  - `location`: Geolocation services
+  - `places`: Location and places services
+  - `text_to_image`: Image generation
+  - `time`: Time utilities
 
 ### Google Services Integration
 Many tools integrate with Google services via OAuth:

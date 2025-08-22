@@ -28,9 +28,6 @@ class BaseContextManager(ABC):
         Args:
             provider_name: Name of the LLM provider (e.g., 'gemini', 'anthropic', 'openai')
         """
-        self._messages_history: List[BaseMessage] = []
-        self._current_iteration = 0
-        self._execution_metadata: Dict[str, Any] = {}
         self._provider_name = provider_name
         # Working contents will be populated by initialize_from_messages
         self.working_contents: List[Dict[str, Any]] = []
@@ -88,40 +85,3 @@ class BaseContextManager(ABC):
             List[Dict[str, Any]]: Current working contents in provider-specific format
         """
         return self.working_contents
-    
-    # === Common utility methods ===
-    
-    def get_current_iteration(self) -> int:
-        """Get current iteration count."""
-        return self._current_iteration
-    
-    def increment_iteration(self) -> None:
-        """Increment iteration count."""
-        self._current_iteration += 1
-    
-    def get_messages_count(self) -> int:
-        """Get message history count."""
-        return len(self._messages_history)
-    
-    def set_execution_metadata(self, key: str, value: Any) -> None:
-        """Set execution metadata."""
-        self._execution_metadata[key] = value
-    
-    def get_execution_metadata(self, key: str, default: Any = None) -> Any:
-        """Get execution metadata."""
-        return self._execution_metadata.get(key, default)
-    
-    def clear_context(self) -> None:
-        """Clear context state."""
-        self._messages_history.clear()
-        self._current_iteration = 0
-        self._execution_metadata.clear()
-    
-    def get_debug_info(self) -> Dict[str, Any]:
-        """Get debug information."""
-        return {
-            'messages_count': self.get_messages_count(),
-            'current_iteration': self.get_current_iteration(),
-            'execution_metadata': self._execution_metadata.copy()
-        }
-    

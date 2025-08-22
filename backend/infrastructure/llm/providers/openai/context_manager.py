@@ -56,7 +56,6 @@ class OpenAIContextManager(BaseContextManager):
                 })
         
         self.working_contents.append(assistant_message)
-        self.increment_iteration()
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """

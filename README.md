@@ -39,7 +39,7 @@ aiNagisa features a revolutionary **parallel tool execution system** that delive
 
 ### 🧠 **Autonomous Tool Orchestration with `FastMCP`**
 
-At the heart of aiNagisa is the **Master Control Program (MCP)**, a powerful tool orchestration engine. Unlike traditional chatbots with hardcoded tool integrations, aiNagisa features a dynamic, semantic tool discovery and invocation system.
+At the heart of aiNagisa is the **Model Context Protocol (MCP)**, a powerful tool orchestration engine. Unlike traditional chatbots with hardcoded tool integrations, aiNagisa features a dynamic, semantic tool discovery and invocation system.
 
 - **Semantic Tool Search**: We use a `ToolVectorizer` to embed the descriptions and capabilities of all available tools into a vector space. When a user makes a request, the LLM can query this vector space to find the most relevant tools for the task at hand. This allows for a much more flexible and extensible tool system.
 - **Dynamic Tool Loading**: Tools are categorized and can be loaded on-demand, making the system lightweight and scalable. The LLM can request tool categories based on the task, and the MCP will provide the necessary tools.
