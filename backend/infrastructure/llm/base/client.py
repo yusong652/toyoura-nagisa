@@ -94,17 +94,8 @@ class LLMClientBase(ABC):
                 provider_name=provider_name,
                 session_id=session_id
             )
-            
-            # Initialize with historical messages (all except the last one which is the new user message)
-            if len(messages) > 1:
-                historical_messages = messages[:-1]
-                self.context_manager.initialize_session_from_history(historical_messages)
-                # Add the new user message incrementally
-                self.context_manager.add_user_message(messages[-1])
-            else:
-                # First message in session
-                self.context_manager.initialize_session_from_history([])
-                self.context_manager.add_user_message(messages[0])
+
+            self.context_manager.initialize_session_from_history(messages)
         else:
             # Existing session - just add the new user message
             if messages:
@@ -361,7 +352,9 @@ class LLMClientBase(ABC):
         """
         
         # Get initial response using provider-specific context with truncation
-        working_contents = context_manager.get_working_contents(max_messages=50)
+        from backend.config import get_llm_settings
+        max_messages = get_llm_settings().recent_messages_length
+        working_contents = context_manager.get_working_contents(max_messages=max_messages)
         current_response = await self.call_api_with_context(
             working_contents, session_id=session_id, **kwargs
         )
@@ -448,7 +441,7 @@ class LLMClientBase(ABC):
                 # Skip completion notifications - let LLM response show naturally
             
             # Get next round response with truncation
-            working_contents = context_manager.get_working_contents(max_messages=50)
+            working_contents = context_manager.get_working_contents(max_messages=max_messages)
             
             if debug:
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")

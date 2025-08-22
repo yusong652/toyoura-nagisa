@@ -149,7 +149,7 @@ class BaseContextManager(ABC):
         """
         pass
     
-    def get_working_contents(self, max_messages: int = 50) -> List[Dict[str, Any]]:
+    def get_working_contents(self, max_messages: int = 23) -> List[Dict[str, Any]]:
         """
         Get working contents with smart truncation preserving tool integrity.
         
@@ -176,38 +176,83 @@ class BaseContextManager(ABC):
         """
         Perform smart truncation for sequentially organized messages.
         
-        This simplified version ensures we don't start with orphaned tool results
-        by checking the message flow after truncation.
+        Ensures that exactly max_count non-tool messages are retained while
+        preserving the integrity of tool calls and their results.
         
         Args:
             messages: Messages to truncate
-            max_count: Maximum messages to keep
+            max_count: Maximum number of non-tool messages to keep
             
         Returns:
-            List[Dict[str, Any]]: Truncated messages
+            List[Dict[str, Any]]: Truncated messages with max_count non-tool messages
         """
-        if len(messages) <= max_count:
+        # Count non-tool messages
+        non_tool_count = sum(
+            1 for msg in messages 
+            if not self._is_tool_call(msg) and not self._is_tool_result(msg)
+        )
+        
+        # If we already have fewer non-tool messages than max_count, return all
+        if non_tool_count <= max_count:
             return messages
         
-        # Keep the most recent messages
-        start_index = len(messages) - max_count
-        truncated = messages[start_index:]
+        # Work backwards to collect the most recent non-tool messages
+        # while preserving their associated tool calls and results
+        result = []
+        non_tool_collected = 0
+        i = len(messages) - 1
         
-        # Ensure we don't start with a tool result
-        # Skip any leading tool results until we find a user/assistant message
-        while truncated and self._is_tool_result(truncated[0]):
-            truncated.pop(0)
-            # Also remove the corresponding tool call if it exists
-            if truncated and self._is_tool_call(truncated[0]):
-                truncated.pop(0)
+        while i >= 0 and non_tool_collected < max_count:
+            msg = messages[i]
+            
+            # If it's a non-tool message, include it
+            if not self._is_tool_call(msg) and not self._is_tool_result(msg):
+                result.insert(0, msg)
+                non_tool_collected += 1
+                i -= 1
+            # If it's a tool result, include it and its corresponding tool call
+            elif self._is_tool_result(msg):
+                # Add the tool result
+                result.insert(0, msg)
+                i -= 1
+                
+                # Look for the corresponding tool call (should be just before)
+                while i >= 0:
+                    if self._is_tool_call(messages[i]):
+                        result.insert(0, messages[i])
+                        i -= 1
+                        break
+                    # Also include any other tool results in between
+                    elif self._is_tool_result(messages[i]):
+                        result.insert(0, messages[i])
+                        i -= 1
+                    else:
+                        # Non-tool message, don't include unless needed
+                        break
+            # If it's a tool call, check if there's a following tool result
+            elif self._is_tool_call(msg):
+                # Check if the next message (in original order) is a tool result
+                if i + 1 < len(messages) and self._is_tool_result(messages[i + 1]):
+                    # This tool call has a result, skip it (will be handled with result)
+                    i -= 1
+                else:
+                    # Orphaned tool call, include it
+                    result.insert(0, msg)
+                    i -= 1
         
-        return truncated
+        # Ensure we don't start with orphaned tool results
+        while result and self._is_tool_result(result[0]):
+            result.pop(0)
+        
+        return result
     
+    @abstractmethod
     def _is_tool_call(self, msg: Dict[str, Any]) -> bool:
         """
         Check if message contains tool calls.
         
-        Provider-specific implementations should override this.
+        Provider-specific implementations must implement this method
+        according to their message format.
         
         Args:
             msg: Message to check
@@ -215,14 +260,15 @@ class BaseContextManager(ABC):
         Returns:
             bool: True if message contains tool calls
         """
-        # Provider-specific implementation needed
-        return False
+        pass
     
+    @abstractmethod
     def _is_tool_result(self, msg: Dict[str, Any]) -> bool:
         """
         Check if message is a tool result.
         
-        Provider-specific implementations should override this.
+        Provider-specific implementations must implement this method
+        according to their message format.
         
         Args:
             msg: Message to check
@@ -230,8 +276,7 @@ class BaseContextManager(ABC):
         Returns:
             bool: True if message is a tool result
         """
-        # Provider-specific implementation needed
-        return False
+        pass
     
     def get_runtime_summary(self) -> Dict[str, Any]:
         """

@@ -232,6 +232,53 @@ class MessageFormatter(BaseMessageFormatter):
         return formatted_messages
 
     @staticmethod
+    def format_single_message(message: BaseMessage) -> Dict[str, Any]:
+        """
+        Format a single BaseMessage to Anthropic API format.
+        
+        Args:
+            message: Single BaseMessage to format
+            
+        Returns:
+            Dict[str, Any]: Single message in Anthropic API format
+        """
+        if message is None:
+            return {}
+            
+        content = []
+        
+        # Handle message content based on format
+        if isinstance(message.content, list):
+            # Multi-part message (text + optional multimodal content)
+            for item in message.content:
+                if "text" in item and item["text"]:
+                    content.append({
+                        "type": "text",
+                        "text": item["text"]
+                    })
+                elif "inline_data" in item:
+                    # Process image content
+                    image_block = MessageFormatter.process_inline_data(item['inline_data'])
+                    if image_block:
+                        content.append(image_block)
+        else:
+            # Simple text message
+            content.append({
+                "type": "text", 
+                "text": str(message.content)
+            })
+        
+        # Map role and return formatted message
+        if content:
+            mapped_role = MessageFormatter.map_role(message.role)
+            return {
+                "role": mapped_role,
+                "content": content
+            }
+        
+        return {}
+
+    @staticmethod
     def format_tool_result_for_context(tool_call_id: str, tool_name: str, result: Any) -> Dict[str, Any]:
         """
         Format tool result for Anthropic working context.
