@@ -191,7 +191,7 @@ def grep(
     ),
     path: Optional[str] = Field(
         None,
-        description="File or directory to search in (git grep PATH). Defaults to current working directory.",
+        description="File or directory to search in (defaults to current working directory if not specified)",
     ),
     glob: Optional[str] = Field(
         None,
@@ -336,16 +336,13 @@ def grep(
         
         # Handle git grep exit codes
         if result.returncode == 1:  # No matches found
-            return error_response("No files found")
+            output_lines = []
         elif result.returncode != 0:  # Error occurred
             error_msg = result.stderr.strip() if result.stderr else "Unknown git grep error"
             return error_response(f"Search error: {error_msg}")
-
-        # Process output
-        output_lines = _process_output(result.stdout, head_limit)
-        
-        if not output_lines:
-            return error_response("No files found")
+        else:
+            # Process output
+            output_lines = _process_output(result.stdout, head_limit)
 
         # Build response based on output mode
         
@@ -353,8 +350,8 @@ def grep(
             total_files = len(output_lines)
             message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
             
-            # Simple LLM content - just the file paths, one per line
-            llm_content = "\n".join(output_lines)
+            # Simple LLM content - just the file paths, one per line (empty string if no files)
+            llm_content = "\n".join(output_lines) if output_lines else ""
             
             return success_response(
                 message,

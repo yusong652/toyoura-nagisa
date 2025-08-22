@@ -32,6 +32,33 @@ MAX_FILES_DEFAULT = 1000
 # Helper functions
 # -----------------------------------------------------------------------------
 
+def _expand_brace_pattern(pattern: str) -> List[str]:
+    """Expand brace patterns like {jpg,png,gif} into multiple patterns.
+    
+    Args:
+        pattern: Pattern potentially containing brace expansion
+        
+    Returns:
+        List of expanded patterns
+    """
+    import re
+    
+    # Find brace patterns like {jpg,png,gif}
+    brace_match = re.search(r'\{([^}]+)\}', pattern)
+    if not brace_match:
+        return [pattern]
+    
+    # Extract the options and create multiple patterns
+    options = brace_match.group(1).split(',')
+    prefix = pattern[:brace_match.start()]
+    suffix = pattern[brace_match.end():]
+    
+    expanded = []
+    for option in options:
+        expanded.append(prefix + option.strip() + suffix)
+    
+    return expanded
+
 def _expand_glob_pattern(
     base_dir: Path,
     pattern: str,
@@ -41,7 +68,7 @@ def _expand_glob_pattern(
     
     Args:
         base_dir: Base directory to search from
-        pattern: Glob pattern to match
+        pattern: Glob pattern to match (supports brace expansion)
         max_files: Maximum number of files to return
         
     Returns:
@@ -54,22 +81,26 @@ def _expand_glob_pattern(
         if pattern.startswith('/'):
             pattern = pattern.lstrip('/')
         
-        # Use pathlib's glob for pattern matching
-        if '**' in pattern:
-            # Recursive glob
-            matches = base_dir.rglob(pattern.replace('**/', ''))
-        else:
-            # Non-recursive glob
-            matches = base_dir.glob(pattern)
+        # Expand brace patterns
+        patterns = _expand_brace_pattern(pattern)
         
-        # Filter to files only and apply limit
-        for match in matches:
-            if len(matched_files) >= max_files:
-                break
+        for pat in patterns:
+            # Use pathlib's glob for pattern matching
+            if '**' in pat:
+                # Recursive glob
+                matches = base_dir.rglob(pat.replace('**/', ''))
+            else:
+                # Non-recursive glob
+                matches = base_dir.glob(pat)
             
-            if match.is_file():
-                matched_files.append(match)
+            # Filter to files only and apply limit
+            for match in matches:
+                if len(matched_files) >= max_files:
+                    break
                 
+                if match.is_file() and match not in matched_files:
+                    matched_files.append(match)
+                    
     except Exception:
         # Invalid pattern or other error
         pass
@@ -104,7 +135,7 @@ def glob(
     ),
     path: Optional[str] = Field(
         None,
-        description="The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter \"undefined\" or \"null\" - simply omit it for the default behavior. Must be a valid directory path if provided.",
+        description="The directory to search in (defaults to current working directory if not specified)",
     ),
 ) -> Dict[str, Any]:
     """- Fast file pattern matching tool that works with any codebase size
@@ -140,10 +171,7 @@ def glob(
         # Find matching files
         matched_files = _expand_glob_pattern(search_dir, pattern, MAX_FILES_DEFAULT)
         
-        if not matched_files:
-            return error_response("No files found")
-        
-        # Security filtering
+        # Security filtering (even if no files matched)
         safe_files = []
         
         for file_path in matched_files:
@@ -155,9 +183,6 @@ def glob(
                 continue
             
             safe_files.append(file_path)
-        
-        if not safe_files:
-            return error_response("No files found")
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
@@ -171,8 +196,8 @@ def glob(
         # Simple user-facing message
         message = f"Found {total_found} matching files"
         
-        # Simple LLM content - just the file paths, one per line
-        llm_content = "\n".join(file_paths)
+        # Simple LLM content - just the file paths, one per line (empty string if no files)
+        llm_content = "\n".join(file_paths) if file_paths else ""
         
         return success_response(
             message,
