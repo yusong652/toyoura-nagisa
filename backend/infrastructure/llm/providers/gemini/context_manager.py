@@ -9,8 +9,9 @@ Gemini Context Manager - 管理工具调用期间的原始上下文
 2. 专注于工具调用期间的上下文状态管理
 """
 
-from typing import Any
+from typing import Any, Optional
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
+from backend.domain.models.messages import BaseMessage
 from .message_formatter import GeminiMessageFormatter
 
 
@@ -29,32 +30,45 @@ class GeminiContextManager(BaseContextManager):
     3. 最终化：创建用于存储的标准化消息
     """
     
-    def __init__(self):
+    def __init__(self, provider_name: str = "gemini", session_id: Optional[str] = None):
         """初始化上下文管理器"""
-        super().__init__(provider_name="gemini")
+        super().__init__(provider_name=provider_name, session_id=session_id)
         # working_contents 已在基类中初始化
     
     def add_response(self, response) -> None:
         """
-        添加原始 Gemini API 响应到工作上下文
+        添加 Gemini API 响应到工作上下文
         
-        按照官方最佳实践，直接使用 candidate.content 而不是重构，
-        确保完整保留所有原始字段，包括思维链、验证字段等。
+        处理两种类型的响应：
+        1. 原始 Gemini API 响应对象（工具调用期间）
+        2. BaseMessage 响应（最终响应存储）
         
         Args:
-            response: 原始 Gemini API 响应对象
+            response: 原始 Gemini API 响应对象或 BaseMessage
         """
-        try:
-            candidate = response.candidates[0]
-        except (AttributeError, IndexError):
-            raise ValueError("Invalid Gemini API response format")
-        
-        # ✅ 官方最佳实践：直接使用 candidate.content，不重构任何内容
-        # 这确保了完整保留所有原始字段，包括思维链、验证字段等
-        raw_content = candidate.content
-        
-        # 添加到工作上下文
-        self.working_contents.append(raw_content)
+        if isinstance(response, BaseMessage):
+            # 处理最终 BaseMessage 响应
+            self._message_history.append(response)
+            
+            # 格式化并添加到工作上下文
+            from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
+            formatter_class = get_message_formatter_class(self._provider_name)
+            formatted_response = formatter_class.format_single_message(response)
+            
+            self.working_contents.append(formatted_response)
+        else:
+            # 处理原始 Gemini API 响应
+            try:
+                candidate = response.candidates[0]
+            except (AttributeError, IndexError):
+                raise ValueError("Invalid Gemini API response format")
+            
+            # ✅ 官方最佳实践：直接使用 candidate.content，不重构任何内容
+            # 这确保了完整保留所有原始字段，包括思维链、验证字段等
+            raw_content = candidate.content
+            
+            # 添加到工作上下文
+            self.working_contents.append(raw_content)
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """

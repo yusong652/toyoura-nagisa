@@ -45,6 +45,10 @@ class LLMClientBase(ABC):
         # Common client attributes that all implementations should have
         self.client = None  # Will be set by concrete implementations
         self.tool_manager = None  # Will be initialized by concrete implementations
+        
+        # Enhanced context manager for runtime tool history preservation
+        # Will be initialized with provider name and session_id when needed
+        self.context_manager = None
 
     # ========== CORE STREAMING INTERFACE ==========
 
@@ -78,10 +82,36 @@ class LLMClientBase(ABC):
         if debug:
             provider_name = self.__class__.__name__.replace('Client', '')
 
-        # Create provider-specific context manager
-        context_manager_class = self._get_context_manager()
-        context_manager = context_manager_class()
-        context_manager.initialize_from_messages(messages)
+        # Initialize or reuse enhanced context manager
+        if self.context_manager is None or self.context_manager.session_id != session_id:
+            # Need to create new enhanced context manager for this session
+            # Get provider name for context manager
+            provider_name = self.__class__.__name__.replace('Client', '').lower()
+            
+            # Create enhanced context manager with session tracking
+            context_manager_class = self._get_context_manager()
+            self.context_manager = context_manager_class(
+                provider_name=provider_name,
+                session_id=session_id
+            )
+            
+            # Initialize with historical messages (all except the last one which is the new user message)
+            if len(messages) > 1:
+                historical_messages = messages[:-1]
+                self.context_manager.initialize_session_from_history(historical_messages)
+                # Add the new user message incrementally
+                self.context_manager.add_user_message(messages[-1])
+            else:
+                # First message in session
+                self.context_manager.initialize_session_from_history([])
+                self.context_manager.add_user_message(messages[0])
+        else:
+            # Existing session - just add the new user message
+            if messages:
+                # Assume the last message is the new user input
+                self.context_manager.add_user_message(messages[-1])
+        
+        context_manager = self.context_manager
         
         # Execution metadata - unified across all providers
         metadata = {
@@ -132,6 +162,9 @@ class LLMClientBase(ABC):
             
             # Create final storage message using provider-specific processor
             final_message = processor.format_response_for_storage(final_response)
+            
+            # Add final response to context manager for next round
+            context_manager.add_response(final_message)
             
             # Yield final result
             yield (final_message, metadata)
@@ -327,8 +360,8 @@ class LLMClientBase(ABC):
             4. Return final response for downstream processing
         """
         
-        # Get initial response using provider-specific context
-        working_contents = context_manager.get_working_contents()
+        # Get initial response using provider-specific context with truncation
+        working_contents = context_manager.get_working_contents(max_messages=50)
         current_response = await self.call_api_with_context(
             working_contents, session_id=session_id, **kwargs
         )
@@ -414,8 +447,8 @@ class LLMClientBase(ABC):
                 
                 # Skip completion notifications - let LLM response show naturally
             
-            # Get next round response
-            working_contents = context_manager.get_working_contents()
+            # Get next round response with truncation
+            working_contents = context_manager.get_working_contents(max_messages=50)
             
             if debug:
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")
@@ -641,6 +674,11 @@ class LLMClientBase(ABC):
         """Clear session tool cache - shared implementation."""
         if self.tool_manager and hasattr(self.tool_manager, 'clear_session_tool_cache'):
             self.tool_manager.clear_session_tool_cache(session_id)
+        
+        # Also clear enhanced context manager if it's for this session
+        if self.context_manager and self.context_manager.session_id == session_id:
+            self.context_manager.clear_runtime_context()
+            self.context_manager = None  # Reset for next session
 
     def update_config(self, **kwargs):
         """

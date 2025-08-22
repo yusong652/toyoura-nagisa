@@ -126,6 +126,59 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             return None
     
     @staticmethod
+    def format_single_message(message: BaseMessage) -> Dict[str, Any]:
+        """
+        Format a single BaseMessage to Gemini API format.
+        
+        Args:
+            message: Single BaseMessage to format
+            
+        Returns:
+            Dict[str, Any]: Single message in Gemini API format
+        """
+        from google.genai import types
+        
+        if message is None:
+            return {}
+            
+        parts = []
+        
+        # Handle message content based on format
+        if isinstance(message.content, list):
+            # Multi-part message (text + optional multimodal content)
+            for item in message.content:
+                if isinstance(item, dict):
+                    # Skip thinking content - don't include in API calls
+                    if item.get("type") in ["thinking", "redacted_thinking"]:
+                        continue
+                        
+                    if item.get("type") == "text" and item.get("text"):
+                        parts.append(types.Part(text=item["text"]))
+                    elif item.get("type") == "image" and "inline_data" in item:
+                        # Handle image content using unified processing
+                        blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                        if blob:
+                            parts.append(types.Part(inline_data=blob))
+                    elif "text" in item and item["text"]:
+                        # Generic text content
+                        parts.append(types.Part(text=item["text"]))
+                    elif "inline_data" in item:
+                        # Generic inline data (images, etc.)
+                        blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
+                        if blob:
+                            parts.append(types.Part(inline_data=blob))
+        else:
+            # Simple text message
+            parts.append(types.Part(text=str(message.content)))
+        
+        # Map role and return formatted message
+        if parts:
+            mapped_role = GeminiMessageFormatter._map_role(message.role)
+            return {"role": mapped_role, "parts": parts}
+        
+        return {}
+
+    @staticmethod
     def format_tool_result_for_context(tool_name: str, result: Any) -> Dict[str, Any]:
         """
         Format tool result for Gemini working context.

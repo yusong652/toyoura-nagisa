@@ -56,6 +56,41 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         return formatted_messages
     
     @staticmethod
+    def format_single_message(
+        message: BaseMessage, 
+        preserve_thinking: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Format a single BaseMessage to OpenAI API format
+        
+        Args:
+            message: Single internal message object
+            preserve_thinking: Whether to preserve thinking content
+            
+        Returns:
+            Dict[str, Any]: OpenAI-formatted message dictionary
+        """
+        if message is None:
+            return {}
+            
+        # Handle regular messages with multimodal content
+        if isinstance(message.content, list):
+            openai_content = OpenAIMessageFormatter._format_multimodal_content(
+                message.content, preserve_thinking
+            )
+            return {
+                "role": message.role,
+                "content": openai_content
+            }
+        else:
+            # Simple text content
+            text_content = str(message.content) if message.content else ""
+            return {
+                "role": message.role,
+                "content": text_content
+            }
+    
+    @staticmethod
     def _format_multimodal_content(
         content: List[Dict[str, Any]], 
         preserve_thinking: bool = True
