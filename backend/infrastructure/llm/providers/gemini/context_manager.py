@@ -1,15 +1,16 @@
 """
-Gemini Context Manager - 管理工具调用期间的原始上下文
+Gemini Context Manager - Manages original context during tool calls
 
-此模块负责在工具调用过程中保持 Gemini API 原始响应格式，
-确保思维链和验证字段完整性，同时处理存储格式的消息。
+This module is responsible for maintaining the original Gemini API response format
+during tool calls, ensuring thinking chain and validation field integrity while
+handling storage format messages.
 
-核心设计原则：
-1. 工作上下文：保持原始 Gemini API 格式，包含完整的思维链信息和验证字段
-2. 专注于工具调用期间的上下文状态管理
+Core design principles:
+1. Working context: Maintain original Gemini API format with complete thinking chain and validation fields
+2. Focus on context state management during tool calls
 """
 
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 from .message_formatter import GeminiMessageFormatter
@@ -17,75 +18,132 @@ from .message_formatter import GeminiMessageFormatter
 
 class GeminiContextManager(BaseContextManager):
     """
-    管理 Gemini API 工具调用过程中的上下文
+    Manages context during Gemini API tool calls
     
-    核心功能：
-    - 维护原始格式的工作上下文，确保思维链完整性
-    - 提供工具调用期间的上下文状态管理
-    - 支持多轮工具调用的上下文连续性
+    Core functionality:
+    - Maintain working context in original format, ensuring thinking chain integrity
+    - Provide context state management during tool calls
+    - Support context continuity across multiple tool calls
     
-    使用场景：
-    1. 初始化：从历史消息创建初始上下文
-    2. 工具调用：添加原始响应和工具结果
-    3. 最终化：创建用于存储的标准化消息
+    Usage scenarios:
+    1. Initialization: Create initial context from message history
+    2. Tool calls: Add original responses and tool results
+    3. Finalization: Create standardized messages for storage
     """
     
     def __init__(self, provider_name: str = "gemini", session_id: Optional[str] = None):
-        """初始化上下文管理器"""
+        """Initialize context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
-        # working_contents 已在基类中初始化
+        # working_contents already initialized in base class
     
     def add_response(self, response) -> None:
         """
-        添加 Gemini API 响应到工作上下文
+        Add Gemini API response to working context
         
-        处理两种类型的响应：
-        1. 原始 Gemini API 响应对象（工具调用期间）
-        2. BaseMessage 响应（最终响应存储）
+        Handles two types of responses:
+        1. Original Gemini API response object (during tool calls)
+        2. BaseMessage response (final response storage)
         
         Args:
-            response: 原始 Gemini API 响应对象或 BaseMessage
+            response: Original Gemini API response object or BaseMessage
         """
         if isinstance(response, BaseMessage):
-            # 处理最终 BaseMessage 响应
+            # Handle final BaseMessage response
             self._message_history.append(response)
             
-            # 格式化并添加到工作上下文
+            # Format and add to working context
             from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
             formatter_class = get_message_formatter_class(self._provider_name)
             formatted_response = formatter_class.format_single_message(response)
             
             self.working_contents.append(formatted_response)
         else:
-            # 处理原始 Gemini API 响应
+            # Handle original Gemini API response
             try:
                 candidate = response.candidates[0]
             except (AttributeError, IndexError):
                 raise ValueError("Invalid Gemini API response format")
             
-            # ✅ 官方最佳实践：直接使用 candidate.content，不重构任何内容
-            # 这确保了完整保留所有原始字段，包括思维链、验证字段等
+            # ✅ Official best practice: Use candidate.content directly without restructuring
+            # This ensures complete preservation of all original fields including thinking chain, validation fields, etc.
             raw_content = candidate.content
             
-            # 添加到工作上下文
+            # Add to working context
             self.working_contents.append(raw_content)
     
     def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
         """
-        添加工具执行结果到上下文中 - 统一实现
+        Add tool execution result to context - unified implementation
         
-        使用消息格式化器处理格式，保持与Anthropic一致的架构模式
+        Use message formatter to handle format, maintaining consistent architecture pattern with Anthropic
         
         Args:
-            tool_call_id: 工具调用的唯一标识（接口要求，Gemini不使用）
-            tool_name: 工具名称
-            result: 工具执行结果
+            tool_call_id: Unique identifier for tool call (required by interface, not used by Gemini)
+            tool_name: Tool name
+            result: Tool execution result
         """
-        # 使用消息格式化器处理工具结果格式
+        # Use message formatter to handle tool result format
         working_content = GeminiMessageFormatter.format_tool_result_for_context(tool_name, result)
         
-        # 添加到工作上下文
+        # Add to working context
         self.working_contents.append(working_content)
     
+    def _is_tool_call(self, msg: Dict[str, Any]) -> bool:
+        """
+        Check if message contains tool calls (Gemini format)
+        
+        Gemini tool calls are included as function_call in parts of assistant messages
+        
+        Args:
+            msg: Message to check
+            
+        Returns:
+            bool: True if message contains tool calls
+        """
+        if not isinstance(msg, dict):
+            return False
+            
+        # Check if it's a model role message with parts
+        if msg.get('role') != 'model' or 'parts' not in msg:
+            return False
+            
+        # Check if parts contain function_call
+        parts = msg.get('parts', [])
+        if not isinstance(parts, list):
+            return False
+            
+        for part in parts:
+            if isinstance(part, dict) and 'function_call' in part:
+                return True
+                
+        return False
     
-    
+    def _is_tool_result(self, msg: Dict[str, Any]) -> bool:
+        """
+        Check if message is a tool result (Gemini format)
+        
+        Gemini tool results are included as function_response in parts of user messages
+        
+        Args:
+            msg: Message to check
+            
+        Returns:
+            bool: True if message is a tool result
+        """
+        if not isinstance(msg, dict):
+            return False
+            
+        # Check if it's a user role message with parts
+        if msg.get('role') != 'user' or 'parts' not in msg:
+            return False
+            
+        # Check if parts contain function_response
+        parts = msg.get('parts', [])
+        if not isinstance(parts, list):
+            return False
+            
+        for part in parts:
+            if isinstance(part, dict) and 'function_response' in part:
+                return True
+                
+        return False
