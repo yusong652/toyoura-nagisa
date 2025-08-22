@@ -177,14 +177,15 @@ class BaseContextManager(ABC):
         Perform smart truncation for sequentially organized messages.
         
         Ensures that exactly max_count non-tool messages are retained while
-        preserving the integrity of tool calls and their results.
+        preserving the integrity of tool calls and their results. Guarantees
+        clean start boundary by ensuring the result starts with a non-tool message.
         
         Args:
             messages: Messages to truncate
             max_count: Maximum number of non-tool messages to keep
             
         Returns:
-            List[Dict[str, Any]]: Truncated messages with max_count non-tool messages
+            List[Dict[str, Any]]: Truncated messages with clean start boundary
         """
         # Count non-tool messages
         non_tool_count = sum(
@@ -240,8 +241,8 @@ class BaseContextManager(ABC):
                     result.insert(0, msg)
                     i -= 1
         
-        # Ensure we don't start with orphaned tool results
-        while result and self._is_tool_result(result[0]):
+        # Ensure clean start boundary: remove orphaned tool calls/results at beginning
+        while result and (self._is_tool_call(result[0]) or self._is_tool_result(result[0])):
             result.pop(0)
         
         return result
