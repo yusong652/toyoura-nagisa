@@ -149,9 +149,13 @@ class BaseContextManager(ABC):
         """
         pass
     
-    def get_working_contents(self, max_messages: int = 23) -> List[Dict[str, Any]]:
+    def get_working_contents(self, recent_messages_length: int = 23) -> List[Dict[str, Any]]:
         """
         Get working contents with smart truncation preserving tool integrity.
+        
+        Ensures that exactly recent_messages_length non-tool messages are retained while
+        preserving the integrity of tool calls and their results. Guarantees
+        clean start boundary by ensuring the result starts with a non-tool message.
         
         This method ensures that:
         1. Tool calls and results are kept together
@@ -159,91 +163,71 @@ class BaseContextManager(ABC):
         3. Clean message boundaries (no orphaned tool results)
         
         Args:
-            max_messages: Maximum number of messages to keep
-            
-        Returns:
-            List[Dict[str, Any]]: Truncated working contents
-        """
-        if len(self.working_contents) <= max_messages:
-            return self.working_contents
-        
-        # Smart truncation from the end (keep most recent)
-        truncated = self._smart_truncate_sequential(self.working_contents, max_messages)
-        
-        return truncated
-    
-    def _smart_truncate_sequential(self, messages: List[Dict[str, Any]], max_count: int) -> List[Dict[str, Any]]:
-        """
-        Perform smart truncation for sequentially organized messages.
-        
-        Ensures that exactly max_count non-tool messages are retained while
-        preserving the integrity of tool calls and their results. Guarantees
-        clean start boundary by ensuring the result starts with a non-tool message.
-        
-        Args:
-            messages: Messages to truncate
-            max_count: Maximum number of non-tool messages to keep
+            recent_messages_length: Maximum number of non-tool messages to keep
             
         Returns:
             List[Dict[str, Any]]: Truncated messages with clean start boundary
         """
+        messages = self.working_contents
+        
+        # Debug: Print message details
+        print(f"[DEBUG] Total messages: {len(messages)}")
+        print(f"[DEBUG] recent_messages_length: {recent_messages_length}")
+        
+        for i, msg in enumerate(messages):
+            is_tool_call = self._is_tool_call(msg)
+            is_tool_result = self._is_tool_result(msg)
+            
+            if isinstance(msg, dict):
+                role = msg.get('role', 'unknown')
+                parts_info = "dict format"
+                # Debug parts structure for dict messages
+                if 'parts' in msg:
+                    parts = msg['parts']
+                    if isinstance(parts, list) and len(parts) > 0:
+                        first_part = parts[0]
+                        if isinstance(first_part, dict):
+                            part_keys = list(first_part.keys())
+                            print(f"[DEBUG]   First part keys: {part_keys}")
+                        else:
+                            print(f"[DEBUG]   First part type: {type(first_part)}")
+            else:
+                role = getattr(msg, 'role', 'unknown')
+                parts_info = "SDK object"
+            
+            print(f"[DEBUG] Message {i}: role={role}, is_tool_call={is_tool_call}, is_tool_result={is_tool_result}, format={parts_info}")
+        
         # Count non-tool messages
         non_tool_count = sum(
             1 for msg in messages 
             if not self._is_tool_call(msg) and not self._is_tool_result(msg)
         )
         
-        # If we already have fewer non-tool messages than max_count, return all
-        if non_tool_count <= max_count:
+        print(f"[DEBUG] Non-tool message count: {non_tool_count}")
+        
+        # If we already have fewer non-tool messages than recent_messages_length, return all
+        if non_tool_count <= recent_messages_length:
+            print(f"[DEBUG] Returning all messages (non_tool_count <= recent_messages_length)")
             return messages
         
         # Work backwards to collect the most recent non-tool messages
-        # while preserving their associated tool calls and results
+        # Tool messages are included but don't count toward the limit
         result = []
         non_tool_collected = 0
         i = len(messages) - 1
         
-        while i >= 0 and non_tool_collected < max_count:
+        while i >= 0 and non_tool_collected < recent_messages_length:
             msg = messages[i]
             
-            # If it's a non-tool message, include it
             if not self._is_tool_call(msg) and not self._is_tool_result(msg):
+                # Non-tool message: include and count
                 result.insert(0, msg)
                 non_tool_collected += 1
-                i -= 1
-            # If it's a tool result, include it and its corresponding tool call
-            elif self._is_tool_result(msg):
-                # Add the tool result
+            else:
+                # Tool message (call or result): include but don't count
                 result.insert(0, msg)
-                i -= 1
-                
-                # Look for the corresponding tool call (should be just before)
-                while i >= 0:
-                    if self._is_tool_call(messages[i]):
-                        result.insert(0, messages[i])
-                        i -= 1
-                        break
-                    # Also include any other tool results in between
-                    elif self._is_tool_result(messages[i]):
-                        result.insert(0, messages[i])
-                        i -= 1
-                    else:
-                        # Non-tool message, don't include unless needed
-                        break
-            # If it's a tool call, check if there's a following tool result
-            elif self._is_tool_call(msg):
-                # Check if the next message (in original order) is a tool result
-                if i + 1 < len(messages) and self._is_tool_result(messages[i + 1]):
-                    # This tool call has a result, skip it (will be handled with result)
-                    i -= 1
-                else:
-                    # Orphaned tool call, include it
-                    result.insert(0, msg)
-                    i -= 1
-        
-        # Ensure clean start boundary: remove orphaned tool calls/results at beginning
-        while result and (self._is_tool_call(result[0]) or self._is_tool_result(result[0])):
-            result.pop(0)
+            
+            i -= 1
         
         return result
     

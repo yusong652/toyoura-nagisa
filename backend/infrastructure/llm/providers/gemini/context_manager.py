@@ -92,29 +92,45 @@ class GeminiContextManager(BaseContextManager):
         """
         Check if message contains tool calls (Gemini format)
         
-        Gemini tool calls are included as function_call in parts of assistant messages
+        Handles both dictionary format (from formatted messages) and
+        Gemini SDK Content objects (from API responses).
         
         Args:
-            msg: Message to check
+            msg: Message to check (dict or Content object)
             
         Returns:
             bool: True if message contains tool calls
         """
-        if not isinstance(msg, dict):
-            return False
-            
-        # Check if it's a model role message with parts
-        if msg.get('role') != 'model' or 'parts' not in msg:
-            return False
-            
-        # Check if parts contain function_call
-        parts = msg.get('parts', [])
-        if not isinstance(parts, list):
-            return False
-            
-        for part in parts:
-            if isinstance(part, dict) and 'function_call' in part:
-                return True
+        # Handle dictionary format (from formatted messages)
+        if isinstance(msg, dict):
+            # Check if it's a model role message with parts
+            if msg.get('role') != 'model' or 'parts' not in msg:
+                return False
+                
+            # Check if parts contain function_call
+            parts = msg.get('parts', [])
+            if not isinstance(parts, list):
+                return False
+                
+            for part in parts:
+                # Part can be either a dict or a SDK Part object
+                if isinstance(part, dict) and 'function_call' in part:
+                    return True
+                elif hasattr(part, 'function_call') and part.function_call:
+                    # Handle SDK Part objects in dict message format
+                    return True
+        
+        # Handle Gemini SDK Content object (from API responses)
+        else:
+            # Check if it's a Content object with model role
+            if not hasattr(msg, 'role') or msg.role != 'model':
+                return False
+                
+            # Check if parts contain function_call
+            if hasattr(msg, 'parts'):
+                for part in msg.parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        return True
                 
         return False
     
@@ -122,28 +138,44 @@ class GeminiContextManager(BaseContextManager):
         """
         Check if message is a tool result (Gemini format)
         
-        Gemini tool results are included as function_response in parts of user messages
+        Handles both dictionary format (from formatted messages) and
+        Gemini SDK Content objects (from API responses).
         
         Args:
-            msg: Message to check
+            msg: Message to check (dict or Content object)
             
         Returns:
             bool: True if message is a tool result
         """
-        if not isinstance(msg, dict):
-            return False
-            
-        # Check if it's a user role message with parts
-        if msg.get('role') != 'user' or 'parts' not in msg:
-            return False
-            
-        # Check if parts contain function_response
-        parts = msg.get('parts', [])
-        if not isinstance(parts, list):
-            return False
-            
-        for part in parts:
-            if isinstance(part, dict) and 'function_response' in part:
-                return True
+        # Handle dictionary format (from formatted messages)
+        if isinstance(msg, dict):
+            # Check if it's a user role message with parts
+            if msg.get('role') != 'user' or 'parts' not in msg:
+                return False
+                
+            # Check if parts contain function_response
+            parts = msg.get('parts', [])
+            if not isinstance(parts, list):
+                return False
+                
+            for part in parts:
+                # Part can be either a dict or a SDK Part object
+                if isinstance(part, dict) and 'function_response' in part:
+                    return True
+                elif hasattr(part, 'function_response') and part.function_response:
+                    # Handle SDK Part objects in dict message format
+                    return True
+        
+        # Handle Gemini SDK Content object (from API responses)
+        else:
+            # Check if it's a Content object with user role
+            if not hasattr(msg, 'role') or msg.role != 'user':
+                return False
+                
+            # Check if parts contain function_response
+            if hasattr(msg, 'parts'):
+                for part in msg.parts:
+                    if hasattr(part, 'function_response') and part.function_response:
+                        return True
                 
         return False
