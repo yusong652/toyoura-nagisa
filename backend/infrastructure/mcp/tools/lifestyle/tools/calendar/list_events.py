@@ -58,14 +58,14 @@ def register_list_events_tool(mcp: FastMCP):
         ),
         time_min: Optional[Dict[str, int]] = Field(
             None,
-            description="Start time filter. If not provided, defaults to current time to show upcoming events. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 9, 'minute': 0}",
+            description="Start time filter. If not provided, defaults to today's start (00:00) to show all events from today. Example: {'year': 2025, 'month': 7, 'day': 30, 'hour': 9, 'minute': 0}",
         ),
         time_max: Optional[Dict[str, int]] = Field(
             None,
             description="End time filter. If not provided, defaults to 1 year from start time to limit recurring events like birthdays. Example: {'year': 2025, 'month': 7, 'day': 31, 'hour': 23, 'minute': 59}",
         ),
     ) -> Dict[str, Any]:
-        """List events from Google Calendar. Automatically limits recurring events like birthdays to within 1 year. If no time filter is provided, shows upcoming events from current time."""
+        """List events from Google Calendar. Automatically limits recurring events like birthdays to within 1 year. If no time filter is provided, shows events from today's start (00:00)."""
         
         try:
             print(f"DEBUG: list_calendar_events called with time_min={time_min}, time_max={time_max}, max_results={max_results}")
@@ -88,11 +88,12 @@ def register_list_events_tool(mcp: FastMCP):
                 print(f"DEBUG: ValueError in parameter processing: {e}")
                 return error_response(f"Invalid parameters: {str(e)}")
 
-            # If no time_min provided, default to current time to get upcoming events
+            # If no time_min provided, default to today's start (00:00) to get all of today's events
             if time_min is None:
-                current_time = datetime.now(timezone.utc)
-                time_min = current_time.isoformat()
-                print(f"DEBUG: No time_min provided, defaulting to current time: {time_min}")
+                # Get today's date at 00:00 in UTC
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                time_min = today_start.isoformat()
+                print(f"DEBUG: No time_min provided, defaulting to today's start: {time_min}")
 
             # If no time_max provided, default to 1 year from time_min to prevent endless recurring events
             if time_max is None and time_min:
