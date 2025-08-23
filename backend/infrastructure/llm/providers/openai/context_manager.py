@@ -131,7 +131,7 @@ class OpenAIContextManager(BaseContextManager):
         if not isinstance(msg, dict):
             return False
             
-        # Check if it's a tool role with tool_call_id
-        return (msg.get('role') == 'tool' and 
-                'tool_call_id' in msg and 
-                msg.get('tool_call_id'))
+        # Check if it's a tool role with tool_call_id  
+        return bool(msg.get('role') == 'tool' and 
+                   'tool_call_id' in msg and 
+                   msg.get('tool_call_id'))
