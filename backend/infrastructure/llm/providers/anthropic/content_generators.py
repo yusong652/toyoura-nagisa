@@ -19,6 +19,7 @@ from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
 )
+from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from .message_formatter import MessageFormatter
 from backend.config import get_llm_settings
 from .config import get_anthropic_client_config
@@ -37,7 +38,8 @@ class TitleGenerator(BaseTitleGenerator):
     @staticmethod
     def generate_title_from_messages(
         client: anthropic.Anthropic,
-        latest_messages: List[BaseMessage]
+        latest_messages: List[BaseMessage],
+        debug: bool = False
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
@@ -45,6 +47,7 @@ class TitleGenerator(BaseTitleGenerator):
         Args:
             client: Anthropic Claude client instance for API calls
             latest_messages: Recent conversation messages to generate title from
+            debug: Enable debug logging for API calls
             
         Returns:
             Generated title string, or None if generation fails
@@ -84,20 +87,9 @@ class TitleGenerator(BaseTitleGenerator):
             if response.content and len(response.content) > 0:
                 title_response_text = response.content[0].text
                 
-                # 处理标题格式
-                title_match = re.search(r'<title>(.*?)</title>', title_response_text, re.DOTALL)
-                if title_match:
-                    title = title_match.group(1).strip()
-                    if not title:
-                        return None
-                    if len(title) > 30:
-                        title = title[:30]
-                    return title
-                
-                # 兜底处理
-                cleaned_title = title_response_text.strip().strip('"\'').strip()
-                if cleaned_title and len(cleaned_title) <= 30:
-                    return cleaned_title
+                # Parse title using shared utility function
+                # Using max_length=30 to match original Anthropic behavior
+                return parse_title_response(title_response_text, max_length=30, debug=debug)
             return None
             
         except Exception as e:
@@ -165,16 +157,8 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
                 "temperature": 0.1
             })
             
-            if debug:
-                # 使用统一的调试工具打印详细的API payload
-                AnthropicDebugger.log_api_payload(api_kwargs, component="WebSearch", detailed=True)
-            
-            # Call the API with web search tool (async version)
-            response = await client.messages.create(**api_kwargs)
-            
-            if debug:
-                # 使用统一的调试工具打印API响应信息
-                AnthropicDebugger.log_api_response(response)
+            # Call the API with web search tool (sync version - Anthropic client is not async)
+            response = client.messages.create(**api_kwargs)
             
             # Extract response text and tool usage information
             response_text = ""
@@ -207,8 +191,7 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
                 "tool_calls": tool_calls,
                 "note": "Anthropic web search synthesizes results directly into response text"
             }
-            
-            
+             
             return result
             
         except Exception as e:
@@ -216,7 +199,6 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
             if debug:
                 print(f"[WebSearch] Error: {error_msg}")
             return {"error": error_msg, "query": query}
-
 
 from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
 

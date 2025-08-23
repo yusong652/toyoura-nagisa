@@ -7,7 +7,6 @@ maintaining compatibility with the unified content generation interface.
 """
 
 from typing import Optional, Dict, Any, List
-import re
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators import (
@@ -18,6 +17,7 @@ from backend.infrastructure.llm.shared.constants import (
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 )
+from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from .message_formatter import OpenAIMessageFormatter
 from .debug import OpenAIDebugger
 from .constants import *
@@ -75,11 +75,6 @@ class TitleGenerator(BaseTitleGenerator):
                 "max_tokens": 100
             }
             
-            # Debug payload printing (similar to Gemini)
-            if debug:
-                print("[DEBUG] Title generation API call:")
-                OpenAIDebugger.print_debug_request_payload(api_kwargs)
-            
             # Use smaller model for title generation
             response = client.chat.completions.create(**api_kwargs)
             
@@ -93,38 +88,8 @@ class TitleGenerator(BaseTitleGenerator):
             
             title_response_text = response.choices[0].message.content or ""
             
-            # Extract title from tags
-            title_match = re.search(r'<title>(.*?)</title>', title_response_text, re.DOTALL)
-            if title_match:
-                title = title_match.group(1).strip()
-                # If title is too long, truncate it intelligently
-                if title:
-                    if len(title) <= TITLE_MAX_LENGTH:
-                        return title
-                    else:
-                        # Truncate at word boundary if possible
-                        truncated = title[:TITLE_MAX_LENGTH]
-                        last_space = truncated.rfind(' ')
-                        if last_space > 20:  # Keep at least 20 chars
-                            truncated = truncated[:last_space]
-                        return truncated.strip()
-            
-            # Fallback: clean the response directly
-            cleaned_title = title_response_text.strip().strip('"\'').strip()
-            if cleaned_title:
-                # Remove <title> tags if present in fallback
-                cleaned_title = re.sub(r'</?title>', '', cleaned_title, flags=re.IGNORECASE).strip()
-                if len(cleaned_title) <= TITLE_MAX_LENGTH:
-                    return cleaned_title
-                else:
-                    # Truncate fallback title too
-                    truncated = cleaned_title[:TITLE_MAX_LENGTH]
-                    last_space = truncated.rfind(' ')
-                    if last_space > 20:
-                        truncated = truncated[:last_space]
-                    return truncated.strip()
-            
-            return None
+            # Parse title using shared utility function
+            return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH, debug=debug)
             
         except Exception as e:
             print(f"OpenAI title generation error: {str(e)}")
