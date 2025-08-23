@@ -353,8 +353,8 @@ class LLMClientBase(ABC):
         
         # Get initial response using provider-specific context with truncation
         from backend.config import get_llm_settings
-        max_messages = get_llm_settings().recent_messages_length
-        working_contents = context_manager.get_working_contents(max_messages=max_messages)
+        recent_messages_length = get_llm_settings().recent_messages_length
+        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
             working_contents, session_id=session_id, **kwargs
         )
@@ -441,7 +441,7 @@ class LLMClientBase(ABC):
                 # Skip completion notifications - let LLM response show naturally
             
             # Get next round response with truncation
-            working_contents = context_manager.get_working_contents(max_messages=max_messages)
+            working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
             
             if debug:
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")
