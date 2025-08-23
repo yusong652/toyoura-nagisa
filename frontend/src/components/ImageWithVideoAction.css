@@ -1,0 +1,68 @@
+.image-video-action-container {
+  position: relative;
+  display: inline-block;
+}
+
+.generate-video-button,
+.play-video-button {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.file-preview:hover .generate-video-button,
+.file-preview:hover .play-video-button,
+.image-video-action-container:hover .generate-video-button,
+.image-video-action-container:hover .play-video-button {
+  opacity: 1;
+}
+
+/* Ensure the button is always visible on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .generate-video-button,
+  .play-video-button {
+    opacity: 0.8;
+  }
+}
+
+/* Video player overlay styles */
+.video-player-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.video-player-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.video-player-container video {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+.video-close-button {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  color: white;
+  background: transparent;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  padding: 8px;
+  transition: transform 0.2s;
+}
+
+.video-close-button:hover {
+  transform: scale(1.1);
+}

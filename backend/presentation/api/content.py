@@ -6,7 +6,7 @@ and image generation following Clean Architecture principles.
 """
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Request
-from backend.presentation.models.api_models import GenerateImageRequest
+from backend.presentation.models.api_models import GenerateImageRequest, GenerateVideoRequest
 from backend.domain.services.content_service import ContentService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
@@ -143,6 +143,55 @@ async def generate_image(
         if not result.get("success"):
             error_msg = result.get("error", "Image generation failed")
             print(f"[ERROR] Image generation failed: {error_msg}")
+            
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@router.post("/generate-video", response_model=dict)
+async def generate_video(
+    request: GenerateVideoRequest,
+    service: ContentService = Depends(get_content_service),
+    llm_client: LLMClientBase = Depends(get_llm_client)
+) -> Dict[str, Any]:
+    """
+    Generate a video from the most recent image in conversation context.
+    
+    This endpoint:
+    1. Finds the most recent generated image in the session
+    2. Extracts the original text-to-image prompt from history
+    3. Optimizes the prompt for video motion using LLM
+    4. Generates video using image-to-video service
+    5. Saves generated video to session folder
+    
+    Args:
+        request: Video generation request with session_id and optional motion_type
+        
+    Returns:
+        Dict[str, Any]: Video generation result with structure:
+            - success: bool - Operation success flag
+            - video_path: str - Local path to saved video (if successful)
+            - error: str - Error message (if failed)
+    
+    Raises:
+        HTTPException: 500 if video generation fails
+    """
+    try:
+        result = await service.generate_video_for_session(
+            session_id=request.session_id,
+            motion_type=request.motion_type,
+            llm_client=llm_client
+        )
+        
+        if not result.get("success"):
+            error_msg = result.get("error", "Video generation failed")
+            print(f"[ERROR] Video generation failed: {error_msg}")
             
         return result
     except Exception as e:

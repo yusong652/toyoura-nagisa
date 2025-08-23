@@ -16,6 +16,11 @@ from backend.infrastructure.storage.image_storage import (
 from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import (
     generate_image_from_description
 )
+from backend.infrastructure.mcp.tools.lifestyle.tools.image_to_video.image_to_video import (
+    generate_video_from_context as mcp_generate_video_from_context,
+    get_latest_text_to_image_prompt,
+    find_recent_image_in_messages
+)
 from backend.shared.utils.helpers import generate_title_for_session as generate_title_helper
 
 
@@ -201,6 +206,104 @@ class ContentService:
         except Exception as e:
             import traceback
             print(f"[ERROR] Image generation exception: {e}")
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_video_for_session(
+        self,
+        session_id: str,
+        motion_type: str = "cinematic",
+        llm_client: Any = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a video from the most recent image in session context.
+        
+        This operation:
+        1. Finds the most recent generated image in the session
+        2. Extracts the original text-to-image prompt from history
+        3. Optimizes the prompt for video motion using LLM
+        4. Generates video using image-to-video service
+        5. Saves the generated video to session folder
+        
+        Args:
+            session_id: Session UUID for context
+            motion_type: Type of motion for video (gentle/dynamic/cinematic/loop)
+            llm_client: LLM client for prompt optimization
+            
+        Returns:
+            Dict[str, Any]: Video generation result:
+                - success: bool - Operation success flag
+                - video_path: str - Local path to saved video (if successful)
+                - error: str - Error message (if failed)
+        """
+        try:
+            # For now, we'll directly call the MCP tool function
+            # This could be refactored to use a proper video service later
+            from fastmcp.server.context import Context
+            
+            # Create a mock context for the MCP tool
+            # In a real implementation, this would be cleaner
+            class MockContext:
+                def __init__(self, session_id: str, llm_client, chat_service):
+                    self.client_id = session_id
+                    self.fastmcp = type('MockFastMCP', (), {
+                        'app': type('MockApp', (), {
+                            'state': type('MockState', (), {
+                                'llm_client': llm_client,
+                                'chat_service': chat_service
+                            })()
+                        })()
+                    })()
+            
+            # Get chat service from session manager (we need this to find images)
+            from backend.infrastructure.storage.session_manager import get_session_data
+            from backend.domain.services.session_service import SessionService
+            
+            session_service = SessionService()
+            
+            context = MockContext(session_id, llm_client, session_service)
+            
+            # Call the MCP tool
+            result = await mcp_generate_video_from_context(context)
+            
+            if result.get("status") == "error":
+                return {
+                    "success": False,
+                    "error": result.get("message", "Video generation failed")
+                }
+            
+            # Extract video data from the successful result
+            video_data = result.get("data", {}).get("video_base64")
+            if not video_data:
+                return {
+                    "success": False,
+                    "error": "No video data in generation result"
+                }
+            
+            # Save video to session folder (similar to how images are saved)
+            from backend.infrastructure.storage.video_storage import save_video_from_base64
+            
+            try:
+                local_path = save_video_from_base64(video_data, session_id)
+                print(f"[DEBUG] Successfully saved video to: {local_path}")
+                
+                return {
+                    "success": True,
+                    "video_path": local_path
+                }
+            except Exception as e:
+                print(f"[ERROR] Failed to save video: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to save video: {str(e)}"
+                }
+            
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] Video generation exception: {e}")
             traceback.print_exc()
             return {
                 "success": False,

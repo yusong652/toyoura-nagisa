@@ -79,3 +79,12 @@ class UpdateTTSEnabledRequest(BaseModel):
 class GenerateImageRequest(BaseModel):
     """一键生成图片的请求模型"""
     session_id: str
+
+
+# =====================
+# 视频生成相关模型
+# =====================
+class GenerateVideoRequest(BaseModel):
+    """生成视频的请求模型"""
+    session_id: str
+    motion_type: Optional[str] = Field(default="cinematic", description="运动类型: gentle/dynamic/cinematic/loop")

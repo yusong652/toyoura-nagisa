@@ -4,6 +4,7 @@ import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/chat/ChatContext'
 import MessageToolState from './MessageToolState'
 import ImageViewer from './ImageViewer'
+import ImageWithVideoAction from './ImageWithVideoAction'
 import ReactMarkdown from 'react-markdown'
 import { useImageNavigation } from '../hooks/useImageNavigation'
 
@@ -235,15 +236,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                       {files.map((file, index) => (
                         <div key={index} className="file-preview">
                           {file.type.startsWith('image/') ? (
-                            <img 
-                              src={file.data} 
-                              alt={file.name} 
-                              className="file-image" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleImageClick(file.data);
-                              }}
-                            />
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <img 
+                                src={file.data} 
+                                alt={file.name} 
+                                className="file-image" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleImageClick(file.data);
+                                }}
+                              />
+                              {sender === 'bot' && (
+                                <ImageWithVideoAction />
+                              )}
+                            </div>
                           ) : (
                             <div className="file-info">
                               <span className="file-name">{file.name}</span>
