@@ -247,24 +247,17 @@ class ContentService:
             # Create a mock context for the MCP tool
             # In a real implementation, this would be cleaner
             class MockContext:
-                def __init__(self, session_id: str, llm_client, chat_service):
+                def __init__(self, session_id: str, llm_client):
                     self.client_id = session_id
                     self.fastmcp = type('MockFastMCP', (), {
                         'app': type('MockApp', (), {
                             'state': type('MockState', (), {
-                                'llm_client': llm_client,
-                                'chat_service': chat_service
+                                'llm_client': llm_client
                             })()
                         })()
                     })()
             
-            # Get chat service from session manager (we need this to find images)
-            from backend.infrastructure.storage.session_manager import get_session_data
-            from backend.domain.services.session_service import SessionService
-            
-            session_service = SessionService()
-            
-            context = MockContext(session_id, llm_client, session_service)
+            context = MockContext(session_id, llm_client)
             
             # Call the MCP tool
             result = await mcp_generate_video_from_context(context)

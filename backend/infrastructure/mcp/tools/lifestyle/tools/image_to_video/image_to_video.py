@@ -350,34 +350,82 @@ async def generate_video_from_image(
         return error_response(f"Video generation failed: {str(e)}")
 
 
-async def find_recent_image_in_messages(chat_service, session_id: str) -> str | None:
+def find_recent_image_in_messages(session_id: str) -> str | None:
     """
     Find the most recent AI-generated image in conversation messages.
     
     Args:
-        chat_service: Chat service instance
         session_id: Current session ID
     
     Returns:
         Base64 image data or None if not found
     """
     try:
-        recent_messages = await chat_service.get_recent_messages(
-            session_id=session_id,
-            limit=10
-        )
+        from backend.infrastructure.storage.session_manager import load_all_message_history
         
-        # Look for the most recent image in assistant messages
-        for msg in reversed(recent_messages):
-            if msg.get("role") == "assistant" and msg.get("files"):
-                for file in msg["files"]:
-                    if file.get("type", "").startswith("image/"):
-                        return file.get("data")
+        # Load all messages from session
+        all_messages = load_all_message_history(session_id)
         
+        logger.info(f"[DEBUG] Loaded {len(all_messages)} messages from session {session_id}")
+        
+        # Look for the most recent image (search backwards)
+        for msg in reversed(all_messages):
+            # Convert Pydantic model to dict if needed
+            if hasattr(msg, 'model_dump'):
+                msg_dict = msg.model_dump()
+            elif hasattr(msg, 'dict'):
+                msg_dict = msg.dict()
+            else:
+                msg_dict = msg
+            
+            logger.info(f"[DEBUG] Checking message: role={msg_dict.get('role')}, sender={msg_dict.get('sender')}, has_files={bool(msg_dict.get('files'))}, has_image_path={bool(msg_dict.get('image_path'))}")
+            
+            # Method 1: Check for ImageMessage with image_path
+            if msg_dict.get("role") == "image" and msg_dict.get("image_path"):
+                image_path = msg_dict.get("image_path")
+                logger.info(f"[DEBUG] Found ImageMessage with path: {image_path}")
+                
+                # Convert file path to base64
+                try:
+                    import os
+                    import base64
+                    full_path = os.path.join("chat/data", image_path)
+                    
+                    if os.path.exists(full_path):
+                        with open(full_path, "rb") as f:
+                            image_data = base64.b64encode(f.read()).decode('utf-8')
+                        logger.info(f"[DEBUG] Successfully loaded image from file, length: {len(image_data)}")
+                        return image_data
+                    else:
+                        logger.warning(f"[DEBUG] Image file not found: {full_path}")
+                except Exception as e:
+                    logger.error(f"[DEBUG] Error reading image file: {e}")
+                    continue
+            
+            # Method 2: Check assistant messages with files (for other types of image messages)
+            is_assistant = (msg_dict.get("role") == "assistant" or msg_dict.get("sender") == "bot")
+            
+            if is_assistant and msg_dict.get("files"):
+                logger.info(f"[DEBUG] Found assistant message with {len(msg_dict['files'])} files")
+                for file in msg_dict["files"]:
+                    file_type = file.get("type", "")
+                    logger.info(f"[DEBUG] File type: {file_type}")
+                    
+                    if file_type.startswith("image/"):
+                        image_data = file.get("data")
+                        if image_data:
+                            logger.info(f"[DEBUG] Found image data, length: {len(image_data)}")
+                            # Remove data URL prefix if present
+                            if image_data.startswith('data:image'):
+                                image_data = image_data.split(',')[1]
+                            return image_data
+        
+        logger.warning(f"[DEBUG] No image found in {len(all_messages)} messages")
         return None
         
     except Exception as e:
         logger.error(f"Error finding recent image: {e}")
+        logger.error(traceback.format_exc())
         return None
 
 
@@ -404,23 +452,17 @@ async def generate_video_from_context(context: Context) -> Dict[str, Any]:
     
     fastapi_app = getattr(getattr(context, "fastmcp", None), "app", None)
     llm_client = None
-    chat_service = None
     
     if fastapi_app is not None:
         if hasattr(fastapi_app.state, "llm_client"):
             llm_client = fastapi_app.state.llm_client
-        if hasattr(fastapi_app.state, "chat_service"):
-            chat_service = fastapi_app.state.chat_service
     
     if llm_client is None:
         return error_response("Video generation failed: LLM client unavailable")
     
-    if chat_service is None:
-        return error_response("Video generation failed: Chat service unavailable")
-    
     try:
         # Find the most recent image
-        image_base64 = await find_recent_image_in_messages(chat_service, session_id)
+        image_base64 = find_recent_image_in_messages(session_id)
         
         if not image_base64:
             return error_response(

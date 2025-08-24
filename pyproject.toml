@@ -66,7 +66,8 @@ dependencies = [
     "psutil>=7.0.0",
     "vllm>=0.8.0",
     "ollama>=0.5.0",
-    "mem0ai>=0.1.0"
+    "mem0ai>=0.1.0",
+    "matplotlib>=3.10.5",
 ]
 
 [project.urls]
@@ -80,6 +81,11 @@ packages = ["backend"]
 dev-dependencies = [
     "pytest",
     "pytest-cov",
+]
+
+[tool.uv.workspace]
+members = [
+    "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot",
 ]
 
 [project.optional-dependencies]
