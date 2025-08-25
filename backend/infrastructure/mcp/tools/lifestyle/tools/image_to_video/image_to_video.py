@@ -77,13 +77,36 @@ async def call_animatediff_api(
     Returns:
         Dict containing video result or error
     """
+    print(f"[DEBUG] call_animatediff_api started")
+    print(f"[DEBUG] Motion type: {motion_type}")
+    print(f"[DEBUG] Prompt: {prompt[:100]}...")  # First 100 chars
+    print(f"[DEBUG] Negative prompt: {negative_prompt[:100]}...")
+    
     try:
         # Get configuration
         settings = get_image_to_video_settings()
         config = settings.get_animatediff_config()
+        print(f"[DEBUG] AnimateDiff server URL: {config.server_url}")
+        print(f"[DEBUG] AnimateDiff endpoint: {config.img2vid_endpoint}")
         
         # Get motion preset
         motion_preset = settings.motion_presets.get(motion_type, {})
+        
+        # Decode image to get dimensions
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        
+        img_data = base64.b64decode(image_base64)
+        img = Image.open(BytesIO(img_data))
+        width, height = img.size
+        print(f"[DEBUG] Input image dimensions: {width}x{height}")
+        
+        # Get text-to-image config to use the same model settings
+        from backend.config.text_to_image import get_text_to_image_settings
+        txt2img_settings = get_text_to_image_settings()
+        txt2img_config = txt2img_settings.get_current_config()
+        model_preset = txt2img_config.get_current_preset()
         
         # Prepare API payload for img2img with AnimateDiff
         payload = {
@@ -93,32 +116,38 @@ async def call_animatediff_api(
             "steps": config.steps,
             "cfg_scale": motion_preset.get("cfg_scale", config.cfg_scale),
             "denoising_strength": config.denoising_strength,
-            "sampler_name": config.sampler_name,
+            "sampler_name": model_preset.get("sampler_name", config.sampler_name),  # Use model's sampler
             "seed": config.seed,
-            "batch_size": 1,
+            "batch_size": 1,  # Fixed to 1 for img2img
             "n_iter": 1,
+            "width": width,  # Set actual image dimensions
+            "height": height,
+            "override_settings": {
+                "sd_model_checkpoint": model_preset.get("sd_model_checkpoint"),
+                "sd_vae": model_preset.get("sd_vae"),
+                "CLIP_stop_at_last_layers": model_preset.get("clip_skip", 2)
+            },
             
-            # AnimateDiff specific parameters
-            "alwayson_scripts": {
-                "AnimateDiff": {
-                    "args": [
-                        {
-                            "enable": True,
-                            "video_length": config.frame_count,
-                            "fps": config.fps,
-                            "loop_number": 0,
-                            "closed_loop": motion_preset.get("closed_loop", config.closed_loop),
-                            "batch_index": 0,
-                            "stride": 1,
-                            "overlap": config.context_overlap,
-                            "format": config.output_format,
-                            "video_quality": config.video_quality,
-                            "model": config.motion_module,
-                            "motion_scale": motion_preset.get("motion_scale", config.motion_scale)
-                        }
-                    ]
-                }
-            }
+            # 暂时禁用 AnimateDiff，测试普通 img2img
+            # "alwayson_scripts": {
+            #     "animatediff": {
+            #         "args": [
+            #             {
+            #                 "model": "mm_sdxl_v10_beta.ckpt",
+            #                 "enable": True,
+            #                 "video_length": 16,
+            #                 "fps": 8,
+            #                 "loop_number": 0,
+            #                 "closed_loop": "N",
+            #                 "batch_size": 16,
+            #                 "stride": 1,
+            #                 "overlap": -1,
+            #                 "format": ["GIF"],
+            #                 "interp": "Off"
+            #             }
+            #         ]
+            #     }
+            # }
         }
         
         if config.debug:
@@ -128,35 +157,59 @@ async def call_animatediff_api(
             logger.info(f"  - Frames: {config.frame_count}, FPS: {config.fps}")
         
         # Make API call
+        print(f"[DEBUG] Preparing to call AnimateDiff API...")
+        endpoint = f"{config.server_url}{config.img2vid_endpoint}"
+        print(f"[DEBUG] Full endpoint URL: {endpoint}")
+        print(f"[DEBUG] Payload size: {len(json.dumps(payload))} bytes")
+        
         async with httpx.AsyncClient() as client:
-            endpoint = f"{config.server_url}{config.img2vid_endpoint}"
+            print(f"[DEBUG] Sending POST request to AnimateDiff...")
             response = await client.post(
                 endpoint,
                 headers={"Content-Type": "application/json"},
                 content=json.dumps(payload),
                 timeout=600.0  # Longer timeout for video generation
             )
+            print(f"[DEBUG] Response received from AnimateDiff")
             
             response.raise_for_status()
             result = response.json()
             
-            # AnimateDiff returns video in images array
+            print(f"[DEBUG] API response keys: {result.keys() if result else 'None'}")
+            
+            # img2img returns images in 'images' array
             if "images" in result and result["images"]:
-                video_base64 = result["images"][0]
+                image_base64 = result["images"][0]
+                print(f"[DEBUG] Got image data, length: {len(image_base64) if image_base64 else 0}")
+                
+                # 暂时返回静态图片（因为 AnimateDiff 被禁用了）
                 return {
-                    "type": "video_base64",
-                    "video": video_base64,
-                    "format": config.output_format,
+                    "type": "image_base64",  # 改为 image 类型
+                    "video": image_base64,  # 实际上是图片，但保持字段名兼容
+                    "format": "png",  # 静态图片格式
                     "fps": config.fps,
-                    "frames": config.frame_count
+                    "frames": 1,  # 只有一帧
+                    "note": "AnimateDiff disabled, returning static image"
                 }
             else:
-                return {"type": "error", "message": "Video generation failed, no video in response"}
+                print(f"[DEBUG] No images in response. Full response: {str(result)[:500]}")
+                return {"type": "error", "message": "No image data in response"}
                 
+    except httpx.ConnectError as e:
+        print(f"[ERROR] Connection failed to AnimateDiff server: {e}")
+        print(f"[ERROR] Server URL was: {config.server_url}")
+        print(f"[ERROR] Please check if AnimateDiff WebUI is running and accessible")
+        logger.error(f"Connection error in AnimateDiff API call: {e}")
+        return {"type": "error", "message": f"Cannot connect to AnimateDiff server at {config.server_url}. Please ensure the server is running."}
     except httpx.HTTPStatusError as e:
+        print(f"[ERROR] HTTP error from AnimateDiff: {e}")
+        print(f"[ERROR] Response status: {e.response.status_code}")
         logger.error(f"HTTP error in AnimateDiff API call: {e}")
         return {"type": "error", "message": f"API error: {e.response.status_code}"}
     except Exception as e:
+        print(f"[ERROR] Unexpected error in AnimateDiff API call: {e}")
+        print(f"[ERROR] Error type: {type(e).__name__}")
+        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
         logger.error(f"Error in AnimateDiff API call: {e}")
         logger.error(traceback.format_exc())
         return {"type": "error", "message": str(e)}
@@ -171,77 +224,67 @@ async def optimize_prompt_for_video(
     """
     Optimize static image prompt for video generation.
     
-    Uses LLM to transform static descriptions into dynamic motion descriptions.
+    Uses provider-specific content generators for non-streaming API calls.
     
     Args:
         llm_client: LLM client for prompt optimization
-        session_id: Current session ID
+        session_id: Current session ID (currently unused but kept for compatibility)
         original_prompt: Original static image prompt
         image_base64: Optional base64 image for visual context
     
     Returns:
         Dict with optimized video_prompt and negative_prompt
     """
+    print(f"[DEBUG] optimize_prompt_for_video started")
+    print(f"[DEBUG] Original prompt: {original_prompt}")
+    print(f"[DEBUG] Has image: {bool(image_base64)}")
+    
     try:
         settings = get_image_to_video_settings()
         
-        # Build optimization prompt
-        system_prompt = settings.video_prompt_system
+        # Determine which provider we're using and get the appropriate generator
+        client_class_name = llm_client.__class__.__name__
+        print(f"[DEBUG] LLM client type: {client_class_name}")
         
-        user_message = f"""Transform this static image prompt into a dynamic video prompt:
-
-Original prompt: {original_prompt}
-
-Add motion descriptions, camera movements, and temporal changes.
-Keep the core subject and style, but make it dynamic.
-Output format:
-VIDEO_PROMPT: <your video prompt>
-NEGATIVE_PROMPT: <negative prompt for video>"""
-
-        # Call LLM for optimization
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
+        if "Gemini" in client_class_name:
+            print(f"[DEBUG] Using Gemini video prompt generator")
+            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
+            # Get the native Gemini client
+            print(f"[DEBUG] Calling GeminiVideoPromptGenerator.generate_video_prompt...")
+            result = await GeminiVideoPromptGenerator.generate_video_prompt(
+                llm_client.client,  # Use the native Gemini client
+                original_prompt,
+                image_base64
+            )
+            print(f"[DEBUG] Gemini generator returned: {result}")
+        elif "OpenAI" in client_class_name:
+            # TODO: Implement OpenAIVideoPromptGenerator when needed
+            # For now, fallback to default behavior
+            logger.warning("OpenAI video prompt generator not yet implemented, using fallback")
+            result = None
+        elif "Anthropic" in client_class_name:
+            # TODO: Implement AnthropicVideoPromptGenerator when needed
+            # For now, fallback to default behavior
+            logger.warning("Anthropic video prompt generator not yet implemented, using fallback")
+            result = None
+        else:
+            logger.warning(f"Unknown LLM client type: {client_class_name}, using fallback")
+            result = None
         
-        # If image is provided, add it for visual context
-        if image_base64:
-            messages.append({
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Here's the image to animate:"},
-                    {"type": "image", "source": {"data": image_base64}}
-                ]
-            })
+        # If we got a result from the content generator, return it
+        if result:
+            return result
         
-        response = await llm_client.generate_response(
-            messages=messages,
-            temperature=settings.video_prompt_temperature,
-            max_tokens=500
-        )
-        
-        # Parse response
-        response_text = response.get("content", "")
-        video_prompt = original_prompt  # Fallback
-        negative_prompt = settings.default_motion_negative
-        
-        for line in response_text.split("\n"):
-            if line.startswith("VIDEO_PROMPT:"):
-                video_prompt = line.replace("VIDEO_PROMPT:", "").strip()
-            elif line.startswith("NEGATIVE_PROMPT:"):
-                negative_prompt = line.replace("NEGATIVE_PROMPT:", "").strip()
-        
-        # Add default motion keywords
-        video_prompt = f"{video_prompt}, {settings.default_motion_positive}"
-        
+        # Fallback to adding basic motion keywords
         return {
-            "video_prompt": video_prompt,
-            "negative_prompt": negative_prompt
+            "video_prompt": f"{original_prompt}, {settings.default_motion_positive}",
+            "negative_prompt": settings.default_motion_negative
         }
         
     except Exception as e:
         logger.error(f"Error optimizing prompt for video: {e}")
         # Fallback to adding basic motion keywords
+        settings = get_image_to_video_settings()
         return {
             "video_prompt": f"{original_prompt}, {settings.default_motion_positive}",
             "negative_prompt": settings.default_motion_negative
@@ -291,6 +334,7 @@ async def generate_video_from_image(
     
     try:
         # Optimize prompt for video
+        print(f"[DEBUG] Starting prompt optimization...")
         prompt_result = await optimize_prompt_for_video(
             llm_client=llm_client,
             session_id=session_id,
@@ -300,6 +344,9 @@ async def generate_video_from_image(
         
         video_prompt = prompt_result["video_prompt"]
         negative_prompt = prompt_result["negative_prompt"]
+        print(f"[DEBUG] Prompt optimization completed")
+        print(f"[DEBUG] Video prompt: {video_prompt[:100]}...")
+        print(f"[DEBUG] Negative prompt: {negative_prompt[:100]}...")
         
         if settings.enable_debug:
             logger.info(f"[DEBUG] Video prompt optimization:")
@@ -308,22 +355,55 @@ async def generate_video_from_image(
             logger.info(f"  - Motion type: {motion_type}")
         
         # Generate video
+        print(f"[DEBUG] Starting video generation with AnimateDiff...")
         video_result = await call_animatediff_api(
             image_base64=image_base64,
             prompt=video_prompt,
             negative_prompt=negative_prompt,
             motion_type=motion_type
         )
+        print(f"[DEBUG] Video generation completed")
+        print(f"[DEBUG] video_result type: '{video_result.get('type')}'")
+        print(f"[DEBUG] video_result keys: {list(video_result.keys())}")
         
         if video_result.get("type") == "error":
             return error_response(
                 f"Video generation failed: {video_result.get('message', 'Unknown error')}"
             )
         
-        # Calculate generation time
-        generation_time = f"{time.time() - start_time:.1f}s"
+        # 处理静态图片结果（AnimateDiff 禁用时）
+        if video_result.get("type") == "image_base64":
+            print(f"[DEBUG] Got static image instead of video (AnimateDiff disabled)")
+            print(f"[DEBUG] Returning success response for static image")
+            # 返回静态图片作为"视频"（实际上是单帧）
+            generation_time = f"{time.time() - start_time:.1f}s"
+            result = success_response(
+                message=f"Generated static image (AnimateDiff disabled) ({generation_time})",
+                llm_content={
+                    "description": "Generated static image - AnimateDiff is disabled",
+                    "note": video_result.get("note", ""),
+                    "generation_time": generation_time
+                },
+                data={
+                    "image_base64": video_result.get("video"),  # 实际是图片
+                    "format": "png",
+                    "type": "static_image",
+                    "prompts": {
+                        "video": video_prompt,
+                        "negative": negative_prompt
+                    }
+                }
+            )
+            print(f"[DEBUG] Successfully created response: {result.get('status', 'unknown')}")
+            return result
         
-        # Build success response
+        # 检查是否有视频数据（只有非 image_base64 类型才执行）
+        if not video_result.get("video"):
+            print(f"[DEBUG] No video data in result: {video_result}")
+            return error_response("No video data in generation result")
+        
+        # 正常的视频结果
+        generation_time = f"{time.time() - start_time:.1f}s"
         return success_response(
             message=f"Video generated successfully ({generation_time})",
             llm_content={
