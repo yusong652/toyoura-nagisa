@@ -13,7 +13,7 @@ from backend.config import get_text_to_image_settings
 from backend.infrastructure.llm.shared.utils.text_processing import extract_text_content, parse_text_to_image_response, enhance_prompts_with_defaults
 from backend.infrastructure.llm.shared.utils.text_to_image import load_text_to_image_history, save_text_to_image_generation
 from backend.infrastructure.llm.shared.constants.defaults import DEFAULT_FEW_SHOT_MAX_LENGTH, DEFAULT_CONTEXT_MESSAGE_COUNT
-from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT, CONVERSATION_TEXT_PROMPT_PREFIX
+from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT, CONVERSATION_TEXT_PROMPT_PREFIX, DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT
 
 
 class BaseContentGenerator(ABC):
@@ -395,5 +395,87 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         
         return {
             "text_prompt": text_prompt,
+            "negative_prompt": negative_prompt
+        }
+
+
+class BaseVideoPromptGenerator(BaseContentGenerator):
+    """
+    Abstract base class for video prompt generation from static image prompts.
+    
+    Transforms static image descriptions into dynamic video prompts with motion,
+    camera movements, and temporal changes for AI video generation models.
+    """
+    
+    @staticmethod
+    @abstractmethod
+    async def generate_video_prompt(
+        client,  # LLM client instance (provider-specific)
+        original_prompt: str,
+        image_base64: Optional[str] = None
+    ) -> Optional[Dict[str, str]]:
+        """
+        Generate optimized video prompt from static image prompt.
+        
+        Args:
+            client: Provider-specific LLM client instance
+            original_prompt: Original static image generation prompt
+            image_base64: Optional base64 encoded image for visual context
+            
+        Returns:
+            Dict with 'video_prompt' and 'negative_prompt' keys, or None if failed
+        """
+        pass
+    
+    @staticmethod
+    def create_video_prompt_request(original_prompt: str) -> str:
+        """
+        Create the user message for video prompt generation.
+        
+        Args:
+            original_prompt: Original static image prompt
+            
+        Returns:
+            Formatted request message
+        """
+        return f"""Transform this static image prompt into a dynamic video prompt:
+
+Original prompt: {original_prompt}
+
+Add motion descriptions, camera movements, and temporal changes.
+Keep the core subject and style, but make it dynamic.
+Output format:
+VIDEO_PROMPT: <your video prompt>
+NEGATIVE_PROMPT: <negative prompt for video>"""
+    
+    @staticmethod
+    def parse_video_prompt_response(response_text: str, original_prompt: str) -> Dict[str, str]:
+        """
+        Parse the LLM response to extract video and negative prompts.
+        
+        Args:
+            response_text: Raw LLM response text
+            original_prompt: Original prompt as fallback
+            
+        Returns:
+            Dict with 'video_prompt' and 'negative_prompt'
+        """
+        from backend.config import get_image_to_video_settings
+        settings = get_image_to_video_settings()
+        
+        video_prompt = original_prompt  # Fallback
+        negative_prompt = settings.default_motion_negative
+        
+        for line in response_text.split("\n"):
+            if line.startswith("VIDEO_PROMPT:"):
+                video_prompt = line.replace("VIDEO_PROMPT:", "").strip()
+            elif line.startswith("NEGATIVE_PROMPT:"):
+                negative_prompt = line.replace("NEGATIVE_PROMPT:", "").strip()
+        
+        # Add default motion keywords
+        video_prompt = f"{video_prompt}, {settings.default_motion_positive}"
+        
+        return {
+            "video_prompt": video_prompt,
             "negative_prompt": negative_prompt
         }

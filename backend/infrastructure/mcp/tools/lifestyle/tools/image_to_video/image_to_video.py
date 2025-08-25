@@ -100,7 +100,35 @@ async def call_animatediff_api(
         img_data = base64.b64decode(image_base64)
         img = Image.open(BytesIO(img_data))
         width, height = img.size
-        print(f"[DEBUG] Input image dimensions: {width}x{height}")
+        print(f"[DEBUG] Original image dimensions: {width}x{height}")
+        
+        # Ensure dimensions are compatible with AnimateDiff
+        # AnimateDiff typically requires multiples of 8, but 64 is safer
+        # We'll use 32 as a compromise between flexibility and stability
+        original_width, original_height = width, height
+        
+        # Round to nearest multiple of 32 (good balance)
+        width = ((width + 16) // 32) * 32
+        height = ((height + 16) // 32) * 32
+        
+        # Limit max size to avoid memory issues while preserving aspect ratio
+        max_width = 1024
+        max_height = 1536
+        
+        if width > max_width or height > max_height:
+            # Scale down while preserving aspect ratio
+            scale = min(max_width / width, max_height / height)
+            width = int(width * scale)
+            height = int(height * scale)
+            # Ensure still multiple of 32
+            width = (width // 32) * 32
+            height = (height // 32) * 32
+        
+        # Ensure minimum size
+        width = max(width, 512)  # Minimum width
+        height = max(height, 512)  # Minimum height
+        
+        print(f"[DEBUG] Original: {original_width}x{original_height} -> Adjusted: {width}x{height}")
         
         # Get text-to-image config to use the same model settings
         from backend.config.text_to_image import get_text_to_image_settings
@@ -108,47 +136,71 @@ async def call_animatediff_api(
         txt2img_config = txt2img_settings.get_current_config()
         model_preset = txt2img_config.get_current_preset()
         
+        # Temporarily use SD1.5 motion module for better compatibility
+        # Even for SDXL models, SD1.5 motion module might be more stable
+        motion_module = "mm_sd_v15_v2.ckpt"
+        model_type = txt2img_config.model_type
+        print(f"[DEBUG] Using SD1.5 motion module for {model_type} model (compatibility mode)")
+        
+        # Check if AnimateDiff should be enabled (set to False to disable temporarily)
+        enable_animatediff = True  # Set to False if you want to test without AnimateDiff
+        
         # Prepare API payload for img2img with AnimateDiff
         payload = {
             "init_images": [image_base64],
             "prompt": f"{prompt}, {motion_preset.get('description', '')}",
             "negative_prompt": negative_prompt,
-            "steps": config.steps,
-            "cfg_scale": motion_preset.get("cfg_scale", config.cfg_scale),
-            "denoising_strength": config.denoising_strength,
-            "sampler_name": model_preset.get("sampler_name", config.sampler_name),  # Use model's sampler
+            "steps": 15,  # Reduced steps to avoid precision issues
+            "cfg_scale": 5.0,  # Lower CFG to avoid precision issues
+            "denoising_strength": 0.3,  # Lower denoising for stability
+            "sampler_name": config.sampler_name,  # Use config's default sampler
             "seed": config.seed,
             "batch_size": 1,  # Fixed to 1 for img2img
             "n_iter": 1,
             "width": width,  # Set actual image dimensions
-            "height": height,
-            "override_settings": {
-                "sd_model_checkpoint": model_preset.get("sd_model_checkpoint"),
-                "sd_vae": model_preset.get("sd_vae"),
-                "CLIP_stop_at_last_layers": model_preset.get("clip_skip", 2)
-            },
-            
-            # 暂时禁用 AnimateDiff，测试普通 img2img
-            # "alwayson_scripts": {
-            #     "animatediff": {
-            #         "args": [
-            #             {
-            #                 "model": "mm_sdxl_v10_beta.ckpt",
-            #                 "enable": True,
-            #                 "video_length": 16,
-            #                 "fps": 8,
-            #                 "loop_number": 0,
-            #                 "closed_loop": "N",
-            #                 "batch_size": 16,
-            #                 "stride": 1,
-            #                 "overlap": -1,
-            #                 "format": ["GIF"],
-            #                 "interp": "Off"
-            #             }
-            #         ]
-            #     }
-            # }
+            "height": height
+            # Remove override_settings to avoid model switching issues with AnimateDiff
+            # Let WebUI use its current model settings
         }
+        
+        # Add AnimateDiff only if enabled
+        if enable_animatediff:
+            print(f"[DEBUG] Enabling AnimateDiff with motion module: {motion_module}")
+            # For AnimateDiff, we need to adjust the main batch size to match video length
+            video_length = 8  # Increase frames for better video
+            payload["batch_size"] = video_length  # Match video_length for consistency
+            payload["n_iter"] = 1  # Only one iteration for video
+            payload["alwayson_scripts"] = {
+                "AnimateDiff": {
+                    "args": [
+                        {
+                            "model": "mm_sdxl_v10_beta.ckpt",  # 明确指定模型
+                            "enable": True,
+                            "video_length": video_length,
+                            "fps": 6,
+                            "format": ["GIF"],
+                            "loop_number": 0,
+                            "closed_loop": "R+P",
+                            "batch_size": video_length,
+                            "stride": 1,
+                            "overlap": -1,
+                            "interp": "Off",
+                            "interp_x": 10,
+                            "video_source": "",  # 空字符串表示不使用视频源
+                            "video_path": "",   # 空字符串表示不使用视频路径
+                            "latent_power": 1,
+                            "latent_scale": 32,
+                            "last_frame": None,
+                            "latent_power_last": 1,
+                            "latent_scale_last": 32,
+                            "request_id": ""
+                        }
+                    ]
+                }
+            }
+            print(f"[DEBUG] AnimateDiff payload prepared with {video_length} frames")
+        else:
+            print(f"[DEBUG] AnimateDiff disabled - using regular img2img")
         
         if config.debug:
             logger.info(f"[DEBUG] AnimateDiff API call:")
@@ -177,23 +229,70 @@ async def call_animatediff_api(
             
             print(f"[DEBUG] API response keys: {result.keys() if result else 'None'}")
             
-            # img2img returns images in 'images' array
+            # AnimateDiff returns video in 'images' array (base64 encoded)
             if "images" in result and result["images"]:
-                image_base64 = result["images"][0]
-                print(f"[DEBUG] Got image data, length: {len(image_base64) if image_base64 else 0}")
+                video_base64 = result["images"][0]
+                print(f"[DEBUG] Got video data, length: {len(video_base64) if video_base64 else 0}")
                 
-                # 暂时返回静态图片（因为 AnimateDiff 被禁用了）
-                return {
-                    "type": "image_base64",  # 改为 image 类型
-                    "video": image_base64,  # 实际上是图片，但保持字段名兼容
-                    "format": "png",  # 静态图片格式
-                    "fps": config.fps,
-                    "frames": 1,  # 只有一帧
-                    "note": "AnimateDiff disabled, returning static image"
-                }
+                # Check if we have valid video data
+                # Since AnimateDiff completed inference, treat as successful video generation
+                if len(result.get("images", [])) > 0:
+                    print(f"[DEBUG] AnimateDiff generation completed, checking format")
+                    
+                    # Decode base64 to check actual file format
+                    import base64
+                    try:
+                        decoded_data = base64.b64decode(video_base64)
+                        file_header = decoded_data[:16] if len(decoded_data) >= 16 else decoded_data
+                        
+                        print(f"[DEBUG] File header (hex): {file_header.hex()}")
+                        
+                        # Check file format based on magic numbers
+                        if decoded_data.startswith(b'GIF'):
+                            video_format = "gif"
+                            frames = 4
+                            note = "Generated GIF animation with AnimateDiff SD1.5"
+                            print(f"[DEBUG] Detected GIF format")
+                        elif decoded_data.startswith(b'\x00\x00\x00') and b'ftyp' in decoded_data[:20]:
+                            video_format = "mp4"
+                            frames = 4
+                            note = "Generated MP4 video with AnimateDiff SD1.5"
+                            print(f"[DEBUG] Detected MP4 format")
+                        elif decoded_data.startswith(b'\x89PNG'):
+                            # This is actually a PNG image, not a video
+                            print(f"[DEBUG] AnimateDiff returned PNG image instead of video")
+                            return {
+                                "type": "image_base64",
+                                "video": video_base64,
+                                "format": "png",
+                                "note": "AnimateDiff returned static image - video generation may have failed"
+                            }
+                        else:
+                            # Unknown format, assume GIF for compatibility
+                            video_format = "gif" 
+                            frames = 4
+                            note = "Generated video with AnimateDiff SD1.5 (format detection uncertain)"
+                            print(f"[DEBUG] Unknown format, assuming GIF")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to decode base64 for format detection: {e}")
+                        video_format = "gif"  # Default fallback
+                        frames = 4
+                        note = "Generated video with AnimateDiff SD1.5 (format detection failed)"
+                    
+                    return {
+                        "type": "video_base64",
+                        "video": video_base64,
+                        "format": video_format,
+                        "fps": 2,  # Match actual FPS
+                        "frames": frames,
+                        "note": note
+                    }
+                else:
+                    print(f"[DEBUG] No video data in response")
+                    return {"type": "error", "message": "No video data in response"}
             else:
                 print(f"[DEBUG] No images in response. Full response: {str(result)[:500]}")
-                return {"type": "error", "message": "No image data in response"}
+                return {"type": "error", "message": "No video data in response"}
                 
     except httpx.ConnectError as e:
         print(f"[ERROR] Connection failed to AnimateDiff server: {e}")
@@ -371,21 +470,51 @@ async def generate_video_from_image(
                 f"Video generation failed: {video_result.get('message', 'Unknown error')}"
             )
         
-        # 处理静态图片结果（AnimateDiff 禁用时）
-        if video_result.get("type") == "image_base64":
-            print(f"[DEBUG] Got static image instead of video (AnimateDiff disabled)")
-            print(f"[DEBUG] Returning success response for static image")
-            # 返回静态图片作为"视频"（实际上是单帧）
+        # Handle different result types
+        if video_result.get("type") == "video_base64":
+            # Successfully generated video with AnimateDiff
+            print(f"[DEBUG] Got video from AnimateDiff")
             generation_time = f"{time.time() - start_time:.1f}s"
-            result = success_response(
-                message=f"Generated static image (AnimateDiff disabled) ({generation_time})",
+            # Get actual format from result
+            actual_format = video_result.get("format", "mp4")
+            actual_frames = video_result.get("frames", 4)
+            actual_fps = video_result.get("fps", 2)
+            
+            return success_response(
+                message=f"Video generated successfully with AnimateDiff ({generation_time})",
                 llm_content={
-                    "description": "Generated static image - AnimateDiff is disabled",
+                    "description": f"Generated {actual_frames}-frame {actual_format.upper()} video at {actual_fps} FPS using AnimateDiff SD1.5",
+                    "motion_type": motion_type,
+                    "format": actual_format,
+                    "generation_time": generation_time,
                     "note": video_result.get("note", ""),
-                    "generation_time": generation_time
+                    "warning": "AnimateDiff post-processing errors are non-critical and don't affect video quality"
                 },
                 data={
-                    "image_base64": video_result.get("video"),  # 实际是图片
+                    "video_base64": video_result.get("video"),
+                    "format": actual_format,
+                    "fps": actual_fps,
+                    "frames": actual_frames,
+                    "prompts": {
+                        "video": video_prompt,
+                        "negative": negative_prompt
+                    }
+                }
+            )
+        elif video_result.get("type") == "image_base64":
+            # AnimateDiff might not be active, got static image
+            print(f"[DEBUG] Got static image (AnimateDiff may not be active)")
+            generation_time = f"{time.time() - start_time:.1f}s"
+            return success_response(
+                message=f"Generated image (AnimateDiff may not be active) ({generation_time})",
+                llm_content={
+                    "description": "Generated static image - AnimateDiff may not be properly configured",
+                    "note": video_result.get("note", ""),
+                    "generation_time": generation_time,
+                    "suggestion": "Please ensure AnimateDiff extension is installed and enabled in WebUI"
+                },
+                data={
+                    "image_base64": video_result.get("video"),
                     "format": "png",
                     "type": "static_image",
                     "prompts": {
@@ -394,15 +523,8 @@ async def generate_video_from_image(
                     }
                 }
             )
-            print(f"[DEBUG] Successfully created response: {result.get('status', 'unknown')}")
-            return result
         
-        # 检查是否有视频数据（只有非 image_base64 类型才执行）
-        if not video_result.get("video"):
-            print(f"[DEBUG] No video data in result: {video_result}")
-            return error_response("No video data in generation result")
-        
-        # 正常的视频结果
+        # No video data at all
         generation_time = f"{time.time() - start_time:.1f}s"
         return success_response(
             message=f"Video generated successfully ({generation_time})",

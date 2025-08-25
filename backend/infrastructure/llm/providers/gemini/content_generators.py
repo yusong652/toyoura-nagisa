@@ -11,7 +11,7 @@ from backend.domain.models.messages import BaseMessage
 from backend.config import get_llm_settings
 
 # Import base components
-from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator
+from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator, BaseVideoPromptGenerator
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,
@@ -20,7 +20,8 @@ from backend.infrastructure.llm.shared.constants.defaults import (
 from backend.infrastructure.llm.shared.constants.prompts import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     TITLE_GENERATION_REQUEST_TEXT,
-    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
+    DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
+    DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT
 )
 
 # Import Gemini-specific components
@@ -271,4 +272,99 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
         except Exception as e:
             if debug:
                 print(f"[text_to_image] Error during prompt generation: {str(e)}")
+            return None
+
+
+class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
+    """
+    Gemini-specific video prompt generation from static image prompts.
+    """
+    
+    @staticmethod
+    async def generate_video_prompt(
+        client,  # Gemini client instance
+        original_prompt: str,
+        image_base64: Optional[str] = None
+    ) -> Optional[Dict[str, str]]:
+        """
+        Generate optimized video prompt using Gemini's native API.
+        
+        Args:
+            client: Gemini client instance
+            original_prompt: Original static image generation prompt
+            image_base64: Optional base64 encoded image for visual context
+            
+        Returns:
+            Dict with 'video_prompt' and 'negative_prompt' keys, or None if failed
+        """
+        try:
+            from backend.config import get_llm_settings, get_image_to_video_settings
+            llm_settings = get_llm_settings()
+            gemini_config = llm_settings.get_gemini_config()
+            video_settings = get_image_to_video_settings()
+            
+            # Read Gemini client configuration
+            gemini_client_config = get_gemini_client_config()
+            
+            # Use video prompt system or fallback to default
+            system_prompt = getattr(video_settings, 'video_prompt_system', DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT)
+            
+            # Configure generation parameters
+            config_kwargs = {
+                "system_instruction": system_prompt,
+                "temperature": getattr(video_settings, 'video_prompt_temperature', 1.2),
+                "max_output_tokens": gemini_client_config.model_settings.max_output_tokens
+            }
+            
+            # Add thinking configuration if applicable
+            model = gemini_config.model
+            if (model.startswith("gemini-2.5") and 
+                gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
+                config_kwargs["thinking_config"] = types.ThinkingConfig(
+                    include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
+                )
+            
+            prompt_config = types.GenerateContentConfig(**config_kwargs)
+            
+            # Build request message
+            user_message = BaseVideoPromptGenerator.create_video_prompt_request(original_prompt)
+            
+            # Create contents list
+            contents = []
+            
+            # If image is provided, create multimodal content
+            if image_base64:
+                contents.append({
+                    "role": "user",
+                    "parts": [
+                        {"text": user_message},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                    ]
+                })
+            else:
+                contents.append({
+                    "role": "user", 
+                    "parts": [{"text": user_message}]
+                })
+            
+            # Call Gemini API
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=prompt_config
+            )
+            
+            # Extract response text
+            response_text = GeminiResponseProcessor.extract_text_content(response)
+            
+            if response_text:
+                # Parse and return the response
+                return BaseVideoPromptGenerator.parse_video_prompt_response(
+                    response_text, original_prompt
+                )
+            
+            return None
+            
+        except Exception as e:
+            print(f"[video_prompt] Error during Gemini video prompt generation: {str(e)}")
             return None

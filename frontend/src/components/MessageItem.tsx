@@ -5,6 +5,7 @@ import { useChat } from '../contexts/chat/ChatContext'
 import MessageToolState from './MessageToolState'
 import ImageViewer from './ImageViewer'
 import ImageWithVideoAction from './ImageWithVideoAction'
+import VideoPlayer from './VideoPlayer'
 import ReactMarkdown from 'react-markdown'
 import { useImageNavigation } from '../hooks/useImageNavigation'
 
@@ -23,6 +24,9 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   const { deleteMessage } = useChat()
   const [viewerOpen, setViewerOpen] = useState(false)
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('')
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false)
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('')
+  const [currentVideoFormat, setCurrentVideoFormat] = useState<string>('mp4')
   
   // Use image navigation hook
   const { allImages, getImageIndex } = useImageNavigation(allMessages)
@@ -208,6 +212,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     setViewerOpen(true);
   };
 
+  const handleVideoClick = (videoUrl: string, format: string = 'mp4') => {
+    setCurrentVideoUrl(videoUrl);
+    setCurrentVideoFormat(format);
+    setShowVideoPlayer(true);
+  };
+
   return (
     <>
       <div 
@@ -250,6 +260,40 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                                 <ImageWithVideoAction />
                               )}
                             </div>
+                          ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') ? (
+                            <div 
+                              className="file-video-preview" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const format = file.name.toLowerCase().endsWith('.gif') ? 'gif' : 'mp4';
+                                handleVideoClick(file.data, format);
+                              }}
+                              style={{ position: 'relative', cursor: 'pointer' }}
+                            >
+                              <video 
+                                src={file.data} 
+                                className="file-video-thumbnail"
+                                style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }}
+                                muted
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                borderRadius: '50%',
+                                width: '48px',
+                                height: '48px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '24px'
+                              }}>
+                                ▶️
+                              </div>
+                            </div>
                           ) : (
                             <div className="file-info">
                               <span className="file-name">{file.name}</span>
@@ -285,6 +329,40 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                             handleImageClick(file.data);
                           }}
                         />
+                      ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') ? (
+                        <div 
+                          className="file-video-preview" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const format = file.name.toLowerCase().endsWith('.gif') ? 'gif' : 'mp4';
+                            handleVideoClick(file.data, format);
+                          }}
+                          style={{ position: 'relative', cursor: 'pointer' }}
+                        >
+                          <video 
+                            src={file.data} 
+                            className="file-video-thumbnail"
+                            style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }}
+                            muted
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            borderRadius: '50%',
+                            width: '48px',
+                            height: '48px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '24px'
+                          }}>
+                            ▶️
+                          </div>
+                        </div>
                       ) : (
                         <div className="file-info">
                           <span className="file-icon">📄</span>
@@ -318,6 +396,13 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           images={allImages.map(img => img.url)}
           initialIndex={getImageIndex(currentImageUrl)}
           imageNames={allImages.map(img => img.name)}
+        />
+      )}
+      {showVideoPlayer && currentVideoUrl && (
+        <VideoPlayer
+          videoUrl={currentVideoUrl}
+          format={currentVideoFormat}
+          onClose={() => setShowVideoPlayer(false)}
         />
       )}
     </>

@@ -35,6 +35,7 @@ export interface SessionHistoryResponse {
       action?: string
     }
     image_path?: string
+    video_path?: string
   }>
 }
 

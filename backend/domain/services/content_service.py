@@ -268,24 +268,93 @@ class ContentService:
                     "error": result.get("message", "Video generation failed")
                 }
             
-            # Extract video data from the successful result
-            video_data = result.get("data", {}).get("video_base64")
+            # Extract video or image data from the successful result
+            data = result.get("data", {})
+            # 修复嵌套的 data 结构
+            if "data" in data:
+                data = data["data"]
+            
+            video_data = data.get("video_base64")
+            image_data = data.get("image_base64")  # 静态图片的情况
+            
+            print(f"[DEBUG] content_service data keys: {list(data.keys()) if data else 'None'}")
+            print(f"[DEBUG] video_data exists: {bool(video_data)}")
+            print(f"[DEBUG] image_data exists: {bool(image_data)}")
+            print(f"[DEBUG] data type: {data.get('type')}")
+            
+            if not video_data and not image_data:
+                print(f"[DEBUG] No video or image data found in result: {result}")
+                return {
+                    "success": False,
+                    "error": "No video or image data in generation result"
+                }
+            
+            # 处理静态图片（AnimateDiff 返回PNG时）
+            if image_data and data.get("type") == "static_image":
+                print(f"[DEBUG] Processing static image result (AnimateDiff disabled)")
+                # 将静态图片保存为"视频"（实际是图片）
+                from backend.infrastructure.storage.image_storage import save_image_from_base64
+                try:
+                    # 保存为图片文件
+                    local_path = save_image_from_base64(image_data, session_id)
+                    print(f"[DEBUG] Successfully saved static image to: {local_path}")
+                    
+                    return {
+                        "success": True,
+                        "result": f"生成了静态图片（AnimateDiff已禁用）",
+                        "local_path": local_path,
+                        "type": "static_image"
+                    }
+                except Exception as e:
+                    print(f"[ERROR] Failed to save static image: {e}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to save static image: {str(e)}"
+                    }
+            
+            # 处理AnimateDiff返回的PNG图片（本应是视频但返回了图片）
+            if data.get("type") == "image_base64" and data.get("format") == "png":
+                print(f"[DEBUG] AnimateDiff returned PNG instead of video - treating as image")
+                image_data = data.get("video")  # 虽然key是video，但实际是图片
+                if image_data:
+                    from backend.infrastructure.storage.image_storage import save_image_from_base64
+                    try:
+                        local_path = save_image_from_base64(image_data, session_id)
+                        print(f"[DEBUG] Successfully saved PNG as image: {local_path}")
+                        
+                        return {
+                            "success": True,
+                            "result": "AnimateDiff生成了静态图片而非视频，请检查AnimateDiff配置",
+                            "local_path": local_path,
+                            "type": "image",
+                            "note": data.get("note", "")
+                        }
+                    except Exception as e:
+                        print(f"[ERROR] Failed to save PNG image: {e}")
+                        return {
+                            "success": False,
+                            "error": f"Failed to save PNG image: {str(e)}"
+                        }
+            
+            # 正常的视频处理
             if not video_data:
                 return {
                     "success": False,
                     "error": "No video data in generation result"
                 }
             
-            # Save video to session folder (similar to how images are saved)
+            # Save video to session folder using the video storage service
             from backend.infrastructure.storage.video_storage import save_video_from_base64
             
             try:
-                local_path = save_video_from_base64(video_data, session_id)
+                video_format = data.get("format", "mp4")
+                local_path = save_video_from_base64(video_data, session_id, output_dir_base="chat/data", format=video_format)
                 print(f"[DEBUG] Successfully saved video to: {local_path}")
                 
                 return {
                     "success": True,
-                    "video_path": local_path
+                    "video_path": local_path,
+                    "data": data
                 }
             except Exception as e:
                 print(f"[ERROR] Failed to save video: {e}")

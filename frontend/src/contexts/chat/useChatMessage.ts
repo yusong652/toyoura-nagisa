@@ -58,7 +58,8 @@ export const useChatMessage = ({
               .filter((msg: any) => {
                 return (msg.role === 'user' && !msg.tool_request) ||
                        (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) ||
-                       (msg.role === 'image')
+                       (msg.role === 'image') ||
+                       (msg.role === 'video')
               })
               .map((msg: any): Message | null => {
                 let sender: 'user' | 'bot'
@@ -67,6 +68,8 @@ export const useChatMessage = ({
                 } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
                   sender = 'bot'
                 } else if (msg.role === 'image') {
+                  sender = 'bot'
+                } else if (msg.role === 'video') {
                   sender = 'bot'
                 } else {
                   return null
@@ -81,6 +84,16 @@ export const useChatMessage = ({
                     name: 'generated_image',
                     type: 'image/png',
                     data: `/api/images/${msg.image_path}`
+                  })
+                } else if (msg.role === 'video') {
+                  text = msg.content || ''
+                  // 根据文件扩展名确定视频类型
+                  const videoPath = msg.video_path
+                  const isGif = videoPath?.toLowerCase().endsWith('.gif')
+                  files.push({
+                    name: 'generated_video',
+                    type: isGif ? 'image/gif' : 'video/mp4',
+                    data: `/api/videos/${msg.video_path}`
                   })
                 } else if (typeof msg.content === 'string') {
                   text = msg.content
@@ -282,6 +295,7 @@ export const useChatMessage = ({
       return updatedMessages
     })
   }, [])
+
 
   // 创建并发送消息的基础函数
   // 职责：创建用户消息 -> 调用后端API -> 创建机器人消息占位符

@@ -10,7 +10,7 @@ import uuid
 import base64
 from datetime import datetime
 from typing import Optional
-# We'll create a simple video message structure without a separate model for now
+from backend.domain.models.messages import VideoMessage
 from backend.infrastructure.storage.session_manager import load_all_message_history, save_history
 
 
@@ -76,54 +76,27 @@ def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: 
 
 def _create_and_save_video_message(session_id: str, filename: str, format: str = "mp4") -> None:
     """
-    创建视频消息并保存到历史记录
+    创建视频消息并添加到会话历史记录
+    
     Args:
-        session_id (str): 会话ID
-        filename (str): 视频文件名
-        format (str): 视频格式
+        session_id: 会话ID
+        filename: 视频文件名
+        format: 视频格式
     """
-    try:
-        # 生成唯一的消息ID
-        message_id = str(uuid.uuid4())
-        
-        # 构建视频文件路径（相对于会话目录）
-        relative_path = os.path.join(session_id, filename)
-        
-        # 读取视频文件并转换为base64供前端显示
-        full_path = os.path.join("chat/data", relative_path)
-        with open(full_path, "rb") as f:
-            video_data = base64.b64encode(f.read()).decode('utf-8')
-        
-        # 创建视频消息字典（类似现有消息格式）
-        video_message = {
-            "id": message_id,
-            "role": "assistant",
-            "sender": "bot",  # For frontend compatibility
-            "content": "🎬 视频已生成完成",
-            "text": "🎬 视频已生成完成",  # For frontend compatibility
-            "files": [{
-                "name": filename,
-                "type": f"video/{format}",
-                "data": f"data:video/{format};base64,{video_data}"
-            }],
-            "timestamp": int(datetime.now().timestamp() * 1000),
-            "streaming": False,
-            "isLoading": False
-        }
-        
-        # 加载现有历史记录
-        history = load_all_message_history(session_id)
-        
-        # 添加到历史记录
-        history.append(video_message)
-        
-        # 保存更新后的历史记录
-        save_history(session_id, history)
-        
-        print(f"[DEBUG] Video message saved to history: {message_id}")
-        
-    except Exception as e:
-        print(f"[ERROR] Failed to create and save video message: {e}")
-        import traceback
-        print(f"[ERROR] Traceback: {traceback.format_exc()}")
-        # 不抛出异常，因为视频已经保存了，只是消息记录失败
+    # 创建视频消息
+    relative_path = os.path.join(session_id, filename)
+    print(f"[DEBUG] Creating video message with relative_path: {relative_path}")
+    video_message = VideoMessage(
+        content="🎬 视频已生成完成",
+        video_path=relative_path,
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now()
+    )
+    
+    # 将视频消息添加到历史记录
+    print("[DEBUG] Loading current history to append video message")
+    history = load_all_message_history(session_id)
+    history.append(video_message)
+    print(f"[DEBUG] Saving history with {len(history)} messages")
+    save_history(session_id, history)
+    print("[DEBUG] Video message successfully saved to history")

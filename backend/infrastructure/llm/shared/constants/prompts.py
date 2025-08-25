@@ -34,6 +34,14 @@ DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT = (
     "composition, and quality keywords. The negative prompt should specify what to avoid."
 )
 
+# Default system prompt for video generation from image
+DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT = (
+    "You are an expert at transforming static image prompts into dynamic video prompts for AI video generation. "
+    "Your task is to enhance static descriptions with motion, camera movements, and temporal changes while "
+    "preserving the core subject and artistic style. Focus on adding cinematic motion descriptions that bring "
+    "the scene to life. Always maintain the original subject and composition while adding dynamic elements."
+)
+
 # === PROMPT TEMPLATES ===
 
 # Title generation request text

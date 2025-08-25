@@ -18,7 +18,7 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showError, setShowError] = useState(false);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
-  const { currentSessionId, refreshSessions } = useSession();
+  const { currentSessionId, refreshSessions, switchSession } = useSession();
 
   const handleGenerateVideo = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -44,9 +44,22 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
       const result = await response.json();
       
       if (result.success) {
-        // Video generation successful, refresh sessions to reload messages
+        // Video generation successful, refresh sessions and reload current session messages
         await refreshSessions();
-        console.log('Video generated successfully:', result.video_path);
+        if (currentSessionId) {
+          await switchSession(currentSessionId);
+        }
+        
+        // If the API returns video data directly, we could add it to messages
+        if (result.data && result.data.video_base64) {
+          console.log('Video generated successfully with data:', {
+            format: result.data.format,
+            frames: result.data.frames,
+            fps: result.data.fps
+          });
+        } else {
+          console.log('Video generated successfully, check messages for video file');
+        }
       } else {
         setError(result.error || 'Failed to generate video');
         setShowError(true);
