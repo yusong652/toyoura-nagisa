@@ -484,3 +484,117 @@
     background-color: rgba(255, 255, 255, 0.1);
   }
 }
+
+/* 优雅的视频消息样式 */
+.elegant-video {
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.02) 100%);
+}
+
+.elegant-video:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.elegant-video-thumbnail {
+  width: 100%;
+  max-width: 360px;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+  background-color: #f5f5f5;
+  border-radius: 12px;
+}
+
+.elegant-video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.1);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.elegant-video:hover .elegant-video-overlay {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.elegant-play-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.elegant-video:hover .elegant-play-button {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.elegant-play-button svg {
+  margin-left: 2px; /* 微调播放按钮位置 */
+}
+
+.elegant-video-info {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.video-format-badge {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 深色模式下的视频样式 */
+@media (prefers-color-scheme: dark) {
+  .elegant-video {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  }
+  
+  .elegant-video-thumbnail {
+    background-color: #2a2a2a;
+  }
+  
+  .elegant-play-button {
+    background: rgba(40, 40, 40, 0.95);
+    color: #fff;
+  }
+  
+  .elegant-video:hover .elegant-play-button {
+    background: rgba(50, 50, 50, 1);
+  }
+  
+  .video-format-badge {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}

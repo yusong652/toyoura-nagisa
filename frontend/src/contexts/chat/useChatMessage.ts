@@ -270,7 +270,7 @@ export const useChatMessage = ({
   }, [])
 
   // 添加视频消息
-  const addVideoMessage = useCallback((videoPath: string, content: string = "🎬 视频已生成完成") => {
+  const addVideoMessage = useCallback((videoPath: string, content: string = "") => {
     const videoMessageId = uuidv4()
     const extension = videoPath.toLowerCase().split('.').pop()
     let mediaType = 'video/mp4' // 默认
@@ -286,7 +286,7 @@ export const useChatMessage = ({
     const videoMessage: Message = {
       id: videoMessageId,
       sender: 'bot',
-      text: content,
+      text: content, // 空内容，只显示视频
       files: [{
         name: 'generated_video',
         type: mediaType,

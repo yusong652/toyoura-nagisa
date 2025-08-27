@@ -87,7 +87,7 @@ def _create_and_save_video_message(session_id: str, filename: str, format: str =
     relative_path = os.path.join(session_id, filename)
     print(f"[DEBUG] Creating video message with relative_path: {relative_path}")
     video_message = VideoMessage(
-        content="🎬 视频已生成完成",
+        content="",  # 空内容，只显示视频
         video_path=relative_path,
         id=str(uuid.uuid4()),
         timestamp=datetime.now()

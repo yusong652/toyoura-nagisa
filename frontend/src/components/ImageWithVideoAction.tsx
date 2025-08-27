@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { IconButton, Tooltip, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { IconButton, Snackbar, Alert } from '@mui/material';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useSession } from '../contexts/session/SessionContext';
 import { useChat } from '../contexts/chat/ChatContext';
 import VideoPlayer from './VideoPlayer';
 import { sessionService } from '../services/api/sessionService';
-import { v4 as uuidv4 } from 'uuid';
 import './ImageWithVideoAction.css';
 
 interface ImageWithVideoActionProps {
@@ -57,9 +56,9 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
               .filter((msg: any) => msg.role === 'video')
               .pop();
 
-            if (lastVideoMessage) {
+            if (lastVideoMessage && lastVideoMessage.video_path) {
               // 直接添加视频消息到当前消息列表，与图片消息逻辑一致
-              addVideoMessage(lastVideoMessage.video_path, lastVideoMessage.content || "🎬 视频已生成完成");
+              addVideoMessage(lastVideoMessage.video_path, lastVideoMessage.content || "");
               console.log('Video message added to chat');
             }
           }
@@ -94,8 +93,6 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
     <>
       <div className="image-video-action-container">
         {!videoUrl ? (
-          <Tooltip title={isGenerating ? "Generating video..." : "Generate video from image"}>
-            <span>
               <IconButton
                 className="generate-video-button"
                 onClick={handleGenerateVideo}
@@ -105,27 +102,27 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
                   position: 'absolute',
                   bottom: 8,
                   right: 8,
-                  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                  backgroundColor: isGenerating ? 'rgba(138, 180, 248, 0.8)' : 'rgba(0, 0, 0, 0.6)',
                   color: 'white',
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    backgroundColor: isGenerating ? 'rgba(138, 180, 248, 0.9)' : 'rgba(0, 0, 0, 0.8)',
                   },
                   '&:disabled': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                    color: 'rgba(255, 255, 255, 0.5)',
+                    backgroundColor: 'rgba(138, 180, 248, 0.7)',
+                    color: 'white',
                   }
                 }}
               >
                 {isGenerating ? (
-                  <CircularProgress size={20} sx={{ color: 'white' }} />
+                  <div className="elegant-loading-container">
+                    <div className="elegant-spinner" />
+                    <div className="loading-pulse" />
+                  </div>
                 ) : (
                   <VideoLibraryIcon fontSize="small" />
                 )}
               </IconButton>
-            </span>
-          </Tooltip>
         ) : (
-          <Tooltip title="Play video">
             <IconButton
               className="play-video-button"
               onClick={handlePlayVideo}
@@ -143,7 +140,6 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
             >
               <PlayCircleOutlineIcon fontSize="small" />
             </IconButton>
-          </Tooltip>
         )}
       </div>
       

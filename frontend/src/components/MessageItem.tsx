@@ -237,7 +237,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
             {toolState && <MessageToolState toolState={toolState} />}
             {(renderStreamingText() || (files && files.length > 0 && !isLoading)) && (
               <div className="message-content">
-                {renderStreamingText()}
+                {displayText && renderStreamingText()}
                 
                 {files && files.length > 0 && !isLoading && (() => {
                       
@@ -261,47 +261,46 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                               )}
                             </div>
                           ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webm') ? (
-                            <div 
-                              className="file-video-preview" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const fileName = file.name.toLowerCase();
-                                let format = 'mp4'; // 默认
-                                if (fileName.endsWith('.gif')) {
-                                  format = 'gif';
-                                } else if (fileName.endsWith('.webm')) {
-                                  format = 'webm';
-                                } else if (fileName.endsWith('.mp4')) {
-                                  format = 'mp4';
-                                }
-                                handleVideoClick(file.data, format);
-                              }}
-                              style={{ position: 'relative', cursor: 'pointer' }}
-                            >
-                              <video 
-                                src={file.data} 
-                                className="file-video-thumbnail"
-                                style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }}
-                                muted
-                              />
-                              <div style={{
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                borderRadius: '50%',
-                                width: '48px',
-                                height: '48px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontSize: '24px'
-                              }}>
-                                ▶️
-                              </div>
-                            </div>
+                            (() => {
+                              const fileName = file.name.toLowerCase();
+                              let format = 'mp4'; // 默认
+                              if (fileName.endsWith('.gif')) {
+                                format = 'gif';
+                              } else if (fileName.endsWith('.webm')) {
+                                format = 'webm';
+                              } else if (fileName.endsWith('.mp4')) {
+                                format = 'mp4';
+                              }
+                              
+                              return (
+                                <div 
+                                  className="file-video-preview elegant-video" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVideoClick(file.data, format);
+                                  }}
+                                >
+                                  <video 
+                                    src={file.data} 
+                                    className="elegant-video-thumbnail"
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div className="elegant-video-overlay">
+                                    <div className="elegant-play-button">
+                                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                      </svg>
+                                    </div>
+                                  </div>
+                                  <div className="elegant-video-info">
+                                    <div className="video-format-badge">
+                                      {format.toUpperCase()}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()
                           ) : (
                             <div className="file-info">
                               <span className="file-name">{file.name}</span>
@@ -337,48 +336,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                             handleImageClick(file.data);
                           }}
                         />
-                      ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webm') ? (
-                        <div 
-                          className="file-video-preview" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const fileName = file.name.toLowerCase();
-                            let format = 'mp4'; // 默认
-                            if (fileName.endsWith('.gif')) {
-                              format = 'gif';
-                            } else if (fileName.endsWith('.webm')) {
-                              format = 'webm';
-                            } else if (fileName.endsWith('.mp4')) {
-                              format = 'mp4';
-                            }
-                            handleVideoClick(file.data, format);
-                          }}
-                          style={{ position: 'relative', cursor: 'pointer' }}
-                        >
-                          <video 
-                            src={file.data} 
-                            className="file-video-thumbnail"
-                            style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }}
-                            muted
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            borderRadius: '50%',
-                            width: '48px',
-                            height: '48px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontSize: '24px'
-                          }}>
-                            ▶️
-                          </div>
-                        </div>
                       ) : (
                         <div className="file-info">
                           <span className="file-icon">📄</span>
