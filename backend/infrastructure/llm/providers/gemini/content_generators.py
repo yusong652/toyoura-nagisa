@@ -284,20 +284,30 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
     async def generate_video_prompt(
         client,  # Gemini client instance
         original_prompt: str,
-        image_base64: Optional[str] = None
+        image_base64: Optional[str] = None,
+        motion_type: str = "cinematic",
+        few_shot_history: Optional[List[Dict[str, Any]]] = None
     ) -> Optional[Dict[str, str]]:
         """
-        Generate optimized video prompt using Gemini's native API.
+        Generate optimized video prompt using Gemini's native API with few-shot learning.
         
         Args:
             client: Gemini client instance
             original_prompt: Original static image generation prompt
             image_base64: Optional base64 encoded image for visual context
+            motion_type: Type of motion for the video
+            few_shot_history: Optional few-shot examples for better generation
             
         Returns:
             Dict with 'video_prompt' and 'negative_prompt' keys, or None if failed
         """
         try:
+            print(f"[video_prompt] Starting Gemini video prompt generation")
+            print(f"[video_prompt] Original prompt length: {len(original_prompt)}")
+            print(f"[video_prompt] Motion type: {motion_type}")
+            print(f"[video_prompt] Has image: {bool(image_base64)}")
+            print(f"[video_prompt] Few-shot history count: {len(few_shot_history) if few_shot_history else 0}")
+            
             from backend.config import get_llm_settings, get_image_to_video_settings
             llm_settings = get_llm_settings()
             gemini_config = llm_settings.get_gemini_config()
@@ -326,14 +336,43 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
             
             prompt_config = types.GenerateContentConfig(**config_kwargs)
             
-            # Build request message
-            user_message = BaseVideoPromptGenerator.create_video_prompt_request(original_prompt)
+            print(f"[video_prompt] Using model: {model}")
+            print(f"[video_prompt] Temperature: {config_kwargs['temperature']}")
+            print(f"[video_prompt] Max output tokens: {config_kwargs['max_output_tokens']}")
+            
+            # Build request message with motion type context
+            user_message = BaseVideoPromptGenerator.create_video_prompt_request(original_prompt, motion_type)
+            print(f"[video_prompt] Built user message length: {len(user_message)}")
             
             # Create contents list
             contents = []
             
-            # If image is provided, create multimodal content
+            # Add few-shot examples if available
+            if few_shot_history:
+                print(f"[video_prompt] Adding {len(few_shot_history)} few-shot examples")
+                for i, example in enumerate(few_shot_history):
+                    print(f"[video_prompt] Adding few-shot example {i+1}")
+                    # Add user example (from user_message.content)
+                    user_msg = example.get('user_message', {})
+                    user_content = user_msg.get('content', '')
+                    contents.append({
+                        "role": "user",
+                        "parts": [{"text": user_content}]
+                    })
+                    
+                    # Add assistant example (from assistant_message.content)
+                    assistant_msg = example.get('assistant_message', {})
+                    assistant_content = assistant_msg.get('content', '')
+                    contents.append({
+                        "role": "model",
+                        "parts": [{"text": assistant_content}]
+                    })
+            else:
+                print(f"[video_prompt] No few-shot examples available")
+            
+            # Add current request
             if image_base64:
+                print(f"[video_prompt] Adding current request with image")
                 contents.append({
                     "role": "user",
                     "parts": [
@@ -342,10 +381,28 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
                     ]
                 })
             else:
+                print(f"[video_prompt] Adding current request without image")
                 contents.append({
                     "role": "user", 
                     "parts": [{"text": user_message}]
                 })
+            
+            print(f"[video_prompt] Total content parts: {len(contents)}")
+            print(f"[video_prompt] ===== PAYLOAD DEBUG =====")
+            print(f"[video_prompt] Model: {model}")
+            print(f"[video_prompt] Config: {prompt_config}")
+            print(f"[video_prompt] Contents:")
+            for i, content in enumerate(contents):
+                print(f"[video_prompt]   [{i}] Role: {content.get('role')}")
+                parts = content.get('parts', [])
+                for j, part in enumerate(parts):
+                    if 'text' in part:
+                        text_preview = part['text'][:200] + "..." if len(part['text']) > 200 else part['text']
+                        print(f"[video_prompt]     Part[{j}] Text: {text_preview}")
+                    elif 'inline_data' in part:
+                        print(f"[video_prompt]     Part[{j}] Image: {part['inline_data']['mime_type']}")
+            print(f"[video_prompt] ===== END PAYLOAD =====")
+            print(f"[video_prompt] Calling Gemini API...")
             
             # Call Gemini API
             response = client.models.generate_content(
@@ -354,14 +411,42 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
                 config=prompt_config
             )
             
+            print(f"[video_prompt] Received response from Gemini API")
+            print(f"[video_prompt] ===== RESPONSE DEBUG =====")
+            print(f"[video_prompt] Response type: {type(response)}")
+            print(f"[video_prompt] Response dir: {dir(response)}")
+            if hasattr(response, 'candidates'):
+                print(f"[video_prompt] Candidates count: {len(response.candidates) if response.candidates else 0}")
+                if response.candidates:
+                    for i, candidate in enumerate(response.candidates):
+                        print(f"[video_prompt]   Candidate[{i}]: {type(candidate)}")
+                        if hasattr(candidate, 'content'):
+                            print(f"[video_prompt]     Content: {candidate.content}")
+                        if hasattr(candidate, 'finish_reason'):
+                            print(f"[video_prompt]     Finish reason: {candidate.finish_reason}")
+            print(f"[video_prompt] ===== END RESPONSE =====")
+            
             # Extract response text
             response_text = GeminiResponseProcessor.extract_text_content(response)
+            print(f"[video_prompt] Response text length: {len(response_text) if response_text else 0}")
+            if response_text:
+                print(f"[video_prompt] Response text preview: {response_text[:300]}...")
             
             if response_text:
+                print(f"[video_prompt] Parsing response text...")
                 # Parse and return the response
-                return BaseVideoPromptGenerator.parse_video_prompt_response(
+                parsed_result = BaseVideoPromptGenerator.parse_video_prompt_response(
                     response_text, original_prompt
                 )
+                if parsed_result:
+                    print(f"[video_prompt] Successfully parsed video prompt")
+                    print(f"[video_prompt] Video prompt length: {len(parsed_result.get('video_prompt', ''))}")
+                    print(f"[video_prompt] Negative prompt length: {len(parsed_result.get('negative_prompt', ''))}")
+                else:
+                    print(f"[video_prompt] Failed to parse response")
+                return parsed_result
+            else:
+                print(f"[video_prompt] No response text received")
             
             return None
             

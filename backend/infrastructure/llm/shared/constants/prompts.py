@@ -37,9 +37,12 @@ DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT = (
 # Default system prompt for video generation from image
 DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT = (
     "You are an expert at transforming static image prompts into dynamic video prompts for AI video generation. "
-    "Your task is to enhance static descriptions with motion, camera movements, and temporal changes while "
-    "preserving the core subject and artistic style. Focus on adding cinematic motion descriptions that bring "
-    "the scene to life. Always maintain the original subject and composition while adding dynamic elements."
+    "Based on the original image prompt and motion type, generate optimized prompts for video creation. "
+    "Your response must include both a video prompt and a negative prompt in the specified format:\n\n"
+    "<video_prompt>[enhanced prompt with motion descriptions here]</video_prompt>\n"
+    "<negative_prompt>[negative prompt for video generation here]</negative_prompt>\n\n"
+    "The video prompt should add motion, camera movements, and temporal changes while preserving the core "
+    "subject and artistic style. The negative prompt should specify what to avoid in video generation."
 )
 
 # === PROMPT TEMPLATES ===
@@ -57,6 +60,9 @@ TEXT_TO_IMAGE_PROMPT_PATTERN = r'<text_to_image_prompt>(.*?)</text_to_image_prom
 
 # Pattern for extracting negative prompts from responses
 NEGATIVE_PROMPT_PATTERN = r'<negative_prompt>(.*?)</negative_prompt>'
+
+# Pattern for extracting video prompts from responses
+VIDEO_PROMPT_PATTERN = r'<video_prompt>(.*?)</video_prompt>'
 
 # Pattern for extracting titles from responses
 TITLE_PROMPT_PATTERN = r'<title>(.*?)</title>'

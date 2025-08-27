@@ -184,28 +184,30 @@ async def optimize_prompt_for_video(
     llm_client: Any,
     session_id: str,
     original_prompt: str,
-    image_base64: Optional[str] = None
+    motion_type: str = "cinematic"
 ) -> Dict[str, str]:
     """
-    Optimize static image prompt for WAN 2.2 video generation.
+    Optimize static image prompt for WAN 2.2 video generation with few-shot learning.
     
-    Uses provider-specific content generators for non-streaming API calls.
+    Uses provider-specific content generators and few-shot examples for better results.
     
     Args:
         llm_client: LLM client for prompt optimization
-        session_id: Current session ID (currently unused but kept for compatibility)
+        session_id: Current session ID for few-shot history
         original_prompt: Original static image prompt
         image_base64: Optional base64 image for visual context
+        motion_type: Type of motion for the video
     
     Returns:
         Dict with optimized video_prompt and negative_prompt for WAN 2.2
     """
     print(f"[DEBUG] optimize_prompt_for_video started")
     print(f"[DEBUG] Original prompt: {original_prompt}")
-    print(f"[DEBUG] Has image: {bool(image_base64)}")
+    print(f"[DEBUG] Motion type: {motion_type}")
     
-    # Note: session_id parameter is currently unused but kept for API compatibility
-    _ = session_id
+    # Load few-shot history
+    from backend.infrastructure.llm.shared.utils.image_to_video import load_video_prompt_history
+    few_shot_history = load_video_prompt_history(session_id) if session_id else []
     
     try:
         settings = get_image_to_video_settings()
@@ -215,14 +217,22 @@ async def optimize_prompt_for_video(
         print(f"[DEBUG] LLM client type: {client_class_name}")
         
         if "Gemini" in client_class_name:
-            print(f"[DEBUG] Using Gemini video prompt generator")
+            print(f"[DEBUG] Using Gemini video prompt generator with few-shot")
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
+            
+            # Limit few-shot examples based on config
+            max_few_shot = settings.video_few_shot_max_length
+            limited_few_shot_history = few_shot_history[-max_few_shot:] if max_few_shot > 0 else []
+            print(f"[DEBUG] Using {len(limited_few_shot_history)} few-shot examples")
+            
             # Get the native Gemini client
             print(f"[DEBUG] Calling GeminiVideoPromptGenerator.generate_video_prompt...")
             result = await GeminiVideoPromptGenerator.generate_video_prompt(
                 llm_client.client,  # Use the native Gemini client
                 original_prompt,
-                image_base64
+                image_base64=None,  # Don't send image to LLM
+                motion_type=motion_type,
+                few_shot_history=limited_few_shot_history
             )
             print(f"[DEBUG] Gemini generator returned: {result}")
         elif "OpenAI" in client_class_name:
@@ -239,24 +249,36 @@ async def optimize_prompt_for_video(
             logger.warning(f"Unknown LLM client type: {client_class_name}, using fallback")
             result = None
         
-        # If we got a result from the content generator, return it
+        # If we got a result from the content generator, save it and return
         if result:
+            # Save to few-shot history (same format as text-to-image)
+            from backend.infrastructure.llm.shared.utils.image_to_video import save_video_prompt_generation
+            try:
+                # Create user request in same format as BaseVideoPromptGenerator.create_video_prompt_request
+                user_request = f"Transform this static image prompt into a dynamic video prompt:\n\nOriginal prompt: {original_prompt}\nMotion type: {motion_type}\n\nAdd motion descriptions, camera movements, and temporal changes that match the {motion_type} style."
+                
+                # Create assistant response in XML format
+                assistant_response = f"<video_prompt>{result.get('video_prompt', '')}</video_prompt>\n<negative_prompt>{result.get('negative_prompt', '')}</negative_prompt>"
+                
+                save_video_prompt_generation(
+                    session_id=session_id,
+                    user_request=user_request,
+                    assistant_response=assistant_response
+                )
+                print(f"[DEBUG] Saved video prompt to few-shot history")
+            except Exception as e:
+                print(f"[WARNING] Failed to save video prompt to history: {e}")
+            
             return result
         
-        # Fallback to adding basic motion keywords
-        return {
-            "video_prompt": f"{original_prompt}, {settings.default_motion_positive}",
-            "negative_prompt": settings.default_motion_negative
-        }
+        # No result from API
+        print(f"[DEBUG] API returned None, skipping video prompt generation")
+        return None
         
     except Exception as e:
         logger.error(f"Error optimizing prompt for video: {e}")
-        # Fallback to adding basic motion keywords
-        settings = get_image_to_video_settings()
-        return {
-            "video_prompt": f"{original_prompt}, {settings.default_motion_positive}",
-            "negative_prompt": settings.default_motion_negative
-        }
+        print(f"[DEBUG] Exception occurred during prompt optimization, returning None")
+        return None
 
 
 async def generate_video_from_image(
@@ -307,14 +329,19 @@ async def generate_video_from_image(
             llm_client=llm_client,
             session_id=session_id,
             original_prompt=prompt,
-            image_base64=image_base64
+            motion_type=motion_type
         )
         
-        video_prompt = prompt_result["video_prompt"]
-        negative_prompt = prompt_result["negative_prompt"]
-        print(f"[DEBUG] Prompt optimization completed")
-        print(f"[DEBUG] Video prompt: {video_prompt[:100]}...")
-        print(f"[DEBUG] Negative prompt: {negative_prompt[:100]}...")
+        if prompt_result:
+            video_prompt = prompt_result["video_prompt"]
+            negative_prompt = prompt_result["negative_prompt"]
+            print(f"[DEBUG] Prompt optimization completed")
+            print(f"[DEBUG] Video prompt: {video_prompt[:100]}...")
+            print(f"[DEBUG] Negative prompt: {negative_prompt[:100]}...")
+        else:
+            # LLM optimization failed, skip video generation
+            print(f"[DEBUG] LLM optimization failed, skipping video generation")
+            return error_response("Video generation skipped: LLM prompt optimization failed")
         
         if settings.debug:
             logger.info(f"[DEBUG] Video prompt optimization:")

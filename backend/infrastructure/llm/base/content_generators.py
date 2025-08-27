@@ -428,30 +428,41 @@ class BaseVideoPromptGenerator(BaseContentGenerator):
         pass
     
     @staticmethod
-    def create_video_prompt_request(original_prompt: str) -> str:
+    def create_video_prompt_request(original_prompt: str, motion_type: str = "cinematic") -> str:
         """
         Create the user message for video prompt generation.
         
         Args:
             original_prompt: Original static image prompt
+            motion_type: Type of motion for the video
             
         Returns:
             Formatted request message
         """
+        motion_descriptions = {
+            "gentle": "subtle, gentle movements like gentle breeze, slow motion, peaceful transitions",
+            "dynamic": "energetic, dynamic motion with action sequences and fast movements", 
+            "cinematic": "cinematic camera movements, smooth panning, professional film-like motion",
+            "loop": "seamless looping motion with cyclic, repeating patterns"
+        }
+        
+        motion_desc = motion_descriptions.get(motion_type, motion_descriptions["cinematic"])
+        
         return f"""Transform this static image prompt into a dynamic video prompt:
 
 Original prompt: {original_prompt}
+Motion type: {motion_type} ({motion_desc})
 
-Add motion descriptions, camera movements, and temporal changes.
-Keep the core subject and style, but make it dynamic.
+Add motion descriptions, camera movements, and temporal changes that match the {motion_type} style.
+Keep the core subject and artistic style, but make it dynamic with {motion_desc}.
 Output format:
-VIDEO_PROMPT: <your video prompt>
-NEGATIVE_PROMPT: <negative prompt for video>"""
+<video_prompt>your enhanced video prompt here</video_prompt>
+<negative_prompt>negative prompt for video generation here</negative_prompt>"""
     
     @staticmethod
     def parse_video_prompt_response(response_text: str, original_prompt: str) -> Dict[str, str]:
         """
-        Parse the LLM response to extract video and negative prompts.
+        Parse the LLM response to extract video and negative prompts using XML tags.
         
         Args:
             response_text: Raw LLM response text
@@ -460,17 +471,35 @@ NEGATIVE_PROMPT: <negative prompt for video>"""
         Returns:
             Dict with 'video_prompt' and 'negative_prompt'
         """
+        import re
         from backend.config import get_image_to_video_settings
+        from backend.infrastructure.llm.shared.constants.prompts import VIDEO_PROMPT_PATTERN, NEGATIVE_PROMPT_PATTERN
+        
         settings = get_image_to_video_settings()
         
-        video_prompt = original_prompt  # Fallback
-        negative_prompt = settings.default_motion_negative
+        # Try to extract using XML tags first
+        video_match = re.search(VIDEO_PROMPT_PATTERN, response_text, re.DOTALL)
+        negative_match = re.search(NEGATIVE_PROMPT_PATTERN, response_text, re.DOTALL)
         
-        for line in response_text.split("\n"):
-            if line.startswith("VIDEO_PROMPT:"):
-                video_prompt = line.replace("VIDEO_PROMPT:", "").strip()
-            elif line.startswith("NEGATIVE_PROMPT:"):
-                negative_prompt = line.replace("NEGATIVE_PROMPT:", "").strip()
+        if video_match:
+            video_prompt = video_match.group(1).strip()
+        else:
+            # Fallback to old format for backward compatibility
+            video_prompt = original_prompt
+            for line in response_text.split("\n"):
+                if line.startswith("VIDEO_PROMPT:"):
+                    video_prompt = line.replace("VIDEO_PROMPT:", "").strip()
+                    break
+        
+        if negative_match:
+            negative_prompt = negative_match.group(1).strip()
+        else:
+            # Fallback to old format for backward compatibility
+            negative_prompt = settings.default_motion_negative
+            for line in response_text.split("\n"):
+                if line.startswith("NEGATIVE_PROMPT:"):
+                    negative_prompt = line.replace("NEGATIVE_PROMPT:", "").strip()
+                    break
         
         # Add default motion keywords
         video_prompt = f"{video_prompt}, {settings.default_motion_positive}"

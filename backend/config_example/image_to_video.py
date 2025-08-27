@@ -1,77 +1,11 @@
 """
 Image-to-video configuration module
-Contains configurations related to image-to-video generation using AnimateDiff
+Contains configurations related to image-to-video generation using ComfyUI WAN 2.2
 """
 from __future__ import annotations
-from typing import Literal, Optional, Dict, Any
+from typing import Literal, Dict, Any
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class AnimateDiffConfig(BaseSettings):
-    """AnimateDiff WebUI configuration"""
-    
-    # Server configuration
-    server_url: str = Field(
-        default="http://127.0.0.1:7860",
-        description="AnimateDiff WebUI server URL",
-        validation_alias="ANIMATEDIFF_WEBUI_URL"
-    )
-    
-    # API endpoints
-    img2vid_endpoint: str = Field(
-        default="/sdapi/v1/img2img",
-        description="Image-to-video API endpoint"
-    )
-    
-    # Video generation parameters
-    fps: int = Field(default=8, ge=1, le=30, description="Frames per second")
-    frame_count: int = Field(default=16, ge=8, le=32, description="Number of frames to generate")
-    motion_module: str = Field(
-        default="mm_sd_v15_v2.ckpt",
-        description="Motion module checkpoint"
-    )
-    
-    # Generation parameters (inherited from SD)
-    steps: int = Field(default=20, ge=1, le=150, description="Sampling steps")
-    sampler_name: str = Field(default="DPM++ 2M Karras", description="Sampler name")
-    cfg_scale: float = Field(default=7.0, ge=1.0, le=20.0, description="CFG scale")
-    denoising_strength: float = Field(default=0.75, ge=0.0, le=1.0, description="Denoising strength for img2img")
-    seed: int = Field(default=-1, description="Random seed")
-    
-    # Motion parameters
-    motion_scale: float = Field(default=1.0, ge=0.0, le=2.0, description="Motion intensity scale")
-    context_overlap: int = Field(default=4, ge=0, le=8, description="Context frame overlap")
-    closed_loop: bool = Field(default=False, description="Enable closed loop animation")
-    
-    # Output configuration
-    output_format: Literal["gif", "mp4", "webm"] = Field(
-        default="mp4",
-        description="Output video format"
-    )
-    video_quality: int = Field(default=95, ge=1, le=100, description="Video quality (1-100)")
-    
-    # Debug configuration
-    debug: bool = Field(default=True, description="Enable debug mode")
-    
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_nested_delimiter='_',
-        case_sensitive=False,
-        env_prefix='',
-        extra='ignore'
-    )
-    
-    def __init__(self, **kwargs):
-        """Initialize configuration with debug information"""
-        import os
-        if kwargs.get('debug', True):
-            print(f"[DEBUG] AnimateDiffConfig initialization:")
-            print(f"[DEBUG] - Environment variable ANIMATEDIFF_WEBUI_URL: {os.environ.get('ANIMATEDIFF_WEBUI_URL', 'NOT_SET')}")
-        super().__init__(**kwargs)
-        if self.debug:
-            print(f"[DEBUG] - Final config server_url: {self.server_url}")
-            print(f"[DEBUG] - Final config fps: {self.fps}, frames: {self.frame_count}")
 
 
 class ImageToVideoSettings(BaseSettings):
@@ -174,16 +108,31 @@ class ImageToVideoSettings(BaseSettings):
         description="Motion type presets"
     )
     
-    # Temperature for prompt generation
+    # Temperature configuration for video prompt generation
     video_prompt_temperature: float = Field(
         default=0.8,
         ge=0.0,
         le=2.0,
-        description="Temperature for video prompt generation"
+        description="Temperature parameter for video prompt generation (higher values = more creative)"
+    )
+    
+    # Few-shot learning configuration
+    video_few_shot_max_length: int = Field(
+        default=15,
+        ge=0,
+        le=32,
+        description="Few-shot example maximum count for video prompt generation"
+    )
+    
+    # Server configuration
+    server_url: str = Field(
+        default="http://localhost:8188/prompt",
+        description="ComfyUI server URL with endpoint",
+        validation_alias="COMFYUI_SERVER_URL"
     )
     
     # Debug configuration
-    enable_debug: bool = Field(default=True, description="Enable debug mode")
+    debug: bool = Field(default=True, description="Enable debug mode")
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -192,18 +141,6 @@ class ImageToVideoSettings(BaseSettings):
         env_prefix='',
         extra='ignore'
     )
-    
-    def get_animatediff_config(self) -> AnimateDiffConfig:
-        """Get AnimateDiff configuration"""
-        return AnimateDiffConfig()
-    
-    def validate_config(self):
-        """Validate AnimateDiff configuration"""
-        try:
-            config = self.get_animatediff_config()
-            return config
-        except Exception as e:
-            raise ValueError(f"AnimateDiff configuration validation failed: {e}")
 
 
 # Global image-to-video configuration instance
