@@ -254,7 +254,7 @@ def load_and_restore_history(session_id: str):
 
 def delete_message(session_id: str, message_id: str) -> bool:
     """
-    从指定会话中删除特定ID的消息
+    从指定会话中删除特定ID的消息，并清理相关文件
     Args:
         session_id: 会话ID
         message_id: 要删除的消息ID
@@ -265,16 +265,76 @@ def delete_message(session_id: str, message_id: str) -> bool:
         session_history = load_all_message_history(session_id)
         if not session_history:
             return False
+        
+        # 找到要删除的消息，检查是否需要清理文件
+        message_to_delete = None
+        for msg in session_history:
+            if msg.get('id') == message_id:
+                message_to_delete = msg
+                break
+        
+        if not message_to_delete:
+            return False  # 没找到要删的消息
+        
+        # 如果是视频消息或图片消息，删除相关文件
+        _cleanup_message_files(session_id, message_to_delete)
+        
         # 删除消息
         new_history = [msg for msg in session_history if msg.get('id') != message_id]
-        if len(new_history) == len(session_history):
-            return False  # 没找到要删的
-        # 保存
+        
+        # 保存更新后的历史记录
         save_history(session_id, new_history)
         return True
     except Exception as e:
         print(f"删除消息时出错: {e}")
         return False
+
+
+def _cleanup_message_files(session_id: str, message: dict) -> None:
+    """
+    清理消息相关的文件（视频、图片等）
+    
+    Args:
+        session_id: 会话ID
+        message: 要清理的消息对象
+    """
+    try:
+        message_type = message.get('type', '').lower()
+        
+        if message_type == 'video' and message.get('video_path'):
+            # 清理视频文件
+            video_path = message.get('video_path')
+            if not os.path.isabs(video_path):
+                # 如果是相对路径，构建完整路径
+                full_path = os.path.join(HISTORY_BASE_DIR, video_path)
+            else:
+                full_path = video_path
+            
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                print(f"[DEBUG] Deleted video file: {full_path}")
+            else:
+                print(f"[DEBUG] Video file not found: {full_path}")
+        
+        elif message_type == 'image' and message.get('image_path'):
+            # 清理图片文件
+            image_path = message.get('image_path')
+            if not os.path.isabs(image_path):
+                # 如果是相对路径，构建完整路径
+                full_path = os.path.join(HISTORY_BASE_DIR, image_path)
+            else:
+                full_path = image_path
+            
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                print(f"[DEBUG] Deleted image file: {full_path}")
+            else:
+                print(f"[DEBUG] Image file not found: {full_path}")
+        
+        # 可以在这里添加其他类型文件的清理逻辑
+        
+    except Exception as e:
+        print(f"[WARNING] Failed to cleanup files for message {message.get('id')}: {e}")
 
 
 def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], ...]:
