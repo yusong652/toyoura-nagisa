@@ -260,12 +260,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                                 <ImageWithVideoAction />
                               )}
                             </div>
-                          ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') ? (
+                          ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webm') ? (
                             <div 
                               className="file-video-preview" 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const format = file.name.toLowerCase().endsWith('.gif') ? 'gif' : 'mp4';
+                                const fileName = file.name.toLowerCase();
+                                let format = 'mp4'; // 默认
+                                if (fileName.endsWith('.gif')) {
+                                  format = 'gif';
+                                } else if (fileName.endsWith('.webm')) {
+                                  format = 'webm';
+                                } else if (fileName.endsWith('.mp4')) {
+                                  format = 'mp4';
+                                }
                                 handleVideoClick(file.data, format);
                               }}
                               style={{ position: 'relative', cursor: 'pointer' }}
@@ -329,12 +337,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                             handleImageClick(file.data);
                           }}
                         />
-                      ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') ? (
+                      ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webm') ? (
                         <div 
                           className="file-video-preview" 
                           onClick={(e) => {
                             e.stopPropagation();
-                            const format = file.name.toLowerCase().endsWith('.gif') ? 'gif' : 'mp4';
+                            const fileName = file.name.toLowerCase();
+                            let format = 'mp4'; // 默认
+                            if (fileName.endsWith('.gif')) {
+                              format = 'gif';
+                            } else if (fileName.endsWith('.webm')) {
+                              format = 'webm';
+                            } else if (fileName.endsWith('.mp4')) {
+                              format = 'mp4';
+                            }
                             handleVideoClick(file.data, format);
                           }}
                           style={{ position: 'relative', cursor: 'pointer' }}

@@ -46,6 +46,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     deleteMessage,
     clearChat,
     sendMessage: createAndSendMessage,
+    addVideoMessage,
     updateMessageStatus
   } = useChatMessage({
     currentSessionId,
@@ -128,7 +129,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       sendMessage,
       clearChat,
       deleteMessage,
-      generateImage
+      generateImage,
+      addVideoMessage
     }}>
       {children}
     </ChatContext.Provider>

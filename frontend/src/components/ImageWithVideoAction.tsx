@@ -3,7 +3,10 @@ import { IconButton, Tooltip, CircularProgress, Snackbar, Alert } from '@mui/mat
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useSession } from '../contexts/session/SessionContext';
+import { useChat } from '../contexts/chat/ChatContext';
 import VideoPlayer from './VideoPlayer';
+import { sessionService } from '../services/api/sessionService';
+import { v4 as uuidv4 } from 'uuid';
 import './ImageWithVideoAction.css';
 
 interface ImageWithVideoActionProps {
@@ -18,7 +21,8 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showError, setShowError] = useState(false);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
-  const { currentSessionId, refreshSessions, switchSession } = useSession();
+  const { currentSessionId } = useSession();
+  const { addVideoMessage } = useChat();
 
   const handleGenerateVideo = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,22 +47,24 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
       
       const result = await response.json();
       
-      if (result.success) {
-        // Video generation successful, refresh sessions and reload current session messages
-        await refreshSessions();
-        if (currentSessionId) {
-          await switchSession(currentSessionId);
-        }
-        
-        // If the API returns video data directly, we could add it to messages
-        if (result.data && result.data.video_base64) {
-          console.log('Video generated successfully with data:', {
-            format: result.data.format,
-            frames: result.data.frames,
-            fps: result.data.fps
-          });
-        } else {
-          console.log('Video generated successfully, check messages for video file');
+      if (result.success && currentSessionId) {
+        try {
+          // 获取会话历史，查找最新的视频消息
+          const historyData = await sessionService.getSessionHistory(currentSessionId);
+          
+          if (historyData.history && Array.isArray(historyData.history)) {
+            const lastVideoMessage = historyData.history
+              .filter((msg: any) => msg.role === 'video')
+              .pop();
+
+            if (lastVideoMessage) {
+              // 直接添加视频消息到当前消息列表，与图片消息逻辑一致
+              addVideoMessage(lastVideoMessage.video_path, lastVideoMessage.content || "🎬 视频已生成完成");
+              console.log('Video message added to chat');
+            }
+          }
+        } catch (error) {
+          console.error('获取生成的视频消息失败:', error);
         }
       } else {
         setError(result.error || 'Failed to generate video');

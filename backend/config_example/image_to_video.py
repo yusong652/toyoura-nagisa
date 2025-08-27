@@ -77,12 +77,60 @@ class AnimateDiffConfig(BaseSettings):
 class ImageToVideoSettings(BaseSettings):
     """Image-to-video general configuration"""
     
+    # Workflow selection
+    workflow_type: Literal["wan22_optimized", "animatediff_standard"] = Field(
+        default="wan22_optimized",
+        description="Workflow type: wan22_optimized (WAN 2.2 5B high quality) or animatediff_standard (legacy)"
+    )
+    
+    # WAN 2.2 workflow parameters - complete workflow configurations
+    wan22_workflows: Dict[str, Dict[str, Any]] = Field(
+        default={
+            "gentle": {
+                "width": 360,
+                "height": 640,
+                "frames": 25,
+                "fps": 16.0,
+                "steps": 15,
+                "cfg": 4.0
+            },
+            "dynamic": {
+                "width": 360,
+                "height": 640,
+                "frames": 33,
+                "fps": 20.0,
+                "steps": 18,
+                "cfg": 5.0
+            },
+            "cinematic": {
+                "width": 360,
+                "height": 640,
+                "frames": 41,
+                "fps": 24.0,
+                "steps": 20,
+                "cfg": 4.5
+            },
+            "loop": {
+                "width": 360,
+                "height": 640,
+                "frames": 25,
+                "fps": 20.0,
+                "steps": 15,
+                "cfg": 4.0
+            }
+        },
+        description="WAN 2.2 workflow configurations for different motion types"
+    )
+    
     # System configuration for prompt optimization
     video_prompt_system: str = Field(
-        default="""You are a professional prompt engineer specializing in video generation from static images.
-Your task is to transform static image prompts into dynamic video prompts that describe motion, camera movement, and temporal changes.
-Focus on adding motion keywords like: 'moving', 'flowing', 'walking', 'rotating', 'zooming', 'panning', etc.""",
-        description="System prompt for video prompt generation"
+        default=(
+            "You are an expert at transforming static image prompts into dynamic video prompts for AI video generation. "
+            "Your task is to enhance static descriptions with motion, camera movements, and temporal changes while "
+            "preserving the core subject and artistic style. Focus on adding cinematic motion descriptions that bring "
+            "the scene to life. Always maintain the original subject and composition while adding dynamic elements."
+        ),
+        description="System prompt for LLM when generating video prompts from image context"
     )
     
     # Context configuration

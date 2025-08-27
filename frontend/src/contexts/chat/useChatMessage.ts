@@ -34,6 +34,7 @@ export interface UseChatMessageReturn {
   }>
   addUserMessage: (text: string, files?: FileData[]) => string
   addBotMessage: () => string
+  addVideoMessage: (videoPath: string, content?: string) => string
   updateMessageStatus: (messageId: string, status: MessageStatus) => void
   updateBotMessage: (messageId: string, updates: Partial<Message>) => void
 }
@@ -89,10 +90,20 @@ export const useChatMessage = ({
                   text = msg.content || ''
                   // 根据文件扩展名确定视频类型
                   const videoPath = msg.video_path
-                  const isGif = videoPath?.toLowerCase().endsWith('.gif')
+                  const extension = videoPath?.toLowerCase().split('.').pop()
+                  let mediaType = 'video/mp4' // 默认
+                  
+                  if (extension === 'gif') {
+                    mediaType = 'image/gif'
+                  } else if (extension === 'webm') {
+                    mediaType = 'video/webm'
+                  } else if (extension === 'mp4') {
+                    mediaType = 'video/mp4'
+                  }
+                  
                   files.push({
                     name: 'generated_video',
-                    type: isGif ? 'image/gif' : 'video/mp4',
+                    type: mediaType,
                     data: `/api/videos/${msg.video_path}`
                   })
                 } else if (typeof msg.content === 'string') {
@@ -258,6 +269,36 @@ export const useChatMessage = ({
     return botMessageId
   }, [])
 
+  // 添加视频消息
+  const addVideoMessage = useCallback((videoPath: string, content: string = "🎬 视频已生成完成") => {
+    const videoMessageId = uuidv4()
+    const extension = videoPath.toLowerCase().split('.').pop()
+    let mediaType = 'video/mp4' // 默认
+    
+    if (extension === 'gif') {
+      mediaType = 'image/gif'
+    } else if (extension === 'webm') {
+      mediaType = 'video/webm'
+    } else if (extension === 'mp4') {
+      mediaType = 'video/mp4'
+    }
+    
+    const videoMessage: Message = {
+      id: videoMessageId,
+      sender: 'bot',
+      text: content,
+      files: [{
+        name: 'generated_video',
+        type: mediaType,
+        data: `/api/videos/${videoPath}`
+      }],
+      timestamp: Date.now()
+    }
+    
+    setMessages(prev => [...prev, videoMessage])
+    return videoMessageId
+  }, [])
+
   // 更新消息状态
   const updateMessageStatus = useCallback((messageId: string, status: MessageStatus) => {
     setMessages(prev => 
@@ -346,6 +387,7 @@ export const useChatMessage = ({
     sendMessage,
     addUserMessage,
     addBotMessage,
+    addVideoMessage,
     updateMessageStatus,
     updateBotMessage
   }

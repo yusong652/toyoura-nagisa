@@ -16,12 +16,8 @@ from backend.infrastructure.storage.image_storage import (
 from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import (
     generate_image_from_description
 )
-from backend.infrastructure.mcp.tools.lifestyle.tools.image_to_video.image_to_video import (
-    generate_video_from_context as mcp_generate_video_from_context,
-    get_latest_text_to_image_prompt,
-    find_recent_image_in_messages
-)
 from backend.shared.utils.helpers import generate_title_for_session as generate_title_helper
+from backend.shared.utils.session_helpers import find_latest_image_in_session, get_latest_text_to_image_prompt
 
 
 class ContentService:
@@ -239,13 +235,25 @@ class ContentService:
                 - video_path: str - Local path to saved video (if successful)
                 - error: str - Error message (if failed)
         """
+        # Use the MCP tool directly for video generation
+        from backend.infrastructure.mcp.tools.lifestyle.tools.image_to_video.image_to_video import generate_video_from_image
+        
         try:
-            # For now, we'll directly call the MCP tool function
-            # This could be refactored to use a proper video service later
-            from fastmcp.server.context import Context
+            # Find the most recent image in the session
+            try:
+                image_base64 = find_latest_image_in_session(session_id)
+            except ValueError as e:
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+            
+            # Get the latest text-to-image prompt for better video generation
+            original_prompt = get_latest_text_to_image_prompt(session_id)
+            if not original_prompt:
+                original_prompt = "Generate a dynamic video with natural motion and cinematic quality"
             
             # Create a mock context for the MCP tool
-            # In a real implementation, this would be cleaner
             class MockContext:
                 def __init__(self, session_id: str, llm_client):
                     self.client_id = session_id
@@ -259,8 +267,13 @@ class ContentService:
             
             context = MockContext(session_id, llm_client)
             
-            # Call the MCP tool
-            result = await mcp_generate_video_from_context(context)
+            # Generate video using the MCP tool with original image prompt
+            result = await generate_video_from_image(
+                context=context,
+                image_base64=image_base64,
+                prompt=original_prompt,
+                motion_type=motion_type
+            )
             
             if result.get("status") == "error":
                 return {
@@ -268,88 +281,39 @@ class ContentService:
                     "error": result.get("message", "Video generation failed")
                 }
             
-            # Extract video or image data from the successful result
+            # Extract video data and save it
             data = result.get("data", {})
-            # 修复嵌套的 data 结构
-            if "data" in data:
-                data = data["data"]
             
-            video_data = data.get("video_base64")
-            image_data = data.get("image_base64")  # 静态图片的情况
+            # Check if video_base64 is in nested data structure
+            video_data = None
+            if isinstance(data.get("data"), dict):
+                video_data = data["data"].get("video_base64")
+                video_format = data["data"].get("format", "webm")
+            else:
+                video_data = data.get("video_base64")
+                video_format = data.get("format", "webm")
             
-            print(f"[DEBUG] content_service data keys: {list(data.keys()) if data else 'None'}")
-            print(f"[DEBUG] video_data exists: {bool(video_data)}")
-            print(f"[DEBUG] image_data exists: {bool(image_data)}")
-            print(f"[DEBUG] data type: {data.get('type')}")
+            print(f"[DEBUG] ContentService data keys: {list(data.keys()) if data else 'None'}")
+            print(f"[DEBUG] Has nested data: {isinstance(data.get('data'), dict)}")
+            print(f"[DEBUG] Has video_base64: {bool(video_data)}")
+            print(f"[DEBUG] Video format: {video_format}")
             
-            if not video_data and not image_data:
-                print(f"[DEBUG] No video or image data found in result: {result}")
-                return {
-                    "success": False,
-                    "error": "No video or image data in generation result"
-                }
-            
-            # 处理静态图片（AnimateDiff 返回PNG时）
-            if image_data and data.get("type") == "static_image":
-                print(f"[DEBUG] Processing static image result (AnimateDiff disabled)")
-                # 将静态图片保存为"视频"（实际是图片）
-                from backend.infrastructure.storage.image_storage import save_image_from_base64
-                try:
-                    # 保存为图片文件
-                    local_path = save_image_from_base64(image_data, session_id)
-                    print(f"[DEBUG] Successfully saved static image to: {local_path}")
-                    
-                    return {
-                        "success": True,
-                        "result": f"生成了静态图片（AnimateDiff已禁用）",
-                        "local_path": local_path,
-                        "type": "static_image"
-                    }
-                except Exception as e:
-                    print(f"[ERROR] Failed to save static image: {e}")
-                    return {
-                        "success": False,
-                        "error": f"Failed to save static image: {str(e)}"
-                    }
-            
-            # 处理AnimateDiff返回的PNG图片（本应是视频但返回了图片）
-            if data.get("type") == "image_base64" and data.get("format") == "png":
-                print(f"[DEBUG] AnimateDiff returned PNG instead of video - treating as image")
-                image_data = data.get("video")  # 虽然key是video，但实际是图片
-                if image_data:
-                    from backend.infrastructure.storage.image_storage import save_image_from_base64
-                    try:
-                        local_path = save_image_from_base64(image_data, session_id)
-                        print(f"[DEBUG] Successfully saved PNG as image: {local_path}")
-                        
-                        return {
-                            "success": True,
-                            "result": "AnimateDiff生成了静态图片而非视频，请检查AnimateDiff配置",
-                            "local_path": local_path,
-                            "type": "image",
-                            "note": data.get("note", "")
-                        }
-                    except Exception as e:
-                        print(f"[ERROR] Failed to save PNG image: {e}")
-                        return {
-                            "success": False,
-                            "error": f"Failed to save PNG image: {str(e)}"
-                        }
-            
-            # 正常的视频处理
             if not video_data:
+                data_summary = {k: f"<{type(v).__name__}>" if k == "data" and isinstance(v, dict) else v 
+                               for k, v in data.items() if k != "video_base64"}
+                print(f"[DEBUG] No video_base64 found in structure. Keys: {list(data.keys())}, Summary: {data_summary}")
                 return {
                     "success": False,
                     "error": "No video data in generation result"
                 }
             
-            # Save video to session folder using the video storage service
+            # Save video to session folder
             from backend.infrastructure.storage.video_storage import save_video_from_base64
             
             try:
-                video_format = data.get("format", "mp4")
+                print(f"[DEBUG] Saving video with format: {video_format}")
                 local_path = save_video_from_base64(video_data, session_id, output_dir_base="chat/data", format=video_format)
-                print(f"[DEBUG] Successfully saved video to: {local_path}")
+                print(f"[DEBUG] Video saved successfully to: {local_path}")
                 
                 return {
                     "success": True,
@@ -357,17 +321,13 @@ class ContentService:
                     "data": data
                 }
             except Exception as e:
-                print(f"[ERROR] Failed to save video: {e}")
                 return {
                     "success": False,
                     "error": f"Failed to save video: {str(e)}"
                 }
-            
+                
         except Exception as e:
-            import traceback
-            print(f"[ERROR] Video generation exception: {e}")
-            traceback.print_exc()
             return {
                 "success": False,
-                "error": str(e)
+                "error": f"Video generation failed: {str(e)}"
             }
