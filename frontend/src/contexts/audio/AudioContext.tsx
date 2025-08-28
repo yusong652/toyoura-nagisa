@@ -159,8 +159,57 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
         // 重置停止标记
         shouldStopCurrentAudioRef.current = false;
         
-        console.log('开始解码音频数据...')
-        const audioBuffer = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0)).buffer
+        // 验证音频数据
+        if (!audioBase64 || audioBase64.length === 0) {
+          console.warn('收到空的音频数据，跳过播放')
+          resolve()
+          return
+        }
+        
+        // 验证base64格式
+        try {
+          // 基础base64格式检查
+          if (!/^[A-Za-z0-9+/]*={0,2}$/.test(audioBase64)) {
+            console.error('无效的base64格式:', audioBase64.substring(0, 50) + '...')
+            reject(new Error('Invalid base64 format'))
+            return
+          }
+        } catch (e) {
+          console.error('base64格式验证失败:', e)
+          reject(new Error('Base64 validation failed'))
+          return
+        }
+        
+        console.log('开始解码音频数据...', `数据长度: ${audioBase64.length}`, `前50个字符: ${audioBase64.substring(0, 50)}...`)
+        
+        let audioBuffer: ArrayBuffer
+        try {
+          const binaryString = atob(audioBase64)
+          console.log('Base64解码成功，二进制字符串长度:', binaryString.length)
+          
+          if (binaryString.length === 0) {
+            console.warn('Base64解码后的二进制字符串为空')
+            resolve()
+            return
+          }
+          
+          const uint8Array = Uint8Array.from(binaryString, c => c.charCodeAt(0))
+          audioBuffer = uint8Array.buffer
+          console.log('ArrayBuffer创建成功，从', uint8Array.length, '字节转换')
+        } catch (e) {
+          console.error('Base64解码失败:', e)
+          reject(new Error('Base64 decode failed: ' + e))
+          return
+        }
+        
+        // 检查解码后的数据大小
+        console.log('解码后的音频缓冲区大小:', audioBuffer.byteLength, 'bytes')
+        
+        if (audioBuffer.byteLength === 0) {
+          console.warn('解码后的音频数据为空，跳过播放')
+          resolve()
+          return
+        }
         const context = await getAudioContext()
         
         // 确保AudioContext处于running状态
@@ -282,6 +331,14 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
           }
         }, (err: Error) => {
           console.error('音频解码失败:', err)
+          console.error('失败的音频缓冲区大小:', audioBuffer?.byteLength || 0, 'bytes')
+          try {
+            if (audioBuffer && audioBuffer.byteLength > 0) {
+              console.error('音频数据前100字节:', new Uint8Array(audioBuffer.slice(0, Math.min(100, audioBuffer.byteLength))))
+            }
+          } catch (bufferError) {
+            console.error('无法读取音频缓冲区数据:', bufferError)
+          }
           stopLipSync()
           reject(new Error('音频解码失败: ' + err))
         })

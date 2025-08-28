@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { IconButton, Snackbar, Alert } from '@mui/material';
+import { IconButton } from '@mui/material';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import { useSession } from '../contexts/session/SessionContext';
 import { useChat } from '../contexts/chat/ChatContext';
 import VideoPlayer from './VideoPlayer';
+import UnifiedErrorDisplay from './UnifiedErrorDisplay';
 import { sessionService } from '../services/api/sessionService';
+import { useErrorDisplay } from '../hooks/useErrorDisplay';
 import './ImageWithVideoAction.css';
 
 interface ImageWithVideoActionProps {
@@ -17,11 +19,10 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showError, setShowError] = useState(false);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const { currentSessionId } = useSession();
   const { addVideoMessage } = useChat();
+  const { error, showTemporaryError, clearError } = useErrorDisplay();
 
   const handleGenerateVideo = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -29,7 +30,7 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
     if (isGenerating || videoUrl) return;
     
     setIsGenerating(true);
-    setError(null);
+    clearError();
     
     try {
       // Call the video generation API
@@ -63,16 +64,15 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
           }
         } catch (error) {
           console.error('获取生成的视频消息失败:', error);
+          showTemporaryError('Failed to retrieve generated video', 4000);
         }
       } else {
-        setError(result.error || 'Failed to generate video');
-        setShowError(true);
+        showTemporaryError(result.error || 'Failed to generate video', 5000);
       }
       
     } catch (err) {
       console.error('Error generating video:', err);
-      setError('Failed to generate video. Please try again.');
-      setShowError(true);
+      showTemporaryError('Failed to generate video. Please try again.', 5000);
     } finally {
       setIsGenerating(false);
     }
@@ -142,16 +142,10 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
         )}
       </div>
       
-      <Snackbar
-        open={showError}
-        autoHideDuration={6000}
-        onClose={() => setShowError(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setShowError(false)} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
       
       {showVideoPlayer && videoUrl && (
         <VideoPlayer

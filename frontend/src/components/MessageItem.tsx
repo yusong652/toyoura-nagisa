@@ -6,8 +6,10 @@ import MessageToolState from './MessageToolState'
 import ImageViewer from './ImageViewer'
 import ImageWithVideoAction from './ImageWithVideoAction'
 import VideoPlayer from './VideoPlayer'
+import UnifiedErrorDisplay from './UnifiedErrorDisplay'
 import ReactMarkdown from 'react-markdown'
 import { useImageNavigation } from '../hooks/useImageNavigation'
+import { useErrorDisplay } from '../hooks/useErrorDisplay'
 
 interface MessageItemProps {
   message: Message
@@ -22,6 +24,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const { deleteMessage } = useChat()
+  const { error, showTemporaryError, clearError } = useErrorDisplay()
   const [viewerOpen, setViewerOpen] = useState(false)
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('')
   const [showVideoPlayer, setShowVideoPlayer] = useState(false)
@@ -99,7 +102,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
       onMessageSelect(null)
     } catch (error) {
       console.error('删除消息失败:', error)
-      // 可以在这里添加错误提示
+      showTemporaryError('Failed to delete message. Please try again.', 4000)
     }
   }
   
@@ -378,6 +381,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           onClose={() => setShowVideoPlayer(false)}
         />
       )}
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
     </>
   )
 }

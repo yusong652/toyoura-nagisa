@@ -2,11 +2,14 @@ import React, { useState } from 'react'
 import './ChatHistorySidebar.css'
 import { useSession } from '../contexts/session/SessionContext'
 import { ChatSession } from '../types/session'
+import UnifiedErrorDisplay from './UnifiedErrorDisplay'
+import { useErrorDisplay } from '../hooks/useErrorDisplay'
 
 const ChatHistorySidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [newSessionName, setNewSessionName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const { error, showTemporaryError, clearError } = useErrorDisplay()
   
   const { 
     sessions, 
@@ -47,6 +50,7 @@ const ChatHistorySidebar: React.FC = () => {
       setNewSessionName('');
     } catch (error) {
       console.error('Error creating session:', error);
+      showTemporaryError('Failed to create new session. Please try again.', 4000);
     } finally {
       setIsCreating(false);
     }
@@ -137,6 +141,10 @@ const ChatHistorySidebar: React.FC = () => {
           )}
         </div>
       </div>
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
     </>
   )
 }

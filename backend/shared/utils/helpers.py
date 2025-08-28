@@ -171,8 +171,27 @@ async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
             return {'text': sentence, 'audio': None}
             
         audio_bytes = await tts_engine.synthesize(sentence)
-        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-        return {'text': sentence, 'audio': audio_b64}
+        
+        # 验证音频数据
+        if not audio_bytes or len(audio_bytes) == 0:
+            print(f"TTS引擎返回空音频数据，句子: '{sentence}'")
+            return {'text': sentence, 'audio': None, 'error': 'Empty audio data from TTS engine'}
+        
+        # 验证音频数据是否为有效字节流
+        if not isinstance(audio_bytes, bytes):
+            print(f"TTS引擎返回无效数据类型: {type(audio_bytes)}，句子: '{sentence}'")
+            return {'text': sentence, 'audio': None, 'error': f'Invalid audio data type: {type(audio_bytes)}'}
+        
+        try:
+            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+            print(f"TTS成功，句子: '{sentence}', 音频数据长度: {len(audio_bytes)} bytes -> base64长度: {len(audio_b64)}")
+            # 检查音频数据的前几个字节来确认格式
+            if len(audio_bytes) > 10:
+                print(f"音频数据头部: {audio_bytes[:10].hex()}")
+            return {'text': sentence, 'audio': audio_b64}
+        except Exception as b64_error:
+            print(f"Base64编码失败: {b64_error}")
+            return {'text': sentence, 'audio': None, 'error': f'Base64 encoding failed: {str(b64_error)}'}
     except Exception as e:
         print(f"TTS合成失败: {e}")
         return {'text': sentence, 'audio': None, 'error': str(e)}
