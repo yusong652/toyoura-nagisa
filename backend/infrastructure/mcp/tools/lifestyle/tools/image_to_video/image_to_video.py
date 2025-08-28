@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import json
 import logging
 import traceback
-from typing import Any, Dict, Optional
+from typing import Dict, Optional, Any
 import httpx
 import base64
 from io import BytesIO
@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 async def call_wan22_api(
     image_base64: str,
     prompt: str,
-    negative_prompt: str,
-    motion_type: str = "cinematic"
+    negative_prompt: str
 ) -> Dict[str, Any]:
     """
     Call ComfyUI API to generate video using optimized WAN 2.2 image-to-video workflow.
@@ -39,12 +38,11 @@ async def call_wan22_api(
         image_base64: Base64 encoded input image for video generation
         prompt: Positive prompt with motion descriptions
         negative_prompt: Negative prompt
-        motion_type: Type of motion preset to use
     
     Returns:
         Dict containing video result or error
     """
-    print(f"[DEBUG] Starting WAN 2.2 generation - Motion: {motion_type}")
+    print(f"[DEBUG] Starting WAN 2.2 generation")
     
     try:
         # Get configuration
@@ -55,52 +53,63 @@ async def call_wan22_api(
         client_id = str(uuid.uuid4())
         
         # Get workflow based on configuration
-        if settings.workflow_type == "wan22_optimized":
-            workflow = get_wan22_high_quality_workflow(
-                image_base64=image_base64,
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                motion_type=motion_type
-            )
-            print(f"[DEBUG] Using optimized WAN 2.2 workflow with motion type: {motion_type}")
-        else:
-            # Fallback to standard workflow (if implemented)
-            print(f"[WARNING] Workflow type '{settings.workflow_type}' not fully implemented, using WAN 2.2")
-            workflow = get_wan22_high_quality_workflow(
-                image_base64=image_base64,
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                motion_type=motion_type
-            )
+        workflow = get_wan22_high_quality_workflow(
+            image_base64=image_base64,
+            prompt=prompt,
+            negative_prompt=negative_prompt
+        )
+        print(f"[DEBUG] Using optimized WAN 2.2 workflow")
         
         
         # Prepare payload with optimized workflow
         payload = {
             "prompt": workflow,
-            "client_id": client_id,
-            "return_base64": True
+            "client_id": client_id
+            # Remove return_base64 - might not be supported by proxy
         }
-        
-        if settings.debug:
-            logger.info(f"[DEBUG] ComfyUI WAN 2.2 Optimized API call:")
-            logger.info(f"  - Server: {settings.server_url}")
-            logger.info(f"  - Motion type: {motion_type}")
-            logger.info(f"  - Using official WAN 2.2 workflow structure")
-            logger.info(f"  - High-quality parameters: 1280x704 resolution")
-            logger.info(f"  - Optimized for anime-style video generation")
         
         # Make API call
         endpoint = settings.server_url
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                endpoint,
-                headers={"Content-Type": "application/json"},
-                content=json.dumps(payload),
-                timeout=600.0  # 10 minutes timeout for high-quality generation
-            )
+        print(f"[DEBUG] Sending request to ComfyUI server: {endpoint}")
+        print(f"[DEBUG] Payload size: {len(json.dumps(payload))} bytes")
+        
+        # Configure client with extended timeout for video generation
+        # Video generation can take 5-10 minutes, so we need very long timeouts
+        timeout = httpx.Timeout(
+            connect=120.0,  # 2 minutes for connection (should be plenty)
+            read=600.0,     # 10 minutes for read (video generation time)
+            write=120.0,    # 2 minutes for write (large payload upload)
+            pool=120.0      # 2 minutes pool timeout
+        )
+        
+        import time as time_module
+        start_time = time_module.time()
+        
+        async with httpx.AsyncClient(timeout=timeout, limits=httpx.Limits(max_keepalive_connections=5)) as client:
+            print(f"[DEBUG] Sending POST request to {endpoint}...")
+            print(f"[DEBUG] Request started at: {time_module.strftime('%Y-%m-%d %H:%M:%S')}")
             
+            try:
+                response = await client.post(
+                    endpoint,
+                    headers={"Content-Type": "application/json"},
+                    content=json.dumps(payload)
+                )
+                elapsed = time_module.time() - start_time
+                print(f"[DEBUG] Request completed in {elapsed:.1f} seconds")
+            except Exception as e:
+                elapsed = time_module.time() - start_time
+                print(f"[DEBUG] Request failed after {elapsed:.1f} seconds")
+                raise
+            
+            print(f"[DEBUG] Response status: {response.status_code}")
             response.raise_for_status()
+            
+            # Check response size before parsing
+            content_length = response.headers.get('content-length', 'unknown')
+            print(f"[DEBUG] Response content-length: {content_length}")
+            
             result = response.json()
             
             print(f"[DEBUG] ComfyUI response keys: {list(result.keys())}")
@@ -138,22 +147,17 @@ async def call_wan22_api(
                 video_format = "webm"
                 note = "Generated high-quality WEBM video with WAN 2.2 image-to-video"
                 
-                # Get motion-specific parameters for response
-                motion_configs = {
-                    "gentle": {"fps": 16.0, "frames": 41},
-                    "dynamic": {"fps": 20.0, "frames": 61},
-                    "cinematic": {"fps": 24.0, "frames": 81},
-                    "loop": {"fps": 20.0, "frames": 41}
-                }
-                config = motion_configs.get(motion_type, motion_configs["cinematic"])
+                # Get actual parameters from config
+                actual_frames = settings.frame_count
+                actual_fps = float(settings.fps)
                 
                 return {
                     "type": "video_base64",
                     "video": video_base64,
                     "format": video_format,
-                    "fps": config["fps"],
-                    "frames": config["frames"],
-                    "length": round(config["frames"] / config["fps"], 2),
+                    "fps": actual_fps,
+                    "frames": actual_frames,
+                    "length": round(actual_frames / actual_fps, 2),
                     "note": note,
                     "quality": "high",
                     "resolution": "1280x704"
@@ -167,6 +171,17 @@ async def call_wan22_api(
         print(f"[ERROR] Server URL was: {settings.server_url}")
         logger.error(f"Connection error in ComfyUI API call: {e}")
         return {"type": "error", "message": f"Cannot connect to ComfyUI server at {settings.server_url}. Please ensure the server is running."}
+    except httpx.ReadError as e:
+        print(f"[ERROR] Read error from ComfyUI server: {e}")
+        print(f"[ERROR] This may be due to server timeout or large response size")
+        print(f"[ERROR] Server URL: {settings.server_url}")
+        logger.error(f"Read error in ComfyUI API call: {e}")
+        return {"type": "error", "message": "Server read timeout or connection lost. The video generation may still be processing on the server."}
+    except httpx.TimeoutException as e:
+        print(f"[ERROR] Request timeout to ComfyUI server: {e}")
+        print(f"[ERROR] The server is taking too long to respond")
+        logger.error(f"Timeout in ComfyUI API call: {e}")
+        return {"type": "error", "message": "Request timeout. The video generation is taking longer than expected."}
     except httpx.HTTPStatusError as e:
         print(f"[ERROR] HTTP error from ComfyUI: {e}")
         print(f"[ERROR] Response status: {e.response.status_code}")
@@ -184,8 +199,8 @@ async def optimize_prompt_for_video(
     llm_client: Any,
     session_id: str,
     original_prompt: str,
-    motion_type: str = "cinematic"
-) -> Dict[str, str]:
+    motion_style: Optional[str] = None
+) -> Optional[Dict[str, str]]:
     """
     Optimize static image prompt for WAN 2.2 video generation with few-shot learning.
     
@@ -196,14 +211,14 @@ async def optimize_prompt_for_video(
         session_id: Current session ID for few-shot history
         original_prompt: Original static image prompt
         image_base64: Optional base64 image for visual context
-        motion_type: Type of motion for the video
+        motion_style: Optional motion style description to add to the prompt
     
     Returns:
         Dict with optimized video_prompt and negative_prompt for WAN 2.2
     """
     print(f"[DEBUG] optimize_prompt_for_video started")
     print(f"[DEBUG] Original prompt: {original_prompt}")
-    print(f"[DEBUG] Motion type: {motion_type}")
+    print(f"[DEBUG] Motion style: {motion_style}")
     
     # Load few-shot history
     from backend.infrastructure.llm.shared.utils.image_to_video import load_video_prompt_history
@@ -227,11 +242,16 @@ async def optimize_prompt_for_video(
             
             # Get the native Gemini client
             print(f"[DEBUG] Calling GeminiVideoPromptGenerator.generate_video_prompt...")
+            # Add motion style to prompt if provided
+            enhanced_prompt = original_prompt
+            if motion_style:
+                enhanced_prompt = f"{original_prompt}. Motion style: {motion_style}"
+            
             result = await GeminiVideoPromptGenerator.generate_video_prompt(
                 llm_client.client,  # Use the native Gemini client
-                original_prompt,
+                enhanced_prompt,
                 image_base64=None,  # Don't send image to LLM
-                motion_type=motion_type,
+                motion_type="cinematic",  # Default for compatibility with existing generator
                 few_shot_history=limited_few_shot_history
             )
             print(f"[DEBUG] Gemini generator returned: {result}")
@@ -255,7 +275,8 @@ async def optimize_prompt_for_video(
             from backend.infrastructure.llm.shared.utils.image_to_video import save_video_prompt_generation
             try:
                 # Create user request in same format as BaseVideoPromptGenerator.create_video_prompt_request
-                user_request = f"Transform this static image prompt into a dynamic video prompt:\n\nOriginal prompt: {original_prompt}\nMotion type: {motion_type}\n\nAdd motion descriptions, camera movements, and temporal changes that match the {motion_type} style."
+                motion_desc = f" with {motion_style}" if motion_style else ""
+                user_request = f"Transform this static image prompt into a dynamic video prompt{motion_desc}:\n\nOriginal prompt: {original_prompt}\n\nAdd motion descriptions, camera movements, and temporal changes."
                 
                 # Create assistant response in XML format
                 assistant_response = f"<video_prompt>{result.get('video_prompt', '')}</video_prompt>\n<negative_prompt>{result.get('negative_prompt', '')}</negative_prompt>"
@@ -285,7 +306,7 @@ async def generate_video_from_image(
     context: Context,
     image_base64: str,
     prompt: str,
-    motion_type: str = "cinematic"
+    motion_style: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Generate video from static image using WAN 2.2 image-to-video.
@@ -296,7 +317,7 @@ async def generate_video_from_image(
         context: MCP context with session info
         image_base64: Base64 encoded input image
         prompt: Text description for the video generation
-        motion_type: Type of motion (gentle/dynamic/cinematic/loop)
+        motion_style: Optional motion style description (e.g., 'cinematic camera movement')
     
     Returns:
         ToolResult with video data or error
@@ -304,10 +325,13 @@ async def generate_video_from_image(
     import time
     start_time = time.time()
     
-    # Validate motion type
+    # Get settings
     settings = get_image_to_video_settings()
-    if motion_type not in settings.motion_presets:
-        motion_type = "cinematic"  # Default fallback
+    
+    # Use default motion style if not specified
+    if not motion_style:
+        # Use cinematic as default from motion_styles config
+        motion_style = settings.motion_styles.get("cinematic", "cinematic camera movement")
     
     # Get LLM client for prompt optimization
     session_id: str | None = getattr(context, "client_id", None)
@@ -329,7 +353,7 @@ async def generate_video_from_image(
             llm_client=llm_client,
             session_id=session_id,
             original_prompt=prompt,
-            motion_type=motion_type
+            motion_style=motion_style
         )
         
         if prompt_result:
@@ -347,15 +371,14 @@ async def generate_video_from_image(
             logger.info(f"[DEBUG] Video prompt optimization:")
             logger.info(f"  - Original: {prompt}")
             logger.info(f"  - Optimized: {video_prompt}")
-            logger.info(f"  - Motion type: {motion_type}")
+            logger.info(f"  - Motion style: {motion_style}")
         
         # Generate video
         print(f"[DEBUG] Starting video generation with WAN 2.2...")
         video_result = await call_wan22_api(
             image_base64=image_base64,
             prompt=video_prompt,
-            negative_prompt=negative_prompt,
-            motion_type=motion_type
+            negative_prompt=negative_prompt
         )
         print(f"[DEBUG] Video generation completed")
         print(f"[DEBUG] video_result type: '{video_result.get('type')}'")
@@ -366,86 +389,35 @@ async def generate_video_from_image(
                 f"Video generation failed: {video_result.get('message', 'Unknown error')}"
             )
         
-        # Handle different result types
-        if video_result.get("type") == "video_base64":
-            # Successfully generated video with optimized WAN 2.2 workflow
-            print(f"[DEBUG] Got video from optimized WAN 2.2 workflow")
-            generation_time = f"{time.time() - start_time:.1f}s"
-            # Get actual format from result
-            actual_format = video_result.get("format", "webm")
-            actual_frames = video_result.get("frames", 81)
-            actual_fps = video_result.get("fps", 24)
-            actual_length = video_result.get("length", 3.375)
-            actual_resolution = video_result.get("resolution", "1280x704")
-            
-            return success_response(
-                message=f"High-quality video generated with optimized WAN 2.2 workflow ({generation_time})",
-                llm_content={
-                    "description": f"Generated {actual_frames}-frame {actual_format.upper()} HD video at {actual_fps} FPS ({actual_length}s) using optimized WAN 2.2 workflow at {actual_resolution} resolution",
-                    "motion_type": motion_type,
-                    "format": actual_format,
-                    "generation_time": generation_time,
-                    "quality": "high",
-                    "resolution": actual_resolution,
-                    "note": video_result.get("note", "")
-                },
-                data={
-                    "video_base64": video_result.get("video"),
-                    "format": actual_format,
-                    "fps": actual_fps,
-                    "frames": actual_frames,
-                    "length": actual_length,
-                    "quality": "high",
-                    "resolution": actual_resolution,
-                    "prompts": {
-                        "video": video_prompt,
-                        "negative": negative_prompt
-                    }
-                }
-            )
-        elif video_result.get("type") == "image_base64":
-            # WAN 2.2 might not be active, got static image
-            print(f"[DEBUG] Got static image (WAN 2.2 may not be active)")
-            generation_time = f"{time.time() - start_time:.1f}s"
-            return success_response(
-                message=f"Generated image (WAN 2.2 may not be active) ({generation_time})",
-                llm_content={
-                    "description": "Generated static image - WAN 2.2 may not be properly configured",
-                    "note": video_result.get("note", ""),
-                    "generation_time": generation_time,
-                    "suggestion": "Please ensure WAN 2.2 nodes are properly installed in ComfyUI"
-                },
-                data={
-                    "image_base64": video_result.get("video"),
-                    "format": "png",
-                    "type": "static_image",
-                    "prompts": {
-                        "video": video_prompt,
-                        "negative": negative_prompt
-                    }
-                }
-            )
-        
-        # No video data at all - fallback response
+        # Successfully generated video with optimized WAN 2.2 workflow
+        print(f"[DEBUG] Got video from optimized WAN 2.2 workflow")
         generation_time = f"{time.time() - start_time:.1f}s"
+        # Get actual format from result
+        actual_format = video_result.get("format", "webm")
+        actual_frames = video_result.get("frames", 81)
+        actual_fps = video_result.get("fps", 24)
+        actual_length = video_result.get("length", 3.375)
+        actual_resolution = video_result.get("resolution", "1280x704")
+        
         return success_response(
-            message=f"Video generated with optimized workflow ({generation_time})",
+            message=f"High-quality video generated with optimized WAN 2.2 workflow ({generation_time})",
             llm_content={
-                "description": f"Generated HD video using optimized WAN 2.2 workflow at 1280x704 resolution",
-                "motion_type": motion_type,
-                "format": video_result.get("format", "webm"),
+                "description": f"Generated {actual_frames}-frame {actual_format.upper()} HD video at {actual_fps} FPS ({actual_length}s) using optimized WAN 2.2 workflow at {actual_resolution} resolution",
+                "motion_style": motion_style,
+                "format": actual_format,
                 "generation_time": generation_time,
                 "quality": "high",
-                "resolution": "1280x704"
+                "resolution": actual_resolution,
+                "note": video_result.get("note", "")
             },
             data={
                 "video_base64": video_result.get("video"),
-                "format": video_result.get("format", "webm"),
-                "fps": video_result.get("fps", 24),
-                "frames": video_result.get("frames", 81),
-                "length": video_result.get("length", 3.375),
+                "format": actual_format,
+                "fps": actual_fps,
+                "frames": actual_frames,
+                "length": actual_length,
                 "quality": "high",
-                "resolution": "1280x704",
+                "resolution": actual_resolution,
                 "prompts": {
                     "video": video_prompt,
                     "negative": negative_prompt
@@ -473,7 +445,7 @@ def register_image_to_video_tools(mcp: FastMCP) -> None:
     async def _tool_generate_video_from_image(
         image_base64: str,
         prompt: str,
-        motion_type: str = "cinematic"
+        motion_style: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate video from static image.
@@ -481,7 +453,7 @@ def register_image_to_video_tools(mcp: FastMCP) -> None:
         Args:
             image_base64: Base64 encoded input image
             prompt: Description of desired motion and video content
-            motion_type: Type of motion - gentle/dynamic/cinematic/loop
+            motion_style: Optional motion style (e.g., 'cinematic camera movement')
         
         Returns:
             Video in base64 format with metadata
@@ -492,7 +464,7 @@ def register_image_to_video_tools(mcp: FastMCP) -> None:
             context=context,
             image_base64=image_base64,
             prompt=prompt,
-            motion_type=motion_type
+            motion_style=motion_style
         )
     
     logger.info("Image-to-video tools registered successfully")
