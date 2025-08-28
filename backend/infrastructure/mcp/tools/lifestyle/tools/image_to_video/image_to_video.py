@@ -116,31 +116,7 @@ async def call_wan22_api(
             print(f"[DEBUG] Looking for video data in response...")
             
             # Extract video data from response
-            video_base64 = None
-            source_key = None
-            
-            if "videos" in result and result["videos"] and len(result["videos"]) > 0:
-                video_base64 = result["videos"][0]
-                source_key = "videos[0]"
-                print(f"[DEBUG] Found video in 'videos' array")
-            elif "video" in result and result["video"]:
-                video_base64 = result["video"]
-                source_key = "video"
-                print(f"[DEBUG] Found video in 'video' field")
-            elif "47" in result:  # SaveWEBM output node
-                video_base64 = result.get("47")
-                source_key = "47 (SaveWEBM)"
-                print(f"[DEBUG] Found video in node 47 (SaveWEBM)")
-            else:
-                print(f"[DEBUG] No video found. Available keys: {list(result.keys())}")
-                # Check if there are any other numbered keys that might contain video
-                for key in result.keys():
-                    if key.isdigit():
-                        print(f"[DEBUG] Checking numeric key '{key}': {type(result[key])}")
-                        if result[key] and len(str(result[key])) > 100:  # Likely base64 data
-                            print(f"[DEBUG] Key '{key}' contains data of length {len(str(result[key]))}")
-            
-            print(f"[DEBUG] Video source: {source_key}, has data: {bool(video_base64)}")
+            video_base64 = result.get("47") or result.get("video") or (result.get("videos") and result["videos"][0] if result.get("videos") else None)
             
             if video_base64:
                 # Return WEBM format from SaveWEBM node
@@ -166,34 +142,13 @@ async def call_wan22_api(
                 print(f"[DEBUG] No video in response. Available keys: {list(result.keys())}")
                 return {"type": "error", "message": "No video data in response from optimized workflow"}
                 
-    except httpx.ConnectError as e:
-        print(f"[ERROR] Connection failed to ComfyUI server: {e}")
-        print(f"[ERROR] Server URL was: {settings.server_url}")
-        logger.error(f"Connection error in ComfyUI API call: {e}")
-        return {"type": "error", "message": f"Cannot connect to ComfyUI server at {settings.server_url}. Please ensure the server is running."}
-    except httpx.ReadError as e:
-        print(f"[ERROR] Read error from ComfyUI server: {e}")
-        print(f"[ERROR] This may be due to server timeout or large response size")
-        print(f"[ERROR] Server URL: {settings.server_url}")
-        logger.error(f"Read error in ComfyUI API call: {e}")
-        return {"type": "error", "message": "Server read timeout or connection lost. The video generation may still be processing on the server."}
-    except httpx.TimeoutException as e:
-        print(f"[ERROR] Request timeout to ComfyUI server: {e}")
-        print(f"[ERROR] The server is taking too long to respond")
-        logger.error(f"Timeout in ComfyUI API call: {e}")
-        return {"type": "error", "message": "Request timeout. The video generation is taking longer than expected."}
+    except (httpx.TimeoutException, httpx.ReadError, httpx.ConnectError):
+        return {"type": "error", "message": "Video generation timeout due to Cloudflare limits. Consider using async polling for longer tasks."}
     except httpx.HTTPStatusError as e:
-        print(f"[ERROR] HTTP error from ComfyUI: {e}")
-        print(f"[ERROR] Response status: {e.response.status_code}")
-        logger.error(f"HTTP error in ComfyUI API call: {e}")
-        return {"type": "error", "message": f"API error: {e.response.status_code}"}
+        return {"type": "error", "message": f"Server error: {e.response.status_code}"}
     except Exception as e:
-        print(f"[ERROR] Unexpected error in ComfyUI API call: {e}")
-        print(f"[ERROR] Error type: {type(e).__name__}")
-        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
-        logger.error(f"Error in ComfyUI API call: {e}")
-        logger.error(traceback.format_exc())
-        return {"type": "error", "message": str(e)}
+        logger.error(f"Video generation error: {e}")
+        return {"type": "error", "message": "Video generation failed"}
 
 async def optimize_prompt_for_video(
     llm_client: Any,
@@ -392,36 +347,19 @@ async def generate_video_from_image(
         # Successfully generated video with optimized WAN 2.2 workflow
         print(f"[DEBUG] Got video from optimized WAN 2.2 workflow")
         generation_time = f"{time.time() - start_time:.1f}s"
-        # Get actual format from result
+        # Get essential info from result
         actual_format = video_result.get("format", "webm")
-        actual_frames = video_result.get("frames", 81)
-        actual_fps = video_result.get("fps", 24)
         actual_length = video_result.get("length", 3.375)
-        actual_resolution = video_result.get("resolution", "1280x704")
         
         return success_response(
-            message=f"High-quality video generated with optimized WAN 2.2 workflow ({generation_time})",
+            message=f"Video generated successfully ({generation_time})",
             llm_content={
-                "description": f"Generated {actual_frames}-frame {actual_format.upper()} HD video at {actual_fps} FPS ({actual_length}s) using optimized WAN 2.2 workflow at {actual_resolution} resolution",
-                "motion_style": motion_style,
-                "format": actual_format,
-                "generation_time": generation_time,
-                "quality": "high",
-                "resolution": actual_resolution,
-                "note": video_result.get("note", "")
+                "description": f"Generated a {actual_length}s video"
             },
             data={
                 "video_base64": video_result.get("video"),
                 "format": actual_format,
-                "fps": actual_fps,
-                "frames": actual_frames,
-                "length": actual_length,
-                "quality": "high",
-                "resolution": actual_resolution,
-                "prompts": {
-                    "video": video_prompt,
-                    "negative": negative_prompt
-                }
+                "length": actual_length
             }
         )
         
