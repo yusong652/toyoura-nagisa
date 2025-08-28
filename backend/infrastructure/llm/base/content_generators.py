@@ -448,16 +448,11 @@ class BaseVideoPromptGenerator(BaseContentGenerator):
         
         motion_desc = motion_descriptions.get(motion_type, motion_descriptions["cinematic"])
         
-        return f"""Transform this static image prompt into a dynamic video prompt:
+        return f"""Transform this static image prompt into a dynamic video prompt with {motion_type} style:
 
 Original prompt: {original_prompt}
-Motion type: {motion_type} ({motion_desc})
 
-Add motion descriptions, camera movements, and temporal changes that match the {motion_type} style.
-Keep the core subject and artistic style, but make it dynamic with {motion_desc}.
-Output format:
-<video_prompt>your enhanced video prompt here</video_prompt>
-<negative_prompt>negative prompt for video generation here</negative_prompt>"""
+Add {motion_desc} to enhance the scene."""
     
     @staticmethod
     def parse_video_prompt_response(response_text: str, original_prompt: str) -> Dict[str, str]:
@@ -508,3 +503,59 @@ Output format:
             "video_prompt": video_prompt,
             "negative_prompt": negative_prompt
         }
+    
+    @staticmethod
+    def process_video_generation_response(
+        response_text: str,
+        original_prompt: str,
+        motion_type: str = "cinematic",
+        session_id: Optional[str] = None,
+        debug: bool = False
+    ) -> Optional[Dict[str, str]]:
+        """
+        Process the raw video generation response and extract prompts.
+        Similar to BaseImagePromptGenerator.process_generation_response pattern.
+        
+        Args:
+            response_text: Raw response text from LLM (with XML tags)
+            original_prompt: Original static image prompt
+            motion_type: Type of motion for the video
+            session_id: Optional session ID for saving history
+            debug: Enable debug output
+            
+        Returns:
+            Dictionary with 'video_prompt' and 'negative_prompt' keys, or None if failed
+        """
+        if not response_text:
+            return None
+        
+        # Parse the response
+        parsed_result = BaseVideoPromptGenerator.parse_video_prompt_response(
+            response_text, original_prompt
+        )
+        
+        if not parsed_result:
+            return None
+        
+        # Save to history for future few-shot learning
+        if session_id:
+            from backend.infrastructure.llm.shared.utils.image_to_video import save_video_prompt_generation
+            try:
+                # Create user request message (same format as create_video_prompt_request)
+                user_request = BaseVideoPromptGenerator.create_video_prompt_request(
+                    original_prompt, motion_type
+                )
+                
+                # Save with the original LLM response (already contains XML tags)
+                save_video_prompt_generation(
+                    session_id=session_id,
+                    user_request=user_request,
+                    assistant_response=response_text  # Save raw LLM response with XML tags
+                )
+                if debug:
+                    print(f"[video_prompt] Saved generation to history for session {session_id}")
+            except Exception as e:
+                if debug:
+                    print(f"[video_prompt] Warning: Failed to save generation to history: {e}")
+        
+        return parsed_result
