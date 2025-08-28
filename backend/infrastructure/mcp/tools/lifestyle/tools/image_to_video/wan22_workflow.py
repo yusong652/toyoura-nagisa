@@ -201,17 +201,18 @@ def get_wan22_optimized_workflow(
 def get_wan22_high_quality_workflow(
     image_base64: str,
     prompt: str,
-    negative_prompt: str,
-    motion_type: str = "cinematic"
+    negative_prompt: str
 ) -> Dict[str, Any]:
     """
-    Get high-quality WAN 2.2 workflow with motion-type specific parameters from config.
+    Get high-quality WAN 2.2 workflow with parameters from config.
+    
+    All parameters are read from the configuration file to ensure consistency
+    and avoid hardcoded values.
     
     Args:
         image_base64: Base64 encoded input image
         prompt: Positive prompt for video generation
         negative_prompt: Negative prompt
-        motion_type: Type of motion (gentle/dynamic/cinematic/loop)
     
     Returns:
         Dict containing the optimized workflow
@@ -221,17 +222,24 @@ def get_wan22_high_quality_workflow(
     
     settings = get_image_to_video_settings()
     
-    # Get motion-type specific parameters from config
-    config = settings.wan22_workflows.get(motion_type, settings.wan22_workflows["cinematic"])
+    # Use unified configuration from settings
+    # Default resolution for WAN 2.2 optimal performance
+    width = getattr(settings, 'width', 640)
+    height = getattr(settings, 'height', 960)
+    
+    # Get sampling parameters with sensible defaults
+    steps = getattr(settings, 'steps', 20)
+    cfg_scale = getattr(settings, 'cfg', 4.5)
     
     return get_wan22_optimized_workflow(
         image_base64=image_base64,
         prompt=prompt,
         negative_prompt=negative_prompt,
-        width=config["width"],
-        height=config["height"],
-        video_frames=config["frames"],
-        fps=config["fps"],
-        steps=config["steps"],
-        cfg_scale=config["cfg"]
+        width=width,
+        height=height,
+        video_frames=settings.frame_count,
+        fps=float(settings.fps),
+        seed=settings.seed,
+        steps=steps,
+        cfg_scale=cfg_scale
     )

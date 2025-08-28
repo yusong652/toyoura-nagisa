@@ -39,8 +39,7 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          session_id: currentSessionId,
-          motion_type: 'cinematic'
+          session_id: currentSessionId
         }),
       });
       

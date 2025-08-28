@@ -171,7 +171,7 @@ async def generate_video(
     5. Saves generated video to session folder
     
     Args:
-        request: Video generation request with session_id and optional motion_type
+        request: Video generation request with session_id and optional motion_style
         
     Returns:
         Dict[str, Any]: Video generation result with structure:
@@ -185,7 +185,7 @@ async def generate_video(
     try:
         result = await service.generate_video_for_session(
             session_id=request.session_id,
-            motion_type=request.motion_type,
+            motion_style=request.motion_style,
             llm_client=llm_client
         )
         

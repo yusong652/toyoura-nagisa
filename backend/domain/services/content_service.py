@@ -211,7 +211,7 @@ class ContentService:
     async def generate_video_for_session(
         self,
         session_id: str,
-        motion_type: str = "cinematic",
+        motion_style: Optional[str] = None,
         llm_client: Any = None
     ) -> Dict[str, Any]:
         """
@@ -226,7 +226,7 @@ class ContentService:
         
         Args:
             session_id: Session UUID for context
-            motion_type: Type of motion for video (gentle/dynamic/cinematic/loop)
+            motion_style: Optional motion style description (e.g., 'cinematic camera movement')
             llm_client: LLM client for prompt optimization
             
         Returns:
@@ -272,7 +272,7 @@ class ContentService:
                 context=context,
                 image_base64=image_base64,
                 prompt=original_prompt,
-                motion_type=motion_type
+                motion_style=motion_style
             )
             
             if result.get("status") == "error":

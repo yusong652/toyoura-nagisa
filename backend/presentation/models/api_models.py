@@ -87,4 +87,4 @@ class GenerateImageRequest(BaseModel):
 class GenerateVideoRequest(BaseModel):
     """生成视频的请求模型"""
     session_id: str
-    motion_type: Optional[str] = Field(default="cinematic", description="运动类型: gentle/dynamic/cinematic/loop")
+    motion_style: Optional[str] = Field(default=None, description="Motion style description (e.g., 'cinematic camera movement')")

@@ -4,6 +4,7 @@ Video generation API endpoints
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
+from typing import Optional
 from pydantic import BaseModel
 from backend.domain.services.content_service import ContentService
 from backend.infrastructure.llm.base.client import LLMClientBase
@@ -15,7 +16,7 @@ BASE_DIR = Path(__file__).parent.parent.parent / "chat" / "data"
 
 class VideoGenerationRequest(BaseModel):
     session_id: str
-    motion_type: str = "cinematic"
+    motion_style: Optional[str] = None
 
 def get_content_service() -> ContentService:
     """
@@ -89,7 +90,7 @@ async def generate_video(
     Generate video from the most recent image in conversation context.
     
     Args:
-        request: Video generation request with session_id and motion_type
+        request: Video generation request with session_id and motion_style
         
     Returns:
         dict: Generation result with success status and video data
@@ -97,7 +98,7 @@ async def generate_video(
     try:
         result = await service.generate_video_for_session(
             session_id=request.session_id,
-            motion_type=request.motion_type,
+            motion_style=request.motion_style,
             llm_client=llm_client
         )
         
