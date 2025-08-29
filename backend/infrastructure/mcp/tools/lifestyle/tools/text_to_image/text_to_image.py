@@ -1,88 +1,75 @@
 from fastmcp import FastMCP
-import asyncio
 from dotenv import load_dotenv
-import json
 import logging
-import traceback
-from typing import Any
-import httpx
+from typing import Any, Dict
 from fastapi import FastAPI
 from fastmcp.server.context import Context  # type: ignore
-from backend.config import get_text_to_image_config
+from backend.config.text_to_image import TextToImageSettings
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from .comfyui_client import ComfyUIClient
 
 load_dotenv()
 
 app = FastAPI()
 
 
-async def generate_image_from_description(prompt: str, negative_prompt: str):
-    """Generate image from text prompts using Stable Diffusion WebUI API."""
+async def generate_image_from_description(prompt: str, negative_prompt: str, seed: int = -1) -> Dict[str, Any]:
+    """
+    Generate image from text prompts using ComfyUI API.
+    
+    Creates a ComfyUI workflow from the provided prompts and executes it through
+    the ComfyUI client, returning base64 encoded image data.
+    
+    Args:
+        prompt: Positive text prompt for image generation
+        negative_prompt: Negative text prompt to avoid unwanted elements
+        seed: Random seed for reproducible generation (-1 for random)
+        
+    Returns:
+        Dict[str, Any]: Generation result with structure:
+            - type: Literal["image_base64", "error"] - Result type
+            - image: str - Base64 image data when successful
+            - message: str - Error description when failed
+            - prompt_id: Optional[str] - ComfyUI prompt ID for debugging
+    """
     try:
         # Get configuration
-        config = get_text_to_image_config()
-        provider = config.get("provider")
+        settings = TextToImageSettings()
+        comfyui_config = settings.get_current_config()
         
-        if provider != "stable_diffusion_webui":
-            return {"type": "error", "message": f"Unsupported image generation provider: {provider}"}
+        # Generate ComfyUI workflow
+        workflow = comfyui_config.generate_workflow(
+            positive_prompt=prompt,
+            negative_prompt=negative_prompt,
+            seed=seed
+        )
+        
+        # Create ComfyUI client and generate image
+        client = ComfyUIClient(
+            server_url=comfyui_config.comfyui_server_url,
+            client_id=comfyui_config.client_id
+        )
+        
+        # Execute workflow with progress logging
+        def progress_callback(data: Dict[str, Any]) -> None:
+            if data.get('type') == 'progress':
+                progress_data = data.get('data', {})
+                current = progress_data.get('value', 0)
+                total = progress_data.get('max', 100)
+                logging.info(f"ComfyUI progress: {current}/{total}")
+        
+        result = await client.generate_image(workflow, progress_callback)
+        
+        if result["type"] == "image_base64":
+            logging.info(f"Successfully generated image with prompt_id: {result.get('prompt_id')}")
+        else:
+            logging.error(f"Image generation failed: {result.get('message')}")
             
-        sd_config = config.get("stable_diffusion_webui", {})
-        server_url = sd_config.get("server_url")
-
-        if not server_url:
-            return {"type": "error", "message": "Stable Diffusion server URL is not configured."}
-        
-        # Get model type and preset
-        model_type = sd_config.get("model_type", "illustrious")
-        model_preset = sd_config.get("model_presets", {}).get(model_type, {})
-
-        # Prepare base payload
-        payload = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "steps": sd_config.get("steps", 25),
-            "seed": sd_config.get("seed", -1),
-            "enable_hr": sd_config.get("enable_hr", False),
-            "hr_scale": sd_config.get("hr_scale", 2.0),
-            "hr_upscaler": sd_config.get("hr_upscaler", "4x-UltraSharp"),
-            "denoising_strength": sd_config.get("denoising_strength", 0.5),
-        }
-        
-        # Apply model preset, values from preset will override base payload
-        payload.update(model_preset)
-
-        # Build override_settings and remove corresponding keys from payload
-        override_settings = {}
-        if "sd_model_checkpoint" in payload:
-            override_settings["sd_model_checkpoint"] = payload.pop("sd_model_checkpoint")
-        if "sd_vae" in payload:
-            override_settings["sd_vae"] = payload.pop("sd_vae")
-        if "clip_skip" in payload:
-            override_settings["CLIP_stop_at_last_layers"] = payload.pop("clip_skip")
-            
-        if override_settings:
-            payload["override_settings"] = override_settings
-
-        async with httpx.AsyncClient() as client:
-            endpoint = f"{server_url}"
-            response = await client.post(
-                endpoint,
-                headers={"Content-Type": "application/json"},
-                content=json.dumps(payload),
-                timeout=300.0 
-            )
-
-            response.raise_for_status()
-            result = response.json()
-
-            if "images" in result and result["images"]:
-                base64_image = result["images"][0]
-                return {"type": "image_base64", "image": base64_image}
-            else:
-                return {"type": "error", "message": "Image generation failed, no image in response."}
+        return result
                 
     except Exception as e:
-        return {"type": "error", "message": str(e)}
+        logging.error(f"ComfyUI generation error: {e}")
+        return {"type": "error", "message": f"ComfyUI generation failed: {str(e)}"}
 
 async def generate_image(context: Context) -> dict[str, Any]:
     """Generate a bespoke illustration that visually represents the current conversation context.
@@ -125,13 +112,14 @@ async def generate_image(context: Context) -> dict[str, Any]:
 
     text_prompt = prompt_result["text_prompt"]
     negative_prompt = prompt_result["negative_prompt"]
+    seed = prompt_result.get("seed", -1)  # Extract seed from prompt result
 
-    # Generate image using configured provider
+    # Generate image using ComfyUI
     try:
-        image_result = await generate_image_from_description(text_prompt, negative_prompt)
+        image_result = await generate_image_from_description(text_prompt, negative_prompt, seed)
     except Exception as e:
         return error_response(
-            "Image generation failed"
+            f"ComfyUI image generation failed: {str(e)}"
         )
 
     if not image_result:
@@ -168,13 +156,21 @@ async def generate_image(context: Context) -> dict[str, Any]:
 
 def register_text_to_image_tools(mcp: FastMCP):
     """
-    Register the text-to-image generation tool with proper tags synchronization.
+    Register the ComfyUI text-to-image generation tool with proper tags synchronization.
+    
+    Updates tool registration to reflect ComfyUI backend integration while maintaining
+    the same external interface for consistent tool ecosystem compatibility.
     
     Args:
         mcp: The FastMCP instance to register the tool with
     """
     mcp.tool(
-        tags={"image", "generation", "ai", "creative", "media"}, 
-        annotations={"category": "media", "tags": ["image", "generation", "ai", "creative", "media"]}
+        tags={"image", "generation", "ai", "creative", "media", "comfyui"}, 
+        annotations={
+            "category": "media", 
+            "tags": ["image", "generation", "ai", "creative", "media", "comfyui"],
+            "backend": "comfyui",
+            "workflow_based": True
+        }
     )(generate_image)
 

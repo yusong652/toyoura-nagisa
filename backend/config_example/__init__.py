@@ -149,29 +149,27 @@ def get_text_to_image_config() -> Dict[str, Any]:
     """Get text-to-image configuration (backward compatibility)"""
     settings = get_app_settings().get_text_to_image_settings()
     
-    # Since we only support stable_diffusion_webui now, get its config directly
-    sd_config = settings.get_current_config()
+    # Since we now use ComfyUI, get its config directly
+    comfyui_config = settings.get_current_config()
     
     config = {
-        "provider": "stable_diffusion_webui",  # Always stable_diffusion_webui now
+        "provider": "comfyui",  # Now using ComfyUI
         "text_to_image_system_prompt": settings.text_to_image_system_prompt,
         "context_message_count": settings.context_message_count,
         "text_to_image_default_positive_prompt": settings.text_to_image_default_positive_prompt,
         "text_to_image_default_negative_prompt": settings.text_to_image_default_negative_prompt,
         "debug": settings.enable_debug,
-        "stable_diffusion_webui": {
-            "server_url": sd_config.server_url,
-            "steps": sd_config.steps,
-            "sampler_name": sd_config.sampler_name,
-            "cfg_scale": sd_config.cfg_scale,
-            "seed": sd_config.seed,
-            "enable_hr": sd_config.enable_hr,
-            "hr_scale": sd_config.hr_scale,
-            "hr_upscaler": sd_config.hr_upscaler,
-            "denoising_strength": sd_config.denoising_strength,
-            "model_type": sd_config.model_type,
-            "debug": sd_config.debug,
-            "model_presets": sd_config.model_presets,
+        "comfyui": {
+            "server_url": comfyui_config.comfyui_server_url,
+            "available_samplers": comfyui_config.available_samplers,
+            "available_schedulers": comfyui_config.available_schedulers,
+            "available_checkpoints": comfyui_config.available_checkpoints,
+            "model_type": comfyui_config.model_type,
+            "default_seed": comfyui_config.default_seed,
+            "client_id": comfyui_config.client_id,
+            "return_base64": comfyui_config.return_base64,
+            "debug": comfyui_config.debug,
+            "model_presets": comfyui_config.model_presets,
         }
     }
     
