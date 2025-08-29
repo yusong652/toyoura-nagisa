@@ -5,11 +5,12 @@ Based on the official WAN 2.2 workflow structure to avoid noise-to-image artifac
 and generate proper anime-style videos.
 """
 import random
+import uuid
 from typing import Dict, Any
 
 
 def get_wan22_optimized_workflow(
-    image_base64: str,
+    image_filename: str,
     prompt: str,
     negative_prompt: str,
     width: int = 360,
@@ -27,7 +28,7 @@ def get_wan22_optimized_workflow(
     and avoids the noise-to-image artifact by using the correct node sequence.
     
     Args:
-        image_base64: Base64 encoded input image
+        image_filename: Uploaded image filename on ComfyUI server
         prompt: Positive prompt for video generation
         negative_prompt: Negative prompt
         width: Video width (recommended: 1280)
@@ -53,10 +54,7 @@ def get_wan22_optimized_workflow(
                 "type": "wan",
                 "device": "default"
             },
-            "class_type": "CLIPLoader",
-            "_meta": {
-                "title": "CLIPLoader"
-            }
+            "class_type": "CLIPLoader"
         },
         
         # Load WAN 2.2 5B Model
@@ -65,10 +63,7 @@ def get_wan22_optimized_workflow(
                 "unet_name": "wan2.2_ti2v_5B_fp16.safetensors",
                 "weight_dtype": "default"
             },
-            "class_type": "UNETLoader",
-            "_meta": {
-                "title": "UNETLoader"
-            }
+            "class_type": "UNETLoader"
         },
         
         # Load VAE
@@ -76,22 +71,15 @@ def get_wan22_optimized_workflow(
             "inputs": {
                 "vae_name": "wan2.2_vae.safetensors"
             },
-            "class_type": "VAELoader",
-            "_meta": {
-                "title": "VAELoader"
-            }
+            "class_type": "VAELoader"
         },
         
         # Load Input Image
         "57": {
             "inputs": {
-                "image": image_base64,
-                "upload": "image"
+                "image": image_filename
             },
-            "class_type": "LoadImage",
-            "_meta": {
-                "title": "LoadImage"
-            }
+            "class_type": "LoadImage"
         },
         
         # Model Sampling Configuration
@@ -100,10 +88,7 @@ def get_wan22_optimized_workflow(
                 "model": ["37", 0],
                 "shift": 8.0
             },
-            "class_type": "ModelSamplingSD3",
-            "_meta": {
-                "title": "ModelSamplingSD3"
-            }
+            "class_type": "ModelSamplingSD3"
         },
         
         # Positive Prompt Encoding
@@ -112,10 +97,7 @@ def get_wan22_optimized_workflow(
                 "text": prompt,
                 "clip": ["38", 0]
             },
-            "class_type": "CLIPTextEncode",
-            "_meta": {
-                "title": "CLIP Text Encode (Positive Prompt)"
-            }
+            "class_type": "CLIPTextEncode"
         },
         
         # Negative Prompt Encoding
@@ -124,10 +106,7 @@ def get_wan22_optimized_workflow(
                 "text": negative_prompt,
                 "clip": ["38", 0]
             },
-            "class_type": "CLIPTextEncode",
-            "_meta": {
-                "title": "CLIP Text Encode (Negative Prompt)"
-            }
+            "class_type": "CLIPTextEncode"
         },
         
         # WAN 2.2 Image to Video Latent (Key Node!)
@@ -140,10 +119,7 @@ def get_wan22_optimized_workflow(
                 "length": video_frames,
                 "batch_size": 1
             },
-            "class_type": "Wan22ImageToVideoLatent",
-            "_meta": {
-                "title": "Wan22ImageToVideoLatent"
-            }
+            "class_type": "Wan22ImageToVideoLatent"
         },
         
         # Sampling
@@ -161,10 +137,7 @@ def get_wan22_optimized_workflow(
                 "negative": ["7", 0],
                 "latent_image": ["55", 0]
             },
-            "class_type": "KSampler",
-            "_meta": {
-                "title": "KSampler"
-            }
+            "class_type": "KSampler"
         },
         
         # Decode Video
@@ -173,10 +146,7 @@ def get_wan22_optimized_workflow(
                 "samples": ["3", 0],
                 "vae": ["39", 0]
             },
-            "class_type": "VAEDecode",
-            "_meta": {
-                "title": "VAEDecode"
-            }
+            "class_type": "VAEDecode"
         },
         
         # Save as WEBM Video
@@ -188,18 +158,19 @@ def get_wan22_optimized_workflow(
                 "fps": fps,
                 "crf": 16.111083984375
             },
-            "class_type": "SaveWEBM",
-            "_meta": {
-                "title": "SaveWEBM"
-            }
+            "class_type": "SaveWEBM"
         }
     }
     
-    return workflow
+    # Return in ComfyUI API format with client_id
+    return {
+        "prompt": workflow,
+        "client_id": f"video_{uuid.uuid4().hex[:8]}"
+    }
 
 
 def get_wan22_high_quality_workflow(
-    image_base64: str,
+    image_filename: str,
     prompt: str,
     negative_prompt: str
 ) -> Dict[str, Any]:
@@ -210,7 +181,7 @@ def get_wan22_high_quality_workflow(
     and avoid hardcoded values.
     
     Args:
-        image_base64: Base64 encoded input image
+        image_filename: Uploaded image filename on ComfyUI server
         prompt: Positive prompt for video generation
         negative_prompt: Negative prompt
     
@@ -232,7 +203,7 @@ def get_wan22_high_quality_workflow(
     cfg_scale = getattr(settings, 'cfg', 4.5)
     
     return get_wan22_optimized_workflow(
-        image_base64=image_base64,
+        image_filename=image_filename,
         prompt=prompt,
         negative_prompt=negative_prompt,
         width=width,

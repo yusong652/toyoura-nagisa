@@ -9,7 +9,6 @@ import json
 import logging
 import traceback
 from typing import Dict, Optional, Any
-import httpx
 import base64
 from io import BytesIO
 from PIL import Image
@@ -18,31 +17,34 @@ from fastmcp.server.context import Context  # type: ignore
 from backend.config.image_to_video import get_image_to_video_settings
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from .wan22_workflow import get_wan22_high_quality_workflow
+from .comfyui_video_client import ComfyUIVideoClient
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-async def call_wan22_api(
+async def call_wan22_api_with_polling(
     image_base64: str,
     prompt: str,
-    negative_prompt: str
+    negative_prompt: str,
+    cleanup: bool = True
 ) -> Dict[str, Any]:
     """
-    Call ComfyUI API to generate video using optimized WAN 2.2 image-to-video workflow.
+    Generate video using optimized WAN 2.2 workflow with polling-based execution.
     
-    Uses the official WAN 2.2 workflow structure to avoid noise-to-image artifacts
-    and generate high-quality anime-style videos.
+    Uses ComfyUI polling approach for reliable video generation with automatic
+    cleanup and progress monitoring.
     
     Args:
         image_base64: Base64 encoded input image for video generation
         prompt: Positive prompt with motion descriptions
         negative_prompt: Negative prompt
+        cleanup: Whether to delete video files from server after retrieval
     
     Returns:
         Dict containing video result or error
     """
-    print(f"[DEBUG] Starting WAN 2.2 generation")
+    print(f"[DEBUG] Starting WAN 2.2 generation with polling")
     
     try:
         # Get configuration
@@ -50,105 +52,83 @@ async def call_wan22_api(
         
         # Generate client ID
         import uuid
-        client_id = str(uuid.uuid4())
+        client_id = f"video_{uuid.uuid4().hex[:8]}"
         
-        # Get workflow based on configuration
+        # Create ComfyUI video client first
+        video_client = ComfyUIVideoClient(
+            server_url=settings.comfyui_server_url,
+            client_id=client_id
+        )
+        
+        # Upload image to ComfyUI server first
+        print(f"[DEBUG] Uploading image to ComfyUI server...")
+        try:
+            uploaded_filename = await video_client.upload_image(image_base64)
+            print(f"[DEBUG] Image uploaded successfully: {uploaded_filename}")
+        except Exception as e:
+            print(f"[DEBUG] Image upload failed: {e}")
+            return {"type": "error", "message": f"Image upload failed: {str(e)}"}
+        
+        # Get workflow based on configuration using uploaded filename
         workflow = get_wan22_high_quality_workflow(
-            image_base64=image_base64,
+            image_filename=uploaded_filename,
             prompt=prompt,
             negative_prompt=negative_prompt
         )
-        print(f"[DEBUG] Using optimized WAN 2.2 workflow")
+        print(f"[DEBUG] Using optimized WAN 2.2 workflow with polling")
         
+        # ComfyUI API payload - workflow should already include proper structure
+        prompt_payload = workflow
         
-        # Prepare payload with optimized workflow
-        payload = {
-            "prompt": workflow,
-            "client_id": client_id
-            # Remove return_base64 - might not be supported by proxy
-        }
+        print(f"[DEBUG] Prompt payload size: {len(json.dumps(prompt_payload))} bytes")
         
-        # Make API call
-        endpoint = settings.server_url
+        # Progress callback for video generation
+        def progress_callback(data: Dict[str, Any]) -> None:
+            if data.get('type') == 'progress':
+                progress_data = data.get('data', {})
+                status = progress_data.get('status', 'unknown')
+                elapsed = progress_data.get('elapsed', 0)
+                print(f"[DEBUG] Video generation progress: {status} (elapsed: {elapsed:.1f}s)")
         
-        print(f"[DEBUG] Sending request to ComfyUI server: {endpoint}")
-        print(f"[DEBUG] Payload size: {len(json.dumps(payload))} bytes")
+        print(f"[DEBUG] Starting video generation with 10-minute timeout...")
         
-        # Configure client with extended timeout for video generation
-        # Video generation can take 5-10 minutes, so we need very long timeouts
-        timeout = httpx.Timeout(
-            connect=120.0,  # 2 minutes for connection (should be plenty)
-            read=600.0,     # 10 minutes for read (video generation time)
-            write=120.0,    # 2 minutes for write (large payload upload)
-            pool=120.0      # 2 minutes pool timeout
+        # Generate video with polling (10 minutes max for video)
+        # Pass the ComfyUI API payload with proper structure
+        result = await video_client.generate_video(
+            workflow=prompt_payload,
+            progress_callback=progress_callback,
+            cleanup=cleanup,
+            max_wait=600  # 10 minutes for video generation
         )
         
-        import time as time_module
-        start_time = time_module.time()
-        
-        async with httpx.AsyncClient(timeout=timeout, limits=httpx.Limits(max_keepalive_connections=5)) as client:
-            print(f"[DEBUG] Sending POST request to {endpoint}...")
-            print(f"[DEBUG] Request started at: {time_module.strftime('%Y-%m-%d %H:%M:%S')}")
+        if result['type'] == 'video_base64':
+            # Get actual parameters from config
+            actual_frames = settings.frame_count
+            actual_fps = float(settings.fps)
             
-            try:
-                response = await client.post(
-                    endpoint,
-                    headers={"Content-Type": "application/json"},
-                    content=json.dumps(payload)
-                )
-                elapsed = time_module.time() - start_time
-                print(f"[DEBUG] Request completed in {elapsed:.1f} seconds")
-            except Exception as e:
-                elapsed = time_module.time() - start_time
-                print(f"[DEBUG] Request failed after {elapsed:.1f} seconds")
-                raise
-            
-            print(f"[DEBUG] Response status: {response.status_code}")
-            response.raise_for_status()
-            
-            # Check response size before parsing
-            content_length = response.headers.get('content-length', 'unknown')
-            print(f"[DEBUG] Response content-length: {content_length}")
-            
-            result = response.json()
-            
-            print(f"[DEBUG] ComfyUI response keys: {list(result.keys())}")
-            print(f"[DEBUG] Looking for video data in response...")
-            
-            # Extract video data from response
-            video_base64 = result.get("47") or result.get("video") or (result.get("videos") and result["videos"][0] if result.get("videos") else None)
-            
-            if video_base64:
-                # Return WEBM format from SaveWEBM node
-                video_format = "webm"
-                note = "Generated high-quality WEBM video with WAN 2.2 image-to-video"
+            return {
+                "type": "video_base64",
+                "video": result['video'],
+                "format": result.get('format', 'webm'),
+                "fps": actual_fps,
+                "frames": actual_frames,
+                "length": round(actual_frames / actual_fps, 2),
+                "note": "Generated high-quality video with WAN 2.2 polling workflow",
+                "quality": "high",
+                "resolution": "1280x704",
+                "prompt_id": result.get('prompt_id'),
+                "total_videos": result.get('total_videos', 1)
+            }
+        else:
+            print(f"[DEBUG] Video generation failed: {result.get('message')}")
+            return {
+                "type": "error", 
+                "message": result.get('message', 'Video generation failed')
+            }
                 
-                # Get actual parameters from config
-                actual_frames = settings.frame_count
-                actual_fps = float(settings.fps)
-                
-                return {
-                    "type": "video_base64",
-                    "video": video_base64,
-                    "format": video_format,
-                    "fps": actual_fps,
-                    "frames": actual_frames,
-                    "length": round(actual_frames / actual_fps, 2),
-                    "note": note,
-                    "quality": "high",
-                    "resolution": "1280x704"
-                }
-            else:
-                print(f"[DEBUG] No video in response. Available keys: {list(result.keys())}")
-                return {"type": "error", "message": "No video data in response from optimized workflow"}
-                
-    except (httpx.TimeoutException, httpx.ReadError, httpx.ConnectError):
-        return {"type": "error", "message": "Video generation timeout due to Cloudflare limits. Consider using async polling for longer tasks."}
-    except httpx.HTTPStatusError as e:
-        return {"type": "error", "message": f"Server error: {e.response.status_code}"}
     except Exception as e:
-        logger.error(f"Video generation error: {e}")
-        return {"type": "error", "message": "Video generation failed"}
+        logger.error(f"Video generation error: {e}", exc_info=True)
+        return {"type": "error", "message": f"Video generation failed: {str(e)}"}
 
 async def optimize_prompt_for_video(
     llm_client: Any,
@@ -294,12 +274,13 @@ async def generate_video_from_image(
             logger.info(f"  - Optimized: {video_prompt}")
             logger.info(f"  - Motion style: {motion_style}")
         
-        # Generate video
-        print(f"[DEBUG] Starting video generation with WAN 2.2...")
-        video_result = await call_wan22_api(
+        # Generate video with polling
+        print(f"[DEBUG] Starting video generation with WAN 2.2 polling...")
+        video_result = await call_wan22_api_with_polling(
             image_base64=image_base64,
             prompt=video_prompt,
-            negative_prompt=negative_prompt
+            negative_prompt=negative_prompt,
+            cleanup=True  # Enable automatic cleanup
         )
         print(f"[DEBUG] Video generation completed")
         print(f"[DEBUG] video_result type: '{video_result.get('type')}'")
