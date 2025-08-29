@@ -11,10 +11,11 @@ from backend.domain.models.messages import BaseMessage
 from backend.config import get_llm_settings
 
 # Import base components
-from backend.infrastructure.llm.base.content_generators import (
-    BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator, 
-    BaseVideoPromptGenerator, BaseUnifiedPromptGenerator, PromptType
-)
+from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
+from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
+from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
+from backend.infrastructure.llm.base.content_generators.video_prompt import BaseVideoPromptGenerator
+from backend.infrastructure.llm.base.content_generators.unified import BaseUnifiedPromptGenerator, PromptType
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,

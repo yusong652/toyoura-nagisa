@@ -183,7 +183,7 @@ async def optimize_prompt_for_video(
         if "Gemini" in client_class_name:
             print(f"[DEBUG] Using Gemini unified prompt generator")
             from backend.infrastructure.llm.providers.gemini.content_generators import GeminiUnifiedPromptGenerator
-            from backend.infrastructure.llm.base.content_generators import PromptType
+            from backend.infrastructure.llm.base.content_generators.unified import PromptType
             
             # Use unified generator with IMAGE_TO_VIDEO type
             result = await GeminiUnifiedPromptGenerator.generate_prompt(

@@ -9,10 +9,8 @@ maintaining compatibility with the unified content generation interface.
 from typing import Optional, Dict, Any, List
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_llm_settings
-from backend.infrastructure.llm.base.content_generators import (
-    BaseWebSearchGenerator, 
-    BaseTitleGenerator
-)
+from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
+from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
 from backend.infrastructure.llm.shared.constants import (
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
@@ -96,7 +94,7 @@ class TitleGenerator(BaseTitleGenerator):
             return None
 
 
-from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
+from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 
 class ImagePromptGenerator(BaseImagePromptGenerator):
     """
