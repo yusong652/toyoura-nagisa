@@ -1,89 +1,88 @@
 """
 Text-to-image configuration module
-Contains configurations related to text-to-image generation
+Contains configurations related to text-to-image generation using ComfyUI
 """
 from __future__ import annotations
-from typing import Literal, Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any, List
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-
-class ModelPreset(BaseSettings):
-    """Model preset configuration"""
+class ComfyUIConfig(BaseSettings):
+    """ComfyUI API configuration for text-to-image generation"""
     
-    sd_model_checkpoint: str = Field(description="Stable Diffusion model checkpoint")
-    sd_vae: str = Field(description="VAE model")
-    width: int = Field(ge=64, le=2048, description="Image width")
-    height: int = Field(ge=64, le=2048, description="Image height")
-    cfg_scale: float = Field(ge=1.0, le=20.0, description="CFG scale")
-    clip_skip: int = Field(ge=1, le=12, description="CLIP skip layers")
-    sampler_name: str = Field(description="Sampler name")
+    # Server configuration - Use environment variable or update with your server URL
+    comfyui_server_url: str = Field(
+        default="http://127.0.0.1:8188",  # Example: Local ComfyUI server
+        description="ComfyUI server URL (e.g., http://your-server.com or https://your-server.com)",
+        validation_alias="COMFYUI_SERVER_URL"
+    )
     
-    model_config = SettingsConfigDict(extra='allow')
-
-
-class StableDiffusionWebUIConfig(BaseSettings):
-    """Stable Diffusion WebUI configuration"""
+    # Client configuration
+    client_id: str = Field(
+        default="txt2img_client",
+        description="Client ID for ComfyUI session tracking"
+    )
     
-    # Server configuration
-    server_url: str = Field(
-        default="http://127.0.0.1:7860/sdapi/v1/txt2img",
-        description="Stable Diffusion WebUI server URL",
-        validation_alias="STABLE_DIFFUSION_WEBUI_URL"
+    # Available samplers in ComfyUI
+    available_samplers: List[str] = Field(
+        default=["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_3m_sde"],
+        description="Available sampler names in ComfyUI"
+    )
+    
+    # Available schedulers
+    available_schedulers: List[str] = Field(
+        default=["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"],
+        description="Available scheduler names"
     )
     
     # Generation parameters
-    steps: int = Field(default=23, ge=1, le=150, description="Sampling steps")  # Increased to avoid undersampling
-    sampler_name: str = Field(default="DPM++ 2M Karras", description="Sampler name")
-    cfg_scale: float = Field(default=6.5, ge=1.0, le=20.0, description="CFG scale")
-    seed: int = Field(default=-1, description="Random seed")
-    
-    # High-resolution fix configuration
-    enable_hr: bool = Field(default=False, description="Enable high-resolution fix")
-    hr_scale: float = Field(default=2.0, ge=1.0, le=4.0, description="High-resolution scale")
-    hr_upscaler: str = Field(default="4x-UltraSharp", description="High-resolution upscaler")
-    denoising_strength: float = Field(default=0.5, ge=0.0, le=1.0, description="Denoising strength")
-    
-    # Model configuration
-    model_type: Literal["illustrious", "sdxl", "sd15"] = Field(
-        default="illustrious",
-        description="Model type preset"
-    )
-    debug: bool = Field(default=True, description="Enable debug mode")
+    steps: int = Field(default=20, ge=1, le=150, description="Default sampling steps")
+    cfg_scale: float = Field(default=7.0, ge=1.0, le=20.0, description="Default CFG scale")
+    seed: int = Field(default=-1, description="Random seed (-1 for random)")
+    denoise: float = Field(default=1.0, ge=0.0, le=1.0, description="Denoise strength")
     
     # Model preset configurations
     model_presets: Dict[str, Dict[str, Any]] = Field(
         default={
-            "illustrious": {
-                "sd_model_checkpoint": "illustriousXLPersonalMerge_v10.safetensors",
-                "sd_vae": "sdxl_vae.safetensors",
+            "anime": {
+                "ckpt_name": "animagineXLV31_v30.safetensors",  # Example anime model
                 "width": 1024,
                 "height": 1536,
                 "cfg_scale": 7.0,
-                "clip_skip": 2,
-                "sampler_name": "Euler a"
+                "steps": 20,
+                "sampler_name": "euler",
+                "scheduler": "normal",
+                "denoise": 1.0
             },
-            "sdxl": {
-                "sd_model_checkpoint": "sd_xl_base_1.0.safetensors",
-                "sd_vae": "sdxl_vae.safetensors",
+            "realistic": {
+                "ckpt_name": "juggernautXL_v8Rundiffusion.safetensors",  # Example realistic model
                 "width": 1024,
-                "height": 1536,
-                "cfg_scale": 6.0,
-                "clip_skip": 2,
-                "sampler_name": "DPM++ 2M Karras"
+                "height": 1024,
+                "cfg_scale": 6.5,
+                "steps": 25,
+                "sampler_name": "dpmpp_2m",
+                "scheduler": "karras",
+                "denoise": 1.0
             },
-            "sd15": {
-                "sd_model_checkpoint": "v1-5-pruned-emaonly.safetensors",
-                "sd_vae": "vae-ft-mse-840000-ema-pruned.safetensors",  # Try "None" or "Automatic" if generating noise
-                "width": 512,
-                "height": 768,
-                "cfg_scale": 6.5,  # Lower CFG to avoid over-guidance, try 5.0-8.0 range
-                "clip_skip": 1,
-                "sampler_name": "DPM++ 2M Karras"  # More stable sampler, replaces DPM++ SDE Karras
+            "artistic": {
+                "ckpt_name": "sdxl_base_1.0.safetensors",  # Example SDXL base model
+                "width": 1024,
+                "height": 1024,
+                "cfg_scale": 7.5,
+                "steps": 30,
+                "sampler_name": "dpmpp_2m_sde",
+                "scheduler": "karras",
+                "denoise": 1.0
             }
         },
-        description="Model preset configurations"
+        description="Model preset configurations for different styles"
+    )
+    
+    # Current active preset
+    active_preset: str = Field(
+        default="anime",
+        description="Currently active model preset"
     )
     
     model_config = SettingsConfigDict(
@@ -94,78 +93,156 @@ class StableDiffusionWebUIConfig(BaseSettings):
         extra='ignore'
     )
     
-    def __init__(self, **kwargs):
-        """Initialize configuration with debug information"""
-        import os
-        print(f"[DEBUG] StableDiffusionWebUIConfig initialization:")
-        print(f"[DEBUG] - Environment variable STABLE_DIFFUSION_WEBUI_URL: {os.environ.get('STABLE_DIFFUSION_WEBUI_URL', 'NOT_SET')}")
-        super().__init__(**kwargs)
-        print(f"[DEBUG] - Final config server_url: {self.server_url}")
-        print(f"[DEBUG] - Final config debug: {self.debug}")
-    
     def get_current_preset(self) -> Dict[str, Any]:
-        """Get current model preset"""
-        return self.model_presets.get(self.model_type, {})
+        """Get current model preset configuration"""
+        return self.model_presets.get(self.active_preset, self.model_presets["anime"])
+    
+    def generate_workflow(self, positive_prompt: str, negative_prompt: str, seed: Optional[int] = None) -> Dict[str, Any]:
+        """Generate ComfyUI workflow from preset and prompts"""
+        import random
+        
+        preset = self.get_current_preset()
+        
+        # Generate random seed if not provided or if -1 is passed
+        if seed is None or seed < 0:
+            actual_seed = random.randint(1, 2**32 - 1)
+        else:
+            actual_seed = seed
+        
+        workflow = {
+            "prompt": {
+                "3": {
+                    "class_type": "KSampler",
+                    "inputs": {
+                        "seed": actual_seed,
+                        "steps": preset.get("steps", 20),
+                        "cfg": preset.get("cfg_scale", 7.0),
+                        "sampler_name": preset.get("sampler_name", "euler"),
+                        "scheduler": preset.get("scheduler", "normal"),
+                        "denoise": preset.get("denoise", 1.0),
+                        "model": ["4", 0],
+                        "positive": ["6", 0],
+                        "negative": ["7", 0],
+                        "latent_image": ["5", 0]
+                    }
+                },
+                "4": {
+                    "class_type": "CheckpointLoaderSimple",
+                    "inputs": {
+                        "ckpt_name": preset.get("ckpt_name", "sdxl_base_1.0.safetensors")
+                    }
+                },
+                "5": {
+                    "class_type": "EmptyLatentImage",
+                    "inputs": {
+                        "width": preset.get("width", 1024),
+                        "height": preset.get("height", 1024),
+                        "batch_size": 1
+                    }
+                },
+                "6": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": positive_prompt,
+                        "clip": ["4", 1]
+                    }
+                },
+                "7": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": negative_prompt,
+                        "clip": ["4", 1]
+                    }
+                },
+                "8": {
+                    "class_type": "VAEDecode",
+                    "inputs": {
+                        "samples": ["3", 0],
+                        "vae": ["4", 2]
+                    }
+                },
+                "9": {
+                    "class_type": "SaveImage",
+                    "inputs": {
+                        "filename_prefix": "ComfyUI",
+                        "images": ["8", 0]
+                    }
+                }
+            },
+            "client_id": self.client_id
+        }
+        
+        return workflow
 
 
 class TextToImageSettings(BaseSettings):
-    """Text-to-image general configuration"""
+    """Text-to-image generation configuration"""
     
-    # System configuration
+    # System configuration for prompt optimization
     text_to_image_system_prompt: str = Field(
         default="You are a professional prompt engineer specializing in AI image generation.",
-        description="System prompt"
+        description="System prompt for LLM-based prompt optimization"
     )
-    context_message_count: int = Field(default=6, ge=1, le=50, description="Context message count")
+    
+    # Context configuration
+    context_message_count: int = Field(
+        default=6, 
+        ge=1, 
+        le=50, 
+        description="Number of recent messages to include for context"
+    )
     
     # Few-shot learning configuration
-    few_shot_max_length: int = Field(default=23, ge=0, le=32, description="Few-shot example maximum count")
+    few_shot_max_length: int = Field(
+        default=23, 
+        ge=0, 
+        le=32, 
+        description="Maximum number of few-shot examples"
+    )
     
-    # Default prompt configuration
+    # Default prompts for enhancement
     text_to_image_default_positive_prompt: str = Field(
         default="high quality, detailed, masterpiece, best quality",
-        description="Default positive prompt"
+        description="Default positive prompt to append"
     )
     text_to_image_default_negative_prompt: str = Field(
         default="blurry, low quality, distorted, bad anatomy, text, watermark, ugly, deformed",
-        description="Default negative prompt"
+        description="Default negative prompt to append"
     )
     
-    # Temperature configuration for text-to-image prompt generation
+    # Temperature for prompt generation
     text_to_image_temperature: float = Field(
-        default=2.0,
+        default=0.8,
         ge=0.0,
         le=2.0,
-        description="Temperature parameter for text-to-image prompt generation"
+        description="Temperature for LLM prompt generation (higher = more creative)"
     )
     
     # Debug configuration
-    enable_debug: bool = Field(default=True, description="Enable debug mode")
+    enable_debug: bool = Field(default=True, description="Enable debug logging")
     
     model_config = SettingsConfigDict(
         env_file='.env',
         env_nested_delimiter='_',
         case_sensitive=False,
-        env_prefix='',  # Remove prefix!
+        env_prefix='',
         extra='ignore'
     )
     
-    
-    def get_current_config(self) -> StableDiffusionWebUIConfig:
-        """Get Stable Diffusion WebUI configuration"""
-        return StableDiffusionWebUIConfig()
+    def get_current_config(self) -> ComfyUIConfig:
+        """Get ComfyUI configuration instance"""
+        return ComfyUIConfig()
     
     def validate_current_config(self):
-        """Validate Stable Diffusion WebUI configuration - implements fail fast"""
+        """Validate ComfyUI configuration"""
         try:
             config = self.get_current_config()
-            # This will trigger configuration validation
             return config
         except Exception as e:
-            raise ValueError(f"Stable Diffusion WebUI configuration validation failed: {e}")
+            raise ValueError(f"ComfyUI configuration validation failed: {e}")
 
 
-# Global text-to-image configuration instance
+# Global configuration instance
 def get_text_to_image_settings() -> TextToImageSettings:
     """Get text-to-image configuration instance"""
     return TextToImageSettings()
