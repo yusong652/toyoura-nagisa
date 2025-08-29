@@ -46,7 +46,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, connection_m
             await _process_websocket_message(data, session_id, connection_manager)
             
     except WebSocketDisconnect:
-        connection_manager.disconnect(session_id)
+        await connection_manager.disconnect(session_id)
         logger.info(f"WebSocket disconnected for session: {session_id}")
 
 
