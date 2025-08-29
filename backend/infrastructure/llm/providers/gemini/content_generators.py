@@ -11,7 +11,10 @@ from backend.domain.models.messages import BaseMessage
 from backend.config import get_llm_settings
 
 # Import base components
-from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator, BaseVideoPromptGenerator
+from backend.infrastructure.llm.base.content_generators import (
+    BaseImagePromptGenerator, BaseTitleGenerator, BaseWebSearchGenerator, 
+    BaseVideoPromptGenerator, BaseUnifiedPromptGenerator, PromptType
+)
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
 from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_TITLE_MAX_LENGTH,
@@ -188,7 +191,9 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
 
 class GeminiImagePromptGenerator(BaseImagePromptGenerator):
     """
-    Gemini-specific image prompt generation inheriting base functionality.
+    Gemini-specific image prompt generation delegating to unified generator.
+    
+    Maintains backward compatibility while using the new unified approach.
     """
     
     @staticmethod
@@ -198,86 +203,24 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
         """
-        Generate high-quality text-to-image prompts using shared context preparation.
+        Generate high-quality text-to-image prompts using unified generator.
+        
+        This method now delegates to the unified prompt generator for consistency
+        and reduced code duplication.
         """
-        try:
-            # Get Gemini configuration for model info
-            from backend.config import get_llm_settings
-            llm_settings = get_llm_settings()
-            llm_gemini_config = llm_settings.get_gemini_config()  # This has the 'model' attribute
-            
-            # Prepare generation context using inherited method with provider info
-            context = GeminiImagePromptGenerator.prepare_generation_context(
-                session_id=session_id,
-                llm_provider="gemini",
-                llm_model=llm_gemini_config.model
-            )
-            
-            # Note: Context preparation already handles empty conversation validation
-            
-            # Read Gemini client configuration for detailed settings
-            gemini_client_config = get_gemini_client_config()
-            
-            # Create API call configuration
-            config_kwargs = {
-                "system_instruction": context['system_prompt'],
-                "safety_settings": gemini_client_config.safety_settings.to_gemini_format(),
-                "temperature": context['temperature'],
-                "max_output_tokens": gemini_client_config.model_settings.max_output_tokens
-            }
-            
-            # Use the model from context (which now correctly uses Gemini's model)
-            model_for_text_to_image = context.get('model', llm_gemini_config.model)
-            
-            # Add thinking configuration if applicable
-            if (model_for_text_to_image.startswith("gemini-2.5") and 
-                gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=gemini_client_config.model_settings.include_thoughts_in_response
-                )
-            
-            prompt_config = types.GenerateContentConfig(**config_kwargs)
-            
-            # Build messages using inherited method
-            messages = GeminiImagePromptGenerator.build_messages_for_generation(context)
-            
-            # Format messages using Gemini formatter
-            contents = GeminiMessageFormatter.format_messages(messages)
-            
-            if debug:
-                print("[text_to_image] Formatted contents (simplified):")
-                GeminiDebugger.print_debug_request(contents, prompt_config)
-            
-            response = client.models.generate_content(
-                model=model_for_text_to_image,
-                contents=contents,
-                config=prompt_config
-            )
-            
-            if debug:
-                print("[text_to_image] Response received:")
-                GeminiDebugger.print_debug_response(response)
-            
-            # Extract response text using ResponseProcessor
-            prompt_text = GeminiResponseProcessor.extract_text_content(response)
-            
-            if prompt_text:
-                # Process response using inherited method
-                return GeminiImagePromptGenerator.process_generation_response(
-                    prompt_text, context, session_id, debug
-                )
-            
-            return None
-            
-        except Exception as e:
-            if debug:
-                print(f"[text_to_image] Error during prompt generation: {str(e)}")
-            return None
+        return await GeminiUnifiedPromptGenerator.generate_prompt(
+            client=client,
+            prompt_type=PromptType.TEXT_TO_IMAGE,
+            session_id=session_id,
+            debug=debug
+        )
 
 
 class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
     """
-    Gemini-specific video prompt generation from static image prompts.
+    Gemini-specific video prompt generation delegating to unified generator.
+    
+    Maintains backward compatibility while using the new unified approach.
     """
     
     @staticmethod
@@ -290,39 +233,104 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
         session_id: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
-        Generate optimized video prompt using Gemini's native API with few-shot learning.
+        Generate optimized video prompt using unified generator.
+        
+        This method now delegates to the unified prompt generator, which handles
+        conversation context and few-shot learning directly.
         
         Args:
             client: Gemini client instance
-            original_prompt: Original static image generation prompt
-            image_base64: Optional base64 encoded image for visual context
-            motion_type: Type of motion for the video
-            few_shot_history: Optional few-shot examples for better generation
+            original_prompt: Original static image generation prompt (not used directly)
+            image_base64: Optional base64 encoded image (not sent to LLM)
+            motion_type: Type of motion for the video (converted to motion_style)
+            few_shot_history: Optional few-shot examples (handled by unified generator)
+            session_id: Session ID for context and history
             
         Returns:
             Dict with 'video_prompt' and 'negative_prompt' keys, or None if failed
         """
+        # Convert motion_type to motion_style description
+        motion_descriptions = {
+            "gentle": "subtle, gentle movements like gentle breeze, slow motion, peaceful transitions",
+            "dynamic": "energetic, dynamic motion with action sequences and fast movements", 
+            "cinematic": "cinematic camera movements, smooth panning, professional film-like motion",
+            "loop": "seamless looping motion with cyclic, repeating patterns"
+        }
+        motion_style = motion_descriptions.get(motion_type, motion_descriptions["cinematic"])
+        
+        # Delegate to unified generator
+        # Note: image_base64 is not passed since it shouldn't be sent to LLM
+        # few_shot_history is also not passed as it's loaded automatically by session_id
+        return await GeminiUnifiedPromptGenerator.generate_prompt(
+            client=client,
+            prompt_type=PromptType.IMAGE_TO_VIDEO,
+            session_id=session_id,
+            motion_style=motion_style,
+            debug=True  # Keep debug enabled for video prompts
+        )
+
+
+class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
+    """
+    Gemini-specific unified prompt generator for both text-to-image and image-to-video.
+    
+    Provides a single interface that handles both prompt types using conversation
+    context and few-shot learning, reducing code duplication and improving consistency.
+    """
+    
+    @staticmethod
+    async def generate_prompt(
+        client,  # Gemini client instance
+        prompt_type: PromptType,
+        session_id: Optional[str] = None,
+        motion_style: Optional[str] = None,
+        image_base64: Optional[str] = None,
+        debug: bool = False
+    ) -> Optional[Dict[str, str]]:
+        """
+        Generate high-quality prompts using unified approach with Gemini API.
+        
+        Args:
+            client: Gemini client instance
+            prompt_type: Type of prompt to generate (text_to_image or image_to_video)
+            session_id: Optional session ID for conversation context and few-shot learning
+            motion_style: Optional motion style description (for video prompts)
+            image_base64: Optional base64 image (for image-to-video)
+            debug: Enable debug output
+            
+        Returns:
+            Dictionary with appropriate prompt keys based on type
+        """
         try:
-            from backend.config import get_llm_settings, get_image_to_video_settings
+            # Get Gemini configuration
+            from backend.config import get_llm_settings
             llm_settings = get_llm_settings()
-            gemini_config = llm_settings.get_gemini_config()
-            video_settings = get_image_to_video_settings()
+            llm_gemini_config = llm_settings.get_gemini_config()
             
             # Read Gemini client configuration
             gemini_client_config = get_gemini_client_config()
             
-            # Use video prompt system or fallback to default
-            system_prompt = getattr(video_settings, 'video_prompt_system', DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT)
+            # Prepare unified context with provider info
+            context = GeminiUnifiedPromptGenerator.prepare_unified_context(
+                prompt_type=prompt_type,
+                session_id=session_id,
+                motion_style=motion_style,
+                llm_provider="gemini",
+                llm_model=llm_gemini_config.model
+            )
             
-            # Configure generation parameters
+            # Create API call configuration
             config_kwargs = {
-                "system_instruction": system_prompt,
-                "temperature": getattr(video_settings, 'video_prompt_temperature', 1.2),
+                "system_instruction": context['system_prompt'],
+                "safety_settings": gemini_client_config.safety_settings.to_gemini_format(),
+                "temperature": context['temperature'],
                 "max_output_tokens": gemini_client_config.model_settings.max_output_tokens
             }
             
+            # Use the model from context
+            model = context.get('model', llm_gemini_config.model)
+            
             # Add thinking configuration if applicable
-            model = gemini_config.model
             if (model.startswith("gemini-2.5") and 
                 gemini_client_config.model_settings.enable_thinking_for_gemini_2_5):
                 config_kwargs["thinking_config"] = types.ThinkingConfig(
@@ -331,74 +339,43 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
             
             prompt_config = types.GenerateContentConfig(**config_kwargs)
             
-            # Build request message with motion type context
-            user_message = BaseVideoPromptGenerator.create_video_prompt_request(original_prompt, motion_type)
+            # Build messages using unified method
+            messages = GeminiUnifiedPromptGenerator.build_unified_messages(context)
             
-            # Create contents list
-            contents = []
+            # Format messages using Gemini formatter
+            contents = GeminiMessageFormatter.format_messages(messages)
             
-            # Add few-shot examples if available
-            if few_shot_history:
-                for example in few_shot_history:
-                    # Add user example (from user_message.content)
-                    user_msg = example.get('user_message', {})
-                    user_content = user_msg.get('content', '')
-                    contents.append({
-                        "role": "user",
-                        "parts": [{"text": user_content}]
-                    })
-                    
-                    # Add assistant example (from assistant_message.content)
-                    assistant_msg = example.get('assistant_message', {})
-                    assistant_content = assistant_msg.get('content', '')
-                    contents.append({
-                        "role": "model",
-                        "parts": [{"text": assistant_content}]
-                    })
+            # Note: We do NOT send the image to the LLM for prompt generation
+            # The image is only sent to the video generation server
+            # The LLM only needs the conversation context to generate appropriate prompts
             
-            # Add current request
-            if image_base64:
-                contents.append({
-                    "role": "user",
-                    "parts": [
-                        {"text": user_message},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
-                    ]
-                })
-            else:
-                contents.append({
-                    "role": "user", 
-                    "parts": [{"text": user_message}]
-                })
-            
-            # Debug payload using GeminiDebugger
-            debug = True  # Enable debug for video prompt generation
             if debug:
+                print(f"[{prompt_type.value}] Formatted contents for Gemini:")
                 GeminiDebugger.print_debug_request(contents, prompt_config)
             
-            # Call Gemini API
+            # Make API call
             response = client.models.generate_content(
                 model=model,
                 contents=contents,
                 config=prompt_config
             )
             
-            # Debug response using GeminiDebugger
             if debug:
+                print(f"[{prompt_type.value}] Response received:")
                 GeminiDebugger.print_debug_response(response)
             
             # Extract response text
-            response_text = GeminiResponseProcessor.extract_text_content(response)
+            prompt_text = GeminiResponseProcessor.extract_text_content(response)
             
-            # Process response and save to history using base class method
-            return BaseVideoPromptGenerator.process_video_generation_response(
-                response_text=response_text,
-                original_prompt=original_prompt,
-                motion_type=motion_type,
-                session_id=session_id,  # Use the session_id parameter
-                debug=debug  # Pass debug flag through
-            )
+            if prompt_text:
+                # Process response using unified method
+                return GeminiUnifiedPromptGenerator.process_unified_response(
+                    prompt_text, context, session_id, debug
+                )
+            
+            return None
             
         except Exception as e:
-            print(f"[video_prompt] Error during Gemini video prompt generation: {str(e)}")
+            if debug:
+                print(f"[{prompt_type.value}] Error during unified prompt generation: {str(e)}")
             return None

@@ -157,76 +157,58 @@ async def optimize_prompt_for_video(
     motion_description: Optional[str] = None
 ) -> Optional[Dict[str, str]]:
     """
-    Optimize static image prompt for WAN 2.2 video generation with few-shot learning.
+    Optimize prompt for video generation using unified prompt generator.
     
-    Uses provider-specific content generators and few-shot examples for better results.
+    Uses the unified prompt generation approach that leverages conversation context
+    and few-shot learning directly from the session history.
     
     Args:
         llm_client: LLM client for prompt optimization
-        session_id: Current session ID for few-shot history
-        original_prompt: Original static image prompt
-        motion_description: Optional motion description to incorporate in the prompt
+        session_id: Current session ID for context and few-shot history
+        original_prompt: Original static image prompt (not used directly)
+        motion_description: Optional motion description to use as motion_style
     
     Returns:
         Dict with optimized video_prompt and negative_prompt for WAN 2.2
     """
     print(f"[DEBUG] optimize_prompt_for_video started")
-    print(f"[DEBUG] Original prompt: {original_prompt}")
+    print(f"[DEBUG] Session ID: {session_id}")
     print(f"[DEBUG] Motion description: {motion_description}")
     
-    # Load few-shot history
-    from backend.infrastructure.llm.shared.utils.image_to_video import load_video_prompt_history
-    few_shot_history = load_video_prompt_history(session_id) if session_id else []
-    
     try:
-        settings = get_image_to_video_settings()
-        
         # Determine which provider we're using and get the appropriate generator
         client_class_name = llm_client.__class__.__name__
         print(f"[DEBUG] LLM client type: {client_class_name}")
         
         if "Gemini" in client_class_name:
-            print(f"[DEBUG] Using Gemini video prompt generator with few-shot")
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
+            print(f"[DEBUG] Using Gemini unified prompt generator")
+            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiUnifiedPromptGenerator
+            from backend.infrastructure.llm.base.content_generators import PromptType
             
-            # Limit few-shot examples based on config
-            max_few_shot = settings.video_few_shot_max_length
-            limited_few_shot_history = few_shot_history[-max_few_shot:] if max_few_shot > 0 else []
-            print(f"[DEBUG] Using {len(limited_few_shot_history)} few-shot examples")
-            
-            # Get the native Gemini client
-            print(f"[DEBUG] Calling GeminiVideoPromptGenerator.generate_video_prompt...")
-            
-            # Combine original prompt with motion description if provided
-            enhanced_prompt = original_prompt
-            if motion_description:
-                enhanced_prompt = f"{original_prompt}. {motion_description}"
-            
-            result = await GeminiVideoPromptGenerator.generate_video_prompt(
-                llm_client.client,  # Use the native Gemini client
-                enhanced_prompt,  # Pass prompt with motion description
-                image_base64=None,  # Don't send image to LLM
-                motion_type="cinematic",  # Use default motion type for prompt formatting
-                few_shot_history=limited_few_shot_history,
-                session_id=session_id  # Pass session_id for history saving
+            # Use unified generator with IMAGE_TO_VIDEO type
+            result = await GeminiUnifiedPromptGenerator.generate_prompt(
+                client=llm_client.client,  # Use the native Gemini client
+                prompt_type=PromptType.IMAGE_TO_VIDEO,
+                session_id=session_id,  # Session provides conversation context and few-shot history
+                motion_style=motion_description,  # Pass motion description as style
+                debug=True  # Enable debug for video prompts
             )
-            print(f"[DEBUG] Gemini generator returned: {result}")
+            print(f"[DEBUG] Unified generator returned: {result}")
+            
         elif "OpenAI" in client_class_name:
-            # TODO: Implement OpenAIVideoPromptGenerator when needed
-            # For now, fallback to default behavior
-            logger.warning("OpenAI video prompt generator not yet implemented, using fallback")
+            # TODO: Implement OpenAIUnifiedPromptGenerator when needed
+            logger.warning("OpenAI unified prompt generator not yet implemented, using fallback")
             result = None
+            
         elif "Anthropic" in client_class_name:
-            # TODO: Implement AnthropicVideoPromptGenerator when needed
-            # For now, fallback to default behavior
-            logger.warning("Anthropic video prompt generator not yet implemented, using fallback")
+            # TODO: Implement AnthropicUnifiedPromptGenerator when needed
+            logger.warning("Anthropic unified prompt generator not yet implemented, using fallback")
             result = None
+            
         else:
             logger.warning(f"Unknown LLM client type: {client_class_name}, using fallback")
             result = None
         
-        # If we got a result from the content generator, return it
-        # (History saving is now handled inside the generator using base class method)
         if result:
             print(f"[DEBUG] Video prompt generation completed successfully")
             return result
