@@ -45,4 +45,5 @@ export interface ChatContextType extends ChatState {
   clearChat: () => void;
   deleteMessage: (messageId: string) => Promise<void>;
   generateImage: (sessionId: string) => Promise<{ success: boolean; image_path?: string; error?: string }>;
+  addVideoMessage: (videoPath: string, content?: string) => string;
 } 

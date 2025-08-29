@@ -7,6 +7,7 @@ from backend.infrastructure.tts.tts_factory import get_tts_engine
 from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client
 from backend.presentation.api import images
+from backend.presentation.api import videos
 from backend.presentation.api import agent_profiles  
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
@@ -87,6 +88,7 @@ app.add_middleware(
 )
 
 app.include_router(images.router)
+app.include_router(videos.router)
 app.include_router(agent_profiles.router)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")

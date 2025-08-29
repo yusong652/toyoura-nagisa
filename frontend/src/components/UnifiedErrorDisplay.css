@@ -1,0 +1,175 @@
+/* Unified Error Display Styles */
+.unified-error-display {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1500; /* Higher than most components but below modals */
+}
+
+.unified-error-alert {
+  min-width: 280px;
+  max-width: 600px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  
+  /* Smooth transitions for all state changes */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Typography improvements */
+  font-weight: 500;
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+
+/* Severity-specific styling */
+.unified-error-display.error .unified-error-alert {
+  background-color: rgba(211, 47, 47, 0.95);
+  color: white;
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.unified-error-display.warning .unified-error-alert {
+  background-color: rgba(237, 108, 2, 0.95);
+  color: white;
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+.unified-error-display.info .unified-error-alert {
+  background-color: rgba(2, 136, 209, 0.95);
+  color: white;
+  border-color: rgba(33, 150, 243, 0.3);
+}
+
+/* Position-specific adjustments */
+.unified-error-display.position-top {
+  margin-top: 20px;
+}
+
+.unified-error-display.position-bottom {
+  margin-bottom: 20px;
+}
+
+.unified-error-display.position-center {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+}
+
+/* Action button styling */
+.unified-error-action {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.unified-error-action:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.unified-error-action:active {
+  transform: translateY(0);
+}
+
+/* Close button styling */
+.unified-error-close {
+  color: rgba(255, 255, 255, 0.8) !important;
+  transition: color 0.2s ease;
+}
+
+.unified-error-close:hover {
+  color: white !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Prevent flickering by ensuring smooth transitions */
+.unified-error-alert .MuiAlert-icon {
+  transition: opacity 0.2s ease;
+}
+
+.unified-error-alert .MuiAlert-message {
+  transition: opacity 0.2s ease;
+  flex: 1;
+  padding: 2px 0;
+}
+
+/* Enhanced animations for different entry points */
+.unified-error-display.position-bottom .unified-error-alert {
+  animation: slideUpSmooth 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.unified-error-display.position-top .unified-error-alert {
+  animation: slideDownSmooth 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.unified-error-display.position-center .unified-error-alert {
+  animation: scaleInSmooth 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUpSmooth {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownSmooth {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleInSmooth {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .unified-error-alert {
+    min-width: 90vw;
+    max-width: 90vw;
+    margin: 0 5vw;
+    font-size: 0.85rem;
+  }
+  
+  .unified-error-action {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+}
+
+/* Dark theme compatibility */
+@media (prefers-color-scheme: dark) {
+  .unified-error-alert {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+}

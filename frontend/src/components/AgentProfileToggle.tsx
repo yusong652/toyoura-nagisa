@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgent } from '../contexts/agent/AgentContext';
 import { AgentProfileType } from '../types/agent';
+import UnifiedErrorDisplay from './UnifiedErrorDisplay';
+import { useErrorDisplay } from '../hooks/useErrorDisplay';
 import './AgentProfileToggle.css';
 
 // SVG icon components for different agent profiles
@@ -59,6 +61,7 @@ export const AgentProfileToggle: React.FC = () => {
     isProfileLoading,
     updateAgentProfile 
   } = useAgent();
+  const { error, showTemporaryError, clearError } = useErrorDisplay();
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -86,6 +89,7 @@ export const AgentProfileToggle: React.FC = () => {
       setIsOpen(false); // Close dropdown after selection
     } catch (error) {
       console.error('Failed to change agent profile:', error);
+      showTemporaryError('Failed to change agent profile. Please try again.', 4000);
       // Keep dropdown open on error so user can try again
     }
   };
@@ -195,6 +199,10 @@ export const AgentProfileToggle: React.FC = () => {
         </div>
       )}
 
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
     </div>
   );
 }; 

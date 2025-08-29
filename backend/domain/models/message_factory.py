@@ -6,7 +6,7 @@ Contains business rules and processing logic for messages.
 """
 
 from typing import Dict, Any, List
-from .messages import BaseMessage, UserMessage, AssistantMessage, ImageMessage
+from .messages import BaseMessage, UserMessage, AssistantMessage, ImageMessage, VideoMessage
 from backend.shared.utils.text_clean import extract_response_without_think
 
 
@@ -40,6 +40,17 @@ def message_factory(data: dict) -> BaseMessage:
             timestamp=data.get('timestamp')
         )
     
+    # Handle video messages
+    if role == 'video':
+        if 'video_path' not in data:
+            raise ValueError("Video message must have a video_path")
+        return VideoMessage(
+            content=data.get('content', ''),
+            video_path=data['video_path'],
+            id=data.get('id'),
+            timestamp=data.get('timestamp')
+        )
+    
     # Handle regular messages
     filtered_data = {k: v for k, v in data.items() if k != 'role'}
     
@@ -66,8 +77,8 @@ def message_factory_no_thinking(data: dict) -> BaseMessage:
     """
     role = data.get('role')
     
-    # Image messages remain unchanged
-    if role == 'image':
+    # Image and video messages remain unchanged
+    if role in ['image', 'video']:
         return message_factory(data)
     
     # Handle messages that need thinking filtering

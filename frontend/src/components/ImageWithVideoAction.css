@@ -1,0 +1,175 @@
+.image-video-action-container {
+  position: relative;
+  display: inline-block;
+}
+
+.generate-video-button,
+.play-video-button {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.file-preview:hover .generate-video-button,
+.file-preview:hover .play-video-button,
+.image-video-action-container:hover .generate-video-button,
+.image-video-action-container:hover .play-video-button {
+  opacity: 1;
+}
+
+/* Ensure the button is always visible on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .generate-video-button,
+  .play-video-button {
+    opacity: 0.8;
+  }
+}
+
+/* Video player overlay styles */
+.video-player-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.video-player-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.video-player-container video {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+.video-close-button {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  color: white;
+  background: transparent;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  padding: 8px;
+  transition: transform 0.2s;
+}
+
+.video-close-button:hover {
+  transform: scale(1.1);
+}
+
+/* Elegant loading animations */
+.elegant-loading-container {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.elegant-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  animation: elegant-spin 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  position: relative;
+  z-index: 2;
+}
+
+.loading-pulse {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  animation: elegant-pulse 2s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes elegant-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+    border-top-color: rgba(255, 255, 255, 0.9);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.1);
+    border-top-color: rgba(138, 180, 248, 0.9);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+    border-top-color: rgba(168, 162, 255, 0.9);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+    border-top-color: rgba(196, 181, 253, 0.9);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    border-top-color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@keyframes elegant-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.1;
+  }
+}
+
+/* Enhanced button states */
+.generate-video-button {
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.generate-video-button:not(:disabled):hover {
+  transform: scale(1.05) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.generate-video-button:disabled {
+  transform: none;
+  animation: generating-breathe 2s ease-in-out infinite;
+}
+
+@keyframes generating-breathe {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(138, 180, 248, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(168, 162, 255, 0.6);
+  }
+}
+
+/* Smooth visibility transitions */
+.generate-video-button,
+.play-video-button {
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform: translateY(4px);
+}
+
+.file-preview:hover .generate-video-button,
+.file-preview:hover .play-video-button,
+.image-video-action-container:hover .generate-video-button,
+.image-video-action-container:hover .play-video-button {
+  opacity: 1;
+  transform: translateY(0);
+}

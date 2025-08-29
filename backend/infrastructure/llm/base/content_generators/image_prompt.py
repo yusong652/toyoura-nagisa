@@ -1,11 +1,10 @@
 """
-Base content generators - Abstract base classes for specialized content generation.
+Base image prompt generator for text-to-image generation.
 
-This module provides the foundation for all provider-specific content generators,
-extracting common patterns and providing shared interfaces.
+Handles text-to-image prompt generation using conversation context and few-shot learning.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Optional, Dict, Any, List
 from backend.domain.models.messages import BaseMessage, UserMessage, AssistantMessage
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
@@ -14,216 +13,7 @@ from backend.infrastructure.llm.shared.utils.text_processing import extract_text
 from backend.infrastructure.llm.shared.utils.text_to_image import load_text_to_image_history, save_text_to_image_generation
 from backend.infrastructure.llm.shared.constants.defaults import DEFAULT_FEW_SHOT_MAX_LENGTH, DEFAULT_CONTEXT_MESSAGE_COUNT
 from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT, CONVERSATION_TEXT_PROMPT_PREFIX
-
-
-class BaseContentGenerator(ABC):
-    """
-    Abstract base class for content generators.
-    
-    Provides common interface for specialized content generation utilities
-    like title generation, image prompt generation, and web search.
-    """
-    
-    def __init__(self, client, config=None):
-        """
-        Initialize content generator.
-        
-        Args:
-            client: LLM client instance
-            config: Optional configuration object
-        """
-        self.client = client
-        self.config = config
-
-
-class BaseTitleGenerator(BaseContentGenerator):
-    """
-    Abstract base class for title generation.
-    
-    Handles conversation title generation using LLM APIs.
-    Generates concise, descriptive titles based on the first exchange
-    in a conversation to help users identify and organize their chats.
-    """
-    
-    @staticmethod
-    @abstractmethod
-    def generate_title_from_messages(
-        client,  # LLM client instance
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate a concise conversation title based on recent messages.
-        
-        Args:
-            client: LLM client instance for API calls
-            latest_messages: Recent conversation messages to generate title from
-            
-        Returns:
-            Generated title string, or None if generation fails
-        """
-        pass
-    
-    @staticmethod
-    def validate_messages_for_title(latest_messages: List[BaseMessage]) -> bool:
-        """
-        Validate if messages are sufficient for title generation.
-        
-        Args:
-            latest_messages: Messages to validate
-            
-        Returns:
-            True if messages are valid for title generation
-        """
-        return latest_messages and len(latest_messages) >= 2
-    
-    @staticmethod
-    def prepare_title_generation_messages(
-        latest_messages: List[BaseMessage], 
-        title_request_text: str
-    ) -> List[BaseMessage]:
-        """
-        Prepare message sequence for title generation.
-        
-        Args:
-            latest_messages: Original conversation messages
-            title_request_text: Text prompt requesting title generation
-            
-        Returns:
-            Complete message list including title request
-        """
-        from backend.infrastructure.llm.shared.constants.prompts import TITLE_GENERATION_REQUEST_TEXT
-        
-        return list(latest_messages) + [
-            UserMessage(role="user", content=[{"type": "text", "text": title_request_text or TITLE_GENERATION_REQUEST_TEXT}])
-        ]
-
-
-class BaseWebSearchGenerator(BaseContentGenerator):
-    """
-    Abstract base class for web search generation.
-    
-    Handles web search using LLM APIs with appropriate search tools.
-    Performs web searches and returns structured results with proper error
-    handling and debugging support.
-    """
-    
-    @staticmethod
-    @abstractmethod
-    def perform_web_search(
-        client,  # LLM client instance
-        query: str,
-        debug: bool = False,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Perform a web search using the LLM's web search capabilities.
-        
-        Args:
-            client: LLM client instance for API calls
-            query: The search query to find information on the web
-            debug: Enable debug output
-            **kwargs: Additional search parameters (max_uses, etc.)
-            
-        Returns:
-            Dictionary containing search results or error information
-        """
-        pass
-    
-    @staticmethod
-    def create_search_user_message(query: str) -> UserMessage:
-        """
-        Create a user message for web search query.
-        
-        Args:
-            query: The search query
-            
-        Returns:
-            UserMessage object containing the query
-        """
-        return UserMessage(role="user", content=query)
-    
-    @staticmethod
-    def format_search_result(
-        query: str,
-        response_text: str,
-        sources: List[Dict[str, Any]],
-        error: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Format web search results into standardized structure.
-        
-        Args:
-            query: Original search query
-            response_text: Synthesized response text
-            sources: List of source dictionaries
-            error: Optional error message
-            
-        Returns:
-            Standardized search result dictionary
-        """
-        return {
-            "query": query,
-            "response_text": response_text,
-            "sources": sources,
-            "total_sources": len(sources),
-            "error": error
-        }
-    
-    @staticmethod
-    def format_search_error(query: str, error_message: str) -> Dict[str, Any]:
-        """
-        Format search error into standardized response.
-        
-        Args:
-            query: Original search query
-            error_message: Error description
-            
-        Returns:
-            Standardized error response
-        """
-        return BaseWebSearchGenerator.format_search_result(
-            query=query,
-            response_text="",
-            sources=[],
-            error=error_message
-        )
-    
-    @staticmethod
-    def debug_search_start(query: str, debug: bool):
-        """
-        Print debug message for search start.
-        
-        Args:
-            query: Search query
-            debug: Whether debug is enabled
-        """
-        if debug:
-            print(f"[WebSearch] Performing search for query: {query}")
-    
-    @staticmethod
-    def debug_search_complete(debug: bool):
-        """
-        Print debug message for search completion.
-        
-        Args:
-            debug: Whether debug is enabled
-        """
-        if debug:
-            print(f"[WebSearch] API call completed")
-    
-    @staticmethod
-    def debug_search_results(sources_count: int, response_length: int, debug: bool):
-        """
-        Print debug message for search results.
-        
-        Args:
-            sources_count: Number of sources found
-            response_length: Length of response text
-            debug: Whether debug is enabled
-        """
-        if debug:
-            print(f"[WebSearch] Extracted {sources_count} sources")
-            print(f"[WebSearch] Response text length: {response_length}")
+from .base import BaseContentGenerator
 
 
 class BaseImagePromptGenerator(BaseContentGenerator):
@@ -270,6 +60,8 @@ class BaseImagePromptGenerator(BaseContentGenerator):
             session_id: Optional session ID for conversation context
             few_shot_max_length: Maximum number of few-shot examples
             context_message_count: Number of recent messages to include
+            llm_provider: Optional LLM provider name
+            llm_model: Optional LLM model name
             
         Returns:
             Dictionary containing prepared context data

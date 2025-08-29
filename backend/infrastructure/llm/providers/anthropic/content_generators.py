@@ -10,11 +10,9 @@ import json
 from typing import Optional, Dict, List, Any
 import anthropic
 from backend.domain.models.messages import BaseMessage, UserMessage
-from backend.infrastructure.llm.base.content_generators import (
-    BaseTitleGenerator,
-    BaseWebSearchGenerator,
-    BaseImagePromptGenerator
-)
+from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
+from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
+from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT
@@ -200,7 +198,7 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
                 print(f"[WebSearch] Error: {error_msg}")
             return {"error": error_msg, "query": query}
 
-from backend.infrastructure.llm.base.content_generators import BaseImagePromptGenerator
+from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 
 class ImagePromptGenerator(BaseImagePromptGenerator):
     """

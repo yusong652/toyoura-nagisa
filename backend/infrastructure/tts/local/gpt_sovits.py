@@ -68,6 +68,9 @@ class GPTSoVITSTTS(BaseTTS):
             raise TTSSynthesisError("TTS client not initialized. Call initialize() first.")
         try:
             cleaned_text = self.clean_text(text)
+            if not cleaned_text or not cleaned_text.strip():
+                raise TTSSynthesisError(f"Text is empty after cleaning: '{text}' -> '{cleaned_text}'")
+            
             data = dict(self.config._config)
             data.update(kwargs)
             data["text"] = cleaned_text
@@ -78,8 +81,8 @@ class GPTSoVITSTTS(BaseTTS):
             if response.status_code != 200:
                 raise TTSSynthesisError(f"GPT-SoVITS server returned error: {response.text}")
             audio_bytes = response.content
-            if not audio_bytes:
-                raise TTSSynthesisError("No audio data in response")
+            if not audio_bytes or len(audio_bytes) == 0:
+                raise TTSSynthesisError(f"No audio data in response from GPT-SoVITS server. Response size: {len(audio_bytes)} bytes")
             if output_path:
                 self.save_audio_to_file(audio_bytes, output_path, audio_format="wav")
             return audio_bytes

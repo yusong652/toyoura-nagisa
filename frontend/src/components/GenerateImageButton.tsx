@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import './GenerateImageButton.css';
 import { useChat } from '../contexts/chat/ChatContext';
 import { useSession } from '../contexts/session/SessionContext';
+import UnifiedErrorDisplay from './UnifiedErrorDisplay';
+import { useErrorDisplay } from '../hooks/useErrorDisplay';
 
 const GenerateImageButton: React.FC = () => {
   const { generateImage } = useChat();
   const { currentSessionId } = useSession();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const { error, showTemporaryError, clearError } = useErrorDisplay();
 
   const handleClick = async () => {
     if (!currentSessionId) return;
@@ -22,6 +25,7 @@ const GenerateImageButton: React.FC = () => {
       }
     } catch (e: any) {
       console.error('Failed to generate image:', e);
+      showTemporaryError('Failed to generate image. Please try again.', 4000);
     } finally {
       setLoading(false);
     }
@@ -52,6 +56,10 @@ const GenerateImageButton: React.FC = () => {
           </svg>
         )}
       </button>
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
     </div>
   );
 };

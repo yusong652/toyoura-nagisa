@@ -4,8 +4,12 @@ import { Message, MessageStatus } from '../types/chat'
 import { useChat } from '../contexts/chat/ChatContext'
 import MessageToolState from './MessageToolState'
 import ImageViewer from './ImageViewer'
+import ImageWithVideoAction from './ImageWithVideoAction'
+import VideoPlayer from './VideoPlayer'
+import UnifiedErrorDisplay from './UnifiedErrorDisplay'
 import ReactMarkdown from 'react-markdown'
 import { useImageNavigation } from '../hooks/useImageNavigation'
+import { useErrorDisplay } from '../hooks/useErrorDisplay'
 
 interface MessageItemProps {
   message: Message
@@ -20,8 +24,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
   const [displayText, setDisplayText] = useState('')
   const [dotCount, setDotCount] = useState(0)
   const { deleteMessage } = useChat()
+  const { error, showTemporaryError, clearError } = useErrorDisplay()
   const [viewerOpen, setViewerOpen] = useState(false)
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('')
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false)
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('')
+  const [currentVideoFormat, setCurrentVideoFormat] = useState<string>('mp4')
   
   // Use image navigation hook
   const { allImages, getImageIndex } = useImageNavigation(allMessages)
@@ -94,7 +102,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
       onMessageSelect(null)
     } catch (error) {
       console.error('删除消息失败:', error)
-      // 可以在这里添加错误提示
+      showTemporaryError('Failed to delete message. Please try again.', 4000)
     }
   }
   
@@ -207,6 +215,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     setViewerOpen(true);
   };
 
+  const handleVideoClick = (videoUrl: string, format: string = 'mp4') => {
+    setCurrentVideoUrl(videoUrl);
+    setCurrentVideoFormat(format);
+    setShowVideoPlayer(true);
+  };
+
   return (
     <>
       <div 
@@ -226,7 +240,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
             {toolState && <MessageToolState toolState={toolState} />}
             {(renderStreamingText() || (files && files.length > 0 && !isLoading)) && (
               <div className="message-content">
-                {renderStreamingText()}
+                {displayText && renderStreamingText()}
                 
                 {files && files.length > 0 && !isLoading && (() => {
                       
@@ -235,15 +249,61 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                       {files.map((file, index) => (
                         <div key={index} className="file-preview">
                           {file.type.startsWith('image/') ? (
-                            <img 
-                              src={file.data} 
-                              alt={file.name} 
-                              className="file-image" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleImageClick(file.data);
-                              }}
-                            />
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <img 
+                                src={file.data} 
+                                alt={file.name} 
+                                className="file-image" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleImageClick(file.data);
+                                }}
+                              />
+                              {sender === 'bot' && (
+                                <ImageWithVideoAction />
+                              )}
+                            </div>
+                          ) : file.type.startsWith('video/') || file.name.toLowerCase().endsWith('.mp4') || file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.webm') ? (
+                            (() => {
+                              const fileName = file.name.toLowerCase();
+                              let format = 'mp4'; // 默认
+                              if (fileName.endsWith('.gif')) {
+                                format = 'gif';
+                              } else if (fileName.endsWith('.webm')) {
+                                format = 'webm';
+                              } else if (fileName.endsWith('.mp4')) {
+                                format = 'mp4';
+                              }
+                              
+                              return (
+                                <div 
+                                  className="file-video-preview elegant-video" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVideoClick(file.data, format);
+                                  }}
+                                >
+                                  <video 
+                                    src={file.data} 
+                                    className="elegant-video-thumbnail"
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div className="elegant-video-overlay">
+                                    <div className="elegant-play-button">
+                                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                      </svg>
+                                    </div>
+                                  </div>
+                                  <div className="elegant-video-info">
+                                    <div className="video-format-badge">
+                                      {format.toUpperCase()}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()
                           ) : (
                             <div className="file-info">
                               <span className="file-name">{file.name}</span>
@@ -314,6 +374,17 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           imageNames={allImages.map(img => img.name)}
         />
       )}
+      {showVideoPlayer && currentVideoUrl && (
+        <VideoPlayer
+          videoUrl={currentVideoUrl}
+          format={currentVideoFormat}
+          onClose={() => setShowVideoPlayer(false)}
+        />
+      )}
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
     </>
   )
 }

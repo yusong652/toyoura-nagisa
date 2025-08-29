@@ -34,6 +34,7 @@ export interface UseChatMessageReturn {
   }>
   addUserMessage: (text: string, files?: FileData[]) => string
   addBotMessage: () => string
+  addVideoMessage: (videoPath: string, content?: string) => string
   updateMessageStatus: (messageId: string, status: MessageStatus) => void
   updateBotMessage: (messageId: string, updates: Partial<Message>) => void
 }
@@ -58,7 +59,8 @@ export const useChatMessage = ({
               .filter((msg: any) => {
                 return (msg.role === 'user' && !msg.tool_request) ||
                        (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) ||
-                       (msg.role === 'image')
+                       (msg.role === 'image') ||
+                       (msg.role === 'video')
               })
               .map((msg: any): Message | null => {
                 let sender: 'user' | 'bot'
@@ -67,6 +69,8 @@ export const useChatMessage = ({
                 } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
                   sender = 'bot'
                 } else if (msg.role === 'image') {
+                  sender = 'bot'
+                } else if (msg.role === 'video') {
                   sender = 'bot'
                 } else {
                   return null
@@ -81,6 +85,26 @@ export const useChatMessage = ({
                     name: 'generated_image',
                     type: 'image/png',
                     data: `/api/images/${msg.image_path}`
+                  })
+                } else if (msg.role === 'video') {
+                  text = msg.content || ''
+                  // 根据文件扩展名确定视频类型
+                  const videoPath = msg.video_path
+                  const extension = videoPath?.toLowerCase().split('.').pop()
+                  let mediaType = 'video/mp4' // 默认
+                  
+                  if (extension === 'gif') {
+                    mediaType = 'image/gif'
+                  } else if (extension === 'webm') {
+                    mediaType = 'video/webm'
+                  } else if (extension === 'mp4') {
+                    mediaType = 'video/mp4'
+                  }
+                  
+                  files.push({
+                    name: 'generated_video',
+                    type: mediaType,
+                    data: `/api/videos/${msg.video_path}`
                   })
                 } else if (typeof msg.content === 'string') {
                   text = msg.content
@@ -245,6 +269,36 @@ export const useChatMessage = ({
     return botMessageId
   }, [])
 
+  // 添加视频消息
+  const addVideoMessage = useCallback((videoPath: string, content: string = "") => {
+    const videoMessageId = uuidv4()
+    const extension = videoPath.toLowerCase().split('.').pop()
+    let mediaType = 'video/mp4' // 默认
+    
+    if (extension === 'gif') {
+      mediaType = 'image/gif'
+    } else if (extension === 'webm') {
+      mediaType = 'video/webm'
+    } else if (extension === 'mp4') {
+      mediaType = 'video/mp4'
+    }
+    
+    const videoMessage: Message = {
+      id: videoMessageId,
+      sender: 'bot',
+      text: content, // 空内容，只显示视频
+      files: [{
+        name: 'generated_video',
+        type: mediaType,
+        data: `/api/videos/${videoPath}`
+      }],
+      timestamp: Date.now()
+    }
+    
+    setMessages(prev => [...prev, videoMessage])
+    return videoMessageId
+  }, [])
+
   // 更新消息状态
   const updateMessageStatus = useCallback((messageId: string, status: MessageStatus) => {
     setMessages(prev => 
@@ -282,6 +336,7 @@ export const useChatMessage = ({
       return updatedMessages
     })
   }, [])
+
 
   // 创建并发送消息的基础函数
   // 职责：创建用户消息 -> 调用后端API -> 创建机器人消息占位符
@@ -332,6 +387,7 @@ export const useChatMessage = ({
     sendMessage,
     addUserMessage,
     addBotMessage,
+    addVideoMessage,
     updateMessageStatus,
     updateBotMessage
   }

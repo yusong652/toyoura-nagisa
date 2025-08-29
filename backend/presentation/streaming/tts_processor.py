@@ -73,7 +73,8 @@ async def process_tts_pipeline(
             
             for i, sentence in enumerate(sentences):
                 tts_text = clean_text_for_tts(sentence)
-                if not tts_text.strip():  # Skip empty sentences
+                if not tts_text or not tts_text.strip():  # Skip empty sentences
+                    logger.debug(f"Skipping empty sentence after text cleaning: '{sentence}' -> '{tts_text}'")
                     continue
                     
                 sentence_start = time.time()

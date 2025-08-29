@@ -71,8 +71,21 @@ class ImageMessage(BaseModel):
     role: Literal["image"] = "image"
 
 
+class VideoMessage(BaseModel):
+    """
+    Generated video message.
+    
+    Represents system-generated or processed video content, containing video path information.
+    """
+    content: Union[str, List[dict]]
+    id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    video_path: str
+    role: Literal["video"] = "video"
+
+
 # =====================
 # Type Definitions
 # =====================
-MessageType = Union[UserMessage, AssistantMessage, ImageMessage]
+MessageType = Union[UserMessage, AssistantMessage, ImageMessage, VideoMessage]
 Message = MessageType  # Compatible with existing type hints

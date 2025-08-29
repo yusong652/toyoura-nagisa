@@ -1,0 +1,161 @@
+import React, { useState } from 'react';
+import { IconButton } from '@mui/material';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import { useSession } from '../contexts/session/SessionContext';
+import { useChat } from '../contexts/chat/ChatContext';
+import VideoPlayer from './VideoPlayer';
+import UnifiedErrorDisplay from './UnifiedErrorDisplay';
+import { sessionService } from '../services/api/sessionService';
+import { useErrorDisplay } from '../hooks/useErrorDisplay';
+import './ImageWithVideoAction.css';
+
+interface ImageWithVideoActionProps {
+  onVideoGenerated?: (videoUrl: string) => void;
+}
+
+const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
+  onVideoGenerated
+}) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [videoUrl] = useState<string | null>(null);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const { currentSessionId } = useSession();
+  const { addVideoMessage } = useChat();
+  const { error, showTemporaryError, clearError } = useErrorDisplay();
+
+  const handleGenerateVideo = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isGenerating || videoUrl) return;
+    
+    setIsGenerating(true);
+    clearError();
+    
+    try {
+      // Call the video generation API
+      const response = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: currentSessionId
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && currentSessionId) {
+        try {
+          // 获取会话历史，查找最新的视频消息
+          const historyData = await sessionService.getSessionHistory(currentSessionId);
+          
+          if (historyData.history && Array.isArray(historyData.history)) {
+            const lastVideoMessage = historyData.history
+              .filter((msg: any) => msg.role === 'video')
+              .pop();
+
+            if (lastVideoMessage && lastVideoMessage.video_path) {
+              // 直接添加视频消息到当前消息列表，与图片消息逻辑一致
+              addVideoMessage(lastVideoMessage.video_path, lastVideoMessage.content || "");
+              console.log('Video message added to chat');
+            }
+          }
+        } catch (error) {
+          console.error('获取生成的视频消息失败:', error);
+          showTemporaryError('Failed to retrieve generated video', 4000);
+        }
+      } else {
+        showTemporaryError(result.error || 'Failed to generate video', 5000);
+      }
+      
+    } catch (err) {
+      console.error('Error generating video:', err);
+      showTemporaryError('Failed to generate video. Please try again.', 5000);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePlayVideo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoUrl) {
+      setShowVideoPlayer(true);
+      if (onVideoGenerated) {
+        onVideoGenerated(videoUrl);
+      }
+    }
+  };
+
+  return (
+    <>
+      <div className="image-video-action-container">
+        {!videoUrl ? (
+              <IconButton
+                className="generate-video-button"
+                onClick={handleGenerateVideo}
+                disabled={isGenerating}
+                size="small"
+                sx={{
+                  position: 'absolute',
+                  bottom: 8,
+                  right: 8,
+                  backgroundColor: isGenerating ? 'rgba(138, 180, 248, 0.8)' : 'rgba(0, 0, 0, 0.6)',
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: isGenerating ? 'rgba(138, 180, 248, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+                  },
+                  '&:disabled': {
+                    backgroundColor: 'rgba(138, 180, 248, 0.7)',
+                    color: 'white',
+                  }
+                }}
+              >
+                {isGenerating ? (
+                  <div className="elegant-loading-container">
+                    <div className="elegant-spinner" />
+                    <div className="loading-pulse" />
+                  </div>
+                ) : (
+                  <VideoLibraryIcon fontSize="small" />
+                )}
+              </IconButton>
+        ) : (
+            <IconButton
+              className="play-video-button"
+              onClick={handlePlayVideo}
+              size="small"
+              sx={{
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: 'rgba(0, 128, 0, 0.6)',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 128, 0, 0.8)',
+                }
+              }}
+            >
+              <PlayCircleOutlineIcon fontSize="small" />
+            </IconButton>
+        )}
+      </div>
+      
+      <UnifiedErrorDisplay
+        error={error}
+        onClose={clearError}
+      />
+      
+      {showVideoPlayer && videoUrl && (
+        <VideoPlayer
+          videoUrl={videoUrl}
+          format="mp4"
+          onClose={() => setShowVideoPlayer(false)}
+        />
+      )}
+    </>
+  );
+};
+
+export default ImageWithVideoAction;
