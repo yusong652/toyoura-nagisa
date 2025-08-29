@@ -14,7 +14,7 @@ from backend.infrastructure.llm.shared.utils.text_processing import extract_text
 from backend.infrastructure.llm.shared.utils.text_to_image import load_text_to_image_history, save_text_to_image_generation
 from backend.infrastructure.llm.shared.utils.image_to_video import load_video_prompt_history, save_video_prompt_generation
 from backend.infrastructure.llm.shared.constants.defaults import DEFAULT_FEW_SHOT_MAX_LENGTH, DEFAULT_CONTEXT_MESSAGE_COUNT
-from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT, CONVERSATION_TEXT_PROMPT_PREFIX, DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT
+from backend.infrastructure.llm.shared.constants.prompts import DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT, CONVERSATION_TEXT_PROMPT_PREFIX, CONVERSATION_VIDEO_PROMPT_PREFIX, DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT
 from .base import BaseContentGenerator
 from .video_prompt import BaseVideoPromptGenerator
 
@@ -128,8 +128,15 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
         # Get latest conversation messages
         latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
         
-        # Build conversation context
-        conversation_text = CONVERSATION_TEXT_PROMPT_PREFIX
+        # Build conversation context with appropriate prefix
+        if prompt_type == PromptType.TEXT_TO_IMAGE:
+            conversation_text = CONVERSATION_TEXT_PROMPT_PREFIX
+        elif prompt_type == PromptType.IMAGE_TO_VIDEO:
+            conversation_text = CONVERSATION_VIDEO_PROMPT_PREFIX
+        else:
+            # Fallback to text-to-image prefix
+            conversation_text = CONVERSATION_TEXT_PROMPT_PREFIX
+            
         for msg in latest_messages:
             if msg is not None:
                 text_content = extract_text_content(msg.content)

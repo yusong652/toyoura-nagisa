@@ -53,6 +53,9 @@ TITLE_GENERATION_REQUEST_TEXT = "Please generate a title for the above conversat
 # Conversation context prefix for text-to-image
 CONVERSATION_TEXT_PROMPT_PREFIX = "Based on the following conversation, please generate a text-to-image prompt:\n\n"
 
+# Conversation context prefix for image-to-video
+CONVERSATION_VIDEO_PROMPT_PREFIX = "Based on the following conversation, please generate an optimized video prompt for image-to-video generation:\n\n"
+
 # === REGEX PATTERNS ===
 
 # Pattern for extracting text prompts from responses
