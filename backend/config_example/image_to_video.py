@@ -68,7 +68,7 @@ class ImageToVideoSettings(BaseSettings):
     )
     
     # Context configuration
-    context_message_count: int = Field(default=4, ge=1, le=20, description="Context message count")
+    context_message_count: int = Field(default=4, ge=1, le=50, description="Number of recent conversation messages to include for context")
     
     # Default motion prompts
     default_motion_positive: str = Field(
@@ -117,7 +117,7 @@ class ImageToVideoSettings(BaseSettings):
     )
     
     # Few-shot learning configuration
-    video_few_shot_max_length: int = Field(
+    few_shot_max_length: int = Field(
         default=15,
         ge=0,
         le=32,

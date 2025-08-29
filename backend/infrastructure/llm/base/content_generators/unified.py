@@ -88,8 +88,8 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
             prompt_type: Type of prompt being generated
             session_id: Optional session ID for conversation context
             motion_style: Optional motion style for video prompts
-            few_shot_max_length: Maximum number of few-shot examples
-            context_message_count: Number of recent messages to include
+            few_shot_max_length: Maximum number of few-shot examples (uses config if available, else default)
+            context_message_count: Number of recent messages to include (uses config if available, else default)
             llm_provider: Optional LLM provider name
             llm_model: Optional LLM model name
             
@@ -103,12 +103,16 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
             - prompt_type: The prompt type being generated
             - motion_style: Motion style (for video)
         """
-        # Get appropriate settings based on type
+        # Get appropriate settings based on type and override parameters with config values
         if prompt_type == PromptType.TEXT_TO_IMAGE:
             from backend.config import get_text_to_image_settings
             settings = get_text_to_image_settings()
             system_prompt = settings.text_to_image_system_prompt or DEFAULT_TEXT_TO_IMAGE_SYSTEM_PROMPT
             temperature = getattr(settings, 'text_to_image_temperature', 1.0)
+            
+            # Actively get config values, fallback to function parameter defaults
+            actual_few_shot_max_length = getattr(settings, 'few_shot_max_length', few_shot_max_length)
+            actual_context_message_count = getattr(settings, 'context_message_count', context_message_count)
             
             # Load text-to-image few-shot history
             few_shot_history = load_text_to_image_history(session_id) if session_id else []
@@ -119,14 +123,18 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
             system_prompt = getattr(settings, 'video_prompt_system', DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT)
             temperature = getattr(settings, 'video_prompt_temperature', 1.2)
             
+            # Actively get config values with fallback to function parameter defaults
+            actual_few_shot_max_length = getattr(settings, 'few_shot_max_length', few_shot_max_length)
+            actual_context_message_count = getattr(settings, 'context_message_count', context_message_count)
+            
             # Load video prompt few-shot history
             few_shot_history = load_video_prompt_history(session_id) if session_id else []
             
         else:
             raise ValueError(f"Unsupported prompt type: {prompt_type}")
         
-        # Get latest conversation messages
-        latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
+        # Get latest conversation messages using actual config values
+        latest_messages = get_latest_n_messages(session_id, actual_context_message_count) if session_id else tuple([None] * actual_context_message_count)
         
         # Build conversation context with appropriate prefix
         if prompt_type == PromptType.TEXT_TO_IMAGE:
@@ -160,7 +168,7 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
         return {
             'system_prompt': system_prompt,
             'conversation_text': conversation_text,
-            'few_shot_history': few_shot_history[-few_shot_max_length:],
+            'few_shot_history': few_shot_history[-actual_few_shot_max_length:] if actual_few_shot_max_length > 0 else [],
             'temperature': temperature,
             'model': prompt_model,
             'prompt_type': prompt_type,
