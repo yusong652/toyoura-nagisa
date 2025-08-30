@@ -90,7 +90,9 @@ export const useChatMessage = ({
                   text = msg.content || ''
                   // 根据文件扩展名确定视频类型
                   const videoPath = msg.video_path
-                  const extension = videoPath?.toLowerCase().split('.').pop()
+                  // 从路径中提取文件名 (格式: session_id/filename.ext)
+                  const filename = videoPath?.split('/').pop() || 'video.mp4'
+                  const extension = filename.toLowerCase().split('.').pop()
                   let mediaType = 'video/mp4' // 默认
                   
                   if (extension === 'gif') {
@@ -102,7 +104,7 @@ export const useChatMessage = ({
                   }
                   
                   files.push({
-                    name: 'generated_video',
+                    name: filename,
                     type: mediaType,
                     data: `/api/videos/${msg.video_path}`
                   })
@@ -272,7 +274,9 @@ export const useChatMessage = ({
   // 添加视频消息
   const addVideoMessage = useCallback((videoPath: string, content: string = "") => {
     const videoMessageId = uuidv4()
-    const extension = videoPath.toLowerCase().split('.').pop()
+    // 从路径中提取文件名 (格式: session_id/filename.ext)
+    const filename = videoPath.split('/').pop() || 'video.mp4'
+    const extension = filename.toLowerCase().split('.').pop()
     let mediaType = 'video/mp4' // 默认
     
     if (extension === 'gif') {
@@ -288,7 +292,7 @@ export const useChatMessage = ({
       sender: 'bot',
       text: content, // 空内容，只显示视频
       files: [{
-        name: 'generated_video',
+        name: filename,
         type: mediaType,
         data: `/api/videos/${videoPath}`
       }],
