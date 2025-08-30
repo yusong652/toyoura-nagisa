@@ -91,6 +91,7 @@ async def call_wan22_api_with_polling(
                 print(f"[DEBUG] Video generation progress: {status} (elapsed: {elapsed:.1f}s)")
         
         print(f"[DEBUG] Starting video generation with 10-minute timeout...")
+        print(f"[DEBUG] Will cleanup uploaded image: {uploaded_filename} (cleanup={cleanup})")
         
         # Generate video with polling (10 minutes max for video)
         # Pass the ComfyUI API payload with proper structure
@@ -98,7 +99,8 @@ async def call_wan22_api_with_polling(
             workflow=prompt_payload,
             progress_callback=progress_callback,
             cleanup=cleanup,
-            max_wait=600  # 10 minutes for video generation
+            max_wait=600,  # 10 minutes for video generation
+            uploaded_images=[uploaded_filename]  # Pass uploaded image for cleanup
         )
         
         if result['type'] == 'video_base64':

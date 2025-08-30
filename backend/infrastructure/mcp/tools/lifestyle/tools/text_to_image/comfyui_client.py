@@ -201,9 +201,9 @@ class ComfyUIClient:
         image_type: str = 'output'
     ) -> bool:
         """
-        Delete image file from ComfyUI server storage using custom delete API.
+        Delete image file from ComfyUI server storage using delete API.
         
-        Uses the /files/single endpoint to delete specific image files from
+        Uses the /api/files/delete endpoint to delete specific image files from
         the ComfyUI server storage directory.
         
         Args:
@@ -215,16 +215,16 @@ class ComfyUIClient:
             bool: True if deletion was successful, False otherwise
         """
         try:
-            delete_url = urljoin(self.server_url, '/files/single')
+            delete_url = urljoin(self.server_url, '/api/files/delete')
             
             payload = {
-                'filename': filename,
-                'subfolder': subfolder,
-                'type': image_type
+                'mode': 'single',
+                'directory': image_type,
+                'filepath': f"{subfolder}/{filename}" if subfolder else filename
             }
             
             async with aiohttp.ClientSession() as session:
-                async with session.delete(
+                async with session.post(
                     delete_url, 
                     json=payload,
                     headers={'Content-Type': 'application/json'},

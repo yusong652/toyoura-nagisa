@@ -126,7 +126,7 @@ class ComfyUIVideoClient:
             bool: True if cleanup was successful, False otherwise
         """
         try:
-            cleanup_url = urljoin(self.server_url, '/files/cleanup')
+            cleanup_url = urljoin(self.server_url, '/files/cleanup/all')
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(cleanup_url, timeout=30.0) as response:
@@ -271,18 +271,20 @@ class ComfyUIVideoClient:
         self, 
         prompt_id: str, 
         result_data: Dict[str, Any], 
-        cleanup: bool = True
+        cleanup: bool = True,
+        input_images: List[str] = None
     ) -> List[str]:
         """
         Extract videos from ComfyUI result, convert to base64, and optionally cleanup.
         
         Handles both video and gif formats from various ComfyUI save nodes,
-        with automatic server cleanup after successful retrieval.
+        with automatic server cleanup after successful retrieval including input images.
         
         Args:
             prompt_id: ComfyUI prompt ID for logging purposes
             result_data: Raw ComfyUI completion result containing outputs
-            cleanup: Whether to delete videos from server after retrieval
+            cleanup: Whether to delete videos and input images from server after retrieval
+            input_images: List of input image filenames to clean up from input folder
             
         Returns:
             List[str]: List of base64 encoded videos
@@ -363,6 +365,22 @@ class ComfyUIVideoClient:
                     except Exception as e:
                         logger.warning(f"Failed to delete {file_info['filename']}: {e}")
             
+            # Cleanup input images if requested
+            if cleanup and input_images:
+                print(f"[DEBUG] Cleaning up {len(input_images)} input image files...")
+                logger.info(f"Cleaning up {len(input_images)} input image files...")
+                for image_filename in input_images:
+                    try:
+                        print(f"[DEBUG] Deleting input image: {image_filename}")
+                        success = await self.delete_input_image(filename=image_filename)
+                        if success:
+                            print(f"[DEBUG] Successfully deleted input image: {image_filename}")
+                        else:
+                            print(f"[DEBUG] Failed to delete input image: {image_filename}")
+                    except Exception as e:
+                        print(f"[DEBUG] Exception deleting input image {image_filename}: {e}")
+                        logger.warning(f"Failed to delete input image {image_filename}: {e}")
+            
             logger.info(f"Total base64 videos generated: {len(base64_videos)}")
             
         except Exception as e:
@@ -388,16 +406,16 @@ class ComfyUIVideoClient:
             bool: True if deletion was successful, False otherwise
         """
         try:
-            delete_url = urljoin(self.server_url, '/files/single')
+            delete_url = urljoin(self.server_url, '/api/files/delete')
             
             payload = {
-                'filename': filename,
-                'subfolder': subfolder,
-                'type': video_type
+                'mode': 'single',
+                'directory': video_type,
+                'filepath': f"{subfolder}/{filename}" if subfolder else filename
             }
             
             async with aiohttp.ClientSession() as session:
-                async with session.delete(
+                async with session.post(
                     delete_url, 
                     json=payload,
                     headers={'Content-Type': 'application/json'},
@@ -421,12 +439,65 @@ class ComfyUIVideoClient:
             logger.error(f"Error deleting video {filename}: {e}")
             return False
     
+    async def delete_input_image(
+        self, 
+        filename: str, 
+        subfolder: str = ''
+    ) -> bool:
+        """
+        Delete input image file from ComfyUI server storage using /files/single endpoint.
+        
+        Args:
+            filename: Image filename to delete from input folder
+            subfolder: Optional subdirectory path within input folder
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        try:
+            delete_url = urljoin(self.server_url, '/api/files/delete')
+            
+            payload = {
+                'mode': 'single',
+                'directory': 'input',
+                'filepath': f"{subfolder}/{filename}" if subfolder else filename
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    delete_url, 
+                    json=payload,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=15.0
+                ) as response:
+                    
+                    if response.status == 200:
+                        result = await response.json()
+                        print(f"[DEBUG] Delete response for {filename}: {result}")
+                        if result.get('success'):
+                            logger.info(f"Successfully deleted input image: {filename}")
+                            return True
+                        else:
+                            logger.warning(f"Delete API returned success=false for input image {filename}: {result.get('message')}")
+                            print(f"[DEBUG] Delete API returned success=false: {result.get('message')}")
+                            return False
+                    else:
+                        error_text = await response.text()
+                        print(f"[DEBUG] Delete request failed with status {response.status}: {error_text}")
+                        logger.error(f"Input image delete request failed with status {response.status}: {error_text}")
+                        return False
+            
+        except Exception as e:
+            logger.error(f"Error deleting input image {filename}: {e}")
+            return False
+    
     async def generate_video(
         self, 
         workflow: Dict[str, Any], 
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         cleanup: bool = True,
-        max_wait: int = 600
+        max_wait: int = 600,
+        uploaded_images: List[str] = None
     ) -> Dict[str, Any]:
         """
         Execute complete video generation workflow with polling and cleanup.
@@ -437,8 +508,9 @@ class ComfyUIVideoClient:
         Args:
             workflow: Complete ComfyUI video workflow
             progress_callback: Optional callback for progress updates
-            cleanup: Whether to delete videos from server after retrieval
+            cleanup: Whether to delete videos and input images from server after retrieval
             max_wait: Maximum wait time in seconds (default 10 minutes)
+            uploaded_images: List of uploaded image filenames to clean up from input folder
             
         Returns:
             Dict[str, Any]: Generation result containing:
@@ -474,7 +546,8 @@ class ComfyUIVideoClient:
             base64_videos = await self.get_videos_as_base64_and_cleanup(
                 prompt_id=prompt_id,
                 result_data=execution_result,
-                cleanup=cleanup
+                cleanup=cleanup,
+                input_images=uploaded_images
             )
             
             if not base64_videos:
