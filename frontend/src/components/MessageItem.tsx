@@ -107,7 +107,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     }
   }
   
-  // 格式化时间戳 - 使用智能时间显示
+  // Format timestamp with smart time display
   const getFormattedTime = (timestamp: number) => {
     return formatSmartTime(timestamp, { showRelative: true })
   }
