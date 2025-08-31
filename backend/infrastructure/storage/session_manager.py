@@ -198,15 +198,15 @@ def save_history(session_id: str, current_history: List[Any]) -> None:
 
 
 def load_history(session_id: str) -> List[Dict[str, Any]]:
-    """load history without image"""
+    """load history without image and video"""
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
         return []
     try:
         with open(session_file, 'r', encoding='utf-8') as f:
             history = json.load(f)
-            # 读取后，过滤掉 image 类型
-            history = [msg for msg in history if msg.get('role') != 'image']
+            # 读取后，过滤掉 image 和 video 类型
+            history = [msg for msg in history if msg.get('role') not in ['image', 'video']]
             for msg in history:
                 if 'timestamp' not in msg or not msg['timestamp']:
                     msg['timestamp'] = datetime.now().isoformat()
@@ -299,7 +299,7 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
         message: 要清理的消息对象
     """
     try:
-        message_type = message.get('type', '').lower()
+        message_type = message.get('role', message.get('type', '')).lower()
         
         if message_type == 'video' and message.get('video_path'):
             # 清理视频文件
@@ -350,7 +350,7 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
         Tuple: 包含消息对象的元组，如果消息不足n条，返回所有实际消息
     """
     
-    history = load_history(session_id)  # 只返回非 image 消息
+    history = load_history(session_id)  # 只返回非 image 和非 video 消息
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
     if not history_msgs:
         return tuple()

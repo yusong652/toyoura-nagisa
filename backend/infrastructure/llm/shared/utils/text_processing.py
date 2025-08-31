@@ -65,8 +65,16 @@ def parse_text_to_image_response(
         negative_prompt will be empty string if none found in response.
     """
     try:
+        # Clean up markdown code blocks if present
+        cleaned_text = response_text
+        if "```" in response_text:
+            # Remove markdown code block markers
+            cleaned_text = re.sub(r'```(?:text|xml|html)?\n?', '', response_text)
+            if debug:
+                print(f"[text_to_image] Cleaned markdown blocks from response")
+        
         # Extract text prompt
-        text_prompt_match = re.search(TEXT_TO_IMAGE_PROMPT_PATTERN, response_text, re.DOTALL)
+        text_prompt_match = re.search(TEXT_TO_IMAGE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         if not text_prompt_match:
             if debug:
                 print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {response_text}")
@@ -79,7 +87,7 @@ def parse_text_to_image_response(
             return None
         
         # Extract negative prompt
-        negative_prompt_match = re.search(NEGATIVE_PROMPT_PATTERN, response_text, re.DOTALL)
+        negative_prompt_match = re.search(NEGATIVE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else ""
         
         return text_prompt, negative_prompt
@@ -169,13 +177,21 @@ def parse_title_response(
         Cleaned title string, or None if parsing failed
     """
     try:
+        # Clean up markdown code blocks if present
+        cleaned_text = response_text
+        if "```" in response_text:
+            # Remove markdown code block markers
+            cleaned_text = re.sub(r'```(?:text|xml|html)?\n?', '', response_text)
+            if debug:
+                print(f"[title_generation] Cleaned markdown blocks from response")
+        
         # Try to extract title using pattern matching
-        title_match = re.search(TITLE_PROMPT_PATTERN, response_text, re.DOTALL)
+        title_match = re.search(TITLE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         if title_match:
             title = title_match.group(1).strip()
         else:
             # Fallback: use entire response as title
-            title = response_text.strip()
+            title = cleaned_text.strip()
         
         # Clean up the title
         title = title.strip('"').strip("'").strip()

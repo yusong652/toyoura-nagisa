@@ -105,6 +105,13 @@ export const useStreamProcessor = ({
         if (data.text !== undefined || data.audio !== undefined) {
           // Always use the most current message ID
           const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
+          console.log('[StreamProcessor] Processing content update:', {
+            hasText: data.text !== undefined,
+            textLength: data.text?.length,
+            messageId: messageIdForUpdate,
+            originalBotId: botMessageId,
+            finalId: finalAiMessageIdRef.current
+          })
           handleContentUpdate(data, messageIdForUpdate)
         }
       } catch (e) {

@@ -55,16 +55,22 @@ class BaseVideoPromptGenerator(BaseContentGenerator):
         
         settings = get_image_to_video_settings()
         
+        # Clean up markdown code blocks if present
+        cleaned_text = response_text
+        if "```" in response_text:
+            # Remove markdown code block markers
+            cleaned_text = re.sub(r'```(?:text|xml|html)?\n?', '', response_text)
+        
         # Try to extract using XML tags first
-        video_match = re.search(VIDEO_PROMPT_PATTERN, response_text, re.DOTALL)
-        negative_match = re.search(NEGATIVE_PROMPT_PATTERN, response_text, re.DOTALL)
+        video_match = re.search(VIDEO_PROMPT_PATTERN, cleaned_text, re.DOTALL)
+        negative_match = re.search(NEGATIVE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         
         if video_match:
             video_prompt = video_match.group(1).strip()
         else:
             # Fallback to old format for backward compatibility
             video_prompt = original_prompt
-            for line in response_text.split("\n"):
+            for line in cleaned_text.split("\n"):
                 if line.startswith("VIDEO_PROMPT:"):
                     video_prompt = line.replace("VIDEO_PROMPT:", "").strip()
                     break
@@ -74,7 +80,7 @@ class BaseVideoPromptGenerator(BaseContentGenerator):
         else:
             # Fallback to old format for backward compatibility
             negative_prompt = settings.default_motion_negative
-            for line in response_text.split("\n"):
+            for line in cleaned_text.split("\n"):
                 if line.startswith("NEGATIVE_PROMPT:"):
                     negative_prompt = line.replace("NEGATIVE_PROMPT:", "").strip()
                     break
