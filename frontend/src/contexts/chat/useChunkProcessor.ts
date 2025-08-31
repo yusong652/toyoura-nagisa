@@ -157,6 +157,15 @@ export const useChunkProcessor = ({
   ): Promise<void> => {
     if (!chunk) return
     
+    console.log('[ChunkProcessor] processChunk called:', {
+      messageId,
+      hasText: chunk.text !== undefined,
+      textContent: chunk.text,
+      hasAudio: chunk.audio !== undefined,
+      hasIndex: chunk.index !== undefined,
+      index: chunk.index
+    })
+    
     // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await handleOrderedChunk(chunk, messageId)

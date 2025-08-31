@@ -71,11 +71,24 @@ export const useMessageStateManager = ({
       onRenderComplete?: () => void
     }
   ) => {
+    console.log('[MessageStateManager] updateMessageText called:', {
+      messageId,
+      textLength: text?.length,
+      textContent: text,
+      options
+    })
+    
     setMessages(prev => {
       let messageFound = false
       const updatedMessages = prev.map(msg => {
         if (msg.id === messageId) {
           messageFound = true
+          console.log('[MessageStateManager] Updating message text:', {
+            messageId,
+            oldText: msg.text,
+            newText: text,
+            options
+          })
           return {
             ...msg,
             text,
@@ -86,7 +99,9 @@ export const useMessageStateManager = ({
       })
       
       if (!messageFound) {
-        console.warn(`[MessageStateManager] Message not found with ID: ${messageId}`)
+        console.warn(`[MessageStateManager] Message not found with ID: ${messageId}`, {
+          availableIds: prev.map(m => m.id)
+        })
       }
       
       return updatedMessages
