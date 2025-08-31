@@ -409,7 +409,7 @@
   display: none;
 }
 
-/* 时间戳样式 */
+/* 时间戳样式 - 改进版支持相对时间和悬停效果 */
 .message-time {
   display: block;
   text-align: right;
@@ -421,6 +421,16 @@
   user-select: none;
   font-weight: 400;
   animation: fadeInTime 0.3s ease-out;
+  cursor: help;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.message-time:hover {
+  opacity: 1;
+  color: #555;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .message.user .message-time {

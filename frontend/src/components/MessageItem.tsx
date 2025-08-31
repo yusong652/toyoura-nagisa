@@ -10,6 +10,7 @@ import UnifiedErrorDisplay from './UnifiedErrorDisplay'
 import ReactMarkdown from 'react-markdown'
 import { useImageNavigation } from '../hooks/useImageNavigation'
 import { useErrorDisplay } from '../hooks/useErrorDisplay'
+import { formatSmartTime } from '../utils/timeFormatter'
 
 interface MessageItemProps {
   message: Message
@@ -106,10 +107,9 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     }
   }
   
-  // 格式化时间戳
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // 格式化时间戳 - 使用智能时间显示
+  const getFormattedTime = (timestamp: number) => {
+    return formatSmartTime(timestamp, { showRelative: true })
   }
   
   // 为流式文本添加渐变效果
@@ -315,7 +315,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                     </div>
                   );
                 })()}
-              <span className="message-time">{formatTime(message.timestamp)}</span>
+              <span 
+                className="message-time" 
+                title={getFormattedTime(message.timestamp).fullTime}
+              >
+                {getFormattedTime(message.timestamp).display}
+              </span>
             </div>
             )}
           </div>
@@ -350,7 +355,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
                 </div>
               );
             })()}
-            <span className="message-time">{formatTime(message.timestamp)}</span>
+            <span 
+              className="message-time" 
+              title={getFormattedTime(message.timestamp).fullTime}
+            >
+              {getFormattedTime(message.timestamp).display}
+            </span>
           </div>
         )}
         
