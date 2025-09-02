@@ -1,0 +1,772 @@
+/**
+ * InputArea component styles with modular architecture.
+ * 
+ * Organized to match the refactored component structure with:
+ * - Main container styles
+ * - File preview area styling  
+ * - Message input container and textarea
+ * - Control buttons and toolbar integration
+ * - Status and feedback UI
+ * - Responsive design and accessibility
+ * 
+ * Following aiNagisa's design system with CSS custom properties
+ * and consistent spacing, typography, and interaction patterns.
+ */
+
+/* =============================================================================
+   Main InputArea Container
+   ============================================================================= */
+
+.input-area {
+  padding: 0 0 16px 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  min-height: unset;
+  width: 100%;
+  position: relative;
+}
+
+/* =============================================================================
+   File Preview Section
+   ============================================================================= */
+
+.file-preview-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+  max-height: 200px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.file-preview-area::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.file-preview-area::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.2));
+  border-radius: 2px;
+}
+
+.file-preview-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Individual file preview items */
+.file-thumb-box {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  margin: 2px;
+  display: inline-block;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-thumb-box:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.file-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: filter 0.2s ease;
+}
+
+.file-thumb-img:hover {
+  filter: brightness(1.1);
+}
+
+.file-thumb-other {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--file-bg, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  padding: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.file-name {
+  font-size: 10px;
+  color: var(--text-secondary, #aaa);
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.2;
+  max-height: 24px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.file-thumb-del {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: rgba(255, 0, 0, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 0;
+}
+
+.file-thumb-del:hover {
+  background-color: rgba(255, 0, 0, 0.95);
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.file-thumb-del:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* File overflow indicator */
+.file-overflow-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  background: var(--file-overflow-bg, rgba(255, 255, 255, 0.05));
+  border: 2px dashed var(--border-color, #444);
+  border-radius: 8px;
+  margin: 2px;
+}
+
+.overflow-text {
+  font-size: 10px;
+  color: var(--text-secondary, #aaa);
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* =============================================================================
+   Message Input Container
+   ============================================================================= */
+
+.message-input-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--input-bg, #ffffff);
+  border: 1.5px solid var(--border-color, #e0e0e0);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 0 12px;
+  position: relative;
+  min-height: 104px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-input-container:focus-within {
+  border-color: var(--primary-color, #4a90e2);
+  box-shadow: 0 2px 10px rgba(74, 144, 226, 0.2);
+}
+
+/* =============================================================================
+   Message Input Textarea
+   ============================================================================= */
+
+.message-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color, #333333);
+  font-size: 16px;
+  font-family: inherit;
+  resize: none;
+  box-shadow: none;
+  margin: 0;
+  width: 100%;
+  line-height: 1.6;
+  min-height: 84px;
+  max-height: 200px;
+  overflow-y: hidden;
+  padding: 8px 0;
+  box-sizing: border-box;
+}
+
+.message-input.with-corner-buttons {
+  padding: 8px 0 40px 0; /* Reduced top padding, extra bottom padding for corner buttons */
+}
+
+.message-input::placeholder {
+  color: var(--text-placeholder, #666);
+  opacity: 1;
+}
+
+.message-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Auto-resize support */
+.message-input {
+  transition: height 0.1s ease;
+}
+
+/* =============================================================================
+   Input Controls and Buttons
+   ============================================================================= */
+
+/* Corner buttons container */
+.input-corner-buttons {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 2;
+}
+
+/* File upload button */
+.add-file-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-color, #eee);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.add-file-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+.add-file-btn:hover {
+  background: var(--button-secondary-hover, rgba(255, 255, 255, 0.1));
+  transform: translateY(-1px);
+  color: var(--primary-color, #4a90e2);
+}
+
+.add-file-btn:active {
+  transform: translateY(0);
+}
+
+.add-file-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+  transform: none;
+}
+
+/* Send button */
+.send-button {
+  background: var(--primary-color, #4a90e2);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  align-self: center;
+  margin-left: 8px;
+}
+
+.send-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.send-button:hover:not(:disabled) {
+  background: var(--primary-color-hover, #3a7bc8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
+.send-button:active:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+}
+
+.send-button.sending {
+  background: var(--sending-color, #666);
+  cursor: not-allowed;
+  animation: pulse 1.5s infinite;
+}
+
+.send-button:disabled {
+  background: var(--disabled-color, #555);
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.send-button.disabled {
+  background: var(--disabled-color, #555);
+}
+
+.send-button.enabled {
+  background: var(--primary-color, #4a90e2);
+}
+
+/* Loading spinner animation */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Hidden file input */
+.file-input {
+  display: none !important;
+}
+
+/* =============================================================================
+   Status and Feedback UI
+   ============================================================================= */
+
+.input-status {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: all 0.3s ease;
+}
+
+.input-status.error {
+  background: var(--error-bg, rgba(255, 0, 0, 0.1));
+  color: var(--error-color, #ff6b6b);
+  border: 1px solid var(--error-border, rgba(255, 0, 0, 0.3));
+}
+
+.input-status.success {
+  background: var(--success-bg, rgba(0, 255, 0, 0.1));
+  color: var(--success-color, #4caf50);
+  border: 1px solid var(--success-border, rgba(0, 255, 0, 0.3));
+}
+
+/* Inline status information in input area */
+.input-status-inline {
+  position: absolute;
+  bottom: 8px;
+  right: 60px; /* Leave space for send button */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-secondary, #666666);
+  font-family: system-ui, -apple-system, sans-serif;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: var(--status-bg, rgba(0, 0, 0, 0.05));
+  border-radius: 8px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.status-label {
+  font-size: 9px;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.status-value {
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.char-status {
+  min-width: 46px;
+}
+
+.file-status {
+  background: var(--primary-color, #4a90e2);
+  color: white;
+}
+
+.file-status .status-label {
+  opacity: 0.9;
+}
+
+.send-status {
+  background: transparent;
+  padding: 2px 4px;
+}
+
+.status-indicator {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 1px 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.status-indicator[data-status="ready"] {
+  background: var(--primary-color, #4a90e2);
+  color: white;
+}
+
+.status-indicator[data-status="waiting"] {
+  background: var(--disabled-color, #cccccc);
+  color: var(--text-secondary, #666666);
+}
+
+.message-input-container:focus-within .status-item {
+  opacity: 0.85;
+}
+
+.message-input-container:focus-within .status-indicator[data-status="ready"] {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+/* =============================================================================
+   Responsive Design
+   ============================================================================= */
+
+@media (max-width: 768px) {
+  .message-input-container {
+    max-width: 100%;
+    margin: 0 8px;
+    padding: 0 8px;
+  }
+  
+  .input-corner-buttons {
+    left: 10px;
+    bottom: 8px;
+    gap: 4px;
+  }
+  
+  .add-file-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+  
+  .add-file-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .send-button {
+    width: 44px;
+    height: 44px;
+    margin-left: 6px;
+  }
+  
+  .send-button svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .file-preview-area {
+    margin-bottom: 8px;
+    padding: 6px 0;
+  }
+  
+  .file-thumb-box {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .file-overflow-indicator {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .input-status-inline {
+    right: 48px; /* Smaller send button on mobile */
+    bottom: 6px;
+    gap: 6px;
+    font-size: 9px;
+  }
+  
+  .status-item {
+    padding: 1px 4px;
+    gap: 2px;
+  }
+  
+  .status-label {
+    font-size: 8px;
+  }
+  
+  .status-value {
+    font-size: 9px;
+  }
+  
+  .status-indicator {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .input-area {
+    padding: 0 0 12px 0;
+  }
+  
+  .message-input-container {
+    min-height: 72px;
+    border-radius: 12px;
+  }
+  
+  .message-input {
+    font-size: 14px;
+    min-height: 58px;
+  }
+  
+  .message-input.with-corner-buttons {
+    padding: 6px 0 34px 0;
+  }
+  
+  .send-button {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .send-button svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .file-thumb-box {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .file-thumb-del {
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+  
+  .input-status-inline {
+    right: 44px; /* Even smaller send button on smallest screens */
+    bottom: 4px;
+    gap: 4px;
+    font-size: 8px;
+  }
+  
+  .status-item {
+    padding: 1px 3px;
+    gap: 1px;
+  }
+  
+  .char-status {
+    min-width: 38px;
+  }
+  
+  .status-label {
+    font-size: 7px;
+  }
+  
+  .status-value {
+    font-size: 8px;
+  }
+  
+  .status-indicator {
+    font-size: 7px;
+    padding: 0px 2px;
+  }
+}
+
+/* =============================================================================
+   Accessibility and Focus States
+   ============================================================================= */
+
+.add-file-btn:focus,
+.send-button:focus {
+  outline: 2px solid var(--focus-color, rgba(74, 144, 226, 0.8));
+  outline-offset: 2px;
+}
+
+.message-input:focus {
+  outline: none; /* Handled by container focus-within */
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .message-input-container {
+    border-width: 2px;
+  }
+  
+  .send-button {
+    box-shadow: 0 0 0 2px var(--primary-color);
+  }
+  
+  .file-thumb-del {
+    box-shadow: 0 0 0 2px rgba(255, 0, 0, 1);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .file-thumb-box,
+  .add-file-btn,
+  .send-button,
+  .message-input-container,
+  .input-status,
+  .input-status-info {
+    transition: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+  }
+  
+  .send-button.sending {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   Light/Dark Theme Support
+   ============================================================================= */
+
+/* Default light theme */
+:root {
+  --input-bg: #ffffff;
+  --border-color: #e0e0e0;
+  --text-color: #333333;
+  --text-secondary: #666666;
+  --text-placeholder: #999999;
+  --primary-color: #4a90e2;
+  --primary-color-hover: #3a7bc8;
+  --button-secondary-hover: rgba(0, 0, 0, 0.05);
+  --disabled-color: #cccccc;
+  --sending-color: #999999;
+  --file-bg: rgba(0, 0, 0, 0.05);
+  --file-overflow-bg: rgba(0, 0, 0, 0.03);
+  --error-bg: rgba(255, 0, 0, 0.1);
+  --error-color: #d32f2f;
+  --error-border: rgba(255, 0, 0, 0.3);
+  --success-bg: rgba(0, 255, 0, 0.1);
+  --success-color: #4caf50;
+  --success-border: rgba(0, 255, 0, 0.3);
+  --status-bg: rgba(0, 0, 0, 0.05);
+  --status-color: #666666;
+  --status-border: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --focus-color: rgba(74, 144, 226, 0.8);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --input-bg: #222222;
+  --border-color: #444444;
+  --text-color: #eeeeee;
+  --text-secondary: #aaaaaa;
+  --text-placeholder: #666666;
+  --primary-color: #4a90e2;
+  --primary-color-hover: #3a7bc8;
+  --button-secondary-hover: rgba(255, 255, 255, 0.1);
+  --disabled-color: #555555;
+  --sending-color: #666666;
+  --file-bg: rgba(255, 255, 255, 0.1);
+  --file-overflow-bg: rgba(255, 255, 255, 0.05);
+  --error-bg: rgba(255, 0, 0, 0.1);
+  --error-color: #ff6b6b;
+  --error-border: rgba(255, 0, 0, 0.3);
+  --success-bg: rgba(0, 255, 0, 0.1);
+  --success-color: #4caf50;
+  --success-border: rgba(0, 255, 0, 0.3);
+  --status-bg: rgba(255, 255, 255, 0.1);
+  --status-color: #888888;
+  --status-border: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --focus-color: rgba(74, 144, 226, 0.8);
+}
+
+/**
+ * CSS Architecture Benefits:
+ * 
+ * 1. **Modular Organization**: Styles organized by component sections
+ * 2. **CSS Custom Properties**: Theme-aware with proper fallbacks
+ * 3. **Responsive Design**: Mobile-first with progressive enhancement
+ * 4. **Accessibility**: High contrast, reduced motion, focus states
+ * 5. **Performance**: Hardware-accelerated animations and transitions
+ * 6. **Maintainability**: Clear section organization and naming
+ * 
+ * Design System Integration:
+ * - Consistent spacing scale (4px, 8px, 12px, 16px)
+ * - Typography scale with proper line heights
+ * - Color system with semantic naming
+ * - Animation system with easing curves
+ * - Component state variations (hover, active, disabled)
+ * 
+ * Browser Compatibility:
+ * - CSS Grid and Flexbox for modern browsers
+ * - Graceful fallbacks for older browsers  
+ * - Vendor prefixes where needed
+ * - Progressive enhancement approach
+ */

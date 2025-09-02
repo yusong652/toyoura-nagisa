@@ -60,8 +60,8 @@
 
 /* 暗色模式状态 */
 .theme-toggle-input:checked + .theme-toggle-label {
-  background: rgba(64, 64, 64, 0.3);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(128, 128, 128, 0.7);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .theme-toggle-input:checked + .theme-toggle-label .theme-toggle-slider {
@@ -90,8 +90,8 @@
 }
 
 .theme-toggle-input:checked + .theme-toggle-label:hover {
-  background: rgba(64, 64, 64, 0.4);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(144, 144, 144, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .theme-toggle-label:active {
