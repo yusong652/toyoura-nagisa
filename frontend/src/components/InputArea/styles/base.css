@@ -1,0 +1,92 @@
+/* =============================================================================
+   InputArea Base Styles
+   ============================================================================= */
+
+.input-area {
+  position: relative;
+  width: 100%;
+  padding: 16px;
+  background: transparent;
+  border-radius: 16px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.message-input-container {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 104px; /* Adjusted height for better visual balance */
+  background: var(--input-bg);
+  border: 1.5px solid var(--border-color);
+  border-radius: 16px;
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.message-input-container:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 
+    0 2px 8px rgba(74, 144, 226, 0.15),
+    0 4px 16px rgba(74, 144, 226, 0.08);
+}
+
+/* Default light theme */
+:root {
+  --input-bg: #ffffff;
+  --border-color: #e0e0e0;
+  --text-color: #333333;
+  --text-secondary: #666666;
+  --text-placeholder: #999999;
+  --primary-color: #4a90e2;
+  --primary-color-hover: #3a7bc8;
+  --button-secondary-hover: rgba(0, 0, 0, 0.05);
+  --disabled-color: #cccccc;
+  --sending-color: #999999;
+  --file-bg: rgba(0, 0, 0, 0.05);
+  --file-overflow-bg: rgba(0, 0, 0, 0.03);
+  --error-bg: rgba(255, 0, 0, 0.1);
+  --error-color: #d32f2f;
+  --error-border: rgba(255, 0, 0, 0.3);
+  --success-bg: rgba(0, 255, 0, 0.1);
+  --success-color: #4caf50;
+  --success-border: rgba(0, 255, 0, 0.3);
+  --status-bg: rgba(0, 0, 0, 0.05);
+  --status-color: #666666;
+  --status-border: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --focus-color: rgba(74, 144, 226, 0.8);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --input-bg: #222222;
+  --border-color: #444444;
+  --text-color: #eeeeee;
+  --text-secondary: #aaaaaa;
+  --text-placeholder: #666666;
+  --primary-color: #4a90e2;
+  --primary-color-hover: #3a7bc8;
+  --button-secondary-hover: rgba(255, 255, 255, 0.1);
+  --disabled-color: #555555;
+  --sending-color: #666666;
+  --file-bg: rgba(255, 255, 255, 0.1);
+  --file-overflow-bg: rgba(255, 255, 255, 0.05);
+  --error-bg: rgba(255, 0, 0, 0.1);
+  --error-color: #ff6b6b;
+  --error-border: rgba(255, 0, 0, 0.3);
+  --success-bg: rgba(0, 255, 0, 0.1);
+  --success-color: #4caf50;
+  --success-border: rgba(0, 255, 0, 0.3);
+  --status-bg: rgba(255, 255, 255, 0.1);
+  --status-color: #888888;
+  --status-border: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --focus-color: rgba(74, 144, 226, 0.8);
+}

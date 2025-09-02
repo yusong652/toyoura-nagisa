@@ -1,17 +1,19 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   useInputState,
   useFileHandling,
   useMessageSending,
-  useInputAutoResize
+  useInputAutoResize,
+  useSlashCommand
 } from './hooks'
 import {
   FilePreviewArea,
-  MessageInput
+  MessageInput,
+  SlashCommandSuggestions
 } from './components'
 import { CollapsibleToolbar } from '../CollapsibleToolbar'
 import { InputAreaProps, DEFAULT_INPUT_CONFIG } from './types'
-import './InputArea.css'
+import './styles/index.css'
 
 /**
  * Advanced input area component with modular architecture.
@@ -30,6 +32,8 @@ import './InputArea.css'
  * - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
  * - Integration with CollapsibleToolbar for agent settings
  * - Loading states and disabled state management
+ * - Slash command system with intelligent suggestions (/text_to_image, /help)
+ * - Real-time command detection and execution
  * - Comprehensive accessibility features
  * 
  * Architecture Benefits:
@@ -92,6 +96,28 @@ const InputArea: React.FC<InputAreaProps> = ({
     canAddMoreFiles
   } = useFileHandling(files, setFiles, maxFiles)
   
+  // Cursor position tracking for slash commands
+  const [cursorPosition, setCursorPosition] = useState<number>(0)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
+  
+  // Slash command functionality
+  const {
+    suggestions,
+    isCommandActive,
+    executeCommand,
+    selectSuggestion
+  } = useSlashCommand(message, cursorPosition, async (command, args) => {
+    console.log(`Executing command: ${command.trigger} with args:`, args)
+    if (command.trigger === 'text_to_image') {
+      // Handle text_to_image command
+      const prompt = args.join(' ')
+      if (prompt) {
+        console.log('Generating image with prompt:', prompt)
+        // TODO: Integrate with backend API for image generation
+      }
+    }
+  })
+  
   // Message sending logic
   const {
     handleSendMessage,
@@ -104,9 +130,89 @@ const InputArea: React.FC<InputAreaProps> = ({
     resetTextareaHeight()
   }, textareaRef)
   
-  // Message change handler with auto-resize
+  // Handle suggestion selection
+  const handleSelectSuggestion = useCallback((suggestion: any) => {
+    // Find the slash position and replace with selected command
+    const slashIndex = message.lastIndexOf('/', cursorPosition)
+    if (slashIndex !== -1) {
+      const beforeSlash = message.substring(0, slashIndex)
+      const afterCursor = message.substring(cursorPosition)
+      const newMessage = `${beforeSlash}/${suggestion.command.trigger} ${afterCursor}`
+      setMessage(newMessage)
+      
+      // Update cursor position to after the inserted command
+      const newCursorPosition = slashIndex + suggestion.command.trigger.length + 2 // +2 for "/" and space
+      setCursorPosition(newCursorPosition)
+      
+      // Focus the textarea and set cursor position
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus()
+          textareaRef.current.setSelectionRange(newCursorPosition, newCursorPosition)
+        }
+      }, 0)
+    }
+    
+    selectSuggestion(suggestion)
+    // Reset suggestion selection
+    setSelectedSuggestionIndex(0)
+  }, [selectSuggestion, message, cursorPosition, textareaRef])
+
+  // Handle cursor position updates
+  const handleCursorChange = useCallback((position: number) => {
+    setCursorPosition(position)
+  }, [])
+
+  // Handle keyboard navigation for slash commands
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Only handle keyboard events when slash commands are active
+    if (!isCommandActive || suggestions.length === 0) {
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        )
+        break
+
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        )
+        break
+
+      case 'Enter':
+        e.preventDefault()
+        if (suggestions[selectedSuggestionIndex]) {
+          handleSelectSuggestion(suggestions[selectedSuggestionIndex])
+        }
+        break
+
+      case 'Escape':
+        e.preventDefault()
+        // Clear suggestions by resetting cursor position or clearing command state
+        setSelectedSuggestionIndex(0)
+        // For now, we can move cursor to end to hide suggestions
+        const textarea = e.currentTarget
+        const newPosition = message.length
+        setCursorPosition(newPosition)
+        setTimeout(() => {
+          textarea.setSelectionRange(newPosition, newPosition)
+        }, 0)
+        break
+    }
+  }, [isCommandActive, suggestions, selectedSuggestionIndex, handleSelectSuggestion, message])
+
+  // Message change handler with auto-resize and cursor tracking
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
+    // Update cursor position for slash command detection
+    const position = e.target.selectionStart || 0
+    setCursorPosition(position)
     // Auto-resize will be handled by useInputAutoResize hook
   }
   
@@ -124,6 +230,15 @@ const InputArea: React.FC<InputAreaProps> = ({
       
       {/* Main input container with textarea and controls */}
       <div className="message-input-container">
+        {/* Slash command suggestions - shown when typing commands */}
+        {isCommandActive && suggestions.length > 0 && (
+          <SlashCommandSuggestions
+            suggestions={suggestions}
+            onSelectSuggestion={handleSelectSuggestion}
+            selectedIndex={selectedSuggestionIndex}
+          />
+        )}
+        
         {/* Corner buttons - file upload and toolbar */}
         <div className="input-corner-buttons">
           {canAddMoreFiles && (
@@ -158,6 +273,7 @@ const InputArea: React.FC<InputAreaProps> = ({
           value={message}
           onChange={handleMessageChange}
           onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={placeholder}
           disabled={inputDisabled}

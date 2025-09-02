@@ -1,0 +1,176 @@
+/* =============================================================================
+   Status Indicators
+   ============================================================================= */
+
+/* Status message display */
+.input-status {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+  animation: statusSlideIn 0.3s ease-out;
+}
+
+@keyframes statusSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.input-status.error {
+  background: var(--error-bg);
+  color: var(--error-color);
+  border: 1px solid var(--error-border);
+}
+
+.input-status.success {
+  background: var(--success-bg);
+  color: var(--success-color);
+  border: 1px solid var(--success-border);
+}
+
+/* Inline status information in input area */
+.input-status-inline {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: system-ui, -apple-system, sans-serif;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: var(--status-bg);
+  border-radius: 8px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.status-label {
+  font-size: 9px;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.status-value {
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.char-status {
+  min-width: 46px;
+}
+
+.file-status {
+  background: var(--primary-color);
+  color: white;
+}
+
+.file-status .status-label {
+  opacity: 0.9;
+}
+
+.send-status {
+  background: transparent;
+  padding: 2px 4px;
+}
+
+.status-indicator {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 1px 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.status-indicator[data-status="ready"] {
+  background: var(--primary-color);
+  color: white;
+}
+
+.status-indicator[data-status="waiting"] {
+  background: var(--disabled-color);
+  color: var(--text-secondary);
+}
+
+.message-input-container:focus-within .status-item {
+  opacity: 0.85;
+}
+
+.message-input-container:focus-within .status-indicator[data-status="ready"] {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+/* Debug information (development only) */
+.input-debug-info {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  background: var(--status-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Loading states */
+.input-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.input-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Success feedback */
+.input-success-flash {
+  animation: successFlash 0.5s ease-out;
+}
+
+@keyframes successFlash {
+  0% { background: var(--success-bg); }
+  100% { background: transparent; }
+}
+
+/* Error feedback */
+.input-error-shake {
+  animation: errorShake 0.5s ease-out;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}

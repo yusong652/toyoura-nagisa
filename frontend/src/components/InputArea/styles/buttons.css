@@ -1,0 +1,135 @@
+/* =============================================================================
+   Button Styles
+   ============================================================================= */
+
+/* Corner buttons positioning */
+.input-corner-buttons {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+/* File upload button */
+.add-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.add-file-btn:hover:not(:disabled) {
+  background: var(--button-secondary-hover);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.add-file-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.add-file-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.add-file-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Send button */
+.send-button {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--disabled-color);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.send-button.enabled {
+  background: var(--primary-color);
+  cursor: pointer;
+}
+
+.send-button.enabled:hover:not(:disabled) {
+  background: var(--primary-color-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.25);
+}
+
+.send-button.enabled:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.send-button.disabled {
+  background: var(--disabled-color);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.send-button.sending {
+  background: var(--sending-color);
+  cursor: not-allowed;
+}
+
+.send-button svg {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.2s ease;
+}
+
+.send-button.enabled:hover svg {
+  transform: scale(1.05);
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Hidden file input */
+.file-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

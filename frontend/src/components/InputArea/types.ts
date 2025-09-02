@@ -73,6 +73,17 @@ export interface InputAutoResizeHookReturn {
   maxHeight: number
 }
 
+export interface SlashCommandHookReturn {
+  context: SlashCommandContext
+  activeCommand: SlashCommandMatch | null
+  suggestions: SlashCommandSuggestion[]
+  isCommandActive: boolean
+  executeCommand: (command: SlashCommand, args: string[]) => Promise<void>
+  selectSuggestion: (suggestion: SlashCommandSuggestion) => void
+  clearCommand: () => void
+  availableCommands: SlashCommand[]
+}
+
 // =============================================================================
 // Component-Specific Types
 // =============================================================================
@@ -88,6 +99,7 @@ export interface MessageInputProps {
   value: string
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   onKeyPress: (e: React.KeyboardEvent) => Promise<void>
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
   onPaste: (e: React.ClipboardEvent) => void
   placeholder?: string
   disabled?: boolean
@@ -226,7 +238,7 @@ export const DEFAULT_INPUT_CONFIG: InputAreaConfig = {
     generateThumbnails: true
   },
   slashCommands: {
-    enabled: false, // Will be enabled after refactoring
+    enabled: true, // Enabled for slash command functionality
     triggerChar: '/',
     availableCommands: []
   },

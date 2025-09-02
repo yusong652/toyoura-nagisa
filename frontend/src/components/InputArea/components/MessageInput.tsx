@@ -42,6 +42,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   value,
   onChange,
   onKeyPress,
+  onKeyDown,
   onPaste,
   placeholder = 'Type a message...',
   disabled = false,
@@ -64,6 +65,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       value={value}
       onChange={onChange}
       onKeyPress={onKeyPress}
+      onKeyDown={onKeyDown}
       onPaste={onPaste}
       disabled={disabled}
       rows={1} // Start with single row, auto-resize will handle expansion

@@ -1,0 +1,266 @@
+/* =============================================================================
+   Responsive Design
+   ============================================================================= */
+
+@media (max-width: 768px) {
+  .message-input-container {
+    max-width: 100%;
+    margin: 0 8px;
+    padding: 0 8px;
+  }
+  
+  .input-corner-buttons {
+    left: 10px;
+    bottom: 8px;
+    gap: 4px;
+  }
+  
+  .add-file-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+  
+  .add-file-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .send-button {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 44px;
+    height: 44px;
+    margin-left: 0;
+  }
+  
+  .send-button svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .file-preview-area {
+    margin-bottom: 8px;
+    padding: 6px 0;
+  }
+  
+  .file-thumb-box {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .file-overflow-indicator {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .input-status-inline {
+    top: 6px;
+    right: 12px;
+    gap: 6px;
+    font-size: 9px;
+  }
+  
+  .status-item {
+    padding: 1px 4px;
+    gap: 2px;
+  }
+  
+  .status-label {
+    font-size: 8px;
+  }
+  
+  .status-value {
+    font-size: 9px;
+  }
+  
+  .status-indicator {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+
+  /* Mobile slash command adjustments */
+  .slash-command-suggestions {
+    margin-bottom: 4px;
+    border-radius: 6px;
+  }
+
+  .suggestion-item {
+    padding: 10px;
+  }
+
+  .suggestion-description {
+    font-size: 11px;
+    margin-left: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .input-area {
+    padding: 0 0 12px 0;
+  }
+  
+  .message-input-container {
+    min-height: 72px;
+    border-radius: 12px;
+  }
+  
+  .message-input {
+    font-size: 14px;
+    min-height: 58px;
+    padding: 4px 0;
+  }
+  
+  .message-input.with-corner-buttons {
+    padding: 4px 0 30px 0;
+  }
+  
+  .send-button {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 40px;
+    height: 40px;
+  }
+  
+  .send-button svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .file-thumb-box {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .file-thumb-del {
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+  
+  .input-status-inline {
+    top: 4px;
+    right: 10px;
+    gap: 4px;
+    font-size: 8px;
+  }
+  
+  .status-item {
+    padding: 1px 3px;
+    gap: 1px;
+  }
+  
+  .char-status {
+    min-width: 38px;
+  }
+  
+  .status-label {
+    font-size: 7px;
+  }
+  
+  .status-value {
+    font-size: 8px;
+  }
+  
+  .status-indicator {
+    font-size: 7px;
+    padding: 0px 2px;
+  }
+
+  /* Smaller slash command suggestions on mobile */
+  .slash-command-suggestions {
+    border-radius: 4px;
+  }
+
+  .suggestions-header {
+    padding: 6px 10px;
+  }
+
+  .suggestion-item {
+    padding: 8px 10px;
+  }
+
+  .category-icon {
+    font-size: 12px;
+    width: 14px;
+  }
+
+  .trigger-text {
+    font-size: 12px;
+  }
+
+  .suggestion-description {
+    font-size: 10px;
+    margin-left: 18px;
+  }
+
+  .suggestions-footer {
+    padding: 6px 10px;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .input-area {
+    padding: 8px;
+  }
+  
+  .message-input-container {
+    min-height: 60px;
+  }
+  
+  .message-input {
+    min-height: 42px;
+  }
+  
+  .send-button {
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    width: 38px;
+    height: 38px;
+  }
+  
+  .input-status-inline {
+    top: 4px;
+    right: 10px;
+  }
+}
+
+/* Tablet specific adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .message-input-container {
+    max-width: 700px;
+  }
+  
+  .message-input {
+    font-size: 16px;
+  }
+  
+  .file-thumb-box {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .slash-command-suggestions {
+    font-size: 14px;
+  }
+}
+
+/* Large screens */
+@media (min-width: 1200px) {
+  .message-input-container {
+    max-width: 900px;
+  }
+  
+  .message-input {
+    max-height: 400px;
+  }
+  
+  .suggestions-list {
+    max-height: 250px;
+  }
+}
