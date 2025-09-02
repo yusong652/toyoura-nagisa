@@ -1,17 +1,22 @@
-.image-viewer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+/**
+ * ImageViewer specific styles
+ * Extends MediaModal base styles for advanced image viewing
+ */
+
+/* Override MediaModal for full-screen image viewing */
+.image-viewer .media-modal-overlay {
   background-color: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(10px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
   cursor: pointer;
-  animation: fadeIn 0.3s ease-out;
+}
+
+.image-viewer .media-modal-container {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: transparent;
+  cursor: default;
 }
 
 .image-viewer-container {
