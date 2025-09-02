@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import './App.css'
-import ChatBox from './components/ChatBox'
+import { ChatBox } from './components/ChatBox'
 import InputArea from './components/InputArea'
 import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar'
