@@ -78,8 +78,8 @@ export interface MessageAvatarProps {
 export interface MessageActionsProps {
   messageId?: string
   isSelected: boolean
-  isLoading: boolean
-  streaming: boolean
+  isLoading?: boolean
+  streaming?: boolean
   onDelete: (e: React.MouseEvent) => void
 }
 

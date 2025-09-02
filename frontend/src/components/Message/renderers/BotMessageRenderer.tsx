@@ -2,7 +2,7 @@ import React from 'react'
 import StreamingTextRenderer from './StreamingTextRenderer'
 import MessageFiles from '../content/MessageFiles'
 import MessageTimestamp from '../content/MessageTimestamp'
-import MessageToolState from '../../MessageToolState'
+import ToolStateDisplay from '../tools/ToolStateDisplay'
 import { BotMessageRendererProps } from '../types'
 
 /**
@@ -38,7 +38,7 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
   
   return (
     <div className="message-wrapper">
-      {toolState && <MessageToolState toolState={toolState} />}
+      {toolState && <ToolStateDisplay toolState={toolState} />}
       
       {shouldShowContent && (
         <div className="message-content">
