@@ -1,0 +1,610 @@
+.message {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  margin-top: 12px;
+  animation: fadeIn 0.3s ease-in-out;
+  max-width: 98%;
+  position: relative;
+  cursor: pointer;
+}
+
+.message.user {
+  flex-direction: row-reverse;
+  margin-left: auto;
+  margin-bottom: 16px;
+  margin-top: 12px;
+}
+
+.message:not(.user) {
+  margin-right: auto;
+}
+
+/* 被选中的消息样式 */
+.message.selected .message-content {
+  box-shadow: 0 0 0 2px rgba(158, 156, 255, 0.35), 0 0 16px 4px rgba(158, 156, 255, 0.18);
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 12px;
+  cursor: help;
+  border: 2px solid var(--primary-color, #4a90e2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.avatar:hover {
+  transform: scale(1.05);
+}
+
+.message-content {
+  background-color: var(--bot-message-bg);
+  border-radius: 18px;
+  padding: 12px 16px;
+  max-width: 100%;
+  min-width: 120px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.message-content:hover {
+  box-shadow: 0 0 12px var(--message-hover-glow, rgba(74, 144, 226, 0.2));
+}
+
+.message.user .message-content {
+  background-color: var(--user-message-bg);
+  border-top-right-radius: 4px;
+  align-items: flex-end;
+}
+
+.message.user .message-content:hover {
+  box-shadow: 0 0 12px var(--user-message-hover-glow, rgba(74, 144, 226, 0.3));
+}
+
+.message:not(.user) .message-content {
+  border-top-left-radius: 4px;
+}
+
+.message:not(.user) .message-content:hover {
+  box-shadow: 0 0 12px var(--bot-message-hover-glow, rgba(130, 130, 130, 0.25));
+}
+
+/* Dark mode adjustments for message hover effects */
+@media (prefers-color-scheme: dark) {
+  .message-content:hover {
+    box-shadow: 0 0 12px var(--message-hover-glow-dark, rgba(100, 180, 255, 0.25));
+  }
+  
+  .message.user .message-content:hover {
+    box-shadow: 0 0 12px var(--user-message-hover-glow-dark, rgba(100, 180, 255, 0.3));
+  }
+  
+  .message:not(.user) .message-content:hover {
+    box-shadow: 0 0 12px var(--bot-message-hover-glow-dark, rgba(180, 180, 180, 0.25));
+  }
+}
+
+.message-text {
+  width: 100%;
+  text-align: left;
+}
+
+.streaming-text {
+  display: block;
+  width: 100%;
+}
+
+.completed-text {
+  width: 100%;
+  display: inline;
+}
+
+.fade-in-chunk {
+  animation: fadeIn 0.3s ease-in-out;
+  animation-fill-mode: both;
+  display: inline;
+}
+
+/* 确保 markdown 内容的一致性 */
+.message-text p,
+.completed-text p,
+.fade-in-chunk p {
+  margin: 0;
+  display: inline;
+}
+
+.message-text code,
+.completed-text code,
+.fade-in-chunk code {
+  white-space: pre-wrap;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 加载状态的样式 */
+.typing-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 24px;
+  text-align: left;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  padding: 4px 0;
+}
+
+.loading-spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top: 3px solid var(--primary-color, #4a90e2);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin-breath 1s linear infinite;
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.typing-text {
+  font-size: 15px;
+  color: var(--text-color);
+  opacity: 0.8;
+  line-height: 1.6;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: opacity 0.2s ease;
+  min-width: 80px;
+}
+
+@keyframes spin-breath {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.25);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.message-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.file-preview {
+  max-width: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.file-preview:hover {
+  transform: scale(1.03);
+}
+
+.file-image {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.file-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+
+.file-preview:hover .file-image::after {
+  content: '🔍';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  color: white;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  animation: fadeIn 0.2s ease;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--file-bg);
+  border-radius: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.file-info:hover {
+  background-color: var(--file-hover-bg, rgba(0, 0, 0, 0.05));
+}
+
+.file-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.file-name {
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.avatar-tooltip {
+  position: absolute;
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: pre-line;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.2s ease-out;
+  max-width: 330px;
+  width: max-content;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 消息状态样式 */
+.message-status {
+  position: absolute;
+  bottom: -18px;
+  right: 64px;
+  font-size: 11px;
+  user-select: none;
+  opacity: 0.7;
+}
+
+/* 删除按钮样式 */
+.message-delete-button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: rgba(150, 150, 150, 0.2);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.25s ease;
+  z-index: 10;
+}
+
+/* SVG 样式 */
+.message-delete-button svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+/* 当消息被选中时，显示删除按钮 */
+.message.selected .message-delete-button {
+  opacity: 0.8;
+  transform: scale(1);
+  animation: fadeInButton 0.25s ease-out;
+}
+
+/* 删除按钮的淡入动画 */
+@keyframes fadeInButton {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}
+
+.message-delete-button:hover {
+  opacity: 1;
+  background-color: var(--status-error-color, #ff5252);
+  color: white;
+  transform: scale(1.1);
+}
+
+.message.user .message-delete-button {
+  right: unset;
+  left: 5px;
+}
+
+/* 消息状态颜色 */
+.status-sending {
+  color: var(--status-sending-color);
+}
+
+.status-sending::before {
+  background-color: var(--status-sending-color);
+  animation: pulse 1.2s infinite;
+}
+
+.status-sent {
+  color: var(--status-sent-color);
+}
+
+.status-sent::before {
+  background-color: var(--status-sent-color);
+}
+
+.status-read {
+  color: var(--status-read-color);
+}
+
+.status-read::before {
+  background-color: var(--status-read-color);
+}
+
+.status-error {
+  color: var(--status-error-color);
+}
+
+.status-error::before {
+  background-color: var(--status-error-color);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+
+/* 移除旧的已读样式 */
+.read-receipt {
+  display: none;
+}
+
+/* Timestamp styles - Enhanced version with relative time and hover effects */
+.message-time {
+  display: block;
+  text-align: right;
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #666;
+  opacity: 0.8;
+  line-height: 1.2;
+  user-select: none;
+  font-weight: 400;
+  animation: fadeInTime 0.3s ease-out;
+  cursor: pointer;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.message-time:hover {
+  opacity: 1;
+  color: #555;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.message.user .message-time {
+  text-align: right;
+}
+
+.message:not(.user) .message-time {
+  text-align: left;
+}
+
+@keyframes fadeInTime {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+
+/* 为机器人消息添加包装容器，以便正确定位时间戳 */
+.message-wrapper {
+  display: inline-block;
+  vertical-align: top;
+  position: relative;
+  max-width: 100%;
+}
+
+/* 消息点击和悬停效果 */
+.message .message-content {
+  position: relative;
+}
+
+.message .message-content::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.message:hover .message-content::after {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.message:active .message-content::after {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 深色模式调整 */
+@media (prefers-color-scheme: dark) {
+  .message:hover .message-content::after {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .message:active .message-content::after {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* 优雅的视频消息样式 */
+.elegant-video {
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.02) 100%);
+}
+
+.elegant-video:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.elegant-video-thumbnail {
+  width: 100%;
+  max-width: 360px;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+  background-color: #f5f5f5;
+  border-radius: 12px;
+}
+
+.elegant-video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.1);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.elegant-video:hover .elegant-video-overlay {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.elegant-play-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.elegant-video:hover .elegant-play-button {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.elegant-play-button svg {
+  margin-left: 2px; /* 微调播放按钮位置 */
+}
+
+.elegant-video-info {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.video-format-badge {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 深色模式下的视频样式 */
+@media (prefers-color-scheme: dark) {
+  .elegant-video {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  }
+  
+  .elegant-video-thumbnail {
+    background-color: #2a2a2a;
+  }
+  
+  .elegant-play-button {
+    background: rgba(40, 40, 40, 0.95);
+    color: #fff;
+  }
+  
+  .elegant-video:hover .elegant-play-button {
+    background: rgba(50, 50, 50, 1);
+  }
+  
+  .video-format-badge {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}
