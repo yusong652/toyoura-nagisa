@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AgentProfileToggle } from './AgentProfileToggle';
+import { AgentProfileSelector } from './AgentProfileSelector';
 import { TTSToggle } from './Toggle/variants/TTSToggle';
 import { Live2DToggle } from './Toggle/variants/Live2DToggle';
 import { SettingsToggle } from './Toggle/variants/SettingsToggle';
@@ -59,7 +59,13 @@ export const CollapsibleToolbar: React.FC = () => {
                 </svg>
                 <span className="toolbar-label">Agent Profile</span>
               </div>
-              <AgentProfileToggle />
+              <AgentProfileSelector 
+                useContext={true}
+                variant="compact"
+                iconType="svg"
+                showDescription={false}
+                showToolCount={false}
+              />
             </div>
           </div>
           

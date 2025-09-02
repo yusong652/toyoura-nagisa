@@ -15,6 +15,148 @@
   transition: all 0.2s ease;
   font-size: 14px;
   min-width: 200px;
+  outline: none;
+}
+
+/* Compact variant for toolbar - exactly match AgentProfileToggle styles */
+.agent-profile-selector.compact .profile-button {
+  display: flex;
+  align-items: center;
+  gap: 6px !important;
+  padding: 8px 12px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(224, 224, 224, 0.6) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(8px);
+  color: var(--text-primary) !important;
+  transition: all 0.2s ease;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  outline: none;
+  position: relative;
+  white-space: nowrap;
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+  justify-content: space-between;
+}
+
+.agent-profile-selector.compact .profile-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.agent-profile-selector.compact .profile-button.loading {
+  opacity: 0.7;
+}
+
+.agent-profile-selector.compact .profile-button.open {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.agent-profile-selector.compact .profile-button:not(.open) {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.agent-profile-selector.compact .profile-button:hover:not(:disabled):not(.open) {
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.agent-profile-selector.compact .profile-button:hover:not(:disabled).open {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.agent-profile-selector.compact .profile-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-profile-selector.compact .profile-name-compact {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.agent-profile-selector.compact .profile-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(224, 224, 224, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  overflow: hidden;
+  animation: profile-dropdown-slide 0.2s ease-out;
+  transform-origin: top;
+  width: 120px;
+}
+
+.agent-profile-selector.compact .profile-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.agent-profile-selector.compact .profile-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.agent-profile-selector.compact .profile-option:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.agent-profile-selector.compact .profile-option.selected {
+  background-color: var(--primary-color);
+  color: var(--primary-contrast);
+  font-weight: 500;
+}
+
+.agent-profile-selector.compact .profile-option:not(.selected):not(:disabled):hover {
+  background-color: var(--hover-color, rgba(0, 0, 0, 0.05));
+}
+
+.agent-profile-selector.compact .agent-profile-option-name {
+  font-weight: inherit;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-name-compact {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
 }
 
 .profile-button:hover:not(:disabled) {
@@ -70,6 +212,39 @@
   transform: rotate(180deg);
 }
 
+.dropdown-arrow-svg {
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow-svg.rotated {
+  transform: rotate(180deg);
+}
+
+.profile-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  animation: profile-spin 1s linear infinite;
+}
+
+@keyframes profile-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes profile-dropdown-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
 .profile-dropdown {
   position: absolute;
   top: 100%;
@@ -87,24 +262,23 @@
 .profile-option {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  padding: 12px;
+  padding: 8px 12px;
   background: none;
   border: none;
   text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
 }
 
-.profile-option:hover {
-  background: var(--hover-bg);
+.profile-option:not(.selected):not(:disabled):hover {
+  background: var(--hover-color, rgba(0, 0, 0, 0.05));
 }
 
 .profile-option.selected {
-  background: var(--primary-color-light);
-  border-left-color: var(--profile-color, var(--primary-color));
+  background: var(--primary-color);
+  color: var(--primary-contrast, #ffffff);
 }
 
 .option-icon {
@@ -137,11 +311,6 @@
   opacity: 0.8;
 }
 
-.selected-indicator {
-  color: var(--primary-color);
-  font-weight: bold;
-  flex-shrink: 0;
-}
 
 /* Dark theme adjustments */
 [data-theme="dark"] .agent-profile-selector {
@@ -154,6 +323,17 @@
   --text-tertiary: #999999;
   --primary-color: #4a9eff;
   --primary-color-light: rgba(74, 158, 255, 0.1);
+}
+
+/* Dark theme support for compact mode - exactly match AgentProfileToggle */
+[data-theme="dark"] .agent-profile-selector.compact .profile-button {
+  background-color: rgba(51, 51, 51, 0.9);
+  border: 1px solid rgba(85, 85, 85, 0.6);
+}
+
+[data-theme="dark"] .agent-profile-selector.compact .profile-dropdown {
+  background-color: rgba(51, 51, 51, 0.95);
+  border: 1px solid rgba(85, 85, 85, 0.7);
 }
 
 /* Light theme */
