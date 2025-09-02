@@ -109,16 +109,7 @@ export const useStreamProcessor = ({
         // Handle tool events
         if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
           handleToolEvent(data, currentMessageId)
-          
-          // For NAGISA_IS_USING_TOOL, also process action_text as message text
-          if (data.type === 'NAGISA_IS_USING_TOOL' && data.action_text) {
-            console.log('[StreamProcessor] Processing action_text as message text:', {
-              messageId: currentMessageId,
-              actionText: data.action_text
-            })
-            // Process action_text as regular text content
-            handleContentUpdate({ text: data.action_text, index: 0 }, currentMessageId)
-          }
+          // action_text is handled via toolState, not through streaming pipeline
           return
         }
         

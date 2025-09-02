@@ -119,12 +119,42 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
       ? toolState.action 
       : displayText;
     
-    if (!streaming || sender !== 'bot') {
-      return textToDisplay ? (
-        <div className="message-text">
-          <ReactMarkdown>{textToDisplay}</ReactMarkdown>
-        </div>
-      ) : null
+    console.log('[MessageItem] renderStreamingText:', {
+      messageId: id,
+      toolStateIsUsingTool: toolState?.isUsingTool,
+      toolStateAction: toolState?.action,
+      displayText: displayText,
+      textToDisplay: textToDisplay
+    });
+    
+    // Use non-streaming rendering for tool action text or non-bot messages
+    const shouldUseNonStreaming = !streaming || sender !== 'bot' || (toolState?.isUsingTool && toolState?.action);
+    
+    console.log('[MessageItem] Render conditions:', {
+      messageId: id,
+      streaming,
+      sender,
+      shouldUseNonStreaming,
+      hasTextToDisplay: !!textToDisplay,
+      willRender: shouldUseNonStreaming && !!textToDisplay
+    });
+    
+    if (shouldUseNonStreaming) {
+      if (textToDisplay) {
+        console.log('[MessageItem] Returning non-streaming JSX:', {
+          messageId: id,
+          textLength: textToDisplay.length,
+          textPreview: textToDisplay.substring(0, 50) + '...'
+        });
+        return (
+          <div className="message-text">
+            <ReactMarkdown>{textToDisplay}</ReactMarkdown>
+          </div>
+        );
+      } else {
+        console.log('[MessageItem] No textToDisplay, returning null');
+        return null;
+      }
     }
     
     // 流式渲染，使用完整文本进行渲染，但保持块级淡入效果
@@ -240,7 +270,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
             {toolState && <MessageToolState toolState={toolState} />}
             {(renderStreamingText() || (files && files.length > 0 && !isLoading)) && (
               <div className="message-content">
-                {displayText && renderStreamingText()}
+                {(displayText || (toolState?.isUsingTool && toolState?.action)) && renderStreamingText()}
                 
                 {files && files.length > 0 && !isLoading && (() => {
                       

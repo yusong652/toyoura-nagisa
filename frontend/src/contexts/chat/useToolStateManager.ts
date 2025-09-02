@@ -34,6 +34,13 @@ export const useToolStateManager = ({
       thinking: data.thinking // Add thinking content if available
     }
     
+    console.log('[ToolStateManager] handleToolStart - Setting toolState:', {
+      messageId,
+      toolState,
+      dataActionText: data.action_text,
+      dataThinking: data.thinking
+    })
+    
     // Update message-specific tool state
     updateMessageToolState(messageId, toolState)
     

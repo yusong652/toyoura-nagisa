@@ -18,7 +18,7 @@ const MessageToolState: React.FC<MessageToolStateProps> = ({ toolState }) => {
   const thinkingContent = thinking || 'Processing...';
   
   useEffect(() => {
-    if (!thinkingContent) {
+    if (!thinkingContent || thinkingContent === 'Processing...') {
       setDisplayedText('Processing...');
       return;
     }
