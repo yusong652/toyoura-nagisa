@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AgentProfileSelector } from './AgentProfileSelector';
+import AgentProfileSelector from './AgentProfileSelector';
 import { TTSToggle } from './Toggle/variants/TTSToggle';
 import { Live2DToggle } from './Toggle/variants/Live2DToggle';
 import { SettingsToggle } from './Toggle/variants/SettingsToggle';
