@@ -73,17 +73,33 @@ export interface Live2DToggleProps {
 }
 
 /**
- * Agent Profile Toggle specific props
+ * Settings Toggle specific props
+ * Supports both controlled and uncontrolled modes
  */
-export interface AgentProfileToggleProps {
-  /** Whether toggle is enabled */
-  enabled: boolean
+export interface SettingsToggleProps {
+  /** Controlled toggle state */
+  checked?: boolean
   
-  /** Callback to set enabled state */
-  setEnabled: (enabled: boolean) => void
+  /** Initial toggle state (used when not controlled) */
+  initialChecked?: boolean
+  
+  /** Callback when toggle state changes */
+  onChange?: (checked: boolean) => void
+  
+  /** Toggle label for accessibility */
+  label?: string
+  
+  /** Whether the toggle is disabled */
+  disabled?: boolean
+  
+  /** Toggle size */
+  size?: 'small' | 'medium' | 'large'
   
   /** Additional CSS classes */
   className?: string
+  
+  /** Test ID for testing */
+  'data-testid'?: string
 }
 
 /**

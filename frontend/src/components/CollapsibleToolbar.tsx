@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentProfileToggle } from './AgentProfileToggle';
-import { TTSToggle } from './TTSToggle';
-import { Live2DToggle } from './Live2DToggle';
-import { SlideToggle } from './SlideToggle';
+import { TTSToggle } from './Toggle/variants/TTSToggle';
+import { Live2DToggle } from './Toggle/variants/Live2DToggle';
+import { SettingsToggle } from './Toggle/variants/SettingsToggle';
 import './CollapsibleToolbar.css';
 
 export const CollapsibleToolbar: React.FC = () => {
@@ -105,7 +105,7 @@ export const CollapsibleToolbar: React.FC = () => {
                 </svg>
                 <span className="toolbar-label">Settings</span>
               </div>
-              <SlideToggle
+              <SettingsToggle
                 checked={settingsEnabled}
                 onChange={setSettingsEnabled}
               />
