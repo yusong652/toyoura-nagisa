@@ -1,38 +1,45 @@
-"""System-prompt builder utilities.
+"""System prompt builder utilities following Anthropic best practices.
 
-This module centralises the logic for building the system prompt fed into the
-LLM.  The first step is simply **reading** the static template file
-`config/prompts/base_prompt.md` so that individual LLM clients (GPT, Gemini, Anthropic …) can
-reuse the same prompt without duplicating I/O code.
+This module centralizes system prompt construction for LLM interactions,
+implementing Anthropic's recommended format for tool-enabled conversations.
 
-Later we will extend this module to inject dynamic environment context (date,
-os/platform, working directory, git/sandbox hints, user memory, etc.) – mirroring
-the approach used by gemini-cli – but for now it only supports loading the base
-prompt contents.
+Key features:
+- Dynamic tool schema embedding in system prompt (Anthropic best practice)
+- Proper prompt component ordering per official documentation
+- Support for base, tool, expression, and memory prompts
+- Environment context injection (workspace, date, platform)
+- Tool definition formatting in JSON Schema format
+
+Architecture follows Anthropic's recommended structure:
+1. Base system instructions
+2. Tool access declaration and formatting rules
+3. Tool definitions in JSON Schema format
+4. Additional context (memory, expression rules)
 """
 
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 
-# 1. Environment variable override (similar to GEMINI_SYSTEM_MD)
-#    If ``NAGISA_SYSTEM_MD`` is set:
-#      * "0" / "false" (case-insensitive)  →  disable file loading and use
-#        *empty string* as base prompt (caller may append custom content).
-#      * "1" / "true"                       →  enable but keep default path
-#      * any other non-empty value           →  treat value as **absolute** path
-#        to a custom markdown prompt file.
-ENV_VAR = "NAGISA_SYSTEM_MD"
+# Environment variable overrides
+ENV_BASE_PROMPT = "NAGISA_BASE_PROMPT"
+ENV_SYSTEM_MD = "NAGISA_SYSTEM_MD"  # Legacy support
 
-# 2. Default prompt file lives in config/prompts directory
-DEFAULT_PROMPT_PATH = Path(__file__).parent.parent.parent / "config" / "prompts" / "base_prompt.md"
+# Prompt file paths
+PROMPTS_DIR = Path(__file__).parent.parent.parent / "config" / "prompts"
+DEFAULT_BASE_PROMPT = PROMPTS_DIR / "base_prompt.md"
+DEFAULT_TOOL_PROMPT = PROMPTS_DIR / "tool_prompt.md"
+DEFAULT_EXPRESSION_PROMPT = PROMPTS_DIR / "expression_prompt.md"
+DEFAULT_MEMORY_TEMPLATE = PROMPTS_DIR / "memory_context_template.md"
 
 
 # -----------------------------------------------------------------------------
