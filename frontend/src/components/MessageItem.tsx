@@ -112,47 +112,33 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
     return formatSmartTime(timestamp, { showRelative: true })
   }
   
-  // 为流式文本添加渐变效果
-  const renderStreamingText = () => {
+  // 简单用户消息渲染
+  const renderUserText = () => {
+    return displayText ? (
+      <div className="message-text">
+        <ReactMarkdown>{displayText}</ReactMarkdown>
+      </div>
+    ) : null
+  }
+  
+  // 机器人消息的复杂流式渲染（包含工具状态和action_text处理）
+  const renderBotStreamingText = () => {
     // 如果有工具状态和action，显示action text
     const textToDisplay = (toolState?.isUsingTool && toolState?.action) 
       ? toolState.action 
       : displayText;
     
-    console.log('[MessageItem] renderStreamingText:', {
-      messageId: id,
-      toolStateIsUsingTool: toolState?.isUsingTool,
-      toolStateAction: toolState?.action,
-      displayText: displayText,
-      textToDisplay: textToDisplay
-    });
-    
-    // Use non-streaming rendering for tool action text or non-bot messages
-    const shouldUseNonStreaming = !streaming || sender !== 'bot' || (toolState?.isUsingTool && toolState?.action);
-    
-    console.log('[MessageItem] Render conditions:', {
-      messageId: id,
-      streaming,
-      sender,
-      shouldUseNonStreaming,
-      hasTextToDisplay: !!textToDisplay,
-      willRender: shouldUseNonStreaming && !!textToDisplay
-    });
+    // Use non-streaming rendering for tool action text
+    const shouldUseNonStreaming = !streaming || (toolState?.isUsingTool && toolState?.action);
     
     if (shouldUseNonStreaming) {
       if (textToDisplay) {
-        console.log('[MessageItem] Returning non-streaming JSX:', {
-          messageId: id,
-          textLength: textToDisplay.length,
-          textPreview: textToDisplay.substring(0, 50) + '...'
-        });
         return (
           <div className="message-text">
             <ReactMarkdown>{textToDisplay}</ReactMarkdown>
           </div>
         );
       } else {
-        console.log('[MessageItem] No textToDisplay, returning null');
         return null;
       }
     }
@@ -268,9 +254,9 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
         {sender === 'bot' ? (
           <div className="message-wrapper">
             {toolState && <MessageToolState toolState={toolState} />}
-            {(renderStreamingText() || (files && files.length > 0 && !isLoading)) && (
+            {(renderBotStreamingText() || (files && files.length > 0 && !isLoading)) && (
               <div className="message-content">
-                {(displayText || (toolState?.isUsingTool && toolState?.action)) && renderStreamingText()}
+                {(displayText || (toolState?.isUsingTool && toolState?.action)) && renderBotStreamingText()}
                 
                 {files && files.length > 0 && !isLoading && (() => {
                       
@@ -356,7 +342,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, onMessageSelect, sel
           </div>
         ) : (
           <div className="message-content">
-            {renderStreamingText()}
+            {renderUserText()}
             
             {files && files.length > 0 && !isLoading && (() => {
               
