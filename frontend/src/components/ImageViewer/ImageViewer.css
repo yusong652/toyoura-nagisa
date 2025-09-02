@@ -141,9 +141,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, opacity 0.3s ease-in-out;
   z-index: 10001;
   padding: 0;
+  opacity: 1;
 }
 
 .nav-btn:hover {
@@ -173,6 +174,8 @@
   border-radius: 25px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 10001;
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
 .control-btn {
@@ -304,29 +307,6 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
-.keyboard-shortcuts {
-  position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 10001;
-  animation: slideDown 0.5s ease-out;
-  animation-delay: 1s;
-  animation-fill-mode: both;
-  opacity: 0;
-}
-
-.shortcuts-hint {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  text-align: center;
-  white-space: nowrap;
-}
 
 /* Animations */
 @keyframes fadeIn {
@@ -407,9 +387,6 @@
     padding: 8px;
   }
   
-  .keyboard-shortcuts {
-    display: none; /* Hide on mobile */
-  }
 }
 
 @media (max-width: 480px) {
@@ -441,8 +418,7 @@
 }
 
 [data-theme="dark"] .image-controls,
-[data-theme="dark"] .thumbnail-strip,
-[data-theme="dark"] .keyboard-shortcuts {
+[data-theme="dark"] .thumbnail-strip {
   background: rgba(0, 0, 0, 0.9);
   border-color: rgba(255, 255, 255, 0.15);
 }
@@ -460,8 +436,7 @@
 [data-theme="light"] .close-btn,
 [data-theme="light"] .nav-btn,
 [data-theme="light"] .control-btn,
-[data-theme="light"] .zoom-indicator,
-[data-theme="light"] .shortcuts-hint {
+[data-theme="light"] .zoom-indicator {
   color: #333;
 }
 
@@ -472,8 +447,7 @@
 }
 
 [data-theme="light"] .image-controls,
-[data-theme="light"] .thumbnail-strip,
-[data-theme="light"] .keyboard-shortcuts {
+[data-theme="light"] .thumbnail-strip {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(0, 0, 0, 0.1);
 }

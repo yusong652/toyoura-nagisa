@@ -5,7 +5,8 @@ import { ImageControlsProps } from '../types'
  * Control buttons component for ImageViewer.
  * 
  * Provides zoom in, zoom out, and zoom reset controls with
- * proper disabled states and accessibility labels.
+ * proper disabled states and accessibility labels. Supports
+ * auto-hide functionality for cleaner viewing experience.
  * 
  * Args:
  *     zoom: Current zoom level for display
@@ -14,15 +15,18 @@ import { ImageControlsProps } from '../types'
  *     onZoomIn: Handler for zoom in button
  *     onZoomOut: Handler for zoom out button
  *     onZoomReset: Handler for zoom reset button
+ *     visible: Whether controls should be visible (auto-hide support)
+ *     className: Additional CSS classes for styling
  * 
  * Returns:
- *     JSX.Element: Control buttons with zoom indicator
+ *     JSX.Element | null: Control buttons with zoom indicator or null when hidden
  * 
  * TypeScript Learning Points:
  * - Props with boolean state for button enabling
- * - Conditional button disabled states
+ * - Conditional rendering based on visibility
  * - Mathematical rounding for display
  * - SVG icon components with consistent styling
+ * - CSS class composition with visibility control
  */
 const ImageControls: React.FC<ImageControlsProps> = ({
   zoom,
@@ -30,10 +34,11 @@ const ImageControls: React.FC<ImageControlsProps> = ({
   canZoomOut,
   onZoomIn,
   onZoomOut,
-  onZoomReset
+  onZoomReset,
+  className = ''
 }) => {
   return (
-    <div className="image-controls">
+    <div className={`image-controls ${className}`.trim()}>
       {/* Zoom Out Button */}
       <button 
         className="control-btn" 

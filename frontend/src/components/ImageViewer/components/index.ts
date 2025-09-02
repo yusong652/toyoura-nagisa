@@ -14,7 +14,6 @@
  *     - ImageControls: Zoom control buttons
  *     - ImageNavigation: Previous/next navigation arrows
  *     - ThumbnailStrip: Scrollable thumbnail navigation
- *     - KeyboardShortcutsHelp: Help text for keyboard shortcuts
  * 
  * Component Responsibilities:
  * - Each component handles a single UI concern
@@ -29,7 +28,6 @@ export { default as LoadingOverlay } from './LoadingOverlay'
 export { default as ImageControls } from './ImageControls'
 export { default as ImageNavigation } from './ImageNavigation'
 export { default as ThumbnailStrip } from './ThumbnailStrip'
-export { default as KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 
 // Re-export component prop types for convenience
 export type { 

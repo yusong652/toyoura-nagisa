@@ -5,7 +5,8 @@ import { ImageNavigationProps } from '../types'
  * Navigation arrows component for ImageViewer.
  * 
  * Provides previous and next navigation buttons positioned on the sides
- * of the image. Only renders when multiple images are available.
+ * of the image. Only renders when multiple images are available and can
+ * be hidden/shown based on user activity.
  * 
  * Args:
  *     hasMultipleImages: Whether navigation should be shown
@@ -13,23 +14,28 @@ import { ImageNavigationProps } from '../types'
  *     canNavigateNext: Whether next navigation is enabled
  *     onPrevImage: Handler for previous image button
  *     onNextImage: Handler for next image button
+ *     visible: Whether navigation controls should be visible (auto-hide support)
+ *     className: Additional CSS classes for styling
  * 
  * Returns:
- *     JSX.Element | null: Navigation arrows or null for single images
+ *     JSX.Element | null: Navigation arrows or null when not needed/visible
  * 
  * TypeScript Learning Points:
  * - Early return for conditional component rendering
- * - Fragment wrapper for multiple elements
+ * - Fragment wrapper for multiple elements  
  * - Boolean props for conditional functionality
  * - Consistent SVG icon patterns
+ * - CSS class composition with visibility control
  */
 const ImageNavigation: React.FC<ImageNavigationProps> = ({
   hasMultipleImages,
   canNavigatePrev,
   canNavigateNext,
   onPrevImage,
-  onNextImage
+  onNextImage,
+  className = ''
 }) => {
+  // Don't render when not needed
   if (!hasMultipleImages) {
     return null
   }
@@ -38,7 +44,7 @@ const ImageNavigation: React.FC<ImageNavigationProps> = ({
     <>
       {/* Previous Image Button */}
       <button 
-        className="nav-btn prev-btn" 
+        className={`nav-btn prev-btn ${className}`.trim()} 
         onClick={onPrevImage}
         disabled={!canNavigatePrev}
         aria-label="Previous image"
@@ -61,7 +67,7 @@ const ImageNavigation: React.FC<ImageNavigationProps> = ({
       
       {/* Next Image Button */}
       <button 
-        className="nav-btn next-btn" 
+        className={`nav-btn next-btn ${className}`.trim()} 
         onClick={onNextImage}
         disabled={!canNavigateNext}
         aria-label="Next image"

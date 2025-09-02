@@ -47,8 +47,7 @@ export {
   LoadingOverlay,
   ImageControls,
   ImageNavigation,
-  ThumbnailStrip,
-  KeyboardShortcutsHelp
+  ThumbnailStrip
 } from './components'
 
 // Type exports for external TypeScript usage

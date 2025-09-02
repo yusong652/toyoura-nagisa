@@ -1,10 +1,9 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { 
   ImageInteractionHookReturn, 
   PanPosition, 
   DragState, 
-  TouchState,
-  DEFAULT_SWIPE_THRESHOLD 
+  TouchState
 } from '../types'
 
 /**
@@ -52,6 +51,10 @@ export const useImageInteraction = (
   const [dragStart, setDragStart] = useState<DragState>({ x: 0, y: 0 })
   const [touchStart, setTouchStart] = useState<TouchState>({ x: 0, y: 0 })
   const [lastTouchDistance, setLastTouchDistance] = useState(0)
+  
+  // Performance optimization: use ref for throttling and debouncing
+  const lastUpdateTime = useRef(0)
+  const pendingZoomUpdate = useRef<number | null>(null)
 
   /**
    * Calculate distance between two touch points for pinch gestures.
@@ -67,29 +70,27 @@ export const useImageInteraction = (
   }, [])
 
   /**
-   * Mouse down handler - start dragging if zoomed.
+   * Mouse down handler - start dragging at any zoom level.
    */
   const handleMouseDown = useCallback((e: React.MouseEvent): void => {
-    if (zoom > 1) {
-      setIsDragging(true)
-      setDragStart({
-        x: e.clientX - pan.x,
-        y: e.clientY - pan.y
-      })
-    }
-  }, [zoom, pan])
+    setIsDragging(true)
+    setDragStart({
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y
+    })
+  }, [pan])
 
   /**
    * Mouse move handler - update pan position while dragging.
    */
   const handleMouseMove = useCallback((e: React.MouseEvent): void => {
-    if (isDragging && zoom > 1) {
+    if (isDragging) {
       setPan({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
       })
     }
-  }, [isDragging, zoom, dragStart, setPan])
+  }, [isDragging, dragStart, setPan])
 
   /**
    * Mouse up handler - stop dragging.
@@ -99,18 +100,15 @@ export const useImageInteraction = (
   }, [])
 
   /**
-   * Mouse wheel handler - zoom with Ctrl/Cmd key.
+   * Mouse wheel handler - direct zoom without modifier keys.
    */
   const handleWheel = useCallback((e: React.WheelEvent): void => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? 0.9 : 1.1
-      setZoom(prev => {
-        const newZoom = prev * delta
-        // Clamp zoom to valid range
-        return Math.min(Math.max(newZoom, 0.1), 5)
-      })
-    }
+    const delta = e.deltaY > 0 ? 0.965 : 1.035
+    setZoom(prev => {
+      const newZoom = prev * delta
+      // Clamp zoom to valid range
+      return Math.min(Math.max(newZoom, 0.1), 5)
+    })
   }, [setZoom])
 
   /**
@@ -125,86 +123,107 @@ export const useImageInteraction = (
       // Two fingers - pinch gesture
       const distance = getTouchDistance(e.touches)
       setLastTouchDistance(distance)
+      // Reset pan state when starting pinch
+      if (zoom <= 1) {
+        setPan({ x: 0, y: 0 })
+      }
     }
-  }, [getTouchDistance])
+  }, [getTouchDistance, zoom, setPan])
 
   /**
    * Touch move handler - handle pan and pinch gestures.
    */
   const handleTouchMove = useCallback((e: React.TouchEvent): void => {
-    e.preventDefault()
-    
     if (e.touches.length === 1) {
       // Single touch - pan or swipe detection
       const touch = e.touches[0]
       const deltaX = touch.clientX - touchStart.x
       const deltaY = touch.clientY - touchStart.y
       
-      if (zoom > 1) {
-        // Pan when zoomed
-        setPan(prevPan => ({
-          x: prevPan.x + deltaX,
-          y: prevPan.y + deltaY
-        }))
-        setTouchStart({ x: touch.clientX, y: touch.clientY })
-      }
+      // Allow panning at any zoom level for touch
+      setPan(prevPan => ({
+        x: prevPan.x + deltaX,
+        y: prevPan.y + deltaY
+      }))
+      setTouchStart({ x: touch.clientX, y: touch.clientY })
     } else if (e.touches.length === 2) {
-      // Two fingers - pinch zoom
+      // Two fingers - pinch zoom with throttling for performance
       const currentDistance = getTouchDistance(e.touches)
-      const distanceChange = Math.abs(currentDistance - lastTouchDistance)
       
-      // Only process significant distance changes to avoid jitter
-      if (distanceChange > 10 && lastTouchDistance > 0) {
+      // Process pinch zoom with better performance optimization
+      if (lastTouchDistance > 0 && currentDistance > 0) {
         const scale = currentDistance / lastTouchDistance
-        setZoom(prevZoom => {
-          const newZoom = prevZoom * scale
-          return Math.min(Math.max(newZoom, 0.1), 5)
-        })
+        const distanceChange = Math.abs(currentDistance - lastTouchDistance)
+        
+        // Aggressive throttling for high zoom levels to prevent stuttering
+        const now = performance.now()
+        const timeDiff = now - lastUpdateTime.current
+        
+        // Adaptive throttling: slower updates for larger zoom levels
+        const throttleMs = zoom > 2 ? 66 : zoom > 1.5 ? 50 : 33 // 15fps, 20fps, 30fps
+        const shouldUpdate = distanceChange > 10 && timeDiff > throttleMs
+        
+        if (shouldUpdate) {
+          // Clear any pending update
+          if (pendingZoomUpdate.current) {
+            clearTimeout(pendingZoomUpdate.current)
+          }
+          
+          // Apply conservative smoothing with zoom-based dampening
+          const dampening = zoom > 2 ? 0.05 : zoom > 1.5 ? 0.08 : 0.105
+          const smoothScale = 1 + (scale - 1) * dampening
+          
+          setZoom(prevZoom => {
+            const newZoom = prevZoom * smoothScale
+            return Math.min(Math.max(newZoom, 0.1), 5)
+          })
+          
+          setLastTouchDistance(currentDistance)
+          lastUpdateTime.current = now
+        }
+      } else {
         setLastTouchDistance(currentDistance)
       }
     }
-  }, [touchStart, zoom, pan, setPan, setZoom, getTouchDistance, lastTouchDistance])
+  }, [touchStart, getTouchDistance, setPan, setZoom, lastTouchDistance, zoom])
 
   /**
    * Touch end handler - detect swipe gestures for navigation.
    */
   const handleTouchEnd = useCallback((e: React.TouchEvent): void => {
-    if (e.changedTouches.length === 1 && e.touches.length === 0) {
-      const touch = e.changedTouches[0]
-      const deltaX = touch.clientX - touchStart.x
-      const deltaY = touch.clientY - touchStart.y
-      
-      // Check for horizontal swipe when not zoomed
-      if (Math.abs(deltaX) > DEFAULT_SWIPE_THRESHOLD && 
-          Math.abs(deltaX) > Math.abs(deltaY) * 2 && 
-          zoom <= 1) {
-        if (deltaX > 0) {
-          onPrevImage() // Swipe right - previous image
-        } else {
-          onNextImage() // Swipe left - next image
-        }
-      }
-    }
+    // Disabled swipe navigation to avoid conflicts with drag
+    // Users can use navigation arrows or keyboard shortcuts instead
     
     // Reset touch states
     setLastTouchDistance(0)
-  }, [touchStart, zoom, onPrevImage, onNextImage])
+  }, [])
 
   /**
    * Dynamic container styles based on interaction state.
    */
   const containerStyle = useMemo((): React.CSSProperties => ({
-    cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-    touchAction: 'none' // Prevent default touch behaviors
-  }), [zoom, isDragging])
+    cursor: isDragging ? 'grabbing' : 'grab',
+    touchAction: 'manipulation' // Allow pinch-zoom and pan but prevent other default behaviors
+  }), [isDragging])
 
   /**
-   * Dynamic image transform styles.
+   * Dynamic image transform styles with hardware acceleration and performance optimization.
    */
-  const imageStyle = useMemo((): React.CSSProperties => ({
-    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-    transition: isDragging ? 'none' : 'transform 0.2s ease-out'
-  }), [zoom, pan, isDragging])
+  const imageStyle = useMemo((): React.CSSProperties => {
+    // Round values to reduce precision for better performance
+    const roundedZoom = Math.round(zoom * 1000) / 1000
+    const roundedPanX = Math.round((pan.x / zoom) * 100) / 100
+    const roundedPanY = Math.round((pan.y / zoom) * 100) / 100
+    
+    return {
+      transform: `scale3d(${roundedZoom}, ${roundedZoom}, 1) translate3d(${roundedPanX}px, ${roundedPanY}px, 0)`,
+      transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+      willChange: isDragging ? 'transform' : 'auto', // Only enable when needed
+      backfaceVisibility: 'hidden',
+      transformStyle: 'preserve-3d', // Better GPU utilization
+      containIntrinsicSize: '100% 100%' // Help browser optimize
+    }
+  }, [zoom, pan, isDragging])
 
   return {
     isDragging,

@@ -116,6 +116,7 @@ export interface ImageControlsProps {
   onZoomIn: () => void
   onZoomOut: () => void
   onZoomReset: () => void
+  className?: string
 }
 
 export interface ImageNavigationProps {
@@ -124,6 +125,7 @@ export interface ImageNavigationProps {
   canNavigateNext: boolean
   onPrevImage: () => void
   onNextImage: () => void
+  className?: string
 }
 
 export interface ThumbnailStripProps {

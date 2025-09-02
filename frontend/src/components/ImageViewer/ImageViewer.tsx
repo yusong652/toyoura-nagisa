@@ -11,10 +11,8 @@ import {
 import {
   ImageViewerHeader,
   ImageContainer,
-  ImageControls,
   ImageNavigation,
-  ThumbnailStrip,
-  KeyboardShortcutsHelp
+  ThumbnailStrip
 } from './components'
 import { ImageViewerProps } from './types'
 import './ImageViewer.css'
@@ -94,9 +92,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const {
     handleZoomIn,
     handleZoomOut,
-    handleZoomReset,
-    canZoomIn,
-    canZoomOut
+    handleZoomReset
   } = useImageZoom(zoom, setZoom, setPan)
 
   // Interaction handling
@@ -126,6 +122,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     activeThumbnailRef,
     scrollToActiveThumbnail
   } = useThumbnailNavigation(currentIndex, images.length, open)
+
 
   // Keyboard shortcuts (handled by MediaModal's useKeyboardShortcuts)
   useKeyboardShortcuts({
@@ -191,15 +188,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           onNextImage={handleNextImage}
         />
 
-        {/* Zoom controls */}
-        <ImageControls
-          zoom={zoom}
-          canZoomIn={canZoomIn}
-          canZoomOut={canZoomOut}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onZoomReset={handleZoomReset}
-        />
 
         {/* Thumbnail strip for quick navigation */}
         <ThumbnailStrip
@@ -211,8 +199,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           activeThumbnailRef={activeThumbnailRef}
         />
 
-        {/* Keyboard shortcuts help */}
-        <KeyboardShortcutsHelp />
       </div>
     </MediaModal>
   )
