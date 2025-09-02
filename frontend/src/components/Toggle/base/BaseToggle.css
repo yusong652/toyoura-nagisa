@@ -1,0 +1,101 @@
+/**
+ * Base Toggle Component Styles
+ * 
+ * Based on the original SlideToggle design, maintaining the same visual style
+ * with minor naming updates for consistency.
+ */
+
+.base-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: var(--toggle-bg-off, #444);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 2px;
+  outline: none;
+}
+
+.base-toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--primary-color, #4a90e2);
+}
+
+/* Size variants */
+.base-toggle--small {
+  width: 36px;
+  height: 20px;
+}
+
+.base-toggle--medium {
+  width: 44px;
+  height: 24px;
+  border-radius: 16px;
+}
+
+.base-toggle--large {
+  width: 52px;
+  height: 28px;
+  border-radius: 18px;
+}
+
+/* Checked state */
+.base-toggle--checked {
+  background: var(--primary-color, #4a90e2);
+}
+
+/* Disabled state */
+.base-toggle--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Toggle thumb */
+.base-toggle__thumb {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Thumb sizes and positions */
+.base-toggle--small .base-toggle__thumb {
+  width: 16px;
+  height: 16px;
+  transform: translateX(0);
+}
+
+.base-toggle--small.base-toggle--checked .base-toggle__thumb {
+  transform: translateX(16px);
+}
+
+.base-toggle--medium .base-toggle__thumb {
+  width: 20px;
+  height: 20px;
+  transform: translateX(0);
+}
+
+.base-toggle--medium.base-toggle--checked .base-toggle__thumb {
+  transform: translateX(20px);
+}
+
+.base-toggle--large .base-toggle__thumb {
+  width: 24px;
+  height: 24px;
+  transform: translateX(0);
+}
+
+.base-toggle--large.base-toggle--checked .base-toggle__thumb {
+  transform: translateX(24px);
+}
+
+/* Hover effects */
+.base-toggle:hover:not(.base-toggle--disabled) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.base-toggle--checked:hover:not(.base-toggle--disabled) {
+  background: var(--primary-hover, #3a7bc8);
+}
