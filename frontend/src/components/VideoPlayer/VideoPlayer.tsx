@@ -72,6 +72,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   className = '',
   closeButtonContent
 }) => {
+  // Track if user has manually paused to prevent autoplay from restarting
+  const [userPaused, setUserPaused] = React.useState(false)
   // Core state management
   const {
     videoInfo,
@@ -86,7 +88,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     videoRef,
     handlePlay,
     handlePause,
-    handlePlayPause,
     handleVolumeChange,
     handleMuteToggle,
     handleSeek,
@@ -94,8 +95,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     handleLoadStart,
     handleCanPlay,
     handleError,
-    handleTimeUpdate
+    handleTimeUpdate,
+    handleVideoPlay,
+    handleVideoPause
   } = useVideoPlayback(videoInfo, playbackState, setPlaybackState)
+
+  // Enhanced play/pause handler that tracks user interaction
+  const enhancedHandlePlayPause = () => {
+    if (playbackState.isPlaying) {
+      // User is pausing - mark as manually paused
+      setUserPaused(true)
+      handlePause()
+    } else {
+      // User is playing - clear manual pause flag
+      setUserPaused(false)
+      handlePlay()
+    }
+  }
 
   // Enhanced keyboard shortcut handlers
   const handleVolumeUp = () => {
@@ -123,7 +139,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Keyboard shortcuts integration
   const { shortcutsEnabled } = useVideoKeyboardShortcuts({
-    onPlayPause: handlePlayPause,
+    onPlayPause: enhancedHandlePlayPause,
     onVolumeUp: handleVolumeUp,
     onVolumeDown: handleVolumeDown,
     onSeekForward: handleSeekForward,
@@ -140,21 +156,57 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [initialVolume, isReady, handleVolumeChange])
 
+  // Handle autoplay when video is ready (but not if user manually paused)
+  React.useEffect(() => {
+    if (autoPlay && isReady && !playbackState.isPlaying && !videoInfo.isImageFormat && !userPaused) {
+      // Small delay to ensure video element is fully loaded
+      const autoplayTimer = setTimeout(async () => {
+        try {
+          await handlePlay()
+        } catch (error: any) {
+          console.log('Autoplay blocked by browser, trying muted autoplay:', error)
+          
+          // Try muted autoplay as fallback
+          try {
+            if (!playbackState.isMuted) {
+              handleMuteToggle() // Mute the video
+              setTimeout(async () => {
+                try {
+                  await handlePlay()
+                  console.log('Muted autoplay successful')
+                } catch (mutedError: any) {
+                  console.log('Even muted autoplay blocked:', mutedError)
+                  // Completely blocked, give up gracefully
+                }
+              }, 50)
+            }
+          } catch (muteError: any) {
+            console.log('Failed to mute for autoplay:', muteError)
+          }
+        }
+      }, 100)
+
+      return () => clearTimeout(autoplayTimer)
+    }
+  }, [autoPlay, isReady, playbackState.isPlaying, playbackState.isMuted, videoInfo.isImageFormat, userPaused, handlePlay, handleMuteToggle])
+
   return (
     <MediaModal
       open={true}
       onClose={onClose}
       className={`video-player ${className}`.trim()}
-      showCloseButton={false} // Using custom header with close button
+      showCloseButton={false} // Disable close button - only backdrop click to close
     >
       <div className="video-player-container">
-        {/* Header with video info and close button */}
-        <VideoPlayerHeader
-          videoInfo={videoInfo}
-          onClose={onClose}
-          closeButtonContent={closeButtonContent}
-          className="video-player-header"
-        />
+        {/* Header disabled - using MediaModal's built-in close button */}
+        {false && (
+          <VideoPlayerHeader
+            videoInfo={videoInfo}
+            onClose={onClose}
+            closeButtonContent={closeButtonContent}
+            className="video-player-header"
+          />
+        )}
 
         {/* Main video content area with loading/error states */}
         <VideoContainer
@@ -163,7 +215,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           playbackState={playbackState}
           autoPlay={autoPlay}
           loop={loop}
-          showControls={showControls}
           onLoadStart={handleLoadStart}
           onCanPlay={() => {
             handleCanPlay()
@@ -174,11 +225,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           className="video-container"
         />
 
-        {/* Custom video controls - shown for video formats only */}
-        {!videoInfo.isImageFormat && showControls && (
+        {/* Custom video controls disabled - using native browser controls */}
+        {false && !videoInfo.isImageFormat && showControls && (
           <VideoControls
             playbackState={playbackState}
-            onPlayPause={handlePlayPause}
+            onPlayPause={enhancedHandlePlayPause}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={handleMuteToggle}
             onSeek={handleSeek}

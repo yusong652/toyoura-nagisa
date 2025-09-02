@@ -139,6 +139,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
           videoUrl={currentVideoUrl}
           format={currentVideoFormat}
           onClose={() => setShowVideoPlayer(false)}
+          autoPlay={true}
+          loop={true}
         />
       )}
       

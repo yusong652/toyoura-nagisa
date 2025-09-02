@@ -152,6 +152,8 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
           videoUrl={videoUrl}
           format="mp4"
           onClose={() => setShowVideoPlayer(false)}
+          autoPlay={true}
+          loop={true}
         />
       )}
     </>

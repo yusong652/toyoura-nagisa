@@ -2,9 +2,7 @@ import { useRef, useCallback } from 'react'
 import {
   VideoPlaybackHookReturn,
   VideoPlaybackState,
-  VideoInfo,
-  DEFAULT_SEEK_INCREMENT,
-  DEFAULT_VOLUME_INCREMENT
+  VideoInfo
 } from '../types'
 
 /**
@@ -63,19 +61,19 @@ const useVideoPlayback = (
 
   /**
    * Start video playback.
-   * Handles browser autoplay policies and updates state accordingly.
+   * Handles browser autoplay policies. State will be updated by onPlay event.
    */
   const handlePlay = useCallback(async (): Promise<void> => {
     const video = videoRef.current
     if (!video || videoInfo.isImageFormat) return
 
     try {
-      // Attempt to play - may be blocked by browser policies
+      // Attempt to play - state will be updated by onPlay event
       await video.play()
       
+      // Clear any previous errors
       setPlaybackState(prev => ({
         ...prev,
-        isPlaying: true,
         error: null
       }))
     } catch (error) {
@@ -94,19 +92,15 @@ const useVideoPlayback = (
 
   /**
    * Pause video playback.
-   * Updates state to reflect paused status.
+   * State will be updated by onPause event.
    */
   const handlePause = useCallback((): void => {
     const video = videoRef.current
     if (!video || videoInfo.isImageFormat) return
 
+    // Pause video - state will be updated by onPause event
     video.pause()
-    
-    setPlaybackState(prev => ({
-      ...prev,
-      isPlaying: false
-    }))
-  }, [videoInfo.isImageFormat, setPlaybackState])
+  }, [videoInfo.isImageFormat])
 
   /**
    * Toggle between play and pause states.
@@ -265,6 +259,29 @@ const useVideoPlayback = (
     }))
   }, [setPlaybackState])
 
+  /**
+   * Handle video play event from video element.
+   * Synchronizes React state when video actually starts playing.
+   */
+  const handleVideoPlay = useCallback((): void => {
+    setPlaybackState(prev => ({
+      ...prev,
+      isPlaying: true,
+      error: null
+    }))
+  }, [setPlaybackState])
+
+  /**
+   * Handle video pause event from video element.
+   * Synchronizes React state when video is actually paused.
+   */
+  const handleVideoPause = useCallback((): void => {
+    setPlaybackState(prev => ({
+      ...prev,
+      isPlaying: false
+    }))
+  }, [setPlaybackState])
+
   return {
     videoRef,
     handlePlay,
@@ -277,7 +294,9 @@ const useVideoPlayback = (
     handleLoadStart,
     handleCanPlay,
     handleError,
-    handleTimeUpdate
+    handleTimeUpdate,
+    handleVideoPlay,
+    handleVideoPause
   }
 }
 

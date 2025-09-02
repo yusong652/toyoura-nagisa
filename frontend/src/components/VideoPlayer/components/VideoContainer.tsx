@@ -49,7 +49,6 @@ const VideoContainer: React.FC<VideoContainerProps> = ({
   playbackState,
   autoPlay = false,
   loop = false,
-  showControls = true,
   onLoadStart,
   onCanPlay,
   onError,
@@ -121,6 +120,7 @@ const VideoContainer: React.FC<VideoContainerProps> = ({
     onError?.('Failed to load image content')
   }
 
+
   return (
     <div className={`video-container ${className}`.trim()}>
       {/* Loading overlay - shown when content is loading */}
@@ -149,10 +149,11 @@ const VideoContainer: React.FC<VideoContainerProps> = ({
           src={videoInfo.source}
           className="video-content video-element"
           autoPlay={autoPlay}
+          muted={autoPlay} // Mute by default when autoplay is enabled for better browser support
           loop={loop}
-          controls={showControls}
+          controls={true}
           playsInline
-          preload="metadata"
+          preload="auto"
           // Event handlers
           onLoadStart={handleLoadStart}
           onCanPlay={handleCanPlay}

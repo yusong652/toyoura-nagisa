@@ -132,7 +132,7 @@ export interface VideoPlayerStateHookReturn {
  */
 export interface VideoPlaybackHookReturn {
   /** Video element ref for direct control */
-  videoRef: React.RefObject<HTMLVideoElement>
+  videoRef: React.RefObject<HTMLVideoElement | null>
   /** Play video */
   handlePlay: () => void
   /** Pause video */
@@ -155,6 +155,10 @@ export interface VideoPlaybackHookReturn {
   handleError: (error: string) => void
   /** Handle time update */
   handleTimeUpdate: (currentTime: number, duration: number) => void
+  /** Handle video play event from video element */
+  handleVideoPlay: () => void
+  /** Handle video pause event from video element */
+  handleVideoPause: () => void
 }
 
 /**
@@ -195,15 +199,13 @@ export interface VideoContainerProps {
   /** Video information and source */
   videoInfo: VideoInfo
   /** Video element ref */
-  videoRef?: React.RefObject<HTMLVideoElement>
+  videoRef?: React.RefObject<HTMLVideoElement | null>
   /** Playback state */
   playbackState: VideoPlaybackState
   /** Auto-play on load */
   autoPlay?: boolean
   /** Loop playback */
   loop?: boolean
-  /** Show native controls */
-  showControls?: boolean
   /** Video load start handler */
   onLoadStart?: () => void
   /** Video ready handler */
