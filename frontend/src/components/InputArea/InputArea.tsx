@@ -4,8 +4,11 @@ import {
   useFileHandling,
   useMessageSending,
   useInputAutoResize,
-  useSlashCommand
+  useSlashCommand,
+  BUILTIN_COMMANDS
 } from './hooks'
+import { useChat } from '../../contexts/chat/ChatContext'
+import { useSession } from '../../contexts/session/SessionContext'
 import {
   FilePreviewArea,
   MessageInput,
@@ -100,35 +103,120 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [cursorPosition, setCursorPosition] = useState<number>(0)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
   
+  // Loading state for slash commands
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
+  
+  // Get functions from ChatContext
+  const { generateImage, generateVideo } = useChat()
+  const { currentSessionId } = useSession()
+  
   // Slash command functionality
   const {
     suggestions,
     isCommandActive,
     executeCommand,
-    selectSuggestion
+    selectSuggestion,
+    activeCommand
   } = useSlashCommand(message, cursorPosition, async (command, args) => {
     console.log(`Executing command: ${command.trigger} with args:`, args)
-    if (command.trigger === 'text_to_image') {
-      // Handle text_to_image command
-      const prompt = args.join(' ')
-      if (prompt) {
-        console.log('Generating image with prompt:', prompt)
-        // TODO: Integrate with backend API for image generation
+    
+    if (!currentSessionId) {
+      console.error('No active session for slash command')
+      return
+    }
+    
+    if (command.trigger === 'image') {
+      // Handle image generation command - generates based on conversation context
+      clearInput()
+      resetTextareaHeight()
+      setIsGeneratingImage(true)
+      
+      try {
+        // Generate image based on recent conversation context
+        const result = await generateImage(currentSessionId)
+        if (!result.success) {
+          console.error('Image generation failed:', result.error)
+        }
+      } finally {
+        setIsGeneratingImage(false)
+      }
+    } else if (command.trigger === 'video') {
+      // Handle video generation command - converts last image to video
+      clearInput()
+      resetTextareaHeight()
+      setIsGeneratingVideo(true)
+      
+      try {
+        // Generate video from the last image in the conversation
+        const result = await generateVideo(currentSessionId)
+        if (!result.success) {
+          console.error('Video generation failed:', result.error)
+        }
+      } finally {
+        setIsGeneratingVideo(false)
       }
     }
   })
   
-  // Message sending logic
-  const {
-    handleSendMessage,
-    handleKeyPress,
-    canSendMessage,
-    isSending,
-    sendingStatus
-  } = useMessageSending(messageInfo, () => {
+  // Message sending logic - wrap to intercept slash commands
+  const originalSendHandlers = useMessageSending(messageInfo, () => {
     clearInput()
     resetTextareaHeight()
   }, textareaRef)
+  
+  // Override handleSendMessage to check for slash commands first
+  const handleSendMessage = useCallback(async () => {
+    // Check if the message starts with a slash command
+    const trimmedMessage = message.trim()
+    if (trimmedMessage.startsWith('/')) {
+      // Parse the command
+      const parts = trimmedMessage.substring(1).split(' ')
+      const commandTrigger = parts[0]
+      const args = parts.slice(1)
+      
+      // Find the matching command
+      const command = [...BUILTIN_COMMANDS].find(cmd => cmd.trigger === commandTrigger)
+      
+      if (command) {
+        // Execute the command through the slash command handler
+        await executeCommand(command, args)
+        return // Don't send as a regular message
+      }
+    }
+    
+    // If not a slash command, send as a regular message
+    await originalSendHandlers.handleSendMessage()
+  }, [message, executeCommand, originalSendHandlers.handleSendMessage])
+  
+  // Override handleKeyPress to intercept Enter for slash commands
+  const handleKeyPress = useCallback(async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Check if we have a complete slash command
+      const trimmedMessage = message.trim()
+      if (trimmedMessage.startsWith('/')) {
+        const parts = trimmedMessage.substring(1).split(' ')
+        const commandTrigger = parts[0]
+        const command = [...BUILTIN_COMMANDS].find(cmd => cmd.trigger === commandTrigger)
+        
+        if (command) {
+          e.preventDefault()
+          await handleSendMessage() // This will now execute the command
+          return
+        }
+      }
+    }
+    
+    // Otherwise use the original key press handler
+    await originalSendHandlers.handleKeyPress(e)
+  }, [message, handleSendMessage, originalSendHandlers.handleKeyPress])
+  
+  // Extract the rest of the handlers
+  const {
+    canSendMessage,
+    isSending,
+    sendingStatus
+  } = originalSendHandlers
   
   // Handle suggestion selection
   const handleSelectSuggestion = useCallback((suggestion: any) => {
@@ -187,8 +275,23 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       case 'Enter':
         e.preventDefault()
+        // When Enter is pressed with a suggestion selected
         if (suggestions[selectedSuggestionIndex]) {
-          handleSelectSuggestion(suggestions[selectedSuggestionIndex])
+          const suggestion = suggestions[selectedSuggestionIndex]
+          const command = suggestion.command
+          
+          // Since our commands don't need arguments, execute immediately
+          if (command.trigger === 'image' || command.trigger === 'video') {
+            // Clear input and execute the command
+            clearInput()
+            resetTextareaHeight()
+            
+            // Execute the command through our command handler
+            executeCommand(command, [])
+          } else {
+            // For other potential future commands, just insert the text
+            handleSelectSuggestion(suggestion)
+          }
         }
         break
 
@@ -283,21 +386,46 @@ const InputArea: React.FC<InputAreaProps> = ({
         
         {/* Inline status indicator in bottom right corner */}
         <div className="input-status-inline">
-          <span className="status-item char-status">
-            <span className="status-label">chars</span>
-            <span className="status-value">{messageInfo.characterCount}</span>
-          </span>
-          {files.length > 0 && (
-            <span className="status-item file-status">
-              <span className="status-label">files</span>
-              <span className="status-value">{files.length}/{maxFiles}</span>
+          {/* Show loading status when generating */}
+          {(isGeneratingImage || isGeneratingVideo) && (
+            <span className="status-item generating-status">
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                className="status-spinner"
+                style={{ animation: 'spin 1s linear infinite' }}
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v2" />
+              </svg>
+              <span className="status-label">
+                {isGeneratingImage ? 'generating image' : 'generating video'}
+              </span>
             </span>
           )}
-          <span className="status-item send-status">
-            <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
-              {canSendMessage ? 'ready' : 'wait'}
-            </span>
-          </span>
+          {!(isGeneratingImage || isGeneratingVideo) && (
+            <>
+              <span className="status-item char-status">
+                <span className="status-label">chars</span>
+                <span className="status-value">{messageInfo.characterCount}</span>
+              </span>
+              {files.length > 0 && (
+                <span className="status-item file-status">
+                  <span className="status-label">files</span>
+                  <span className="status-value">{files.length}/{maxFiles}</span>
+                </span>
+              )}
+              <span className="status-item send-status">
+                <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
+                  {canSendMessage ? 'ready' : 'wait'}
+                </span>
+              </span>
+            </>
+          )}
         </div>
         
         {/* Send button positioned on the right */}

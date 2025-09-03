@@ -24,7 +24,7 @@ export { default as useInputState } from './useInputState'
 export { default as useFileHandling } from './useFileHandling'
 export { default as useMessageSending } from './useMessageSending'
 export { default as useInputAutoResize } from './useInputAutoResize'
-export { default as useSlashCommand } from './useSlashCommand'
+export { default as useSlashCommand, BUILTIN_COMMANDS } from './useSlashCommand'
 
 // Re-export hook return types for convenience
 export type {

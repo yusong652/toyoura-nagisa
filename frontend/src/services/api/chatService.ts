@@ -115,6 +115,37 @@ export class ChatService {
       }
     }
   }
+
+  /**
+   * Generate a video from the most recent image in the session.
+   * 
+   * @param sessionId - Session containing the image to convert to video
+   * @param motionStyle - Optional motion style for the video generation
+   * @returns Promise resolving to video generation result
+   */
+  async generateVideo(sessionId: string, motionStyle?: string): Promise<{
+    success: boolean
+    video_path?: string
+    error?: string
+  }> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean
+        video_path?: string
+        error?: string
+      }>('/api/generate-video', { 
+        session_id: sessionId,
+        motion_style: motionStyle
+      })
+      
+      return response
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error.message || 'Network error during video generation' 
+      }
+    }
+  }
 }
 
 // Create a singleton instance

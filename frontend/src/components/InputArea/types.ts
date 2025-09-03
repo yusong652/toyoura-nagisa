@@ -165,7 +165,7 @@ export interface DragDropState {
 export interface SlashCommand {
   trigger: string
   description: string
-  handler: (args: string[]) => void | Promise<void>
+  handler: (args: string[]) => any | Promise<any>
   isVisible: boolean
   category?: string
 }

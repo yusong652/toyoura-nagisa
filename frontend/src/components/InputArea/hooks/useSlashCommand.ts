@@ -55,25 +55,24 @@ export interface SlashCommandHookReturn {
 }
 
 // Built-in commands for the system
-const BUILTIN_COMMANDS: SlashCommand[] = [
+export const BUILTIN_COMMANDS: SlashCommand[] = [
   {
-    trigger: 'text_to_image',
-    description: 'Generate an image from text description',
-    handler: async (args: string[]) => {
-      console.log('Executing text_to_image command with args:', args)
-      // Implementation will be added when integrating with backend
+    trigger: 'image',
+    description: 'Generate image from conversation context',
+    handler: async () => {
+      // Handler is empty - actual execution happens in onCommandExecute
     },
     isVisible: true,
     category: 'media'
   },
   {
-    trigger: 'help',
-    description: 'Show available commands and their usage',
-    handler: async (args: string[]) => {
-      console.log('Showing help for commands')
+    trigger: 'video',
+    description: 'Convert last image to video',
+    handler: async () => {
+      // Handler is empty - actual execution happens in onCommandExecute
     },
     isVisible: true,
-    category: 'utility'
+    category: 'media'
   }
 ]
 

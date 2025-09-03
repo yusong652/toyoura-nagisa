@@ -6,7 +6,6 @@ import { useSession } from '../contexts/session/SessionContext';
 import { useChat } from '../contexts/chat/ChatContext';
 import VideoPlayer from './VideoPlayer';
 import UnifiedErrorDisplay from './UnifiedErrorDisplay';
-import { sessionService } from '../services/api/sessionService';
 import { useErrorDisplay } from '../hooks/useErrorDisplay';
 import './ImageWithVideoAction.css';
 
@@ -21,7 +20,7 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
   const [videoUrl] = useState<string | null>(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const { currentSessionId } = useSession();
-  const { addVideoMessage } = useChat();
+  const { generateVideo } = useChat();
   const { error, showTemporaryError, clearError } = useErrorDisplay();
 
   const handleGenerateVideo = async (e: React.MouseEvent) => {
@@ -33,40 +32,15 @@ const ImageWithVideoAction: React.FC<ImageWithVideoActionProps> = ({
     clearError();
     
     try {
-      // Call the video generation API
-      const response = await fetch('/api/generate-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: currentSessionId
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (result.success && currentSessionId) {
-        try {
-          // 获取会话历史，查找最新的视频消息
-          const historyData = await sessionService.getSessionHistory(currentSessionId);
-          
-          if (historyData.history && Array.isArray(historyData.history)) {
-            const lastVideoMessage = historyData.history
-              .filter((msg: any) => msg.role === 'video')
-              .pop();
+      if (!currentSessionId) {
+        showTemporaryError('No active session', 3000);
+        return;
+      }
 
-            if (lastVideoMessage && lastVideoMessage.video_path) {
-              // 直接添加视频消息到当前消息列表，与图片消息逻辑一致
-              addVideoMessage(lastVideoMessage.video_path, lastVideoMessage.content || "");
-              console.log('Video message added to chat');
-            }
-          }
-        } catch (error) {
-          console.error('获取生成的视频消息失败:', error);
-          showTemporaryError('Failed to retrieve generated video', 4000);
-        }
-      } else {
+      // Call the video generation API using the generateVideo hook
+      const result = await generateVideo(currentSessionId);
+      
+      if (!result.success) {
         showTemporaryError(result.error || 'Failed to generate video', 5000);
       }
       

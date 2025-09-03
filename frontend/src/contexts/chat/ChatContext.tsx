@@ -7,6 +7,7 @@ import { useSession } from '../session/SessionContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useImageGenerator } from './useImageGenerator'
+import { useVideoGenerator } from './useVideoGenerator'
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
@@ -94,6 +95,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages
   })
 
+  // 使用视频生成钩子
+  const { generateVideo } = useVideoGenerator({
+    currentSessionId,
+    setMessages
+  })
+
 
   // 注意：会话相关的功能已经移至 SessionContext，组件应直接使用 useSession()
   // 消息管理功能已经移至 useChatMessage 钩子
@@ -130,6 +137,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       clearChat,
       deleteMessage,
       generateImage,
+      generateVideo,
       addVideoMessage
     }}>
       {children}
