@@ -50,14 +50,14 @@
 /* Send button with modern glass-morphism design */
 .send-button {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 12px;
+  bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  width: 32px;
+  height: 32px;
+  padding: 2px;
   border: none;
   border-radius: 8px;
   background: rgba(204, 204, 204, 0.7);
