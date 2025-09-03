@@ -1,5 +1,4 @@
 import React from 'react'
-import ImageWithVideoAction from '../../ImageWithVideoAction'
 
 interface ImageFileProps {
   file: {
@@ -14,18 +13,18 @@ interface ImageFileProps {
 /**
  * Image file display component.
  * 
- * Renders image files with click handling for viewer and optional action overlay
- * for bot messages. Prevents event bubbling to parent message handlers.
+ * Renders image files with click handling for viewer. Video generation
+ * is now available via the /video slash command for better user experience.
  * 
  * Args:
  *     file: Image file object with data URL
  *     onClick: Optional click handler for image viewer
- *     sender: Message sender type for action overlay logic
+ *     sender: Message sender type (kept for future extensibility)
  * 
  * Returns:
- *     JSX element with clickable image and optional action overlay
+ *     JSX element with clickable image
  */
-const ImageFile: React.FC<ImageFileProps> = ({ file, onClick, sender }) => {
+const ImageFile: React.FC<ImageFileProps> = ({ file, onClick }) => {
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onClick?.(file.data)
@@ -33,17 +32,13 @@ const ImageFile: React.FC<ImageFileProps> = ({ file, onClick, sender }) => {
   
   return (
     <div className="file-preview">
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        <img 
-          src={file.data} 
-          alt={file.name} 
-          className="file-image" 
-          onClick={handleImageClick}
-        />
-        {sender === 'bot' && (
-          <ImageWithVideoAction />
-        )}
-      </div>
+      <img 
+        src={file.data} 
+        alt={file.name} 
+        className="file-image" 
+        onClick={handleImageClick}
+      />
+      {/* Video generation is now available via /video slash command */}
     </div>
   )
 }
