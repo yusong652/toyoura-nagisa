@@ -1,5 +1,42 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { FilePreviewAreaProps, FilePreviewItemProps, isImageFile } from '../types'
+
+/**
+ * Generate a thumbnail from an image file data
+ */
+const generateThumbnail = (fileData: string, maxSize: number = 112): Promise<string> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+    
+    img.onload = () => {
+      // Calculate thumbnail dimensions maintaining aspect ratio
+      const { width, height } = img
+      const scale = Math.min(maxSize / width, maxSize / height)
+      const newWidth = width * scale
+      const newHeight = height * scale
+      
+      // Set canvas size
+      canvas.width = newWidth
+      canvas.height = newHeight
+      
+      // Draw resized image
+      ctx?.drawImage(img, 0, 0, newWidth, newHeight)
+      
+      // Convert to data URL with compression
+      const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8)
+      resolve(thumbnailUrl)
+    }
+    
+    img.onerror = () => {
+      // Fallback to original image if thumbnail generation fails
+      resolve(fileData)
+    }
+    
+    img.src = fileData
+  })
+}
 
 /**
  * File preview item component for individual file display.
@@ -36,7 +73,27 @@ const FilePreviewItem: React.FC<FilePreviewItemProps> = ({
   onRemove, 
   className = '' 
 }) => {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>('')
+  const [isGenerating, setIsGenerating] = useState<boolean>(false)
+  
   const handleRemove = () => onRemove(index)
+  
+  // Generate thumbnail for image files
+  useEffect(() => {
+    if (isImageFile(file)) {
+      setIsGenerating(true)
+      generateThumbnail(file.data, 112) // 112px for 56x56 display at 2x resolution
+        .then(thumbnailUrl => {
+          setThumbnailUrl(thumbnailUrl)
+          setIsGenerating(false)
+        })
+        .catch(() => {
+          // Fallback to original image if thumbnail generation fails
+          setThumbnailUrl(file.data)
+          setIsGenerating(false)
+        })
+    }
+  }, [file])
   
   return (
     <div className={`file-thumb-box ${className}`.trim()}>
@@ -47,19 +104,42 @@ const FilePreviewItem: React.FC<FilePreviewItemProps> = ({
         type="button"
         aria-label={`Remove file ${file.name}`}
       >
-        ×
+        <svg 
+          width="10" 
+          height="10" 
+          viewBox="0 0 12 12" 
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path 
+            d="M9 3L3 9M3 3L9 9" 
+            stroke="currentColor" 
+            strokeWidth="1.2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
       
       {isImageFile(file) ? (
-        <img 
-          src={file.data} 
-          alt={file.name} 
-          className="file-thumb-img"
-          loading="lazy" // Performance optimization for many images
-        />
+        <div className="file-thumb-image-container">
+          {isGenerating && (
+            <div className="file-thumb-loading">
+              <span className="loading-spinner">⟳</span>
+            </div>
+          )}
+          {!isGenerating && thumbnailUrl && (
+            <img 
+              src={thumbnailUrl}
+              alt={file.name} 
+              className="file-thumb-image"
+              loading="lazy"
+            />
+          )}
+        </div>
       ) : (
         <div className="file-thumb-other">
-          <span className="file-icon" role="img" aria-label="Document file">
+          <span className="file-thumb-icon" role="img" aria-label="Document file">
             📄
           </span>
           <span className="file-name" title={file.name}>

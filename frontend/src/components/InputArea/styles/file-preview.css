@@ -3,8 +3,8 @@
    ============================================================================= */
 
 .file-preview-area {
-  margin-bottom: 12px;
-  padding: 8px 0;
+  margin-bottom: 0; /* No bottom margin when inside input area */
+  padding: 0;
   background: transparent;
 }
 
@@ -25,9 +25,20 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--file-bg);
-  overflow: hidden;
   transition: all 0.2s ease;
   cursor: pointer;
+}
+
+/* Image container to control image overflow while allowing button to show outside */
+.file-thumb-image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .file-thumb-box:hover {
@@ -36,11 +47,13 @@
   border-color: var(--primary-color);
 }
 
+/* Image that fills the container properly */
 .file-thumb-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 6px;
+  display: block;
 }
 
 .file-thumb-icon {
@@ -49,25 +62,56 @@
   opacity: 0.7;
 }
 
-.file-thumb-del {
-  position: absolute;
-  top: -6px;
-  right: -6px;
+/* Loading state for thumbnail generation */
+.file-thumb-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 100%;
+  height: 100%;
+  background: var(--file-bg);
+  border-radius: 6px;
+}
+
+.file-thumb-loading .loading-spinner {
+  font-size: 16px;
+  color: var(--text-secondary);
+  animation: spin 1s linear infinite;
+  opacity: 0.6;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.file-thumb-del {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   border: none;
   border-radius: 50%;
   background: #ff4757;
   color: white;
-  font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  z-index: 3;
+  z-index: 10;
   box-shadow: 0 2px 6px rgba(255, 71, 87, 0.3);
+  padding: 0;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.file-thumb-del svg {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
 }
 
 .file-thumb-del:hover {
@@ -76,8 +120,16 @@
   box-shadow: 0 3px 8px rgba(255, 71, 87, 0.4);
 }
 
+.file-thumb-del:hover svg {
+  transform: scale(1.1);
+}
+
 .file-thumb-del:active {
   transform: scale(0.95);
+}
+
+.file-thumb-del:active svg {
+  transform: scale(0.9);
 }
 
 /* File overflow indicator */

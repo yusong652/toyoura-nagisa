@@ -30,6 +30,20 @@
     0 4px 16px rgba(74, 144, 226, 0.08);
 }
 
+/* File preview container integrated inside input area */
+.input-file-preview {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  opacity: 0.95;
+  transition: opacity 0.2s ease;
+}
+
+.input-area:focus-within .input-file-preview {
+  opacity: 1;
+  border-bottom-color: rgba(74, 144, 226, 0.15);
+}
+
 /* Default light theme */
 :root {
   --input-bg: #ffffff;

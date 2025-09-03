@@ -202,13 +202,6 @@ const InputArea: React.FC<InputAreaProps> = ({
   
   return (
     <div className="input-area-wrapper">
-      {/* File preview section - shown when files are selected */}
-      <FilePreviewArea
-        files={files}
-        onRemoveFile={removeFile}
-        className="file-preview-section"
-      />
-      
       <div className={`input-area ${className}`.trim()}>
         {/* Slash command suggestions - shown when typing commands */}
         {isCommandActive && suggestions.length > 0 && (
@@ -217,6 +210,17 @@ const InputArea: React.FC<InputAreaProps> = ({
             onSelectSuggestion={handleSelectSuggestion}
             selectedIndex={selectedSuggestionIndex}
           />
+        )}
+        
+        {/* File preview section - integrated inside input area */}
+        {files.length > 0 && (
+          <div className="input-file-preview">
+            <FilePreviewArea
+              files={files}
+              onRemoveFile={removeFile}
+              className="file-preview-section"
+            />
+          </div>
         )}
         
         {/* Main message input textarea - now with full width */}
