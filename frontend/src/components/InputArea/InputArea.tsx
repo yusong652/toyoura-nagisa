@@ -219,25 +219,7 @@ const InputArea: React.FC<InputAreaProps> = ({
           />
         )}
         
-        {/* Corner buttons - file upload and toolbar */}
-        <div className="input-corner-buttons">
-          {canAddMoreFiles && (
-            <button 
-              className="add-file-btn" 
-              onClick={openFileSelector}
-              disabled={isSending}
-              title="Add Files"
-              type="button"
-              aria-label="Upload files"
-            >
-              <AddFileIcon size={18} />
-            </button>
-          )}
-          
-          <CollapsibleToolbar />
-        </div>
-        
-        {/* Main message input textarea */}
+        {/* Main message input textarea - now with full width */}
         <MessageInput
           value={message}
           onChange={handleMessageChange}
@@ -250,23 +232,44 @@ const InputArea: React.FC<InputAreaProps> = ({
           className="message-textarea"
         />
         
-        {/* Regular input status - always visible */}
-        <div className="input-status-inline">
-          <span className="status-item char-status">
-            <span className="status-label">chars</span>
-            <span className="status-value">{messageInfo.characterCount}</span>
-          </span>
-          {files.length > 0 && (
-            <span className="status-item file-status">
-              <span className="status-label">files</span>
-              <span className="status-value">{files.length}/{maxFiles}</span>
+        {/* Bottom toolbar with controls and status */}
+        <div className="input-bottom-toolbar">
+          {/* Left side - action buttons */}
+          <div className="toolbar-left">
+            {canAddMoreFiles && (
+              <button 
+                className="add-file-btn" 
+                onClick={openFileSelector}
+                disabled={isSending}
+                title="Add Files"
+                type="button"
+                aria-label="Upload files"
+              >
+                <AddFileIcon size={18} />
+              </button>
+            )}
+            
+            <CollapsibleToolbar />
+          </div>
+          
+          {/* Right side - status indicators */}
+          <div className="toolbar-right input-status-bottom">
+            <span className="status-item char-status">
+              <span className="status-label">chars</span>
+              <span className="status-value">{messageInfo.characterCount}</span>
             </span>
-          )}
-          <span className="status-item send-status">
-            <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
-              {canSendMessage ? 'ready' : 'wait'}
+            {files.length > 0 && (
+              <span className="status-item file-status">
+                <span className="status-label">files</span>
+                <span className="status-value">{files.length}/{maxFiles}</span>
+              </span>
+            )}
+            <span className="status-item send-status">
+              <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
+                {canSendMessage ? 'ready' : 'wait'}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
         
         {/* Send button positioned on the right */}

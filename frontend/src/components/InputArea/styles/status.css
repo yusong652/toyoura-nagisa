@@ -36,67 +36,113 @@
   border: 1px solid var(--success-border);
 }
 
-/* Inline status information in input area */
-.input-status-inline {
+/* Bottom toolbar layout */
+.input-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   position: absolute;
-  top: 8px;
-  right: 12px;
+  bottom: 8px;
+  left: 8px;
+  right: 60px; /* Leave space for send button */
+  height: 32px;
+  pointer-events: none; /* Allow clicks to pass through to children */
+  z-index: 1;
+}
+
+.toolbar-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
-  color: var(--text-secondary);
+  pointer-events: auto; /* Enable clicks for buttons */
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none; /* Status is read-only */
+}
+
+/* Bottom status styling */
+.input-status-bottom {
+  font-family: system-ui, -apple-system, sans-serif;
+  opacity: 0.7;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Legacy top-right positioning (kept for compatibility) */
+.input-status-inline {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
   font-family: system-ui, -apple-system, sans-serif;
   pointer-events: none;
   z-index: 1;
+  opacity: 0.6;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .status-item {
   display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
-  background: var(--status-bg);
-  border-radius: 8px;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  align-items: baseline;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .status-label {
-  font-size: 9px;
+  font-size: 10px;
   opacity: 0.8;
-  font-weight: 400;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .status-value {
   font-weight: 600;
-  font-size: 10px;
-}
-
-.char-status {
-  min-width: 46px;
-}
-
-.file-status {
-  background: var(--primary-color);
-  color: white;
-}
-
-.file-status .status-label {
+  font-size: 11px;
+  color: var(--text-color);
   opacity: 0.9;
 }
 
+.char-status .status-value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.file-status {
+  color: var(--primary-color);
+}
+
+.file-status .status-label,
+.file-status .status-value {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
 .send-status {
-  background: transparent;
-  padding: 2px 4px;
+  background: none;
+  padding: 0;
 }
 
 .status-indicator {
-  font-size: 9px;
-  font-weight: 500;
-  padding: 1px 4px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0;
+  border: none;
+  background: none;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 /* Generating status with spinner */
@@ -129,22 +175,46 @@
 }
 
 .status-indicator[data-status="ready"] {
-  background: var(--primary-color);
-  color: white;
+  color: #4caf50;
+  font-weight: 700;
+  animation: readyTextPulse 2s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.status-indicator[data-status="ready"]::after {
+  content: '●';
+  margin-left: 4px;
+  font-size: 8px;
+  color: #4caf50;
+  animation: readyDotPulse 1.5s ease-in-out infinite;
 }
 
 .status-indicator[data-status="waiting"] {
-  background: var(--disabled-color);
   color: var(--text-secondary);
+  opacity: 0.6;
+  font-weight: 500;
 }
 
-.message-input-container:focus-within .status-item {
+.status-indicator[data-status="waiting"]::after {
+  content: '○';
+  margin-left: 4px;
+  font-size: 8px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.input-area:focus-within .input-status-inline {
   opacity: 0.85;
 }
 
-.message-input-container:focus-within .status-indicator[data-status="ready"] {
+.input-area:focus-within .input-status-bottom {
+  opacity: 0.9;
+}
+
+.input-area:focus-within .status-indicator[data-status="ready"] {
   opacity: 1;
-  transform: scale(1.02);
+  color: #4caf50;
+  text-shadow: 0 0 12px rgba(76, 175, 80, 0.4);
 }
 
 /* Debug information (development only) */
@@ -252,5 +322,108 @@
   to {
     opacity: 1;
     transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes readyTextPulse {
+  0%, 100% { 
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+  }
+  50% { 
+    opacity: 0.8;
+    text-shadow: 0 0 12px rgba(76, 175, 80, 0.5);
+  }
+}
+
+@keyframes readyDotPulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+/* Responsive adjustments for bottom toolbar */
+@media (max-width: 480px) {
+  .input-bottom-toolbar {
+    bottom: 6px;
+    left: 6px;
+    right: 48px; /* Smaller space for mobile send button */
+    height: 28px;
+  }
+  
+  .toolbar-left {
+    gap: 6px;
+  }
+  
+  .toolbar-right {
+    gap: 8px;
+  }
+  
+  .input-status-bottom .status-item {
+    font-size: 10px;
+  }
+  
+  .input-status-bottom .status-label {
+    font-size: 9px;
+  }
+  
+  .input-status-bottom .status-value {
+    font-size: 10px;
+  }
+  
+  .input-status-bottom .status-indicator {
+    font-size: 9px;
+  }
+  
+  /* Legacy top positioning for mobile */
+  .input-status-inline {
+    right: 12px;
+    gap: 8px;
+    top: 8px;
+  }
+}
+
+@media (max-width: 320px) {
+  .input-bottom-toolbar {
+    bottom: 4px;
+    left: 4px;
+    right: 44px;
+    height: 24px;
+  }
+  
+  .toolbar-right {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  
+  .input-status-bottom .status-item {
+    font-size: 9px;
+  }
+  
+  .input-status-bottom .status-label {
+    font-size: 8px;
+  }
+  
+  .input-status-bottom .status-value {
+    font-size: 9px;
+  }
+  
+  .input-status-bottom .status-indicator {
+    font-size: 8px;
+  }
+  
+  /* Legacy top positioning for very small screens */
+  .input-status-inline {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    top: 6px;
+    right: 10px;
   }
 }

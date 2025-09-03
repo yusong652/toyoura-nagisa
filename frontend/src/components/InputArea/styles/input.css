@@ -3,10 +3,12 @@
    ============================================================================= */
 
 .message-input {
-  flex: 1;
-  min-height: 84px; /* Increased minimum height for better text input space */
+  width: 100%;
+  min-height: 84px;
   max-height: 300px;
-  padding: 8px 0;
+  padding: 0 0 40px 0; /* No right padding, bottom space for toolbar */
+  margin-right: 36px; /* Space for smaller send button */
+  box-sizing: border-box;
   font-size: 15px;
   line-height: 1.5;
   color: var(--text-color);
@@ -33,7 +35,8 @@
 }
 
 .message-input.with-corner-buttons {
-  padding: 8px 0 36px 0; /* Better text positioning with corner buttons */
+  padding: 8px 0 40px 0; /* No right padding, bottom for toolbar */  
+  margin-right: 36px; /* Space for smaller send button */
 }
 
 /* Auto-resize functionality */

@@ -11,9 +11,6 @@
 
 .input-area {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
   width: 100%;
   min-height: 104px;
   background: var(--input-bg);
