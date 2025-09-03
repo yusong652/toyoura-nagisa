@@ -73,6 +73,10 @@ const useSlashCommandDetection = (
   onCommandExecute?: (command: SlashCommand, args: string[]) => void | Promise<void>
 ): SlashCommandDetectionHookReturn => {
   
+  // Activation state management - the key to elegant ESC handling
+  const [isActivated, setIsActivated] = useState<boolean>(false)
+  const [wasJustDeactivated, setWasJustDeactivated] = useState<boolean>(false)
+  
   // Available commands (builtin + user-defined)
   const availableCommands = useMemo(() => {
     return [...BUILTIN_COMMANDS, ...DEFAULT_INPUT_CONFIG.slashCommands.availableCommands]
@@ -118,11 +122,12 @@ const useSlashCommandDetection = (
   // Generate command suggestions based on partial input
   const generateSuggestions = useCallback((
     text: string, 
-    cursor: number
+    cursor: number,
+    activated: boolean
   ): SlashCommandSuggestion[] => {
     
-    // Only trigger if slash is at position 0 and cursor is after it
-    if (!text.startsWith('/') || cursor === 0) {
+    // Only show suggestions if explicitly activated
+    if (!activated || !text.startsWith('/') || cursor === 0) {
       return []
     }
     
@@ -171,13 +176,42 @@ const useSlashCommandDetection = (
     
   }, [availableCommands])
   
+  // Auto-activation logic: activate when user types '/' at beginning
+  useEffect(() => {
+    const shouldAutoActivate = 
+      message.startsWith('/') && 
+      cursorPosition > 0 && 
+      !wasJustDeactivated &&
+      DEFAULT_INPUT_CONFIG.slashCommands.enabled
+    
+    if (shouldAutoActivate && !isActivated) {
+      setIsActivated(true)
+    }
+    
+    // Clear the "just deactivated" flag after a brief delay
+    if (wasJustDeactivated) {
+      const timeout = setTimeout(() => {
+        setWasJustDeactivated(false)
+      }, 100)
+      return () => clearTimeout(timeout)
+    }
+  }, [message, cursorPosition, isActivated, wasJustDeactivated])
+  
+  // Auto-deactivation: deactivate when slash is removed
+  useEffect(() => {
+    if (isActivated && !message.startsWith('/')) {
+      setIsActivated(false)
+    }
+  }, [message, isActivated])
+  
   // Current command context
   const context: SlashCommandContext = useMemo(() => {
-    const isTriggered = message.includes('/') && 
+    const isTriggered = isActivated && 
+                       message.startsWith('/') && 
                        cursorPosition > 0 && 
                        DEFAULT_INPUT_CONFIG.slashCommands.enabled
     
-    const suggestions = isTriggered ? generateSuggestions(message, cursorPosition) : []
+    const suggestions = generateSuggestions(message, cursorPosition, isActivated)
     
     return {
       currentText: message,
@@ -186,7 +220,7 @@ const useSlashCommandDetection = (
       isTriggered,
       suggestions
     }
-  }, [message, cursorPosition, availableCommands, generateSuggestions])
+  }, [message, cursorPosition, availableCommands, generateSuggestions, isActivated])
   
   // Active command match
   const activeCommand = useMemo(() => {
@@ -214,11 +248,14 @@ const useSlashCommandDetection = (
     // The actual text replacement should be handled by the parent component
   }, [])
   
-  // Clear active command
+  // Clear active command - elegant ESC handling
   const clearCommand = useCallback(() => {
-    // Reset command state - implementation depends on integration
-    console.log('Clearing active command')
-  }, [])
+    if (isActivated) {
+      setIsActivated(false)
+      setWasJustDeactivated(true) // Prevent immediate reactivation
+      console.log('Slash command suggestions deactivated via ESC')
+    }
+  }, [isActivated])
   
   return {
     context,

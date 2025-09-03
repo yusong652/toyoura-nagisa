@@ -110,7 +110,8 @@ const InputArea: React.FC<InputAreaProps> = ({
   const {
     suggestions,
     isCommandActive,
-    selectSuggestion
+    selectSuggestion,
+    clearCommand
   } = useSlashCommandDetection(message, cursorPosition)
   
   // Message sending logic - no interception, allow slash text as normal messages
@@ -175,18 +176,12 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       case 'Escape':
         e.preventDefault()
-        // Clear suggestions by resetting cursor position or clearing command state
+        // Elegant ESC handling - deactivate slash command suggestions
+        clearCommand()
         setSelectedSuggestionIndex(0)
-        // For now, we can move cursor to end to hide suggestions
-        const textarea = e.currentTarget
-        const newPosition = message.length
-        setCursorPosition(newPosition)
-        setTimeout(() => {
-          textarea.setSelectionRange(newPosition, newPosition)
-        }, 0)
         break
     }
-  }, [isCommandActive, suggestions, selectedSuggestionIndex, handleSelectSuggestion, message])
+  }, [isCommandActive, suggestions, selectedSuggestionIndex, handleSelectSuggestion, clearCommand])
 
   // Message change handler with auto-resize and cursor tracking
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
