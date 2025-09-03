@@ -4,8 +4,7 @@ import {
   useFileHandling,
   useMessageSending,
   useInputAutoResize,
-  useSlashCommandDetection,
-  useSlashCommandExecution
+  useSlashCommandDetection
 } from './hooks'
 import {
   FilePreviewArea,
@@ -17,8 +16,7 @@ import { InputAreaProps, DEFAULT_INPUT_CONFIG } from './types'
 import {
   AddFileIcon,
   LoadingSpinnerIcon,
-  SendIcon,
-  StatusSpinnerIcon
+  SendIcon
 } from './styles/icons'
 import './styles/index.css'
 
@@ -73,7 +71,8 @@ const InputArea: React.FC<InputAreaProps> = ({
   placeholder = 'Type a message...',
   disabled = false,
   maxFiles = DEFAULT_INPUT_CONFIG.maxFiles,
-  acceptedFileTypes = DEFAULT_INPUT_CONFIG.allowedFileTypes
+  acceptedFileTypes = DEFAULT_INPUT_CONFIG.allowedFileTypes,
+  executeSlashCommand
 }) => {
   // Core state management hook
   const {
@@ -89,7 +88,6 @@ const InputArea: React.FC<InputAreaProps> = ({
   // Textarea auto-resize functionality
   const {
     textareaRef,
-    handleTextareaResize,
     resetTextareaHeight
   } = useInputAutoResize(message)
   
@@ -107,28 +105,13 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [cursorPosition, setCursorPosition] = useState<number>(0)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
   
-  // Slash command execution hook - handles loading states and API calls
-  const {
-    isGeneratingImage,
-    isGeneratingVideo,
-    executeSlashCommand,
-    isExecuting
-  } = useSlashCommandExecution()
   
   // Slash command functionality
   const {
     suggestions,
     isCommandActive,
-    executeCommand,
-    selectSuggestion,
-    activeCommand
-  } = useSlashCommandDetection(message, cursorPosition, async (command, args) => {
-    // Execute command through the dedicated hook with cleanup callback
-    await executeSlashCommand(command, args, () => {
-      clearInput()
-      resetTextareaHeight()
-    })
-  })
+    selectSuggestion
+  } = useSlashCommandDetection(message, cursorPosition)
   
   // Message sending logic - no interception, allow slash text as normal messages
   const {
@@ -144,15 +127,18 @@ const InputArea: React.FC<InputAreaProps> = ({
   
   // Handle suggestion selection - execute command immediately
   const handleSelectSuggestion = useCallback(async (suggestion: any) => {
-    // Execute the selected command immediately through the execution hook
-    await executeSlashCommand(suggestion.command, [], () => {
-      clearInput()
-      resetTextareaHeight()
-    })
+    // Clear input immediately to provide instant visual feedback
+    clearInput()
+    resetTextareaHeight()
     
     // Reset suggestion state
     selectSuggestion(suggestion)
     setSelectedSuggestionIndex(0)
+    
+    // Execute the selected command through the passed-in execution function
+    if (executeSlashCommand) {
+      await executeSlashCommand(suggestion.command, [])
+    }
   }, [selectSuggestion, executeSlashCommand, clearInput, resetTextareaHeight])
 
 
@@ -265,36 +251,24 @@ const InputArea: React.FC<InputAreaProps> = ({
           className="message-textarea"
         />
         
-        {/* Inline status indicator in bottom right corner */}
+
+        {/* Regular input status - always visible */}
         <div className="input-status-inline">
-          {/* Show loading status when generating */}
-          {(isGeneratingImage || isGeneratingVideo) && (
-            <span className="status-item generating-status">
-              <StatusSpinnerIcon size={16} />
-              <span className="status-label">
-                {isGeneratingImage ? 'generating image' : 'generating video'}
-              </span>
+          <span className="status-item char-status">
+            <span className="status-label">chars</span>
+            <span className="status-value">{messageInfo.characterCount}</span>
+          </span>
+          {files.length > 0 && (
+            <span className="status-item file-status">
+              <span className="status-label">files</span>
+              <span className="status-value">{files.length}/{maxFiles}</span>
             </span>
           )}
-          {!(isGeneratingImage || isGeneratingVideo) && (
-            <>
-              <span className="status-item char-status">
-                <span className="status-label">chars</span>
-                <span className="status-value">{messageInfo.characterCount}</span>
-              </span>
-              {files.length > 0 && (
-                <span className="status-item file-status">
-                  <span className="status-label">files</span>
-                  <span className="status-value">{files.length}/{maxFiles}</span>
-                </span>
-              )}
-              <span className="status-item send-status">
-                <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
-                  {canSendMessage ? 'ready' : 'wait'}
-                </span>
-              </span>
-            </>
-          )}
+          <span className="status-item send-status">
+            <span className="status-indicator" data-status={canSendMessage ? 'ready' : 'waiting'}>
+              {canSendMessage ? 'ready' : 'wait'}
+            </span>
+          </span>
         </div>
         
         {/* Send button positioned on the right */}

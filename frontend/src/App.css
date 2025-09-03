@@ -68,6 +68,7 @@
   margin: 0 auto;
   width: 100%;
   padding: 0 8px;
+  position: relative;
 }
 
 .chat-right-panel {

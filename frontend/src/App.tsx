@@ -2,10 +2,12 @@ import React, { useEffect } from 'react'
 import './App.css'
 import { ChatBox } from './components/ChatBox'
 import InputArea from './components/InputArea'
+import { SlashCommandStatusPanel } from './components/SlashCommandStatusPanel'
 import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
+import { useSlashCommandExecution } from './components/InputArea/hooks'
 import { AudioProvider } from './contexts/audio/AudioContext'
 import { TtsEnableProvider } from './contexts/audio/TtsEnableContext'
 import { ConnectionProvider } from './contexts/connection/ConnectionContext'
@@ -18,14 +20,24 @@ import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
   const { connectionStatus, connectionError, checkConnection } = useConnection()
+  
+  // Slash command execution hook - shared between InputArea and StatusPanel
+  const { executeSlashCommand, executionQueue } = useSlashCommandExecution()
 
   return (
     <div className="app-container">
       <ThemeToggle />
       <div className="chat-container">
         <div className="chat-left-panel">
-          <ChatBox />
-          <InputArea />
+          <ChatBox 
+            statusPanel={
+              <SlashCommandStatusPanel 
+                executionQueue={executionQueue}
+                position="chatbox-right"
+              />
+            }
+          />
+          <InputArea executeSlashCommand={executeSlashCommand} />
         </div>
       </div>
       <ChatHistorySidebar />

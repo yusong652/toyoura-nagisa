@@ -24,6 +24,7 @@ export interface InputAreaProps {
   disabled?: boolean
   maxFiles?: number
   acceptedFileTypes?: string[]
+  executeSlashCommand?: (command: SlashCommand, args: string[], onComplete?: () => void) => Promise<void>
 }
 
 export interface MessageInputInfo {
@@ -405,12 +406,24 @@ export interface SlashCommandDetectionHookReturn {
 }
 
 /**
+ * Represents a command execution task in the queue
+ */
+export interface CommandExecutionTask {
+  id: string
+  command: SlashCommand
+  args: string[]
+  startTime: number
+  status: 'executing' | 'completed' | 'error'
+}
+
+/**
  * Hook return type for useSlashCommandExecution
- * Handles command execution and loading state management
+ * Handles command execution and loading state management with queue support
  */
 export interface SlashCommandExecutionHookReturn {
   isGeneratingImage: boolean
   isGeneratingVideo: boolean  
   executeSlashCommand: (command: SlashCommand, args: string[], onComplete?: () => void) => Promise<void>
   isExecuting: boolean
+  executionQueue: CommandExecutionTask[]
 }

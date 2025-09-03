@@ -40,7 +40,11 @@ import './ChatBox.css'
  * - Props spreading vs explicit passing
  * - Ref forwarding to DOM elements
  */
-const ChatBox: React.FC = () => {
+interface ChatBoxProps {
+  statusPanel?: React.ReactNode
+}
+
+const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
   // Get messages from context
   const { messages } = useChat()
   
@@ -92,6 +96,9 @@ const ChatBox: React.FC = () => {
         
         {/* Bottom Shadow for scroll indication */}
         <ShadowOverlay position="bottom" />
+        
+        {/* Status panel via props composition */}
+        {statusPanel}
       </div>
     </>
   )
