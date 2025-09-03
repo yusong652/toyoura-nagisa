@@ -201,7 +201,7 @@ const InputArea: React.FC<InputAreaProps> = ({
   const inputDisabled = disabled || isInputDisabled
   
   return (
-    <div className={`input-area ${className}`.trim()}>
+    <div className="input-area-wrapper">
       {/* File preview section - shown when files are selected */}
       <FilePreviewArea
         files={files}
@@ -209,8 +209,7 @@ const InputArea: React.FC<InputAreaProps> = ({
         className="file-preview-section"
       />
       
-      {/* Main input container with textarea and controls */}
-      <div className="message-input-container">
+      <div className={`input-area ${className}`.trim()}>
         {/* Slash command suggestions - shown when typing commands */}
         {isCommandActive && suggestions.length > 0 && (
           <SlashCommandSuggestions
@@ -251,7 +250,6 @@ const InputArea: React.FC<InputAreaProps> = ({
           className="message-textarea"
         />
         
-
         {/* Regular input status - always visible */}
         <div className="input-status-inline">
           <span className="status-item char-status">
@@ -306,7 +304,6 @@ const InputArea: React.FC<InputAreaProps> = ({
           {sendingStatus.message}
         </div>
       )}
-      
     </div>
   )
 }
