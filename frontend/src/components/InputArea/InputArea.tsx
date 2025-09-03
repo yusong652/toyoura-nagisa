@@ -16,6 +16,12 @@ import {
 } from './components'
 import { CollapsibleToolbar } from '../CollapsibleToolbar'
 import { InputAreaProps, DEFAULT_INPUT_CONFIG } from './types'
+import {
+  AddFileIcon,
+  LoadingSpinnerIcon,
+  SendIcon,
+  StatusSpinnerIcon
+} from './styles/icons'
 import './styles/index.css'
 
 /**
@@ -353,18 +359,7 @@ const InputArea: React.FC<InputAreaProps> = ({
               type="button"
               aria-label="Upload files"
             >
-              <svg 
-                viewBox="0 0 24 24" 
-                width="18" 
-                height="18" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                fill="none"
-                aria-hidden="true"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+              <AddFileIcon size={18} />
             </button>
           )}
           
@@ -389,19 +384,7 @@ const InputArea: React.FC<InputAreaProps> = ({
           {/* Show loading status when generating */}
           {(isGeneratingImage || isGeneratingVideo) && (
             <span className="status-item generating-status">
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                className="status-spinner"
-                style={{ animation: 'spin 1s linear infinite' }}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v2" />
-              </svg>
+              <StatusSpinnerIcon size={16} />
               <span className="status-label">
                 {isGeneratingImage ? 'generating image' : 'generating video'}
               </span>
@@ -438,45 +421,9 @@ const InputArea: React.FC<InputAreaProps> = ({
           aria-label={isSending ? 'Sending message' : 'Send message'}
         >
           {isSending ? (
-            <svg 
-              viewBox="0 0 24 24" 
-              width="28" 
-              height="28" 
-              fill="none"
-              className="loading-spinner"
-              aria-hidden="true"
-            >
-              <circle 
-                cx="12" 
-                cy="12" 
-                r="10" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeDasharray="60"
-                strokeDashoffset="20"
-                opacity="0.3"
-              />
-              <circle 
-                cx="12" 
-                cy="12" 
-                r="10" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeDasharray="15"
-                strokeDashoffset="0"
-                transform="rotate(90 12 12)"
-              />
-            </svg>
+            <LoadingSpinnerIcon size={28} />
           ) : (
-            <svg 
-              viewBox="0 0 24 24" 
-              width="24" 
-              height="24" 
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
+            <SendIcon size={24} />
           )}
         </button>
         

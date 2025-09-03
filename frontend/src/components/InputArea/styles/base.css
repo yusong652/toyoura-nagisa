@@ -90,3 +90,24 @@
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
   --focus-color: rgba(74, 144, 226, 0.8);
 }
+
+/* =============================================================================
+   Loading Animations
+   ============================================================================= */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.status-spinner {
+  animation: spin 1s linear infinite;
+}
