@@ -388,3 +388,29 @@ export interface SlashCommandContext {
  * - **Refactoring Safety**: Changes caught at compile time
  * - **Team Collaboration**: Clear contracts between developers
  */
+
+/**
+ * Hook return type for useSlashCommandDetection
+ * Handles command detection, parsing, and suggestion generation
+ */
+export interface SlashCommandDetectionHookReturn {
+  context: SlashCommandContext
+  activeCommand: SlashCommandMatch | null
+  suggestions: SlashCommandSuggestion[]
+  isCommandActive: boolean
+  executeCommand: (command: SlashCommand, args: string[]) => Promise<void>
+  selectSuggestion: (suggestion: SlashCommandSuggestion) => void
+  clearCommand: () => void
+  availableCommands: SlashCommand[]
+}
+
+/**
+ * Hook return type for useSlashCommandExecution
+ * Handles command execution and loading state management
+ */
+export interface SlashCommandExecutionHookReturn {
+  isGeneratingImage: boolean
+  isGeneratingVideo: boolean  
+  executeSlashCommand: (command: SlashCommand, args: string[], onComplete?: () => void) => Promise<void>
+  isExecuting: boolean
+}

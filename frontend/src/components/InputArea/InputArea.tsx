@@ -4,11 +4,9 @@ import {
   useFileHandling,
   useMessageSending,
   useInputAutoResize,
-  useSlashCommand,
-  BUILTIN_COMMANDS
+  useSlashCommandDetection,
+  useSlashCommandExecution
 } from './hooks'
-import { useChat } from '../../contexts/chat/ChatContext'
-import { useSession } from '../../contexts/session/SessionContext'
 import {
   FilePreviewArea,
   MessageInput,
@@ -109,13 +107,13 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [cursorPosition, setCursorPosition] = useState<number>(0)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
   
-  // Loading state for slash commands
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
-  
-  // Get functions from ChatContext
-  const { generateImage, generateVideo } = useChat()
-  const { currentSessionId } = useSession()
+  // Slash command execution hook - handles loading states and API calls
+  const {
+    isGeneratingImage,
+    isGeneratingVideo,
+    executeSlashCommand,
+    isExecuting
+  } = useSlashCommandExecution()
   
   // Slash command functionality
   const {
@@ -124,141 +122,42 @@ const InputArea: React.FC<InputAreaProps> = ({
     executeCommand,
     selectSuggestion,
     activeCommand
-  } = useSlashCommand(message, cursorPosition, async (command, args) => {
-    console.log(`Executing command: ${command.trigger} with args:`, args)
-    
-    if (!currentSessionId) {
-      console.error('No active session for slash command')
-      return
-    }
-    
-    if (command.trigger === 'image') {
-      // Handle image generation command - generates based on conversation context
+  } = useSlashCommandDetection(message, cursorPosition, async (command, args) => {
+    // Execute command through the dedicated hook with cleanup callback
+    await executeSlashCommand(command, args, () => {
       clearInput()
       resetTextareaHeight()
-      setIsGeneratingImage(true)
-      
-      try {
-        // Generate image based on recent conversation context
-        const result = await generateImage(currentSessionId)
-        if (!result.success) {
-          console.error('Image generation failed:', result.error)
-        }
-      } finally {
-        setIsGeneratingImage(false)
-      }
-    } else if (command.trigger === 'video') {
-      // Handle video generation command - converts last image to video
-      clearInput()
-      resetTextareaHeight()
-      setIsGeneratingVideo(true)
-      
-      try {
-        // Generate video from the last image in the conversation
-        const result = await generateVideo(currentSessionId)
-        if (!result.success) {
-          console.error('Video generation failed:', result.error)
-        }
-      } finally {
-        setIsGeneratingVideo(false)
-      }
-    }
+    })
   })
   
-  // Message sending logic - wrap to intercept slash commands
-  const originalSendHandlers = useMessageSending(messageInfo, () => {
+  // Message sending logic - no interception, allow slash text as normal messages
+  const {
+    handleSendMessage,
+    handleKeyPress,
+    canSendMessage,
+    isSending,
+    sendingStatus
+  } = useMessageSending(messageInfo, () => {
     clearInput()
     resetTextareaHeight()
   }, textareaRef)
   
-  // Override handleSendMessage to check for slash commands first
-  const handleSendMessage = useCallback(async () => {
-    // Check if the message starts with a slash command
-    const trimmedMessage = message.trim()
-    if (trimmedMessage.startsWith('/')) {
-      // Parse the command
-      const parts = trimmedMessage.substring(1).split(' ')
-      const commandTrigger = parts[0]
-      const args = parts.slice(1)
-      
-      // Find the matching command
-      const command = [...BUILTIN_COMMANDS].find(cmd => cmd.trigger === commandTrigger)
-      
-      if (command) {
-        // Execute the command through the slash command handler
-        await executeCommand(command, args)
-        return // Don't send as a regular message
-      }
-    }
+  // Handle suggestion selection - execute command immediately
+  const handleSelectSuggestion = useCallback(async (suggestion: any) => {
+    // Execute the selected command immediately through the execution hook
+    await executeSlashCommand(suggestion.command, [], () => {
+      clearInput()
+      resetTextareaHeight()
+    })
     
-    // If not a slash command, send as a regular message
-    await originalSendHandlers.handleSendMessage()
-  }, [message, executeCommand, originalSendHandlers.handleSendMessage])
-  
-  // Override handleKeyPress to intercept Enter for slash commands
-  const handleKeyPress = useCallback(async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Check if we have a complete slash command
-      const trimmedMessage = message.trim()
-      if (trimmedMessage.startsWith('/')) {
-        const parts = trimmedMessage.substring(1).split(' ')
-        const commandTrigger = parts[0]
-        const command = [...BUILTIN_COMMANDS].find(cmd => cmd.trigger === commandTrigger)
-        
-        if (command) {
-          e.preventDefault()
-          await handleSendMessage() // This will now execute the command
-          return
-        }
-      }
-    }
-    
-    // Otherwise use the original key press handler
-    await originalSendHandlers.handleKeyPress(e)
-  }, [message, handleSendMessage, originalSendHandlers.handleKeyPress])
-  
-  // Extract the rest of the handlers
-  const {
-    canSendMessage,
-    isSending,
-    sendingStatus
-  } = originalSendHandlers
-  
-  // Handle suggestion selection
-  const handleSelectSuggestion = useCallback((suggestion: any) => {
-    // Find the slash position and replace with selected command
-    const slashIndex = message.lastIndexOf('/', cursorPosition)
-    if (slashIndex !== -1) {
-      const beforeSlash = message.substring(0, slashIndex)
-      const afterCursor = message.substring(cursorPosition)
-      const newMessage = `${beforeSlash}/${suggestion.command.trigger} ${afterCursor}`
-      setMessage(newMessage)
-      
-      // Update cursor position to after the inserted command
-      const newCursorPosition = slashIndex + suggestion.command.trigger.length + 2 // +2 for "/" and space
-      setCursorPosition(newCursorPosition)
-      
-      // Focus the textarea and set cursor position
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus()
-          textareaRef.current.setSelectionRange(newCursorPosition, newCursorPosition)
-        }
-      }, 0)
-    }
-    
+    // Reset suggestion state
     selectSuggestion(suggestion)
-    // Reset suggestion selection
     setSelectedSuggestionIndex(0)
-  }, [selectSuggestion, message, cursorPosition, textareaRef])
+  }, [selectSuggestion, executeSlashCommand, clearInput, resetTextareaHeight])
 
-  // Handle cursor position updates
-  const handleCursorChange = useCallback((position: number) => {
-    setCursorPosition(position)
-  }, [])
 
   // Handle keyboard navigation for slash commands
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Only handle keyboard events when slash commands are active
     if (!isCommandActive || suggestions.length === 0) {
       return
@@ -281,23 +180,10 @@ const InputArea: React.FC<InputAreaProps> = ({
 
       case 'Enter':
         e.preventDefault()
-        // When Enter is pressed with a suggestion selected
+        // When Enter is pressed with a suggestion selected, execute it immediately
         if (suggestions[selectedSuggestionIndex]) {
           const suggestion = suggestions[selectedSuggestionIndex]
-          const command = suggestion.command
-          
-          // Since our commands don't need arguments, execute immediately
-          if (command.trigger === 'image' || command.trigger === 'video') {
-            // Clear input and execute the command
-            clearInput()
-            resetTextareaHeight()
-            
-            // Execute the command through our command handler
-            executeCommand(command, [])
-          } else {
-            // For other potential future commands, just insert the text
-            handleSelectSuggestion(suggestion)
-          }
+          await handleSelectSuggestion(suggestion)
         }
         break
 

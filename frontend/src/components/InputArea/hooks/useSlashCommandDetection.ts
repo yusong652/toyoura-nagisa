@@ -4,17 +4,18 @@ import {
   SlashCommandContext, 
   SlashCommandMatch, 
   SlashCommandSuggestion,
+  SlashCommandDetectionHookReturn,
   DEFAULT_INPUT_CONFIG 
 } from '../types'
 
 /**
- * Hook for slash command detection, parsing, and execution.
+ * Hook for slash command detection, parsing, and suggestion generation.
  * 
- * This hook provides comprehensive slash command functionality including:
+ * This hook provides comprehensive slash command detection functionality including:
  * - Real-time detection of '/' trigger character
  * - Command parsing with argument extraction  
  * - Intelligent command suggestions based on partial input
- * - Command execution with proper context management
+ * - Command matching and validation
  * - Cursor position tracking for accurate command positioning
  * 
  * The hook integrates seamlessly with the InputArea's message input
@@ -33,7 +34,7 @@ import {
  *     onCommandExecute?: (command: SlashCommand, args: string[]) => void | Promise<void>
  * 
  * Returns:
- *     SlashCommandHookReturn: Complete slash command state and handlers
+ *     SlashCommandDetectionHookReturn: Complete slash command detection state and handlers
  * 
  * TypeScript Learning Points:
  * - Advanced string parsing with regex patterns
@@ -43,16 +44,6 @@ import {
  * - Cursor position management in text inputs
  */
 
-export interface SlashCommandHookReturn {
-  context: SlashCommandContext
-  activeCommand: SlashCommandMatch | null
-  suggestions: SlashCommandSuggestion[]
-  isCommandActive: boolean
-  executeCommand: (command: SlashCommand, args: string[]) => Promise<void>
-  selectSuggestion: (suggestion: SlashCommandSuggestion) => void
-  clearCommand: () => void
-  availableCommands: SlashCommand[]
-}
 
 // Built-in commands for the system
 export const BUILTIN_COMMANDS: SlashCommand[] = [
@@ -76,11 +67,11 @@ export const BUILTIN_COMMANDS: SlashCommand[] = [
   }
 ]
 
-const useSlashCommand = (
+const useSlashCommandDetection = (
   message: string,
   cursorPosition: number,
   onCommandExecute?: (command: SlashCommand, args: string[]) => void | Promise<void>
-): SlashCommandHookReturn => {
+): SlashCommandDetectionHookReturn => {
   
   // Available commands (builtin + user-defined)
   const availableCommands = useMemo(() => {
@@ -93,21 +84,12 @@ const useSlashCommand = (
     cursor: number
   ): SlashCommandMatch | null => {
     
-    // Find slash character before cursor position
-    let slashIndex = -1
-    for (let i = cursor - 1; i >= 0; i--) {
-      const char = text[i]
-      if (char === '/') {
-        slashIndex = i
-        break
-      }
-      if (char === ' ' || char === '\n') {
-        // Stop if we hit whitespace before finding slash
-        break
-      }
+    // Only trigger if slash is at position 0 and cursor is after it
+    if (!text.startsWith('/') || cursor === 0) {
+      return null
     }
     
-    if (slashIndex === -1) return null
+    const slashIndex = 0
     
     // Extract command text from slash to cursor
     const commandText = text.substring(slashIndex + 1, cursor)
@@ -139,20 +121,12 @@ const useSlashCommand = (
     cursor: number
   ): SlashCommandSuggestion[] => {
     
-    // Find slash character before cursor
-    let slashIndex = -1
-    for (let i = cursor - 1; i >= 0; i--) {
-      const char = text[i]
-      if (char === '/') {
-        slashIndex = i
-        break
-      }
-      if (char === ' ' || char === '\n') {
-        break
-      }
+    // Only trigger if slash is at position 0 and cursor is after it
+    if (!text.startsWith('/') || cursor === 0) {
+      return []
     }
     
-    if (slashIndex === -1) return []
+    const slashIndex = 0
     
     // Extract partial command text
     const partialCommand = text.substring(slashIndex + 1, cursor).toLowerCase()
@@ -258,7 +232,7 @@ const useSlashCommand = (
   }
 }
 
-export default useSlashCommand
+export default useSlashCommandDetection
 
 /**
  * TypeScript Concepts Demonstrated:
