@@ -5,9 +5,9 @@
 .input-area {
   position: relative;
   width: 100%;
-  padding: 8px 16px;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
   background: transparent;
-  border-radius: 16px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
@@ -17,14 +17,11 @@
   align-items: flex-end;
   gap: 8px;
   width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  min-height: 104px; /* Adjusted height for better visual balance */
+  min-height: 104px;
   background: var(--input-bg);
   border: 1.5px solid var(--border-color);
-  border-radius: 16px;
-  padding: 12px 16px;
-  transition: all 0.2s ease;
+  border-radius: var(--border-radius-container);
+  padding: 12px var(--content-padding);
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.06),
     0 1px 2px rgba(0, 0, 0, 0.04);

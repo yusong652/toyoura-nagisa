@@ -8,8 +8,8 @@
   width: 100%;
   height: calc(100% - 100px); /* 减小高度 */
   min-height: 300px;
-  border-radius: 12px;
-  max-width: 900px;
+  border-radius: var(--border-radius-container);
+  max-width: var(--content-max-width);
   margin: 0 auto 12px auto;
 }
 
@@ -48,7 +48,7 @@
 .chatbox {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 8px;
+  padding: 8px var(--content-padding);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -58,13 +58,13 @@
   background-color: var(--chatbox-bg, rgba(0, 0, 0, 0.03));
   position: relative;
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--border-radius-container);
   overflow-anchor: auto;
   scroll-behavior: smooth;
   /* 添加以下属性以优化滚动体验 */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  max-width: 900px;
+  max-width: var(--content-max-width);
 }
 
 /* 移除之前的chatbox伪元素阴影 */

@@ -6,6 +6,15 @@
   height: 100vh;
 }
 
+/* =============================================================================
+   Shared Container Width Variables
+   ============================================================================= */
+:root {
+  --content-max-width: 900px;  /* Unified max width for content containers */
+  --content-padding: 16px;     /* Consistent padding for containers */
+  --border-radius-container: 12px;  /* Shared border radius for containers */
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
