@@ -5,7 +5,6 @@ This service handles configuration changes for TTS, tools, and other
 application-level settings.
 """
 from typing import Dict, Any
-from backend.presentation.models.agent_profile_models import AgentProfileType
 
 
 class SettingsService:
@@ -45,24 +44,12 @@ class SettingsService:
         # Update LLM client configuration
         llm_client.update_config(tools_enabled=enabled)
         
-        # Synchronize with Agent Profile system for consistency
-        try:
-            import backend.presentation.api.agent_profiles as agent_api
-            
-            if enabled:
-                # Enable tools - default to general assistant mode
-                agent_api._current_agent_profile = AgentProfileType.GENERAL
-            else:
-                # Disable tools - set to disabled mode
-                agent_api._current_agent_profile = AgentProfileType.DISABLED
-                
-        except ImportError:
-            print("[WARNING] Could not synchronize with agent profile system")
+        # agent_profile is now stateless - no global state to synchronize
         
         return {
             "success": True,
             "tools_enabled": enabled,
-            "message": "Recommend using new /api/agent/profile endpoint for more granular tool control"
+            "message": "Tools enabled/disabled successfully. Use agent_profile in chat requests for granular tool control."
         }
     
     async def update_tts_enabled(

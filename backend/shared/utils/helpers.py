@@ -18,10 +18,15 @@ from backend.shared.utils.text_clean import extract_response_without_think
 # memory_manager = MemoryManager()
 
 def parse_message_data(data: dict) -> tuple:
-    """解析消息数据，返回消息内容和会话ID"""
+    """解析消息数据，返回消息内容、会话ID和agent profile"""
     message_data = data.get('messageData')
+    session_id = data.get('session_id', "default_session")
+    agent_profile = data.get('agent_profile', "general")  # 默认为 general
+    
+    print(f"[DEBUG] parse_message_data: agent_profile={agent_profile}, session_id={session_id}")
+    
     if not message_data:
-        return None, data.get('session_id', "default_session")
+        return None, session_id, agent_profile
     msg_obj = json.loads(message_data)
     text = msg_obj.get('text', '')
     files = msg_obj.get('files', [])
@@ -43,7 +48,7 @@ def parse_message_data(data: dict) -> tuple:
         'content': content,
         'timestamp': timestamp,
         'id': msg_id  # 修复：返回id字段
-    }, data.get('session_id', "default_session")
+    }, session_id, agent_profile
 
 def process_user_message(parsed_data: dict, session_id: str, history_msgs: list) -> UserMessage:
     """处理用户消息，创建并返回消息对象，同时保存到历史记录和向量数据库"""

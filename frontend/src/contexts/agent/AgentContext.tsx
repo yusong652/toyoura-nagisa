@@ -10,11 +10,11 @@ interface AgentContextType {
   updateToolsEnabled: (enabled: boolean) => Promise<void>
   setToolState: (state: ToolState | null) => void
   
-  // Agent profile state
+  // Agent profile state (frontend only)
   currentProfile: AgentProfileType
+  setCurrentProfile: (profile: AgentProfileType) => void
   availableProfiles: AgentProfileInfo[]
   isProfileLoading: boolean
-  updateAgentProfile: (profile: AgentProfileType) => Promise<void>
   refreshProfiles: () => Promise<void>
 }
 
@@ -60,46 +60,36 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     }
   }, [])
 
-  // Refresh available profiles
+  // Refresh available profiles from backend
   const refreshProfiles = useCallback(async (): Promise<void> => {
+    setIsProfileLoading(true)
     try {
       const data = await agentService.getAvailableProfiles()
       if (data.success) {
-        setAvailableProfiles(data.available_profiles)
-        setCurrentProfile(data.current_profile)
-        // Update tools enabled based on current profile
-        setToolsEnabled(data.current_profile !== AgentProfileType.DISABLED)
+        // Convert backend format to frontend format
+        const profiles: AgentProfileInfo[] = data.profiles.map(p => ({
+          profile_type: p.profile_type as AgentProfileType,
+          name: p.name,
+          description: p.description,
+          tool_count: p.tool_count,
+          estimated_tokens: p.estimated_tokens,
+          color: p.color,
+          icon: p.icon
+        }))
+        setAvailableProfiles(profiles)
       }
     } catch (error) {
       console.error('Failed to load agent profiles:', error)
-    }
-  }, [])
-
-  // Update agent profile
-  const updateAgentProfile = useCallback(async (profile: AgentProfileType): Promise<void> => {
-    setIsProfileLoading(true)
-    try {
-      // TODO: Get current session ID from session context
-      const sessionId = undefined // We'll need to get this from useSession()
-      
-      const data = await agentService.updateAgentProfile(profile, sessionId)
-      if (data.success) {
-        setCurrentProfile(data.current_profile)
-        setToolsEnabled(data.tools_enabled)
-        
-        // Update the profile info in availableProfiles
-        setAvailableProfiles(prev => 
-          prev.map(p => 
-            p.profile_type === profile ? data.profile_info : p
-          )
-        )
-      }
-    } catch (error) {
-      console.error('Failed to update agent profile:', error)
-      throw error
     } finally {
       setIsProfileLoading(false)
     }
+  }, [])
+
+  // Simple profile selection (frontend state only)
+  const handleSetCurrentProfile = useCallback((profile: AgentProfileType) => {
+    setCurrentProfile(profile)
+    // Update tools enabled based on selected profile
+    setToolsEnabled(profile !== AgentProfileType.DISABLED)
   }, [])
 
   return (
@@ -109,9 +99,9 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
       updateToolsEnabled,
       setToolState,
       currentProfile,
+      setCurrentProfile: handleSetCurrentProfile,
       availableProfiles,
       isProfileLoading,
-      updateAgentProfile,
       refreshProfiles
     }}>
       {children}

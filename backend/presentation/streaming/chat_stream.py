@@ -10,13 +10,12 @@ import uuid
 from typing import List, AsyncGenerator
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory_no_thinking, message_factory
+from backend.domain.models.message_factory import message_factory_no_thinking
 from backend.infrastructure.storage.session_manager import load_history
 from backend.infrastructure.tts.base import BaseTTS
 from backend.config import get_llm_settings
 from backend.presentation.streaming.llm_response_handler import handle_llm_response
 from backend.presentation.streaming.memory_injection_handler import (
-    get_system_prompt_with_memory_context,
     save_conversation_memory
 )
 
@@ -27,7 +26,8 @@ async def generate_chat_stream(
     llm_client: LLMClientBase, 
     tts_engine: BaseTTS,
     user_id: str = "default",
-    enable_memory: bool = True
+    enable_memory: bool = True,
+    agent_profile: str = "general"
 ) -> AsyncGenerator[str, None]:
     """
     Enhanced chat stream generator with memory injection.
@@ -41,6 +41,11 @@ async def generate_chat_stream(
     Args:
         session_id: Current session ID
         recent_msgs: Recent conversation messages (unused, loaded from history)
+        llm_client: LLM client instance
+        tts_engine: Text-to-speech engine
+        user_id: User ID for memory operations
+        enable_memory: Whether to enable memory injection
+        agent_profile: Agent profile type for tool selection
         llm_client: LLM client instance
         tts_engine: TTS engine instance
         user_id: User identifier for memory operations
@@ -64,30 +69,15 @@ async def generate_chat_stream(
         recent_messages_length = get_llm_settings().recent_messages_length
         recent_msgs = recent_msgs[-recent_messages_length:]
         
-        # Get enhanced system prompt with memory context if enabled
-        enhanced_system_prompt = None
+        # Extract latest user message for memory saving
+        latest_user_message = None
+        for msg in reversed(recent_msgs):
+            if hasattr(msg, 'role') and msg.role == 'user':
+                latest_user_message = msg
+                break
         
-        # Memory injection processing
-        
-        if enable_memory:
-            # Use the latest user message (last message in recent_msgs)
-            if recent_msgs:
-                latest_user_message = recent_msgs[-1]
-                from backend.shared.utils.prompt import get_system_prompt
-                # Use the LLM client's actual tools_enabled setting
-                tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
-                base_system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-                # Get enhanced system prompt with memory context
-                enhanced_system_prompt = await get_system_prompt_with_memory_context(
-                    session_id=session_id,
-                    user_message=latest_user_message,
-                    base_system_prompt=base_system_prompt,
-                    user_id=user_id
-                )
-                # Memory context processing complete
-            else:
-                # No user query available for memory enhancement
-                pass
+        # Memory injection is now handled internally by LLM clients
+        # based on agent_profile, session_id, and enable_memory flag
         
         # Process LLM response with messages and enhanced system prompt
         assistant_response = None
@@ -96,7 +86,7 @@ async def generate_chat_stream(
             session_id, 
             llm_client, 
             tts_engine, 
-            enhanced_system_prompt=enhanced_system_prompt
+            agent_profile=agent_profile
         ):
             # Capture assistant response for memory saving
             if isinstance(chunk, str) and 'data:' in chunk:

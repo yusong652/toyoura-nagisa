@@ -32,7 +32,7 @@ async def handle_llm_response(
     session_id: str,
     llm_client: LLMClientBase,
     tts_engine,
-    enhanced_system_prompt: Optional[str] = None
+    agent_profile: str = "general"
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Enhanced LLM Response Handler - Real-time streaming architecture.
@@ -76,10 +76,12 @@ async def handle_llm_response(
         
         # Use new streaming method - Real-time tool call notifications
         # Pass enhanced system prompt if available
-        get_response_kwargs = {"session_id": session_id}
-        if enhanced_system_prompt:
-            get_response_kwargs["enhanced_system_prompt"] = enhanced_system_prompt
-            # Enhanced system prompt active
+        get_response_kwargs = {
+            "session_id": session_id,
+            "agent_profile": agent_profile
+        }
+        
+        print(f"[DEBUG] handle_llm_response: calling llm_client.get_response with agent_profile={agent_profile}, session_id={session_id}")
         
         async for item in llm_client.get_response(
             recent_msgs, 

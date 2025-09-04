@@ -5,13 +5,10 @@ This implementation inherits from the base LLMClientBase and uses shared compone
 where possible, while implementing Gemini-specific functionality.
 """
 
-from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
+from typing import List, Optional, Dict, Any
 
 from google import genai
 from google.genai import types
-
-from backend.config import get_llm_settings
-from backend.shared.utils.prompt import get_system_prompt
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 
@@ -79,34 +76,31 @@ class GeminiClient(LLMClientBase):
         print(f"Enhanced Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
         # Initialize component managers with unified architecture
-        self.tool_manager = GeminiToolManager(tools_enabled=self._init_tools_enabled)
-        
-        # Clean up temporary initialization attribute
-        del self._init_tools_enabled
+        self.tool_manager = GeminiToolManager()
 
     # get_response is now implemented in base class using provider-specific components
 
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
-    async def get_function_call_schemas(self, session_id: str) -> List[types.Tool]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[types.Tool]:
         """
-        Get MCP tool schemas in Gemini format based on current agent profile.
+        Get MCP tool schemas in Gemini format based on agent profile.
         
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
+            agent_profile: Agent profile type for tool filtering
             
         Returns:
             List[types.Tool]: Tool schemas in Gemini format
         """
         debug = self.gemini_config.debug
-        agent_profile = self.extra_config.get('agent_profile')
         return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
 
     async def call_api_with_context(
         self, 
         context_contents: List[Dict[str, Any]], 
         session_id: str,
-        enhanced_system_prompt: Optional[str] = None,
+        agent_profile: str = "general",
         **kwargs
     ) -> types.GenerateContentResponse:
         """
@@ -144,18 +138,30 @@ class GeminiClient(LLMClientBase):
             This method integrates with GeminiToolManager for session-specific tool schemas
             and GeminiDebugger for comprehensive request/response logging when debug mode is enabled.
         """
-        # Get tool schemas for the session
-        tool_schemas = await self.get_function_call_schemas(session_id)
-        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
-        tools_enabled = self.tool_manager.tools_enabled
-        
-        # Use enhanced system prompt if provided, otherwise use base system prompt
-        if enhanced_system_prompt:
-            system_prompt = enhanced_system_prompt
-        else:
-            system_prompt = get_system_prompt(tools_enabled=tools_enabled)
-        
         debug = self.gemini_config.debug
+        
+        # Get tool schemas for the session (API format)
+        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
+        
+        # Get tool schemas for system prompt embedding (clean dict format)
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
+        
+        print(f"[DEBUG] GeminiClient.call_api_with_context: agent_profile={agent_profile}")
+        print(f"[DEBUG] GeminiClient.call_api_with_context: tool_schemas count={len(tool_schemas) if tool_schemas else 0}")
+        print(f"[DEBUG] GeminiClient.call_api_with_context: prompt_tool_schemas count={len(prompt_tool_schemas) if prompt_tool_schemas else 0}")
+        
+        # Build unified system prompt with memory injection
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        system_prompt = build_system_prompt(
+            agent_profile=agent_profile,
+            tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
+            session_id=session_id
+        )
+        
+        print(f"[DEBUG] GeminiClient.call_api_with_context: system_prompt contains tools: {'tools' in system_prompt.lower()}")
+        print(f"[DEBUG] GeminiClient.call_api_with_context: system_prompt length: {len(system_prompt)}")
+        if debug:
+            print(f"[DEBUG] GeminiClient.call_api_with_context: full system_prompt:\n{system_prompt}\n")
         
         # Build API configuration
         config_kwargs = self.gemini_config.get_generation_config_kwargs(

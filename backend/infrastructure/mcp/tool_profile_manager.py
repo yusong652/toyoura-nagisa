@@ -4,7 +4,7 @@ Tool Profile Manager - 简化的Agent身份化工具管理系统
 分为两种模式：生活助手 和 编程助手
 """
 
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -14,6 +14,7 @@ class AgentProfile(Enum):
     LIFESTYLE = "lifestyle"  # 生活助手
     CODING = "coding"        # 编程助手
     GENERAL = "general"      # 通用模式，加载所有工具
+    DISABLED = "disabled"    # 禁用所有工具
 
 
 @dataclass
@@ -34,20 +35,19 @@ class ToolProfileManager:
     CODING_TOOLS = [
         "write",
         "read",
-        "bash",  # Updated from run_shell_command
-        "ls",    # Updated from list_directory
+        "edit",   # 文件编辑工具
+        "bash",   # Updated from run_shell_command
+        "ls",     # Updated from list_directory
         "glob",
         "grep",
-        "replace",
         "web_search"  # 编程时也需要搜索
     ]
     
     # 生活类工具 (除了coding以外的所有工具，包括web_search)
     LIFESTYLE_TOOLS = [
-        "get_user_email",
         "send_email", 
         "check_emails",
-        "read_email",  # 添加读取邮件工具
+        "read_email",
         "list_calendar_events",
         "create_calendar_event",
         "update_calendar_event", 
@@ -55,10 +55,8 @@ class ToolProfileManager:
         "list_contacts",
         "search_contacts",
         "generate_image",
-        "search_places", 
-        "get_place_details",
+        "search_places",
         "get_location",
-        "get_weather",
         "web_search",  # 生活中也需要搜索
         "get_current_time"
     ]
@@ -78,7 +76,7 @@ class ToolProfileManager:
             name="Lifestyle", 
             description="Focused on daily life, communication, entertainment and information services",
             tools=LIFESTYLE_TOOLS,
-            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 17个工具
+            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 14个工具
             color="#FF9800",  # 橙色
             icon="🌟"
         ),
@@ -90,6 +88,15 @@ class ToolProfileManager:
             estimated_tokens=24 * 282,  # 所有24个工具
             color="#607D8B",  # 灰蓝色
             icon="🤖"
+        ),
+        
+        AgentProfile.DISABLED: ToolProfile(
+            name="Disabled",
+            description="No tools enabled, pure conversation mode",
+            tools=[],  # 空列表，但通过特殊逻辑处理为禁用所有工具
+            estimated_tokens=0,  # 没有工具
+            color="#F44336",  # 红色
+            icon="🚫"
         )
     }
     
@@ -107,7 +114,12 @@ class ToolProfileManager:
     @classmethod
     def should_load_all_tools(cls, profile: AgentProfile) -> bool:
         """判断是否应该加载所有工具"""
-        return profile == AgentProfile.GENERAL or len(cls.TOOL_PROFILES[profile].tools) == 0
+        return profile == AgentProfile.GENERAL
+    
+    @classmethod
+    def should_disable_all_tools(cls, profile: AgentProfile) -> bool:
+        """判断是否应该禁用所有工具"""
+        return profile == AgentProfile.DISABLED
     
     @classmethod
     def get_available_profiles(cls) -> Dict[str, Dict[str, Any]]:

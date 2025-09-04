@@ -30,7 +30,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const {
     toolState,
     toolsEnabled,
-    setToolState
+    setToolState,
+    currentProfile
   } = useAgent()
   
   // 从SessionContext获取会话相关状态和方法
@@ -53,7 +54,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    ttsEnabled
+    ttsEnabled,
+    currentProfile
   })
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve

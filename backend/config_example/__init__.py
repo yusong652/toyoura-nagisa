@@ -120,18 +120,23 @@ def get_tool_prompt() -> str:
     return prompt
 
 
-def get_system_prompt(tools_enabled: bool = True) -> str:
+def get_system_prompt(agent_profile: str = "general") -> str:
     """
     Get complete system prompt.
+    
+    DEPRECATED: This is a legacy implementation kept for config example purposes.
+    Use backend.shared.utils.prompt.get_system_prompt() for the actual implementation.
 
-    Dynamically combines different prompt modules based on `tools_enabled` flag.
+    Args:
+        agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
     """
     base = get_base_prompt()
     expression = get_expression_prompt()
     
     components = [base]
     
-    if tools_enabled:
+    # Only include tool prompt if agent profile is not "disabled"
+    if agent_profile != "disabled":
         tool_prompt = get_tool_prompt()
         if tool_prompt:
             components.append(tool_prompt)

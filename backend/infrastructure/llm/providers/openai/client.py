@@ -9,7 +9,6 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from openai import OpenAI
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.shared.utils.prompt import get_system_prompt
 
 # Import OpenAI-specific implementations
 from .config import get_openai_client_config
@@ -68,33 +67,30 @@ class OpenAIClient(LLMClientBase):
         self.client = OpenAI(api_key=self.api_key)
         
         # Initialize unified tool manager
-        self.tool_manager = OpenAIToolManager(tools_enabled=self._init_tools_enabled)
-        
-        # Clean up temporary initialization attribute
-        del self._init_tools_enabled
+        self.tool_manager = OpenAIToolManager()
 
     # ========== CORE API METHODS ==========
 
-    async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[Dict[str, Any]]:
         """
         Get all MCP tool schemas in OpenAI format.
         Only return meta tools + cached tools, not all regular tools.
         
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
+            agent_profile: Agent profile type for tool filtering
             
         Returns:
             List[Dict[str, Any]]: Tool schemas in OpenAI format
         """
         debug = getattr(self, 'debug', False)  # Fallback for debug flag
-        agent_profile = self.extra_config.get('agent_profile')
         return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
 
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
         session_id: Optional[str] = None,
-        enhanced_system_prompt: Optional[str] = None,
+        agent_profile: str = "general",
         **kwargs
     ):
         """
@@ -128,19 +124,19 @@ class OpenAIClient(LLMClientBase):
         """
         debug = self.openai_config.debug
         
-        # Get agent profile from extra config
-        agent_profile = self.extra_config.get('agent_profile')
-        
-        # Get tool schemas for the session with agent profile
+        # Get tool schemas for the session with agent profile (API format)
         tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
-        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
-        tools_enabled = self.tool_manager.tools_enabled
         
-        # Use enhanced system prompt if provided, otherwise use base system prompt
-        if enhanced_system_prompt:
-            system_prompt = enhanced_system_prompt
-        else:
-            system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+        # Get tool schemas for system prompt embedding (clean dict format)
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
+        
+        # Build unified system prompt with memory injection
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        system_prompt = build_system_prompt(
+            agent_profile=agent_profile,
+            tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
+            session_id=session_id
+        )
         
         # Build API configuration
         kwargs_api = self.openai_config.get_api_call_kwargs(

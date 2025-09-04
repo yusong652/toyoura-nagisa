@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def get_tool_prompt_with_schemas(
     session_id: str,
-    agent_profile: Optional[str] = None,
-    tools_enabled: bool = True
+    agent_profile: Optional[str] = None
 ) -> str:
     """
     Build tool prompt with embedded tool schemas based on agent profile.
@@ -24,13 +23,12 @@ async def get_tool_prompt_with_schemas(
     
     Args:
         session_id: Session ID for tool context
-        agent_profile: Agent profile type (coding, lifestyle, general, or None for disabled)
-        tools_enabled: Whether tools are enabled
+        agent_profile: Agent profile type (coding, lifestyle, general, or "disabled")
         
     Returns:
         Tool prompt with embedded schemas in Anthropic format
     """
-    if not tools_enabled or agent_profile == "disabled":
+    if agent_profile == "disabled" or agent_profile is None:
         return ""
     
     try:

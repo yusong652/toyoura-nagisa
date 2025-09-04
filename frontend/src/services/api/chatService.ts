@@ -22,6 +22,7 @@ export interface MessageRequest {
 export interface ChatStreamRequest {
   messageData: string
   session_id: string
+  agent_profile: string
   tts_enabled: boolean
 }
 
@@ -43,6 +44,7 @@ export class ChatService {
    * @param files - Optional file attachments
    * @param sessionId - Current session identifier
    * @param userMessageId - Unique identifier for the user message
+   * @param agentProfile - Agent profile for tool selection
    * @param ttsEnabled - Whether TTS is enabled for response
    * @returns Promise resolving to Response object for stream processing
    */
@@ -51,6 +53,7 @@ export class ChatService {
     files: FileData[] = [],
     sessionId: string,
     userMessageId: string,
+    agentProfile: string,
     ttsEnabled: boolean
   ): Promise<Response> {
     const messageData: MessageRequest = {
@@ -67,6 +70,7 @@ export class ChatService {
     const streamRequest: ChatStreamRequest = {
       messageData: JSON.stringify(messageData),
       session_id: sessionId,
+      agent_profile: agentProfile,
       tts_enabled: ttsEnabled
     }
 

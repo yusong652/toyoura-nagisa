@@ -20,6 +20,7 @@ export interface UseChatMessageOptions {
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
   ttsEnabled?: boolean
+  currentProfile?: string
 }
 
 export interface UseChatMessageReturn {
@@ -43,7 +44,8 @@ export const useChatMessage = ({
   currentSessionId,
   sessionRefreshSessions,
   sessionSwitchSession,
-  ttsEnabled = false
+  ttsEnabled = false,
+  currentProfile = "general"
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -176,7 +178,7 @@ export const useChatMessage = ({
                   isRead: true,
                   toolState: msg.tool_state ? {
                     isUsingTool: msg.tool_state.is_using_tool || false,
-                    toolName: msg.tool_state.tool_name,
+                    toolNames: msg.tool_state.tool_name ? [msg.tool_state.tool_name] : undefined,
                     action: msg.tool_state.action
                   } : undefined
                 }
@@ -363,7 +365,7 @@ export const useChatMessage = ({
     try {
       // 创建API请求
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
-      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, ttsEnabled)
+      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled)
       
       // 更新用户消息状态为已发送
       updateMessageStatus(userMessageId, MessageStatus.SENT)
@@ -381,7 +383,7 @@ export const useChatMessage = ({
       updateMessageStatus(userMessageId, MessageStatus.ERROR)
       throw error
     }
-  }, [currentSessionId, ttsEnabled, addUserMessage, addBotMessage, updateMessageStatus])
+  }, [currentSessionId, currentProfile, ttsEnabled, addUserMessage, addBotMessage, updateMessageStatus])
 
   return {
     messages,

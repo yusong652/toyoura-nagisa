@@ -35,8 +35,10 @@ def get_expression_prompt() -> str:
 
 def get_tool_prompt() -> str:
     """
-    DEPRECATED: Use get_tool_prompt_with_schemas() for dynamic tool loading.
+    DEPRECATED: Use build_system_prompt() for modern tool schema embedding with memory injection.
     Load basic tool usage guide prompt with workspace root substitution.
+    
+    This function is kept for legacy compatibility only.
     """
     try:
         from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
@@ -52,17 +54,26 @@ def get_tool_prompt() -> str:
     return prompt
 
 
-def get_system_prompt(tools_enabled: bool = True) -> str:
+def get_system_prompt(agent_profile: str = "general") -> str:
     """
     Get complete system prompt.
-    Dynamically combines different prompt modules based on tools_enabled flag.
+    Dynamically combines different prompt modules based on agent profile.
+    
+    Args:
+        agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
+                      "disabled" means no tools will be included
+                      
+    Returns:
+        Complete system prompt with appropriate components
     """
     base = get_base_prompt()
     expression = get_expression_prompt()
     
     components = [base]
     
-    if tools_enabled:
+    # Only include tool prompt if agent profile is not "disabled"
+    # This is for backward compatibility - actual tool schemas should be embedded separately
+    if agent_profile != "disabled":
         tool_prompt = get_tool_prompt()
         if tool_prompt:
             components.append(tool_prompt)

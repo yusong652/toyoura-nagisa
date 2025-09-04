@@ -30,9 +30,8 @@ class BaseToolManager(ABC):
     - Client-specific schema formatting
     """
     
-    def __init__(self, tools_enabled: bool = True):
+    def __init__(self):
         """Initialize base state."""
-        self.tools_enabled = tools_enabled
         
         # Lazy import to avoid circular dependency
         from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
@@ -160,8 +159,6 @@ class BaseToolManager(ABC):
         Returns:
             Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
         """
-        if not self.tools_enabled:
-            return {}
         
         tools_dict: Dict[str, ToolSchema] = {}
         
@@ -174,7 +171,12 @@ class BaseToolManager(ABC):
                 # 确定要加载的工具集合
                 if agent_profile:
                     profile_enum = ToolProfileManager.validate_profile(agent_profile)
-                    if profile_enum and not ToolProfileManager.should_load_all_tools(profile_enum):
+                    if profile_enum and ToolProfileManager.should_disable_all_tools(profile_enum):
+                        # DISABLED 状态：不加载任何工具
+                        if debug:
+                            print(f"[DEBUG] Disabling all tools (profile: {agent_profile})")
+                        return {}
+                    elif profile_enum and not ToolProfileManager.should_load_all_tools(profile_enum):
                         # 使用指定profile的工具集合
                         allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
                         if debug:

@@ -57,27 +57,27 @@ export const useProfileSelectorEvents = (
     
     try {
       if (useContext) {
-        // Use context for profile change
-        await contextAgent.updateAgentProfile(profile)
+        // Use context for profile change (now synchronous)
+        contextAgent.setCurrentProfile(profile)
+        // Close dropdown after successful change
+        setIsOpen?.(false)
       } else if (propOnProfileChange) {
         // Use provided handler for profile change
         await propOnProfileChange(profile)
+        // Close dropdown after successful change
+        setIsOpen?.(false)
       } else {
         console.warn('No profile change handler available')
+        setIsOpen?.(false)
       }
-      
-      // Close dropdown after successful change
-      setIsOpen?.(false)
     } catch (error) {
       console.error('Failed to change agent profile:', error)
       
-      // Show error message only in context mode
-      if (useContext) {
-        const errorMessage = error instanceof Error 
-          ? error.message 
-          : 'Failed to change agent profile. Please try again.'
-        showTemporaryError(errorMessage, 4000)
-      }
+      // Show error message (for props-based handlers that might throw)
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to change agent profile. Please try again.'
+      showTemporaryError(errorMessage, 4000)
       
       // Keep dropdown open on error for retry
     }

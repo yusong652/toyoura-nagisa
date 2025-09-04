@@ -2,7 +2,6 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 import anthropic
-from backend.shared.utils.prompt import get_system_prompt
 from .config import get_anthropic_client_config
 from .content_generators import TitleGenerator, ImagePromptGenerator
 from .response_processor import AnthropicResponseProcessor
@@ -55,12 +54,7 @@ class AnthropicClient(LLMClientBase):
         self.client = anthropic.Anthropic(api_key=self.api_key)
        
         # 初始化统一工具管理器
-        self.tool_manager = AnthropicToolManager(
-            tools_enabled=self._init_tools_enabled
-        )
-        
-        # Clean up temporary initialization attribute
-        del self._init_tools_enabled
+        self.tool_manager = AnthropicToolManager()
 
     # get_response is now implemented in base class using provider-specific components
 
@@ -89,25 +83,25 @@ class AnthropicClient(LLMClientBase):
 
     # _streaming_tool_calling_loop is inherited from LLMClientBase
 
-    async def get_function_call_schemas(self, session_id: str) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[Dict[str, Any]]:
         """
-        Get MCP tool schemas in Anthropic format based on current agent profile.
+        Get MCP tool schemas in Anthropic format based on agent profile.
         
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
+            agent_profile: Agent profile type for tool filtering
             
         Returns:
             List[Dict[str, Any]]: Tool schemas in Anthropic format
         """
         debug = self.anthropic_config.debug
-        agent_profile = self.extra_config.get('agent_profile')
         return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
 
     async def call_api_with_context(
         self,
         anthropic_messages: List[Dict[str, Any]],
         session_id: Optional[str] = None,
-        enhanced_system_prompt: Optional[str] = None,
+        agent_profile: str = "general",
         **kwargs
     ):
         """
@@ -115,26 +109,23 @@ class AnthropicClient(LLMClientBase):
         """
         debug = self.anthropic_config.debug
         
-        # 获取工具schemas
-        tools = await self.tool_manager.get_function_call_schemas(session_id, debug)
-        # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
-        tools_enabled = self.tool_manager.tools_enabled
+        # 获取工具 schemas (API format)
+        tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
         
-        # Build system prompt with embedded tool schemas (Anthropic best practice)
-        if enhanced_system_prompt:
-            # If already enhanced (e.g., with memory), use as-is
-            system_prompt = enhanced_system_prompt
-        else:
-            # Build system prompt with embedded tool schemas following Claude Code approach
-            from backend.shared.utils.prompt import build_system_prompt
-            system_prompt = build_system_prompt(
-                tools_enabled=tools_enabled,
-                tool_schemas=tools if tools_enabled else None
-            )
+        # Get tool schemas for system prompt embedding (clean dict format)
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
+        
+        # Build unified system prompt with memory injection and embedded tool schemas
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        system_prompt = build_system_prompt(
+            agent_profile=agent_profile,
+            tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
+            session_id=session_id
+        )
         
         # Still pass tools to API for proper function calling support
         # The embedding in system prompt provides better context, while API tools enable calling
-        api_tools = tools if tools_enabled else []
+        api_tools = tools if tools else []
         
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(

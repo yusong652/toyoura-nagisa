@@ -22,7 +22,7 @@ class ChatService:
     managing conversation history, and generating streaming responses.
     """
     
-    def parse_request_data(self, data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    def parse_request_data(self, data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str], str]:
         """
         Parse and validate chat request data.
         
@@ -33,14 +33,16 @@ class ChatService:
             data: Raw request data dictionary containing:
                 - message content and metadata
                 - session_id for conversation context
+                - agent_profile for tool selection
                 
         Returns:
-            Tuple[Optional[Dict[str, Any]], Optional[str]]: Parsed data and session ID:
+            Tuple[Optional[Dict[str, Any]], Optional[str], str]: Parsed data, session ID and agent profile:
                 - parsed_data: Dict containing validated message data or None if invalid
                 - session_id: str - Session UUID for conversation context or None if missing
+                - agent_profile: str - Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
         
         Example:
-            parsed_data, session_id = chat_service.parse_request_data(request_json)
+            parsed_data, session_id, agent_profile = chat_service.parse_request_data(request_json)
             if not parsed_data:
                 return error_response
         """
@@ -103,6 +105,7 @@ class ChatService:
         session_id: str,
         llm_client: LLMClientBase,
         tts_engine: BaseTTS,
+        agent_profile: str = "general",
         additional_messages: List[Any] = None
     ) -> StreamingResponse:
         """
@@ -121,6 +124,7 @@ class ChatService:
                 - Audio generation from text
                 - Voice configuration support
                 - Streaming audio output
+            agent_profile: Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
             additional_messages: Optional extra messages for context
                 
         Returns:
@@ -144,6 +148,6 @@ class ChatService:
             additional_messages = []
             
         return StreamingResponse(
-            generate_chat_stream(session_id, additional_messages, llm_client, tts_engine),
+            generate_chat_stream(session_id, additional_messages, llm_client, tts_engine, agent_profile=agent_profile),
             media_type="text/event-stream"
         )

@@ -17,9 +17,9 @@ class OpenAIToolManager(BaseToolManager):
     tool execution with proper result formatting.
     """
     
-    def __init__(self, tools_enabled: bool = True):
+    def __init__(self):
         """Initialize OpenAI tool manager"""
-        super().__init__(tools_enabled)
+        super().__init__()
     
     async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
         """
@@ -36,8 +36,6 @@ class OpenAIToolManager(BaseToolManager):
         Returns:
             List of OpenAI-formatted tool schemas or None if tools disabled
         """
-        if not self.tools_enabled:
-            return None
         
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
@@ -110,4 +108,47 @@ class OpenAIToolManager(BaseToolManager):
             print(f"[WARNING] Failed to convert tool {tool_schema.name} to OpenAI format: {e}")
             print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
+
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
+        """
+        Get tool schemas in standardized dictionary format for system prompt embedding.
+        
+        This method returns a clean dictionary format specifically designed for embedding
+        tool schemas into system prompts, separate from the API-specific formats.
+        
+        Args:
+            session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name for tool filtering
+            debug: Whether to enable debug output
+            
+        Returns:
+            List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt
+        """
+        
+        # Get standardized tools from base class
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
+        
+        if not tools_dict:
+            return []
+        
+        # Convert ToolSchema objects to clean dictionary format for system prompt
+        prompt_schemas = []
+        for tool_name, tool_schema in tools_dict.items():
+            try:
+                # Build clean schema dictionary
+                schema_dict = {
+                    "name": tool_schema.name,
+                    "description": tool_schema.description,
+                    "parameters": tool_schema.inputSchema.model_dump(exclude_none=True)
+                }
+                prompt_schemas.append(schema_dict)
+            except Exception as e:
+                if debug:
+                    print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
+                continue
+        
+        if debug:
+            print(f"[DEBUG] OpenAI system prompt schemas count: {len(prompt_schemas)}")
+        
+        return prompt_schemas
     

@@ -69,6 +69,7 @@ async def chat_endpoint(
         request: FastAPI request containing message data in JSON body:
             - message content and metadata
             - session_id for conversation context
+            - agent_profile for tool selection ("general", "coding", "lifestyle", etc.)
             - optional configuration flags
         
     Returns:
@@ -90,13 +91,14 @@ async def chat_endpoint(
         {
             "message": "Hello, how can you help me?",
             "session_id": "550e8400-e29b-41d4-a716-446655440000",
+            "agent_profile": "general",
             "type": "text"
         }
     """
     try:
         # Parse and validate request data
         data = await request.json()
-        parsed_data, session_id = service.parse_request_data(data)
+        parsed_data, session_id, agent_profile = service.parse_request_data(data)
         
         if not parsed_data:
             raise HTTPException(
@@ -116,7 +118,8 @@ async def chat_endpoint(
         return await service.create_streaming_response(
             session_id=session_id,
             llm_client=llm_client,
-            tts_engine=tts_engine
+            tts_engine=tts_engine,
+            agent_profile=agent_profile
         )
         
     except HTTPException:

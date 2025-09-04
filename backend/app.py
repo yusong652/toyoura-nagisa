@@ -8,12 +8,13 @@ from backend.infrastructure.mcp.smart_mcp_server import mcp
 from fastmcp import Client
 from backend.presentation.api import images
 from backend.presentation.api import videos
-from backend.presentation.api import agent_profiles  
+  
 from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
 from backend.presentation.api import settings
 from backend.presentation.api import chat
+from backend.presentation.api import profiles
 from backend.presentation.websocket.connection import ConnectionManager
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.exceptions import register_exception_handlers
@@ -89,12 +90,12 @@ app.add_middleware(
 
 app.include_router(images.router)
 app.include_router(videos.router)
-app.include_router(agent_profiles.router)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(profiles.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)
 register_websocket_routes(app)

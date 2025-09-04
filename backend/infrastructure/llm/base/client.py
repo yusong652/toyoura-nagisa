@@ -29,17 +29,13 @@ class LLMClientBase(ABC):
     - Consistent: unified streaming interface avoiding redundant wrappers
     """
     
-    def __init__(self, tools_enabled: bool = False, extra_config: Dict[str, Any] = None):
+    def __init__(self, extra_config: Dict[str, Any] = None):
         """
         Initialize LLM client base class.
         
         Args:
-            tools_enabled: Whether to enable tool calling functionality (passed to tool_manager)
             extra_config: Additional configuration parameters
         """
-        # Store tools_enabled temporarily for subclass tool_manager initialization
-        # Each subclass should use this to initialize their tool_manager, then this can be discarded
-        self._init_tools_enabled = tools_enabled
         self.extra_config = extra_config or {}
         
         # Common client attributes that all implementations should have
@@ -56,6 +52,7 @@ class LLMClientBase(ABC):
         self,
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
+        agent_profile: str = "general",
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
         """
@@ -68,6 +65,7 @@ class LLMClientBase(ABC):
         Args:
             messages: Input message list
             session_id: Session ID for tool and context management
+            agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
             **kwargs: Additional parameters (like max_iterations, temperature, etc.)
             
         Yields:
@@ -118,9 +116,11 @@ class LLMClientBase(ABC):
             from backend.config import get_llm_settings
             max_iterations = get_llm_settings().max_tool_iterations
             
+            print(f"[DEBUG] LLMClientBase.get_response: about to call _streaming_tool_calling_loop with agent_profile={agent_profile}")
+            
             final_response = None
             async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, **kwargs
+                context_manager, session_id, max_iterations, metadata, debug, agent_profile, **kwargs
             ):
                 if isinstance(item, dict):
                     # Intermediate notification - yield directly to API layer
@@ -179,12 +179,13 @@ class LLMClientBase(ABC):
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str) -> List[Any]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[Any]:
         """
         Get function call schemas for tool registration.
         
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
+            agent_profile: Agent profile type for tool filtering
             
         Returns:
             List[Any]: List of tool schemas in provider-specific format
@@ -196,6 +197,7 @@ class LLMClientBase(ABC):
         self, 
         context_contents: List[Dict[str, Any]], 
         session_id: str,
+        agent_profile: str = "general",
         **kwargs
     ) -> Any:
         """
@@ -309,6 +311,7 @@ class LLMClientBase(ABC):
         max_iterations: int,
         metadata: Dict[str, Any],
         debug: bool,
+        agent_profile: str = "general",
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
         """
@@ -356,7 +359,7 @@ class LLMClientBase(ABC):
         recent_messages_length = get_llm_settings().recent_messages_length
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id, **kwargs
+            working_contents, session_id=session_id, agent_profile=agent_profile, **kwargs
         )
         metadata['api_calls'] += 1
         
@@ -439,7 +442,7 @@ class LLMClientBase(ABC):
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")
             
             current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id, **kwargs
+                working_contents, session_id=session_id, agent_profile=agent_profile, **kwargs
             )
             metadata['api_calls'] += 1
             
@@ -670,23 +673,10 @@ class LLMClientBase(ABC):
         Update client configuration.
         
         Args:
-            **kwargs: Configuration parameters to update (tools_enabled, agent_profile, etc.)
+            **kwargs: Configuration parameters to update (tools_enabled, etc.)
         """
-        # Handle tools_enabled specially - only update tool_manager
-        if 'tools_enabled' in kwargs:
-            if self.tool_manager:
-                self.tool_manager.tools_enabled = kwargs['tools_enabled']
-                print(f"[DEBUG] Updated tool_manager.tools_enabled to {kwargs['tools_enabled']}")
-            # Also update extra_config for consistency
-            self.extra_config['tools_enabled'] = kwargs['tools_enabled']
-            # Don't set on self since we don't have this attribute anymore
-            kwargs = {k: v for k, v in kwargs.items() if k != 'tools_enabled'}
         
-        # Handle agent_profile specially - store for tool loading
-        if 'agent_profile' in kwargs:
-            self.extra_config['agent_profile'] = kwargs['agent_profile']
-            print(f"[DEBUG] Updated agent_profile to {kwargs['agent_profile']}")
-            kwargs = {k: v for k, v in kwargs.items() if k != 'agent_profile'}
+        # agent_profile is now stateless - passed in each request, no longer stored
         
         # Handle other configuration parameters
         for key, value in kwargs.items():
@@ -694,11 +684,3 @@ class LLMClientBase(ABC):
             # Also update extra_config
             self.extra_config[key] = value
     
-    def update_agent_profile(self, profile: str):
-        """
-        Update agent profile for tool filtering.
-        
-        Args:
-            profile: Agent profile name ("coding", "lifestyle", "general", etc.)
-        """
-        self.update_config(agent_profile=profile)
