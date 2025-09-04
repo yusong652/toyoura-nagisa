@@ -2,7 +2,7 @@
 Prompt utilities for aiNagisa - Centralized prompt construction following Anthropic best practices.
 
 This module provides a modular and extensible prompt building system with:
-- Core prompt loading and caching
+- Core prompt loading (no caching - always fresh)
 - Tool schema embedding (Anthropic best practice)
 - Memory context integration
 - Dynamic tool loading based on agent profiles

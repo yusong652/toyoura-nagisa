@@ -12,7 +12,6 @@ After completing your visible response, append **one** emotion/content keyword o
 4. Vary emotional keywords where appropriate to enhance expressiveness.
 
 ## Examples
-```text
 Sure, the file has been updated successfully. [[neutral]]
 I'm so glad I could help you! [[happy]]
 That action might be risky; please confirm before I proceed. [[thinking]] 

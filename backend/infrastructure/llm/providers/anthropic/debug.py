@@ -18,6 +18,39 @@ class AnthropicDebugger:
     """
 
     @staticmethod
+    def print_full_system_prompt(system_prompt: str) -> None:
+        """
+        Print the complete system prompt for debugging purposes.
+        
+        This method displays the full system prompt without truncation,
+        allowing developers to verify the exact prompt being sent to Claude.
+        
+        Args:
+            system_prompt: Complete system prompt text
+        """
+        print("\n" + "=" * 80)
+        print("🔍 ANTHROPIC FULL SYSTEM PROMPT (DEBUG MODE)")
+        print("=" * 80)
+        
+        if system_prompt:
+            # Display basic statistics
+            print(f"📊 System Prompt Statistics:")
+            print(f"   - Total Length: {len(system_prompt)} characters")
+            print(f"   - Lines Count: {system_prompt.count(chr(10)) + 1} lines")
+            print(f"   - Words Count: {len(system_prompt.split())} words")
+            print()
+            print("📜 Complete System Prompt:")
+            print("-" * 80)
+            print(system_prompt)
+            print("-" * 80)
+        else:
+            print("⚠️ No system prompt provided")
+        
+        print("=" * 80)
+        print("END OF SYSTEM PROMPT")
+        print("=" * 80 + "\n")
+    
+    @staticmethod
     def log_api_payload(
         api_kwargs: Dict[str, Any],
         component: str = "ANTHROPIC",

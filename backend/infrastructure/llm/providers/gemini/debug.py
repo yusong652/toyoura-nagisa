@@ -51,6 +51,39 @@ class GeminiDebugger:
         print("\n📝 Simplified Payload (truncated descriptions):")
         GeminiDebugger._print_simplified_payload(payload_to_print)
         print("========== END ==========")
+    
+    @staticmethod
+    def print_full_system_prompt(system_prompt: str) -> None:
+        """
+        Print the complete system prompt for debugging purposes.
+        
+        This method displays the full system instruction/prompt without truncation,
+        allowing developers to verify the exact prompt being sent to the model.
+        
+        Args:
+            system_prompt: Complete system prompt/instruction text
+        """
+        print("\n" + "=" * 80)
+        print("🔍 GEMINI FULL SYSTEM PROMPT (DEBUG MODE)")
+        print("=" * 80)
+        
+        if system_prompt:
+            # Display basic statistics
+            print(f"📊 System Prompt Statistics:")
+            print(f"   - Total Length: {len(system_prompt)} characters")
+            print(f"   - Lines Count: {system_prompt.count(chr(10)) + 1} lines")
+            print(f"   - Words Count: {len(system_prompt.split())} words")
+            print()
+            print("📜 Complete System Instruction:")
+            print("-" * 80)
+            print(system_prompt)
+            print("-" * 80)
+        else:
+            print("⚠️ No system prompt provided")
+        
+        print("=" * 80)
+        print("END OF SYSTEM PROMPT")
+        print("=" * 80 + "\n")
 
     @staticmethod
     def print_debug_response(response) -> None:
