@@ -1,0 +1,85 @@
+.chat-history-item {
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.chat-history-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(178, 75, 185, 0.3);
+  transform: translateX(2px);
+}
+
+.chat-history-item.active {
+  background: linear-gradient(135deg, rgba(178, 75, 185, 0.1), rgba(147, 51, 153, 0.1));
+  border-color: rgba(178, 75, 185, 0.5);
+}
+
+.chat-history-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 70%;
+  background: linear-gradient(135deg, #b24bb9, #8e3a95);
+  border-radius: 0 3px 3px 0;
+}
+
+.chat-history-item-content {
+  flex: 1;
+  min-width: 0;
+  margin-right: 10px;
+}
+
+.chat-history-item-title {
+  font-weight: 500;
+  color: #ffffff;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history-item-preview {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-session-button {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.chat-history-item:hover .delete-session-button {
+  opacity: 1;
+}
+
+.delete-session-button:hover {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: rgba(255, 59, 48, 0.3);
+  transform: scale(1.1);
+}

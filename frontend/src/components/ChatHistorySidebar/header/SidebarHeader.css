@@ -1,0 +1,41 @@
+.chat-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(93, 23, 121, 0.05), rgba(178, 75, 185, 0.05));
+}
+
+.chat-history-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #b24bb9, #6b1575);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.chat-history-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.chat-history-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-history-close svg {
+  width: 14px;
+  height: 14px;
+}

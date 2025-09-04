@@ -1,0 +1,61 @@
+.chat-history-actions {
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.new-session-input-container {
+  display: flex;
+  gap: 10px;
+}
+
+.new-session-input {
+  flex: 1;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.new-session-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(178, 75, 185, 0.5);
+  box-shadow: 0 0 0 3px rgba(178, 75, 185, 0.1);
+}
+
+.new-session-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.new-session-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.new-session-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #b24bb9, #8e3a95);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.new-session-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c55cc4, #9f42a6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(178, 75, 185, 0.3);
+}
+
+.new-session-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
