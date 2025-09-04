@@ -19,7 +19,7 @@ import { MessageToolState as MessageToolStateType } from '../../../types/chat'
 const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
   if (!toolState) return null
   
-  const { isUsingTool, toolName, thinking } = toolState
+  const { isUsingTool, toolNames, thinking } = toolState
   const [displayedText, setDisplayedText] = useState('')
   const [isScrolling, setIsScrolling] = useState(false)
   const [animationDuration, setAnimationDuration] = useState(10)
@@ -84,10 +84,15 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
       <div className="message-tool-state-content">
         <div className="message-tool-thinking-container">
           <div className="message-tool-thinking-viewport">
-            {toolName && (
+            {toolNames && toolNames.length > 0 && (
               <div className="message-tool-name">
                 <div className="tool-name-icon"></div>
-                <span className="tool-name-text">{toolName}</span>
+                <span className="tool-name-text">
+                  {toolNames.length === 1 
+                    ? toolNames[0] 
+                    : `${toolNames.length} tools: ${toolNames.join(', ')}`
+                  }
+                </span>
               </div>
             )}
             <div 

@@ -388,6 +388,9 @@ class LLMClientBase(ABC):
                 # Extract thinking content if available
                 thinking_content = self._extract_thinking_content(current_response)
                 
+                # Extract tool names once for reuse
+                tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
+                
                 # Determine action text: use extracted LLM text or fallback to generic message
                 if extracted_text and len(extracted_text.strip()) > 0:
                     action_text = extracted_text.strip()
@@ -397,31 +400,20 @@ class LLMClientBase(ABC):
                 else:
                     # Fallback to tool-specific message
                     if num_tools == 1:
-                        action_text = f"Using {tool_calls[0].get('name', 'unknown_tool')}..."
+                        action_text = f"Using {tool_names[0]}..."
                     else:
-                        tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
                         action_text = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
                 
-                # Send notification with LLM content, thinking, or fallback message
-                if num_tools == 1:
-                    tool_name = tool_calls[0].get('name', 'unknown_tool')
-                    notification = {
-                        'type': 'NAGISA_IS_USING_TOOL',
-                        'tool_name': tool_name,
-                        'action_text': action_text
-                    }
-                    if thinking_content:
-                        notification['thinking'] = thinking_content
-                    yield notification
-                else:
-                    notification = {
-                        'type': 'NAGISA_IS_USING_TOOL',
-                        'tool_name': 'parallel_tools',
-                        'action_text': action_text
-                    }
-                    if thinking_content:
-                        notification['thinking'] = thinking_content
-                    yield notification
+                notification = {
+                    'type': 'NAGISA_IS_USING_TOOL',
+                    'tool_names': tool_names,  # Always provide array of tool names
+                    'action_text': action_text
+                }
+                
+                if thinking_content:
+                    notification['thinking'] = thinking_content
+                    
+                yield notification
                 
                 # Execute all tools in parallel
                 tasks = []

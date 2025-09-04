@@ -24,7 +24,7 @@ export enum MessageStatus {
 // 消息中的工具状态
 export interface MessageToolState {
   isUsingTool: boolean;
-  toolName?: string;
+  toolNames?: string[]; // 工具名称数组，支持单个和多个工具
   action?: string;
   thinking?: string; // AI thinking content
 }

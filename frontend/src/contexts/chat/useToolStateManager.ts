@@ -29,7 +29,7 @@ export const useToolStateManager = ({
   const handleToolStart = useCallback((messageId: string, data: any) => {
     const toolState = {
       isUsingTool: true,
-      toolName: data.tool_name,
+      toolNames: data.tool_names, // 使用新的tool_names数组
       action: data.action_text,
       thinking: data.thinking // Add thinking content if available
     }

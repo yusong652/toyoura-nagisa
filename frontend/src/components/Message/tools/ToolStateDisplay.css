@@ -6,6 +6,7 @@
   position: relative;
   overflow: hidden;
   max-height: 200px; /* Maximum height limit */
+  border-radius: 16px;
 }
 
 .message-tool-state::before {
@@ -25,31 +26,32 @@
   );
   animation: shimmer 3s ease-in-out infinite;
   pointer-events: none;
-  border-radius: 12px;
+  border-radius: 16px;
 }
 
 .message-tool-state-content {
   background: linear-gradient(
     135deg,
-    var(--tool-state-bg, rgba(140, 145, 150, 0.12)) 0%,
-    var(--tool-state-bg-secondary, rgba(130, 135, 140, 0.08)) 100%
+    rgba(59, 130, 246, 0.08) 0%,
+    rgba(37, 99, 235, 0.04) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px; /* More generous rounded corners */
-  padding: 6px 6px; /* Reduced padding for better proportions */
-  font-size: 14px; /* Larger base font */
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 16px;
+  padding: 8px;
+  font-size: 14px;
   color: var(--text-color);
-  backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
   box-shadow: 
-    0 8px 32px rgba(140, 145, 150, 0.15),
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    0 4px 20px rgba(59, 130, 246, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: left;
-  animation: breathe 4s ease-in-out infinite;
   display: flex;
   flex-direction: column;
-  gap: 6px; /* Reduced spacing between elements */
+  gap: 8px;
   position: relative;
   overflow: hidden;
 }
@@ -65,35 +67,39 @@
 .message-tool-thinking-viewport {
   position: relative;
   overflow: hidden;
-  min-height: 60px; /* Minimum height for small content */
-  max-height: 120px; /* Maximum height for 5 lines */
-  height: auto; /* Dynamic height based on content */
+  min-height: 60px;
+  max-height: 120px;
+  height: auto;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.03) 100%
+    rgba(0, 0, 0, 0.03) 0%,
+    rgba(0, 0, 0, 0.01) 100%
   );
-  border: none;
-  border-radius: 8px;
-  padding: 4px 8px;
-  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 6px 10px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .message-tool-thinking-content {
   font-weight: 400;
-  color: #5a6068;
-  letter-spacing: 0.3px;
+  color: #71717a;
+  letter-spacing: 0.2px;
   text-align: left;
-  font-style: italic;
-  font-size: 12px;
-  opacity: 0.95;
-  line-height: 1.4;
+  font-style: normal;
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.5;
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
   position: relative;
-  padding: 8px 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  padding: 32px 4px 8px 4px; /* 增加顶部padding为工具名称留出空间 */
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
+  font-feature-settings: 'liga' on, 'kern' on;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Thinking dots animation for continuous thinking indication */
@@ -101,7 +107,7 @@
   display: inline-block;
   margin-left: 4px;
   font-style: normal;
-  color: rgba(140, 145, 150, 0.6);
+  color: rgba(113, 113, 122, 0.6);
 }
 
 .dot {
@@ -136,23 +142,23 @@
   transform: translateZ(0);
 }
 
-/* Enhanced gradient overlays for premium fade effect */
+/* Subtle fade effects */
 .message-tool-thinking-viewport::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 16px; /* More generous fade height */
+  height: 12px;
   background: linear-gradient(
     to bottom, 
-    rgba(255, 255, 255, 0.12), 
-    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.04), 
+    rgba(255, 255, 255, 0.02),
     transparent
   );
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px 12px 0 0;
 }
 
 .message-tool-thinking-viewport::after {
@@ -161,16 +167,16 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 16px; /* More generous fade height */
+  height: 12px;
   background: linear-gradient(
     to top, 
-    rgba(255, 255, 255, 0.12), 
-    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.04), 
+    rgba(255, 255, 255, 0.02),
     transparent
   );
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 12px 12px;
 }
 
 @keyframes scrollUp {
@@ -184,34 +190,36 @@
 
 .message-tool-name {
   position: absolute;
-  top: 4px;
-  left: 6px;
-  z-index: 2;
+  top: 6px;
+  left: 8px;
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  letter-spacing: 0.4px;
-  color: rgba(140, 145, 150, 0.85);
+  gap: 8px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  color: #52525b;
   font-weight: 600;
-  opacity: 1;
+  opacity: 0.9;
   text-align: left;
   margin: 0;
   padding: 0;
   border: none;
   flex-shrink: 0;
-  animation: toolNameBreathe 4s ease-in-out infinite;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  font-feature-settings: 'liga' on, 'kern' on;
+  -webkit-font-smoothing: antialiased;
+  text-shadow: 0 1px 2px rgba(82, 82, 91, 0.1);
 }
 
 .tool-name-icon {
-  width: 14px; /* Larger icon for premium feel */
-  height: 14px;
-  border: 2.5px solid rgba(140, 145, 150, 0.7);
+  width: 12px;
+  height: 12px;
+  border: 2px solid #71717a;
   border-radius: 50%;
   border-top-color: transparent;
-  border-right-color: rgba(140, 145, 150, 0.4);
-  animation: rotateAndPulse 3.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  border-right-color: rgba(113, 113, 122, 0.3);
+  animation: smoothRotate 2s linear infinite;
   flex-shrink: 0;
   position: relative;
 }
@@ -221,12 +229,12 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 6px;
-  height: 6px;
-  background: rgba(140, 145, 150, 0.3);
+  width: 4px;
+  height: 4px;
+  background: rgba(113, 113, 122, 0.4);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  animation: pulse 2s ease-in-out infinite alternate;
+  animation: gentlePulse 2s ease-in-out infinite alternate;
 }
 
 .tool-name-text {
@@ -289,118 +297,136 @@
   }
 }
 
-@keyframes breathe {
-  0%, 100% {
-    border-color: rgba(140, 145, 150, 0.2);
-    box-shadow: 
-      0 8px 32px rgba(140, 145, 150, 0.15),
-      0 2px 8px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    transform: scale(1);
+@keyframes smoothRotate {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    border-color: rgba(140, 145, 150, 0.35);
-    box-shadow: 
-      0 12px 48px rgba(140, 145, 150, 0.25),
-      0 4px 16px rgba(0, 0, 0, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    transform: scale(1.005);
+  to {
+    transform: rotate(360deg);
   }
 }
 
-@keyframes toolNameBreathe {
-  0%, 100% {
-    color: rgba(140, 145, 150, 0.85);
-    opacity: 0.95;
-    text-shadow: 0 0 8px rgba(140, 145, 150, 0.1);
-  }
-  50% {
-    color: rgba(140, 145, 150, 1);
-    opacity: 1;
-    text-shadow: 0 0 12px rgba(140, 145, 150, 0.2);
-  }
-}
-
-@keyframes rotateAndPulse {
+@keyframes gentlePulse {
   0% {
-    transform: rotate(0deg) scale(1);
-    border-color: rgba(140, 145, 150, 0.7);
-    filter: drop-shadow(0 0 4px rgba(140, 145, 150, 0.2));
-  }
-  25% {
-    transform: rotate(90deg) scale(1.08);
-    border-color: rgba(140, 145, 150, 0.85);
-    filter: drop-shadow(0 0 6px rgba(140, 145, 150, 0.3));
-  }
-  50% {
-    transform: rotate(180deg) scale(1.12);
-    border-color: rgba(140, 145, 150, 1);
-    filter: drop-shadow(0 0 8px rgba(140, 145, 150, 0.4));
-  }
-  75% {
-    transform: rotate(270deg) scale(1.08);
-    border-color: rgba(140, 145, 150, 0.85);
-    filter: drop-shadow(0 0 6px rgba(140, 145, 150, 0.3));
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-    border-color: rgba(140, 145, 150, 0.7);
-    filter: drop-shadow(0 0 4px rgba(140, 145, 150, 0.2));
-  }
-}
-
-@keyframes pulse {
-  0% {
-    opacity: 0.3;
+    opacity: 0.4;
     transform: translate(-50%, -50%) scale(0.8);
   }
   100% {
-    opacity: 0.6;
-    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1.1);
   }
 }
 
-/* Premium dark mode adjustments */
+
+
+
+/* Dark mode adjustments */
+[data-theme="dark"] .message-tool-state-content {
+  background: linear-gradient(
+    135deg,
+    rgba(30, 58, 138, 0.12) 0%,
+    rgba(30, 58, 138, 0.06) 100%
+  );
+  border-color: rgba(59, 130, 246, 0.2);
+  color: var(--tool-state-text-dark, #e2e8f0);
+  box-shadow: 
+    0 4px 20px rgba(30, 58, 138, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+}
+
+[data-theme="dark"] .message-tool-name {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .tool-name-icon {
+  border-color: #ffffff;
+  border-top-color: transparent;
+  border-right-color: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .tool-name-icon::after {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+[data-theme="dark"] .message-tool-thinking-viewport {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.1),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .message-tool-thinking-content {
+  color: var(--tool-state-thinking-dark, #a1a1aa);
+}
+
+[data-theme="dark"] .thinking-dots {
+  color: rgba(161, 161, 170, 0.6);
+}
+
 @media (prefers-color-scheme: dark) {
   .message-tool-state-content {
     background: linear-gradient(
       135deg,
-      var(--tool-state-bg-dark, rgba(140, 145, 150, 0.18)) 0%,
-      var(--tool-state-bg-secondary-dark, rgba(140, 145, 150, 0.12)) 100%
+      rgba(30, 58, 138, 0.12) 0%,
+      rgba(30, 58, 138, 0.06) 100%
     );
-    border-color: var(--tool-state-border-dark, rgba(140, 145, 150, 0.35));
+    border-color: rgba(59, 130, 246, 0.2);
     color: var(--tool-state-text-dark, #e2e8f0);
     box-shadow: 
-      0 8px 32px rgba(140, 145, 150, 0.2),
-      0 2px 8px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      0 4px 20px rgba(30, 58, 138, 0.15),
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
   }
 
   .message-tool-thinking-viewport {
     background: linear-gradient(
       135deg,
-      rgba(0, 0, 0, 0.15) 0%,
-      rgba(0, 0, 0, 0.08) 100%
+      rgba(0, 0, 0, 0.08) 0%,
+      rgba(0, 0, 0, 0.04) 100%
     );
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.06);
     box-shadow: 
-      inset 0 1px 2px rgba(0, 0, 0, 0.2),
-      inset 0 -1px 2px rgba(255, 255, 255, 0.03);
+      inset 0 1px 2px rgba(0, 0, 0, 0.1),
+      inset 0 -1px 2px rgba(255, 255, 255, 0.02);
   }
 
   .message-tool-thinking-content {
-    color: var(--tool-state-thinking-dark, #94a3b8);
+    color: var(--tool-state-thinking-dark, #a1a1aa);
   }
 
   .thinking-dots {
-    color: rgba(147, 197, 253, 0.6);
+    color: rgba(161, 161, 170, 0.6);
+  }
+
+  .message-tool-name {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+  }
+
+  .tool-name-icon {
+    border-color: #ffffff;
+    border-top-color: transparent;
+    border-right-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .tool-name-icon::after {
+    background: rgba(255, 255, 255, 0.4);
   }
 
   .message-tool-thinking-viewport::before {
     background: linear-gradient(
       to bottom, 
-      rgba(0, 0, 0, 0.18), 
-      rgba(0, 0, 0, 0.08),
+      rgba(0, 0, 0, 0.08), 
+      rgba(0, 0, 0, 0.04),
       transparent
     );
   }
@@ -408,85 +434,13 @@
   .message-tool-thinking-viewport::after {
     background: linear-gradient(
       to top, 
-      rgba(0, 0, 0, 0.18), 
-      rgba(0, 0, 0, 0.08),
+      rgba(0, 0, 0, 0.08), 
+      rgba(0, 0, 0, 0.04),
       transparent
     );
   }
 
-  .message-tool-name {
-    color: rgba(147, 197, 253, 0.9);
-  }
 
-  .tool-name-icon {
-    border-color: rgba(147, 197, 253, 0.8);
-    border-top-color: transparent;
-    border-right-color: rgba(147, 197, 253, 0.5);
-  }
-
-  .tool-name-icon::after {
-    background: rgba(147, 197, 253, 0.4);
-  }
-
-  @keyframes toolNameBreathe {
-    0%, 100% {
-      color: rgba(147, 197, 253, 0.9);
-      opacity: 0.95;
-      text-shadow: 0 0 8px rgba(147, 197, 253, 0.15);
-    }
-    50% {
-      color: rgba(147, 197, 253, 1);
-      opacity: 1;
-      text-shadow: 0 0 12px rgba(147, 197, 253, 0.25);
-    }
-  }
-
-  @keyframes rotateAndPulse {
-    0% {
-      transform: rotate(0deg) scale(1);
-      border-color: rgba(147, 197, 253, 0.8);
-      filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.25));
-    }
-    25% {
-      transform: rotate(90deg) scale(1.08);
-      border-color: rgba(147, 197, 253, 0.9);
-      filter: drop-shadow(0 0 6px rgba(147, 197, 253, 0.35));
-    }
-    50% {
-      transform: rotate(180deg) scale(1.12);
-      border-color: rgba(147, 197, 253, 1);
-      filter: drop-shadow(0 0 8px rgba(147, 197, 253, 0.45));
-    }
-    75% {
-      transform: rotate(270deg) scale(1.08);
-      border-color: rgba(147, 197, 253, 0.9);
-      filter: drop-shadow(0 0 6px rgba(147, 197, 253, 0.35));
-    }
-    100% {
-      transform: rotate(360deg) scale(1);
-      border-color: rgba(147, 197, 253, 0.8);
-      filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.25));
-    }
-  }
-
-  @keyframes breathe {
-    0%, 100% {
-      border-color: rgba(140, 145, 150, 0.35);
-      box-shadow: 
-        0 8px 32px rgba(140, 145, 150, 0.2),
-        0 2px 8px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      transform: scale(1);
-    }
-    50% {
-      border-color: rgba(140, 145, 150, 0.5);
-      box-shadow: 
-        0 12px 48px rgba(140, 145, 150, 0.3),
-        0 4px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
-      transform: scale(1.005);
-    }
-  }
 
   .message-tool-state::before {
     background: linear-gradient(
