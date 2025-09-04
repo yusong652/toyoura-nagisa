@@ -103,13 +103,12 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
               } as React.CSSProperties}
             >
               {displayedText}
-              {isScrolling && (
-                <span className="thinking-dots">
-                  <span className="dot dot-1">•</span>
-                  <span className="dot dot-2">•</span>
-                  <span className="dot dot-3">•</span>
-                </span>
-              )}
+              {/* 始终显示思考动画点，表示模型正在思考中 */}
+              <span className="thinking-dots">
+                <span className="dot dot-1">•</span>
+                <span className="dot dot-2">•</span>
+                <span className="dot dot-3">•</span>
+              </span>
             </div>
           </div>
         </div>
