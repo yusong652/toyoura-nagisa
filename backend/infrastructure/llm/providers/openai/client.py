@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from openai import OpenAI
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
-from backend.config import get_system_prompt
+from backend.shared.utils.prompt_builder import get_system_prompt
 
 # Import OpenAI-specific implementations
 from .config import get_openai_client_config

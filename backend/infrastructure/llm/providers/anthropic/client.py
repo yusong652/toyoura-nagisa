@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 import anthropic
-from backend.config import get_system_prompt
+from backend.shared.utils.prompt_builder import get_system_prompt
 from .config import get_anthropic_client_config
 from .content_generators import TitleGenerator, ImagePromptGenerator
 from .response_processor import AnthropicResponseProcessor
@@ -120,26 +120,40 @@ class AnthropicClient(LLMClientBase):
         # Use the tool manager's tools_enabled flag to determine if tools are actually enabled
         tools_enabled = self.tool_manager.tools_enabled
         
-        # Use enhanced system prompt if provided, otherwise use base system prompt
+        # Build system prompt with embedded tool schemas (Anthropic best practice)
         if enhanced_system_prompt:
+            # If already enhanced (e.g., with memory), use as-is
             system_prompt = enhanced_system_prompt
         else:
-            system_prompt = get_system_prompt(tools_enabled=tools_enabled)
+            # Build system prompt with embedded tool schemas following Claude Code approach
+            from backend.shared.utils.prompt_builder import build_system_prompt
+            system_prompt = build_system_prompt(
+                tools_enabled=tools_enabled,
+                tool_schemas=tools if tools_enabled else None
+            )
+        
+        # Still pass tools to API for proper function calling support
+        # The embedding in system prompt provides better context, while API tools enable calling
+        api_tools = tools if tools_enabled else []
         
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(
             system_prompt=system_prompt,
             messages=anthropic_messages,
-            tools=tools
+            tools=api_tools
         )
 
         if debug:
-            # Log basic API call information
+            # Log basic API call information with tool embedding info
             AnthropicDebugger.log_api_call_info(
                 tools_count=len(tools) if tools else 0,
                 model=self.anthropic_config.model_settings.model,
                 thinking_enabled=self.anthropic_config.model_settings.supports_thinking() and self.anthropic_config.model_settings.enable_thinking
             )
+            
+            # Log tool embedding status
+            if tools and tools_enabled:
+                print(f"[Anthropic Debug] Tool schemas embedded in system prompt: {len(tools)} tools")
             
             # Print simplified debug payload
             AnthropicDebugger.print_debug_request_payload(kwargs_api)
