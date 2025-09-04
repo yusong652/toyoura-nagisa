@@ -39,6 +39,21 @@ const SlashCommandStatusPanel: React.FC<SlashCommandStatusPanelProps> = ({
     return null
   }
 
+  /**
+   * Truncate error message with ellipsis if too long
+   * Responsive truncation based on screen size
+   * @param message - Error message to truncate
+   * @returns Truncated message with ellipsis if needed
+   */
+  const truncateMessage = (message: string): string => {
+    // Check if we're on mobile (simplified approach)
+    const isMobile = window.innerWidth <= 768
+    const maxLength = isMobile ? 25 : 40
+    
+    if (message.length <= maxLength) return message
+    return message.substring(0, maxLength).trim() + '...'
+  }
+
   return (
     <div className={`slash-command-status-panel ${position} ${className}`.trim()}>
       {executionQueue.map((task, index) => {
@@ -50,11 +65,14 @@ const SlashCommandStatusPanel: React.FC<SlashCommandStatusPanelProps> = ({
             ) : (
               <StatusSpinnerIcon size={16} className="command-spinner" />
             )}
-            <span className="command-status-label">
+            <span 
+              className="command-status-label"
+              title={isError && task.error ? `failed ${task.command.trigger}: ${task.error}` : undefined}
+            >
               {isError ? (
                 <>
                   failed {task.command.trigger}
-                  {task.error ? `: ${task.error}` : ''}
+                  {task.error ? `: ${truncateMessage(task.error)}` : ''}
                 </>
               ) : (
                 <>
