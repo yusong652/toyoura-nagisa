@@ -39,8 +39,8 @@ const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = () => {
   // Hook: Error display management
   const { error, clearError } = useErrorDisplay()
   
-  // Hook: Sidebar visibility state management
-  const { isOpen, toggleSidebar, closeSidebar } = useSidebarState()
+  // Hook: Sidebar visibility state management with click outside
+  const { isOpen, toggleSidebar, closeSidebar, sidebarRef, toggleRef } = useSidebarState()
   
   // Hook: Session CRUD operations with sidebar integration
   const {
@@ -65,6 +65,7 @@ const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = () => {
     <>
       {/* Toggle button - always visible */}
       <button 
+        ref={toggleRef}
         className="history-toggle" 
         onClick={toggleSidebar} 
         aria-label="Toggle chat history"
@@ -84,7 +85,7 @@ const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = () => {
       </button>
       
       {/* Main sidebar container */}
-      <div className={`chat-history-sidebar ${isOpen ? 'open' : ''}`}>
+      <div ref={sidebarRef} className={`chat-history-sidebar ${isOpen ? 'open' : ''}`}>
         {/* Header with title and close button */}
         <SidebarHeader 
           isOpen={isOpen} 

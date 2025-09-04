@@ -46,9 +46,7 @@ const SessionList: React.FC<SessionListProps> = ({
           session={session}
           isActive={currentSessionId === session.id}
           onSelect={() => onSwitchSession(session.id)}
-          onDelete={(e) => onDeleteSession(session.id).then(() => {
-            // Promise resolution handled, no additional action needed
-          })}
+          onDelete={(e) => onDeleteSession(e, session.id)}
         />
       ))}
     </div>

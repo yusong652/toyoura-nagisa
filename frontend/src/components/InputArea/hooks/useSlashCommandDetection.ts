@@ -73,9 +73,11 @@ const useSlashCommandDetection = (
   onCommandExecute?: (command: SlashCommand, args: string[]) => void | Promise<void>
 ): SlashCommandDetectionHookReturn => {
   
-  // Activation state management - the key to elegant ESC handling
+  // Activation state management
   const [isActivated, setIsActivated] = useState<boolean>(false)
-  const [wasJustDeactivated, setWasJustDeactivated] = useState<boolean>(false)
+  // After ESC, suppress auto-activation until the caret moves to just-after the first slash
+  const [suppressSuggestions, setSuppressSuggestions] = useState<boolean>(false)
+  const [prevCursorPosition, setPrevCursorPosition] = useState<number>(cursorPosition)
   
   // Available commands (builtin + user-defined)
   const availableCommands = useMemo(() => {
@@ -178,24 +180,33 @@ const useSlashCommandDetection = (
   
   // Auto-activation logic: activate when user types '/' at beginning
   useEffect(() => {
-    const shouldAutoActivate = 
-      message.startsWith('/') && 
-      cursorPosition > 0 && 
-      !wasJustDeactivated &&
+    // Determine if re-arm condition is met: caret moved to position 1 (just after leading slash)
+    const movedToAfterSlash = message.startsWith('/') && cursorPosition === 1 && prevCursorPosition !== 1
+
+    // Clear suppression when:
+    // - user moved caret to just-after the leading slash, or
+    // - slash no longer at start (user edited text)
+    if (suppressSuggestions) {
+      if (movedToAfterSlash || !message.startsWith('/')) {
+        setSuppressSuggestions(false)
+      }
+    }
+
+    const shouldAutoActivate =
+      message.startsWith('/') &&
+      cursorPosition > 0 &&
+      !suppressSuggestions &&
       DEFAULT_INPUT_CONFIG.slashCommands.enabled
-    
+
     if (shouldAutoActivate && !isActivated) {
       setIsActivated(true)
     }
-    
-    // Clear the "just deactivated" flag after a brief delay
-    if (wasJustDeactivated) {
-      const timeout = setTimeout(() => {
-        setWasJustDeactivated(false)
-      }, 100)
-      return () => clearTimeout(timeout)
+
+    // Track previous cursor for movement detection
+    if (prevCursorPosition !== cursorPosition) {
+      setPrevCursorPosition(cursorPosition)
     }
-  }, [message, cursorPosition, isActivated, wasJustDeactivated])
+  }, [message, cursorPosition, isActivated, suppressSuggestions, prevCursorPosition])
   
   // Auto-deactivation: deactivate when slash is removed
   useEffect(() => {
@@ -248,11 +259,11 @@ const useSlashCommandDetection = (
     // The actual text replacement should be handled by the parent component
   }, [])
   
-  // Clear active command - elegant ESC handling
+  // Clear active command - ESC handling: suppress re-activation until re-armed
   const clearCommand = useCallback(() => {
     if (isActivated) {
       setIsActivated(false)
-      setWasJustDeactivated(true) // Prevent immediate reactivation
+      setSuppressSuggestions(true) // Prevent re-activation until re-armed
       console.log('Slash command suggestions deactivated via ESC')
     }
   }, [isActivated])

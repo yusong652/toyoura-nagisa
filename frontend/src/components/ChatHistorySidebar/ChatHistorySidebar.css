@@ -1,51 +1,57 @@
-/* Toggle button styles */
+@import './theme.css';
+
+/* Toggle button styles - Clean hamburger lines only */
 .history-toggle {
   position: fixed;
   top: 20px;
   left: 20px;
-  z-index: 1000;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: rgba(23, 4, 28, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
+  z-index: 998;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  color: var(--toggle-color);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px;
 }
 
 .history-toggle:hover {
-  background: rgba(35, 10, 45, 0.9);
-  border-color: rgba(178, 75, 185, 0.3);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(178, 75, 185, 0.2);
+  transform: scale(1.1);
+  color: var(--toggle-color);
+}
+
+.history-toggle:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .history-toggle svg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+  opacity: 0.8;
 }
 
-/* Main sidebar container */
+/* Main sidebar container - Modern glass design */
 .chat-history-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   width: 320px;
   height: 100%;
-  background: linear-gradient(135deg, rgba(23, 4, 28, 0.98), rgba(35, 10, 45, 0.98));
-  backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border-right: 1px solid var(--sidebar-border);
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 999;
   display: flex;
   flex-direction: column;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--sidebar-shadow);
 }
 
 .chat-history-sidebar.open {
@@ -72,9 +78,9 @@ body.sidebar-open::after {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--sidebar-overlay);
   backdrop-filter: blur(2px);
-  z-index: 998;
+  z-index: 997;
   animation: fadeIn 0.3s ease;
 }
 

@@ -48,7 +48,7 @@ export interface SessionListProps {
   sessions: ChatSession[]
   currentSessionId: string | null
   onSwitchSession: (sessionId: string) => void
-  onDeleteSession: (sessionId: string) => Promise<void>
+  onDeleteSession: (e: React.MouseEvent, sessionId: string) => Promise<void>
 }
 
 /**
