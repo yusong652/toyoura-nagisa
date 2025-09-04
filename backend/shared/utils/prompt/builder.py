@@ -16,7 +16,7 @@ async def build_system_prompt(
     agent_profile: str = "general",
     tool_schemas: Optional[List[Dict[str, Any]]] = None,
     session_id: Optional[str] = None,
-    user_id: str = "default",
+    user_id: Optional[str] = None,
     enable_memory: bool = True,
 ) -> str:
     """

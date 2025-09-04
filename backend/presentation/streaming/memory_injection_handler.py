@@ -21,7 +21,7 @@ async def get_system_prompt_with_memory_context(
     session_id: str,
     user_message: BaseMessage,
     base_system_prompt: str,
-    user_id: str = "default"
+    user_id: Optional[str] = None
 ) -> str:
     """
     Get system prompt with integrated memory context for a session.
@@ -70,7 +70,7 @@ async def save_conversation_memory(
     user_message: BaseMessage,
     assistant_response: str,
     session_id: str,
-    user_id: str = "default"
+    user_id: Optional[str] = None
 ) -> bool:
     """
     Save conversation turn to memory after successful response.
@@ -115,7 +115,7 @@ async def save_conversation_memory(
 async def handle_memory_management(
     action: str,
     session_id: str,
-    user_id: str = "default",
+    user_id: Optional[str] = None,
     params: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """

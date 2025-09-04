@@ -7,7 +7,7 @@ orchestrating memory injection, LLM response handling, and conversation persiste
 
 import json
 import uuid
-from typing import List, AsyncGenerator
+from typing import List, AsyncGenerator, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory_no_thinking
@@ -25,7 +25,7 @@ async def generate_chat_stream(
     recent_msgs: List[BaseMessage], 
     llm_client: LLMClientBase, 
     tts_engine: BaseTTS,
-    user_id: str = "default",
+    user_id: Optional[str] = None,
     enable_memory: bool = True,
     agent_profile: str = "general"
 ) -> AsyncGenerator[str, None]:

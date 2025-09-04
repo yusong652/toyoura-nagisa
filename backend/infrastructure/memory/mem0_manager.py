@@ -38,6 +38,24 @@ class Mem0MemoryManager:
         Args:
             config: Optional MemoryConfig instance
         """
+        # Ensure environment variables are loaded
+        from dotenv import load_dotenv
+        import os
+        from pathlib import Path
+        
+        # Try to load .env from multiple locations
+        env_paths = [
+            Path(".env"),
+            Path("backend/.env"),
+            Path(__file__).parent.parent.parent / ".env"
+        ]
+        
+        for env_path in env_paths:
+            if env_path.exists():
+                load_dotenv(env_path)
+                print(f"[Mem0 Init] Loaded environment from {env_path}")
+                break
+        
         # Use provided config or create default
         self.config = config or MemoryConfig()
         
@@ -45,20 +63,34 @@ class Mem0MemoryManager:
         mem0_config = self.config.build_mem0_config()
         
         # Log API key status
-        if not os.getenv("GOOGLE_API_KEY"):
+        google_key = os.getenv("GOOGLE_API_KEY")
+        if not google_key:
             logger.warning("[Mem0 Init] GOOGLE_API_KEY not found, using HuggingFace fallback")
+        else:
+            print(f"[Mem0 Init] Using Google API key (length: {len(google_key)})")
         
         # Initialize Mem0
+        print(f"[Mem0 Init] Configuration details:")
+        print(f"  Embedder provider: {mem0_config.get('embedder', {}).get('provider', 'unknown')}")
+        print(f"  Embedder model: {mem0_config.get('embedder', {}).get('config', {}).get('model', 'unknown')}")
+        print(f"  Vector store provider: {mem0_config.get('vector_store', {}).get('provider', 'unknown')}")
+        print(f"  Vector store path: {mem0_config.get('vector_store', {}).get('config', {}).get('path', 'unknown')}")
+        print(f"  Collection name: {mem0_config.get('vector_store', {}).get('config', {}).get('collection_name', 'unknown')}")
+        print(f"  Embedding dimensions: {mem0_config.get('vector_store', {}).get('config', {}).get('embedding_model_dims', 'unknown')}")
+        
         if self.config.debug_mode:
             logger.info(f"[Mem0 Init] Attempting to initialize with config: {mem0_config}")
         
         try:
             self.memory = Memory.from_config(mem0_config)
+            print("[Mem0 Init] ✅ Memory system initialized successfully with above configuration")
+            
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Init] Successfully initialized Mem0")
                 logger.info(f"[Mem0 LLM Config] Using {self.config.mem0_llm_provider} with model {self.config.mem0_llm_model}")
         except Exception as e:
             logger.error(f"[Mem0 Init] Failed to initialize Mem0: {e}")
+            print(f"[Mem0 Init] ❌ Failed to initialize with config: {mem0_config}")
             raise RuntimeError(f"Memory system initialization failed: {e}") from e
         
         # Memory type decay rates (per day)
@@ -103,18 +135,31 @@ class Mem0MemoryManager:
         metadata.update({
             "timestamp": datetime.now().isoformat(),
             "session_id": session_id,
+            "user_id": user_id,  # Persist user for robust filtering
         })
         
         # Add memory using Mem0
         if self.config.debug_mode:
             logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
         
+        # Always log the actual user_id being used for debugging
+        print(f"[DEBUG] add_memory called with user_id={user_id}")
+        
         try:
-            result = self.memory.add(
-                messages=content,
-                user_id=user_id,
-                metadata=metadata
-            )
+            # Support Mem0 API variants: prefer user_id, fallback to agent_id
+            try:
+                result = self.memory.add(
+                    messages=content,
+                    user_id=user_id,
+                    metadata=metadata
+                )
+            except TypeError:
+                # Older/newer API may use agent_id instead of user_id
+                result = self.memory.add(
+                    messages=content,
+                    agent_id=user_id,
+                    metadata=metadata
+                )
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Debug] Add result type: {type(result)}, value: {result}")
         except Exception as e:
@@ -170,7 +215,7 @@ class Mem0MemoryManager:
     async def search_memories(
         self,
         query: str,
-        user_id: str = "default",
+        user_id: Optional[str] = None,
         limit: int = 5,
         session_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -179,29 +224,68 @@ class Mem0MemoryManager:
         
         Args:
             query: Search query
-            user_id: User identifier
+            user_id: User identifier (uses config default if None)
             limit: Maximum results
             session_id: Optional session filter
         
         Returns:
             List of memory dictionaries
         """
+        # Use config defaults
+        user_id = user_id or self.config.mem0_user_id
+        
         # Start timing for vectorization and search
         search_start_time = time.time()
+        print(f"[DEBUG] search_memories called: query='{query}', user_id={user_id}, limit={limit}, session_id={session_id}")
+        
+        # Debug: List all memories for this user first
+        try:
+            # Support Mem0 API variants for get_all
+            try:
+                all_memories_response = self.memory.get_all(user_id=user_id)
+            except TypeError:
+                all_memories_response = self.memory.get_all(agent_id=user_id)
+            if isinstance(all_memories_response, dict) and 'results' in all_memories_response:
+                all_memories = all_memories_response['results']
+                print(f"[DEBUG] Total memories for user {user_id}: {len(all_memories)}")
+                # Show first 3 memories safely (avoid noise)
+                for i, mem in enumerate(all_memories[:3]):
+                    print(f"[DEBUG] Memory {i}: {mem}")
+            else:
+                print(f"[DEBUG] Unexpected get_all response format: {all_memories_response}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to get all memories: {e}")
+        
         if self.config.debug_mode:
             logger.info(f"[Mem0 Timing] Starting vector search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
         
         # Search using Mem0 - this includes vectorization + semantic search
         vectorization_start = time.time()
         try:
-            search_result = self.memory.search(
-                query=query,
-                user_id=user_id,
-                limit=limit
-            )
+            print(f"[DEBUG] Calling mem0.search with query='{query}', user_id={user_id}, limit={limit}")
+            # Support Mem0 API variants for search
+            try:
+                search_result = self.memory.search(
+                    query=query,
+                    user_id=user_id,
+                    limit=limit
+                )
+            except TypeError:
+                search_result = self.memory.search(
+                    query=query,
+                    agent_id=user_id,
+                    limit=limit
+                )
             
+            print(f"[DEBUG] Raw search_result: {search_result}")
             # mem0.search() always returns {'results': [...]} where results is always a list
             results = search_result["results"]
+            print(f"[DEBUG] Mem0 search returned {len(results)} results before session filtering")
+            
+            if results:
+                print(f"[DEBUG] First search result: {results[0]}")
+            else:
+                print(f"[DEBUG] Search returned empty results for user {user_id}")
             
             vectorization_time_ms = (time.time() - vectorization_start) * 1000
             if self.config.debug_mode:
@@ -215,6 +299,7 @@ class Mem0MemoryManager:
         
         # Filter by session if specified
         if session_id:
+            print(f"[DEBUG] Applying session filter: session_id={session_id}")
             filter_start = time.time()
             original_count = len(results)
             results = [
@@ -222,8 +307,11 @@ class Mem0MemoryManager:
                 if r.get("metadata", {}).get("session_id") == session_id
             ]
             filter_time_ms = (time.time() - filter_start) * 1000
+            print(f"[DEBUG] Session filter applied: {original_count} -> {len(results)} results")
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Timing] Session filtering: {filter_time_ms:.2f}ms, {original_count} -> {len(results)} results")
+        else:
+            print(f"[DEBUG] No session filter applied (session_id is None), keeping all {len(results)} results")
         
         total_search_time_ms = (time.time() - search_start_time) * 1000
         if self.config.debug_mode:
@@ -280,7 +368,8 @@ class Mem0MemoryManager:
         raw_memories = await self.search_memories(
             query=query_text,
             user_id=user_id,
-            limit=top_k * 2  # Get extra for filtering
+            limit=top_k * 2,  # Get extra for filtering
+            session_id=None  # Explicitly ensure cross-session search
         )
         
         context_search_time_ms = (time.time() - context_search_start) * 1000
@@ -373,21 +462,34 @@ class Mem0MemoryManager:
     
     async def get_all_memories(
         self,
-        user_id: str = "default",
+        user_id: Optional[str] = None,
         session_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Get all memories for a user or session.
         
         Args:
-            user_id: User identifier
+            user_id: User identifier (uses config default if None)
             session_id: Optional session filter
         
         Returns:
             List of all memories
         """
+        # Use config defaults
+        user_id = user_id or self.config.mem0_user_id
+        
         # Get all memories from Mem0
-        all_memories = self.memory.get_all(user_id=user_id)
+        # Support Mem0 API variants for get_all
+        try:
+            all_memories_resp = self.memory.get_all(user_id=user_id)
+        except TypeError:
+            all_memories_resp = self.memory.get_all(agent_id=user_id)
+        all_memories: List[Dict[str, Any]]
+        if isinstance(all_memories_resp, dict) and 'results' in all_memories_resp:
+            all_memories = all_memories_resp['results']
+        else:
+            # Gracefully handle older/alternative return shapes
+            all_memories = all_memories_resp if isinstance(all_memories_resp, list) else []
         
         # Filter by session if specified
         if session_id:

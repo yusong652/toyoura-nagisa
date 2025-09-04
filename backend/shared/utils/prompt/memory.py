@@ -3,28 +3,11 @@ Memory context integration for prompt system.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-
-def build_memory_section(memory_context: str) -> str:
-    """
-    Build memory context section for system prompt.
-    
-    Args:
-        memory_context: Formatted memory context string
-        
-    Returns:
-        Memory section with proper formatting
-    """
-    if not memory_context or not memory_context.strip():
-        return ""
-    
-    return f"## Relevant Context from Memory\n\n{memory_context.strip()}"
-
-
-async def build_memory_section_from_session(session_id: str, user_id: str = "default") -> Optional[str]:
+async def build_memory_section_from_session(session_id: str, user_id: Optional[str] = None) -> Optional[str]:
     """
     Retrieve and format relevant memories from session history.
     
@@ -33,29 +16,26 @@ async def build_memory_section_from_session(session_id: str, user_id: str = "def
     
     Args:
         session_id: Session ID for loading message history
-        user_id: User ID for memory operations
+        user_id: User ID for memory operations (uses config default if None)
         
     Returns:
         Formatted memory content string, or None if no memories found
     """
     try:
         from backend.infrastructure.storage.session_manager import load_history
-        from backend.infrastructure.memory.memory_injection import MemoryInjectionMiddleware
+        from backend.shared.utils.memory_factory import get_memory_middleware
         from backend.config.memory import MemoryConfig
         from backend.domain.models.memory_context import MemoryContext
         
         # Check if memory injection is enabled
         memory_config = MemoryConfig()
         if not memory_config.should_inject_memory():
-            print("[DEBUG] Memory injection disabled, skipping memory section")
             return None
         
         # Load session history and extract latest user message text
         recent_history = load_history(session_id)
-        print(f"[DEBUG] Loaded {len(recent_history) if recent_history else 0} messages for memory section")
         
         if not recent_history:
-            print("[DEBUG] No session history found")
             return None
         
         # Find latest user message and extract text directly from history
@@ -76,13 +56,13 @@ async def build_memory_section_from_session(session_id: str, user_id: str = "def
                     break
         
         if not latest_user_text or not latest_user_text.strip():
-            print("[DEBUG] No user message text found for memory search")
             return None
         
-        print(f"[DEBUG] Using query text for memory search: {latest_user_text}")
+        # Determine effective user_id (Mem0 requires user or agent id)
+        effective_user_id = user_id or memory_config.mem0_user_id
         
-        # Initialize memory middleware and search for relevant memories
-        memory_middleware = MemoryInjectionMiddleware(config=memory_config)
+        # Initialize/reuse singleton memory middleware
+        memory_middleware = get_memory_middleware()
         
         # Create memory context
         memory_context = MemoryContext(
@@ -94,20 +74,24 @@ async def build_memory_section_from_session(session_id: str, user_id: str = "def
             relevance_threshold=memory_config.memory_relevance_threshold
         )
         
-        # Search for relevant memories
+        # Search for relevant memories across all sessions (cross-session memory retrieval)
+        print(f"[DEBUG] Cross-session memory search: user_id={effective_user_id}, query='{latest_user_text}', session_id=None")
         memories = await memory_middleware.memory_manager.get_relevant_memories_for_context(
             query_text=latest_user_text,
-            session_id=None,  # Search all user memories
+            session_id=None,  # Search all user memories across all sessions
             top_k=memory_context.top_k,
             exclude_recent_minutes=memory_context.exclude_recent_minutes,
             memory_types=memory_context.memory_types,
-            user_id=user_id
+            user_id=effective_user_id
         )
         
-        print(f"[DEBUG] Found {len(memories)} memories for memory section")
+        print(f"[DEBUG] Found {len(memories)} memories for cross-session search")
+        if memories:
+            for i, memory in enumerate(memories):
+                print(f"[DEBUG] Memory {i}: {memory}")
         
         if not memories:
-            print("[DEBUG] No relevant memories found")
+            print(f"[DEBUG] No memories found for user_id={effective_user_id} with query='{latest_user_text}'")
             return None
         
         # Format memories for injection
@@ -115,59 +99,11 @@ async def build_memory_section_from_session(session_id: str, user_id: str = "def
         formatted_context = memory_context.format_for_injection()
         
         if not formatted_context or not formatted_context.strip():
-            print("[DEBUG] No formatted memory context generated")
             return None
-        
-        print(f"[DEBUG] Generated memory content with {len(formatted_context)} characters")
         
         # Return raw memory content, let caller format as section
         return formatted_context
         
     except Exception as e:
         logger.error(f"Failed to build memory section: {e}")
-        print(f"[DEBUG] Memory section build failed: {e}")
         return None
-
-
-async def save_conversation_to_memory(
-    user_message: Any,  # BaseMessage type
-    assistant_message: Any,  # BaseMessage type
-    session_id: str,
-    user_id: str = "default",
-    metadata: Optional[Dict[str, Any]] = None
-) -> None:
-    """
-    Save conversation turn to memory.
-    
-    This function provides a centralized way to save conversations to memory
-    from the prompt builder context.
-    
-    Args:
-        user_message: User's BaseMessage object
-        assistant_message: Assistant's BaseMessage object
-        session_id: Session ID
-        user_id: User ID
-        metadata: Additional metadata
-    """
-    try:
-        from backend.infrastructure.memory.memory_injection import MemoryInjectionMiddleware
-        from backend.config.memory import MemoryConfig
-        
-        memory_config = MemoryConfig()
-        
-        # Skip if memory saving is disabled
-        if not memory_config.should_save_memory():
-            return
-        
-        memory_middleware = MemoryInjectionMiddleware(config=memory_config)
-        
-        await memory_middleware.save_conversation_turn(
-            user_message=user_message,
-            assistant_message=assistant_message,
-            session_id=session_id,
-            user_id=user_id,
-            metadata=metadata
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to save conversation to memory: {e}")

@@ -53,7 +53,7 @@ class MemoryInjectionMiddleware:
         base_system_prompt: str,
         user_message: BaseMessage,
         session_id: str,
-        user_id: str = "default"
+        user_id: Optional[str] = None
     ) -> tuple[str, MemoryInjectionResult]:
         """
         Get enhanced system prompt with memory context using SessionMemoryContextManager.
@@ -65,14 +65,15 @@ class MemoryInjectionMiddleware:
             base_system_prompt: Base system prompt
             user_message: User's message (BaseMessage object)
             session_id: Session ID
-            user_id: User ID
+            user_id: User ID (uses config default if None)
             
         Returns:
             Tuple of (enhanced_system_prompt, injection_result)
         """
+        # Use config defaults
+        user_id = user_id or self.config.mem0_user_id
         
         if not self.config.should_inject_memory():
-            print("[DEBUG] Memory injection disabled or auto-inject off")
             return base_system_prompt, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
@@ -83,10 +84,8 @@ class MemoryInjectionMiddleware:
             # Extract text from user message
             from backend.domain.models.message_factory import extract_text_from_message
             query_text = extract_text_from_message(user_message)
-            print(f"[DEBUG] Extracted query text: {query_text}")
             
             if not query_text:
-                print("[DEBUG] No user query found")
                 return base_system_prompt, MemoryInjectionResult(
                     success=False,
                     injected_count=0,
@@ -103,30 +102,23 @@ class MemoryInjectionMiddleware:
                 relevance_threshold=self.config.memory_relevance_threshold
             )
             
-            # Retrieve relevant memories without session filtering
-            print(f"[DEBUG] Searching for memories with query: {query_text}, user_id: {user_id}")
+            # Retrieve relevant memories without session filtering (cross-session memory retrieval)
             memories = await self.memory_manager.get_relevant_memories_for_context(
                 query_text=query_text,
-                session_id=None,  # Don't filter by session - search all user memories
+                session_id=None,  # Cross-session search - retrieve memories from all user sessions
                 top_k=memory_context.top_k,
                 exclude_recent_minutes=memory_context.exclude_recent_minutes,
                 memory_types=memory_context.memory_types,
                 user_id=user_id
             )
             
-            print(f"[DEBUG] Found {len(memories)} memories for query")
-            if self.config.debug_mode:
-                print(f"[Memory Debug] Found {len(memories)} memories for query")
-            
             memory_context.memories = memories
             
             # Format memories for injection
             formatted_context = memory_context.format_for_injection()
-            print(f"[DEBUG] Formatted context length: {len(formatted_context) if formatted_context else 0}")
             
             if not formatted_context:
                 # No relevant memories found
-                print("[DEBUG] No relevant memories found or formatted context is empty")
                 return base_system_prompt, MemoryInjectionResult(
                     success=True,
                     injected_count=0,
@@ -135,7 +127,6 @@ class MemoryInjectionMiddleware:
             
             # Compose enhanced system prompt using template
             enhanced_prompt = format_memory_context_prompt(base_system_prompt, formatted_context)
-            print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
             
             context_tokens = estimate_tokens(formatted_context)
             
@@ -159,7 +150,7 @@ class MemoryInjectionMiddleware:
         user_message: BaseMessage,
         assistant_message: BaseMessage,
         session_id: str,
-        user_id: str = "default",
+        user_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """
@@ -169,9 +160,12 @@ class MemoryInjectionMiddleware:
             user_message: User's BaseMessage object
             assistant_message: Assistant's BaseMessage object
             session_id: Session ID
-            user_id: User ID
+            user_id: User ID (uses config default if None)
             metadata: Additional metadata
         """
+        # Use config defaults
+        user_id = user_id or self.config.mem0_user_id
+        
         # Check if saving is enabled
         if not self.config.should_save_memory():
             return
@@ -194,12 +188,17 @@ class MemoryInjectionMiddleware:
         conversation_content = f"""User: {user_text}
 Assistant: {assistant_text[:500]}"""
         
-        # Add conversation memory (detailed output handled by Mem0 manager)
-        await self.memory_manager.add_memory(
-            content=conversation_content,
-            user_id=user_id,
-            session_id=session_id,
-            metadata={**turn_metadata, "role": "conversation"}
-        )
+        try:
+            # Add conversation memory (detailed output handled by Mem0 manager)
+            # Memory is saved with session_id for traceability but will be searchable across all sessions
+            await self.memory_manager.add_memory(
+                content=conversation_content,
+                user_id=user_id,
+                session_id=session_id,  # Save with session_id for traceability
+                metadata={**turn_metadata, "role": "conversation"}
+            )
+        except Exception as e:
+            logger.error(f"Failed to save conversation to memory: {e}")
+            raise
 
 

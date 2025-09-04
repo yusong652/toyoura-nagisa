@@ -26,8 +26,7 @@ from .tools import (
 )
 
 from .memory import (
-    build_memory_section,
-    save_conversation_to_memory
+    build_memory_section_from_session
 )
 
 __all__ = [
@@ -45,8 +44,7 @@ __all__ = [
     'build_tool_section',
     
     # Memory functions
-    'build_memory_section',
-    'save_conversation_to_memory',
+    'build_memory_section_from_session',
     
     # Legacy compatibility
     'load_base_prompt'

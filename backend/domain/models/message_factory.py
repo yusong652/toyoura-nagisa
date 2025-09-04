@@ -118,8 +118,12 @@ def extract_text_from_message(message: BaseMessage) -> str:
     if isinstance(content, list):
         text_parts = []
         for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                text_parts.append(item.get("text", ""))
+            if isinstance(item, dict):
+                # Handle both formats: {'type': 'text', 'text': '...'} and {'text': '...'}
+                if item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+                elif "text" in item:
+                    text_parts.append(item["text"])
         return " ".join(text_parts)
     
     # Handle simple string content
