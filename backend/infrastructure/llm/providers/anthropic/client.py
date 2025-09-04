@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 import anthropic
-from backend.shared.utils.prompt_builder import get_system_prompt
+from backend.shared.utils.prompt import get_system_prompt
 from .config import get_anthropic_client_config
 from .content_generators import TitleGenerator, ImagePromptGenerator
 from .response_processor import AnthropicResponseProcessor
@@ -126,7 +126,7 @@ class AnthropicClient(LLMClientBase):
             system_prompt = enhanced_system_prompt
         else:
             # Build system prompt with embedded tool schemas following Claude Code approach
-            from backend.shared.utils.prompt_builder import build_system_prompt
+            from backend.shared.utils.prompt import build_system_prompt
             system_prompt = build_system_prompt(
                 tools_enabled=tools_enabled,
                 tool_schemas=tools if tools_enabled else None

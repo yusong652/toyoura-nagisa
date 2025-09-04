@@ -73,7 +73,7 @@ async def generate_chat_stream(
             # Use the latest user message (last message in recent_msgs)
             if recent_msgs:
                 latest_user_message = recent_msgs[-1]
-                from backend.shared.utils.prompt_builder import get_system_prompt
+                from backend.shared.utils.prompt import get_system_prompt
                 # Use the LLM client's actual tools_enabled setting
                 tools_enabled = llm_client.tool_manager.tools_enabled if hasattr(llm_client, 'tool_manager') else True
                 base_system_prompt = get_system_prompt(tools_enabled=tools_enabled)

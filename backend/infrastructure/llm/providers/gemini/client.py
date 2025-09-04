@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 
 from backend.config import get_llm_settings
-from backend.shared.utils.prompt_builder import get_system_prompt
+from backend.shared.utils.prompt import get_system_prompt
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 
