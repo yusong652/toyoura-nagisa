@@ -201,8 +201,8 @@ async def optimize_prompt_for_video(
         
     except Exception as e:
         logger.error(f"Error optimizing prompt for video: {e}")
-        print(f"[DEBUG] Exception occurred during prompt optimization, returning None")
-        return None
+        # Propagate to caller so that detailed error can be returned to frontend
+        raise
 
 
 async def generate_video_from_image(

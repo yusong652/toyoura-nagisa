@@ -379,4 +379,5 @@ class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
         except Exception as e:
             if debug:
                 print(f"[{prompt_type.value}] Error during unified prompt generation: {str(e)}")
-            return None
+            # Propagate exception so service layer can return detailed error to frontend
+            raise

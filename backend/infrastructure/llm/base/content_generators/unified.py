@@ -134,7 +134,20 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
             raise ValueError(f"Unsupported prompt type: {prompt_type}")
         
         # Get latest conversation messages using actual config values
-        latest_messages = get_latest_n_messages(session_id, actual_context_message_count) if session_id else tuple([None] * actual_context_message_count)
+        latest_messages = (
+            get_latest_n_messages(session_id, actual_context_message_count)
+            if session_id
+            else tuple([None] * actual_context_message_count)
+        )
+
+        # Validate minimum message count when using session context
+        if session_id:
+            actual_message_count = len([m for m in latest_messages if m is not None])
+            if actual_message_count < 2:
+                raise ValueError(
+                    f"Not enough messages in conversation context (found {actual_message_count}). "
+                    "At least 2 messages are required to generate prompts."
+                )
         
         # Build conversation context with appropriate prefix
         if prompt_type == PromptType.TEXT_TO_IMAGE:

@@ -41,15 +41,15 @@ export const useSlashCommandExecution = (): SlashCommandExecutionHookReturn => {
    *     onComplete?: () => void - Callback to execute after command completion
    */
   const executeSlashCommand = useCallback(async (
-    command: SlashCommand, 
-    args: string[], 
+    command: SlashCommand,
+    args: string[],
     onComplete?: () => void
-  ) => {
+  ): Promise<{ success: boolean; error?: string }> => {
     console.log(`Executing command: ${command.trigger} with args:`, args)
     
     if (!currentSessionId) {
       console.error('No active session for slash command')
-      return
+      return { success: false, error: 'No active session' }
     }
     
     // Create task and add to queue
@@ -77,9 +77,9 @@ export const useSlashCommandExecution = (): SlashCommandExecutionHookReturn => {
       }
       
       // Update task status
-      setExecutionQueue(prev => prev.map(t => 
-        t.id === taskId 
-          ? { ...t, status: result.success ? 'completed' : 'error' }
+      setExecutionQueue(prev => prev.map(t =>
+        t.id === taskId
+          ? { ...t, status: result.success ? 'completed' : 'error', error: result.success ? undefined : result.error }
           : t
       ))
       
@@ -95,13 +95,15 @@ export const useSlashCommandExecution = (): SlashCommandExecutionHookReturn => {
         setExecutionQueue(prev => prev.filter(t => t.id !== taskId))
       }, 2000)
       
+      return result
     } catch (error) {
       console.error('Slash command execution failed:', error)
       
       // Mark task as error
-      setExecutionQueue(prev => prev.map(t => 
-        t.id === taskId 
-          ? { ...t, status: 'error' }
+      const message = error instanceof Error ? error.message : 'Command execution failed'
+      setExecutionQueue(prev => prev.map(t =>
+        t.id === taskId
+          ? { ...t, status: 'error', error: message }
           : t
       ))
       
@@ -109,6 +111,8 @@ export const useSlashCommandExecution = (): SlashCommandExecutionHookReturn => {
       setTimeout(() => {
         setExecutionQueue(prev => prev.filter(t => t.id !== taskId))
       }, 3000)
+
+      return { success: false, error: message }
     }
   }, [currentSessionId, generateImage, generateVideo])
   
@@ -117,6 +121,6 @@ export const useSlashCommandExecution = (): SlashCommandExecutionHookReturn => {
     isGeneratingVideo,
     executeSlashCommand,
     isExecuting,
-    executionQueue: executionQueue.filter(task => task.status === 'executing')
+    executionQueue: executionQueue.filter(task => task.status !== 'completed')
   }
 }

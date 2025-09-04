@@ -1,6 +1,6 @@
 import React from 'react'
 import { CommandExecutionTask } from '../InputArea/types'
-import { StatusSpinnerIcon } from '../InputArea/styles/icons'
+import { StatusSpinnerIcon, ErrorIcon } from '../InputArea/styles/icons'
 import './SlashCommandStatusPanel.css'
 
 /**
@@ -41,19 +41,35 @@ const SlashCommandStatusPanel: React.FC<SlashCommandStatusPanelProps> = ({
 
   return (
     <div className={`slash-command-status-panel ${position} ${className}`.trim()}>
-      {executionQueue.map((task, index) => (
-        <div key={task.id} className="command-status-item">
-          <StatusSpinnerIcon size={16} className="command-spinner" />
-          <span className="command-status-label">
-            generating {task.command.trigger}
-            {executionQueue.length > 1 && (
-              <span className="queue-position">
-                ({index + 1}/{executionQueue.length})
-              </span>
+      {executionQueue.map((task, index) => {
+        const isError = task.status === 'error'
+        return (
+          <div key={task.id} className={`command-status-item ${isError ? 'error' : ''}`.trim()}>
+            {isError ? (
+              <ErrorIcon size={16} className="command-error-icon" />
+            ) : (
+              <StatusSpinnerIcon size={16} className="command-spinner" />
             )}
-          </span>
-        </div>
-      ))}
+            <span className="command-status-label">
+              {isError ? (
+                <>
+                  failed {task.command.trigger}
+                  {task.error ? `: ${task.error}` : ''}
+                </>
+              ) : (
+                <>
+                  generating {task.command.trigger}
+                  {executionQueue.length > 1 && (
+                    <span className="queue-position">
+                      ({index + 1}/{executionQueue.length})
+                    </span>
+                  )}
+                </>
+              )}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }

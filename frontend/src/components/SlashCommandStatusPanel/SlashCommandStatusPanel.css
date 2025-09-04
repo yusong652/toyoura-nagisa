@@ -55,6 +55,19 @@
   transition: all 0.3s ease;
 }
 
+/* Error state styling */
+.command-status-item.error {
+  background: var(--status-error-color);
+  box-shadow:
+    0 4px 12px rgba(211, 47, 47, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.command-error-icon {
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
 .command-status-item:hover {
   transform: translateY(-1px);
   box-shadow: 
@@ -143,6 +156,13 @@
   box-shadow: 
     0 4px 12px rgba(74, 144, 226, 0.4),
     0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .command-status-item.error {
+  background: var(--status-error-color);
+  box-shadow:
+    0 4px 12px rgba(255, 82, 82, 0.35),
+    0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="dark"] .command-status-item:hover {

@@ -24,7 +24,11 @@ export interface InputAreaProps {
   disabled?: boolean
   maxFiles?: number
   acceptedFileTypes?: string[]
-  executeSlashCommand?: (command: SlashCommand, args: string[], onComplete?: () => void) => Promise<void>
+  executeSlashCommand?: (
+    command: SlashCommand,
+    args: string[],
+    onComplete?: () => void
+  ) => Promise<{ success: boolean; error?: string }>
 }
 
 export interface MessageInputInfo {
@@ -414,6 +418,7 @@ export interface CommandExecutionTask {
   args: string[]
   startTime: number
   status: 'executing' | 'completed' | 'error'
+  error?: string
 }
 
 /**
@@ -423,7 +428,11 @@ export interface CommandExecutionTask {
 export interface SlashCommandExecutionHookReturn {
   isGeneratingImage: boolean
   isGeneratingVideo: boolean  
-  executeSlashCommand: (command: SlashCommand, args: string[], onComplete?: () => void) => Promise<void>
+  executeSlashCommand: (
+    command: SlashCommand,
+    args: string[],
+    onComplete?: () => void
+  ) => Promise<{ success: boolean; error?: string }>
   isExecuting: boolean
   executionQueue: CommandExecutionTask[]
 }
