@@ -72,6 +72,7 @@ class MemoryInjectionMiddleware:
         """
         
         if not self.config.should_inject_memory():
+            print("[DEBUG] Memory injection disabled or auto-inject off")
             return base_system_prompt, MemoryInjectionResult(
                 success=False,
                 injected_count=0,
@@ -82,8 +83,10 @@ class MemoryInjectionMiddleware:
             # Extract text from user message
             from backend.domain.models.message_factory import extract_text_from_message
             query_text = extract_text_from_message(user_message)
+            print(f"[DEBUG] Extracted query text: {query_text}")
             
             if not query_text:
+                print("[DEBUG] No user query found")
                 return base_system_prompt, MemoryInjectionResult(
                     success=False,
                     injected_count=0,
@@ -101,6 +104,7 @@ class MemoryInjectionMiddleware:
             )
             
             # Retrieve relevant memories without session filtering
+            print(f"[DEBUG] Searching for memories with query: {query_text}, user_id: {user_id}")
             memories = await self.memory_manager.get_relevant_memories_for_context(
                 query_text=query_text,
                 session_id=None,  # Don't filter by session - search all user memories
@@ -110,16 +114,19 @@ class MemoryInjectionMiddleware:
                 user_id=user_id
             )
             
+            print(f"[DEBUG] Found {len(memories)} memories for query")
             if self.config.debug_mode:
-                logger.info(f"[Memory Debug] Found {len(memories)} memories for query")
+                print(f"[Memory Debug] Found {len(memories)} memories for query")
             
             memory_context.memories = memories
             
             # Format memories for injection
             formatted_context = memory_context.format_for_injection()
+            print(f"[DEBUG] Formatted context length: {len(formatted_context) if formatted_context else 0}")
             
             if not formatted_context:
                 # No relevant memories found
+                print("[DEBUG] No relevant memories found or formatted context is empty")
                 return base_system_prompt, MemoryInjectionResult(
                     success=True,
                     injected_count=0,
@@ -128,6 +135,7 @@ class MemoryInjectionMiddleware:
             
             # Compose enhanced system prompt using template
             enhanced_prompt = format_memory_context_prompt(base_system_prompt, formatted_context)
+            print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
             
             context_tokens = estimate_tokens(formatted_context)
             

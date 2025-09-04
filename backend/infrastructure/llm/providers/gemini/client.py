@@ -152,7 +152,7 @@ class GeminiClient(LLMClientBase):
         
         # Build unified system prompt with memory injection
         from backend.shared.utils.prompt.builder import build_system_prompt
-        system_prompt = build_system_prompt(
+        system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
             tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
             session_id=session_id

@@ -6,13 +6,13 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from .core import get_base_prompt, get_expression_prompt
-from .tools import get_tool_prompt_with_schemas, build_tool_section
-from .memory import build_memory_section
+from .tools import build_tool_section
+from .memory import build_memory_section_from_session
 
 logger = logging.getLogger(__name__)
 
 
-def build_system_prompt(
+async def build_system_prompt(
     agent_profile: str = "general",
     tool_schemas: Optional[List[Dict[str, Any]]] = None,
     session_id: Optional[str] = None,
@@ -53,65 +53,17 @@ def build_system_prompt(
             components.append(tool_section)
     
     # 3. Memory context injection (if enabled and session provided)
+    print(f"[DEBUG] Memory injection check: enable_memory={enable_memory}, session_id={session_id}")
+    memory_content = None
     if enable_memory and session_id:
-        try:
-            # Extract latest user message from session history
-            from backend.infrastructure.storage.session_manager import load_history
-            from backend.domain.models.message_factory import message_factory_no_thinking
-            
-            recent_history = load_history(session_id)
-            recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
-            
-            # Find latest user message
-            user_message = None
-            for msg in reversed(recent_msgs):
-                if hasattr(msg, 'role') and msg.role == 'user':
-                    user_message = msg
-                    break
-            
-            # Skip memory injection if no user message found
-            if not user_message:
-                logger.debug("No user message found in session history, skipping memory injection")
-            else:
-                # Import and run memory injection synchronously
-                import asyncio
-                from backend.infrastructure.memory.memory_injection import MemoryInjectionMiddleware
-                from backend.config.memory import MemoryConfig
-                
-                memory_config = MemoryConfig()
-                if memory_config.should_inject_memory():
-                    memory_middleware = MemoryInjectionMiddleware(config=memory_config)
-                    
-                    # Build base prompt so far
-                    base_prompt_so_far = "\n\n---\n\n".join(filter(None, components))
-                    
-                    # Create event loop for async operation
-                    try:
-                        loop = asyncio.get_event_loop()
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    
-                    # Run memory injection
-                    enhanced_prompt, injection_result = loop.run_until_complete(
-                        memory_middleware.get_enhanced_system_prompt(
-                            base_system_prompt=base_prompt_so_far,
-                            user_message=user_message,
-                            session_id=session_id,
-                            user_id=user_id
-                        )
-                    )
-                    
-                    if injection_result.success and enhanced_prompt != base_prompt_so_far:
-                        # Memory was injected, add expression and return
-                        expression = get_expression_prompt()
-                        if expression:
-                            return f"{enhanced_prompt}\n\n---\n\n{expression}"
-                        return enhanced_prompt
-                    
-        except Exception as e:
-            logger.error(f"Memory injection failed in build_system_prompt: {e}")
-            # Continue without memory injection
+        memory_content = await build_memory_section_from_session(session_id, user_id)
+    
+    # Always add memory section when memory is enabled, regardless of content found
+    if enable_memory:
+        if memory_content:
+            components.append(f"## Relevant Context from Memory\n\n{memory_content}")
+        else:
+            components.append("## Relevant Context from Memory\n\n(No relevant memories found for current query)")
     
     # 4. Expression/Live2D instructions
     expression = get_expression_prompt()
