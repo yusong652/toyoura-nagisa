@@ -48,7 +48,6 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         memory_context = MemoryContext(
             query=latest_user_text,
             top_k=memory_config.max_memories_to_inject,
-            exclude_recent_minutes=memory_config.get_time_filter_minutes(),
             relevance_threshold=memory_config.memory_relevance_threshold
         )
         
@@ -57,7 +56,6 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         memories = await memory_middleware.memory_manager.get_relevant_memories_for_context(
             query_text=latest_user_text,
             top_k=memory_context.top_k,
-            exclude_recent_minutes=memory_context.exclude_recent_minutes,
             user_id=effective_user_id
         )
         

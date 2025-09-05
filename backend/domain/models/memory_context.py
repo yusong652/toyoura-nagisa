@@ -6,9 +6,7 @@ for the aiNagisa memory system.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional
-
-
+from typing import Dict, Any, List
 
 
 @dataclass
@@ -51,13 +49,10 @@ class MemoryContext:
     """
     query: str
     top_k: int = 5
-    exclude_recent_minutes: int = 10
     relevance_threshold: float = 0.5
     
     # Results
     memories: List[EnhancedMemory] = field(default_factory=list)
-    injection_time_ms: Optional[float] = None
-    total_tokens: Optional[int] = None
     
     def filter_by_relevance(self) -> List[EnhancedMemory]:
         """Filter memories by relevance threshold."""

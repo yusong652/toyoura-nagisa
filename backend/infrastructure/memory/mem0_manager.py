@@ -285,21 +285,18 @@ class Mem0MemoryManager:
         self,
         query_text: str,
         top_k: Optional[int] = None,
-        exclude_recent_minutes: Optional[int] = None,
         user_id: Optional[str] = None
     ) -> List[EnhancedMemory]:
         """
         Get relevant memories for LLM context injection.
         
-        This method retrieves and ranks memories based on relevance
-        and temporal factors, specifically designed for automatic
-        memory injection into LLM conversations.
+        This method retrieves and ranks memories based on relevance,
+        specifically designed for automatic memory injection into LLM conversations.
         All searches are cross-session for comprehensive context retrieval.
         
         Args:
             query_text: Current user message for semantic search
             top_k: Maximum memories to retrieve (uses config default if None)
-            exclude_recent_minutes: Exclude recent memories (uses config default if None)
             user_id: User identifier (uses config default if None)
         
         Returns:
@@ -307,7 +304,6 @@ class Mem0MemoryManager:
         """
         # Use config defaults if not provided
         top_k = top_k if top_k is not None else self.config.max_memories_to_inject
-        exclude_recent_minutes = exclude_recent_minutes if exclude_recent_minutes is not None else self.config.get_time_filter_minutes()
         user_id = user_id or self.config.mem0_user_id
         
         # Check if memory is enabled
@@ -320,7 +316,7 @@ class Mem0MemoryManager:
         # Search memories with Mem0
         context_search_start = time.time()
         if self.config.debug_mode:
-            logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k}, exclude_recent: {exclude_recent_minutes}min)")
+            logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k})")
         
         raw_memories = await self.search_memories(
             query=query_text,

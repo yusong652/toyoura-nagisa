@@ -38,8 +38,6 @@ class MemoryInjectionMiddleware:
         self.memory_manager = memory_manager or Mem0MemoryManager()
         
         # Use config values
-        self.max_injection_time_ms = self.config.memory_search_timeout_ms
-        self.max_context_tokens = self.config.max_memories_to_inject * 200  # Estimate tokens per memory
         self.enable_injection = self.config.enabled
     
     async def save_conversation_turn(
