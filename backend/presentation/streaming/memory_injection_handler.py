@@ -9,78 +9,24 @@ new SessionMemoryContextManager approach.
 import logging
 from typing import Optional, Dict, Any
 from backend.domain.models.messages import BaseMessage
-from backend.shared.utils.memory_logging import log_memory_injection_result
-from backend.shared.utils.performance import measure_time
 from backend.shared.utils.memory_factory import get_memory_middleware
 
 logger = logging.getLogger(__name__)
 
 
-
-async def get_system_prompt_with_memory_context(
-    session_id: str,
-    user_message: BaseMessage,
-    base_system_prompt: str,
-    user_id: Optional[str] = None
-) -> str:
-    """
-    Get system prompt with integrated memory context for a session.
-    
-    This approach integrates memory context directly into the system prompt
-    rather than injecting system messages into the conversation.
-    
-    Args:
-        session_id: Current session ID
-        user_message: User's message object
-        base_system_prompt: Base system prompt
-        user_id: User identifier
-        
-    Returns:
-        str: Enhanced system prompt with memory context
-    """
-    try:
-        # Define memory retrieval operation
-        @measure_time
-        async def get_memory_enhanced_prompt():
-            # Get memory middleware (uses SessionMemoryContextManager internally)
-            middleware = get_memory_middleware()
-            
-            # Get system prompt with memory context
-            return await middleware.get_enhanced_system_prompt(
-                base_system_prompt=base_system_prompt,
-                user_message=user_message,
-                session_id=session_id,
-                user_id=user_id
-            )
-        
-        # Execute with timing
-        (system_prompt_with_memory, injection_result), total_retrieval_time_ms = await get_memory_enhanced_prompt()
-        
-        # Log memory injection results
-        log_memory_injection_result(injection_result, total_retrieval_time_ms)
-        
-        return system_prompt_with_memory
-        
-    except Exception as e:
-        logger.warning(f"Memory-enhanced system prompt failed: {e}")
-        return base_system_prompt
-
-
 async def save_conversation_memory(
     user_message: BaseMessage,
     assistant_response: str,
-    session_id: str,
     user_id: Optional[str] = None
 ) -> bool:
     """
     Save conversation turn to memory after successful response.
     
-    Uses the new SessionMemoryContextManager for consistent memory handling.
+    Uses the new memory system for consistent cross-session memory handling.
     
     Args:
         user_message: The user's message object
         assistant_response: The assistant's response
-        session_id: Current session ID
         user_id: User identifier
     
     Returns:
@@ -100,7 +46,6 @@ async def save_conversation_memory(
             await middleware.save_conversation_turn(
                 user_message=user_message,
                 assistant_message=assistant_message,
-                session_id=session_id,
                 user_id=user_id
             )
             # Memory saving handled by Mem0 manager with detailed output
@@ -158,8 +103,7 @@ async def handle_memory_management(
             memories = await manager.search_memories(
                 query=query,
                 user_id=user_id,
-                limit=limit,
-                session_id=params.get("session_only") and session_id
+                limit=limit
             )
             return {
                 "success": True,

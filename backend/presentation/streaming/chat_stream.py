@@ -109,7 +109,6 @@ async def generate_chat_stream(
             await save_conversation_memory(
                 user_message=latest_user_message,  # Use already extracted user message
                 assistant_response=assistant_response,
-                session_id=session_id,
                 user_id=user_id
             )
             

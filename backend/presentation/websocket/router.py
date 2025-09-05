@@ -92,7 +92,7 @@ async def _handle_heartbeat_response(session_id: str, connection_manager: Connec
         session_id: Session UUID for heartbeat tracking
         connection_manager: Connection manager to update heartbeat status
     """
-    connection_manager.handle_heartbeat_response(session_id)
+    await connection_manager.handle_heartbeat_response(session_id)
     logger.debug(f"Processed heartbeat response for session {session_id}")
 
 

@@ -105,7 +105,6 @@ class Mem0MemoryManager:
         self,
         content: str,
         user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
@@ -114,7 +113,6 @@ class Mem0MemoryManager:
         Args:
             content: Memory content
             user_id: User identifier (uses config default if None)
-            session_id: Session identifier
             metadata: Additional metadata
         
         Returns:
@@ -134,7 +132,6 @@ class Mem0MemoryManager:
         
         metadata.update({
             "timestamp": datetime.now().isoformat(),
-            "session_id": session_id,
             "user_id": user_id,  # Persist user for robust filtering
         })
         
@@ -216,17 +213,16 @@ class Mem0MemoryManager:
         self,
         query: str,
         user_id: Optional[str] = None,
-        limit: int = 5,
-        session_id: Optional[str] = None
+        limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
         Search memories using Mem0's built-in search.
+        All searches are cross-session for comprehensive retrieval.
         
         Args:
             query: Search query
             user_id: User identifier (uses config default if None)
             limit: Maximum results
-            session_id: Optional session filter
         
         Returns:
             List of memory dictionaries
@@ -236,7 +232,7 @@ class Mem0MemoryManager:
         
         # Start timing for vectorization and search
         search_start_time = time.time()
-        print(f"[DEBUG] search_memories called: query='{query}', user_id={user_id}, limit={limit}, session_id={session_id}")
+        print(f"[DEBUG] search_memories called: query='{query}', user_id={user_id}, limit={limit}")
         
         # Debug: List all memories for this user first
         try:
@@ -297,21 +293,7 @@ class Mem0MemoryManager:
             # Return empty list on search failure
             results = []
         
-        # Filter by session if specified
-        if session_id:
-            print(f"[DEBUG] Applying session filter: session_id={session_id}")
-            filter_start = time.time()
-            original_count = len(results)
-            results = [
-                r for r in results 
-                if r.get("metadata", {}).get("session_id") == session_id
-            ]
-            filter_time_ms = (time.time() - filter_start) * 1000
-            print(f"[DEBUG] Session filter applied: {original_count} -> {len(results)} results")
-            if self.config.debug_mode:
-                logger.info(f"[Mem0 Timing] Session filtering: {filter_time_ms:.2f}ms, {original_count} -> {len(results)} results")
-        else:
-            print(f"[DEBUG] No session filter applied (session_id is None), keeping all {len(results)} results")
+        print(f"[DEBUG] Found {len(results)} memories (cross-session search)")
         
         total_search_time_ms = (time.time() - search_start_time) * 1000
         if self.config.debug_mode:
@@ -322,7 +304,6 @@ class Mem0MemoryManager:
     async def get_relevant_memories_for_context(
         self,
         query_text: str,
-        session_id: str,
         top_k: Optional[int] = None,
         exclude_recent_minutes: Optional[int] = None,
         memory_types: Optional[List[MemoryType]] = None,
@@ -334,10 +315,10 @@ class Mem0MemoryManager:
         This method retrieves and ranks memories based on relevance
         and temporal factors, specifically designed for automatic
         memory injection into LLM conversations.
+        All searches are cross-session for comprehensive context retrieval.
         
         Args:
             query_text: Current user message for semantic search
-            session_id: Current session ID
             top_k: Maximum memories to retrieve (uses config default if None)
             exclude_recent_minutes: Exclude recent memories (uses config default if None)
             memory_types: Filter by memory types
@@ -368,8 +349,7 @@ class Mem0MemoryManager:
         raw_memories = await self.search_memories(
             query=query_text,
             user_id=user_id,
-            limit=top_k * 2,  # Get extra for filtering
-            session_id=None  # Explicitly ensure cross-session search
+            limit=top_k * 2  # Get extra for filtering
         )
         
         context_search_time_ms = (time.time() - context_search_start) * 1000
@@ -432,7 +412,6 @@ class Mem0MemoryManager:
                 content=mem.get("memory", ""),
                 embedding=[],  # Mem0 handles embeddings internally
                 timestamp=timestamp,
-                session_id=metadata.get("session_id", session_id),
                 memory_type=memory_type,
                 memory_tier=memory_tier,
                 confidence=self._calculate_confidence(base_relevance, metadata),
@@ -462,15 +441,13 @@ class Mem0MemoryManager:
     
     async def get_all_memories(
         self,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None
+        user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get all memories for a user or session.
+        Get all memories for a user.
         
         Args:
             user_id: User identifier (uses config default if None)
-            session_id: Optional session filter
         
         Returns:
             List of all memories
@@ -491,28 +468,19 @@ class Mem0MemoryManager:
             # Gracefully handle older/alternative return shapes
             all_memories = all_memories_resp if isinstance(all_memories_resp, list) else []
         
-        # Filter by session if specified
-        if session_id:
-            all_memories = [
-                m for m in all_memories
-                if m.get("metadata", {}).get("session_id") == session_id
-            ]
-        
         return all_memories
     
     async def delete_memory(
         self,
         memory_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None
+        user_id: Optional[str] = None
     ) -> bool:
         """
-        Delete memories by ID, user, or session.
+        Delete memories by ID or user.
         
         Args:
             memory_id: Specific memory ID
             user_id: Delete all memories for user
-            session_id: Delete all memories for session
         
         Returns:
             Success status
@@ -524,12 +492,6 @@ class Mem0MemoryManager:
             elif user_id:
                 # Delete all memories for user
                 self.memory.delete_all(user_id=user_id)
-            elif session_id:
-                # Delete memories for session
-                memories = await self.get_all_memories(session_id=session_id)
-                for mem in memories:
-                    if "id" in mem:
-                        self.memory.delete(memory_id=mem["id"])
             
             return True
         except Exception as e:

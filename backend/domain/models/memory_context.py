@@ -7,7 +7,7 @@ for the aiNagisa memory system.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Literal
+from typing import Dict, Any, List, Optional
 from enum import Enum
 
 
@@ -39,7 +39,6 @@ class EnhancedMemory:
     content: str
     embedding: List[float]
     timestamp: datetime
-    session_id: str
     memory_type: MemoryType
     memory_tier: MemoryTier = MemoryTier.SHORT_TERM
     confidence: float = 0.8
@@ -58,7 +57,6 @@ class EnhancedMemory:
             "content": self.content,
             "embedding": self.embedding,
             "timestamp": self.timestamp.isoformat(),
-            "session_id": self.session_id,
             "memory_type": self.memory_type.value,
             "memory_tier": self.memory_tier.value,
             "confidence": self.confidence,
@@ -77,7 +75,6 @@ class EnhancedMemory:
             content=data["content"],
             embedding=data.get("embedding", []),
             timestamp=datetime.fromisoformat(data["timestamp"]),
-            session_id=data["session_id"],
             memory_type=MemoryType(data["memory_type"]),
             memory_tier=MemoryTier(data.get("memory_tier", MemoryTier.SHORT_TERM.value)),
             confidence=data.get("confidence", 0.8),
@@ -97,8 +94,8 @@ class MemoryContext:
     
     This encapsulates the parameters and results of memory operations
     to provide a clean interface between layers.
+    All memory searches are cross-session for comprehensive context.
     """
-    session_id: str
     query: str
     top_k: int = 5
     exclude_recent_minutes: int = 10

@@ -46,7 +46,6 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         
         # Create memory context
         memory_context = MemoryContext(
-            session_id=session_id,
             query=latest_user_text,
             top_k=memory_config.max_memories_to_inject,
             exclude_recent_minutes=memory_config.get_time_filter_minutes(),
@@ -54,18 +53,17 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
             relevance_threshold=memory_config.memory_relevance_threshold
         )
         
-        # Search for relevant memories across all sessions (cross-session memory retrieval)
-        print(f"[DEBUG] Cross-session memory search: user_id={effective_user_id}, query='{latest_user_text}', session_id=None")
+        # Search for relevant memories (always cross-session)
+        print(f"[DEBUG] Memory search: user_id={effective_user_id}, query='{latest_user_text}'")
         memories = await memory_middleware.memory_manager.get_relevant_memories_for_context(
             query_text=latest_user_text,
-            session_id=None,  # Search all user memories across all sessions
             top_k=memory_context.top_k,
             exclude_recent_minutes=memory_context.exclude_recent_minutes,
             memory_types=memory_context.memory_types,
             user_id=effective_user_id
         )
         
-        print(f"[DEBUG] Found {len(memories)} memories for cross-session search")
+        print(f"[DEBUG] Found {len(memories)} memories")
         if memories:
             for i, memory in enumerate(memories):
                 print(f"[DEBUG] Memory {i}: {memory}")

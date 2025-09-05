@@ -149,19 +149,16 @@ class MemoryInjectionMiddleware:
         self,
         user_message: BaseMessage,
         assistant_message: BaseMessage,
-        session_id: str,
-        user_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        user_id: Optional[str] = None
     ) -> None:
         """
         Save a conversation turn to memory with support for multimodal content.
+        All memories are saved at user level and searchable across all sessions.
         
         Args:
             user_message: User's BaseMessage object
             assistant_message: Assistant's BaseMessage object
-            session_id: Session ID
             user_id: User ID (uses config default if None)
-            metadata: Additional metadata
         """
         # Use config defaults
         user_id = user_id or self.config.mem0_user_id
@@ -169,15 +166,6 @@ class MemoryInjectionMiddleware:
         # Check if saving is enabled
         if not self.config.should_save_memory():
             return
-        
-        # Prepare metadata
-        turn_metadata = {
-            "type": "conversation_turn",
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat()
-        }
-        if metadata:
-            turn_metadata.update(metadata)
         
         # Extract text from standard BaseMessage objects
         from backend.domain.models.message_factory import extract_text_from_message
@@ -188,14 +176,20 @@ class MemoryInjectionMiddleware:
         conversation_content = f"""User: {user_text}
 Assistant: {assistant_text[:500]}"""
         
+        # Prepare metadata
+        metadata = {
+            "type": "conversation_turn",
+            "timestamp": datetime.now().isoformat(),
+            "role": "conversation"
+        }
+        
         try:
             # Add conversation memory (detailed output handled by Mem0 manager)
-            # Memory is saved with session_id for traceability but will be searchable across all sessions
+            # All memories are saved at user level and searchable across all sessions
             await self.memory_manager.add_memory(
                 content=conversation_content,
                 user_id=user_id,
-                session_id=session_id,  # Save with session_id for traceability
-                metadata={**turn_metadata, "role": "conversation"}
+                metadata=metadata
             )
         except Exception as e:
             logger.error(f"Failed to save conversation to memory: {e}")
