@@ -52,14 +52,10 @@ async def build_system_prompt(
         if tool_section:
             components.append(tool_section)
     
-    # 3. Memory context injection (if enabled and session provided)
+    # 3. Memory context injection (if enabled)
     print(f"[DEBUG] Memory injection check: enable_memory={enable_memory}, session_id={session_id}")
-    memory_content = None
-    if enable_memory and session_id:
-        memory_content = await build_memory_section_from_session(session_id, user_id)
-    
-    # Always add memory section when memory is enabled, regardless of content found
     if enable_memory:
+        memory_content = await build_memory_section_from_session(session_id, user_id)
         if memory_content:
             components.append(f"## Relevant Context from Memory\n\n{memory_content}")
         else:

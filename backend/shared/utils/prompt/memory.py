@@ -22,7 +22,7 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         Formatted memory content string, or None if no memories found
     """
     try:
-        from backend.infrastructure.storage.session_manager import load_history
+        from backend.infrastructure.storage.session_manager import get_latest_user_text
         from backend.shared.utils.memory_factory import get_memory_middleware
         from backend.config.memory import MemoryConfig
         from backend.domain.models.memory_context import MemoryContext
@@ -32,30 +32,10 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         if not memory_config.should_inject_memory():
             return None
         
-        # Load session history and extract latest user message text
-        recent_history = load_history(session_id)
+        # Get latest user text message for memory search
+        latest_user_text = get_latest_user_text(session_id)
         
-        if not recent_history:
-            return None
-        
-        # Find latest user message and extract text directly from history
-        latest_user_text = None
-        for msg in reversed(recent_history):
-            if isinstance(msg, dict) and msg.get('role') == 'user':
-                content = msg.get('content', [])
-                if isinstance(content, list):
-                    # Extract text from content array
-                    for item in content:
-                        if isinstance(item, dict) and 'text' in item:
-                            latest_user_text = item['text']
-                            break
-                elif isinstance(content, str):
-                    latest_user_text = content
-                
-                if latest_user_text:
-                    break
-        
-        if not latest_user_text or not latest_user_text.strip():
+        if not latest_user_text:
             return None
         
         # Determine effective user_id (Mem0 requires user or agent id)

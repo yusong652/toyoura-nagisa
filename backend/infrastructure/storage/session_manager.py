@@ -375,6 +375,35 @@ def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[An
     return get_latest_n_messages(session_id, 2)
 
 
+def get_latest_user_text(session_id: str) -> Optional[str]:
+    """
+    获取会话中最新的用户文本消息内容。
+    
+    专门用于内存搜索等需要用户输入文本的场景。
+    会跳过 image、video 等非文本用户消息。
+    
+    Args:
+        session_id: 会话ID
+        
+    Returns:
+        Optional[str]: 最新的用户文本内容，如果没有则返回 None
+    """
+    from backend.domain.models.message_factory import extract_text_from_message
+    
+    history = load_and_restore_history(session_id)
+    if not history:
+        return None
+    
+    # 从最新消息开始查找用户文本消息
+    for msg in reversed(history):
+        if msg.role == 'user':
+            text = extract_text_from_message(msg)
+            if text and text.strip():
+                return text
+    
+    return None
+
+
 # ========== 内部辅助函数 ==========
 
 def _update_session_metadata_timestamp(session_id: str) -> None:

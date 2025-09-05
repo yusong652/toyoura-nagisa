@@ -11,9 +11,7 @@ This module provides a modular and extensible prompt building system with:
 from .core import (
     get_base_prompt,
     get_expression_prompt,
-    get_tool_prompt,
-    get_system_prompt,
-    load_base_prompt  # Legacy compatibility
+    get_tool_prompt
 )
 
 from .builder import (
@@ -34,7 +32,6 @@ __all__ = [
     'get_base_prompt',
     'get_expression_prompt',
     'get_tool_prompt',
-    'get_system_prompt',
     
     # Builder functions
     'build_system_prompt',
@@ -44,8 +41,5 @@ __all__ = [
     'build_tool_section',
     
     # Memory functions
-    'build_memory_section_from_session',
-    
-    # Legacy compatibility
-    'load_base_prompt'
+    'build_memory_section_from_session'
 ]
