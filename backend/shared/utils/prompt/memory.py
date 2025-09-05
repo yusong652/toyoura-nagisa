@@ -49,7 +49,6 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
             query=latest_user_text,
             top_k=memory_config.max_memories_to_inject,
             exclude_recent_minutes=memory_config.get_time_filter_minutes(),
-            memory_types=None,
             relevance_threshold=memory_config.memory_relevance_threshold
         )
         
@@ -59,7 +58,6 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
             query_text=latest_user_text,
             top_k=memory_context.top_k,
             exclude_recent_minutes=memory_context.exclude_recent_minutes,
-            memory_types=memory_context.memory_types,
             user_id=effective_user_id
         )
         

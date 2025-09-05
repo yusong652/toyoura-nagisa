@@ -8,12 +8,8 @@ replacing the legacy ChromaDB-based implementation.
 import time
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
-import math
 from mem0 import Memory
-from backend.domain.models.memory_context import (
-    EnhancedMemory, MemoryType, MemoryTier
-)
+from backend.domain.models.memory_context import EnhancedMemory
 from backend.config.memory import MemoryConfig
 
 logger = logging.getLogger(__name__)
@@ -91,13 +87,6 @@ class Mem0MemoryManager:
             print(f"[Mem0 Init] ❌ Failed to initialize with config: {mem0_config}")
             raise RuntimeError(f"Memory system initialization failed: {e}") from e
         
-        # Memory type decay rates (per day)
-        self.decay_rates = {
-            MemoryType.PREFERENCE: 0.01,
-            MemoryType.FACT: 0.02,
-            MemoryType.CONTEXT: 0.05,
-            MemoryType.EVENT: 0.03
-        }
     
     async def add_memory(
         self,
@@ -297,7 +286,6 @@ class Mem0MemoryManager:
         query_text: str,
         top_k: Optional[int] = None,
         exclude_recent_minutes: Optional[int] = None,
-        memory_types: Optional[List[MemoryType]] = None,
         user_id: Optional[str] = None
     ) -> List[EnhancedMemory]:
         """
@@ -312,7 +300,6 @@ class Mem0MemoryManager:
             query_text: Current user message for semantic search
             top_k: Maximum memories to retrieve (uses config default if None)
             exclude_recent_minutes: Exclude recent memories (uses config default if None)
-            memory_types: Filter by memory types
             user_id: User identifier (uses config default if None)
         
         Returns:
@@ -361,30 +348,14 @@ class Mem0MemoryManager:
                 continue
             metadata = mem.get("metadata", {})
             
-            # Classify memory type
-            memory_type = self._classify_memory_type(
-                mem.get("memory", ""),
-                metadata
-            )
-            
-            # Filter by type if specified
-            if memory_types and memory_type not in memory_types:
-                continue
-            
             # Use relevance score from Mem0
             relevance_score = mem.get("score", 0.5)
             
-            # Create EnhancedMemory with simplified fields
+            # Create simplified EnhancedMemory
             enhanced_memory = EnhancedMemory(
                 content=mem.get("memory", ""),
-                embedding=[],  # Mem0 handles embeddings internally
-                timestamp=datetime.now(),  # Simple fallback timestamp
-                memory_type=memory_type,
-                memory_tier=MemoryTier.SHORT_TERM,  # Simple default tier
-                confidence=relevance_score,
-                source=metadata.get("source", "conversation"),
-                metadata=metadata,
-                relevance_score=relevance_score
+                relevance_score=relevance_score,
+                metadata=metadata
             )
             
             enhanced_memories.append(enhanced_memory)
@@ -464,94 +435,6 @@ class Mem0MemoryManager:
         except Exception as e:
             logger.error(f"Error deleting memory: {e}")
             return False
-    
-    def _classify_memory_type(
-        self,
-        content: str,
-        metadata: Dict[str, Any]
-    ) -> MemoryType:
-        """
-        Classify memory type based on content analysis.
-        
-        Args:
-            content: Memory content
-            metadata: Memory metadata
-        
-        Returns:
-            Classified MemoryType
-        """
-        # Check metadata first
-        if "memory_type" in metadata:
-            try:
-                return MemoryType(metadata["memory_type"])
-            except ValueError:
-                pass
-        
-        if not content:
-            return MemoryType.CONTEXT
-            
-        content_lower = content.lower()
-        
-        # Preference indicators
-        if any(kw in content_lower for kw in [
-            "i like", "i prefer", "i love", "i hate",
-            "my favorite", "i don't like", "i enjoy"
-        ]):
-            return MemoryType.PREFERENCE
-        
-        # Fact indicators
-        if any(kw in content_lower for kw in [
-            "i am", "i work", "i live", "my name",
-            "my job", "my age", "my birthday"
-        ]):
-            return MemoryType.FACT
-        
-        # Event indicators
-        if any(kw in content_lower for kw in [
-            "yesterday", "today", "tomorrow", "last week",
-            "happened", "will", "going to"
-        ]):
-            return MemoryType.EVENT
-        
-        # Default to context
-        return MemoryType.CONTEXT
-    
-    def _calculate_time_weight(
-        self,
-        memory_type: MemoryType,
-        age_days: int
-    ) -> float:
-        """
-        Calculate time-based weight with exponential decay.
-        
-        Args:
-            memory_type: Type of memory
-            age_days: Age in days
-        
-        Returns:
-            Time weight factor
-        """
-        decay_rate = self.decay_rates.get(memory_type, 0.03)
-        return math.exp(-decay_rate * age_days)
-    
-    def _determine_memory_tier(self, age_days: int) -> MemoryTier:
-        """
-        Determine memory tier based on age.
-        
-        Args:
-            age_days: Age in days
-        
-        Returns:
-            Memory tier classification
-        """
-        if age_days < 1:
-            return MemoryTier.WORKING
-        elif age_days < 7:
-            return MemoryTier.SHORT_TERM
-        elif age_days < 30:
-            return MemoryTier.MEDIUM_TERM
-        else:
-            return MemoryTier.LONG_TERM
     
     def _calculate_confidence(
         self,
