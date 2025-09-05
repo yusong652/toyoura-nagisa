@@ -65,12 +65,6 @@ class MemoryContext:
             return []
         return [m for m in self.memories if m.relevance_score >= self.relevance_threshold]
     
-    def get_high_relevance_memories(self, min_relevance: float = 0.7) -> List[EnhancedMemory]:
-        """Get memories with high relevance scores."""
-        if not self.memories:
-            return []
-        return [m for m in self.memories if m.relevance_score >= min_relevance]
-    
     def format_for_injection(self) -> str:
         """
         Format memories for LLM context injection.
@@ -90,11 +84,3 @@ class MemoryContext:
         return "\n".join(formatted_lines)
 
 
-@dataclass
-class MemoryInjectionResult:
-    """Result of memory injection operation."""
-    success: bool
-    injected_count: int
-    error: Optional[str] = None
-    context_tokens: Optional[int] = None
-    formatted_context: Optional[str] = None
