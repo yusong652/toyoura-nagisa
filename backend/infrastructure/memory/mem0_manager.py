@@ -5,7 +5,6 @@ This module provides a modern memory management system using Mem0,
 replacing the legacy ChromaDB-based implementation.
 """
 
-import time
 import logging
 from typing import List, Dict, Any, Optional
 from mem0 import Memory
@@ -210,8 +209,6 @@ class Mem0MemoryManager:
         # Use config defaults
         user_id = user_id or self.config.mem0_user_id
         
-        # Start timing for vectorization and search
-        search_start_time = time.time()
         print(f"[DEBUG] search_memories called: query='{query}', user_id={user_id}, limit={limit}")
         
         # Debug: List all memories for this user first
@@ -233,10 +230,9 @@ class Mem0MemoryManager:
             print(f"[DEBUG] Failed to get all memories: {e}")
         
         if self.config.debug_mode:
-            logger.info(f"[Mem0 Timing] Starting vector search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
+            logger.info(f"[Mem0 Debug] Starting search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
         
         # Search using Mem0 - this includes vectorization + semantic search
-        vectorization_start = time.time()
         try:
             print(f"[DEBUG] Calling mem0.search with query='{query}', user_id={user_id}, limit={limit}")
             # Support Mem0 API variants for search
@@ -263,21 +259,15 @@ class Mem0MemoryManager:
             else:
                 print(f"[DEBUG] Search returned empty results for user {user_id}")
             
-            vectorization_time_ms = (time.time() - vectorization_start) * 1000
             if self.config.debug_mode:
-                logger.info(f"[Mem0 Timing] Mem0 vectorization + search: {vectorization_time_ms:.2f}ms, found {len(results)} results")
+                logger.info(f"[Mem0 Debug] Search completed, found {len(results)} results")
             
         except Exception as e:
-            vectorization_time_ms = (time.time() - vectorization_start) * 1000
-            logger.error(f"[Mem0] Search failed after {vectorization_time_ms:.2f}ms: {e}")
+            logger.error(f"[Mem0] Search failed: {e}")
             # Return empty list on search failure
             results = []
         
         print(f"[DEBUG] Found {len(results)} memories (cross-session search)")
-        
-        total_search_time_ms = (time.time() - search_start_time) * 1000
-        if self.config.debug_mode:
-            logger.info(f"[Mem0 Timing] Total search operation: {total_search_time_ms:.2f}ms")
         
         return results
     
@@ -314,9 +304,8 @@ class Mem0MemoryManager:
         
         
         # Search memories with Mem0
-        context_search_start = time.time()
         if self.config.debug_mode:
-            logger.info(f"[Mem0 Timing] Starting context memory search (top_k: {top_k})")
+            logger.info(f"[Mem0 Debug] Starting context memory search (top_k: {top_k})")
         
         raw_memories = await self.search_memories(
             query=query_text,
@@ -324,12 +313,10 @@ class Mem0MemoryManager:
             limit=top_k * 2  # Get extra for filtering
         )
         
-        context_search_time_ms = (time.time() - context_search_start) * 1000
         if self.config.debug_mode:
-            logger.info(f"[Mem0 Timing] Context search completed: {context_search_time_ms:.2f}ms, processing {len(raw_memories)} raw memories")
+            logger.info(f"[Mem0 Debug] Context search completed, processing {len(raw_memories)} raw memories")
         
         # Convert to EnhancedMemory objects
-        processing_start = time.time()
         enhanced_memories = []
         
         if self.config.debug_mode:
@@ -357,19 +344,11 @@ class Mem0MemoryManager:
             enhanced_memories.append(enhanced_memory)
         
         # Sort by relevance and return top_k
-        sort_start = time.time()
         enhanced_memories.sort(key=lambda m: m.relevance_score, reverse=True)
-        sort_time_ms = (time.time() - sort_start) * 1000
-        
-        processing_time_ms = (time.time() - processing_start) * 1000
         final_memories = enhanced_memories[:top_k]
         
         if self.config.debug_mode:
-            logger.info(
-                f"[Mem0 Timing] Memory processing: {processing_time_ms:.2f}ms "
-                f"(Sort: {sort_time_ms:.2f}ms), "
-                f"final count: {len(final_memories)}"
-            )
+            logger.info(f"[Mem0 Debug] Memory processing completed, final count: {len(final_memories)}")
         
         return final_memories
     
