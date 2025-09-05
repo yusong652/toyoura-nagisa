@@ -89,7 +89,7 @@ class Mem0MemoryManager:
     
     async def add_memory(
         self,
-        content: str,
+        messages: List[Dict[str, str]],
         user_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
@@ -97,7 +97,7 @@ class Mem0MemoryManager:
         Add a memory to the Mem0 store.
         
         Args:
-            content: Memory content
+            messages: List of message dictionaries with 'role' and 'content' keys
             user_id: User identifier (uses config default if None)
             metadata: Additional metadata
         
@@ -113,7 +113,7 @@ class Mem0MemoryManager:
         
         # Add memory using Mem0
         if self.config.debug_mode:
-            logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, content='{content[:50]}...', metadata={metadata}")
+            logger.info(f"[Mem0 Debug] Adding memory: user_id={user_id}, messages={len(messages)} messages, metadata={metadata}")
         
         # Always log the actual user_id being used for debugging
         print(f"[DEBUG] add_memory called with user_id={user_id}")
@@ -122,14 +122,14 @@ class Mem0MemoryManager:
             # Support Mem0 API variants: prefer user_id, fallback to agent_id
             try:
                 result = self.memory.add(
-                    messages=content,
+                    messages=messages,
                     user_id=user_id,
                     metadata=metadata
                 )
             except TypeError:
                 # Older/newer API may use agent_id instead of user_id
                 result = self.memory.add(
-                    messages=content,
+                    messages=messages,
                     agent_id=user_id,
                     metadata=metadata
                 )

@@ -67,15 +67,17 @@ class MemoryInjectionMiddleware:
         user_text = extract_text_from_message(user_message)
         assistant_text = extract_text_from_message(assistant_message)
         
-        # Create conversation content for memory
-        conversation_content = f"""User: {user_text}
-Assistant: {assistant_text[:500]}"""
+        # Create conversation messages in Mem0 format (limit to one turn for testing)
+        messages = [
+            {"role": "user", "content": user_text},
+            {"role": "assistant", "content": assistant_text[:500]}
+        ]
         
         try:
             # Add conversation memory (detailed output handled by Mem0 manager)
             # All memories are saved at user level and searchable across all sessions
             await self.memory_manager.add_memory(
-                content=conversation_content,
+                messages=messages,
                 user_id=user_id
             )
         except Exception as e:
