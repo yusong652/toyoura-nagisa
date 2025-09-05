@@ -23,8 +23,7 @@ def get_memory_manager() -> Mem0MemoryManager:
     """
     global _memory_manager
     if _memory_manager is None:
-        config = MemoryConfig()
-        _memory_manager = Mem0MemoryManager(config=config)
+        _memory_manager = Mem0MemoryManager()
     return _memory_manager
 
 

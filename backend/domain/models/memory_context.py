@@ -109,10 +109,14 @@ class MemoryContext:
     
     def filter_by_relevance(self) -> List[EnhancedMemory]:
         """Filter memories by relevance threshold."""
+        if not self.memories:
+            return []
         return [m for m in self.memories if m.relevance_score >= self.relevance_threshold]
     
     def get_high_confidence_memories(self, min_confidence: float = 0.7) -> List[EnhancedMemory]:
         """Get memories with high confidence scores."""
+        if not self.memories:
+            return []
         return [m for m in self.memories if m.confidence >= min_confidence]
     
     def format_for_injection(self) -> str:

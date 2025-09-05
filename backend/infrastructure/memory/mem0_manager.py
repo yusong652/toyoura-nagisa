@@ -5,11 +5,10 @@ This module provides a modern memory management system using Mem0,
 replacing the legacy ChromaDB-based implementation.
 """
 
-import os
 import time
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import math
 from mem0 import Memory
 from backend.domain.models.memory_context import (
@@ -31,12 +30,11 @@ class Mem0MemoryManager:
     - Time-aware memory retrieval
     """
     
-    def __init__(self, config: Optional[MemoryConfig] = None):
+    def __init__(self):
         """
         Initialize Mem0 memory manager.
         
-        Args:
-            config: Optional MemoryConfig instance
+        Loads configuration directly from backend.config.memory.
         """
         # Ensure environment variables are loaded
         from dotenv import load_dotenv
@@ -56,8 +54,8 @@ class Mem0MemoryManager:
                 print(f"[Mem0 Init] Loaded environment from {env_path}")
                 break
         
-        # Use provided config or create default
-        self.config = config or MemoryConfig()
+        # Load configuration directly from backend.config
+        self.config = MemoryConfig()
         
         # Build complete Mem0 configuration from MemoryConfig
         mem0_config = self.config.build_mem0_config()
@@ -121,19 +119,9 @@ class Mem0MemoryManager:
         # Use config defaults
         user_id = user_id or self.config.mem0_user_id
         
-        # Check if saving is enabled
-        if not self.config.should_save_memory():
-            if self.config.debug_mode:
-                logger.info("[Mem0] Memory saving disabled, skipping")
-            return "disabled_memory_id"
-        # Prepare metadata
+        # Use provided metadata as-is (Mem0 handles user_id separately)
         if metadata is None:
             metadata = {}
-        
-        metadata.update({
-            "timestamp": datetime.now().isoformat(),
-            "user_id": user_id,  # Persist user for robust filtering
-        })
         
         # Add memory using Mem0
         if self.config.debug_mode:
@@ -173,7 +161,6 @@ class Mem0MemoryManager:
             for item in results_list:
                 event_type = item.get("event", "ADD")
                 memory_id = item.get("id", "")
-                memory_text = item.get("memory", item.get("text", ""))
                 
                 # Handle potential errors in result items first
                 if "error" in item:
@@ -183,23 +170,27 @@ class Mem0MemoryManager:
                 # Log different event types with consistent formatting
                 if self.config.debug_mode:
                     if event_type == "UPDATE":
-                        old_memory = item.get("old_memory", "")
+                        old_memory = item.get("previous_memory", "")
+                        new_memory = item.get("memory", "")
                         print(f"[MEMORY] {event_type}: Memory {memory_id} updated")
                         print(f"  OLD: {old_memory}")
-                        print(f"  NEW: {memory_text}")
+                        print(f"  NEW: {new_memory}")
                     elif event_type == "DELETE":
+                        deleted_memory = item.get("memory", "")
                         print(f"[MEMORY] {event_type}: Memory {memory_id} deleted")
-                        print(f"  Content: {memory_text}")
+                        print(f"  Content: {deleted_memory}")
                     elif event_type == "ADD":
+                        added_memory = item.get("memory", "")
                         print(f"[MEMORY] {event_type}: Memory {memory_id} added")
-                        print(f"  Content: {memory_text}")
+                        print(f"  Content: {added_memory}")
                     else:
                         # Unknown event type
                         print(f"[MEMORY] {event_type}: Unknown event for memory {memory_id}")
                 else:
                     # Non-debug mode: only show essential info
                     if event_type == "ADD":
-                        print(f"[MEMORY] Stored: {memory_text}")
+                        added_memory = item.get("memory", "")
+                        print(f"[MEMORY] Stored: {added_memory}")
             
             # Return the ID from the first result with an ID
             first_result = results_list[0]
@@ -338,8 +329,6 @@ class Mem0MemoryManager:
                 logger.info("[Mem0] Memory system disabled, returning empty list")
             return []
         
-        # Calculate time threshold
-        time_threshold = datetime.now() - timedelta(minutes=exclude_recent_minutes)
         
         # Search memories with Mem0
         context_search_start = time.time()
@@ -372,22 +361,6 @@ class Mem0MemoryManager:
                 continue
             metadata = mem.get("metadata", {})
             
-            # Parse timestamp
-            timestamp_str = metadata.get("timestamp")
-            if timestamp_str:
-                timestamp = datetime.fromisoformat(timestamp_str)
-                # Skip if too recent
-                if exclude_recent_minutes > 0 and timestamp > time_threshold:
-                    continue
-                # Skip if too old (if max age is configured)
-                max_age_minutes = self.config.get_max_age_minutes()
-                if max_age_minutes is not None:
-                    max_age_threshold = datetime.now() - timedelta(minutes=max_age_minutes)
-                    if timestamp < max_age_threshold:
-                        continue
-            else:
-                timestamp = datetime.now()
-            
             # Classify memory type
             memory_type = self._classify_memory_type(
                 mem.get("memory", ""),
@@ -398,26 +371,20 @@ class Mem0MemoryManager:
             if memory_types and memory_type not in memory_types:
                 continue
             
-            # Calculate relevance with time decay
-            base_relevance = mem.get("score", 0.5)
-            age_days = (datetime.now() - timestamp).days
-            time_weight = self._calculate_time_weight(memory_type, age_days)
-            final_relevance = base_relevance * time_weight
+            # Use relevance score from Mem0
+            relevance_score = mem.get("score", 0.5)
             
-            # Determine memory tier
-            memory_tier = self._determine_memory_tier(age_days)
-            
-            # Create EnhancedMemory
+            # Create EnhancedMemory with simplified fields
             enhanced_memory = EnhancedMemory(
                 content=mem.get("memory", ""),
                 embedding=[],  # Mem0 handles embeddings internally
-                timestamp=timestamp,
+                timestamp=datetime.now(),  # Simple fallback timestamp
                 memory_type=memory_type,
-                memory_tier=memory_tier,
-                confidence=self._calculate_confidence(base_relevance, metadata),
+                memory_tier=MemoryTier.SHORT_TERM,  # Simple default tier
+                confidence=relevance_score,
                 source=metadata.get("source", "conversation"),
                 metadata=metadata,
-                relevance_score=final_relevance
+                relevance_score=relevance_score
             )
             
             enhanced_memories.append(enhanced_memory)
@@ -520,6 +487,9 @@ class Mem0MemoryManager:
             except ValueError:
                 pass
         
+        if not content:
+            return MemoryType.CONTEXT
+            
         content_lower = content.lower()
         
         # Preference indicators
