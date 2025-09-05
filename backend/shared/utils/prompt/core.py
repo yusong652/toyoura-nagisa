@@ -53,39 +53,3 @@ def get_tool_prompt() -> str:
         prompt = prompt.replace("{workspace_root}", workspace_root)
     return prompt
 
-
-def get_system_prompt(agent_profile: str = "general") -> str:
-    """
-    Get complete system prompt.
-    Dynamically combines different prompt modules based on agent profile.
-    
-    Args:
-        agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
-                      "disabled" means no tools will be included
-                      
-    Returns:
-        Complete system prompt with appropriate components
-    """
-    base = get_base_prompt()
-    expression = get_expression_prompt()
-    
-    components = [base]
-    
-    # Only include tool prompt if agent profile is not "disabled"
-    # This is for backward compatibility - actual tool schemas should be embedded separately
-    if agent_profile != "disabled":
-        tool_prompt = get_tool_prompt()
-        if tool_prompt:
-            components.append(tool_prompt)
-            
-    components.append(expression)
-
-    # Use separator to join all parts, filtering out empty strings
-    full_prompt = "\n\n---\n\n".join(filter(None, components))
-    return full_prompt
-
-
-# Legacy compatibility
-def load_base_prompt() -> str:
-    """Legacy function - use get_base_prompt() instead."""
-    return get_base_prompt()
