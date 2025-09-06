@@ -296,11 +296,8 @@ class Mem0MemoryManager:
         top_k = top_k if top_k is not None else self.config.max_memories_to_inject
         user_id = user_id or self.config.mem0_user_id
         
-        # Check if memory is enabled
-        if not self.config.is_memory_active():
-            if self.config.debug_mode:
-                logger.info("[Mem0] Memory system disabled, returning empty list")
-            return []
+        # Memory search is now controlled by frontend enable_memory parameter
+        # This method is always active when called
         
         
         # Search memories with Mem0

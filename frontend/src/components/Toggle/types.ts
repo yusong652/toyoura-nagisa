@@ -73,6 +73,20 @@ export interface Live2DToggleProps {
 }
 
 /**
+ * Memory Toggle specific props
+ */
+export interface MemoryToggleProps {
+  /** Callback when memory state changes */
+  onMemoryChange?: (enabled: boolean) => void
+  
+  /** Whether the toggle is disabled */
+  disabled?: boolean
+  
+  /** Additional CSS classes */
+  className?: string
+}
+
+/**
  * Settings Toggle specific props
  * Supports both controlled and uncontrolled modes
  */

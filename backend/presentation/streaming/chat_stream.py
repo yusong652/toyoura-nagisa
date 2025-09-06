@@ -86,7 +86,8 @@ async def generate_chat_stream(
             session_id, 
             llm_client, 
             tts_engine, 
-            agent_profile=agent_profile
+            agent_profile=agent_profile,
+            enable_memory=enable_memory
         ):
             # Capture assistant response for memory saving
             if isinstance(chunk, str) and 'data:' in chunk:

@@ -91,6 +91,7 @@ class OpenAIClient(LLMClientBase):
         context_contents: List[Dict[str, Any]],
         session_id: Optional[str] = None,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ):
         """
@@ -107,6 +108,8 @@ class OpenAIClient(LLMClientBase):
                 - tool_calls: Optional[List] - Tool calls from assistant
                 - tool_call_id: Optional[str] - ID for tool responses
             session_id: Session ID for tool schema retrieval and dependency injection
+            agent_profile: Agent profile type for tool filtering and prompt customization
+            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_tokens: Optional[int] - Maximum output tokens override
@@ -135,7 +138,8 @@ class OpenAIClient(LLMClientBase):
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
             tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
-            session_id=session_id
+            session_id=session_id,
+            enable_memory=enable_memory
         )
         
         # Build API configuration

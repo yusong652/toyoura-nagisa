@@ -102,10 +102,18 @@ class AnthropicClient(LLMClientBase):
         anthropic_messages: List[Dict[str, Any]],
         session_id: Optional[str] = None,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ):
         """
         使用上下文调用Anthropic API
+        
+        Args:
+            anthropic_messages: Pre-formatted Anthropic API messages
+            session_id: Session ID for tool schema retrieval and dependency injection
+            agent_profile: Agent profile type for tool filtering and prompt customization
+            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
+            **kwargs: Additional API configuration parameters
         """
         debug = self.anthropic_config.debug
         
@@ -120,7 +128,8 @@ class AnthropicClient(LLMClientBase):
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
             tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
-            session_id=session_id
+            session_id=session_id,
+            enable_memory=enable_memory
         )
         
         # Still pass tools to API for proper function calling support
@@ -143,7 +152,7 @@ class AnthropicClient(LLMClientBase):
             )
             
             # Log tool embedding status
-            if tools and tools_enabled:
+            if tools:
                 print(f"[Anthropic Debug] Tool schemas embedded in system prompt: {len(tools)} tools")
             
             # Print simplified debug payload

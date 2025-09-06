@@ -15,6 +15,7 @@ import { AgentProvider } from './contexts/agent/AgentContext'
 import { SessionProvider } from './contexts/session/SessionContext'
 import { ChatProvider } from './contexts/chat/ChatContext'
 import { Live2DProvider } from './contexts/live2d/Live2DContext'
+import { MemoryProvider } from './contexts/MemoryContext'
 import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
 
@@ -65,12 +66,14 @@ function App(): React.ReactElement {
           <ConnectionProvider>
             <AgentProvider>
               <SessionProvider>
-                <ChatProvider>
-                  <Live2DProvider>
-                    <AppContent />
-                    <Live2DCanvas />
-                  </Live2DProvider>
-                </ChatProvider>
+                <MemoryProvider>
+                  <ChatProvider>
+                    <Live2DProvider>
+                      <AppContent />
+                      <Live2DCanvas />
+                    </Live2DProvider>
+                  </ChatProvider>
+                </MemoryProvider>
               </SessionProvider>
             </AgentProvider>
           </ConnectionProvider>

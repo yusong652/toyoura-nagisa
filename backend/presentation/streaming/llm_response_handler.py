@@ -32,7 +32,8 @@ async def handle_llm_response(
     session_id: str,
     llm_client: LLMClientBase,
     tts_engine,
-    agent_profile: str = "general"
+    agent_profile: str = "general",
+    enable_memory: bool = True
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Enhanced LLM Response Handler - Real-time streaming architecture.
@@ -49,6 +50,8 @@ async def handle_llm_response(
         session_id: Current session ID
         llm_client: LLM client instance
         tts_engine: TTS engine instance
+        agent_profile: Agent profile type for tool filtering and prompt customization
+        enable_memory: Whether to enable memory injection (controlled by frontend toggle)
     
     Yields:
         Streaming response chunks in SSE format
@@ -78,10 +81,11 @@ async def handle_llm_response(
         # Pass enhanced system prompt if available
         get_response_kwargs = {
             "session_id": session_id,
-            "agent_profile": agent_profile
+            "agent_profile": agent_profile,
+            "enable_memory": enable_memory
         }
         
-        print(f"[DEBUG] handle_llm_response: calling llm_client.get_response with agent_profile={agent_profile}, session_id={session_id}")
+        print(f"[DEBUG] handle_llm_response: calling llm_client.get_response with agent_profile={agent_profile}, session_id={session_id}, enable_memory={enable_memory}")
         
         async for item in llm_client.get_response(
             recent_msgs, 

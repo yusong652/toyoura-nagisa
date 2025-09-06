@@ -33,7 +33,7 @@ async def build_system_prompt(
         tool_schemas: List of tool schemas to embed in system prompt
         session_id: Session ID for memory retrieval (when provided, latest user message extracted automatically)
         user_id: User ID for memory operations
-        enable_memory: Whether to enable memory injection
+        enable_memory: Whether to enable memory injection (controlled by frontend)
         
     Returns:
         Complete system prompt string following Anthropic format with memory context

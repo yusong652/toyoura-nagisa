@@ -24,6 +24,7 @@ export interface ChatStreamRequest {
   session_id: string
   agent_profile: string
   tts_enabled: boolean
+  enable_memory?: boolean
 }
 
 export interface MessageDeleteRequest {
@@ -46,6 +47,7 @@ export class ChatService {
    * @param userMessageId - Unique identifier for the user message
    * @param agentProfile - Agent profile for tool selection
    * @param ttsEnabled - Whether TTS is enabled for response
+   * @param memoryEnabled - Whether memory injection is enabled (default: true)
    * @returns Promise resolving to Response object for stream processing
    */
   async sendMessage(
@@ -54,7 +56,8 @@ export class ChatService {
     sessionId: string,
     userMessageId: string,
     agentProfile: string,
-    ttsEnabled: boolean
+    ttsEnabled: boolean,
+    memoryEnabled: boolean = true
   ): Promise<Response> {
     const messageData: MessageRequest = {
       id: userMessageId,
@@ -71,7 +74,8 @@ export class ChatService {
       messageData: JSON.stringify(messageData),
       session_id: sessionId,
       agent_profile: agentProfile,
-      tts_enabled: ttsEnabled
+      tts_enabled: ttsEnabled,
+      enable_memory: memoryEnabled
     }
 
     return await apiClient.postStream('/api/chat/stream', streamRequest)

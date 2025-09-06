@@ -131,17 +131,6 @@ async def handle_memory_management(
                 "deleted": memory_id or "all" if delete_all else f"session_{session_id}"
             }
         
-        elif action == "toggle":
-            # Toggle memory injection on/off
-            enable = params.get("enable", True)
-            middleware.enable_injection = enable
-            
-            return {
-                "success": True,
-                "action": action,
-                "memory_enabled": enable
-            }
-        
         else:
             return {
                 "success": False,

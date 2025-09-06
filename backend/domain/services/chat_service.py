@@ -106,6 +106,7 @@ class ChatService:
         llm_client: LLMClientBase,
         tts_engine: BaseTTS,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         additional_messages: List[Any] = None
     ) -> StreamingResponse:
         """
@@ -125,6 +126,7 @@ class ChatService:
                 - Voice configuration support
                 - Streaming audio output
             agent_profile: Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
+            enable_memory: Whether to enable memory injection (controlled by frontend toggle)
             additional_messages: Optional extra messages for context
                 
         Returns:
@@ -148,6 +150,13 @@ class ChatService:
             additional_messages = []
             
         return StreamingResponse(
-            generate_chat_stream(session_id, additional_messages, llm_client, tts_engine, agent_profile=agent_profile),
+            generate_chat_stream(
+                session_id, 
+                additional_messages, 
+                llm_client, 
+                tts_engine, 
+                agent_profile=agent_profile,
+                enable_memory=enable_memory
+            ),
             media_type="text/event-stream"
         )

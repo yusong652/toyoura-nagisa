@@ -36,9 +36,6 @@ class MemoryInjectionMiddleware:
         """
         self.config = config or MemoryConfig()
         self.memory_manager = memory_manager or Mem0MemoryManager()
-        
-        # Use config values
-        self.enable_injection = self.config.enabled
     
     async def save_conversation_turn(
         self,

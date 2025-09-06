@@ -53,6 +53,7 @@ class LLMClientBase(ABC):
         messages: List[BaseMessage],
         session_id: Optional[str] = None,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
         """
@@ -66,6 +67,7 @@ class LLMClientBase(ABC):
             messages: Input message list
             session_id: Session ID for tool and context management
             agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
+            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
             **kwargs: Additional parameters (like max_iterations, temperature, etc.)
             
         Yields:
@@ -120,7 +122,7 @@ class LLMClientBase(ABC):
             
             final_response = None
             async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, agent_profile, **kwargs
+                context_manager, session_id, max_iterations, metadata, debug, agent_profile, enable_memory, **kwargs
             ):
                 if isinstance(item, dict):
                     # Intermediate notification - yield directly to API layer
@@ -198,6 +200,7 @@ class LLMClientBase(ABC):
         context_contents: List[Dict[str, Any]], 
         session_id: str,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ) -> Any:
         """
@@ -213,6 +216,8 @@ class LLMClientBase(ABC):
                 - Message roles and content parts as required by each provider
                 - Function call definitions and tool schemas when applicable
             session_id: Session ID for tool schema retrieval and dependency injection
+            agent_profile: Agent profile type for tool filtering and prompt customization
+            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_output_tokens: Optional[int] - Maximum output tokens override
@@ -312,6 +317,7 @@ class LLMClientBase(ABC):
         metadata: Dict[str, Any],
         debug: bool,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
         """
@@ -359,7 +365,7 @@ class LLMClientBase(ABC):
         recent_messages_length = get_llm_settings().recent_messages_length
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id, agent_profile=agent_profile, **kwargs
+            working_contents, session_id=session_id, agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
         )
         metadata['api_calls'] += 1
         
@@ -442,7 +448,7 @@ class LLMClientBase(ABC):
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")
             
             current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id, agent_profile=agent_profile, **kwargs
+                working_contents, session_id=session_id, agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
             )
             metadata['api_calls'] += 1
             

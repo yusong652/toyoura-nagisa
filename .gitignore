@@ -96,3 +96,6 @@ backend/chat/anthropic.py
 backend/chat/gpt.py
 backend/chat/grok.py
 backend/chat/mistral.py
+
+# Third-party libraries and dependencies
+_third_party/

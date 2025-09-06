@@ -101,6 +101,7 @@ class GeminiClient(LLMClientBase):
         context_contents: List[Dict[str, Any]], 
         session_id: str,
         agent_profile: str = "general",
+        enable_memory: bool = True,
         **kwargs
     ) -> types.GenerateContentResponse:
         """
@@ -115,6 +116,8 @@ class GeminiClient(LLMClientBase):
                 - role: str - Message role ("user", "model", "system")
                 - parts: List[Dict] - Content parts including text and function calls
             session_id: Session ID for tool schema retrieval and dependency injection
+            agent_profile: Agent profile type for tool filtering and prompt customization
+            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_output_tokens: Optional[int] - Maximum output tokens override
@@ -155,7 +158,8 @@ class GeminiClient(LLMClientBase):
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
             tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
-            session_id=session_id
+            session_id=session_id,
+            enable_memory=enable_memory
         )
         
         print(f"[DEBUG] GeminiClient.call_api_with_context: system_prompt contains tools: {'tools' in system_prompt.lower()}")

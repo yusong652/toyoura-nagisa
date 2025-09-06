@@ -27,10 +27,8 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         from backend.config.memory import MemoryConfig
         from backend.domain.models.memory_context import MemoryContext
         
-        # Check if memory injection is enabled
+        # Get memory configuration
         memory_config = MemoryConfig()
-        if not memory_config.should_inject_memory():
-            return None
         
         # Get latest user text message for memory search
         latest_user_text = get_latest_user_text(session_id)

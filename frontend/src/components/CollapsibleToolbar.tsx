@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AgentProfileSelector from './AgentProfileSelector';
 import { TTSToggle } from './Toggle/variants/TTSToggle';
 import { Live2DToggle } from './Toggle/variants/Live2DToggle';
+import { MemoryToggle } from './Toggle/variants/MemoryToggle';
 import { SettingsToggle } from './Toggle/variants/SettingsToggle';
 import './CollapsibleToolbar.css';
 
@@ -99,6 +100,21 @@ export const CollapsibleToolbar: React.FC = () => {
                 <span className="toolbar-label">Live2D Character</span>
               </div>
               <Live2DToggle />
+            </div>
+          </div>
+          
+          <div className="toolbar-section">
+            <div className="toolbar-item">
+              <div className="toolbar-icon-label">
+                <svg className="toolbar-section-icon" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  {/* Memory icon - chip/circuit design */}
+                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                  <rect x="9" y="9" width="6" height="6" rx="1" ry="1"/>
+                  <path d="M9 1v6m6 0V1M9 17v6m6 0v-6m8-8h-6m0 6h6M7 9H1m6 6H1" strokeLinecap="round"/>
+                </svg>
+                <span className="toolbar-label">Memory</span>
+              </div>
+              <MemoryToggle />
             </div>
           </div>
           

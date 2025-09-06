@@ -70,6 +70,7 @@ async def chat_endpoint(
             - message content and metadata
             - session_id for conversation context
             - agent_profile for tool selection ("general", "coding", "lifestyle", etc.)
+            - enable_memory (optional): Whether to enable memory injection (default: True)
             - optional configuration flags
         
     Returns:
@@ -106,6 +107,9 @@ async def chat_endpoint(
                 detail="Invalid message data format"
             )
         
+        # Extract enable_memory flag from request (default to True)
+        enable_memory = data.get("enable_memory", True)
+        
         # Load conversation history
         history_msgs = service.load_and_prepare_history(session_id)
         
@@ -119,7 +123,8 @@ async def chat_endpoint(
             session_id=session_id,
             llm_client=llm_client,
             tts_engine=tts_engine,
-            agent_profile=agent_profile
+            agent_profile=agent_profile,
+            enable_memory=enable_memory
         )
         
     except HTTPException:

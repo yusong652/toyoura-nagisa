@@ -4,6 +4,7 @@ import { useAudio } from '../audio/AudioContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
 import { useAgent } from '../agent/AgentContext'
 import { useSession } from '../session/SessionContext'
+import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useImageGenerator } from './useImageGenerator'
@@ -27,6 +28,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const { ttsEnabled } = useTtsEnable()
+  const { memoryEnabled } = useMemory()
   const {
     toolState,
     toolsEnabled,
@@ -55,7 +57,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     sessionRefreshSessions,
     sessionSwitchSession,
     ttsEnabled,
-    currentProfile
+    currentProfile,
+    memoryEnabled
   })
 
   // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
