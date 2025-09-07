@@ -13,6 +13,7 @@ class AgentProfile(Enum):
     """Agent身份类型"""
     LIFESTYLE = "lifestyle"  # 生活助手
     CODING = "coding"        # 编程助手
+    PFC = "pfc"             # PFC仿真专家
     GENERAL = "general"      # 通用模式，加载所有工具
     DISABLED = "disabled"    # 禁用所有工具
 
@@ -61,6 +62,28 @@ class ToolProfileManager:
         "get_current_time"
     ]
     
+    # PFC simulation tools (coding tools + PFC-specific tools)
+    PFC_TOOLS = [
+        # File operation tools - for PFC scripts and data files
+        "write",
+        "read",
+        "edit",
+        # System command tools - for running PFC-related commands
+        "bash",
+        "ls",
+        "glob",
+        "grep",
+        # Search tools - for finding PFC documentation and examples
+        "web_search",
+        # PFC-specific tools (to be added in the future)
+        # "pfc_execute",        # Execute PFC commands
+        # "pfc_model_create",   # Create models
+        # "pfc_model_query",    # Query model state
+        # "pfc_simulation_run", # Run simulations
+        # "pfc_data_extract",   # Extract data
+        # "pfc_visualization"   # Visualization
+    ]
+    
     # 工具分类定义
     TOOL_PROFILES: Dict[AgentProfile, ToolProfile] = {
         AgentProfile.CODING: ToolProfile(
@@ -79,6 +102,15 @@ class ToolProfileManager:
             estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 14个工具
             color="#FF9800",  # 橙色
             icon="🌟"
+        ),
+        
+        AgentProfile.PFC: ToolProfile(
+            name="PFC Expert",
+            description="ITASCA PFC simulation specialist with file operations and analysis tools",
+            tools=PFC_TOOLS,
+            estimated_tokens=len(PFC_TOOLS) * 282,  # Currently 8 basic tools, will expand in future
+            color="#9C27B0",  # 紫色
+            icon="⚛️"
         ),
         
         AgentProfile.GENERAL: ToolProfile(
@@ -143,20 +175,3 @@ class ToolProfileManager:
             return AgentProfile(profile_name)
         except ValueError:
             return None
-    
-    @classmethod
-    def get_recommended_profile(cls, query: str) -> AgentProfile:
-        """基于查询内容推荐最合适的Agent身份"""
-        query_lower = query.lower()
-        
-        # 编程相关关键词
-        coding_keywords = {
-            "code", "python", "script", "file", "program", "debug", 
-            "git", "function", "class", "api", "develop", "build",
-            "test", "deploy", "command", "shell", "terminal"
-        }
-        if any(keyword in query_lower for keyword in coding_keywords):
-            return AgentProfile.CODING
-            
-        # 其他都归为生活类
-        return AgentProfile.LIFESTYLE

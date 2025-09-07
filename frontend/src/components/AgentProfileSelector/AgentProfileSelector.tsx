@@ -118,7 +118,7 @@ export const AgentProfileSelector: React.FC<AgentProfileSelectorProps> = ({
   }
 
   const isCompact = variant === 'compact'
-  const combinedError = stateError || displayError
+  const combinedError = displayError || (stateError ? { message: stateError } : null)
   
   return (
     <div 

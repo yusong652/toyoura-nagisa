@@ -1,6 +1,7 @@
 export enum AgentProfileType {
   CODING = 'coding',
-  LIFESTYLE = 'lifestyle', 
+  LIFESTYLE = 'lifestyle',
+  PFC = 'pfc',
   GENERAL = 'general',
   DISABLED = 'disabled'
 }

@@ -28,7 +28,7 @@ const ProfileIcon: React.FC<ProfileIconProps> = ({ profile, size = 16 }) => {
     height: size,
     fill: "currentColor",
     viewBox: "0 0 16 16",
-    "aria-hidden": "true" // Icons are decorative, screen readers use text labels
+    "aria-hidden": true as const // Icons are decorative, screen readers use text labels
   }
 
   switch (profile) {
@@ -43,6 +43,18 @@ const ProfileIcon: React.FC<ProfileIconProps> = ({ profile, size = 16 }) => {
       return (
         <svg {...iconProps} role="img" aria-label="Lifestyle profile">
           <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/>
+        </svg>
+      )
+      
+    case AgentProfileType.PFC:
+      return (
+        <svg {...iconProps} role="img" aria-label="PFC Expert profile">
+          <circle cx="8" cy="8" r="1.5"/>
+          <circle cx="4" cy="4" r="1"/>
+          <circle cx="12" cy="4" r="1"/>
+          <circle cx="4" cy="12" r="1"/>
+          <circle cx="12" cy="12" r="1"/>
+          <path d="M8 6.5v-2M8 9.5v2M6.5 8h-2M9.5 8h2M5.5 5.5L4 4M10.5 5.5L12 4M5.5 10.5L4 12M10.5 10.5L12 12" stroke="currentColor" fill="none" strokeWidth="0.5"/>
         </svg>
       )
       

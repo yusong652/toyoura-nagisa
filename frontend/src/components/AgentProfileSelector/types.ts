@@ -141,6 +141,7 @@ export interface ProfileSelectorError {
 export const PROFILE_ORDER: AgentProfileType[] = [
   AgentProfileType.CODING,
   AgentProfileType.LIFESTYLE,
+  AgentProfileType.PFC,
   AgentProfileType.GENERAL,
   AgentProfileType.DISABLED
 ]
