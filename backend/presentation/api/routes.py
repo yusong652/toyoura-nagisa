@@ -1,7 +1,7 @@
-# API Routes - 统一的路由管理
-# 用于将来整合所有API路由
+# API Routes - Unified route management
+# Used for future integration of all API routes
 
 from . import images, videos
 
-# 这里可以添加其他API路由模块
+# Additional API route modules can be added here
 __all__ = ['images', 'videos']

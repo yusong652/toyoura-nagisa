@@ -1,8 +1,8 @@
 """
-视频存储模块
+Video storage module
 
-提供视频的保存和管理功能。
-支持从base64数据保存视频，并自动创建视频消息记录。
+Provides video saving and management functionality.
+Supports saving videos from base64 data and automatically creates video message records.
 """
 
 import os
@@ -16,14 +16,14 @@ from backend.infrastructure.storage.session_manager import load_all_message_hist
 
 def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: str = "chat/data", format: str = "mp4") -> str:
     """
-    将base64编码的视频保存到指定session目录，同时创建视频消息并保存到历史记录
+    Save base64 encoded video to the specified session directory, create video message and save to history
     Args:
-        video_base64 (str): base64编码的视频数据
-        session_id (str): 会话ID
-        output_dir_base (str): 基础输出目录
-        format (str): 视频格式 (mp4, gif, webm)
+        video_base64 (str): base64 encoded video data
+        session_id (str): session ID
+        output_dir_base (str): base output directory
+        format (str): video format (mp4, gif, webm)
     Returns:
-        str: 保存的视频路径
+        str: saved video path
     """
     print(f"[DEBUG] save_video_from_base64 called with session_id: {session_id}")
     print(f"[DEBUG] video base64 data length: {len(video_base64)}")
@@ -38,9 +38,9 @@ def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: 
     filepath = os.path.join(session_dir, filename)
     print(f"[DEBUG] Target filepath: {filepath}")
     
-    # 解码base64并保存视频
+    # Decode base64 and save video
     try:
-        # 如果base64字符串包含数据URL前缀，去掉它
+        # If base64 string contains data URL prefix, remove it
         if video_base64.startswith('data:video') or video_base64.startswith('data:image/gif'):
             print("[DEBUG] Removing data URL prefix from base64 string")
             video_base64 = video_base64.split(',')[1]
@@ -55,7 +55,7 @@ def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: 
             f.write(video_data)
         print(f"[DEBUG] Successfully wrote video file: {filepath}")
         
-        # 验证文件是否存在
+        # Verify if file exists
         if os.path.exists(filepath):
             file_size = os.path.getsize(filepath)
             print(f"[DEBUG] File exists and size is: {file_size} bytes")
@@ -68,7 +68,7 @@ def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: 
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
         raise e
     
-    # 创建视频消息并添加到历史记录
+    # Create video message and add to history
     _create_and_save_video_message(session_id, filename, format)
     
     return filepath
@@ -76,24 +76,24 @@ def save_video_from_base64(video_base64: str, session_id: str, output_dir_base: 
 
 def _create_and_save_video_message(session_id: str, filename: str, format: str = "mp4") -> None:
     """
-    创建视频消息并添加到会话历史记录
+    Create video message and add to session history
     
     Args:
-        session_id: 会话ID
-        filename: 视频文件名
-        format: 视频格式
+        session_id: session ID
+        filename: video filename
+        format: video format
     """
-    # 创建视频消息
+    # Create video message
     relative_path = os.path.join(session_id, filename)
     print(f"[DEBUG] Creating video message with relative_path: {relative_path}")
     video_message = VideoMessage(
-        content="",  # 空内容，只显示视频
+        content="",  # Empty content, only display video
         video_path=relative_path,
         id=str(uuid.uuid4()),
         timestamp=datetime.now()
     )
     
-    # 将视频消息添加到历史记录
+    # Add video message to history
     print("[DEBUG] Loading current history to append video message")
     history = load_all_message_history(session_id)
     history.append(video_message)

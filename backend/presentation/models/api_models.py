@@ -1,8 +1,8 @@
 """
-API 请求和响应模型
+API request and response models
 
-定义Web API的数据传输对象（DTOs），包括请求和响应的结构。
-这些模型专门用于HTTP API层，与领域模型分离。
+Defines data transfer objects (DTOs) for Web API, including request and response structures.
+These models are specifically used for the HTTP API layer, separated from domain models.
 """
 
 from pydantic import BaseModel, Field
@@ -10,23 +10,23 @@ from typing import Optional
 
 
 # =====================
-# 基础响应模型
+# Basic response models
 # =====================
 class ErrorResponse(BaseModel):
-    """API错误响应模型"""
-    detail: str = Field(..., description="错误信息")
+    """API error response model"""
+    detail: str = Field(..., description="Error message")
 
 
 # =====================
-# 会话管理相关模型
+# Session management models
 # =====================
 class NewHistoryRequest(BaseModel):
-    """创建新历史记录的请求模型"""
+    """Request model for creating new history record"""
     name: Optional[str] = None
 
 
 class HistorySessionResponse(BaseModel):
-    """历史会话响应模型"""
+    """History session response model"""
     id: str
     name: str
     created_at: str
@@ -34,57 +34,57 @@ class HistorySessionResponse(BaseModel):
 
 
 class SwitchSessionRequest(BaseModel):
-    """切换会话的请求模型"""
+    """Request model for switching session"""
     session_id: str
 
 
 class DeleteSessionRequest(BaseModel):
-    """删除会话的请求模型"""
+    """Request model for deleting session"""
     session_id: str
 
 
 # =====================
-# 消息管理相关模型
+# Message management models
 # =====================
 class DeleteMessageRequest(BaseModel):
-    """删除消息的请求模型"""
+    """Request model for deleting message"""
     session_id: str
     message_id: str
 
 
 # =====================
-# 标题生成相关模型
+# Title generation models
 # =====================
 class GenerateTitleRequest(BaseModel):
-    """生成标题的请求模型"""
+    """Request model for generating title"""
     session_id: str
 
 
 # =====================
-# 功能开关相关模型
+# Feature toggle models
 # =====================
 class UpdateToolsEnabledRequest(BaseModel):
-    """更新工具启用状态的请求模型"""
+    """Request model for updating tools enabled status"""
     enabled: bool
 
 
 class UpdateTTSEnabledRequest(BaseModel):
-    """更新TTS启用状态的请求模型"""
+    """Request model for updating TTS enabled status"""
     enabled: bool
 
 
 # =====================
-# 图片生成相关模型
+# Image generation models
 # =====================
 class GenerateImageRequest(BaseModel):
-    """一键生成图片的请求模型"""
+    """Request model for one-click image generation"""
     session_id: str
 
 
 # =====================
-# 视频生成相关模型
+# Video generation models
 # =====================
 class GenerateVideoRequest(BaseModel):
-    """生成视频的请求模型"""
+    """Request model for video generation"""
     session_id: str
     motion_style: Optional[str] = Field(default=None, description="Motion style description (e.g., 'cinematic camera movement')")

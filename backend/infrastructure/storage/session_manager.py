@@ -1,8 +1,8 @@
 """
-会话管理模块
+Session Management Module
 
-提供聊天会话的创建、读取、更新、删除等功能。
-负责会话历史记录的持久化存储和元数据管理。
+Provides functionality for creating, reading, updating, and deleting chat sessions.
+Responsible for persistent storage of session history and metadata management.
 """
 
 import os
@@ -21,38 +21,38 @@ if TYPE_CHECKING:
 
 
 
-# 聊天历史相关工具
+# Chat history related tools
 HISTORY_BASE_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
 
 
 def _get_session_dir(session_id: str) -> str:
-    """获取会话目录路径"""
+    """Get session directory path"""
     return os.path.join(HISTORY_BASE_DIR, session_id)
 
 
 def _get_session_file(session_id: str) -> str:
-    """获取会话文件路径"""
+    """Get session file path"""
     return os.path.join(_get_session_dir(session_id), "history.json")
 
 
-# ========== 会话CRUD操作 ==========
+# ========== Session CRUD Operations ==========
 
 def create_new_history(name: str = None) -> str:
     """
-    创建一个新的聊天历史记录
+    Create a new chat history record
     Args:
-        name: 历史记录的名称，如果为None则使用当前时间作为名称
+        name: Name of the history record, uses current time as name if None
     Returns:
-        新创建的会话ID
+        Newly created session ID
     """
     session_id = str(uuid.uuid4())
     if not name:
         name = f"New Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    elif not name.startswith("New Chat") and "新对话" not in name:
+    elif not name.startswith("New Chat"):
         name = f"New Chat - {name}"
 
-    print(f"创建新会话，ID: {session_id}, 名称: '{name}'")
+    print(f"[DEBUG] Creating new session, ID: {session_id}, name: '{name}'")
 
     session_metadata = {
         "id": session_id,
@@ -61,7 +61,7 @@ def create_new_history(name: str = None) -> str:
         "updated_at": datetime.now().isoformat()
     }
 
-    # 保存元数据
+    # Save metadata
     metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     metadata = {}
     if os.path.exists(metadata_file):
@@ -74,7 +74,7 @@ def create_new_history(name: str = None) -> str:
     with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
-    # 创建会话目录和空的聊天记录文件
+    # Create session directory and empty chat history file
     session_dir = _get_session_dir(session_id)
     os.makedirs(session_dir, exist_ok=True)
     session_file = _get_session_file(session_id)
@@ -86,10 +86,10 @@ def create_new_history(name: str = None) -> str:
 
 def get_all_sessions() -> List[Dict[str, Any]]:
     """
-    获取所有可用的聊天会话
+    Get all available chat sessions
     
     Returns:
-        会话元数据列表，按更新时间倒序排列
+        List of session metadata, sorted by update time in descending order
     """
     metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     if not os.path.exists(metadata_file):
@@ -98,7 +98,7 @@ def get_all_sessions() -> List[Dict[str, Any]]:
     try:
         with open(metadata_file, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
-            # 将字典转换为列表并按更新时间排序
+            # Convert dictionary to list and sort by update time
             sessions = list(metadata.values())
             sessions.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
             return sessions
@@ -107,12 +107,12 @@ def get_all_sessions() -> List[Dict[str, Any]]:
 
 
 def delete_session_data(session_id: str) -> bool:
-    """删除指定会话ID的聊天历史"""
+    """Delete chat history for specified session ID"""
     try:
         session_dir = _get_session_dir(session_id)
         if os.path.exists(session_dir):
             shutil.rmtree(session_dir)
-        # 更新元数据
+        # Update metadata
         metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if os.path.exists(metadata_file):
             try:
@@ -131,17 +131,17 @@ def delete_session_data(session_id: str) -> bool:
 
 def update_session_title(session_id: str, new_title: str) -> bool:
     """
-    更新会话的标题
+    Update session title
     
     Args:
-        session_id: 要更新的会话ID
-        new_title: 新的会话标题
+        session_id: Session ID to update
+        new_title: New session title
         
     Returns:
-        是否更新成功
+        Whether update was successful
     """
     try:
-        # 加载会话元数据
+        # Load session metadata
         metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
         if not os.path.exists(metadata_file):
             return False
@@ -149,34 +149,34 @@ def update_session_title(session_id: str, new_title: str) -> bool:
         with open(metadata_file, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
         
-        # 检查会话是否存在
+        # Check if session exists
         if session_id not in metadata:
             return False
             
-        # 更新标题和更新时间
+        # Update title and update time
         metadata[session_id]["name"] = new_title
         metadata[session_id]["updated_at"] = datetime.now().isoformat()
         
-        # 保存更新后的元数据
+        # Save updated metadata
         with open(metadata_file, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=4, ensure_ascii=False)
             
         return True
     except Exception as e:
-        print(f"更新会话标题时出错: {str(e)}")
+        print(f"[ERROR] Failed to update session title: {str(e)}")
         return False
 
 
-# ========== 消息历史记录操作 ==========
+# ========== Message History Operations ==========
 
 def save_history(session_id: str, current_history: List[Any]) -> None:
-    """保存指定会话ID的聊天历史"""
+    """Save chat history for specified session ID"""
     session_dir = _get_session_dir(session_id)
     session_file = _get_session_file(session_id)
     os.makedirs(session_dir, exist_ok=True)
     processed_history = []
     for msg in current_history:
-        # 如果是Pydantic模型，转为dict
+        # If it's a Pydantic model, convert to dict
         if hasattr(msg, 'model_dump'):
             msg_copy = msg.model_dump()
         else:
@@ -193,7 +193,7 @@ def save_history(session_id: str, current_history: List[Any]) -> None:
         processed_history.append(msg_copy)
     with open(session_file, 'w', encoding='utf-8') as f:
         json.dump(processed_history, f, indent=4, ensure_ascii=False)
-    # 更新元数据中的更新时间
+    # Update the update time in metadata
     _update_session_metadata_timestamp(session_id)
 
 
@@ -205,7 +205,7 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
     try:
         with open(session_file, 'r', encoding='utf-8') as f:
             history = json.load(f)
-            # 读取后，过滤掉 image 和 video 类型
+            # After reading, filter out image and video types
             history = [msg for msg in history if msg.get('role') not in ['image', 'video']]
             for msg in history:
                 if 'timestamp' not in msg or not msg['timestamp']:
@@ -222,7 +222,7 @@ def load_history(session_id: str) -> List[Dict[str, Any]]:
 
 
 def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
-    """加载会话的完整消息历史，包括图片消息"""
+    """Load complete message history for session, including image messages"""
     session_file = _get_session_file(session_id)
     if not os.path.exists(session_file):
         return []
@@ -245,7 +245,7 @@ def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
 
 def load_and_restore_history(session_id: str):
     """
-    加载并还原指定会话ID的聊天历史，返回消息对象列表
+    Load and restore chat history for specified session ID, return list of message objects
     """
     
     history = load_all_message_history(session_id)
@@ -254,19 +254,19 @@ def load_and_restore_history(session_id: str):
 
 def delete_message(session_id: str, message_id: str) -> bool:
     """
-    从指定会话中删除特定ID的消息，并清理相关文件
+    Delete message with specific ID from specified session and clean up related files
     Args:
-        session_id: 会话ID
-        message_id: 要删除的消息ID
+        session_id: Session ID
+        message_id: Message ID to delete
     Returns:
-        bool: 是否成功删除
+        bool: Whether deletion was successful
     """
     try:
         session_history = load_all_message_history(session_id)
         if not session_history:
             return False
         
-        # 找到要删除的消息，检查是否需要清理文件
+        # Find the message to delete and check if files need to be cleaned up
         message_to_delete = None
         for msg in session_history:
             if msg.get('id') == message_id:
@@ -274,38 +274,38 @@ def delete_message(session_id: str, message_id: str) -> bool:
                 break
         
         if not message_to_delete:
-            return False  # 没找到要删的消息
+            return False  # Message to delete not found
         
-        # 如果是视频消息或图片消息，删除相关文件
+        # If it's a video or image message, delete related files
         _cleanup_message_files(session_id, message_to_delete)
         
-        # 删除消息
+        # Delete message
         new_history = [msg for msg in session_history if msg.get('id') != message_id]
         
-        # 保存更新后的历史记录
+        # Save updated history
         save_history(session_id, new_history)
         return True
     except Exception as e:
-        print(f"删除消息时出错: {e}")
+        print(f"[ERROR] Failed to delete message: {e}")
         return False
 
 
 def _cleanup_message_files(session_id: str, message: dict) -> None:
     """
-    清理消息相关的文件（视频、图片等）
+    Clean up message-related files (videos, images, etc.)
     
     Args:
-        session_id: 会话ID
-        message: 要清理的消息对象
+        session_id: Session ID
+        message: Message object to clean up
     """
     try:
         message_type = message.get('role', message.get('type', '')).lower()
         
         if message_type == 'video' and message.get('video_path'):
-            # 清理视频文件
+            # Clean up video file
             video_path = message.get('video_path')
             if not os.path.isabs(video_path):
-                # 如果是相对路径，构建完整路径
+                # If it's a relative path, build full path
                 full_path = os.path.join(HISTORY_BASE_DIR, video_path)
             else:
                 full_path = video_path
@@ -317,10 +317,10 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
                 print(f"[DEBUG] Video file not found: {full_path}")
         
         elif message_type == 'image' and message.get('image_path'):
-            # 清理图片文件
+            # Clean up image file
             image_path = message.get('image_path')
             if not os.path.isabs(image_path):
-                # 如果是相对路径，构建完整路径
+                # If it's a relative path, build full path
                 full_path = os.path.join(HISTORY_BASE_DIR, image_path)
             else:
                 full_path = image_path
@@ -331,7 +331,7 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
             else:
                 print(f"[DEBUG] Image file not found: {full_path}")
         
-        # 可以在这里添加其他类型文件的清理逻辑
+        # Other file type cleanup logic can be added here
         
     except Exception as e:
         print(f"[WARNING] Failed to cleanup files for message {message.get('id')}: {e}")
@@ -339,18 +339,18 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
 
 def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], ...]:
     """
-    获取指定会话中最新的n条消息（返回消息对象而非dict）
-    只返回 user/assistant 消息，过滤掉 image/tool 等其它类型
+    Get latest n messages from specified session (returns message objects instead of dict)
+    Only returns user/assistant messages, filters out image/tool and other types
     
     Args:
-        session_id: 会话ID
-        n: 要获取的消息数量，默认为2
+        session_id: Session ID
+        n: Number of messages to get, defaults to 2
         
     Returns:
-        Tuple: 包含消息对象的元组，如果消息不足n条，返回所有实际消息
+        Tuple: Tuple containing message objects, returns all actual messages if less than n messages exist
     """
     
-    history = load_history(session_id)  # 只返回非 image 和非 video 消息
+    history = load_history(session_id)  # Only returns non-image and non-video messages
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
     if not history_msgs:
         return tuple()
@@ -367,26 +367,26 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
 
 def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
     """
-    获取指定会话中最新的两条消息（返回消息对象而非dict）
-    只返回 user/assistant 消息，过滤掉 image/tool 等其它类型
+    Get latest two messages from specified session (returns message objects instead of dict)
+    Only returns user/assistant messages, filters out image/tool and other types
     
-    Deprecated: 使用 get_latest_n_messages(session_id, 2) 替代
+    Deprecated: Use get_latest_n_messages(session_id, 2) instead
     """
     return get_latest_n_messages(session_id, 2)
 
 
 def get_latest_user_text(session_id: str) -> Optional[str]:
     """
-    获取会话中最新的用户文本消息内容。
+    Get latest user text message content from session.
     
-    专门用于内存搜索等需要用户输入文本的场景。
-    会跳过 image、video 等非文本用户消息。
+    Specifically for scenarios requiring user input text like memory search.
+    Skips non-text user messages like image, video, etc.
     
     Args:
-        session_id: 会话ID
+        session_id: Session ID
         
     Returns:
-        Optional[str]: 最新的用户文本内容，如果没有则返回 None
+        Optional[str]: Latest user text content, returns None if not found
     """
     from backend.domain.models.message_factory import extract_text_from_message
     
@@ -394,7 +394,7 @@ def get_latest_user_text(session_id: str) -> Optional[str]:
     if not history:
         return None
     
-    # 从最新消息开始查找用户文本消息
+    # Search for user text messages starting from the latest
     for msg in reversed(history):
         if msg.role == 'user':
             text = extract_text_from_message(msg)
@@ -404,10 +404,10 @@ def get_latest_user_text(session_id: str) -> Optional[str]:
     return None
 
 
-# ========== 内部辅助函数 ==========
+# ========== Internal Helper Functions ==========
 
 def _update_session_metadata_timestamp(session_id: str) -> None:
-    """更新会话元数据中的时间戳"""
+    """Update timestamp in session metadata"""
     metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     if os.path.exists(metadata_file):
         try:

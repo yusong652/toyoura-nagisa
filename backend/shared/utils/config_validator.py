@@ -17,13 +17,13 @@ async def validate_llm_configuration():
         supported_clients = factory.get_supported_clients()
         
         if not factory.is_client_supported(current_llm):
-            print(f"❌ [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
-            print(f"📋 Supported clients: {', '.join(supported_clients)}")
-            print(f"💡 Please update your configuration to use one of the supported clients.")
+            print(f"[ERROR] [STARTUP ERROR] Unsupported LLM client configured: '{current_llm}'")
+            print(f"[INFO] Supported clients: {', '.join(supported_clients)}")
+            print(f"[INFO] Please update your configuration to use one of the supported clients.")
             # 注意：这里不抛出异常，让应用启动，但在运行时会被工厂方法捕获
             
         else:
-            print(f"✅ [STARTUP] LLM client '{current_llm}' is supported and ready")
+            print(f"[OK] [STARTUP] LLM client '{current_llm}' is supported and ready")
             
     except Exception as e:
-        print(f"⚠️  [STARTUP WARNING] Could not validate LLM configuration: {e}")
+        print(f"[WARNING] [STARTUP WARNING] Could not validate LLM configuration: {e}")

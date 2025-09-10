@@ -11,7 +11,7 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter()
 
-# 获取后端 chat/data 的绝对路径
+# Get absolute path to backend chat/data directory
 BASE_DIR = Path(__file__).parent.parent.parent / "chat" / "data"
 
 class VideoGenerationRequest(BaseModel):
@@ -42,25 +42,25 @@ def get_llm_client(request: Request) -> LLMClientBase:
 @router.get("/api/videos/{video_path:path}")
 async def get_video(video_path: str):
     """
-    提供视频文件访问的API路由
+    API route for video file access.
     
     Args:
-        video_path: 视频的相对路径，格式为 session_id/filename
+        video_path: Relative video path in format session_id/filename
         
     Returns:
-        FileResponse: 视频文件
+        FileResponse: Video file response
     """
     try:
-        # 用绝对路径拼接
+        # Construct full path using absolute path
         full_path = BASE_DIR / video_path
-        # 安全检查：确保路径在允许的目录内
+        # Security check: ensure path is within allowed directory
         if not str(full_path.resolve()).startswith(str(BASE_DIR.resolve())):
             raise HTTPException(status_code=403, detail="Access denied")
-        # 检查文件是否存在
+        # Check if file exists
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="Video not found")
         
-        # 根据文件扩展名确定媒体类型
+        # Determine media type based on file extension
         suffix = full_path.suffix.lower()
         if suffix == '.mp4':
             media_type = "video/mp4"
@@ -71,11 +71,11 @@ async def get_video(video_path: str):
         else:
             media_type = "application/octet-stream"
         
-        # 返回视频文件
+        # Return video file
         return FileResponse(
             full_path,
             media_type=media_type,
-            headers={"Cache-Control": "public, max-age=31536000"}  # 缓存一年
+            headers={"Cache-Control": "public, max-age=31536000"}  # Cache for one year
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

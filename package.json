@@ -9,7 +9,7 @@
     "install:backend": "cd backend && uv pip install -r requirements.txt",
     "lint:backend": "cd backend && ruff check .",
     "format:backend": "cd backend && ruff format .",
-    "start:backend": "cd backend && uv run python run.py",
+    "start:backend": "uv run python backend/run.py",
     "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

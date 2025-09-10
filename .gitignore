@@ -99,3 +99,7 @@ backend/chat/mistral.py
 
 # Third-party libraries and dependencies
 _third_party/
+nul
+C*
+*.zip
+reverse_tunnel.txt
