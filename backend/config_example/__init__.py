@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .base import BaseConfig
+# BaseConfig removed - not used in actual configuration
 from .llm import LLMSettings, get_llm_settings
 from .tts import TTSSettings, get_tts_settings
 from .email import EmailConfig, AuthConfig, SearchConfig, get_email_config, get_auth_config, get_search_config
@@ -23,8 +23,7 @@ class AppSettings(BaseSettings):
     # Environment configuration
     environment: str = Field(default="development", description="Runtime environment")
     
-    # Base configuration
-    base: BaseConfig = Field(default_factory=BaseConfig, description="Base configuration")
+    # Base configuration removed - not needed in actual configuration
     
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -69,10 +68,7 @@ def get_app_settings() -> AppSettings:
 # Backward compatibility interface
 # -----------------------------------------------------------------------------
 
-# Path configuration
-def get_base_config() -> BaseConfig:
-    """Get base configuration"""
-    return get_app_settings().base
+# Path configuration - BaseConfig removed, using direct path constants instead
 
 
 # Base paths
@@ -190,7 +186,7 @@ __all__ = [
     "get_app_settings",
     
     # Configuration getter functions
-    "get_base_config",
+    # "get_base_config" removed - not used in actual configuration
     
     # Prompt functions
     "get_base_prompt",
