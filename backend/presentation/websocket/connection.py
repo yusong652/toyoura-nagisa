@@ -49,10 +49,10 @@ class ConnectionManager:
     
     def __init__(self):
         self.connections: Dict[str, ConnectionInfo] = {}
-        self.heartbeat_interval = 30  # 心跳间隔（秒）
-        self.heartbeat_timeout = 120  # 心跳超时（秒）- 增加到2分钟，避免频繁断开
-        self.max_reconnect_attempts = 3
-        self.reconnect_delay = 1  # 重连延迟（秒）
+        self.heartbeat_interval = 60  # 心跳间隔（秒）- 匹配前端60秒
+        self.heartbeat_timeout = 180  # 心跳超时（秒）- 3分钟，适配远程SSH高延迟
+        self.max_reconnect_attempts = 10  # 增加重连次数适配远程环境
+        self.reconnect_delay = 2  # 重连延迟（秒）- 匹配前端
         self._heartbeat_tasks: Dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
 

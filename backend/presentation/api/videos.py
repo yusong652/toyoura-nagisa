@@ -11,8 +11,9 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter()
 
-# Get absolute path to backend chat/data directory
-BASE_DIR = Path(__file__).parent.parent.parent / "chat" / "data"
+# Get absolute path to project root chat/data directory  
+# Navigate from backend/presentation/api/ to project root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "chat" / "data"
 
 class VideoGenerationRequest(BaseModel):
     session_id: str

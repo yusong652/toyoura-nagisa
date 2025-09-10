@@ -31,7 +31,7 @@ def get_tts_engine() -> BaseTTS:
     elif tts_type == 'gpt_sovits':
         gpt_config = settings.get_gpt_sovits_config()
         return GPTSoVITSTTS(GPTSoVITSConfig({
-            'server_url': gpt_config.server_url,
+            'server_url': gpt_config.gpt_sovits_server_url,
             'text_lang': gpt_config.text_lang,
             'speed': gpt_config.speed,
             'ref_audio_path': gpt_config.ref_audio_path,

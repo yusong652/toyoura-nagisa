@@ -79,11 +79,11 @@ export interface ConnectionStats {
 }
 
 const DEFAULT_OPTIONS: ConnectionOptions = {
-  maxReconnectAttempts: 5,
-  reconnectInterval: 1000, // Start with 1 second
-  maxReconnectInterval: 30000, // Max 30 seconds
-  heartbeatInterval: 30000, // 30 seconds
-  heartbeatTimeout: 10000, // 10 seconds
+  maxReconnectAttempts: 10, // More attempts for unstable connections
+  reconnectInterval: 2000, // Start with 2 seconds
+  maxReconnectInterval: 60000, // Max 60 seconds for remote environments
+  heartbeatInterval: 60000, // 60 seconds - longer interval for remote SSH
+  heartbeatTimeout: 30000, // 30 seconds - much longer timeout for high latency
   enableHeartbeat: true,
   enableAutoReconnect: true
 };
