@@ -2,9 +2,9 @@ import re
 
 def extract_response_without_think(response_text: str) -> str:
     """
-    提取 <thinking>/<think> 标签外部的内容，只返回 LLM 给用户的最终回复。
-    如果没有 <thinking>/<think> 标签，则返回原始内容。
-    处理未闭合的标签情况。
+    Extract content outside <thinking>/<think> tags, returning only the final LLM response to the user.
+    If there are no <thinking>/<think> tags, return the original content.
+    Handle unclosed tag cases.
     """
     # Remove <thinking>...</thinking> blocks
     cleaned = re.sub(r'<thinking>[\s\S]*?</thinking>', '', response_text, flags=re.IGNORECASE)
@@ -23,10 +23,10 @@ def extract_response_without_think(response_text: str) -> str:
         if response_text.lower().startswith('<think'):
             # Extract a reasonable response based on the thinking content
             if '中文' in response_text or 'Chinese' in response_text:
-                return "你好！"
+                return "Hello!"
             elif 'hello' in response_text.lower():
                 return "Hello!"
             else:
-                return "我理解了您的问题。"  # Generic acknowledgment
+                return "I understand your question."  # Generic acknowledgment
     
     return result 
