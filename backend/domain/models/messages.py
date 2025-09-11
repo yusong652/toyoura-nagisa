@@ -22,6 +22,7 @@ class BaseMessage(BaseModel):
     content: Union[str, List[dict]]
     id: Optional[str] = None
     timestamp: Optional[datetime] = None
+    role: str  # Add role attribute to base class
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -58,28 +59,22 @@ class AssistantMessage(BaseMessage):
     role: Literal["assistant"] = "assistant"
 
 
-class ImageMessage(BaseModel):
+class ImageMessage(BaseMessage):
     """
     Generated image message.
     
     Represents system-generated or processed image content, containing image path information.
     """
-    content: Union[str, List[dict]]
-    id: Optional[str] = None
-    timestamp: Optional[datetime] = None
     image_path: str
     role: Literal["image"] = "image"
 
 
-class VideoMessage(BaseModel):
+class VideoMessage(BaseMessage):
     """
     Generated video message.
     
     Represents system-generated or processed video content, containing video path information.
     """
-    content: Union[str, List[dict]]
-    id: Optional[str] = None
-    timestamp: Optional[datetime] = None
     video_path: str
     role: Literal["video"] = "video"
 

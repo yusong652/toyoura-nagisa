@@ -12,10 +12,7 @@ import shutil
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from backend.domain.models.message_factory import message_factory
-from backend.domain.models.message_factory import message_factory
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from backend.domain.models.messages import BaseMessage
+from backend.domain.models.messages import BaseMessage
 
 
 
@@ -38,7 +35,7 @@ def _get_session_file(session_id: str) -> str:
 
 # ========== Session CRUD Operations ==========
 
-def create_new_history(name: str = None) -> str:
+def create_new_history(name: Optional[str] = None) -> str:
     """
     Create a new chat history record
     Args:
@@ -243,13 +240,14 @@ def load_all_message_history(session_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def load_and_restore_history(session_id: str):
+def load_and_restore_history(session_id: str) -> List[BaseMessage]:
     """
     Load and restore chat history for specified session ID, return list of message objects
     """
     
     history = load_all_message_history(session_id)
-    return [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    # Ensure all messages are BaseMessage objects
+    return [message_factory(msg) for msg in history]
 
 
 def delete_message(session_id: str, message_id: str) -> bool:
@@ -304,11 +302,13 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
         if message_type == 'video' and message.get('video_path'):
             # Clean up video file
             video_path = message.get('video_path')
-            if not os.path.isabs(video_path):
+            if video_path and not os.path.isabs(video_path):
                 # If it's a relative path, build full path
                 full_path = os.path.join(HISTORY_BASE_DIR, video_path)
-            else:
+            elif video_path:
                 full_path = video_path
+            else:
+                return  # No valid video path
             
             if os.path.exists(full_path):
                 os.remove(full_path)
@@ -319,11 +319,13 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
         elif message_type == 'image' and message.get('image_path'):
             # Clean up image file
             image_path = message.get('image_path')
-            if not os.path.isabs(image_path):
+            if image_path and not os.path.isabs(image_path):
                 # If it's a relative path, build full path
                 full_path = os.path.join(HISTORY_BASE_DIR, image_path)
-            else:
+            elif image_path:
                 full_path = image_path
+            else:
+                return  # No valid image path
             
             if os.path.exists(full_path):
                 os.remove(full_path)
@@ -337,7 +339,7 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
         print(f"[WARNING] Failed to cleanup files for message {message.get('id')}: {e}")
 
 
-def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], ...]:
+def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[BaseMessage, ...]:
     """
     Get latest n messages from specified session (returns message objects instead of dict)
     Only returns user/assistant messages, filters out image/tool and other types
@@ -347,16 +349,17 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
         n: Number of messages to get, defaults to 2
         
     Returns:
-        Tuple: Tuple containing message objects, returns all actual messages if less than n messages exist
+        Tuple: Tuple containing BaseMessage objects, returns all actual messages if less than n messages exist
     """
     
     history = load_history(session_id)  # Only returns non-image and non-video messages
-    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    # Ensure all messages are BaseMessage objects
+    history_msgs: List[BaseMessage] = [message_factory(msg) for msg in history]
     if not history_msgs:
         return tuple()
-    latest_messages = []
+    latest_messages: List[BaseMessage] = []
     for msg in reversed(history_msgs):
-        if hasattr(msg, 'role') and msg.role in ['user', 'assistant']:
+        if msg.role in ['user', 'assistant']:
             latest_messages.append(msg)
             if len(latest_messages) == n:
                 break
@@ -365,7 +368,7 @@ def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[Optional[Any], .
     return tuple(latest_messages)
 
 
-def get_latest_two_messages(session_id: str) -> Tuple[Optional[Any], Optional[Any]]:
+def get_latest_two_messages(session_id: str) -> Tuple[BaseMessage, ...]:
     """
     Get latest two messages from specified session (returns message objects instead of dict)
     Only returns user/assistant messages, filters out image/tool and other types
