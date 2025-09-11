@@ -1,14 +1,6 @@
 import sys
 import os
 
-# Set UTF-8 encoding for Windows before any imports
-os.environ["PYTHONIOENCODING"] = "utf-8"
-if sys.platform == "win32":
-    import codecs
-    # Force UTF-8 encoding on Windows
-    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
