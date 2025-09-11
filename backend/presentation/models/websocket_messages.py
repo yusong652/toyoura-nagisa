@@ -34,6 +34,10 @@ class MessageType(str, Enum):
     # TTS相关
     TTS_CHUNK = "TTS_CHUNK"
     TTS_COMPLETE = "TTS_COMPLETE"
+    
+    # Bash命令确认相关
+    BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
+    BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
 
 
 class BaseWebSocketMessage(BaseModel):
@@ -110,6 +114,21 @@ class TTSMessage(BaseWebSocketMessage):
     total_chunks: Optional[int] = None
 
 
+class BashConfirmationRequestMessage(BaseWebSocketMessage):
+    """Bash命令确认请求消息"""
+    type: Literal[MessageType.BASH_CONFIRMATION_REQUEST]
+    confirmation_id: str
+    command: str
+    description: Optional[str] = None
+
+
+class BashConfirmationResponseMessage(BaseWebSocketMessage):
+    """Bash命令确认响应消息"""
+    type: Literal[MessageType.BASH_CONFIRMATION_RESPONSE]
+    confirmation_id: str
+    approved: bool
+
+
 class ChatMessage(BaseWebSocketMessage):
     """聊天消息"""
     type: Literal[MessageType.CHAT_MESSAGE, MessageType.CHAT_RESPONSE]
@@ -135,6 +154,8 @@ MESSAGE_TYPE_MAP = {
     MessageType.LOCATION_RESPONSE: LocationResponseMessage,
     MessageType.TTS_CHUNK: TTSMessage,
     MessageType.TTS_COMPLETE: TTSMessage,
+    MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
+    MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
     MessageType.CHAT_MESSAGE: ChatMessage,
     MessageType.CHAT_RESPONSE: ChatMessage,
 }
@@ -258,6 +279,33 @@ def create_tool_use_message(
         parameters=parameters,
         action_text=action_text,
         result=result,
+        session_id=session_id
+    )
+    return msg.model_dump(mode="json", exclude_none=True)
+
+
+def create_bash_confirmation_request(
+    confirmation_id: str,
+    command: str,
+    description: Optional[str] = None,
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """创建Bash命令确认请求消息
+    
+    Args:
+        confirmation_id: 确认请求的唯一ID
+        command: 待执行的bash命令
+        description: 命令描述（可选）
+        session_id: 会话ID
+        
+    Returns:
+        Bash确认请求消息字典
+    """
+    msg = BashConfirmationRequestMessage(
+        type=MessageType.BASH_CONFIRMATION_REQUEST,
+        confirmation_id=confirmation_id,
+        command=command,
+        description=description,
         session_id=session_id
     )
     return msg.model_dump(mode="json", exclude_none=True)

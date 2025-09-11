@@ -38,10 +38,13 @@ build/
 # IDE and Editors
 .idea/
 .vscode/
-.claude/
 *.swp
 *.swo
 *~
+
+# Claude local settings (keep .claude directory but ignore local settings)
+.claude/settings.local.json
+.claude/CLAUDE.local.md
 
 # OS
 .DS_Store
