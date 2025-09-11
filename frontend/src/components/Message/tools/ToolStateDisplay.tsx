@@ -17,19 +17,24 @@ import { MessageToolState as MessageToolStateType } from '../../../types/chat'
  *     JSX element with tool state display or null if no tool state
  */
 const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
-  if (!toolState) return null
-  
-  const { isUsingTool, toolNames, thinking } = toolState
+  // 所有 Hooks 必须在任何条件判断之前调用
   const [displayedText, setDisplayedText] = useState('')
   const [isScrolling, setIsScrolling] = useState(false)
   const [animationDuration, setAnimationDuration] = useState(10)
   const [scrollDistance, setScrollDistance] = useState('-50%')
 
-  if (!isUsingTool) return null
-
+  // 提前获取必要的值，避免在 useEffect 之前有条件性 return
+  const isUsingTool = toolState?.isUsingTool
+  const toolNames = toolState?.toolNames
+  const thinking = toolState?.thinking
   const thinkingContent = thinking || 'Processing...'
   
   useEffect(() => {
+    // 在 useEffect 内部处理条件逻辑
+    if (!toolState || !isUsingTool) {
+      setDisplayedText('Processing...')
+      return
+    }
     if (!thinkingContent || thinkingContent === 'Processing...') {
       setDisplayedText('Processing...')
       return
@@ -77,7 +82,10 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
     // Total duration: no minimum, capped at 8 seconds for very long content
     const duration = Math.min(contentFactor + charFactor, 8)
     setAnimationDuration(duration)
-  }, [thinkingContent])
+  }, [toolState, isUsingTool, thinkingContent])
+
+  // 条件性 return 放在所有 Hooks 之后
+  if (!toolState || !isUsingTool) return null
 
   return (
     <div className="message-tool-state">

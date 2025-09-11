@@ -21,6 +21,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const locationRequestHandler = useRef<((data: any) => void) | null>(null)
+  
+  // 重连管理
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectAttemptsRef = useRef<number>(0)
+  const currentSessionIdRef = useRef<string | null>(null)
+  const maxReconnectAttempts = 5
+  const baseReconnectDelay = 2000
 
   // 处理位置请求的函数
   const handleLocationRequest = useCallback(async (data: any, currentSessionId: string | null) => {

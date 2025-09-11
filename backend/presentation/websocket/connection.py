@@ -49,8 +49,8 @@ class ConnectionManager:
     
     def __init__(self):
         self.connections: Dict[str, ConnectionInfo] = {}
-        self.heartbeat_interval = 60  # 心跳间隔（秒）- 匹配前端60秒
-        self.heartbeat_timeout = 180  # 心跳超时（秒）- 3分钟，适配远程SSH高延迟
+        self.heartbeat_interval = 20   # 心跳间隔（秒）- WebSocket 行业标准
+        self.heartbeat_timeout = 20    # 心跳超时（秒）- 行业标准，等待 pong 响应时间
         self.max_reconnect_attempts = 10  # 增加重连次数适配远程环境
         self.reconnect_delay = 2  # 重连延迟（秒）- 匹配前端
         self._heartbeat_tasks: Dict[str, asyncio.Task] = {}
@@ -80,10 +80,11 @@ class ConnectionManager:
                 conn_info.state = ConnectionState.CONNECTED
                 self.connections[session_id] = conn_info
                 
-                # 启动心跳任务
+                # 启动心跳任务（使用标准 20 秒间隔）
                 self._heartbeat_tasks[session_id] = asyncio.create_task(
                     self._heartbeat_loop(session_id)
                 )
+                print(f"[WebSocket] Connection established with heartbeat (20s interval) for session {session_id}")
                 
                 # 发送连接成功消息
                 await self._send_system_message(session_id, {
@@ -149,10 +150,12 @@ class ConnectionManager:
             bool: 发送是否成功
         """
         if session_id not in self.connections:
+            print(f"[DEBUG] No active WebSocket connection for session: {session_id}")
             logger.warning(f"No active WebSocket connection for session: {session_id}")
             return False
         
         conn_info = self.connections[session_id]
+        print(f"[DEBUG] Connection state for {session_id}: {conn_info.state}, WebSocket ready state: {conn_info.websocket.client_state if hasattr(conn_info.websocket, 'client_state') else 'unknown'}")
         
         # 如果连接不可用，添加到待处理队列（心跳消息除外）
         if conn_info.state != ConnectionState.CONNECTED:
@@ -215,19 +218,21 @@ class ConnectionManager:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _heartbeat_loop(self, session_id: str):
-        """心跳循环任务"""
+        """心跳循环任务 - 仅用于检测连接状态，不主动断开连接"""
         while session_id in self.connections:
             try:
                 conn_info = self.connections[session_id]
                 
-                # 检查连接是否过期
+                # 检查连接是否过期（仅记录警告，不断开连接）
                 if conn_info.is_stale(self.heartbeat_timeout):
-                    logger.warning(f"Connection {session_id} is stale, disconnecting")
-                    await self.disconnect(session_id, 1001, "Heartbeat timeout")
-                    break
+                    logger.warning(f"Connection {session_id} has not responded to heartbeat for {self.heartbeat_timeout}s, but keeping connection alive")
+                    # 不再主动断开连接，让连接自然处理
                 
-                # 发送心跳
-                await self._send_heartbeat(session_id)
+                # 尝试发送心跳（如果发送失败，说明连接已断开）
+                heartbeat_sent = await self._send_heartbeat(session_id)
+                if not heartbeat_sent:
+                    logger.info(f"Failed to send heartbeat to {session_id}, connection may be closed")
+                    # 不主动断开，让 WebSocket 自己处理断开事件
                 
                 # 等待下一次心跳
                 await asyncio.sleep(self.heartbeat_interval)
@@ -238,9 +243,13 @@ class ConnectionManager:
                 logger.error(f"Error in heartbeat loop for session {session_id}: {e}")
                 await asyncio.sleep(self.heartbeat_interval)
 
-    async def _send_heartbeat(self, session_id: str):
-        """发送心跳消息"""
-        await self.send_json(session_id, {
+    async def _send_heartbeat(self, session_id: str) -> bool:
+        """发送心跳消息
+        
+        Returns:
+            bool: 心跳发送是否成功
+        """
+        return await self.send_json(session_id, {
             "type": "HEARTBEAT",
             "timestamp": datetime.now().isoformat()
         })
