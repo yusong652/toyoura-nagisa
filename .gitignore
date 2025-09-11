@@ -38,6 +38,7 @@ build/
 # IDE and Editors
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 *~
@@ -81,6 +82,13 @@ htmlcov/
 
 # Sensitive credentials and tokens
 credentials/
+
+# SSH keys (VS Code Remote SSH issue)
+*id_ed25519*
+*id_rsa*
+*.ssh/
+C:*id_ed25519*
+C\357\200\272*id_ed25519*
 
 # Ignore tool vector database
 backend/tool_db/
