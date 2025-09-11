@@ -42,8 +42,13 @@ def register_websocket_routes(app: FastAPI):
             Delegates actual message handling to the websocket router module
             while maintaining clean separation of concerns.
         """
-        connection_manager: ConnectionManager = websocket.app.state.connection_manager
-        await websocket_endpoint(websocket, session_id, connection_manager)
+        print(f"[WebSocket] Connection attempt for session: {session_id}")
+        try:
+            connection_manager: ConnectionManager = websocket.app.state.connection_manager
+            await websocket_endpoint(websocket, session_id, connection_manager)
+        except Exception as e:
+            print(f"[WebSocket] Error in endpoint: {e}")
+            raise
 
 
 def get_websocket_info() -> dict:

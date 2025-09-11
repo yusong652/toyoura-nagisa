@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node -e \"console.log('[Frontend] Waiting 5 seconds for backend...'); setTimeout(() => process.exit(0), 5000)\" && vite",
+    "dev:nodelay": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

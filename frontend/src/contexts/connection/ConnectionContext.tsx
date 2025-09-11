@@ -112,7 +112,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     if (!sessionId) return
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws"
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${sessionId}`)
+    // WebSocket 连接应该指向后端服务器端口 8000，而不是前端 Vite 端口 5173
+    const wsHost = window.location.hostname
+    const ws = new WebSocket(`${protocol}://${wsHost}:8000/ws/${sessionId}`)
     wsRef.current = ws
 
     ws.onopen = () => {
