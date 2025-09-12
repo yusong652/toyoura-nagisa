@@ -85,7 +85,9 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
   }, [toolState, isUsingTool, thinkingContent])
 
   // 条件性 return 放在所有 Hooks 之后
-  if (!toolState || !isUsingTool) return null
+  if (!toolState || !isUsingTool) {
+    return null
+  }
 
   return (
     <div className="message-tool-state">

@@ -106,10 +106,9 @@ export const useStreamProcessor = ({
           }
         }
         
-        // Handle tool events
+        // Skip SSE tool events - now handled by WebSocket
         if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
-          handleToolEvent(data, currentMessageId)
-          // action_text is handled via toolState, not through streaming pipeline
+          console.log('[StreamProcessor] Skipping SSE tool event (now handled by WebSocket):', data.type)
           return
         }
         

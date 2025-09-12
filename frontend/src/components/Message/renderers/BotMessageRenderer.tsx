@@ -38,6 +38,7 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
   
   return (
     <div className="message-wrapper">
+      {/* Show stored tool state for historical messages (WebSocket tool state shown in ChatBox) */}
       {toolState && <ToolStateDisplay toolState={toolState} />}
       
       {shouldShowContent && (

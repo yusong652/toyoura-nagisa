@@ -167,6 +167,32 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         if (locationRequestHandler.current && data.type === 'LOCATION_REQUEST') {
           locationRequestHandler.current(data)
         }
+        
+        // Handle tool use notifications
+        if (data.type === 'NAGISA_IS_USING_TOOL') {
+          console.log('[WebSocket] Tool use started:', {
+            tools: data.tool_names || [data.tool_name],
+            action: data.action_text,
+            thinking: data.thinking ? data.thinking.substring(0, 100) + '...' : 'N/A'
+          })
+          
+          // Dispatch custom event for other components to listen to
+          window.dispatchEvent(new CustomEvent('toolUseStarted', { 
+            detail: data 
+          }))
+        }
+        
+        if (data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
+          console.log('[WebSocket] Tool use concluded:', {
+            tools: data.tool_names || [data.tool_name],
+            results: data.results ? 'Available' : 'N/A'
+          })
+          
+          // Dispatch custom event for other components to listen to
+          window.dispatchEvent(new CustomEvent('toolUseConcluded', { 
+            detail: data 
+          }))
+        }
       } catch (error) {
         console.error("[WebSocket] failed to parse message:", error)
       }

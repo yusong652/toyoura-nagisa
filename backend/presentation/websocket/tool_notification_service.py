@@ -1,0 +1,290 @@
+"""
+WebSocket Tool Notification Service
+
+This service provides real-time tool calling notifications through WebSocket,
+replacing the SSE-based tool notification system with unified WebSocket architecture.
+"""
+
+import logging
+from typing import Dict, Any, Optional, List
+from backend.presentation.websocket.websocket_handler import get_websocket_handler
+from backend.presentation.websocket.message_types import create_message, MessageType
+
+logger = logging.getLogger(__name__)
+
+
+class ToolNotificationService:
+    """
+    Service for sending real-time tool calling notifications via WebSocket.
+    
+    This service provides a clean interface for LLM clients to send tool calling
+    status updates without directly coupling to WebSocket infrastructure.
+    """
+    
+    def __init__(self):
+        """Initialize the tool notification service."""
+        self._websocket_handler = None
+    
+    def _get_websocket_handler(self):
+        """Get WebSocket handler instance with lazy initialization."""
+        if self._websocket_handler is None:
+            self._websocket_handler = get_websocket_handler()
+        return self._websocket_handler
+    
+    async def notify_tool_use_started(
+        self,
+        session_id: str,
+        tool_names: List[str],
+        action_text: str,
+        thinking: Optional[str] = None
+    ) -> bool:
+        """
+        Send tool use started notification via WebSocket.
+        
+        Args:
+            session_id: Target session ID
+            tool_names: List of tool names being executed
+            action_text: Human-readable action description
+            thinking: Optional thinking content from LLM
+            
+        Returns:
+            bool: Whether notification was sent successfully
+        """
+        try:
+            handler = self._get_websocket_handler()
+            
+            # Create tool use started message
+            message_data = {
+                'type': MessageType.NAGISA_IS_USING_TOOL,
+                'session_id': session_id,
+                'tool_names': tool_names,
+                'action_text': action_text
+            }
+            
+            if thinking:
+                message_data['thinking'] = thinking
+            
+            # Create WebSocket message
+            ws_message = create_message(
+                MessageType.NAGISA_IS_USING_TOOL,
+                session_id=session_id,
+                **{k: v for k, v in message_data.items() if k not in ['type', 'session_id']}
+            )
+            
+            # Send via WebSocket
+            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            
+            if success:
+                logger.debug(f"Sent tool use started notification to session {session_id}: {tool_names}")
+            else:
+                logger.warning(f"Failed to send tool use started notification to session {session_id}")
+                
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error sending tool use started notification: {e}")
+            return False
+    
+    async def notify_tool_use_concluded(
+        self,
+        session_id: str,
+        tool_names: Optional[List[str]] = None,
+        results: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Send tool use concluded notification via WebSocket.
+        
+        Args:
+            session_id: Target session ID
+            tool_names: List of tool names that were executed
+            results: Optional results summary
+            
+        Returns:
+            bool: Whether notification was sent successfully
+        """
+        try:
+            handler = self._get_websocket_handler()
+            
+            # Create tool use concluded message
+            message_data = {
+                'type': MessageType.NAGISA_TOOL_USE_CONCLUDED,
+                'session_id': session_id
+            }
+            
+            if tool_names:
+                message_data['tool_names'] = tool_names
+            if results:
+                message_data['results'] = results
+            
+            # Create WebSocket message
+            ws_message = create_message(
+                MessageType.NAGISA_TOOL_USE_CONCLUDED,
+                session_id=session_id,
+                **{k: v for k, v in message_data.items() if k not in ['type', 'session_id']}
+            )
+            
+            # Send via WebSocket
+            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            
+            if success:
+                logger.debug(f"Sent tool use concluded notification to session {session_id}")
+            else:
+                logger.warning(f"Failed to send tool use concluded notification to session {session_id}")
+                
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error sending tool use concluded notification: {e}")
+            return False
+    
+    async def notify_tool_error(
+        self,
+        session_id: str,
+        tool_name: str,
+        error_message: str,
+        error_details: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Send tool execution error notification via WebSocket.
+        
+        Args:
+            session_id: Target session ID
+            tool_name: Name of the tool that failed
+            error_message: Error description
+            error_details: Optional detailed error information
+            
+        Returns:
+            bool: Whether notification was sent successfully
+        """
+        try:
+            handler = self._get_websocket_handler()
+            
+            # Create error message
+            error_data = {
+                'tool_name': tool_name,
+                'error_message': error_message
+            }
+            
+            if error_details:
+                error_data.update(error_details)
+            
+            ws_message = create_message(
+                MessageType.ERROR,
+                session_id=session_id,
+                error_code='TOOL_EXECUTION_ERROR',
+                error_message=f"Tool '{tool_name}' execution failed: {error_message}",
+                details=error_data
+            )
+            
+            # Send via WebSocket
+            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            
+            if success:
+                logger.debug(f"Sent tool error notification to session {session_id}: {tool_name}")
+            else:
+                logger.warning(f"Failed to send tool error notification to session {session_id}")
+                
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error sending tool error notification: {e}")
+            return False
+    
+    def is_session_connected(self, session_id: str) -> bool:
+        """
+        Check if a session has an active WebSocket connection.
+        
+        Args:
+            session_id: Session ID to check
+            
+        Returns:
+            bool: Whether session has active WebSocket connection
+        """
+        try:
+            handler = self._get_websocket_handler()
+            connection_manager = handler.get_connection_manager()
+            return session_id in connection_manager.connections
+        except Exception:
+            return False
+
+
+# Global service instance
+_tool_notification_service: Optional[ToolNotificationService] = None
+
+
+def get_tool_notification_service() -> ToolNotificationService:
+    """
+    Get singleton tool notification service instance.
+    
+    Returns:
+        ToolNotificationService: Global service instance
+    """
+    global _tool_notification_service
+    if _tool_notification_service is None:
+        _tool_notification_service = ToolNotificationService()
+    return _tool_notification_service
+
+
+# Convenience functions for easy integration
+async def notify_tool_started(
+    session_id: str,
+    tool_names: List[str],
+    action_text: str,
+    thinking: Optional[str] = None
+) -> bool:
+    """
+    Convenience function to send tool use started notification.
+    
+    Args:
+        session_id: Target session ID
+        tool_names: List of tool names being executed
+        action_text: Human-readable action description
+        thinking: Optional thinking content
+        
+    Returns:
+        bool: Whether notification was sent successfully
+    """
+    service = get_tool_notification_service()
+    return await service.notify_tool_use_started(session_id, tool_names, action_text, thinking)
+
+
+async def notify_tool_concluded(
+    session_id: str,
+    tool_names: Optional[List[str]] = None,
+    results: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Convenience function to send tool use concluded notification.
+    
+    Args:
+        session_id: Target session ID
+        tool_names: List of tool names that were executed
+        results: Optional results summary
+        
+    Returns:
+        bool: Whether notification was sent successfully
+    """
+    service = get_tool_notification_service()
+    return await service.notify_tool_use_concluded(session_id, tool_names, results)
+
+
+async def notify_tool_error(
+    session_id: str,
+    tool_name: str,
+    error_message: str,
+    error_details: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Convenience function to send tool error notification.
+    
+    Args:
+        session_id: Target session ID
+        tool_name: Name of the tool that failed
+        error_message: Error description
+        error_details: Optional detailed error information
+        
+    Returns:
+        bool: Whether notification was sent successfully
+    """
+    service = get_tool_notification_service()
+    return await service.notify_tool_error(session_id, tool_name, error_message, error_details)

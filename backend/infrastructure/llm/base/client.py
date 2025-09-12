@@ -149,9 +149,16 @@ class LLMClientBase(ABC):
             
             # Send tool use concluded notification if tools were used
             if metadata['tool_calls_executed'] > 0:
-                yield {
+                # Send both SSE and WebSocket notifications
+                concluded_notification = {
                     'type': 'NAGISA_TOOL_USE_CONCLUDED'
                 }
+                yield concluded_notification
+                
+                # Also send WebSocket notification
+                await self._send_websocket_tool_notification(
+                    session_id, concluded_notification
+                )
             
             # Create final storage message using provider-specific processor
             final_message = processor.format_response_for_storage(final_response)
@@ -421,8 +428,14 @@ class LLMClientBase(ABC):
                 
                 if thinking_content:
                     notification['thinking'] = thinking_content
-                    
+                
+                # Send both SSE and WebSocket notifications
                 yield notification
+                
+                # Also send WebSocket notification
+                await self._send_websocket_tool_notification(
+                    session_id, notification
+                )
                 
                 # Execute all tools in parallel
                 tasks = []
@@ -673,6 +686,51 @@ class LLMClientBase(ABC):
         if self.context_manager and self.context_manager.session_id == session_id:
             self.context_manager.clear_runtime_context()
             self.context_manager = None  # Reset for next session
+    
+    async def _send_websocket_tool_notification(
+        self, 
+        session_id: Optional[str], 
+        notification: Dict[str, Any]
+    ):
+        """
+        Send tool calling notification via WebSocket.
+        
+        This method provides dual-channel notification - both SSE (for backwards compatibility)
+        and WebSocket (for unified real-time architecture) are supported.
+        
+        Args:
+            session_id: Target session ID
+            notification: Notification dictionary with tool calling information
+        """
+        if not session_id:
+            return
+        
+        try:
+            # Import here to avoid circular dependencies
+            from backend.presentation.websocket.tool_notification_service import (
+                notify_tool_started, notify_tool_concluded
+            )
+            
+            notification_type = notification.get('type')
+            
+            if notification_type == 'NAGISA_IS_USING_TOOL':
+                await notify_tool_started(
+                    session_id=session_id,
+                    tool_names=notification.get('tool_names', []),
+                    action_text=notification.get('action_text', ''),
+                    thinking=notification.get('thinking')
+                )
+            elif notification_type == 'NAGISA_TOOL_USE_CONCLUDED':
+                await notify_tool_concluded(
+                    session_id=session_id,
+                    tool_names=notification.get('tool_names'),
+                    results=notification.get('results')
+                )
+            
+        except Exception as e:
+            # Don't fail the main execution if WebSocket notification fails
+            provider_name = self.__class__.__name__.replace('Client', '')
+            print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
 
     def update_config(self, **kwargs):
         """

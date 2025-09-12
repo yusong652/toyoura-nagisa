@@ -43,7 +43,6 @@ def _reverse_geocode(lat: float, lon: float) -> Optional[str]:
         pass
     return None
 
-
 def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
     """Use OpenStreetMap Nominatim to reverse-geocode coordinates to full address"""
     try:
@@ -103,9 +102,6 @@ async def get_browser_location(
         connection_manager = websocket_handler.get_connection_manager()
         active_sessions = connection_manager.get_active_sessions()
         
-        print(f"[DEBUG] Location request - Session ID: {session_id}")
-        print(f"[DEBUG] Active WebSocket sessions: {active_sessions}")
-        
         if session_id not in connection_manager.connections:
             print(f"[DEBUG] Session {session_id} not found in WebSocket connections")
             return None
@@ -121,16 +117,11 @@ async def get_browser_location(
                 request_id=f"location_{session_id}_{int(asyncio.get_event_loop().time())}"
             )
             
-            print(f"[DEBUG] Sending location request message: {request_msg.model_dump()}")
-            
             # First, handle the location request through the handler to set up event
             await location_handler.handle(session_id, request_msg)
-            print(f"[DEBUG] Location request handled, event created")
             
             # Wait for response using location handler
-            print(f"[DEBUG] Waiting for location response (timeout: {timeout}s)...")
             response_data = await location_handler.wait_for_location_response(session_id, timeout)
-            print(f"[DEBUG] Location response received: {response_data}")
             
             # Check if successful
             if response_data.get("success") and response_data.get("location_data"):

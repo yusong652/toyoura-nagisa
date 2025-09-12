@@ -5,7 +5,7 @@ This module defines all supported WebSocket message types and their
 corresponding data structures for the aiNagisa real-time communication system.
 """
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -30,6 +30,10 @@ class MessageType(str, Enum):
     # Tool integration
     TOOL_CALL_REQUEST = "TOOL_CALL_REQUEST"
     TOOL_CALL_RESULT = "TOOL_CALL_RESULT"
+    
+    # Tool use notifications (for frontend display)
+    NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
+    NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED"
     
     # File operations
     FILE_UPLOAD_START = "FILE_UPLOAD_START"
@@ -97,6 +101,15 @@ class ToolCallRequest(BaseWebSocketMessage):
     request_id: str
 
 
+class ToolUseNotification(BaseWebSocketMessage):
+    """Tool use notification message schema"""
+    type: MessageType  # Will be NAGISA_IS_USING_TOOL or NAGISA_TOOL_USE_CONCLUDED
+    tool_names: Optional[List[str]] = None
+    action_text: Optional[str] = None
+    thinking: Optional[str] = None
+    results: Optional[Dict[str, Any]] = None
+
+
 class ErrorMessage(BaseWebSocketMessage):
     """Error message schema"""
     type: MessageType = MessageType.ERROR
@@ -121,6 +134,8 @@ MESSAGE_SCHEMAS = {
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
     MessageType.CHAT_STREAM_CHUNK: ChatStreamChunk,
     MessageType.TOOL_CALL_REQUEST: ToolCallRequest,
+    MessageType.NAGISA_IS_USING_TOOL: ToolUseNotification,
+    MessageType.NAGISA_TOOL_USE_CONCLUDED: ToolUseNotification,
     MessageType.ERROR: ErrorMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
 }
