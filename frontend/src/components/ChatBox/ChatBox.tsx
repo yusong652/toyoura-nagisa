@@ -17,7 +17,7 @@ import ChatBoxTitleBar from './components/ChatBoxTitleBar'
 import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
-import WebSocketToolStateDisplay from '../WebSocketToolStateDisplay'
+import { LiveToolStateDisplay } from '../Tools'
 import './ChatBox.css'
 
 /**
@@ -88,8 +88,8 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
             onMessageSelect={setSelectedMessageId}
           />
           
-          {/* WebSocket Tool State Display - shows real-time tool usage */}
-          <WebSocketToolStateDisplay />
+          {/* Live Tool State Display - shows real-time tool usage */}
+          <LiveToolStateDisplay />
           
           {/* Scroll anchor for maintaining position */}
           <div className="scroll-anchor" />

@@ -26,9 +26,6 @@ export { default as AvatarTooltip } from './avatar/AvatarTooltip'
 export { default as MessageActions } from './actions/MessageActions'
 export { default as DeleteButton } from './actions/DeleteButton'
 
-// Tool components
-export { default as ToolStateDisplay } from './tools/ToolStateDisplay'
-
 // Hooks
 export { useMessageState } from './hooks/useMessageState'
 export { useMessageEvents } from './hooks/useMessageEvents'

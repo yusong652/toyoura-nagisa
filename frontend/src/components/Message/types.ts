@@ -83,10 +83,6 @@ export interface MessageActionsProps {
   onDelete: (e: React.MouseEvent) => void
 }
 
-// 工具状态显示组件属性
-export interface ToolStateDisplayProps {
-  toolState: any
-}
 
 // 消息事件处理器类型
 export interface MessageEventHandlers {

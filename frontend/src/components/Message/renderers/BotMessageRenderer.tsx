@@ -2,7 +2,7 @@ import React from 'react'
 import StreamingTextRenderer from './StreamingTextRenderer'
 import MessageFiles from '../content/MessageFiles'
 import MessageTimestamp from '../content/MessageTimestamp'
-import ToolStateDisplay from '../tools/ToolStateDisplay'
+import { ToolStateDisplay } from '../../Tools'
 import { BotMessageRendererProps } from '../types'
 
 /**

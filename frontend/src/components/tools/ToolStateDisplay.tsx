@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './ToolStateDisplay.css'
-import { ToolStateDisplayProps } from '../types'
-import { MessageToolState as MessageToolStateType } from '../../../types/chat'
+import { ToolStateDisplayProps } from './types'
+import { MessageToolState as MessageToolStateType } from '../../types/chat'
 
 /**
  * Tool state display component.
