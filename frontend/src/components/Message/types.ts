@@ -30,7 +30,6 @@ export interface StreamingTextRendererProps {
   chunks: string[]
   streaming: boolean
   isLoading: boolean
-  toolState?: any
   className?: string
 }
 

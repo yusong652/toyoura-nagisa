@@ -35,7 +35,7 @@ class ToolNotificationService:
         self,
         session_id: str,
         tool_names: List[str],
-        action_text: str,
+        action: str,
         thinking: Optional[str] = None
     ) -> bool:
         """
@@ -44,7 +44,7 @@ class ToolNotificationService:
         Args:
             session_id: Target session ID
             tool_names: List of tool names being executed
-            action_text: Human-readable action description
+            action: Human-readable action description
             thinking: Optional thinking content from LLM
             
         Returns:
@@ -58,7 +58,7 @@ class ToolNotificationService:
                 'type': MessageType.NAGISA_IS_USING_TOOL,
                 'session_id': session_id,
                 'tool_names': tool_names,
-                'action_text': action_text
+                'action': action
             }
             
             if thinking:
@@ -229,7 +229,7 @@ def get_tool_notification_service() -> ToolNotificationService:
 async def notify_tool_started(
     session_id: str,
     tool_names: List[str],
-    action_text: str,
+    action: str,
     thinking: Optional[str] = None
 ) -> bool:
     """
@@ -238,14 +238,14 @@ async def notify_tool_started(
     Args:
         session_id: Target session ID
         tool_names: List of tool names being executed
-        action_text: Human-readable action description
+        action: Human-readable action description
         thinking: Optional thinking content
         
     Returns:
         bool: Whether notification was sent successfully
     """
     service = get_tool_notification_service()
-    return await service.notify_tool_use_started(session_id, tool_names, action_text, thinking)
+    return await service.notify_tool_use_started(session_id, tool_names, action, thinking)
 
 
 async def notify_tool_concluded(

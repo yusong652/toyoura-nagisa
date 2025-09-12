@@ -5,7 +5,7 @@ interface WebSocketToolData {
   type: string
   tool_names?: string[]
   tool_name?: string
-  action_text?: string
+  action?: string
   thinking?: string
   results?: any
   timestamp?: string
@@ -39,7 +39,7 @@ export const useWebSocketToolState = (): WebSocketToolStateReturn => {
       const newToolState: MessageToolState = {
         isUsingTool: true,
         toolNames: data.tool_names || (data.tool_name ? [data.tool_name] : undefined),
-        action: data.action_text,
+        action: data.action,
         thinking: data.thinking
       }
       

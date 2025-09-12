@@ -30,7 +30,7 @@ export const useToolStateManager = ({
     const toolState = {
       isUsingTool: true,
       toolNames: data.tool_names, // 使用新的tool_names数组
-      action: data.action_text,
+      action: data.action,
       thinking: data.thinking // Add thinking content if available
     }
     

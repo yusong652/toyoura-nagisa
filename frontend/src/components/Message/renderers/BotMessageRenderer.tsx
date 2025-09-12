@@ -2,7 +2,6 @@ import React from 'react'
 import StreamingTextRenderer from './StreamingTextRenderer'
 import MessageFiles from '../content/MessageFiles'
 import MessageTimestamp from '../content/MessageTimestamp'
-import { ToolStateDisplay } from '../../Tools'
 import { BotMessageRendererProps } from '../types'
 
 /**
@@ -26,20 +25,18 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
   onImageClick,
   onVideoClick
 }) => {
-  const { toolState, files, isLoading, streaming, text } = message
+  const { files, isLoading, streaming, text } = message
   
   // We need to use the streaming text hook for proper text handling
   const displayText = text || ''
   const chunks: string[] = [] // Simplified for now - full streaming logic in hook if needed
   
-  const hasContent = displayText || (toolState?.isUsingTool && toolState?.action)
+  const hasContent = displayText.trim() !== ''
   const hasFiles = files && files.length > 0 && !isLoading
   const shouldShowContent = hasContent || hasFiles
   
   return (
     <div className="message-wrapper">
-      {/* Show stored tool state for historical messages (WebSocket tool state shown in ChatBox) */}
-      {toolState && <ToolStateDisplay toolState={toolState} />}
       
       {shouldShowContent && (
         <div className="message-content">
@@ -49,7 +46,6 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
               chunks={chunks || []}
               streaming={streaming || false}
               isLoading={isLoading || false}
-              toolState={toolState}
             />
           )}
           

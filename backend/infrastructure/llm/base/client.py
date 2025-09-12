@@ -353,7 +353,7 @@ class LLMClientBase(ABC):
             - Dict[str, Any]: Real-time notifications with structure:
                 - type: str - Notification type ('NAGISA_IS_USING_TOOL', 'error', etc.)
                 - tool_name: str - Name of tool being executed
-                - action_text: str - Human-readable action description
+                - action: str - Human-readable action description
             - Any: Final provider-specific response object for processing
             
         Raises:
@@ -409,21 +409,21 @@ class LLMClientBase(ABC):
                 
                 # Determine action text: use extracted LLM text or fallback to generic message
                 if extracted_text and len(extracted_text.strip()) > 0:
-                    action_text = extracted_text.strip()
+                    action = extracted_text.strip()
                     # Limit text length for display purposes
-                    if len(action_text) > 150:
-                        action_text = action_text[:147] + "..."
+                    if len(action) > 150:
+                        action = action[:147] + "..."
                 else:
                     # Fallback to tool-specific message
                     if num_tools == 1:
-                        action_text = f"Using {tool_names[0]}..."
+                        action = f"Using {tool_names[0]}..."
                     else:
-                        action_text = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+                        action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
                 
                 notification = {
                     'type': 'NAGISA_IS_USING_TOOL',
                     'tool_names': tool_names,  # Always provide array of tool names
-                    'action_text': action_text
+                    'action': action
                 }
                 
                 if thinking_content:
@@ -575,7 +575,7 @@ class LLMClientBase(ABC):
             str: Extracted text content for display and processing
             
         Note:
-            This method is used to generate better action_text in tool calling
+            This method is used to generate better action in tool calling
             notifications by extracting the actual LLM response text instead
             of using generic messages.
         """
@@ -717,7 +717,7 @@ class LLMClientBase(ABC):
                 await notify_tool_started(
                     session_id=session_id,
                     tool_names=notification.get('tool_names', []),
-                    action_text=notification.get('action_text', ''),
+                    action=notification.get('action', ''),
                     thinking=notification.get('thinking')
                 )
             elif notification_type == 'NAGISA_TOOL_USE_CONCLUDED':

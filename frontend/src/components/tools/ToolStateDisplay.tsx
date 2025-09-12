@@ -26,6 +26,7 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
   // 提前获取必要的值，避免在 useEffect 之前有条件性 return
   const isUsingTool = toolState?.isUsingTool
   const toolNames = toolState?.toolNames
+  const action = toolState?.action
   const thinking = toolState?.thinking
   const thinkingContent = thinking || 'Processing...'
   
@@ -121,6 +122,14 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
               </span>
             </div>
           </div>
+          
+          {/* Action text显示在thinking viewport外部，避免被遮挡 */}
+          {action && (
+            <div className="message-tool-action">
+              <div className="tool-action-label">Action:</div>
+              <div className="tool-action-text">{action}</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

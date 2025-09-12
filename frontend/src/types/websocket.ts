@@ -70,7 +70,7 @@ export interface ToolUseMessage extends BaseWebSocketMessage {
   type: MessageType.NAGISA_IS_USING_TOOL | MessageType.NAGISA_TOOL_USE_CONCLUDED;
   tool_names?: string[];  // Array of tool names (new format)
   tool_name?: string;     // Legacy single tool name (backwards compatibility)
-  action_text?: string;
+  action?: string;
   thinking?: string;      // LLM thinking content
   parameters?: Record<string, any>;
   results?: Record<string, any>;  // Results for concluded notifications
@@ -181,7 +181,7 @@ export function createToolUseMessage(
   isUsing: boolean,
   tool_name?: string,
   parameters?: Record<string, any>,
-  action_text?: string,
+  action?: string,
   result?: Record<string, any>,
   session_id?: string
 ): ToolUseMessage {
@@ -189,7 +189,7 @@ export function createToolUseMessage(
     type: isUsing ? MessageType.NAGISA_IS_USING_TOOL : MessageType.NAGISA_TOOL_USE_CONCLUDED,
     tool_name,
     parameters,
-    action_text,
+    action,
     result,
     session_id,
     timestamp: new Date().toISOString()

@@ -82,7 +82,7 @@ class ToolUseMessage(BaseWebSocketMessage):
     type: Literal[MessageType.NAGISA_IS_USING_TOOL, MessageType.NAGISA_TOOL_USE_CONCLUDED]
     tool_name: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
-    action_text: Optional[str] = None
+    action: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
 
 
@@ -254,7 +254,7 @@ def create_tool_use_message(
     is_using: bool,
     tool_name: Optional[str] = None,
     parameters: Optional[Dict[str, Any]] = None,
-    action_text: Optional[str] = None,
+    action: Optional[str] = None,
     result: Optional[Dict[str, Any]] = None,
     session_id: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -264,7 +264,7 @@ def create_tool_use_message(
         is_using: 是否正在使用工具
         tool_name: 工具名称
         parameters: 工具参数
-        action_text: 动作描述
+        action: 动作描述
         result: 工具结果
         session_id: 会话ID
         
@@ -277,7 +277,7 @@ def create_tool_use_message(
         type=msg_type,
         tool_name=tool_name,
         parameters=parameters,
-        action_text=action_text,
+        action=action,
         result=result,
         session_id=session_id
     )

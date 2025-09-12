@@ -5,15 +5,14 @@ import { StreamingTextRendererProps } from '../types'
 /**
  * Streaming text renderer component.
  * 
- * Handles complex streaming text display with chunk-based animations and
- * tool action text integration for bot messages.
+ * Handles streaming text display with chunk-based animations for bot messages.
+ * Focuses purely on text content rendering without tool state coupling.
  * 
  * Args:
- *     displayText: Current accumulated text
+ *     displayText: Current accumulated text content
  *     chunks: Array of text chunks for animation
  *     streaming: Whether message is currently streaming
  *     isLoading: Whether message is in loading state
- *     toolState: Optional tool state for action text
  *     className: Optional CSS class name
  * 
  * Returns:
@@ -24,16 +23,13 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
   chunks,
   streaming,
   isLoading,
-  toolState,
   className = 'message-text'
 }) => {
-  // Determine what text to display (action text or display text)
-  const textToDisplay = (toolState?.isUsingTool && toolState?.action) 
-    ? toolState.action 
-    : displayText
+  // Pure text content rendering - no tool state coupling
+  const textToDisplay = displayText
     
-  // Use non-streaming rendering for tool action text or when not streaming
-  const shouldUseNonStreaming = !streaming || (toolState?.isUsingTool && toolState?.action)
+  // Use non-streaming rendering when not streaming
+  const shouldUseNonStreaming = !streaming
   
   if (shouldUseNonStreaming) {
     if (textToDisplay) {

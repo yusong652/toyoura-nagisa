@@ -105,7 +105,7 @@ class ToolUseNotification(BaseWebSocketMessage):
     """Tool use notification message schema"""
     type: MessageType  # Will be NAGISA_IS_USING_TOOL or NAGISA_TOOL_USE_CONCLUDED
     tool_names: Optional[List[str]] = None
-    action_text: Optional[str] = None
+    action: Optional[str] = None
     thinking: Optional[str] = None
     results: Optional[Dict[str, Any]] = None
 
