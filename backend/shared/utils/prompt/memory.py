@@ -50,21 +50,11 @@ async def build_memory_section_from_session(session_id: str, user_id: Optional[s
         )
         
         # Search for relevant memories (always cross-session)
-        print(f"[DEBUG] Memory search: user_id={effective_user_id}, query='{latest_user_text}'")
         memories = await memory_middleware.memory_manager.get_relevant_memories_for_context(
             query_text=latest_user_text,
             top_k=memory_context.top_k,
             user_id=effective_user_id
         )
-        
-        print(f"[DEBUG] Found {len(memories)} memories")
-        if memories:
-            for i, memory in enumerate(memories):
-                print(f"[DEBUG] Memory {i}: {memory}")
-        
-        if not memories:
-            print(f"[DEBUG] No memories found for user_id={effective_user_id} with query='{latest_user_text}'")
-            return None
         
         # Format memories for injection
         memory_context.memories = memories

@@ -52,7 +52,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             type: 'LOCATION_RESPONSE',
             session_id: currentSessionId,
             location_data: locationData,
-            timestamp: Date.now()
+            timestamp: new Date().toISOString()
           }
           
           wsRef.current.send(JSON.stringify(locationResponse))
@@ -69,7 +69,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             type: 'LOCATION_RESPONSE',
             session_id: currentSessionId,
             error: 'Failed to get location',
-            timestamp: Date.now()
+            timestamp: new Date().toISOString()
           }
           
           wsRef.current.send(JSON.stringify(errorResponse))
@@ -152,19 +152,19 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           console.log('WebSocket received heartbeat, sending ACK')
           const heartbeatAck = {
             type: 'HEARTBEAT_ACK',
-            timestamp: Date.now()
+            timestamp: new Date().toISOString()
           }
           ws.send(JSON.stringify(heartbeatAck))
         }
         
         // Handle location requests
-        if (data.type === 'REQUEST_LOCATION') {
+        if (data.type === 'LOCATION_REQUEST') {
           console.log('WebSocket received location request')
           await handleLocationRequest(data, sessionId)
         }
         
         // Call external location request handler if registered
-        if (locationRequestHandler.current && data.type === 'REQUEST_LOCATION') {
+        if (locationRequestHandler.current && data.type === 'LOCATION_REQUEST') {
           locationRequestHandler.current(data)
         }
       } catch (error) {

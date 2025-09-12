@@ -20,8 +20,6 @@ def register_location_tools(mcp: FastMCP):
         annotations={"category": "location", "tags": ["location", "geolocation", "geography", "coordinates", "position"]}
     )
 
-
-
     @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
         """Get the user's current geographic location.

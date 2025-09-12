@@ -9,22 +9,27 @@ export enum MessageType {
   CONNECTION_CLOSED = "CONNECTION_CLOSED",
   HEARTBEAT = "HEARTBEAT",
   HEARTBEAT_ACK = "HEARTBEAT_ACK",
-  ERROR = "error",
+  ERROR = "ERROR",
   
   // Chat messages
   CHAT_MESSAGE = "CHAT_MESSAGE",
   CHAT_RESPONSE = "CHAT_RESPONSE",
+  CHAT_STREAM_START = "CHAT_STREAM_START",
+  CHAT_STREAM_CHUNK = "CHAT_STREAM_CHUNK", 
+  CHAT_STREAM_END = "CHAT_STREAM_END",
   STATUS_UPDATE = "STATUS_UPDATE",
   
   // Tool related
   NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL",
   NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED",
+  TOOL_CALL_REQUEST = "TOOL_CALL_REQUEST",
+  TOOL_CALL_RESULT = "TOOL_CALL_RESULT",
   
   // Title updates
   TITLE_UPDATE = "TITLE_UPDATE",
   
   // Location related
-  REQUEST_LOCATION = "REQUEST_LOCATION",
+  LOCATION_REQUEST = "LOCATION_REQUEST", 
   LOCATION_RESPONSE = "LOCATION_RESPONSE",
   
   // TTS related
@@ -78,8 +83,10 @@ export interface TitleUpdateMessage extends BaseWebSocketMessage {
 }
 
 export interface LocationRequestMessage extends BaseWebSocketMessage {
-  type: MessageType.REQUEST_LOCATION;
+  type: MessageType.LOCATION_REQUEST;
   reason?: string;
+  request_id?: string;
+  accuracy_level?: string;
 }
 
 export interface LocationResponseMessage extends BaseWebSocketMessage {

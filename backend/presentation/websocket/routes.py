@@ -1,87 +1,108 @@
 """
 WebSocket Routes - Centralized WebSocket endpoint definitions.
 
-This module provides WebSocket routes in a structure similar to API modules,
-though WebSocket routes must be registered directly on the FastAPI app.
+This module provides WebSocket routes using the new unified handler architecture,
+simplifying the routing layer and providing better extensibility.
 """
 from fastapi import FastAPI, WebSocket
-from backend.presentation.websocket.connection import ConnectionManager
-from backend.presentation.websocket.router import websocket_endpoint
+from backend.presentation.websocket.websocket_handler import handle_websocket_connection
+from backend.presentation.websocket.message_types import MessageType
 
 
 def register_websocket_routes(app: FastAPI):
     """
     Register all WebSocket routes with the FastAPI application.
     
-    This function centralizes WebSocket route registration to provide
-    a clean separation similar to API router includes, even though
-    WebSocket routes must be registered directly on the app.
+    Uses the new unified WebSocket handler architecture for simplified
+    message processing and connection management.
     
     Args:
         app: FastAPI application instance to register routes on
         
     Note:
-        Unlike REST API routes, WebSocket routes cannot use include_router()
-        and must be registered directly on the FastAPI app instance.
+        The new architecture eliminates the need for separate router
+        and connection manager instances in the app state.
     """
     
     @app.websocket("/ws/{session_id}")
     async def websocket_session_endpoint(websocket: WebSocket, session_id: str):
         """
-        WebSocket endpoint for session-based real-time communication.
+        Unified WebSocket endpoint for session-based real-time communication.
         
-        Handles WebSocket connections for individual user sessions, providing
-        real-time bidirectional communication for location requests, heartbeat
-        monitoring, and other interactive features.
+        Handles all WebSocket connections using the new message handler architecture,
+        supporting multiple message types including chat, location, tools, and more.
         
         Args:
             websocket: WebSocket connection instance
             session_id: Session UUID for connection context
             
-        Note:
-            Delegates actual message handling to the websocket router module
-            while maintaining clean separation of concerns.
+        Features:
+            - Unified message processing with type validation
+            - Extensible handler system for new message types
+            - Improved error handling and logging
+            - Stream-capable chat responses
+            - Tool integration support
         """
         print(f"[WebSocket] Connection attempt for session: {session_id}")
         try:
-            connection_manager: ConnectionManager = websocket.app.state.connection_manager
-            await websocket_endpoint(websocket, session_id, connection_manager)
+            await handle_websocket_connection(websocket, session_id)
         except Exception as e:
-            print(f"[WebSocket] Error in endpoint: {e}")
+            print(f"[WebSocket] Error in unified handler: {e}")
             raise
 
 
 def get_websocket_info() -> dict:
     """
-    Get information about registered WebSocket routes.
+    Get information about registered WebSocket routes and capabilities.
     
-    Provides metadata about available WebSocket endpoints for
-    documentation and debugging purposes.
+    Provides comprehensive metadata about the WebSocket system including
+    supported message types, handlers, and features.
     
     Returns:
-        dict: WebSocket route information with structure:
+        dict: WebSocket system information with structure:
             - routes: List of WebSocket route definitions
-            - total_routes: int - Number of registered routes
-            - supported_features: List of supported WebSocket features
+            - message_types: List of supported message types
+            - handlers: List of available message handlers
+            - features: List of supported features
     
     Example:
         info = get_websocket_info()
-        print(f"WebSocket routes: {info['total_routes']}")
+        print(f"Supported message types: {len(info['message_types'])}")
     """
+    # Get all message types
+    message_types = [msg_type.value for msg_type in MessageType]
+    
     return {
         "routes": [
             {
                 "path": "/ws/{session_id}",
-                "description": "Session-based real-time communication",
+                "description": "Unified real-time communication endpoint",
                 "parameters": ["session_id"],
-                "supported_messages": ["HEARTBEAT_ACK", "LOCATION_RESPONSE"]
+                "architecture": "unified_handler"
             }
         ],
-        "total_routes": 1,
-        "supported_features": [
+        "message_types": message_types,
+        "handlers": [
+            "HeartbeatHandler",
+            "LocationHandler", 
+            "ChatHandler",
+            "ToolCallHandler"
+        ],
+        "features": [
             "heartbeat_monitoring",
-            "location_requests", 
-            "session_management",
-            "connection_recovery"
-        ]
+            "location_services",
+            "chat_streaming", 
+            "tool_integration",
+            "file_operations",
+            "error_handling",
+            "type_validation",
+            "extensible_architecture"
+        ],
+        "architecture_info": {
+            "version": "2.0",
+            "type": "unified_handler",
+            "connection_management": "integrated",
+            "message_validation": "pydantic_based",
+            "extensibility": "handler_plugin_system"
+        }
     }

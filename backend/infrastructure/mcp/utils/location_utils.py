@@ -81,40 +81,60 @@ async def get_browser_location(
         if not session_id:
             return None
 
-        # Get app and connection manager
+        # Get app and websocket handler
         app = getattr(getattr(context, "fastmcp", None), "app", None)
-        if not app or not hasattr(app.state, "connection_manager"):
+        if not app or not hasattr(app.state, "websocket_handler"):
             return None
 
-        # Import location response events storage
-        from backend.presentation.websocket.router import _location_response_events
-        location_events = _location_response_events
+        # Get WebSocket handler and location handler
+        websocket_handler = getattr(app.state, 'websocket_handler', None)
+        if not websocket_handler:
+            return None
+            
+        # Get location handler from message processor
+        from backend.presentation.websocket.message_handler import LocationHandler
+        message_processor = websocket_handler.get_message_processor()
+        location_handler = message_processor.get_handler(LocationHandler)
         
-        # Check if WebSocket connection exists
-        cm = app.state.connection_manager
-        if session_id not in cm.connections:
+        if not location_handler:
             return None
         
-        # Create event for this location request
-        location_event = asyncio.Event()
-        location_events[session_id] = {
-            "event": location_event,
-            "location_data": None,
-            "success": False,
-            "timestamp": None
-        }
+        # Check if WebSocket connection exists
+        connection_manager = websocket_handler.get_connection_manager()
+        active_sessions = connection_manager.get_active_sessions()
+        
+        print(f"[DEBUG] Location request - Session ID: {session_id}")
+        print(f"[DEBUG] Active WebSocket sessions: {active_sessions}")
+        
+        if session_id not in connection_manager.connections:
+            print(f"[DEBUG] Session {session_id} not found in WebSocket connections")
+            return None
         
         try:
-            # Send location request via WebSocket
-            await cm.send_json(session_id, {"type": "REQUEST_LOCATION"})
+            # Send location request via new handler and wait for response
+            from backend.presentation.websocket.message_types import create_message, MessageType
             
-            # Wait for response with timeout
-            await asyncio.wait_for(location_event.wait(), timeout=timeout)
+            # Create location request message
+            request_msg = create_message(
+                MessageType.LOCATION_REQUEST,
+                session_id=session_id,
+                request_id=f"location_{session_id}_{int(asyncio.get_event_loop().time())}"
+            )
             
-            # Get the response data
-            event_info = location_events.get(session_id, {})
-            if event_info.get("success") and event_info.get("location_data"):
-                location_data = event_info["location_data"]
+            print(f"[DEBUG] Sending location request message: {request_msg.model_dump()}")
+            
+            # First, handle the location request through the handler to set up event
+            await location_handler.handle(session_id, request_msg)
+            print(f"[DEBUG] Location request handled, event created")
+            
+            # Wait for response using location handler
+            print(f"[DEBUG] Waiting for location response (timeout: {timeout}s)...")
+            response_data = await location_handler.wait_for_location_response(session_id, timeout)
+            print(f"[DEBUG] Location response received: {response_data}")
+            
+            # Check if successful
+            if response_data.get("success") and response_data.get("location_data"):
+                location_data = response_data["location_data"]
                 
                 # Get city/region/country via reverse geocoding
                 geocode_data = _reverse_geocode_full(
@@ -131,16 +151,13 @@ async def get_browser_location(
                     accuracy=location_data.get("accuracy"),
                     source="browser_geolocation",
                     session_id=session_id,
-                    timestamp=event_info.get("timestamp", int(asyncio.get_event_loop().time())),
+                    timestamp=response_data.get("timestamp", int(asyncio.get_event_loop().time())),
                     city=geocode_data.get("city"),
                     region=geocode_data.get("region"),
                     country=geocode_data.get("country")
                 )
         except asyncio.TimeoutError:
             pass
-        finally:
-            # Clean up the event
-            location_events.pop(session_id, None)
             
     except Exception:
         pass

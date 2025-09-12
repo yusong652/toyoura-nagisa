@@ -18,7 +18,7 @@ from backend.presentation.api import content
 from backend.presentation.api import settings
 from backend.presentation.api import chat
 from backend.presentation.api import profiles
-from backend.presentation.websocket.connection import ConnectionManager
+from backend.presentation.websocket.websocket_handler import initialize_websocket_handler
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.exceptions import register_exception_handlers
 import threading
@@ -34,9 +34,10 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle events."""
     print("[INIT] Starting application initialization...")
     try:
-        # Initialize WebSocket connection manager
-        connection_manager = ConnectionManager()
-        app.state.connection_manager = connection_manager
+        # Initialize unified WebSocket handler
+        websocket_handler = initialize_websocket_handler()
+        app.state.websocket_handler = websocket_handler
+        print("[INIT] WebSocket handler initialized with unified architecture")
 
         # Initialize TTS Engine
         tts_engine = get_tts_engine()

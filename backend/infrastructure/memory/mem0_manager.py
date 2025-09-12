@@ -209,32 +209,11 @@ class Mem0MemoryManager:
         # Use config defaults
         user_id = user_id or self.config.mem0_user_id
         
-        print(f"[DEBUG] search_memories called: query='{query}', user_id={user_id}, limit={limit}")
-        
-        # Debug: List all memories for this user first
-        try:
-            # Support Mem0 API variants for get_all
-            try:
-                all_memories_response = self.memory.get_all(user_id=user_id)
-            except TypeError:
-                all_memories_response = self.memory.get_all(agent_id=user_id)
-            if isinstance(all_memories_response, dict) and 'results' in all_memories_response:
-                all_memories = all_memories_response['results']
-                print(f"[DEBUG] Total memories for user {user_id}: {len(all_memories)}")
-                # Show first 3 memories safely (avoid noise)
-                for i, mem in enumerate(all_memories[:3]):
-                    print(f"[DEBUG] Memory {i}: {mem}")
-            else:
-                print(f"[DEBUG] Unexpected get_all response format: {all_memories_response}")
-        except Exception as e:
-            print(f"[DEBUG] Failed to get all memories: {e}")
-        
         if self.config.debug_mode:
             logger.info(f"[Mem0 Debug] Starting search for query: '{query[:50]}...' (user: {user_id}, limit: {limit})")
         
         # Search using Mem0 - this includes vectorization + semantic search
         try:
-            print(f"[DEBUG] Calling mem0.search with query='{query}', user_id={user_id}, limit={limit}")
             # Support Mem0 API variants for search
             try:
                 search_result = self.memory.search(
@@ -248,16 +227,8 @@ class Mem0MemoryManager:
                     agent_id=user_id,
                     limit=limit
                 )
-            
-            print(f"[DEBUG] Raw search_result: {search_result}")
             # mem0.search() always returns {'results': [...]} where results is always a list
             results = search_result["results"]
-            print(f"[DEBUG] Mem0 search returned {len(results)} results before session filtering")
-            
-            if results:
-                print(f"[DEBUG] First search result: {results[0]}")
-            else:
-                print(f"[DEBUG] Search returned empty results for user {user_id}")
             
             if self.config.debug_mode:
                 logger.info(f"[Mem0 Debug] Search completed, found {len(results)} results")
@@ -266,8 +237,6 @@ class Mem0MemoryManager:
             logger.error(f"[Mem0] Search failed: {e}")
             # Return empty list on search failure
             results = []
-        
-        print(f"[DEBUG] Found {len(results)} memories (cross-session search)")
         
         return results
     
