@@ -107,7 +107,8 @@ class ChatService:
         tts_engine: BaseTTS,
         agent_profile: str = "general",
         enable_memory: bool = True,
-        additional_messages: List[Any] = None
+        additional_messages: List[Any] = None,
+        user_message_id: Optional[str] = None
     ) -> StreamingResponse:
         """
         Create streaming response for chat conversation.
@@ -156,7 +157,8 @@ class ChatService:
                 llm_client, 
                 tts_engine, 
                 agent_profile=agent_profile,
-                enable_memory=enable_memory
+                enable_memory=enable_memory,
+                user_message_id=user_message_id
             ),
             media_type="text/event-stream"
         )

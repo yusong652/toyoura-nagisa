@@ -168,6 +168,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           locationRequestHandler.current(data)
         }
         
+        // Handle message status updates
+        if (data.type === 'STATUS_UPDATE') {
+          // Dispatch custom event for message status updates
+          window.dispatchEvent(new CustomEvent('messageStatusUpdate', {
+            detail: {
+              messageId: data.message_id,
+              status: data.status,
+              errorMessage: data.error_message
+            }
+          }))
+        }
+        
         // Handle tool use notifications
         if (data.type === 'NAGISA_IS_USING_TOOL') {
           

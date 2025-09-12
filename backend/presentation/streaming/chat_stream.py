@@ -18,6 +18,7 @@ from backend.presentation.streaming.llm_response_handler import handle_llm_respo
 from backend.presentation.streaming.memory_injection_handler import (
     save_conversation_memory
 )
+from backend.presentation.websocket.status_notification_service import get_status_notification_service
 
 
 async def generate_chat_stream(
@@ -27,7 +28,8 @@ async def generate_chat_stream(
     tts_engine: BaseTTS,
     user_id: Optional[str] = None,
     enable_memory: bool = True,
-    agent_profile: str = "general"
+    agent_profile: str = "general",
+    user_message_id: Optional[str] = None
 ) -> AsyncGenerator[str, None]:
     """
     Enhanced chat stream generator with memory injection.
@@ -57,10 +59,15 @@ async def generate_chat_stream(
     # Generate unique request ID for debugging
     request_id = str(uuid.uuid4())[:8]
     
-    yield f"data: {json.dumps({'status': 'sent'})}\n\n"
+    # Send WebSocket status update if service is available and message ID provided
+    status_service = get_status_notification_service()
+    if status_service and user_message_id:
+        await status_service.notify_sent(session_id, user_message_id)
     
     try:
-        yield f"data: {json.dumps({'status': 'read'})}\n\n"
+        # Send WebSocket read status
+        if status_service and user_message_id:
+            await status_service.notify_read(session_id, user_message_id)
         
         # Load conversation history without images
         recent_history = load_history(session_id)
@@ -115,6 +122,11 @@ async def generate_chat_stream(
             
     except Exception as e:
         print(f"[ERROR] API Request {request_id} - Exception in generate(): {e}")
+        
+        # Send error status via WebSocket
+        if status_service and user_message_id:
+            await status_service.notify_error(session_id, user_message_id, str(e))
+        
         yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
         error_data = {
             'type': 'error',

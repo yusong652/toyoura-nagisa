@@ -62,8 +62,9 @@ export interface ErrorMessage extends BaseWebSocketMessage {
 
 export interface StatusMessage extends BaseWebSocketMessage {
   type: MessageType.STATUS_UPDATE;
-  status: "sent" | "read" | "typing" | "thinking" | "complete";
+  status: "sending" | "sent" | "read" | "error";
   message_id?: string;
+  error_message?: string;  // Optional error details when status is "error"
 }
 
 export interface ToolUseMessage extends BaseWebSocketMessage {
@@ -164,15 +165,17 @@ export function createErrorMessage(
 }
 
 export function createStatusMessage(
-  status: "sent" | "read" | "typing" | "thinking" | "complete",
+  status: "sending" | "sent" | "read" | "error",
   session_id?: string,
-  message_id?: string
+  message_id?: string,
+  error_message?: string
 ): StatusMessage {
   return {
     type: MessageType.STATUS_UPDATE,
     status,
     session_id,
     message_id,
+    error_message,
     timestamp: new Date().toISOString()
   };
 }

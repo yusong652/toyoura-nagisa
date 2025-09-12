@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { MessageStatus } from '../../types/chat'
 import { useMessageStateManager } from './useMessageStateManager'
 import { useChunkProcessor } from './useChunkProcessor'
 import { useStreamEventHandlers } from './useStreamEventHandlers'
@@ -11,7 +10,6 @@ interface UseStreamHandlerProps {
   processAudioData: (audioData: string, count: number) => Promise<boolean>
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
-  updateMessageStatus: (messageId: string, status: MessageStatus) => void
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 }
 
@@ -41,7 +39,6 @@ export const useStreamHandler = ({
   processAudioData,
   sessionRefreshSessions,
   sessionSwitchSession,
-  updateMessageStatus,
   setMessages
 }: UseStreamHandlerProps) => {
   
@@ -78,8 +75,7 @@ export const useStreamHandler = ({
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-    updateMessageStatus,
-    updateMessageId,
+      updateMessageId,
     addImageMessage,
     processChunk
   })

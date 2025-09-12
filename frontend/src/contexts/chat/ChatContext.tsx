@@ -88,7 +88,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     processAudioData,
     sessionRefreshSessions,
     sessionSwitchSession,
-    updateMessageStatus,
     setMessages
   })
 

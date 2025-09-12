@@ -110,6 +110,9 @@ async def chat_endpoint(
         # Extract enable_memory flag from request (default to True)
         enable_memory = data.get("enable_memory", True)
         
+        # Extract user message ID for status tracking
+        user_message_id = parsed_data.get("id") if parsed_data else None
+        
         # Load conversation history
         history_msgs = service.load_and_prepare_history(session_id)
         
@@ -118,13 +121,14 @@ async def chat_endpoint(
             parsed_data, session_id, history_msgs
         )
         
-        # Generate streaming response
+        # Generate streaming response with message ID for status updates
         return await service.create_streaming_response(
             session_id=session_id,
             llm_client=llm_client,
             tts_engine=tts_engine,
             agent_profile=agent_profile,
-            enable_memory=enable_memory
+            enable_memory=enable_memory,
+            user_message_id=user_message_id
         )
         
     except HTTPException:

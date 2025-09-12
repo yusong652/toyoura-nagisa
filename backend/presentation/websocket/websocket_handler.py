@@ -11,6 +11,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.presentation.websocket.connection import ConnectionManager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
+from backend.presentation.websocket.status_notification_service import (
+    MessageStatusNotificationService,
+    get_status_notification_service
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ class WebSocketHandler:
     def __init__(self):
         self.connection_manager = ConnectionManager()
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)
+        self.status_service = get_status_notification_service(self.connection_manager)
     
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """

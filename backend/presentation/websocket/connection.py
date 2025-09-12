@@ -246,3 +246,7 @@ class ConnectionManager:
     def get_active_sessions(self) -> list[str]:
         """Get all active session IDs"""
         return list(self.connections.keys())
+    
+    async def is_connected(self, session_id: str) -> bool:
+        """Check if a session is connected"""
+        return session_id in self.connections and self.connections[session_id].state == ConnectionState.CONNECTED

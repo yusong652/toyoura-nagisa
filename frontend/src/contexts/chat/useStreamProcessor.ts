@@ -3,7 +3,6 @@ import { useCallback, useRef } from 'react'
 interface UseStreamProcessorProps {
   handleTitleUpdate: (data: any) => void
   handleSessionRefresh: (data: any) => Promise<void>
-  handleStatusUpdate: (data: any, userMessageId: string) => void
   handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
@@ -28,7 +27,6 @@ interface StreamProcessor {
 export const useStreamProcessor = ({
   handleTitleUpdate,
   handleSessionRefresh,
-  handleStatusUpdate,
   handleAiMessageId,
   handleKeyword,
   handleToolEvent,
@@ -83,8 +81,8 @@ export const useStreamProcessor = ({
           return
         }
         
+        // Status updates now handled via WebSocket, skip SSE status events
         if (data.status) {
-          handleStatusUpdate(data, userMessageId)
           return
         }
         
@@ -126,8 +124,7 @@ export const useStreamProcessor = ({
   }, [
     handleTitleUpdate,
     handleSessionRefresh,
-    handleStatusUpdate,
-    handleAiMessageId,
+      handleAiMessageId,
     handleKeyword,
     handleContentUpdate
   ])

@@ -14,6 +14,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { Message, MessageStatus, FileData } from '../../types/chat'
 import { sessionService, chatService } from '../../services/api'
+import { useWebSocketMessageStatus } from '../../hooks/useWebSocketMessageStatus'
 
 export interface UseChatMessageOptions {
   currentSessionId: string | null
@@ -308,15 +309,20 @@ export const useChatMessage = ({
   }, [])
 
   // 更新消息状态
-  const updateMessageStatus = useCallback((messageId: string, status: MessageStatus) => {
+  const updateMessageStatus = useCallback((messageId: string, status: MessageStatus, errorMessage?: string) => {
     setMessages(prev => 
       prev.map(msg => 
         msg.id === messageId
-          ? { ...msg, status }
+          ? { ...msg, status, errorMessage }
           : msg
       )
     )
   }, [])
+  
+  // Subscribe to WebSocket message status updates
+  useWebSocketMessageStatus({
+    onStatusUpdate: updateMessageStatus
+  })
 
   // 更新机器人消息
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {

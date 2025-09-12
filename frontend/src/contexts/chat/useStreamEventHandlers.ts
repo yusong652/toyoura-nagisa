@@ -1,12 +1,10 @@
 import { useCallback } from 'react'
-import { MessageStatus } from '../../types/chat'
 import { playMotion } from '../../utils/live2d'
 
 interface UseStreamEventHandlersProps {
   currentSessionId: string | null
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
-  updateMessageStatus: (messageId: string, status: MessageStatus) => void
   updateMessageId: (oldId: string, newId: string) => void
   addImageMessage: (imageData: any) => void
   processChunk: (chunk: any, messageId: string) => Promise<void>
@@ -15,7 +13,6 @@ interface UseStreamEventHandlersProps {
 interface StreamEventHandlers {
   handleTitleUpdate: (data: any) => void
   handleSessionRefresh: (data: any) => Promise<void>
-  handleStatusUpdate: (data: any, userMessageId: string) => void
   handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
@@ -31,7 +28,6 @@ export const useStreamEventHandlers = ({
   currentSessionId,
   sessionRefreshSessions,
   sessionSwitchSession,
-  updateMessageStatus,
   updateMessageId,
   addImageMessage,
   processChunk
@@ -87,21 +83,6 @@ export const useStreamEventHandlers = ({
     }
   }, [currentSessionId, sessionSwitchSession, addImageMessage])
 
-  /**
-   * Handle message status update.
-   * 
-   * Updates user message status based on server events.
-   */
-  const handleStatusUpdate = useCallback((data: any, userMessageId: string) => {
-    if (data.status === 'sent') {
-      updateMessageStatus(userMessageId, MessageStatus.SENT)
-    } else if (data.status === 'read') {
-      updateMessageStatus(userMessageId, MessageStatus.READ)
-    } else if (data.status === 'error') {
-      console.error('[EventHandlers] Message error:', data.error)
-      updateMessageStatus(userMessageId, MessageStatus.ERROR)
-    }
-  }, [updateMessageStatus])
 
   /**
    * Handle AI message ID update.
@@ -156,7 +137,6 @@ export const useStreamEventHandlers = ({
   return {
     handleTitleUpdate,
     handleSessionRefresh,
-    handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
     handleContentUpdate
