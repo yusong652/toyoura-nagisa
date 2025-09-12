@@ -6,7 +6,6 @@ interface UseStreamProcessorProps {
   handleStatusUpdate: (data: any, userMessageId: string) => void
   handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
-  handleToolEvent: (data: any, messageId: string) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
   sessionRefreshSessions: () => Promise<any>
   finalizeMessage: (messageId: string) => void
@@ -106,12 +105,6 @@ export const useStreamProcessor = ({
           }
         }
         
-        // Skip SSE tool events - now handled by WebSocket
-        if (data.type === 'NAGISA_IS_USING_TOOL' || data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
-          console.log('[StreamProcessor] Skipping SSE tool event (now handled by WebSocket):', data.type)
-          return
-        }
-        
         // Handle content updates (text/audio)
         // Only process if there's actual content
         if (data.text !== undefined || data.audio !== undefined) {
@@ -136,7 +129,6 @@ export const useStreamProcessor = ({
     handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
-    handleToolEvent,
     handleContentUpdate
   ])
   

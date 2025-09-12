@@ -32,7 +32,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const {
     toolState,
     toolsEnabled,
-    setToolState,
     currentProfile
   } = useAgent()
   
@@ -90,8 +89,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     sessionRefreshSessions,
     sessionSwitchSession,
     updateMessageStatus,
-    setMessages,
-    setToolState
+    setMessages
   })
 
   // 使用图片生成钩子

@@ -13,7 +13,6 @@ interface MessageStateManager {
     isLoading?: boolean
     onRenderComplete?: () => void
   }) => void
-  updateMessageToolState: (messageId: string, toolState: any) => void
   finalizeMessage: (messageId: string) => void
   addImageMessage: (imageData: any) => void
 }
@@ -108,26 +107,7 @@ export const useMessageStateManager = ({
     })
   }, [setMessages])
 
-  /**
-   * Update message tool state.
-   * 
-   * Tracks tool usage status for UI display.
-   */
-  const updateMessageToolState = useCallback((messageId: string, toolState: any) => {
-    setMessages(prev => 
-      prev.map(msg => {
-        if (msg.id === messageId) {
-          return {
-            ...msg,
-            toolState
-          }
-        }
-        return msg
-      })
-    )
-  }, [setMessages])
-
-  /**
+/**
    * Finalize message after stream completion.
    * 
    * Cleans up streaming state and temporary fields.
@@ -175,7 +155,6 @@ export const useMessageStateManager = ({
   return {
     updateMessageId,
     updateMessageText,
-    updateMessageToolState,
     finalizeMessage,
     addImageMessage
   }

@@ -9,8 +9,6 @@ interface UseStreamEventHandlersProps {
   updateMessageStatus: (messageId: string, status: MessageStatus) => void
   updateMessageId: (oldId: string, newId: string) => void
   addImageMessage: (imageData: any) => void
-  handleToolStart: (messageId: string, data: any) => void
-  handleToolEnd: (messageId: string, data: any) => void
   processChunk: (chunk: any, messageId: string) => Promise<void>
 }
 
@@ -20,7 +18,6 @@ interface StreamEventHandlers {
   handleStatusUpdate: (data: any, userMessageId: string) => void
   handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
-  handleToolEvent: (data: any, messageId: string) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
 }
 
@@ -37,8 +34,6 @@ export const useStreamEventHandlers = ({
   updateMessageStatus,
   updateMessageId,
   addImageMessage,
-  handleToolStart,
-  handleToolEnd,
   processChunk
 }: UseStreamEventHandlersProps): StreamEventHandlers => {
   
@@ -140,20 +135,7 @@ export const useStreamEventHandlers = ({
     }
   }, [])
 
-  /**
-   * Handle tool-related events.
-   * 
-   * Routes tool events to appropriate handlers.
-   */
-  const handleToolEvent = useCallback((data: any, messageId: string) => {
-    if (data.type === 'NAGISA_IS_USING_TOOL') {
-      handleToolStart(messageId, data)
-    } else if (data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
-      handleToolEnd(messageId, data)
-    }
-  }, [handleToolStart, handleToolEnd])
-
-  /**
+/**
    * Handle content update (text/audio).
    * 
    * Delegates to chunk processor for handling.
@@ -177,7 +159,6 @@ export const useStreamEventHandlers = ({
     handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
-    handleToolEvent,
     handleContentUpdate
   }
 }

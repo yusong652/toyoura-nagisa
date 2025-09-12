@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { MessageStatus } from '../../types/chat'
 import { useMessageStateManager } from './useMessageStateManager'
-import { useToolStateManager } from './useToolStateManager'
 import { useChunkProcessor } from './useChunkProcessor'
 import { useStreamEventHandlers } from './useStreamEventHandlers'
 import { useStreamProcessor } from './useStreamProcessor'
@@ -14,7 +13,6 @@ interface UseStreamHandlerProps {
   sessionSwitchSession: (sessionId: string) => Promise<void>
   updateMessageStatus: (messageId: string, status: MessageStatus) => void
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
-  setToolState: (state: any) => void
 }
 
 interface StreamHandlerOptions {
@@ -29,11 +27,10 @@ import { Message } from '../../types/chat'
  * Refactored stream handler using modular hooks.
  * 
  * Orchestrates stream processing by composing specialized hooks
- * for message state, tool state, chunk processing, and event handling.
+ * for message state, chunk processing, and event handling.
  * 
  * Architecture:
  * - useMessageStateManager: Manages message state updates
- * - useToolStateManager: Handles tool usage tracking
  * - useChunkProcessor: Processes text/audio chunks
  * - useStreamEventHandlers: Handles various stream events
  * - useStreamProcessor: Core stream reading and parsing
@@ -45,28 +42,17 @@ export const useStreamHandler = ({
   sessionRefreshSessions,
   sessionSwitchSession,
   updateMessageStatus,
-  setMessages,
-  setToolState
+  setMessages
 }: UseStreamHandlerProps) => {
   
   // Initialize message state manager
   const {
     updateMessageId,
     updateMessageText,
-    updateMessageToolState,
     finalizeMessage,
     addImageMessage
   } = useMessageStateManager({
     setMessages
-  })
-  
-  // Initialize tool state manager
-  const {
-    handleToolStart,
-    handleToolEnd
-  } = useToolStateManager({
-    setToolState,
-    updateMessageToolState
   })
   
   // Initialize chunk processor
@@ -87,7 +73,6 @@ export const useStreamHandler = ({
     handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
-    handleToolEvent,
     handleContentUpdate
   } = useStreamEventHandlers({
     currentSessionId,
@@ -96,8 +81,6 @@ export const useStreamHandler = ({
     updateMessageStatus,
     updateMessageId,
     addImageMessage,
-    handleToolStart,
-    handleToolEnd,
     processChunk
   })
   
@@ -110,7 +93,6 @@ export const useStreamHandler = ({
     handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
-    handleToolEvent,
     handleContentUpdate,
     sessionRefreshSessions,
     finalizeMessage,
