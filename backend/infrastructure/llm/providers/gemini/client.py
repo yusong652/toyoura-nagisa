@@ -149,21 +149,15 @@ class GeminiClient(LLMClientBase):
         # Get tool schemas for system prompt embedding (clean dict format)
         prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
         
-        print(f"[DEBUG] GeminiClient.call_api_with_context: agent_profile={agent_profile}")
-        print(f"[DEBUG] GeminiClient.call_api_with_context: tool_schemas count={len(tool_schemas) if tool_schemas else 0}")
-        print(f"[DEBUG] GeminiClient.call_api_with_context: prompt_tool_schemas count={len(prompt_tool_schemas) if prompt_tool_schemas else 0}")
-        
         # Build unified system prompt with memory injection
         from backend.shared.utils.prompt.builder import build_system_prompt
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
-            tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
             session_id=session_id,
-            enable_memory=enable_memory
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
         )
         
-        print(f"[DEBUG] GeminiClient.call_api_with_context: system_prompt contains tools: {'tools' in system_prompt.lower()}")
-        print(f"[DEBUG] GeminiClient.call_api_with_context: system_prompt length: {len(system_prompt)}")
         if debug:
             print(f"[DEBUG] GeminiClient.call_api_with_context: full system_prompt:\n{system_prompt}\n")
         

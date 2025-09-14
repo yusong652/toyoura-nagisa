@@ -12,66 +12,71 @@ logger = logging.getLogger(__name__)
 
 
 async def get_tool_prompt_with_schemas(
-    session_id: str,
-    agent_profile: Optional[str] = None
+    agent_profile: Optional[str] = None,
+    tool_schemas: Optional[List[Dict[str, Any]]] = None
 ) -> str:
     """
-    Build tool prompt with embedded tool schemas based on agent profile.
+    Build complete tool prompt with base context and embedded tool schemas.
     
-    This function dynamically loads tool schemas from the MCP server based on 
-    the current agent profile and embeds them following Anthropic best practices.
+    Loads the base tool prompt template with workspace_root context, then 
+    embeds provided tool schemas following Anthropic best practices.
     
     Args:
-        session_id: Session ID for tool context
         agent_profile: Agent profile type (coding, lifestyle, general, or "disabled")
+        tool_schemas: Pre-fetched tool schemas from appropriate LLM provider
         
     Returns:
-        Tool prompt with embedded schemas in Anthropic format
+        Complete tool prompt with workspace context and embedded schemas
     """
     if agent_profile == "disabled" or agent_profile is None:
         return ""
     
+    # Load base tool prompt with workspace_root substitution
     try:
-        # Import tool manager to get schemas
-        from backend.infrastructure.llm.providers.anthropic.tool_manager import AnthropicToolManager
+        from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
+        workspace_root = str(WORKSPACE_ROOT)
+    except ImportError:
+        from .config import BASE_DIR
+        workspace_root = str(BASE_DIR)
+    
+    base_prompt = _load_prompt_file("tool_prompt.md")
+    if base_prompt:
+        base_prompt = base_prompt.replace("{workspace_root}", workspace_root)
+    
+    # Build tool schemas section if provided
+    if tool_schemas:
+        # Build tool schemas section
+        sections = [
+            "\nIn this environment you have access to a set of tools you can use to answer the user's question.",
+            "String and scalar parameters should be specified as is, while lists and objects should use JSON format.",
+            "Here are the functions available in JSONSchema format:",
+            "<functions>"
+        ]
         
-        # Create temporary tool manager to fetch schemas
-        tool_manager = AnthropicToolManager(tools_enabled=True)
+        for tool_schema in tool_schemas:
+            tool_json = json.dumps(tool_schema, separators=(',', ':'))
+            sections.append(f'<function>{tool_json}</function>')
         
-        # Get tool schemas based on agent profile
-        tool_schemas = await tool_manager.get_function_call_schemas(
-            session_id=session_id,
-            agent_profile=agent_profile,
-            debug=False
-        )
+        sections.append("</functions>")
+        tool_section = "\n".join(sections)
         
-        if tool_schemas:
-            # Build tool section with embedded schemas
-            return build_tool_section(tool_schemas)
+        # Replace {tool_schemas} placeholder with actual schemas
+        if base_prompt:
+            return base_prompt.replace("{tool_schemas}", tool_section)
         else:
-            # No tools available for this profile
-            return ""
-            
-    except Exception as e:
-        logger.error(f"Failed to load tool schemas: {e}")
-        # Fallback to basic tool prompt without schemas
-        return _load_prompt_file("tool_prompt.md")
+            return tool_section
+    
+    # Return base prompt with workspace context (remove tool_schemas placeholder)
+    if base_prompt:
+        return base_prompt.replace("{tool_schemas}", "")
+    return ""
 
 
 def build_tool_section(tool_schemas: List[Dict[str, Any]]) -> str:
     """
     Build tool section following Anthropic's recommended format.
     
-    Format:
-    In this environment you have access to a set of tools...
-    
-    [Formatting Instructions]
-    
-    Here are the functions available in JSONSchema format:
-    <functions>
-    <function>{"name": "tool_name", "description": "...", "parameters": {...}}</function>
-    ...
-    </functions>
+    Legacy function for backwards compatibility.
     
     Args:
         tool_schemas: List of tool schema dictionaries
@@ -82,27 +87,16 @@ def build_tool_section(tool_schemas: List[Dict[str, Any]]) -> str:
     if not tool_schemas:
         return ""
     
-    sections = []
-    
-    # Tool access declaration
-    sections.append(
-        "In this environment you have access to a set of tools you can use to answer the user's question."
-    )
-    
-    # Formatting instructions (Anthropic requirement)
-    sections.append(
-        "String and scalar parameters should be specified as is, while lists and objects should use JSON format."
-    )
-    
-    # Tool definitions in JSON Schema format
-    sections.append("Here are the functions available in JSONSchema format:")
-    sections.append("<functions>")
+    sections = [
+        "In this environment you have access to a set of tools you can use to answer the user's question.",
+        "String and scalar parameters should be specified as is, while lists and objects should use JSON format.",
+        "Here are the functions available in JSONSchema format:",
+        "<functions>"
+    ]
     
     for tool_schema in tool_schemas:
-        # Format each tool as a compact JSON object
         tool_json = json.dumps(tool_schema, separators=(',', ':'))
         sections.append(f'<function>{tool_json}</function>')
     
     sections.append("</functions>")
-    
     return "\n".join(sections)

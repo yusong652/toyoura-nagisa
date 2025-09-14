@@ -137,9 +137,9 @@ class OpenAIClient(LLMClientBase):
         from backend.shared.utils.prompt.builder import build_system_prompt
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
-            tool_schemas=prompt_tool_schemas if prompt_tool_schemas else None,
             session_id=session_id,
-            enable_memory=enable_memory
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
         )
         
         # Build API configuration
