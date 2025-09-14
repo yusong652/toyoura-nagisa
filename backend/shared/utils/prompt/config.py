@@ -19,4 +19,3 @@ ENV_SYSTEM_MD = "NAGISA_SYSTEM_MD"  # Legacy support
 DEFAULT_BASE_PROMPT = PROMPTS_DIR / "base_prompt.md"
 DEFAULT_TOOL_PROMPT = PROMPTS_DIR / "tool_prompt.md"
 DEFAULT_EXPRESSION_PROMPT = PROMPTS_DIR / "expression_prompt.md"
-DEFAULT_MEMORY_TEMPLATE = PROMPTS_DIR / "memory_context_template.md"
