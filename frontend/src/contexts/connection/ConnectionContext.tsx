@@ -12,18 +12,6 @@ export const useConnection = (): ConnectionContextType => {
   return context
 }
 
-// 全局TTS处理器注册
-let globalTTSHandler: ((audioData: string, text: string, index: number) => Promise<void>) | null = null
-
-export const registerGlobalTTSHandler = (handler: (audioData: string, text: string, index: number) => Promise<void>) => {
-  globalTTSHandler = handler
-  console.log('[ConnectionContext] Global TTS handler registered')
-}
-
-export const unregisterGlobalTTSHandler = () => {
-  globalTTSHandler = null
-  console.log('[ConnectionContext] Global TTS handler unregistered')
-}
 
 interface ConnectionProviderProps {
   children: ReactNode
@@ -170,22 +158,31 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           ws.send(JSON.stringify(heartbeatAck))
         }
         
-        // Handle TTS chunks
-        if (data.type === 'TTS_CHUNK' && globalTTSHandler) {
-          console.log('[ConnectionContext] Processing TTS chunk:', {
+        // Handle TTS chunks - dispatch custom events for TTS processors
+        if (data.type === 'TTS_CHUNK') {
+          console.log('[ConnectionContext] Received TTS chunk, dispatching event:', {
             hasText: !!data.text,
             hasAudio: !!data.audio,
             index: data.index,
-            textLength: data.text?.length
+            textLength: data.text?.length,
+            isFinal: data.is_final
           })
 
-          try {
-            if (data.audio && data.text) {
-              await globalTTSHandler(data.audio, data.text, data.index || 0)
+          // Dispatch custom event for existing TTS processors to handle
+          const ttsEvent = new CustomEvent('websocket-tts-chunk', {
+            detail: {
+              text: data.text,
+              audio: data.audio,
+              index: data.index,
+              is_final: data.is_final,
+              message_id: data.message_id,
+              engine_status: data.engine_status,
+              error: data.error,
+              processing_time: data.processing_time
             }
-          } catch (error) {
-            console.error('[ConnectionContext] TTS processing failed:', error)
-          }
+          })
+
+          window.dispatchEvent(ttsEvent)
         }
 
         // Handle location requests

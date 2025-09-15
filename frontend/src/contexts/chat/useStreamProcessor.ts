@@ -104,24 +104,26 @@ export const useStreamProcessor = ({
         }
         
         // Handle content updates (text/audio)
-        // Only process SSE content if there's actual content
-        // TTS chunks are now handled via WebSocket, so skip audio processing in SSE
-        if (data.text !== undefined) {
-          // Process text-only content through SSE (audio handled via WebSocket)
-          const contentWithoutAudio = { ...data }
-          delete contentWithoutAudio.audio  // Remove audio to prevent double processing
-
-          // Always use the most current message ID
+        // Skip all TTS content processing in SSE - WebSocket handles TTS chunks completely
+        if (data.text !== undefined && !data.audio) {
+          // Only process non-TTS text content through SSE
+          // If there's audio, it's a TTS chunk and should be handled via WebSocket
           const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
-          console.log('[StreamProcessor] Processing SSE text content (audio handled via WebSocket):', {
+          console.log('[StreamProcessor] Processing non-TTS SSE content:', {
             hasText: data.text !== undefined,
             textLength: data.text?.length,
             messageId: messageIdForUpdate,
             originalBotId: botMessageId,
-            finalId: finalAiMessageIdRef.current,
-            removedAudio: data.audio !== undefined
+            finalId: finalAiMessageIdRef.current
           })
-          handleContentUpdate(contentWithoutAudio, messageIdForUpdate)
+          handleContentUpdate(data, messageIdForUpdate)
+        } else if (data.text !== undefined && data.audio !== undefined) {
+          console.log('[StreamProcessor] Skipping TTS content in SSE - handled by WebSocket:', {
+            hasText: !!data.text,
+            hasAudio: !!data.audio,
+            textLength: data.text?.length
+          })
+          // TTS chunks (text + audio) are completely handled by WebSocket
         }
       } catch (e) {
         console.error('[StreamProcessor] Error parsing response:', e)

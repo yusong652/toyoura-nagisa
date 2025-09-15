@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { useWebSocketTTS } from './useWebSocketTTS'
 
 interface ChunkData {
   text?: string | string[]
@@ -43,26 +44,13 @@ export const useChunkProcessor = ({
   const audioCountRef = useRef(0)
   const currentMessageRef = useRef<string>('')
 
-  // WebSocket TTS处理器 - 现在将直接在ConnectionContext中处理
-  // 保留接口兼容性，但功能将移到ConnectionContext
-  const webSocketTTS = {
-    setupTTSHandler: (messageId: string) => {
-      console.log('[ChunkProcessor] TTS handler setup called for message:', messageId)
-      // TTS处理现在直接在ConnectionContext中完成
-    },
-    cleanupTTSHandler: () => {
-      console.log('[ChunkProcessor] TTS handler cleanup called')
-      // TTS处理现在直接在ConnectionContext中完成
-    },
-    resetTTSProcessor: () => {
-      console.log('[ChunkProcessor] TTS processor reset called')
-      // TTS处理现在直接在ConnectionContext中完成
-    },
-    updateMessageId: (oldId: string, newId: string) => {
-      console.log('[ChunkProcessor] TTS message ID update called:', { oldId, newId })
-      // TTS处理现在直接在ConnectionContext中完成
-    }
-  }
+  // WebSocket TTS processor - restore full TTS processing functionality
+  const webSocketTTS = useWebSocketTTS({
+    ttsEnabled,
+    processAudioData,
+    updateMessageText,
+    finalizeMessage
+  })
 
   /**
    * Process a single chunk of text and/or audio.

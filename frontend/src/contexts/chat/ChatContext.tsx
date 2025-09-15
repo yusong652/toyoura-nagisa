@@ -5,7 +5,6 @@ import { useTtsEnable } from '../audio/TtsEnableContext'
 import { useAgent } from '../agent/AgentContext'
 import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
-import { registerGlobalTTSHandler, unregisterGlobalTTSHandler } from '../connection/ConnectionContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useImageGenerator } from './useImageGenerator'
@@ -61,55 +60,29 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     memoryEnabled
   })
 
-  // 处理音频数据 - 确保返回一个Promise，该Promise在音频播放完成后resolve
+  // Process audio data - ensure Promise resolves after audio playback completes
   const processAudioData = useCallback(async (audioData: string, count: number): Promise<boolean> => {
     if (typeof audioData !== 'string' || audioData.length === 0) {
-      console.warn('收到空的音频数据或格式不正确')
+      console.warn('Received empty audio data or incorrect format')
       return false
     }
-    
+
     try {
-      console.log(`开始播放音频 #${count}，等待播放完成...`);
-      // 等待音频播放完成后再返回
+      console.log(`Starting audio playback #${count}, waiting for completion...`);
+      // Wait for audio playback to complete before returning
       const startTime = Date.now();
       await queueAndPlayAudio(audioData);
       const duration = (Date.now() - startTime) / 1000;
-      console.log(`音频 #${count} 已完成播放，耗时: ${duration.toFixed(2)}秒`);
+      console.log(`Audio #${count} playback completed, duration: ${duration.toFixed(2)}s`);
       return true;
     } catch (error) {
-      console.error(`音频 #${count} 处理失败:`, error);
+      console.error(`Audio #${count} processing failed:`, error);
       return false;
     }
   }, [queueAndPlayAudio])
 
-  // 注册全局TTS处理器
-  useEffect(() => {
-    if (ttsEnabled) {
-      const ttsHandler = async (audioData: string, text: string, index: number) => {
-        console.log('[ChatContext] TTS handler called:', {
-          hasAudio: !!audioData,
-          text: text,
-          index: index,
-          audioLength: audioData?.length
-        })
 
-        try {
-          // 使用现有的processAudioData函数来处理音频
-          await processAudioData(audioData, index)
-        } catch (error) {
-          console.error('[ChatContext] TTS audio processing failed:', error)
-        }
-      }
-
-      registerGlobalTTSHandler(ttsHandler)
-
-      return () => {
-        unregisterGlobalTTSHandler()
-      }
-    }
-  }, [ttsEnabled, processAudioData])
-
-  // 使用流式处理钩子
+  // Use stream processing hook
   const { processStreamResponse: handleStreamResponse } = useStreamHandler({
     ttsEnabled,
     currentSessionId,
@@ -119,37 +92,31 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages
   })
 
-  // 使用图片生成钩子
+  // Use image generation hook
   const { generateImage } = useImageGenerator({
     currentSessionId,
     setMessages
   })
 
-  // 使用视频生成钩子
+  // Use video generation hook
   const { generateVideo } = useVideoGenerator({
     currentSessionId,
     setMessages
   })
 
-
-  // 注意：会话相关的功能已经移至 SessionContext，组件应直接使用 useSession()
-  // 消息管理功能已经移至 useChatMessage 钩子
-
-
-
-  // 主发送消息函数 - 现在只负责协调消息发送和流处理
+  // Main message sending function - now only coordinates message sending and stream processing
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
     
-    // 重置音频状态 - 确保清理上一次请求的残留状态
+    // Reset audio state - ensure cleanup of residual state from previous requests
     await resetAudioState()
     console.log('[DEBUG] Starting new message request, audio state reset');
     
     try {
-      // 使用useChatMessage提供的基础消息创建和发送功能
+      // Use basic message creation and sending functionality from useChatMessage
       const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files)
-      
-      // 处理流式响应（包括音频、Live2D、工具状态等）
+
+      // Handle streaming response (including audio, Live2D, tool status, etc.)
       await handleStreamResponse(response, { userMessageId, botMessageId })
     } catch (error) {
       console.error('Error sending message:', error)

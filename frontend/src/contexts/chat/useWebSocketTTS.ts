@@ -24,18 +24,17 @@ interface WebSocketTTSHandler {
 }
 
 /**
- * Hook for processing TTS chunks from WebSocket messages.
+ * Hook for processing TTS chunks from WebSocket events.
  *
- * Replaces SSE-based TTS processing with real-time WebSocket handling.
- * Maintains compatibility with existing chunk processor interface.
+ * Listens to custom WebSocket TTS events and processes them using existing
+ * chunk processing logic. Maintains compatibility with SSE-based flow.
  */
 export const useWebSocketTTS = ({
   ttsEnabled,
   processAudioData,
   updateMessageText,
-  finalizeMessage,
-  websocketManager
-}: WebSocketTTSProps): WebSocketTTSHandler => {
+  finalizeMessage
+}: Omit<WebSocketTTSProps, 'websocketManager'>): WebSocketTTSHandler => {
 
   // Processing state
   const isProcessingRef = useRef(false)
@@ -47,25 +46,26 @@ export const useWebSocketTTS = ({
   const currentMessageIdRef = useRef<string>('')
   const activeMessageIdsRef = useRef<Set<string>>(new Set())
 
-  // Store reference to the TTS message handler for cleanup
-  const ttsMessageHandlerRef = useRef<((message: any) => void) | null>(null)
+  // Store reference to the TTS event handler for cleanup
+  const ttsEventHandlerRef = useRef<EventListener | null>(null)
 
-  // WebSocket message handler
-  const handleTTSMessage = useCallback(async (message: TTSChunkMessage) => {
+  // WebSocket TTS event handler
+  const handleTTSEvent = useCallback(async (event: CustomEvent) => {
+    const data = event.detail
     // Check if we have any active message IDs to process
     const activeIds = Array.from(activeMessageIdsRef.current)
     const messageId = currentMessageIdRef.current
 
-    console.log('[WebSocketTTS] Received TTS chunk:', {
+    console.log('[WebSocketTTS] Received TTS event:', {
       activeIds,
       currentMessageId: messageId,
-      messageSessionId: message.session_id,
-      hasText: message.text !== undefined,
-      textContent: message.text,
-      hasAudio: message.audio !== undefined,
-      index: message.index,
-      engineStatus: message.engine_status,
-      error: message.error
+      hasText: data.text !== undefined,
+      textContent: data.text,
+      hasAudio: data.audio !== undefined,
+      index: data.index,
+      engineStatus: data.engine_status,
+      error: data.error,
+      isFinal: data.is_final
     })
 
     if (!messageId && activeIds.length === 0) {
@@ -76,21 +76,21 @@ export const useWebSocketTTS = ({
     // Use current message ID or the most recent active ID
     const targetMessageId = messageId || activeIds[activeIds.length - 1]
 
-    // Convert WebSocket message to chunk format
+    // Convert WebSocket event data to chunk format
     const chunkData: ChunkData = {
-      text: message.text,
-      audio: message.audio,
-      index: message.index
+      text: data.text,
+      audio: data.audio,
+      index: data.index
     }
 
     // Process the chunk using existing logic
     await processChunk(chunkData, targetMessageId)
 
     // Handle final chunk or errors
-    if (message.is_final || message.error) {
+    if (data.is_final || data.error) {
       console.log('[WebSocketTTS] Final TTS chunk or error received:', {
-        isFinal: message.is_final,
-        error: message.error,
+        isFinal: data.is_final,
+        error: data.error,
         targetMessageId
       })
 
@@ -241,13 +241,10 @@ export const useWebSocketTTS = ({
   }, [])
 
   /**
-   * Setup TTS message handler for specific message.
+   * Setup TTS event handler for specific message.
    */
   const setupTTSHandler = useCallback((messageId: string) => {
-    console.log('[WebSocketTTS] Setting up TTS handler for message:', messageId, {
-      hasExistingHandler: !!ttsMessageHandlerRef.current,
-      hasWebSocketManager: !!websocketManager
-    })
+    console.log('[WebSocketTTS] Setting up TTS handler for message:', messageId)
 
     // Add message ID to active set
     activeMessageIdsRef.current.add(messageId)
@@ -256,27 +253,19 @@ export const useWebSocketTTS = ({
     // Reset processor state
     resetTTSProcessor()
 
-    // Always ensure we have a handler registered
-    if (!ttsMessageHandlerRef.current && websocketManager) {
-      // Create and store new handler
-      const ttsHandler = (message: any) => {
-        if (message.type === MessageType.TTS_CHUNK) {
-          console.log('[WebSocketTTS] Raw WebSocket TTS message received:', message)
-          handleTTSMessage(message as TTSChunkMessage)
-        }
+    // Setup event listener if not already done
+    if (!ttsEventHandlerRef.current) {
+      const eventHandler = (event: Event) => {
+        handleTTSEvent(event as CustomEvent)
       }
 
-      ttsMessageHandlerRef.current = ttsHandler
-
-      // Add WebSocket message listener
-      websocketManager.on('message', ttsHandler)
-      console.log('[WebSocketTTS] WebSocket TTS handler registered')
-    } else if (!websocketManager) {
-      console.warn('[WebSocketTTS] No WebSocket manager available!')
+      ttsEventHandlerRef.current = eventHandler
+      window.addEventListener('websocket-tts-chunk', eventHandler)
+      console.log('[WebSocketTTS] TTS event listener registered')
     } else {
-      console.log('[WebSocketTTS] TTS handler already exists, updating message ID only')
+      console.log('[WebSocketTTS] TTS event listener already exists, updating message ID only')
     }
-  }, [websocketManager, handleTTSMessage, resetTTSProcessor])
+  }, [handleTTSEvent, resetTTSProcessor])
 
   /**
    * Cleanup TTS handler.
@@ -294,16 +283,16 @@ export const useWebSocketTTS = ({
 
       // Only remove if no active message IDs and no current message
       if (activeMessageIdsRef.current.size === 0 && !currentMessageIdRef.current) {
-        if (ttsMessageHandlerRef.current && websocketManager) {
-          websocketManager.removeListener('message', ttsMessageHandlerRef.current)
-          ttsMessageHandlerRef.current = null
-          console.log('[WebSocketTTS] WebSocket TTS handler removed')
+        if (ttsEventHandlerRef.current) {
+          window.removeEventListener('websocket-tts-chunk', ttsEventHandlerRef.current)
+          ttsEventHandlerRef.current = null
+          console.log('[WebSocketTTS] TTS event listener removed')
         }
       } else {
         console.log('[WebSocketTTS] Keeping handler active, active messages:', Array.from(activeMessageIdsRef.current))
       }
     }, 2000) // 2 second delay to allow for late TTS chunks
-  }, [websocketManager])
+  }, [])
 
   /**
    * Update message ID when it changes during processing.
