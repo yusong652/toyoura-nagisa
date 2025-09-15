@@ -9,7 +9,7 @@ import logging
 from typing import Optional
 from fastapi import WebSocket, WebSocketDisconnect
 
-from backend.presentation.websocket.connection import ConnectionManager
+from backend.presentation.websocket.connection import ConnectionManager, set_connection_manager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
 from backend.presentation.websocket.status_notification_service import (
     MessageStatusNotificationService,
@@ -31,6 +31,8 @@ class WebSocketHandler:
         self.connection_manager = ConnectionManager()
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)
         self.status_service = get_status_notification_service(self.connection_manager)
+        # Set global connection manager instance for TTS streaming
+        set_connection_manager(self.connection_manager)
     
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """

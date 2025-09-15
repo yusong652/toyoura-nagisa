@@ -104,18 +104,24 @@ export const useStreamProcessor = ({
         }
         
         // Handle content updates (text/audio)
-        // Only process if there's actual content
-        if (data.text !== undefined || data.audio !== undefined) {
+        // Only process SSE content if there's actual content
+        // TTS chunks are now handled via WebSocket, so skip audio processing in SSE
+        if (data.text !== undefined) {
+          // Process text-only content through SSE (audio handled via WebSocket)
+          const contentWithoutAudio = { ...data }
+          delete contentWithoutAudio.audio  // Remove audio to prevent double processing
+
           // Always use the most current message ID
           const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
-          console.log('[StreamProcessor] Processing content update:', {
+          console.log('[StreamProcessor] Processing SSE text content (audio handled via WebSocket):', {
             hasText: data.text !== undefined,
             textLength: data.text?.length,
             messageId: messageIdForUpdate,
             originalBotId: botMessageId,
-            finalId: finalAiMessageIdRef.current
+            finalId: finalAiMessageIdRef.current,
+            removedAudio: data.audio !== undefined
           })
-          handleContentUpdate(data, messageIdForUpdate)
+          handleContentUpdate(contentWithoutAudio, messageIdForUpdate)
         }
       } catch (e) {
         console.error('[StreamProcessor] Error parsing response:', e)

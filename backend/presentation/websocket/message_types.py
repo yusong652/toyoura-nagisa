@@ -44,6 +44,9 @@ class MessageType(str, Enum):
     ERROR = "ERROR"
     STATUS_UPDATE = "STATUS_UPDATE"
     
+    # TTS streaming
+    TTS_CHUNK = "TTS_CHUNK"
+
     # Future extensions
     VOICE_MESSAGE = "VOICE_MESSAGE"
     IMAGE_GENERATION = "IMAGE_GENERATION"
@@ -125,6 +128,18 @@ class StatusUpdate(BaseWebSocketMessage):
     data: Optional[Dict[str, Any]] = None
 
 
+class TTSChunk(BaseWebSocketMessage):
+    """TTS chunk message schema for real-time audio streaming"""
+    type: MessageType = MessageType.TTS_CHUNK
+    text: str
+    audio: Optional[str] = None  # Base64 encoded audio data
+    index: int
+    processing_time: Optional[float] = None
+    engine_status: Optional[str] = None
+    error: Optional[str] = None
+    is_final: bool = False
+
+
 # Message type to schema mapping
 MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT: HeartbeatMessage,
@@ -138,6 +153,7 @@ MESSAGE_SCHEMAS = {
     MessageType.NAGISA_TOOL_USE_CONCLUDED: ToolUseNotification,
     MessageType.ERROR: ErrorMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
+    MessageType.TTS_CHUNK: TTSChunk,
 }
 
 

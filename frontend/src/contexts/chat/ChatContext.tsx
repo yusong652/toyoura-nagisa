@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { FileData, ChatContextType} from '../../types/chat'
 import { useAudio } from '../audio/AudioContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
 import { useAgent } from '../agent/AgentContext'
 import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
+import { registerGlobalTTSHandler, unregisterGlobalTTSHandler } from '../connection/ConnectionContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useImageGenerator } from './useImageGenerator'
@@ -80,6 +81,33 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       return false;
     }
   }, [queueAndPlayAudio])
+
+  // 注册全局TTS处理器
+  useEffect(() => {
+    if (ttsEnabled) {
+      const ttsHandler = async (audioData: string, text: string, index: number) => {
+        console.log('[ChatContext] TTS handler called:', {
+          hasAudio: !!audioData,
+          text: text,
+          index: index,
+          audioLength: audioData?.length
+        })
+
+        try {
+          // 使用现有的processAudioData函数来处理音频
+          await processAudioData(audioData, index)
+        } catch (error) {
+          console.error('[ChatContext] TTS audio processing failed:', error)
+        }
+      }
+
+      registerGlobalTTSHandler(ttsHandler)
+
+      return () => {
+        unregisterGlobalTTSHandler()
+      }
+    }
+  }, [ttsEnabled, processAudioData])
 
   // 使用流式处理钩子
   const { processStreamResponse: handleStreamResponse } = useStreamHandler({

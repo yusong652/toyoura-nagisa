@@ -12,6 +12,19 @@ export const useConnection = (): ConnectionContextType => {
   return context
 }
 
+// 全局TTS处理器注册
+let globalTTSHandler: ((audioData: string, text: string, index: number) => Promise<void>) | null = null
+
+export const registerGlobalTTSHandler = (handler: (audioData: string, text: string, index: number) => Promise<void>) => {
+  globalTTSHandler = handler
+  console.log('[ConnectionContext] Global TTS handler registered')
+}
+
+export const unregisterGlobalTTSHandler = () => {
+  globalTTSHandler = null
+  console.log('[ConnectionContext] Global TTS handler unregistered')
+}
+
 interface ConnectionProviderProps {
   children: ReactNode
 }
@@ -157,12 +170,30 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           ws.send(JSON.stringify(heartbeatAck))
         }
         
+        // Handle TTS chunks
+        if (data.type === 'TTS_CHUNK' && globalTTSHandler) {
+          console.log('[ConnectionContext] Processing TTS chunk:', {
+            hasText: !!data.text,
+            hasAudio: !!data.audio,
+            index: data.index,
+            textLength: data.text?.length
+          })
+
+          try {
+            if (data.audio && data.text) {
+              await globalTTSHandler(data.audio, data.text, data.index || 0)
+            }
+          } catch (error) {
+            console.error('[ConnectionContext] TTS processing failed:', error)
+          }
+        }
+
         // Handle location requests
         if (data.type === 'LOCATION_REQUEST') {
           console.log('WebSocket received location request')
           await handleLocationRequest(data, sessionId)
         }
-        
+
         // Call external location request handler if registered
         if (locationRequestHandler.current && data.type === 'LOCATION_REQUEST') {
           locationRequestHandler.current(data)

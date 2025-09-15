@@ -17,6 +17,9 @@ interface UseChunkProcessorProps {
 interface ChunkProcessor {
   processChunk: (chunk: ChunkData, messageId: string) => Promise<void>
   resetProcessor: () => void
+  setupTTSHandler?: (messageId: string) => void
+  cleanupTTSHandler?: () => void
+  updateTTSMessageId?: (oldId: string, newId: string) => void
 }
 
 /**
@@ -39,6 +42,27 @@ export const useChunkProcessor = ({
   const expectedIndexRef = useRef(0)
   const audioCountRef = useRef(0)
   const currentMessageRef = useRef<string>('')
+
+  // WebSocket TTS处理器 - 现在将直接在ConnectionContext中处理
+  // 保留接口兼容性，但功能将移到ConnectionContext
+  const webSocketTTS = {
+    setupTTSHandler: (messageId: string) => {
+      console.log('[ChunkProcessor] TTS handler setup called for message:', messageId)
+      // TTS处理现在直接在ConnectionContext中完成
+    },
+    cleanupTTSHandler: () => {
+      console.log('[ChunkProcessor] TTS handler cleanup called')
+      // TTS处理现在直接在ConnectionContext中完成
+    },
+    resetTTSProcessor: () => {
+      console.log('[ChunkProcessor] TTS processor reset called')
+      // TTS处理现在直接在ConnectionContext中完成
+    },
+    updateMessageId: (oldId: string, newId: string) => {
+      console.log('[ChunkProcessor] TTS message ID update called:', { oldId, newId })
+      // TTS处理现在直接在ConnectionContext中完成
+    }
+  }
 
   /**
    * Process a single chunk of text and/or audio.
@@ -200,6 +224,9 @@ export const useChunkProcessor = ({
 
   return {
     processChunk,
-    resetProcessor
+    resetProcessor,
+    setupTTSHandler: webSocketTTS.setupTTSHandler,
+    cleanupTTSHandler: webSocketTTS.cleanupTTSHandler,
+    updateTTSMessageId: webSocketTTS.updateMessageId
   }
 }

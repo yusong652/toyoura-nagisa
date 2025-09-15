@@ -55,7 +55,10 @@ export const useStreamHandler = ({
   // Initialize chunk processor
   const {
     processChunk,
-    resetProcessor
+    resetProcessor,
+    setupTTSHandler,
+    cleanupTTSHandler,
+    updateTTSMessageId
   } = useChunkProcessor({
     ttsEnabled,
     processAudioData,
@@ -67,7 +70,6 @@ export const useStreamHandler = ({
   const {
     handleTitleUpdate,
     handleSessionRefresh,
-    handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
     handleContentUpdate
@@ -75,9 +77,10 @@ export const useStreamHandler = ({
     currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
-      updateMessageId,
+    updateMessageId,
     addImageMessage,
-    processChunk
+    processChunk,
+    updateTTSMessageId
   })
   
   // Initialize stream processor
@@ -86,7 +89,6 @@ export const useStreamHandler = ({
   } = useStreamProcessor({
     handleTitleUpdate,
     handleSessionRefresh,
-    handleStatusUpdate,
     handleAiMessageId,
     handleKeyword,
     handleContentUpdate,
@@ -97,21 +99,31 @@ export const useStreamHandler = ({
   
   /**
    * Main stream response processing function.
-   * 
+   *
    * Entry point for processing SSE stream responses.
-   * Delegates to specialized processors for handling.
+   * Sets up WebSocket TTS handling and delegates to specialized processors.
    */
   const processStreamResponse = useCallback(async (
-    response: Response, 
+    response: Response,
     options: StreamHandlerOptions
   ) => {
     try {
+      // Setup WebSocket TTS handler for the bot message
+      if (setupTTSHandler) {
+        setupTTSHandler(options.botMessageId)
+      }
+
       await processStream(response, options)
     } catch (error) {
       console.error('[StreamHandler] Stream processing failed:', error)
       throw error
+    } finally {
+      // Cleanup WebSocket TTS handler
+      if (cleanupTTSHandler) {
+        cleanupTTSHandler()
+      }
     }
-  }, [processStream])
+  }, [processStream, setupTTSHandler, cleanupTTSHandler])
   
   return {
     processStreamResponse

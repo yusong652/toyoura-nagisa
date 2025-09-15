@@ -250,3 +250,20 @@ class ConnectionManager:
     async def is_connected(self, session_id: str) -> bool:
         """Check if a session is connected"""
         return session_id in self.connections and self.connections[session_id].state == ConnectionState.CONNECTED
+
+    def is_connected_sync(self, session_id: str) -> bool:
+        """Check if a session is connected (synchronous version)"""
+        return session_id in self.connections and self.connections[session_id].state == ConnectionState.CONNECTED
+
+
+# Global connection manager instance
+_connection_manager: Optional[ConnectionManager] = None
+
+def get_connection_manager() -> Optional[ConnectionManager]:
+    """Get the global connection manager instance"""
+    return _connection_manager
+
+def set_connection_manager(manager: ConnectionManager):
+    """Set the global connection manager instance"""
+    global _connection_manager
+    _connection_manager = manager

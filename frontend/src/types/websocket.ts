@@ -99,6 +99,18 @@ export interface LocationResponseMessage extends BaseWebSocketMessage {
   error?: string;
 }
 
+export interface TTSChunkMessage extends BaseWebSocketMessage {
+  type: MessageType.TTS_CHUNK;
+  text: string;
+  audio?: string;  // Base64 encoded audio data
+  index: number;
+  processing_time?: number;
+  engine_status?: string;
+  error?: string;
+  is_final?: boolean;
+}
+
+// Keep legacy interface for compatibility
 export interface TTSMessage extends BaseWebSocketMessage {
   type: MessageType.TTS_CHUNK | MessageType.TTS_COMPLETE;
   audio_url?: string;
@@ -117,7 +129,7 @@ export interface ChatMessage extends BaseWebSocketMessage {
   metadata?: Record<string, any>;
 }
 
-export type WebSocketMessage = 
+export type WebSocketMessage =
   | ConnectionMessage
   | HeartbeatMessage
   | ErrorMessage
@@ -126,6 +138,7 @@ export type WebSocketMessage =
   | TitleUpdateMessage
   | LocationRequestMessage
   | LocationResponseMessage
+  | TTSChunkMessage
   | TTSMessage
   | ChatMessage;
 

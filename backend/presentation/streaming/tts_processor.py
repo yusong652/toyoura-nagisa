@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 async def process_tts_pipeline(
     content: str,
     tts_engine: BaseTTS
-) -> AsyncGenerator[Dict[str, Any], None]:
+) -> AsyncGenerator[str, None]:
     """
     Sequential TTS Processing Pipeline - Optimized for First-Chunk Latency.
     
@@ -53,7 +53,7 @@ async def process_tts_pipeline(
         tts_engine: BaseTTS implementation for audio generation
         
     Yields:
-        Dict[str, Any]: TTS results in SSE format, yielded sequentially as processed
+        str: TTS results in SSE format string, yielded sequentially as processed
     """
     pipeline_start = time.time()
     first_chunk_delivered = False

@@ -8,6 +8,7 @@ interface UseStreamEventHandlersProps {
   updateMessageId: (oldId: string, newId: string) => void
   addImageMessage: (imageData: any) => void
   processChunk: (chunk: any, messageId: string) => Promise<void>
+  updateTTSMessageId?: (oldId: string, newId: string) => void
 }
 
 interface StreamEventHandlers {
@@ -30,7 +31,8 @@ export const useStreamEventHandlers = ({
   sessionSwitchSession,
   updateMessageId,
   addImageMessage,
-  processChunk
+  processChunk,
+  updateTTSMessageId
 }: UseStreamEventHandlersProps): StreamEventHandlers => {
   
   /**
@@ -100,10 +102,16 @@ export const useStreamEventHandlers = ({
         textContent: data.text
       })
       updateMessageId(botMessageId, newAiMessageId)
+
+      // Also update TTS message ID tracking
+      if (updateTTSMessageId) {
+        updateTTSMessageId(botMessageId, newAiMessageId)
+      }
+
       return newAiMessageId
     }
     return null
-  }, [updateMessageId])
+  }, [updateMessageId, updateTTSMessageId])
 
   /**
    * Handle keyword for Live2D motion.
