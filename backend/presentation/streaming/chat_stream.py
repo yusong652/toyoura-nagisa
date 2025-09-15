@@ -58,17 +58,13 @@ async def generate_chat_stream(
     """
     # Generate unique request ID for debugging
     request_id = str(uuid.uuid4())[:8]
-    
+
     # Send WebSocket status update if service is available and message ID provided
     status_service = get_status_notification_service()
     if status_service and user_message_id:
         await status_service.notify_sent(session_id, user_message_id)
-    
+
     try:
-        # Send WebSocket read status
-        if status_service and user_message_id:
-            await status_service.notify_read(session_id, user_message_id)
-        
         # Load conversation history without images
         recent_history = load_history(session_id)
         # Create messages without thinking blocks
@@ -85,16 +81,21 @@ async def generate_chat_stream(
         
         # Memory injection is now handled internally by LLM clients
         # based on agent_profile, session_id, and enable_memory flag
-        
+
+        # Send WebSocket read status just before LLM processing starts
+        if status_service and user_message_id:
+            await status_service.notify_read(session_id, user_message_id)
+
         # Process LLM response with messages and enhanced system prompt
         assistant_response = None
         async for chunk in handle_llm_response(
-            recent_msgs, 
-            session_id, 
-            llm_client, 
-            tts_engine, 
+            recent_msgs,
+            session_id,
+            llm_client,
+            tts_engine,
             agent_profile=agent_profile,
-            enable_memory=enable_memory
+            enable_memory=enable_memory,
+            user_message_id=user_message_id
         ):
             # Capture assistant response for memory saving
             if isinstance(chunk, str) and 'data:' in chunk:

@@ -41,7 +41,7 @@ class MessageStatusNotificationService:
     ) -> None:
         """
         Send message status update via WebSocket.
-        
+
         Args:
             session_id: WebSocket session ID
             message_id: ID of the message being updated
@@ -57,7 +57,7 @@ class MessageStatusNotificationService:
                 status=status,
                 error_message=error_message
             )
-            
+
             # Send via WebSocket if connection exists
             if await self.connection_manager.is_connected(session_id):
                 await self.connection_manager.send_json(
@@ -105,15 +105,15 @@ def get_status_notification_service(
 ) -> Optional[MessageStatusNotificationService]:
     """
     Get or create the global status notification service.
-    
+
     Args:
         connection_manager: Connection manager to use for new instance
-        
+
     Returns:
         MessageStatusNotificationService instance or None if not initialized
     """
     global _status_service
-    
+
     if connection_manager:
         _status_service = MessageStatusNotificationService(connection_manager)
     elif _status_service is None:
@@ -125,5 +125,5 @@ def get_status_notification_service(
                 _status_service = MessageStatusNotificationService(handler.connection_manager)
         except Exception as e:
             logger.warning(f"Could not initialize status service: {e}")
-    
+
     return _status_service

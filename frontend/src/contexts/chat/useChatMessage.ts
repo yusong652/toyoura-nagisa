@@ -374,10 +374,7 @@ export const useChatMessage = ({
       // 创建API请求
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
       const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled)
-      
-      // 更新用户消息状态为已发送
-      updateMessageStatus(userMessageId, MessageStatus.SENT)
-      
+
       // 创建机器人消息占位符
       const botMessageId = addBotMessage()
       

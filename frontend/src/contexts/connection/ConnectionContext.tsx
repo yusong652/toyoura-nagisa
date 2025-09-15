@@ -134,7 +134,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       console.log("[WebSocket] closed for session", sessionId)
       setConnectionStatus(ConnectionStatus.DISCONNECTED)
     }
-    
+
     ws.onerror = (e) => {
       console.error("[WebSocket] error", e)
       setConnectionStatus(ConnectionStatus.ERROR)

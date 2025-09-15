@@ -35,10 +35,10 @@ class WebSocketHandler:
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """
         Handle complete WebSocket connection lifecycle.
-        
+
         This method manages connection establishment, message processing loop,
         and cleanup on disconnection.
-        
+
         Args:
             websocket: WebSocket connection instance
             session_id: Unique session identifier

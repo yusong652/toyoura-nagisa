@@ -33,7 +33,8 @@ async def handle_llm_response(
     llm_client: LLMClientBase,
     tts_engine,
     agent_profile: str = "general",
-    enable_memory: bool = True
+    enable_memory: bool = True,
+    user_message_id: Optional[str] = None
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Enhanced LLM Response Handler - Real-time streaming architecture.
@@ -52,6 +53,7 @@ async def handle_llm_response(
         tts_engine: TTS engine instance
         agent_profile: Agent profile type for tool filtering and prompt customization
         enable_memory: Whether to enable memory injection (controlled by frontend toggle)
+        user_message_id: Optional message ID for WebSocket status updates
     
     Yields:
         Streaming response chunks in SSE format
@@ -64,6 +66,14 @@ async def handle_llm_response(
         if session_id in ACTIVE_REQUESTS:
             existing_request = ACTIVE_REQUESTS[session_id]
             error_msg = f"Duplicate request detected. Session {session_id} already has active request {existing_request}"
+
+            # Send error status via WebSocket if message ID is available
+            if user_message_id:
+                from backend.presentation.websocket.status_notification_service import get_status_notification_service
+                status_service = get_status_notification_service()
+                if status_service:
+                    await status_service.notify_error(session_id, user_message_id, error_msg)
+
             error_data = create_error_message(
                 error=error_msg,
                 session_id=session_id,
@@ -115,11 +125,18 @@ async def handle_llm_response(
         print(f"[ERROR] Streaming request {request_id} failed: {e}")
         import traceback
         traceback.print_exc()
-        
+
+        # Send error status via WebSocket if message ID is available
+        if user_message_id:
+            from backend.presentation.websocket.status_notification_service import get_status_notification_service
+            status_service = get_status_notification_service()
+            if status_service:
+                await status_service.notify_error(session_id, user_message_id, str(e))
+
         # Ensure tool use end signal is sent
         tool_end_msg = create_tool_use_message(is_using=False, session_id=session_id)
         yield f"data: {json.dumps(tool_end_msg)}\n\n"
-        
+
         error_data = create_error_message(
             error=f"Request processing failed: {str(e)}",
             session_id=session_id,

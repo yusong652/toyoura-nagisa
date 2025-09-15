@@ -112,7 +112,7 @@ async def chat_endpoint(
         
         # Extract user message ID for status tracking
         user_message_id = parsed_data.get("id") if parsed_data else None
-        
+
         # Load conversation history
         history_msgs = service.load_and_prepare_history(session_id)
         
