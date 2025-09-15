@@ -188,6 +188,7 @@ async def process_single_sentence_tts(
                 
                 # Validate audio data integrity
                 if tts_result.get('audio') and not tts_result.get('error'):
+                    pass  # Successful synthesis
                 else:
                     logger.warning(f"TTS synthesis returned empty audio for sentence {index}")
                     tts_result['engine_status'] = 'partial_failure'

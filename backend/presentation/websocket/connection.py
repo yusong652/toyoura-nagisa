@@ -130,6 +130,7 @@ class ConnectionManager:
         try:
             await conn_info.websocket.close(code, reason)
         except Exception as e:
+            logger.warning(f"Error closing WebSocket for session {session_id}: {e}")
         
         # Remove connection
         del self.connections[session_id]
