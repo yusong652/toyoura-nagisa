@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
-import { startLipSync, stopLipSync } from '../../utils/live2d'
+import { startLipSync, stopLipSync, isLive2DModelInitialized } from '../../utils/live2d'
 import { AudioQueueItem, AudioContextType } from '../../types/audio'
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
@@ -17,7 +17,7 @@ interface AudioProviderProps {
 }
 
 export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
-  // 使用useRef而不是useState来存储audioContext，避免重渲染问题
+  // Use useRef instead of useState to store audioContext to avoid re-render issues
   const audioContextRef = useRef<AudioContext | null>(null)
   const [currentSource, setCurrentSource] = useState<AudioBufferSourceNode | null>(null)
   const [currentAnalyser, setCurrentAnalyser] = useState<AnalyserNode | null>(null)
@@ -25,120 +25,111 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioContextInitialized, setAudioContextInitialized] = useState(false)
   const [currentAudioPromise, setCurrentAudioPromise] = useState<Promise<void> | null>(null)
-  // 添加一个ref来跟踪队列状态，避免闭包问题
+  // Add ref to track queue state to avoid closure issues
   const audioQueueRef = useRef<AudioQueueItem[]>([])
   const isPlayingRef = useRef<boolean>(false)
-  // 添加一个ref来跟踪是否应该停止当前音频
+  // Add ref to track whether current audio should be stopped
   const shouldStopCurrentAudioRef = useRef<boolean>(false)
 
-  // 当audioQueue状态更新时，同步更新ref
+  // Sync ref when audioQueue state updates
   useEffect(() => {
     audioQueueRef.current = audioQueue;
   }, [audioQueue]);
 
-  // 当isPlaying状态更新时，同步更新ref
+  // Sync ref when isPlaying state updates
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // 初始化AudioContext并确保它被激活
+  // Initialize AudioContext and ensure it's activated
   useEffect(() => {
-    // 创建静音音频以激活AudioContext
+    // Create silent audio to activate AudioContext
     const initializeAudioContext = async () => {
       if (!audioContextRef.current) {
         try {
-          console.log('创建AudioContext...')
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
-          
-          // 检查AudioContext状态
+
+          // Check AudioContext state
           if (audioContextRef.current.state === 'suspended') {
-            console.log('AudioContext处于suspended状态，尝试恢复...')
-            
-            // 创建一个短暂的静音音频来激活AudioContext
+            // Create a brief silent audio to activate AudioContext
             const silentBuffer = audioContextRef.current.createBuffer(1, 1, 22050)
             const source = audioContextRef.current.createBufferSource()
             source.buffer = silentBuffer
             source.connect(audioContextRef.current.destination)
             source.start()
-            
-            // 尝试恢复AudioContext
+
+            // Try to resume AudioContext
             try {
               await audioContextRef.current.resume()
-              console.log('AudioContext已恢复:', audioContextRef.current?.state)
               setAudioContextInitialized(true)
             } catch (err) {
-              console.error('恢复AudioContext失败:', err)
+              console.error('Failed to resume AudioContext:', err)
             }
           } else {
-            console.log('AudioContext状态:', audioContextRef.current.state)
             setAudioContextInitialized(true)
           }
         } catch (error) {
-          console.error('初始化AudioContext失败:', error)
+          console.error('Failed to initialize AudioContext:', error)
         }
       }
     }
 
-    // 添加用户交互事件监听器来激活AudioContext
+    // Add user interaction event listeners to activate AudioContext
     const activateAudioContext = async () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         try {
           await audioContextRef.current.resume()
-          console.log('用户交互后AudioContext已恢复:', audioContextRef.current.state)
           setAudioContextInitialized(true)
         } catch (err) {
-          console.error('用户交互后恢复AudioContext失败:', err)
+          console.error('Failed to resume AudioContext after user interaction:', err)
         }
       }
     }
 
-    // 初始化
+    // Initialize
     initializeAudioContext()
 
-    // 添加事件监听器
+    // Add event listeners
     const events = ['click', 'touchstart', 'keydown']
     events.forEach(event => document.addEventListener(event, activateAudioContext, { once: true }))
 
     return () => {
-      // 清理事件监听器
+      // Clean up event listeners
       events.forEach(event => document.removeEventListener(event, activateAudioContext))
     }
   }, [])
 
-  // 获取AudioContext并确保它已激活
+  // Get AudioContext and ensure it's activated
   const getAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
     }
-    
-    // 如果状态是suspended，尝试恢复
+
+    // If state is suspended, try to resume
     if (audioContextRef.current.state === 'suspended') {
       try {
-        console.log('尝试恢复AudioContext...')
         await audioContextRef.current.resume()
-        console.log('AudioContext恢复成功，当前状态:', audioContextRef.current.state)
       } catch (err: any) {
-        console.warn('恢复AudioContext失败:', err)
+        console.warn('Failed to resume AudioContext:', err)
       }
     }
-    
+
     return audioContextRef.current
   }, [])
 
-  // 停止当前播放的音频
+  // Stop currently playing audio
   const stopCurrentAudio = useCallback(async () => {
-    // 标记应该停止当前音频
+    // Mark that current audio should be stopped
     shouldStopCurrentAudioRef.current = true;
-    
+
     if (currentSource) {
       try {
-        console.log('停止当前音频播放')
         currentSource.stop()
         currentSource.disconnect()
         if (currentAnalyser) {
           currentAnalyser.disconnect()
         }
-        // 停止Live2D嘴型同步
+        // Stop Live2D lip sync
         stopLipSync()
       } catch (e) {
         console.log('Audio already stopped')
@@ -147,118 +138,110 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
         setCurrentAnalyser(null)
       }
     }
-    
-    // 重置标记
+
+    // Reset flag
     shouldStopCurrentAudioRef.current = false;
   }, [currentSource, currentAnalyser])
 
-  // 播放单个音频
+  // Play single audio with lip sync
   const playAudioWithLipSync = useCallback((audioBase64: string): Promise<void> => {
     return new Promise(async (resolve, reject) => {
       try {
-        // 重置停止标记
+        // Reset stop flag
         shouldStopCurrentAudioRef.current = false;
-        
-        // 验证音频数据
+
+        // Validate audio data
         if (!audioBase64 || audioBase64.length === 0) {
-          console.warn('收到空的音频数据，跳过播放')
+          console.warn('Received empty audio data, skipping playback')
           resolve()
           return
         }
-        
-        // 验证base64格式
+
+        // Validate base64 format
         try {
-          // 基础base64格式检查
+          // Basic base64 format check
           if (!/^[A-Za-z0-9+/]*={0,2}$/.test(audioBase64)) {
-            console.error('无效的base64格式:', audioBase64.substring(0, 50) + '...')
+            console.error('Invalid base64 format:', audioBase64.substring(0, 50) + '...')
             reject(new Error('Invalid base64 format'))
             return
           }
         } catch (e) {
-          console.error('base64格式验证失败:', e)
+          console.error('Base64 format validation failed:', e)
           reject(new Error('Base64 validation failed'))
           return
         }
-        
-        console.log('开始解码音频数据...', `数据长度: ${audioBase64.length}`, `前50个字符: ${audioBase64.substring(0, 50)}...`)
-        
+
         let audioBuffer: ArrayBuffer
         try {
           const binaryString = atob(audioBase64)
-          console.log('Base64解码成功，二进制字符串长度:', binaryString.length)
-          
+
           if (binaryString.length === 0) {
-            console.warn('Base64解码后的二进制字符串为空')
+            console.warn('Binary string empty after base64 decode')
             resolve()
             return
           }
-          
+
           const uint8Array = Uint8Array.from(binaryString, c => c.charCodeAt(0))
           audioBuffer = uint8Array.buffer
-          console.log('ArrayBuffer创建成功，从', uint8Array.length, '字节转换')
         } catch (e) {
-          console.error('Base64解码失败:', e)
+          console.error('Base64 decode failed:', e)
           reject(new Error('Base64 decode failed: ' + e))
           return
         }
-        
-        // 检查解码后的数据大小
-        console.log('解码后的音频缓冲区大小:', audioBuffer.byteLength, 'bytes')
-        
+
         if (audioBuffer.byteLength === 0) {
-          console.warn('解码后的音频数据为空，跳过播放')
+          console.warn('Decoded audio data is empty, skipping playback')
           resolve()
           return
         }
         const context = await getAudioContext()
-        
-        // 确保AudioContext处于running状态
+
+        // Ensure AudioContext is in running state
         if (context.state === 'suspended') {
-          console.log('AudioContext处于suspended状态，尝试恢复...')
           try {
             await context.resume()
-            console.log('AudioContext已恢复')
           } catch (error) {
-            console.warn('恢复AudioContext失败:', error)
+            console.warn('Failed to resume AudioContext:', error)
           }
         }
-        
-        // 如果在解码前被标记为停止，则直接返回
+
+        // If marked for stopping before decoding, return directly
         if (shouldStopCurrentAudioRef.current) {
-          console.log('音频播放被取消（解码前）')
           resolve();
           return;
         }
         
         context.decodeAudioData(audioBuffer, (decodedData) => {
           try {
-            // 如果在解码后被标记为停止，则直接返回
+            // If marked for stopping after decoding, return directly
             if (shouldStopCurrentAudioRef.current) {
-              console.log('音频播放被取消（解码后）')
               resolve();
               return;
             }
 
             const source = context.createBufferSource()
             source.buffer = decodedData
-            
+
             const analyser = context.createAnalyser()
             analyser.fftSize = 256
-            
+
             source.connect(analyser)
             analyser.connect(context.destination)
 
             setCurrentSource(source)
             setCurrentAnalyser(analyser)
-            
-            // 调用Live2D嘴型同步
-            startLipSync(analyser)
-            
-            // 创建一个标志，表示音频是否已完成
+
+            // Check if Live2D is enabled (from localStorage) and model is initialized
+            const isLive2DEnabled = localStorage.getItem('live2d-enabled') !== 'false'
+            if (isLive2DEnabled && isLive2DModelInitialized()) {
+              startLipSync(analyser)
+            }
+
+            // Create flag to track if audio has completed
             let audioCompleted = false;
             
             source.onended = () => {
-              // 只有在音频正常播放完成时才处理
+              // Only handle if audio completed normally
               if (!audioCompleted && !shouldStopCurrentAudioRef.current) {
                 audioCompleted = true;
                 stopLipSync()
@@ -270,15 +253,13 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
               }
             }
 
-            // AudioBufferSourceNode没有onerror事件，使用try-catch处理错误
+            // AudioBufferSourceNode has no onerror event, use try-catch for error handling
             try {
-              console.log('开始播放音频，持续时间:', decodedData.duration, '秒')
               source.start(0)
-              
-              // 设置一个安全超时，确保即使onended不触发也能继续
+
+              // Set safety timeout to ensure continuation even if onended doesn't trigger
               const safetyTimeout = setTimeout(() => {
                 if (!audioCompleted && !shouldStopCurrentAudioRef.current) {
-                  console.log('音频播放安全超时触发')
                   audioCompleted = true;
                   stopLipSync()
                   try {
@@ -286,18 +267,17 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
                     source.disconnect()
                     analyser.disconnect()
                   } catch (e) {
-                    // 忽略可能的错误
+                    // Ignore possible errors
                   }
                   setCurrentSource(null)
                   setCurrentAnalyser(null)
                   resolve()
                 }
-              }, (decodedData.duration * 1000) + 500); // 音频长度 + 500ms 的安全边界
-              
-              // 如果音频被手动停止
+              }, (decodedData.duration * 1000) + 500); // Audio length + 500ms safety margin
+
+              // Check for manual stop
               const checkStopInterval = setInterval(() => {
                 if (shouldStopCurrentAudioRef.current && !audioCompleted) {
-                  console.log('检测到手动停止音频请求')
                   audioCompleted = true;
                   clearTimeout(safetyTimeout);
                   clearInterval(checkStopInterval);
@@ -307,7 +287,7 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
                     source.disconnect();
                     analyser.disconnect();
                   } catch (e) {
-                    // 忽略可能的错误
+                    // Ignore possible errors
                   }
                   setCurrentSource(null);
                   setCurrentAnalyser(null);
@@ -316,7 +296,7 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
               }, 100);
               
             } catch (error) {
-              console.error('播放音频失败:', error)
+              console.error('Failed to play audio:', error)
               stopLipSync()
               source.disconnect()
               analyser.disconnect()
@@ -325,74 +305,69 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
               reject(error)
             }
           } catch (error) {
-            console.error('设置音频源失败:', error)
+            console.error('Failed to set up audio source:', error)
             stopLipSync()
             reject(error)
           }
         }, (err: Error) => {
-          console.error('音频解码失败:', err)
-          console.error('失败的音频缓冲区大小:', audioBuffer?.byteLength || 0, 'bytes')
+          console.error('Audio decode failed:', err)
+          console.error('Failed audio buffer size:', audioBuffer?.byteLength || 0, 'bytes')
           try {
             if (audioBuffer && audioBuffer.byteLength > 0) {
-              console.error('音频数据前100字节:', new Uint8Array(audioBuffer.slice(0, Math.min(100, audioBuffer.byteLength))))
+              console.error('First 100 bytes of audio data:', new Uint8Array(audioBuffer.slice(0, Math.min(100, audioBuffer.byteLength))))
             }
           } catch (bufferError) {
-            console.error('无法读取音频缓冲区数据:', bufferError)
+            console.error('Cannot read audio buffer data:', bufferError)
           }
           stopLipSync()
-          reject(new Error('音频解码失败: ' + err))
+          reject(new Error('Audio decode failed: ' + err))
         })
       } catch (error) {
-        console.error('处理音频数据失败:', error)
+        console.error('Failed to process audio data:', error)
         stopLipSync()
         reject(error)
       }
     })
   }, [getAudioContext])
 
-  // 播放队列中的下一个音频
+  // Play next audio in queue
   const playNextAudio = useCallback(async () => {
-    console.log('尝试播放下一个音频，当前队列长度:', audioQueueRef.current.length, '是否正在播放:', isPlayingRef.current)
-    
     if (isPlayingRef.current || audioQueueRef.current.length === 0) {
-      console.log('跳过播放：正在播放或队列为空')
       return
     }
-    
+
     setIsPlaying(true)
     isPlayingRef.current = true;
-    
+
     const audioItem = audioQueueRef.current[0]
-    console.log('从队列中取出第一个音频数据，剩余:', audioQueueRef.current.length - 1)
-    
-    // 更新队列状态
+
+    // Update queue state
     setAudioQueue(prev => {
       const newQueue = prev.slice(1)
       return newQueue
     })
-    
+
     try {
-      // 确保AudioContext已初始化并激活
+      // Ensure AudioContext is initialized and activated
       await getAudioContext()
-      
-      // 创建新的音频播放 Promise
-      console.log('开始播放音频')
+
+      // Create new audio playback Promise
       const newAudioPromise = playAudioWithLipSync(audioItem.data)
       setCurrentAudioPromise(newAudioPromise)
       await newAudioPromise
-      
-      // 音频播放完成，调用完成回调
+
+      // Audio playback completed, call completion callback
       audioItem.onComplete();
     } catch (error) {
-      console.error('播放音频出错:', error)
-      // 即使出错也调用完成回调，避免阻塞
+      console.error('Audio playback error:', error)
+      // Call completion callback even on error to avoid blocking
       audioItem.onComplete();
     } finally {
       setIsPlaying(false)
       isPlayingRef.current = false;
       setCurrentAudioPromise(null)
-      
-      // 使用最新的队列状态检查是否还有音频需要播放
+
+      // Check if there are more audios to play using latest queue state
       setTimeout(() => {
         if (audioQueueRef.current.length > 0) {
           playNextAudio()
@@ -401,62 +376,52 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
     }
   }, [getAudioContext, playAudioWithLipSync])
 
-  // 重置音频状态
+  // Reset audio state
   const resetAudioState = useCallback(async () => {
-    console.log('重置音频状态')
-    
-    // 取消队列中所有音频的Promise
+    // Cancel all audio Promises in queue
     audioQueueRef.current.forEach(item => {
       if (item.onComplete) {
-        item.onComplete(); // 调用所有等待中音频的完成回调
+        item.onComplete(); // Call completion callbacks for all waiting audios
       }
     });
-    
+
     setAudioQueue([])
     audioQueueRef.current = [];
     await stopCurrentAudio()
     setIsPlaying(false)
     isPlayingRef.current = false;
     setCurrentAudioPromise(null)
-    console.log('音频状态已重置')
   }, [stopCurrentAudio])
 
-  // 添加音频到队列并开始播放
+  // Add audio to queue and start playback
   const queueAndPlayAudio = useCallback((audioData: string): Promise<void> => {
-    console.log('添加音频到队列，当前队列长度:', audioQueueRef.current.length, '是否正在播放:', isPlayingRef.current)
-    
     if (!audioData || audioData.length === 0) {
-      console.warn('收到空的音频数据，跳过')
+      console.warn('Received empty audio data, skipping')
       return Promise.resolve()
     }
-    
+
     return new Promise<void>((resolve) => {
-      // 创建一个标识，记录当前添加的音频在队列中的位置
+      // Create identifier to record current audio position in queue
       const currentQueueLength = audioQueueRef.current.length;
-      
-      // 直接使用函数式更新确保状态正确更新
+
+      // Use functional update to ensure correct state update
       setAudioQueue(prev => {
         const newQueue = [...prev, {
           data: audioData,
-          onComplete: resolve // 存储resolve回调，音频播放完成时调用
+          onComplete: resolve // Store resolve callback to call when audio playback completes
         }]
-        console.log('更新后的队列长度:', newQueue.length)
         audioQueueRef.current = newQueue
         return newQueue
       })
-      
-      // 如果当前没有播放，则开始播放
+
+      // If not currently playing, start playback
       if (!isPlayingRef.current) {
-        console.log('当前没有播放中的音频，开始播放队列')
-        // 使用setTimeout确保状态更新后再调用
+        // Use setTimeout to ensure state update before calling
         setTimeout(() => {
-          console.log('开始播放队列中的音频，当前队列长度:', audioQueueRef.current.length)
           if (audioQueueRef.current.length > 0) {
-            playNextAudio().catch(err => console.error('播放音频失败:', err))
+            playNextAudio().catch(err => console.error('Audio playback failed:', err))
           }
         }, 50)
-      } else {
-        console.log('当前有音频正在播放，新音频已加入队列')
       }
     });
   }, [playNextAudio])

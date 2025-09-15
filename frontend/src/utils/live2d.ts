@@ -81,9 +81,12 @@ export async function initializeLive2D(canvas: HTMLCanvasElement) {
     }
 }
 
+export function isLive2DModelInitialized(): boolean {
+    return !!currentModel;
+}
+
 export function startLipSync(analyser: AnalyserNode) {
     if (!currentModel) {
-        console.error('模型未初始化，无法进行嘴型同步');
         return;
     }
 
@@ -198,15 +201,13 @@ function displayModelError(canvas: HTMLCanvasElement, modelPath: string, error: 
 
 export function playMotion(motionName: string) {
     if (!currentModel) {
-        console.error('模型未初始化，无法播放动作');
         return;
     }
 
     try {
-        console.log(`尝试播放动作: ${motionName}`);
         currentModel.motion(motionName);
     } catch (error) {
-        console.error(`播放动作 ${motionName} 失败:`, error);
+        console.error(`Failed to play motion ${motionName}:`, error);
     }
 }
 
