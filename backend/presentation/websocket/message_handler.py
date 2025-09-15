@@ -64,7 +64,6 @@ class HeartbeatHandler(MessageHandler):
         if message.type == MessageType.HEARTBEAT_ACK:
             # Update heartbeat timestamp
             await self.connection_manager.handle_heartbeat_response(session_id)
-            logger.debug(f"Processed heartbeat ACK for session {session_id}")
         
         return None  # Heartbeat doesn't send response
 
@@ -87,7 +86,6 @@ class LocationHandler(MessageHandler):
     
     async def _handle_location_response(self, session_id: str, message: LocationResponseMessage):
         """Process location response from client"""
-        logger.debug(f"Received location response for session {session_id}")
         
         # Store location data and trigger waiting events
         if session_id in self.location_events:
@@ -103,7 +101,6 @@ class LocationHandler(MessageHandler):
             
             # Trigger event for waiting tools
             event_info["event"].set()
-            logger.debug(f"Location event triggered for session {session_id}")
     
     async def _handle_location_request(self, session_id: str, message: BaseWebSocketMessage):
         """Handle location request from tools/backend"""
@@ -119,7 +116,6 @@ class LocationHandler(MessageHandler):
         
         # Forward request to client
         await self.send_response(session_id, message)
-        logger.debug(f"Forwarded location request to client {session_id}")
     
     async def wait_for_location_response(self, session_id: str, timeout: float = 30.0) -> Dict[str, Any]:
         """
@@ -167,7 +163,6 @@ class ChatHandler(MessageHandler):
     
     async def _handle_chat_message(self, session_id: str, message: ChatMessageRequest):
         """Process incoming chat message"""
-        logger.info(f"Processing chat message for session {session_id}")
         
         # TODO: Integrate with chat service and LLM
         # For now, send acknowledgment
@@ -228,7 +223,6 @@ class ToolCallHandler(MessageHandler):
     
     async def _handle_tool_call(self, session_id: str, message: ToolCallRequest):
         """Process tool call request"""
-        logger.info(f"Processing tool call '{message.tool_name}' for session {session_id}")
         
         # TODO: Integrate with MCP tool system
         # For now, send acknowledgment
@@ -280,7 +274,6 @@ class WebSocketMessageProcessor:
         try:
             # Parse message into typed object
             message = parse_message(raw_message)
-            logger.debug(f"Processing {message.type} message for session {session_id}")
             
             # Route to appropriate handler
             handler = self.handlers.get(message.type)

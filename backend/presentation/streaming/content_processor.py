@@ -90,15 +90,13 @@ async def process_content_pipeline(
         # Dynamic import to avoid circular dependency
         from backend.presentation.streaming.tts_processor import process_tts_pipeline
         async for chunk in process_tts_pipeline(text_content, tts_engine):
-            # Parse SSE chunk data for WebSocket transmission
+            # Send TTS chunks only via WebSocket (no SSE for TTS)
             await send_tts_chunk_via_websocket(session_id, chunk)
-            yield chunk  # Keep original SSE flow
     else:
         # Send empty text chunk for consistency when only keywords are present
         empty_chunk_data = {'text': '', 'audio': None, 'index': 0}
         empty_sse_chunk = f"data: {json.dumps(empty_chunk_data)}\n\n"
         await send_tts_chunk_via_websocket(session_id, empty_sse_chunk)
-        yield empty_sse_chunk
 
 
 async def send_tts_chunk_via_websocket(session_id: str, sse_chunk: str):

@@ -130,7 +130,6 @@ class ConnectionManager:
         try:
             await conn_info.websocket.close(code, reason)
         except Exception as e:
-            logger.debug(f"Error closing websocket for session {session_id}: {e}")
         
         # Remove connection
         del self.connections[session_id]
@@ -148,7 +147,6 @@ class ConnectionManager:
         """
         conn_info = self.connections.get(session_id)
         if not conn_info or conn_info.state != ConnectionState.CONNECTED:
-            logger.debug(f"No active connection for session {session_id}")
             # Add non-heartbeat messages to pending queue
             if conn_info and data.get("type") != "HEARTBEAT":
                 conn_info.pending_messages.append(data)
@@ -157,7 +155,6 @@ class ConnectionManager:
         try:
             # Check if WebSocket is still available
             if hasattr(conn_info.websocket, 'client_state') and conn_info.websocket.client_state.name != "CONNECTED":
-                logger.debug(f"WebSocket client state is {conn_info.websocket.client_state.name}, skipping send")
                 return False
                 
             await conn_info.websocket.send_json(data)

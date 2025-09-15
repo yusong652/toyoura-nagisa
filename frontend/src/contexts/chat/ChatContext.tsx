@@ -110,7 +110,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     
     // Reset audio state - ensure cleanup of residual state from previous requests
     await resetAudioState()
-    console.log('[DEBUG] Starting new message request, audio state reset');
     
     try {
       // Use basic message creation and sending functionality from useChatMessage

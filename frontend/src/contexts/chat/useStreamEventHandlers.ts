@@ -95,12 +95,6 @@ export const useStreamEventHandlers = ({
   const handleAiMessageId = useCallback((data: any, botMessageId: string): string | null => {
     if (data.message_id) {
       const newAiMessageId = data.message_id
-      console.log('[EventHandlers] handleAiMessageId: Updating message ID', {
-        oldId: botMessageId,
-        newId: newAiMessageId,
-        hasText: data.text !== undefined,
-        textContent: data.text
-      })
       updateMessageId(botMessageId, newAiMessageId)
 
       // Also update TTS message ID tracking
@@ -132,12 +126,6 @@ export const useStreamEventHandlers = ({
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
     if (!data) return
     
-    console.log('[StreamEventHandlers] handleContentUpdate called:', {
-      messageId,
-      hasText: data.text !== undefined,
-      textContent: data.text,
-      hasAudio: data.audio !== undefined
-    })
     
     await processChunk(data, messageId)
   }, [processChunk])

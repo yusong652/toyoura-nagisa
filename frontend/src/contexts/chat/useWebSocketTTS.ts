@@ -56,20 +56,8 @@ export const useWebSocketTTS = ({
     const activeIds = Array.from(activeMessageIdsRef.current)
     const messageId = currentMessageIdRef.current
 
-    console.log('[WebSocketTTS] Received TTS event:', {
-      activeIds,
-      currentMessageId: messageId,
-      hasText: data.text !== undefined,
-      textContent: data.text,
-      hasAudio: data.audio !== undefined,
-      index: data.index,
-      engineStatus: data.engine_status,
-      error: data.error,
-      isFinal: data.is_final
-    })
 
     if (!messageId && activeIds.length === 0) {
-      console.warn('[WebSocketTTS] Received TTS chunk without active message ID, ignoring')
       return
     }
 
@@ -88,11 +76,6 @@ export const useWebSocketTTS = ({
 
     // Handle final chunk or errors
     if (data.is_final || data.error) {
-      console.log('[WebSocketTTS] Final TTS chunk or error received:', {
-        isFinal: data.is_final,
-        error: data.error,
-        targetMessageId
-      })
 
       // Small delay to ensure all processing completes
       setTimeout(() => {
@@ -143,7 +126,6 @@ export const useWebSocketTTS = ({
       try {
         await processAudioData(chunk.audio, audioCountRef.current++)
       } catch (error) {
-        console.error('[WebSocketTTS] Audio processing failed:', error)
       }
     }
   }, [ttsEnabled, processAudioData, updateMessageText])
@@ -204,21 +186,12 @@ export const useWebSocketTTS = ({
   ): Promise<void> => {
     if (!chunk) return
 
-    console.log('[WebSocketTTS] processChunk called:', {
-      messageId,
-      hasText: chunk.text !== undefined,
-      textContent: chunk.text,
-      hasAudio: chunk.audio !== undefined,
-      hasIndex: chunk.index !== undefined,
-      index: chunk.index
-    })
 
     // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await handleOrderedChunk(chunk, messageId)
     } else if (chunk.text !== undefined || chunk.audio !== undefined) {
       // Log warning if we receive content without index (shouldn't happen)
-      console.warn('[WebSocketTTS] Received content chunk without index, treating as ordered chunk #0')
       chunk.index = 0
       await handleOrderedChunk(chunk, messageId)
     } else {
@@ -244,7 +217,6 @@ export const useWebSocketTTS = ({
    * Setup TTS event handler for specific message.
    */
   const setupTTSHandler = useCallback((messageId: string) => {
-    console.log('[WebSocketTTS] Setting up TTS handler for message:', messageId)
 
     // Add message ID to active set
     activeMessageIdsRef.current.add(messageId)
@@ -261,9 +233,7 @@ export const useWebSocketTTS = ({
 
       ttsEventHandlerRef.current = eventHandler
       window.addEventListener('websocket-tts-chunk', eventHandler)
-      console.log('[WebSocketTTS] TTS event listener registered')
     } else {
-      console.log('[WebSocketTTS] TTS event listener already exists, updating message ID only')
     }
   }, [handleTTSEvent, resetTTSProcessor])
 
@@ -271,7 +241,6 @@ export const useWebSocketTTS = ({
    * Cleanup TTS handler.
    */
   const cleanupTTSHandler = useCallback(() => {
-    console.log('[WebSocketTTS] Cleaning up TTS handler')
 
     // Clear current message ID but keep handler active for a bit
     currentMessageIdRef.current = ''
@@ -279,17 +248,14 @@ export const useWebSocketTTS = ({
     // Don't immediately remove handler - keep it active for late-arriving TTS chunks
     // Use a delay to allow for any pending TTS chunks
     setTimeout(() => {
-      console.log('[WebSocketTTS] Delayed cleanup - checking if we should remove handler')
 
       // Only remove if no active message IDs and no current message
       if (activeMessageIdsRef.current.size === 0 && !currentMessageIdRef.current) {
         if (ttsEventHandlerRef.current) {
           window.removeEventListener('websocket-tts-chunk', ttsEventHandlerRef.current)
           ttsEventHandlerRef.current = null
-          console.log('[WebSocketTTS] TTS event listener removed')
         }
       } else {
-        console.log('[WebSocketTTS] Keeping handler active, active messages:', Array.from(activeMessageIdsRef.current))
       }
     }, 2000) // 2 second delay to allow for late TTS chunks
   }, [])
@@ -298,7 +264,6 @@ export const useWebSocketTTS = ({
    * Update message ID when it changes during processing.
    */
   const updateMessageId = useCallback((oldId: string, newId: string) => {
-    console.log('[WebSocketTTS] Updating message ID:', { oldId, newId })
 
     // Update active message IDs
     if (activeMessageIdsRef.current.has(oldId)) {

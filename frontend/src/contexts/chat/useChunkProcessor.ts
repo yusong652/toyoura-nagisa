@@ -99,7 +99,6 @@ export const useChunkProcessor = ({
       try {
         await processAudioData(chunk.audio, audioCountRef.current++)
       } catch (error) {
-        console.error('[ChunkProcessor] Audio processing failed:', error)
       }
     }
   }, [ttsEnabled, processAudioData, updateMessageText])
@@ -169,21 +168,12 @@ export const useChunkProcessor = ({
   ): Promise<void> => {
     if (!chunk) return
     
-    console.log('[ChunkProcessor] processChunk called:', {
-      messageId,
-      hasText: chunk.text !== undefined,
-      textContent: chunk.text,
-      hasAudio: chunk.audio !== undefined,
-      hasIndex: chunk.index !== undefined,
-      index: chunk.index
-    })
     
     // All content chunks should be ordered (have index)
     if (chunk.index !== undefined && typeof chunk.index === 'number') {
       await handleOrderedChunk(chunk, messageId)
     } else if (chunk.text !== undefined || chunk.audio !== undefined) {
       // Log warning if we receive content without index (shouldn't happen)
-      console.warn('[ChunkProcessor] Received content chunk without index, treating as ordered chunk #0')
       chunk.index = 0
       await handleOrderedChunk(chunk, messageId)
     } else {

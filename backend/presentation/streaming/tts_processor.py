@@ -66,7 +66,6 @@ async def process_tts_pipeline(
             
             # Split into sentences for sequential processing
             sentences = split_text_by_punctuations(text_with_placeholders)
-            logger.debug(f"TTS pipeline processing {len(sentences)} sentences")
             
             # Sequential processing for optimal first-chunk latency
             sentence_index = 0
@@ -74,7 +73,6 @@ async def process_tts_pipeline(
             for i, sentence in enumerate(sentences):
                 tts_text = clean_text_for_tts(sentence)
                 if not tts_text or not tts_text.strip():  # Skip empty sentences
-                    logger.debug(f"Skipping empty sentence after text cleaning: '{sentence}' -> '{tts_text}'")
                     continue
                     
                 sentence_start = time.time()
@@ -91,7 +89,6 @@ async def process_tts_pipeline(
                         # Track first-chunk latency metrics
                         if not first_chunk_delivered:
                             first_chunk_latency = time.time() - pipeline_start
-                            logger.info(f"First-chunk TTS latency: {first_chunk_latency:.3f}s")
                             first_chunk_delivered = True
                         
                         # Add performance metadata to result
@@ -102,7 +99,6 @@ async def process_tts_pipeline(
                         sentence_index += 1
                         total_sentences_processed += 1
                         
-                        logger.debug(f"TTS sentence {sentence_index-1} processed in {sentence_duration:.3f}s")
                         
                 except Exception as e:
                     # Individual sentence errors don't block subsequent processing
@@ -135,8 +131,6 @@ async def process_tts_pipeline(
         finally:
             # Log pipeline performance summary
             total_duration = time.time() - pipeline_start
-            logger.info(f"TTS pipeline completed: {total_sentences_processed} sentences in {total_duration:.3f}s "
-                       f"(avg: {total_duration/max(1, total_sentences_processed):.3f}s per sentence)")
 
 
 async def process_single_sentence_tts(
@@ -172,7 +166,6 @@ async def process_single_sentence_tts(
     try:
         # Validate TTS engine readiness
         if not tts_engine.enabled:
-            logger.debug(f"TTS engine disabled, returning text-only result for sentence {index}")
             return {
                 'text': restore_emoticons(original_sentence, kaomoji_list, emoji_list),
                 'audio': None,
@@ -195,7 +188,6 @@ async def process_single_sentence_tts(
                 
                 # Validate audio data integrity
                 if tts_result.get('audio') and not tts_result.get('error'):
-                    logger.debug(f"TTS synthesis successful for sentence {index}")
                 else:
                     logger.warning(f"TTS synthesis returned empty audio for sentence {index}")
                     tts_result['engine_status'] = 'partial_failure'

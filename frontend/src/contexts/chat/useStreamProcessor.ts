@@ -58,17 +58,6 @@ export const useStreamProcessor = ({
         const data = JSON.parse(jsonData)
         const currentMessageId = finalAiMessageIdRef.current || botMessageId
         
-        // Debug: Log all received data
-        console.log('[StreamProcessor] Received data from backend:', {
-          type: data.type,
-          hasText: data.text !== undefined,
-          textContent: data.text,
-          hasAudio: data.audio !== undefined,
-          hasMessageId: data.message_id !== undefined,
-          messageId: data.message_id,
-          hasToolCall: data.tool_call !== undefined,
-          fullData: data
-        })
         
         // Route to specific handlers based on event type
         if (data.type === 'TITLE_UPDATE') {
@@ -109,20 +98,8 @@ export const useStreamProcessor = ({
           // Only process non-TTS text content through SSE
           // If there's audio, it's a TTS chunk and should be handled via WebSocket
           const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
-          console.log('[StreamProcessor] Processing non-TTS SSE content:', {
-            hasText: data.text !== undefined,
-            textLength: data.text?.length,
-            messageId: messageIdForUpdate,
-            originalBotId: botMessageId,
-            finalId: finalAiMessageIdRef.current
-          })
           handleContentUpdate(data, messageIdForUpdate)
         } else if (data.text !== undefined && data.audio !== undefined) {
-          console.log('[StreamProcessor] Skipping TTS content in SSE - handled by WebSocket:', {
-            hasText: !!data.text,
-            hasAudio: !!data.audio,
-            textLength: data.text?.length
-          })
           // TTS chunks (text + audio) are completely handled by WebSocket
         }
       } catch (e) {

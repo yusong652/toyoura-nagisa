@@ -115,7 +115,6 @@ export const useStreamHandler = ({
 
       await processStream(response, options)
     } catch (error) {
-      console.error('[StreamHandler] Stream processing failed:', error)
       throw error
     } finally {
       // Cleanup WebSocket TTS handler
