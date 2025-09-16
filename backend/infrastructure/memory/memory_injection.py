@@ -40,20 +40,18 @@ class MemoryInjectionMiddleware:
     async def save_conversation_turn(
         self,
         user_message: BaseMessage,
-        assistant_message: BaseMessage,
-        user_id: Optional[str] = None
+        assistant_message: BaseMessage
     ) -> None:
         """
         Save a conversation turn to memory with support for multimodal content.
         All memories are saved at user level and searchable across all sessions.
-        
+
         Args:
             user_message: User's BaseMessage object
             assistant_message: Assistant's BaseMessage object
-            user_id: User ID (uses config default if None)
         """
-        # Use config defaults
-        user_id = user_id or self.config.mem0_user_id
+        # Use config default for user_id
+        user_id = self.config.mem0_user_id
         
         # Check if saving is enabled
         if not self.config.should_save_memory():

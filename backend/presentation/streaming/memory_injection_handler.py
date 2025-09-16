@@ -16,19 +16,17 @@ logger = logging.getLogger(__name__)
 
 async def save_conversation_memory(
     user_message: BaseMessage,
-    assistant_response: str,
-    user_id: Optional[str] = None
+    assistant_response: str
 ) -> bool:
     """
     Save conversation turn to memory after successful response.
-    
+
     Uses the new memory system for consistent cross-session memory handling.
-    
+
     Args:
         user_message: The user's message object
         assistant_response: The assistant's response
-        user_id: User identifier
-    
+
     Returns:
         bool: True if save successful, False otherwise
     """
@@ -45,8 +43,7 @@ async def save_conversation_memory(
             middleware = get_memory_middleware()
             await middleware.save_conversation_turn(
                 user_message=user_message,
-                assistant_message=assistant_message,
-                user_id=user_id
+                assistant_message=assistant_message
             )
             # Memory saving handled by Mem0 manager with detailed output
             return True
@@ -60,27 +57,28 @@ async def save_conversation_memory(
 async def handle_memory_management(
     action: str,
     session_id: str,
-    user_id: Optional[str] = None,
     params: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Handle memory management operations.
-    
+
     This provides an API for managing memories directly, useful for
     debugging and user-controlled memory operations.
-    
+
     Args:
         action: Action to perform (list, delete, update, toggle, etc.)
         session_id: Session ID
-        user_id: User ID
         params: Additional parameters for the action
-    
+
     Returns:
         Result of the memory operation
     """
     middleware = get_memory_middleware()
     manager = middleware.memory_manager
-    
+
+    # Use config default for user_id
+    user_id = middleware.config.mem0_user_id
+
     try:
         if action == "list":
             # List all memories for user/session

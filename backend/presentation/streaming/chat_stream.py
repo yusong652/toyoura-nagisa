@@ -22,37 +22,32 @@ from backend.presentation.websocket.status_notification_service import get_statu
 
 
 async def generate_chat_stream(
-    session_id: str, 
-    recent_msgs: List[BaseMessage], 
-    llm_client: LLMClientBase, 
+    session_id: str,
+    recent_msgs: List[BaseMessage],
+    llm_client: LLMClientBase,
     tts_engine: BaseTTS,
-    user_id: Optional[str] = None,
     enable_memory: bool = True,
     agent_profile: str = "general",
     user_message_id: Optional[str] = None
 ) -> AsyncGenerator[str, None]:
     """
     Enhanced chat stream generator with memory injection.
-    
+
     This function integrates the complete streaming pipeline with memory context:
     1. Load conversation history
     2. Inject relevant memory context
     3. Generate LLM response with streaming
     4. Save conversation to memory for future retrieval
-    
+
     Args:
         session_id: Current session ID
         recent_msgs: Recent conversation messages (unused, loaded from history)
         llm_client: LLM client instance
         tts_engine: Text-to-speech engine
-        user_id: User ID for memory operations
         enable_memory: Whether to enable memory injection
         agent_profile: Agent profile type for tool selection
-        llm_client: LLM client instance
-        tts_engine: TTS engine instance
-        user_id: User identifier for memory operations
-        enable_memory: Flag to enable/disable memory injection
-    
+        user_message_id: Optional user message ID for status tracking
+
     Yields:
         SSE formatted response chunks
     """
@@ -117,8 +112,7 @@ async def generate_chat_stream(
         if enable_memory and assistant_response and latest_user_message:
             await save_conversation_memory(
                 user_message=latest_user_message,  # Use already extracted user message
-                assistant_response=assistant_response,
-                user_id=user_id
+                assistant_response=assistant_response
             )
             
     except Exception as e:
