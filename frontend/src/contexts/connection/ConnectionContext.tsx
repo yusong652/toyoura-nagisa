@@ -160,14 +160,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         
         // Handle TTS chunks - dispatch custom events for TTS processors
         if (data.type === 'TTS_CHUNK') {
-          console.log('[ConnectionContext] Received TTS chunk, dispatching event:', {
-            hasText: !!data.text,
-            hasAudio: !!data.audio,
-            index: data.index,
-            textLength: data.text?.length,
-            isFinal: data.is_final
-          })
-
           // Dispatch custom event for existing TTS processors to handle
           const ttsEvent = new CustomEvent('websocket-tts-chunk', {
             detail: {
@@ -222,6 +214,19 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           // Dispatch custom event for other components to listen to
           window.dispatchEvent(new CustomEvent('toolUseConcluded', {
             detail: data
+          }))
+        }
+
+        // Handle message creation requests
+        if (data.type === 'MESSAGE_CREATE') {
+          // Dispatch custom event for message creation
+          window.dispatchEvent(new CustomEvent('messageCreate', {
+            detail: {
+              messageId: data.message_id,
+              sender: data.sender,
+              initialText: data.initial_text || '',
+              streaming: data.streaming || true
+            }
           }))
         }
 

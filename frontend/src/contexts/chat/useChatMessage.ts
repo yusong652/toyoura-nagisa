@@ -36,7 +36,6 @@ export interface UseChatMessageReturn {
     response: Response
   }>
   addUserMessage: (text: string, files?: FileData[]) => string
-  addBotMessage: () => string
   addVideoMessage: (videoPath: string, content?: string) => string
   updateMessageStatus: (messageId: string, status: MessageStatus) => void
   updateBotMessage: (messageId: string, updates: Partial<Message>) => void
@@ -259,22 +258,6 @@ export const useChatMessage = ({
     return userMessage.id
   }, [])
 
-  // 添加机器人消息占位符
-  const addBotMessage = useCallback((): string => {
-    const botMessageId = uuidv4()
-    const botMessage: Message = {
-      id: botMessageId,
-      sender: 'bot',
-      text: '',
-      timestamp: Date.now(),
-      streaming: true,
-      isLoading: true,
-      toolState: undefined
-    }
-    
-    setMessages(prev => [...prev, botMessage])
-    return botMessageId
-  }, [])
 
   // 添加视频消息
   const addVideoMessage = useCallback((videoPath: string, content: string = "") => {
@@ -323,6 +306,35 @@ export const useChatMessage = ({
   useWebSocketMessageStatus({
     onStatusUpdate: updateMessageStatus
   })
+
+  // Subscribe to WebSocket message creation events
+  useEffect(() => {
+    const handleMessageCreate = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { messageId, sender, initialText, streaming } = customEvent.detail
+
+      if (sender === 'bot') {
+        // Create new bot message with specified ID
+        const newBotMessage: Message = {
+          id: messageId,
+          sender: 'bot',
+          text: initialText,
+          timestamp: Date.now(),
+          streaming: streaming,
+          isLoading: false,
+          isRead: false
+        }
+
+        setMessages(prev => [...prev, newBotMessage])
+      }
+    }
+
+    window.addEventListener('messageCreate', handleMessageCreate)
+
+    return () => {
+      window.removeEventListener('messageCreate', handleMessageCreate)
+    }
+  }, [])
 
   // 更新机器人消息
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
@@ -375,12 +387,9 @@ export const useChatMessage = ({
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
       const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled)
 
-      // 创建机器人消息占位符
-      const botMessageId = addBotMessage()
-      
       return {
         userMessageId,
-        botMessageId,
+        botMessageId: '', // 不再需要占位符ID
         response
       }
     } catch (error) {
@@ -388,7 +397,7 @@ export const useChatMessage = ({
       updateMessageStatus(userMessageId, MessageStatus.ERROR)
       throw error
     }
-  }, [currentSessionId, currentProfile, ttsEnabled, memoryEnabled, addUserMessage, addBotMessage, updateMessageStatus])
+  }, [currentSessionId, currentProfile, ttsEnabled, memoryEnabled, addUserMessage, updateMessageStatus])
 
   return {
     messages,
@@ -397,7 +406,6 @@ export const useChatMessage = ({
     clearChat,
     sendMessage,
     addUserMessage,
-    addBotMessage,
     addVideoMessage,
     updateMessageStatus,
     updateBotMessage

@@ -7,6 +7,8 @@ import { useSession } from '../session/SessionContext'
 import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
+import { useWebSocketTTS } from './useWebSocketTTS'
+import { useMessageStateManager } from './useMessageStateManager'
 import { useImageGenerator } from './useImageGenerator'
 import { useVideoGenerator } from './useVideoGenerator'
 
@@ -82,11 +84,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [queueAndPlayAudio])
 
 
-  // Use stream processing hook
-  const { processStreamResponse: handleStreamResponse } = useStreamHandler({
+  // Use message state manager for WebSocket TTS processing
+  const { updateMessageText, finalizeMessage } = useMessageStateManager({ setMessages })
+
+  // Use WebSocket TTS handler
+  const { setupTTSHandler, cleanupTTSHandler } = useWebSocketTTS({
     ttsEnabled,
-    currentSessionId,
     processAudioData,
+    updateMessageText,
+    finalizeMessage
+  })
+
+  // Use stream processing hook for SSE metadata events only
+  const { processStreamResponse: handleStreamResponse } = useStreamHandler({
+    currentSessionId,
     sessionRefreshSessions,
     sessionSwitchSession,
     setMessages
@@ -104,25 +115,33 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages
   })
 
-  // Main message sending function - now only coordinates message sending and stream processing
+  // Main message sending function - now coordinates message sending and both SSE/WebSocket processing
   const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
     if (text.trim() === '' && files.length === 0) return
-    
+
     // Reset audio state - ensure cleanup of residual state from previous requests
     await resetAudioState()
-    
+
+    // Setup WebSocket TTS handler to process incoming TTS chunks
+    setupTTSHandler()
+
     try {
       // Use basic message creation and sending functionality from useChatMessage
       const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files)
 
-      // Handle streaming response (including audio, Live2D, tool status, etc.)
+      // Handle streaming response (SSE metadata events)
       await handleStreamResponse(response, { userMessageId, botMessageId })
+
+      // Note: TTS processing will happen asynchronously via WebSocket
+
     } catch (error) {
       console.error('Error sending message:', error)
+      // Cleanup TTS handler on error
+      cleanupTTSHandler()
     } finally {
       setIsLoading(false)
     }
-  }, [createAndSendMessage, handleStreamResponse, resetAudioState])
+  }, [createAndSendMessage, handleStreamResponse, resetAudioState, setupTTSHandler, cleanupTTSHandler])
 
 
   return (

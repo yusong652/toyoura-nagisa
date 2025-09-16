@@ -52,17 +52,13 @@ export const useWebSocketTTS = ({
   // WebSocket TTS event handler
   const handleTTSEvent = useCallback(async (event: CustomEvent) => {
     const data = event.detail
-    // Check if we have any active message IDs to process
-    const activeIds = Array.from(activeMessageIdsRef.current)
-    const messageId = currentMessageIdRef.current
 
+    // Use message_id from TTS chunk data - no longer need pre-set message IDs
+    const targetMessageId = data.message_id
 
-    if (!messageId && activeIds.length === 0) {
+    if (!targetMessageId) {
       return
     }
-
-    // Use current message ID or the most recent active ID
-    const targetMessageId = messageId || activeIds[activeIds.length - 1]
 
     // Convert WebSocket event data to chunk format
     const chunkData: ChunkData = {
@@ -76,11 +72,18 @@ export const useWebSocketTTS = ({
 
     // Handle final chunk or errors
     if (data.is_final || data.error) {
-
       // Small delay to ensure all processing completes
       setTimeout(() => {
         if (!isProcessingRef.current && chunkQueueRef.current.length === 0) {
           finalizeMessage(targetMessageId)
+
+          // Clean up TTS handler after processing final chunk
+          setTimeout(() => {
+            if (ttsEventHandlerRef.current) {
+              window.removeEventListener('websocket-tts-chunk', ttsEventHandlerRef.current)
+              ttsEventHandlerRef.current = null
+            }
+          }, 1000) // Additional delay to ensure all processing is done
         }
       }, 100)
     }
@@ -214,14 +217,9 @@ export const useWebSocketTTS = ({
   }, [])
 
   /**
-   * Setup TTS event handler for specific message.
+   * Setup TTS event handler - simplified since we get message_id from chunks.
    */
-  const setupTTSHandler = useCallback((messageId: string) => {
-
-    // Add message ID to active set
-    activeMessageIdsRef.current.add(messageId)
-    currentMessageIdRef.current = messageId
-
+  const setupTTSHandler = useCallback((messageId?: string) => {
     // Reset processor state
     resetTTSProcessor()
 
@@ -233,48 +231,27 @@ export const useWebSocketTTS = ({
 
       ttsEventHandlerRef.current = eventHandler
       window.addEventListener('websocket-tts-chunk', eventHandler)
-    } else {
     }
   }, [handleTTSEvent, resetTTSProcessor])
 
   /**
-   * Cleanup TTS handler.
+   * Cleanup TTS handler - backup cleanup for edge cases.
    */
   const cleanupTTSHandler = useCallback(() => {
-
-    // Clear current message ID but keep handler active for a bit
-    currentMessageIdRef.current = ''
-
-    // Don't immediately remove handler - keep it active for late-arriving TTS chunks
-    // Use a delay to allow for any pending TTS chunks
+    // Extended delay for backup cleanup in case final chunk cleanup doesn't work
     setTimeout(() => {
-
-      // Only remove if no active message IDs and no current message
-      if (activeMessageIdsRef.current.size === 0 && !currentMessageIdRef.current) {
-        if (ttsEventHandlerRef.current) {
-          window.removeEventListener('websocket-tts-chunk', ttsEventHandlerRef.current)
-          ttsEventHandlerRef.current = null
-        }
-      } else {
+      if (ttsEventHandlerRef.current) {
+        window.removeEventListener('websocket-tts-chunk', ttsEventHandlerRef.current)
+        ttsEventHandlerRef.current = null
       }
-    }, 2000) // 2 second delay to allow for late TTS chunks
+    }, 10000) // 10 second delay as backup cleanup
   }, [])
 
   /**
-   * Update message ID when it changes during processing.
+   * Update message ID - no longer needed since IDs come from TTS chunks.
    */
   const updateMessageId = useCallback((oldId: string, newId: string) => {
-
-    // Update active message IDs
-    if (activeMessageIdsRef.current.has(oldId)) {
-      activeMessageIdsRef.current.delete(oldId)
-      activeMessageIdsRef.current.add(newId)
-    }
-
-    // Update current message ID if it matches
-    if (currentMessageIdRef.current === oldId) {
-      currentMessageIdRef.current = newId
-    }
+    // No longer needed since message IDs are provided by TTS chunks
   }, [])
 
   return {

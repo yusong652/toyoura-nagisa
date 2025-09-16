@@ -5,9 +5,7 @@ import { useStreamEventHandlers } from './useStreamEventHandlers'
 import { useStreamProcessor } from './useStreamProcessor'
 
 interface UseStreamHandlerProps {
-  ttsEnabled: boolean
   currentSessionId: string | null
-  processAudioData: (audioData: string, count: number) => Promise<boolean>
   sessionRefreshSessions: () => Promise<any>
   sessionSwitchSession: (sessionId: string) => Promise<void>
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
@@ -34,9 +32,7 @@ import { Message } from '../../types/chat'
  * - useStreamProcessor: Core stream reading and parsing
  */
 export const useStreamHandler = ({
-  ttsEnabled,
   currentSessionId,
-  processAudioData,
   sessionRefreshSessions,
   sessionSwitchSession,
   setMessages
@@ -45,32 +41,15 @@ export const useStreamHandler = ({
   // Initialize message state manager
   const {
     updateMessageId,
-    updateMessageText,
-    finalizeMessage,
     addImageMessage
   } = useMessageStateManager({
     setMessages
   })
-  
-  // Initialize chunk processor
-  const {
-    processChunk,
-    resetProcessor,
-    setupTTSHandler,
-    cleanupTTSHandler,
-    updateTTSMessageId
-  } = useChunkProcessor({
-    ttsEnabled,
-    processAudioData,
-    updateMessageText,
-    finalizeMessage
-  })
-  
-  // Initialize event handlers
+
+  // Initialize event handlers for SSE metadata events
   const {
     handleTitleUpdate,
     handleSessionRefresh,
-    handleAiMessageId,
     handleKeyword,
     handleContentUpdate
   } = useStreamEventHandlers({
@@ -78,51 +57,39 @@ export const useStreamHandler = ({
     sessionRefreshSessions,
     sessionSwitchSession,
     updateMessageId,
-    addImageMessage,
-    processChunk,
-    updateTTSMessageId
+    addImageMessage
   })
   
-  // Initialize stream processor
+  // Initialize stream processor for SSE metadata events
   const {
     processStream
   } = useStreamProcessor({
     handleTitleUpdate,
     handleSessionRefresh,
-    handleAiMessageId,
     handleKeyword,
     handleContentUpdate,
-    sessionRefreshSessions,
-    finalizeMessage,
-    resetProcessor
+    sessionRefreshSessions
   })
   
   /**
    * Main stream response processing function.
    *
    * Entry point for processing SSE stream responses.
-   * Sets up WebSocket TTS handling and delegates to specialized processors.
+   * Now only handles metadata events (title updates, session refreshes, keywords).
+   * All content processing moved to WebSocket.
    */
   const processStreamResponse = useCallback(async (
     response: Response,
     options: StreamHandlerOptions
   ) => {
     try {
-      // Setup WebSocket TTS handler for the bot message
-      if (setupTTSHandler) {
-        setupTTSHandler(options.botMessageId)
-      }
-
       await processStream(response, options)
     } catch (error) {
       throw error
     } finally {
-      // Cleanup WebSocket TTS handler
-      if (cleanupTTSHandler) {
-        cleanupTTSHandler()
-      }
+      // SSE stream completed - content handled via WebSocket
     }
-  }, [processStream, setupTTSHandler, cleanupTTSHandler])
+  }, [processStream])
   
   return {
     processStreamResponse

@@ -33,15 +33,12 @@ export const useMessageStateManager = ({
    * Transitions from temporary client-side ID to server-assigned ID.
    */
   const updateMessageId = useCallback((oldId: string, newId: string) => {
-    console.log(`[MessageStateManager] Updating message ID: ${oldId} -> ${newId}`)
-    
-    setMessages(prev => 
+    setMessages(prev =>
       prev.map(msg => {
         if (msg.id === oldId) {
-          console.log(`[MessageStateManager] Found and updated message: ${oldId} -> ${newId}`)
           // 保持所有现有状态，只更新ID
-          return { 
-            ...msg, 
+          return {
+            ...msg,
             id: newId,
             // 保持streaming和text状态
             streaming: msg.streaming,
@@ -61,7 +58,7 @@ export const useMessageStateManager = ({
    * Handles incremental text updates with rendering callbacks.
    */
   const updateMessageText = useCallback((
-    messageId: string, 
+    messageId: string,
     text: string,
     options?: {
       newText?: string
@@ -70,24 +67,9 @@ export const useMessageStateManager = ({
       onRenderComplete?: () => void
     }
   ) => {
-    console.log('[MessageStateManager] updateMessageText called:', {
-      messageId,
-      textLength: text?.length,
-      textContent: text,
-      options
-    })
-    
     setMessages(prev => {
-      let messageFound = false
-      const updatedMessages = prev.map(msg => {
+      return prev.map(msg => {
         if (msg.id === messageId) {
-          messageFound = true
-          console.log('[MessageStateManager] Updating message text:', {
-            messageId,
-            oldText: msg.text,
-            newText: text,
-            options
-          })
           return {
             ...msg,
             text,
@@ -96,14 +78,6 @@ export const useMessageStateManager = ({
         }
         return msg
       })
-      
-      if (!messageFound) {
-        console.warn(`[MessageStateManager] Message not found with ID: ${messageId}`, {
-          availableIds: prev.map(m => m.id)
-        })
-      }
-      
-      return updatedMessages
     })
   }, [setMessages])
 

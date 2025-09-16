@@ -7,14 +7,11 @@ interface UseStreamEventHandlersProps {
   sessionSwitchSession: (sessionId: string) => Promise<void>
   updateMessageId: (oldId: string, newId: string) => void
   addImageMessage: (imageData: any) => void
-  processChunk: (chunk: any, messageId: string) => Promise<void>
-  updateTTSMessageId?: (oldId: string, newId: string) => void
 }
 
 interface StreamEventHandlers {
   handleTitleUpdate: (data: any) => void
   handleSessionRefresh: (data: any) => Promise<void>
-  handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
 }
@@ -30,9 +27,7 @@ export const useStreamEventHandlers = ({
   sessionRefreshSessions,
   sessionSwitchSession,
   updateMessageId,
-  addImageMessage,
-  processChunk,
-  updateTTSMessageId
+  addImageMessage
 }: UseStreamEventHandlersProps): StreamEventHandlers => {
 
   /**
@@ -114,42 +109,19 @@ export const useStreamEventHandlers = ({
   }, [currentSessionId, sessionSwitchSession, addImageMessage])
 
 
-  /**
-   * Handle AI message ID update.
-   * 
-   * Updates message ID when server provides final ID.
-   * Returns the new ID if updated, null otherwise.
-   */
-  const handleAiMessageId = useCallback((data: any, botMessageId: string): string | null => {
-    if (data.message_id) {
-      const newAiMessageId = data.message_id
-      updateMessageId(botMessageId, newAiMessageId)
-
-      // Also update TTS message ID tracking
-      if (updateTTSMessageId) {
-        updateTTSMessageId(botMessageId, newAiMessageId)
-      }
-
-      return newAiMessageId
-    }
-    return null
-  }, [updateMessageId, updateTTSMessageId])
 
   /**
-   * Handle content update (text/audio).
+   * Handle content update - deprecated in WebSocket architecture.
    *
-   * Delegates to chunk processor for handling.
+   * All content updates now handled via WebSocket MESSAGE_CREATE and TTS_CHUNK.
    */
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
-    if (!data) return
-
-    await processChunk(data, messageId)
-  }, [processChunk])
+    // No longer process content via SSE - everything goes through WebSocket
+  }, [])
 
   return {
     handleTitleUpdate,
     handleSessionRefresh,
-    handleAiMessageId,
     handleKeyword,
     handleContentUpdate
   }

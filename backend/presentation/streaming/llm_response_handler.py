@@ -113,10 +113,10 @@ async def handle_llm_response(
         
         # ========== PHASE 4: Content processing pipeline ==========
         if final_message:
-            async for chunk in process_content_pipeline(
+            # Process content via WebSocket - no longer yields SSE chunks
+            await process_content_pipeline(
                 final_message, session_id, request_id, execution_metadata
-            ):
-                yield chunk
+            )
         
         # ========== PHASE 5: Post-processing pipeline ==========
         if execution_metadata:

@@ -47,6 +47,9 @@ class MessageType(str, Enum):
     # TTS streaming
     TTS_CHUNK = "TTS_CHUNK"
 
+    # Message management
+    MESSAGE_CREATE = "MESSAGE_CREATE"
+
     # Emotion and animation
     EMOTION_KEYWORD = "EMOTION_KEYWORD"
 
@@ -143,6 +146,15 @@ class TTSChunk(BaseWebSocketMessage):
     is_final: bool = False
 
 
+class MessageCreateMessage(BaseWebSocketMessage):
+    """Message creation message schema for dynamic bot message creation"""
+    type: MessageType = MessageType.MESSAGE_CREATE
+    message_id: str
+    sender: str = "bot"
+    initial_text: Optional[str] = None
+    streaming: bool = True
+
+
 class EmotionKeywordMessage(BaseWebSocketMessage):
     """Emotion keyword message schema for Live2D animation triggers"""
     type: MessageType = MessageType.EMOTION_KEYWORD
@@ -164,6 +176,7 @@ MESSAGE_SCHEMAS = {
     MessageType.ERROR: ErrorMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TTS_CHUNK: TTSChunk,
+    MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
 }
 

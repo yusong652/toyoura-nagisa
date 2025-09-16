@@ -3,12 +3,9 @@ import { useCallback, useRef } from 'react'
 interface UseStreamProcessorProps {
   handleTitleUpdate: (data: any) => void
   handleSessionRefresh: (data: any) => Promise<void>
-  handleAiMessageId: (data: any, botMessageId: string) => string | null
   handleKeyword: (data: any) => void
   handleContentUpdate: (data: any, messageId: string) => Promise<void>
   sessionRefreshSessions: () => Promise<any>
-  finalizeMessage: (messageId: string) => void
-  resetProcessor: () => void
 }
 
 interface StreamProcessor {
@@ -27,17 +24,11 @@ interface StreamProcessor {
 export const useStreamProcessor = ({
   handleTitleUpdate,
   handleSessionRefresh,
-  handleAiMessageId,
   handleKeyword,
-  handleToolEvent,
   handleContentUpdate,
-  sessionRefreshSessions,
-  finalizeMessage,
-  resetProcessor
+  sessionRefreshSessions
 }: UseStreamProcessorProps): StreamProcessor => {
   
-  // Track final AI message ID
-  const finalAiMessageIdRef = useRef<string | null>(null)
   
   /**
    * Process a single line from the SSE stream.
@@ -56,9 +47,7 @@ export const useStreamProcessor = ({
       
       try {
         const data = JSON.parse(jsonData)
-        const currentMessageId = finalAiMessageIdRef.current || botMessageId
-        
-        
+
         // Route to specific handlers based on event type
         if (data.type === 'TITLE_UPDATE') {
           handleTitleUpdate(data)
@@ -75,13 +64,6 @@ export const useStreamProcessor = ({
           return
         }
         
-        // Handle AI message ID update
-        if (data.message_id && !finalAiMessageIdRef.current) {
-          const newId = handleAiMessageId(data, botMessageId)
-          if (newId) {
-            finalAiMessageIdRef.current = newId
-          }
-        }
         
         // Handle keyword/motion (doesn't need content processing)
         if (data.keyword) {
@@ -92,16 +74,8 @@ export const useStreamProcessor = ({
           }
         }
         
-        // Handle content updates (text/audio)
-        // Skip all TTS content processing in SSE - WebSocket handles TTS chunks completely
-        if (data.text !== undefined && !data.audio) {
-          // Only process non-TTS text content through SSE
-          // If there's audio, it's a TTS chunk and should be handled via WebSocket
-          const messageIdForUpdate = finalAiMessageIdRef.current || botMessageId
-          handleContentUpdate(data, messageIdForUpdate)
-        } else if (data.text !== undefined && data.audio !== undefined) {
-          // TTS chunks (text + audio) are completely handled by WebSocket
-        }
+        // All content updates now handled via WebSocket
+        // SSE no longer carries text or TTS content in the new architecture
       } catch (e) {
         console.error('[StreamProcessor] Error parsing response:', e)
       }
@@ -109,15 +83,14 @@ export const useStreamProcessor = ({
   }, [
     handleTitleUpdate,
     handleSessionRefresh,
-      handleAiMessageId,
     handleKeyword,
     handleContentUpdate
   ])
   
   /**
    * Process the entire SSE stream.
-   * 
-   * Reads stream, parses lines, and coordinates event handling.
+   *
+   * Reads stream, parses lines, and coordinates metadata event handling.
    */
   const processStream = useCallback(async (
     response: Response,
@@ -127,11 +100,7 @@ export const useStreamProcessor = ({
     }
   ) => {
     const { userMessageId, botMessageId } = options
-    
-    // Reset state for new stream
-    finalAiMessageIdRef.current = null
-    resetProcessor()
-    
+
     const reader = response.body?.getReader()
     if (!reader) {
       throw new Error('Unable to read response stream')
@@ -147,10 +116,8 @@ export const useStreamProcessor = ({
         if (done) {
           // Wait for any pending chunk processing
           await new Promise(resolve => setTimeout(resolve, 100))
-          
-          // Finalize the message
-          const finalMessageId = finalAiMessageIdRef.current || botMessageId
-          finalizeMessage(finalMessageId)
+
+          // No longer need to finalize placeholder messages since real messages are created via WebSocket
           
           // Refresh sessions
           sessionRefreshSessions()
@@ -178,8 +145,6 @@ export const useStreamProcessor = ({
     }
   }, [
     processLine,
-    resetProcessor,
-    finalizeMessage,
     sessionRefreshSessions
   ])
   

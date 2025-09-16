@@ -36,6 +36,9 @@ export enum MessageType {
   TTS_CHUNK = "TTS_CHUNK",
   TTS_COMPLETE = "TTS_COMPLETE",
 
+  // Message management
+  MESSAGE_CREATE = "MESSAGE_CREATE",
+
   // Emotion and animation
   EMOTION_KEYWORD = "EMOTION_KEYWORD"
 }
@@ -102,8 +105,17 @@ export interface LocationResponseMessage extends BaseWebSocketMessage {
   error?: string;
 }
 
+export interface MessageCreateMessage extends BaseWebSocketMessage {
+  type: MessageType.MESSAGE_CREATE;
+  message_id: string;
+  sender: string;
+  initial_text?: string;
+  streaming?: boolean;
+}
+
 export interface TTSChunkMessage extends BaseWebSocketMessage {
   type: MessageType.TTS_CHUNK;
+  message_id?: string;  // Added message_id for association
   text: string;
   audio?: string;  // Base64 encoded audio data
   index: number;
@@ -147,6 +159,7 @@ export type WebSocketMessage =
   | TitleUpdateMessage
   | LocationRequestMessage
   | LocationResponseMessage
+  | MessageCreateMessage
   | TTSChunkMessage
   | TTSMessage
   | ChatMessage
