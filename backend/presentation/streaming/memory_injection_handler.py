@@ -14,6 +14,61 @@ from backend.shared.utils.memory_factory import get_memory_middleware
 logger = logging.getLogger(__name__)
 
 
+async def save_session_conversation_memory(session_id: str) -> bool:
+    """
+    Save latest conversation turn from session to memory.
+
+    Automatically extracts the latest user and assistant messages from session history
+    and saves them to memory for future context enhancement.
+
+    Args:
+        session_id: Session ID to extract conversation from
+
+    Returns:
+        bool: True if save successful, False otherwise
+    """
+    try:
+        # Get latest user and assistant messages from session
+        from backend.infrastructure.storage.session_manager import get_latest_user_message, get_latest_n_messages
+
+        # Get latest user message
+        latest_user_message = get_latest_user_message(session_id)
+        if not latest_user_message:
+            logger.warning(f"No user message found in session {session_id} for memory saving")
+            return False
+
+        # Get latest messages to find the most recent assistant response
+        latest_messages = get_latest_n_messages(session_id, 3)  # Get last 3 to be safe
+        latest_assistant_message = None
+
+        for msg in reversed(latest_messages):
+            if msg.role == 'assistant':
+                latest_assistant_message = msg
+                break
+
+        if not latest_assistant_message:
+            logger.warning(f"No assistant message found in session {session_id} for memory saving")
+            return False
+
+        # Extract text from assistant message
+        from backend.domain.models.message_factory import extract_text_from_message
+        assistant_text = extract_text_from_message(latest_assistant_message)
+
+        if not assistant_text:
+            logger.warning(f"No text content in assistant message for session {session_id}")
+            return False
+
+        # Save to memory using existing function
+        return await save_conversation_memory(
+            user_message=latest_user_message,
+            assistant_response=assistant_text
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to save session conversation to memory: {e}")
+        return False
+
+
 async def save_conversation_memory(
     user_message: BaseMessage,
     assistant_response: str
@@ -81,10 +136,9 @@ async def handle_memory_management(
 
     try:
         if action == "list":
-            # List all memories for user/session
+            # List all memories for user (cross-session)
             memories = await manager.get_all_memories(
-                user_id=user_id,
-                session_id=params.get("session_only") and session_id
+                user_id=user_id
             )
             return {
                 "success": True,
@@ -95,8 +149,11 @@ async def handle_memory_management(
         
         elif action == "search":
             # Search memories
-            query = params.get("query", "")
-            limit = params.get("limit", 5)
+            query = ""
+            limit = 5
+            if params:
+                query = str(params.get("query", ""))
+                limit = int(params.get("limit", 5))
             
             memories = await manager.search_memories(
                 query=query,
@@ -113,15 +170,19 @@ async def handle_memory_management(
         
         elif action == "delete":
             # Delete memories
-            memory_id = params.get("memory_id")
-            delete_all = params.get("delete_all", False)
-            
+            memory_id = None
+            delete_all = False
+            if params:
+                memory_id = params.get("memory_id")
+                delete_all = bool(params.get("delete_all", False))
+
             if memory_id:
-                success = await manager.delete_memory(memory_id=memory_id)
+                success = await manager.delete_memory(memory_id=str(memory_id))
             elif delete_all:
                 success = await manager.delete_memory(user_id=user_id)
             else:
-                success = await manager.delete_memory(session_id=session_id)
+                # Default: delete all memories for user (since memory is cross-session)
+                success = await manager.delete_memory(user_id=user_id)
             
             return {
                 "success": success,

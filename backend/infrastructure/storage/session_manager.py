@@ -15,9 +15,6 @@ from backend.domain.models.message_factory import message_factory
 from backend.domain.models.messages import BaseMessage
 
 
-
-
-
 # Chat history related tools
 HISTORY_BASE_DIR = "chat/data"
 BACKUP_DIR = "chat/data/backups"
@@ -404,6 +401,32 @@ def get_latest_user_text(session_id: str) -> Optional[str]:
             if text and text.strip():
                 return text
     
+    return None
+
+
+def get_latest_user_message(session_id: str) -> Optional[BaseMessage]:
+    """
+    Get latest user message object from session.
+
+    Returns the most recent user message as a complete BaseMessage object,
+    useful for memory saving and other operations requiring full message context.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        Optional[BaseMessage]: Latest user message object, returns None if not found
+    """
+    history = load_history(session_id)
+    if not history:
+        return None
+
+    # Search for user messages starting from the latest
+    for msg in reversed(history):
+        msg_obj = message_factory(msg) if isinstance(msg, dict) else msg
+        if msg_obj.role == 'user':
+            return msg_obj
+
     return None
 
 

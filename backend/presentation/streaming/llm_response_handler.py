@@ -105,8 +105,6 @@ async def handle_llm_response(
             "enable_memory": enable_memory
         }
 
-        print(f"[DEBUG] handle_llm_response: calling llm_client.get_response with agent_profile={agent_profile}, session_id={session_id}, enable_memory={enable_memory}")
-
         async for item in llm_client.get_response(
             recent_msgs,
             **get_response_kwargs
