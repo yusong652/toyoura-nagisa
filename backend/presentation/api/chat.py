@@ -57,35 +57,14 @@ async def chat_endpoint(
         }
     """
     try:
-        # Parse and validate request data
-        data = await request.json()
-        result = service.parse_request_data(data)
+        # Parse request and extract configuration
+        result, enable_memory = await service.parse_request(request)
 
-        if not result['content']:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid message data format"
-            )
+        # Save user message to session
+        service.save_user_message_to_session(result)
 
-        # Extract enable_memory flag from request (default to True)
-        enable_memory = data.get("enable_memory", True)
-
-        # Extract user message ID for status tracking
-        user_message_id = result.get("id")
-
-        # Load conversation history
-        history_msgs = service.load_and_prepare_history(result['session_id'])
-
-        # Process user message
-        service.process_user_message_for_session(result, history_msgs)
-        
-        # Generate streaming response with message ID for status updates
-        return await service.create_streaming_response(
-            session_id=result['session_id'],
-            agent_profile=result['agent_profile'],
-            enable_memory=enable_memory,
-            user_message_id=user_message_id
-        )
+        # Generate streaming response
+        return await service.create_streaming_response(result, enable_memory)
         
     except HTTPException:
         raise

@@ -5,6 +5,7 @@ This service handles chat streaming operations including message processing,
 conversation history management, and response generation.
 """
 from typing import AsyncGenerator, List, Any, Dict, Optional
+from fastapi import Request
 from fastapi.responses import StreamingResponse
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
@@ -30,34 +31,48 @@ class ChatService:
     managing conversation history, and generating streaming responses.
     """
     
-    def parse_request_data(self, data: Dict[str, Any]) -> MessageParseResult:
+    async def parse_request(self, request: Request) -> tuple[MessageParseResult, bool]:
         """
-        Parse and validate chat request data.
+        Parse FastAPI request and extract message data with memory configuration.
 
-        Extracts and validates message data from incoming chat requests,
-        ensuring proper format and session identification.
+        Combines JSON parsing, message data validation, and memory setting extraction
+        into a single operation, using configuration defaults.
 
         Args:
-            data: Raw request data dictionary containing:
-                - message content and metadata
-                - session_id for conversation context
-                - agent_profile for tool selection
+            request: FastAPI Request object
 
         Returns:
-            MessageParseResult: Unified message parsing result with structure:
-                - content: Optional[List[Dict[str, Any]]] - Message content items or None if invalid
-                - timestamp: Optional[int] - Message timestamp
-                - id: Optional[str] - Message unique identifier
-                - session_id: str - Session UUID for conversation context (required)
-                - agent_profile: str - Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
+            tuple[MessageParseResult, bool]: Parsed message data and enable_memory flag
 
-        Example:
-            result = chat_service.parse_request_data(request_json)
-            if not result['content']:
-                return error_response
+        Raises:
+            HTTPException: If request data is invalid or malformed
         """
-        return parse_message_data(data)
-    
+        from fastapi import HTTPException
+        from backend.config import get_memory_config
+
+        try:
+            data = await request.json()
+            result = parse_message_data(data)
+
+            if not result['content']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid message data format"
+                )
+
+            # Get enable_memory from request or use config default
+            memory_config = get_memory_config()
+            enable_memory = data.get("enable_memory", memory_config.save_conversations)
+
+            return result, enable_memory
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(
+                status_code=400,
+                detail=f"Request parsing failed: {str(e)}"
+            )
+
     def load_and_prepare_history(self, session_id: str) -> List[Any]:
         """
         Load conversation history and prepare for LLM processing.
@@ -109,49 +124,67 @@ class ChatService:
             for consistent message processing.
         """
         process_user_message(result, history_msgs)
-    
+
+    def save_user_message_to_session(self, result: MessageParseResult) -> None:
+        """
+        Save user message to session history.
+
+        Combines history loading and user message processing into a single operation,
+        eliminating the need for API layer to handle these separately.
+
+        Args:
+            result: Unified MessageParseResult with complete message data including session_id
+
+        Note:
+            This function encapsulates the common pattern of loading history
+            and saving user messages, simplifying API layer code.
+        """
+        # Load current history
+        history_msgs = self.load_and_prepare_history(result['session_id'])
+
+        # Process and save user message
+        self.process_user_message_for_session(result, history_msgs)
+
     async def create_streaming_response(
         self,
-        session_id: str,
-        agent_profile: str = "general",
-        enable_memory: bool = True,
-        user_message_id: Optional[str] = None
+        result: MessageParseResult,
+        enable_memory: bool = True
     ) -> StreamingResponse:
         """
         Create streaming response for chat conversation.
-        
+
         Generates a streaming HTTP response that provides real-time
-        LLM-generated content with optional TTS audio synthesis.
-        
+        LLM-generated content with optional memory injection.
+
         Args:
-            session_id: Session UUID for conversation context
-            agent_profile: Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
-            enable_memory: Whether to enable memory injection (controlled by frontend toggle)
-            user_message_id: Optional user message ID for status tracking
-                
+            result: MessageParseResult containing all message data including:
+                - session_id: Session UUID for conversation context
+                - agent_profile: Agent profile for tool selection
+                - id: User message ID for status tracking
+            enable_memory: Whether to enable memory injection
+
         Returns:
             StreamingResponse: FastAPI streaming response with:
                 - media_type: "text/event-stream" for SSE protocol
                 - content: AsyncGenerator yielding chat stream events
                 - headers: Proper SSE headers for client consumption
-        
+
         Example:
             response = await chat_service.create_streaming_response(
-                session_id, agent_profile="general", enable_memory=True
+                result, enable_memory=True
             )
             return response
-        
+
         Note:
             Uses the existing generate_chat_stream function for actual
-            stream generation, maintaining compatibility with current
-            streaming infrastructure.
+            stream generation, eliminating parameter redundancy.
         """
         return StreamingResponse(
             generate_chat_stream(
-                session_id,
+                result['session_id'],
                 enable_memory=enable_memory,
-                agent_profile=agent_profile,
-                user_message_id=user_message_id
+                agent_profile=result['agent_profile'],
+                user_message_id=result.get('id')
             ),
             media_type="text/event-stream"
         )
