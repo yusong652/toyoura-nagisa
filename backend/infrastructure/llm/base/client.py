@@ -7,7 +7,7 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
+from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union, Type
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
@@ -87,12 +87,12 @@ class LLMClientBase(ABC):
             # Need to create new enhanced context manager for this session
             # Get provider name for context manager
             provider_name = self.__class__.__name__.replace('Client', '').lower()
-            
+
             # Create enhanced context manager with session tracking
             context_manager_class = self._get_context_manager()
             self.context_manager = context_manager_class(
                 provider_name=provider_name,
-                session_id=session_id
+                session_id=session_id or "default"
             )
 
             self.context_manager.initialize_session_from_history(messages)
@@ -141,7 +141,7 @@ class LLMClientBase(ABC):
             
             # Extract keyword using shared utility
             processor = self._get_response_processor()
-            original_text = processor.extract_text_content(final_response)
+            original_text = processor.extract_text_content(final_response) if processor else ""
             if original_text:
                 from backend.shared.utils.text_parser import parse_llm_output
                 _, extracted_keyword = parse_llm_output(original_text)
@@ -158,7 +158,12 @@ class LLMClientBase(ABC):
                 )
             
             # Create final storage message using provider-specific processor
-            final_message = processor.format_response_for_storage(final_response)
+            if processor:
+                final_message = processor.format_response_for_storage(final_response)
+            else:
+                # Fallback: create a basic assistant message
+                from backend.domain.models.messages import AssistantMessage
+                final_message = AssistantMessage(content="Response processing unavailable")
             
             # Add final response to context manager for next round
             context_manager.add_response(final_message)
@@ -363,7 +368,7 @@ class LLMClientBase(ABC):
         recent_messages_length = get_llm_settings().recent_messages_length
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id, agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
+            working_contents, session_id=session_id or "default", agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
         )
         metadata['api_calls'] += 1
         
@@ -449,7 +454,7 @@ class LLMClientBase(ABC):
                 print(f"[DEBUG] Tool calling iteration {iteration + 1}")
             
             current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id, agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
+                working_contents, session_id=session_id or "default", agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
             )
             metadata['api_calls'] += 1
             
@@ -496,22 +501,23 @@ class LLMClientBase(ABC):
         pass
 
     @abstractmethod
-    def _get_response_processor(self):
+    def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
         """
         Get provider-specific response processor instance.
-        
+
         Returns:
-            Provider-specific response processor class (e.g., GeminiResponseProcessor)
+            Optional[BaseResponseProcessor]: Provider-specific response processor instance (e.g., GeminiResponseProcessor)
+                                           Returns None if not implemented by provider
         """
         pass
 
     @abstractmethod
-    def _get_context_manager(self):
+    def _get_context_manager(self) -> Type[BaseContextManager]:
         """
-        Get provider-specific context manager instance.
-        
+        Get provider-specific context manager class.
+
         Returns:
-            Provider-specific context manager class (e.g., GeminiContextManager)
+            Type[BaseContextManager]: Provider-specific context manager class (e.g., GeminiContextManager)
         """
         pass
 
@@ -538,7 +544,7 @@ class LLMClientBase(ABC):
         # Default implementation - providers can override if they support thinking
         try:
             processor = self._get_response_processor()
-            if hasattr(processor, 'extract_thinking_content'):
+            if processor and hasattr(processor, 'extract_thinking_content'):
                 return processor.extract_thinking_content(response)
         except Exception:
             pass
@@ -565,7 +571,7 @@ class LLMClientBase(ABC):
         """
         try:
             processor = self._get_response_processor()
-            return processor.extract_text_content(response)
+            return processor.extract_text_content(response) if processor else ""
         except Exception:
             # Fallback to empty string on extraction failure
             return ""
@@ -610,9 +616,16 @@ class LLMClientBase(ABC):
                 print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')}")
             
             # Tool manager always returns Dict[str, Any]
-            result = await self.tool_manager.handle_function_call(
-                tool_call, session_id, debug
-            )
+            if self.tool_manager:
+                result = await self.tool_manager.handle_function_call(
+                    tool_call, session_id, debug
+                ) # type: ignore
+            else:
+                result = {
+                    'status': 'error',
+                    'message': 'Tool manager not initialized',
+                    'error': 'Tool execution unavailable'
+                }
             
             if debug:
                 print(f"[DEBUG] Tool execution completed: {tool_call.get('name', 'unknown')}")
@@ -715,20 +728,4 @@ class LLMClientBase(ABC):
             # Don't fail the main execution if WebSocket notification fails
             provider_name = self.__class__.__name__.replace('Client', '')
             print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
-
-    def update_config(self, **kwargs):
-        """
-        Update client configuration.
-        
-        Args:
-            **kwargs: Configuration parameters to update (tools_enabled, etc.)
-        """
-        
-        # agent_profile is now stateless - passed in each request, no longer stored
-        
-        # Handle other configuration parameters
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-            # Also update extra_config
-            self.extra_config[key] = value
     
