@@ -63,10 +63,6 @@ class GenerateTitleRequest(BaseModel):
 # =====================
 # Feature toggle models
 # =====================
-class UpdateToolsEnabledRequest(BaseModel):
-    """Request model for updating tools enabled status"""
-    enabled: bool
-
 
 class UpdateTTSEnabledRequest(BaseModel):
     """Request model for updating TTS enabled status"""

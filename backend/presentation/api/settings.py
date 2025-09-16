@@ -7,11 +7,9 @@ and tool configuration following Clean Architecture principles.
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.presentation.models.api_models import (
-    UpdateToolsEnabledRequest,
     UpdateTTSEnabledRequest
 )
 from backend.domain.services.settings_service import SettingsService
-from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.infrastructure.tts.base import BaseTTS
 
 router = APIRouter(tags=["settings"])
@@ -27,19 +25,6 @@ def get_settings_service() -> SettingsService:
     return SettingsService()
 
 
-def get_llm_client(request: Request) -> LLMClientBase:
-    """
-    Get LLM client from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        LLMClientBase: LLM client instance
-    """
-    return request.app.state.llm_client
-
-
 def get_tts_engine(request: Request) -> BaseTTS:
     """
     Get TTS engine from app state.
@@ -51,51 +36,6 @@ def get_tts_engine(request: Request) -> BaseTTS:
         BaseTTS: TTS engine instance
     """
     return request.app.state.tts_engine
-
-
-@router.post("/chat/tools-enabled", response_model=dict)
-async def update_tools_enabled(
-    request: UpdateToolsEnabledRequest,
-    service: SettingsService = Depends(get_settings_service),
-    llm_client: LLMClientBase = Depends(get_llm_client)
-) -> Dict[str, Any]:
-    """
-    Update the tools enabled status for LLM client.
-    
-    DEPRECATED: This endpoint is deprecated. Use /api/agent/profile for more
-    granular tool control through Agent Profile system.
-    
-    This endpoint:
-    1. Updates LLM client's tools_enabled configuration
-    2. Synchronizes with Agent Profile system for consistency
-    3. Provides backward compatibility
-    
-    Args:
-        request: Tools enabled update request with enabled flag
-        
-    Returns:
-        Dict[str, Any]: Update result with structure:
-            - success: bool - Operation success flag
-            - tools_enabled: bool - Updated tools enabled status
-            - message: str - Deprecation notice
-    
-    Raises:
-        HTTPException: 500 if update fails
-    """
-    try:
-        result = await service.update_tools_enabled(
-            enabled=request.enabled,
-            llm_client=llm_client
-        )
-        
-        return result
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update tools status: {str(e)}"
-        )
 
 
 @router.post("/chat/tts-enabled", response_model=dict)
