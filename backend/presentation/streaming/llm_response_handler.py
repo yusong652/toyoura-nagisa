@@ -31,7 +31,6 @@ async def handle_llm_response(
     recent_msgs: List[BaseMessage],
     session_id: str,
     llm_client: LLMClientBase,
-    tts_engine,
     agent_profile: str = "general",
     enable_memory: bool = True,
     user_message_id: Optional[str] = None
@@ -50,7 +49,6 @@ async def handle_llm_response(
         recent_msgs: Recent conversation messages
         session_id: Current session ID
         llm_client: LLM client instance
-        tts_engine: TTS engine instance
         agent_profile: Agent profile type for tool filtering and prompt customization
         enable_memory: Whether to enable memory injection (controlled by frontend toggle)
         user_message_id: Optional message ID for WebSocket status updates
@@ -112,7 +110,7 @@ async def handle_llm_response(
         # ========== PHASE 4: Content processing pipeline ==========
         if final_message:
             async for chunk in process_content_pipeline(
-                final_message, session_id, tts_engine, request_id, execution_metadata
+                final_message, session_id, request_id, execution_metadata
             ):
                 yield chunk
         

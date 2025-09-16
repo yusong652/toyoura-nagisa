@@ -7,11 +7,20 @@ conversation history management, and response generation.
 from typing import AsyncGenerator, List, Any, Dict, Tuple, Optional
 from fastapi.responses import StreamingResponse
 from backend.infrastructure.llm import LLMClientBase
-from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
 from backend.shared.utils.helpers import parse_message_data, process_user_message
 from backend.presentation.streaming.chat_stream import generate_chat_stream
+
+
+def get_chat_service() -> "ChatService":
+    """
+    Dependency injection factory for ChatService.
+
+    Returns:
+        ChatService: Chat streaming service instance
+    """
+    return ChatService()
 
 
 class ChatService:
@@ -104,10 +113,9 @@ class ChatService:
         self,
         session_id: str,
         llm_client: LLMClientBase,
-        tts_engine: BaseTTS,
         agent_profile: str = "general",
         enable_memory: bool = True,
-        additional_messages: List[Any] = None,
+        additional_messages: Optional[List[Any]] = None,
         user_message_id: Optional[str] = None
     ) -> StreamingResponse:
         """
@@ -152,10 +160,9 @@ class ChatService:
             
         return StreamingResponse(
             generate_chat_stream(
-                session_id, 
-                additional_messages, 
-                llm_client, 
-                tts_engine, 
+                session_id,
+                additional_messages,
+                llm_client,
                 agent_profile=agent_profile,
                 enable_memory=enable_memory,
                 user_message_id=user_message_id

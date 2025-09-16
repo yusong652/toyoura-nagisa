@@ -19,26 +19,24 @@ from backend.presentation.websocket.message_types import MessageType, create_mes
 async def process_content_pipeline(
     final_message: BaseMessage,
     session_id: str,
-    tts_engine,
     request_id: str,
     execution_metadata: Optional[Dict[str, Any]] = None
 ) -> AsyncGenerator[str, None]:
     """
     Content processing pipeline for final LLM responses.
-    
+
     This pipeline handles:
     1. Content extraction from structured messages
     2. Message persistence to conversation history
     3. Keyword extraction for emotional expressions
     4. TTS processing coordination
-    
+
     Args:
         final_message: Final LLM response message
         session_id: Current session ID
-        tts_engine: TTS engine instance
         request_id: Request ID for debugging
         execution_metadata: Optional execution metadata with keywords
-    
+
     Yields:
         Content processing results including message IDs, keywords, and TTS chunks
     """
@@ -87,6 +85,10 @@ async def process_content_pipeline(
     
     # Process TTS pipeline if text content is available
     if text_content.strip():
+        # Get TTS engine from app state
+        from backend.shared.utils.app_context import get_tts_engine
+        tts_engine = get_tts_engine()
+
         # Dynamic import to avoid circular dependency
         from backend.presentation.streaming.tts_processor import process_tts_pipeline
         async for chunk in process_tts_pipeline(text_content, tts_engine):

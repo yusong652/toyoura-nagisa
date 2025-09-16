@@ -5,55 +5,18 @@ This module handles chat streaming endpoints following Clean Architecture princi
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
-from backend.domain.services.chat_service import ChatService
+from backend.domain.services.chat_service import ChatService, get_chat_service
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.infrastructure.tts.base import BaseTTS
+from backend.shared.utils.app_context import get_llm_client_dependency
 
 router = APIRouter(tags=["chat"])
-
-
-def get_chat_service() -> ChatService:
-    """
-    Dependency injection for ChatService.
-    
-    Returns:
-        ChatService: Chat streaming service instance
-    """
-    return ChatService()
-
-
-def get_llm_client(request: Request) -> LLMClientBase:
-    """
-    Get LLM client from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        LLMClientBase: LLM client instance
-    """
-    return request.app.state.llm_client
-
-
-def get_tts_engine(request: Request) -> BaseTTS:
-    """
-    Get TTS engine from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        BaseTTS: TTS engine instance
-    """
-    return request.app.state.tts_engine
 
 
 @router.post("/chat/stream")
 async def chat_endpoint(
     request: Request,
     service: ChatService = Depends(get_chat_service),
-    llm_client: LLMClientBase = Depends(get_llm_client),
-    tts_engine: BaseTTS = Depends(get_tts_engine)
+    llm_client: LLMClientBase = Depends(get_llm_client_dependency)
 ) -> StreamingResponse:
     """
     Stream chat responses with real-time LLM generation and optional TTS.
@@ -125,7 +88,6 @@ async def chat_endpoint(
         return await service.create_streaming_response(
             session_id=session_id,
             llm_client=llm_client,
-            tts_engine=tts_engine,
             agent_profile=agent_profile,
             enable_memory=enable_memory,
             user_message_id=user_message_id

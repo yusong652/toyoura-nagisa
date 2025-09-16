@@ -9,6 +9,9 @@ from backend.infrastructure.tts.remote.fish_audio import FishAudioTTS, FishSpeec
 from backend.infrastructure.tts.local.gpt_sovits import GPTSoVITSTTS, GPTSoVITSConfig
 from backend.config import get_tts_settings
 
+# Global TTS engine instance
+_tts_engine: Optional[BaseTTS] = None
+
 def get_tts_engine() -> BaseTTS:
     """
     根据配置获取对应的 TTS 引擎实例

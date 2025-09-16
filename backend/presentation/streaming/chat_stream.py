@@ -25,7 +25,6 @@ async def generate_chat_stream(
     session_id: str,
     recent_msgs: List[BaseMessage],
     llm_client: LLMClientBase,
-    tts_engine: BaseTTS,
     enable_memory: bool = True,
     agent_profile: str = "general",
     user_message_id: Optional[str] = None
@@ -43,7 +42,6 @@ async def generate_chat_stream(
         session_id: Current session ID
         recent_msgs: Recent conversation messages (unused, loaded from history)
         llm_client: LLM client instance
-        tts_engine: Text-to-speech engine
         enable_memory: Whether to enable memory injection
         agent_profile: Agent profile type for tool selection
         user_message_id: Optional user message ID for status tracking
@@ -87,7 +85,6 @@ async def generate_chat_stream(
             recent_msgs,
             session_id,
             llm_client,
-            tts_engine,
             agent_profile=agent_profile,
             enable_memory=enable_memory,
             user_message_id=user_message_id

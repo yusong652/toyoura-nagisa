@@ -3,7 +3,6 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from backend.infrastructure.llm.base.factory import initialize_factory
 from backend.infrastructure.tts.tts_factory import get_tts_engine
@@ -21,11 +20,10 @@ from backend.presentation.api import profiles
 from backend.presentation.websocket.websocket_handler import initialize_websocket_handler
 from backend.presentation.websocket.routes import register_websocket_routes
 from backend.presentation.exceptions import register_exception_handlers
+from backend.shared.utils.app_context import set_app
 import threading
 
 
-# Load environment variables
-load_dotenv()
 # Initialize MCP client
 mcp_client = Client(mcp)
 
@@ -82,6 +80,9 @@ async def lifespan(app: FastAPI):
             print(f"[ERROR] Shutdown error: {e}")
 
 app = FastAPI(lifespan=lifespan)
+
+# Set global app instance for context access
+set_app(app)
 
 # CORS middleware configuration
 app.add_middleware(

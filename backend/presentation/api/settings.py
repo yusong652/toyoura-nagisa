@@ -5,44 +5,19 @@ This module handles application settings endpoints including TTS controls
 and tool configuration following Clean Architecture principles.
 """
 from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends
 from backend.presentation.models.api_models import (
     UpdateTTSEnabledRequest
 )
-from backend.domain.services.settings_service import SettingsService
-from backend.infrastructure.tts.base import BaseTTS
+from backend.domain.services.settings_service import SettingsService, get_settings_service
 
 router = APIRouter(tags=["settings"])
-
-
-def get_settings_service() -> SettingsService:
-    """
-    Dependency injection for SettingsService.
-    
-    Returns:
-        SettingsService: Settings management service instance
-    """
-    return SettingsService()
-
-
-def get_tts_engine(request: Request) -> BaseTTS:
-    """
-    Get TTS engine from app state.
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        BaseTTS: TTS engine instance
-    """
-    return request.app.state.tts_engine
 
 
 @router.post("/chat/tts-enabled", response_model=dict)
 async def update_tts_enabled(
     request: UpdateTTSEnabledRequest,
-    service: SettingsService = Depends(get_settings_service),
-    tts_engine: BaseTTS = Depends(get_tts_engine)
+    service: SettingsService = Depends(get_settings_service)
 ) -> Dict[str, Any]:
     """
     Update the TTS (Text-to-Speech) enabled status.
@@ -65,8 +40,7 @@ async def update_tts_enabled(
     """
     try:
         result = await service.update_tts_enabled(
-            enabled=request.enabled,
-            tts_engine=tts_engine
+            enabled=request.enabled
         )
         
         return result
