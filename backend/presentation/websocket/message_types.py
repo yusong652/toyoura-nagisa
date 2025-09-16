@@ -92,6 +92,10 @@ class ChatMessageRequest(BaseWebSocketMessage):
     message: str
     context: Optional[Dict[str, Any]] = None
     stream_response: bool = True
+    agent_profile: str = "general"
+    enable_memory: bool = True
+    tts_enabled: bool = False
+    files: List[Dict[str, Any]] = []
 
 
 class ChatStreamChunk(BaseWebSocketMessage):

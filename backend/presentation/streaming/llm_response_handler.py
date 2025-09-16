@@ -9,7 +9,7 @@ import json
 import uuid
 import asyncio
 import logging
-from typing import Dict, AsyncGenerator, Optional
+from typing import Dict, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
@@ -32,7 +32,7 @@ async def handle_llm_response(
     agent_profile: str = "general",
     enable_memory: bool = True,
     user_message_id: Optional[str] = None
-) -> AsyncGenerator[str, None]:
+) -> None:
     """
     Enhanced LLM Response Handler - Real-time streaming architecture.
 
@@ -49,8 +49,8 @@ async def handle_llm_response(
         enable_memory: Whether to enable memory injection (controlled by frontend toggle)
         user_message_id: Optional message ID for WebSocket status updates
 
-    Yields:
-        Streaming response chunks in SSE format
+    Returns:
+        None - All output is sent via WebSocket
     """
     # ========== PHASE 1: Request initialization and deduplication ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
@@ -120,8 +120,8 @@ async def handle_llm_response(
         
         # ========== PHASE 5: Post-processing pipeline ==========
         if execution_metadata:
-            async for chunk in process_post_pipeline(session_id, request_id):
-                yield chunk
+            # Post-processing no longer yields - handled via WebSocket
+            await process_post_pipeline(session_id, request_id)
         
     except Exception as e:
         print(f"[ERROR] Streaming request {request_id} failed: {e}")
@@ -135,16 +135,7 @@ async def handle_llm_response(
             if status_service:
                 await status_service.notify_error(session_id, user_message_id, str(e))
 
-        # Ensure tool use end signal is sent
-        tool_end_msg = create_tool_use_message(is_using=False, session_id=session_id)
-        yield f"data: {json.dumps(tool_end_msg)}\n\n"
-
-        error_data = create_error_message(
-            error=f"Request processing failed: {str(e)}",
-            session_id=session_id,
-            details={"request_id": request_id, "traceback": traceback.format_exc()}
-        )
-        yield f"data: {json.dumps(error_data)}\n\n"
+        # Send error notifications via WebSocket - no SSE yields needed
         
     finally:
         # ========== PHASE 6: Cleanup and release ==========
@@ -157,18 +148,18 @@ async def handle_llm_response(
 async def process_post_pipeline(
     session_id: str,
     request_id: str
-) -> AsyncGenerator[str, None]:
+) -> None:
     """
     Post-processing pipeline - Handle title generation and other background tasks.
-    
+
     Non-blocking background processing that doesn't affect the main flow.
-    
+
     Args:
         session_id: Current session ID
         request_id: Request ID for debugging
-    
-    Yields:
-        Post-processing results like title updates
+
+    Returns:
+        None - Title updates sent via WebSocket
     """
     try:
         # Get LLM client from app state
@@ -183,14 +174,9 @@ async def process_post_pipeline(
             if new_title:
                 update_success = update_session_title(session_id, new_title)
                 if update_success:
-                    title_update_data = {
-                        'type': 'TITLE_UPDATE',
-                        'payload': {
-                            'session_id': session_id,
-                            'title': new_title
-                        }
-                    }
-                    yield f"data: {json.dumps(title_update_data)}\n\n"
+                    # Send title update via WebSocket instead of SSE
+                    # TODO: Implement WebSocket title update notification
+                    print(f"[INFO] Title updated for session {session_id}: {new_title}")
     except Exception as e:
         # Post-processing failures should not affect the main flow, just log
         print(f"[WARNING] Post-processing failed for request {request_id}: {e}")

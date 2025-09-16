@@ -24,37 +24,40 @@ class MessageParseResult(TypedDict):
     id: Optional[str]
     session_id: str
     agent_profile: str
+    message: str  # Add text message field
+    request_id: str  # Add request ID field
 
 def parse_message_data(data: dict) -> MessageParseResult:
-    """Parse message data, return content, session ID and agent profile in unified format"""
-    message_data = data.get('messageData')
+    """Parse WebSocket message data in unified format"""
     session_id = data.get('session_id', "default_session")
-    agent_profile = data.get('agent_profile', "general")  # Default to general
+    agent_profile = data.get('agent_profile', "general")
+    text = data.get('message', '')
+    files = data.get('files', [])
+    msg_id = data.get('message_id')
 
-    if not message_data:
-        return {
-            'content': None,
-            'timestamp': None,
-            'id': None,
-            'session_id': session_id,
-            'agent_profile': agent_profile
-        }
+    # Convert ISO timestamp to milliseconds if present
+    timestamp = None
+    if data.get('timestamp'):
+        try:
+            dt = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+            timestamp = int(dt.timestamp() * 1000)
+        except:
+            timestamp = None
 
-    msg_obj = json.loads(message_data)
-    text = msg_obj.get('text', '')
-    files = msg_obj.get('files', [])
-    timestamp = msg_obj.get('timestamp')
-    msg_id = msg_obj.get('id')  # Fix: parse id field
+    # Build content array
     content = []
     if text:
         content.append({"text": text})
+
     for file in files:
         if file['type'].startswith('image/'):
-            b64 = file['data'].split(',', 1)[1]
+            b64_data = file['data']
+            if ',' in b64_data:
+                b64_data = b64_data.split(',', 1)[1]
             content.append({
                 "inline_data": {
                     "mime_type": file['type'],
-                    "data": b64
+                    "data": b64_data
                 }
             })
 
@@ -63,7 +66,9 @@ def parse_message_data(data: dict) -> MessageParseResult:
         'timestamp': timestamp,
         'id': msg_id,
         'session_id': session_id,
-        'agent_profile': agent_profile
+        'agent_profile': agent_profile,
+        'message': text,  # Add text message for streaming handler
+        'request_id': str(uuid.uuid4())  # Generate unique request ID
     }
 
 def process_user_message(result: MessageParseResult, history_msgs: list) -> UserMessage:

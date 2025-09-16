@@ -73,6 +73,51 @@ class ChatService:
                 detail=f"Request parsing failed: {str(e)}"
             )
 
+    async def parse_websocket_request(self, data: dict) -> tuple[MessageParseResult, bool]:
+        """
+        Parse WebSocket message data and extract configuration.
+
+        Replicates HTTP request parsing functionality for WebSocket messages,
+        providing consistent message processing across both transport protocols.
+
+        Args:
+            data: Dictionary containing WebSocket message data with structure:
+                - message: str - The chat message content
+                - session_id: str - Session identifier
+                - agent_profile: str - Agent profile type
+                - type: str - Message type (usually 'text')
+                - message_id: str - Message unique identifier
+                - enable_memory: bool - Memory injection setting
+                - tts_enabled: bool - TTS processing setting
+                - files: List - Attached files (if any)
+
+        Returns:
+            tuple[MessageParseResult, bool]: Parsed message data and enable_memory flag
+
+        Raises:
+            ValueError: If message data is invalid or malformed
+
+        Note:
+            This method provides the same parsing logic as parse_request but
+            operates on dictionary data instead of FastAPI Request objects.
+        """
+        from backend.config import get_memory_config
+
+        try:
+            result = parse_message_data(data)
+
+            if not result['content']:
+                raise ValueError("Invalid message data format")
+
+            # Get enable_memory from data or use config default
+            memory_config = get_memory_config()
+            enable_memory = data.get("enable_memory", memory_config.save_conversations)
+
+            return result, enable_memory
+
+        except Exception as e:
+            raise ValueError(f"WebSocket request parsing failed: {str(e)}")
+
     def load_and_prepare_history(self, session_id: str) -> List[Any]:
         """
         Load conversation history and prepare for LLM processing.

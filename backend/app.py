@@ -15,7 +15,7 @@ from backend.presentation.api import sessions
 from backend.presentation.api import messages
 from backend.presentation.api import content
 from backend.presentation.api import settings
-from backend.presentation.api import chat
+# from backend.presentation.api import chat  # Deprecated: Moved to WebSocket
 from backend.presentation.api import profiles
 from backend.presentation.websocket.websocket_handler import initialize_websocket_handler
 from backend.presentation.websocket.routes import register_websocket_routes
@@ -97,7 +97,7 @@ app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
+# app.include_router(chat.router, prefix="/api")  # Deprecated: Moved to WebSocket
 app.include_router(profiles.router)
 
 # Register WebSocket routes (cannot use include_router for WebSocket)

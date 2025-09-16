@@ -4,7 +4,6 @@ Unified WebSocket message handler architecture.
 This module provides a centralized, extensible message handling system
 for all WebSocket communication in the aiNagisa platform.
 """
-import json
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -13,8 +12,7 @@ from datetime import datetime
 
 from backend.presentation.websocket.connection import ConnectionManager
 from backend.presentation.websocket.message_types import (
-    MessageType, BaseWebSocketMessage, parse_message, create_message,
-    LocationResponseMessage, ChatMessageRequest, ToolCallRequest
+    MessageType, BaseWebSocketMessage, parse_message, create_message
 )
 
 logger = logging.getLogger(__name__)
@@ -81,24 +79,28 @@ class LocationHandler(MessageHandler):
             await self._handle_location_response(session_id, message)
         elif message.type == MessageType.LOCATION_REQUEST:
             await self._handle_location_request(session_id, message)
-        
+
         return None
     
-    async def _handle_location_response(self, session_id: str, message: LocationResponseMessage):
+    async def _handle_location_response(self, session_id: str, message: BaseWebSocketMessage):
         """Process location response from client"""
         
         # Store location data and trigger waiting events
         if session_id in self.location_events:
             event_info = self.location_events[session_id]
-            
-            if message.location_data:
-                event_info["location_data"] = message.location_data
+
+            # Extract location data from message
+            location_data = getattr(message, 'location_data', None)
+            error = getattr(message, 'error', None)
+
+            if location_data:
+                event_info["location_data"] = location_data
                 event_info["timestamp"] = message.timestamp
                 event_info["success"] = True
             else:
-                event_info["error"] = message.error or "Unknown error"
+                event_info["error"] = error or "Unknown error"
                 event_info["success"] = False
-            
+
             # Trigger event for waiting tools
             event_info["event"].set()
     
@@ -153,63 +155,94 @@ class LocationHandler(MessageHandler):
 
 
 class ChatHandler(MessageHandler):
-    """Handle chat and streaming messages"""
-    
+    """Handle chat and streaming messages via WebSocket"""
+
+    def __init__(self, connection_manager: ConnectionManager):
+        super().__init__(connection_manager)
+        # Import chat service for LLM processing
+        from backend.domain.services.chat_service import get_chat_service
+        self.chat_service = get_chat_service()
+
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.CHAT_MESSAGE:
             await self._handle_chat_message(session_id, message)
-        
+
         return None
-    
-    async def _handle_chat_message(self, session_id: str, message: ChatMessageRequest):
-        """Process incoming chat message"""
-        
-        # TODO: Integrate with chat service and LLM
-        # For now, send acknowledgment
-        response = create_message(
-            MessageType.STATUS_UPDATE,
-            session_id=session_id,
-            status="chat_received",
-            data={"message_length": len(message.message)}
-        )
-        
-        await self.send_response(session_id, response)
-        
-        # If streaming requested, start chat stream
-        if message.stream_response:
-            await self._start_chat_stream(session_id, message)
-    
-    async def _start_chat_stream(self, session_id: str, message: ChatMessageRequest):
-        """Start streaming chat response"""
-        # Send stream start notification
-        start_msg = create_message(
-            MessageType.CHAT_STREAM_START,
-            session_id=session_id,
-            message_id=message.message_id
-        )
-        await self.send_response(session_id, start_msg)
-        
-        # TODO: Integrate with actual LLM streaming
-        # For demo, send mock streaming response
-        demo_response = "This is a mock streaming response that will be replaced with actual LLM integration."
-        
-        for i, word in enumerate(demo_response.split()):
-            chunk = create_message(
-                MessageType.CHAT_STREAM_CHUNK,
-                session_id=session_id,
-                content=word + " ",
-                is_final=(i == len(demo_response.split()) - 1)
+
+    async def _handle_chat_message(self, session_id: str, message: BaseWebSocketMessage):
+        """
+        Process incoming chat message with full LLM integration.
+
+        Replicates HTTP chat endpoint functionality in WebSocket architecture:
+        1. Parse and validate message data
+        2. Save user message to session
+        3. Generate streaming LLM response
+        4. Process TTS if enabled
+        5. Handle tool calls and memory injection
+        """
+        try:
+            # Convert WebSocket message to HTTP-compatible request format
+            request_data = await self._convert_websocket_message_to_request(session_id, message)
+
+            # Parse request using chat service
+            result, enable_memory = await self.chat_service.parse_websocket_request(request_data)
+
+            # Save user message to session
+            self.chat_service.save_user_message_to_session(result)
+
+            # Processing started - no status update needed
+
+            # Generate streaming response via existing chat service pipeline
+            await self._process_streaming_response(session_id, result, enable_memory)
+
+        except Exception as e:
+            logger.error(f"Error processing chat message: {e}")
+            await self.send_error(
+                session_id,
+                "CHAT_PROCESSING_ERROR",
+                f"Failed to process chat message: {str(e)}"
             )
-            await self.send_response(session_id, chunk)
-            await asyncio.sleep(0.1)  # Simulate streaming delay
-        
-        # Send stream end notification
-        end_msg = create_message(
-            MessageType.CHAT_STREAM_END,
-            session_id=session_id,
-            message_id=message.message_id
-        )
-        await self.send_response(session_id, end_msg)
+
+    async def _convert_websocket_message_to_request(self, session_id: str, message: BaseWebSocketMessage) -> dict:
+        """Convert WebSocket ChatMessageRequest to HTTP request format"""
+        return {
+            "message": getattr(message, 'message', ''),
+            "session_id": session_id,
+            "agent_profile": getattr(message, 'agent_profile', 'general'),
+            "type": getattr(message, 'type', 'text'),
+            "message_id": message.message_id,
+            "enable_memory": getattr(message, 'enable_memory', True),
+            "tts_enabled": getattr(message, 'tts_enabled', False),
+            "files": getattr(message, 'files', [])
+        }
+
+    async def _process_streaming_response(self, session_id: str, result: Any, enable_memory: bool):
+        """
+        Process streaming LLM response using existing chat service architecture.
+
+        Integrates with existing streaming pipeline but outputs via WebSocket
+        instead of HTTP SSE.
+        """
+        try:
+            # Import streaming handler
+            from backend.presentation.streaming.llm_response_handler import handle_llm_response
+
+            # Process LLM response with streaming pipeline
+            # The pipeline handles all WebSocket output via MESSAGE_CREATE and TTS_CHUNK
+            await handle_llm_response(
+                session_id=result['session_id'],
+                agent_profile=result['agent_profile'],
+                enable_memory=enable_memory,
+                user_message_id=result.get('id')
+            )
+
+        except Exception as e:
+            logger.error(f"Error in streaming response: {e}")
+            await self.send_error(
+                session_id,
+                "STREAMING_ERROR",
+                f"Streaming response failed: {str(e)}"
+            )
 
 
 class ToolCallHandler(MessageHandler):
@@ -218,20 +251,23 @@ class ToolCallHandler(MessageHandler):
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.TOOL_CALL_REQUEST:
             await self._handle_tool_call(session_id, message)
-        
+
         return None
-    
-    async def _handle_tool_call(self, session_id: str, message: ToolCallRequest):
+
+    async def _handle_tool_call(self, session_id: str, message: BaseWebSocketMessage):
         """Process tool call request"""
         
         # TODO: Integrate with MCP tool system
         # For now, send acknowledgment
+        tool_name = getattr(message, 'tool_name', 'unknown')
+        request_id = getattr(message, 'request_id', '')
+
         response = create_message(
             MessageType.TOOL_CALL_RESULT,
             session_id=session_id,
             data={
-                "tool_name": message.tool_name,
-                "request_id": message.request_id,
+                "tool_name": tool_name,
+                "request_id": request_id,
                 "status": "acknowledged",
                 "result": "Tool integration coming soon"
             }
