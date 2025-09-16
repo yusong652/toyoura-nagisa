@@ -45,18 +45,12 @@ async def generate_chat_stream(
     # Send WebSocket status update if service is available and message ID provided
     status_service = get_status_notification_service()
     if status_service and user_message_id:
-        print(f"[STATUS] Sending 'sent' status for message {user_message_id} in session {session_id}")
         await status_service.notify_sent(session_id, user_message_id)
-    elif user_message_id:
-        print(f"[WARNING] Status service not available for session {session_id}")
 
     try:
         # Send WebSocket read status just before LLM processing starts
         if status_service and user_message_id:
-            print(f"[STATUS] Sending 'read' status for message {user_message_id} in session {session_id}")
             await status_service.notify_read(session_id, user_message_id)
-        elif user_message_id:
-            print(f"[WARNING] Cannot send read status - service not available for session {session_id}")
 
         # Process LLM response (messages loaded internally)
         await handle_llm_response(session_id,

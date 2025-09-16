@@ -181,24 +181,17 @@ class ChatHandler(MessageHandler):
         5. Handle tool calls and memory injection
         """
         try:
-            print(f"[ChatHandler] Processing chat message for session {session_id}")
-
             # Convert WebSocket message to HTTP-compatible request format
             request_data = await self._convert_websocket_message_to_request(session_id, message)
-            print(f"[ChatHandler] Converted to request data: {request_data}")
 
             # Parse request using chat service
             result, enable_memory = await self.chat_service.parse_websocket_request(request_data)
-            print(f"[ChatHandler] Parsed request, memory enabled: {enable_memory}")
 
             # Save user message to session
             self.chat_service.save_user_message_to_session(result)
-            print(f"[ChatHandler] User message saved to session")
 
             # Generate streaming response via existing chat service pipeline
-            print(f"[ChatHandler] Starting streaming response...")
             await self._process_streaming_response(session_id, result, enable_memory)
-            print(f"[ChatHandler] Streaming response completed")
 
         except Exception as e:
             logger.error(f"Error processing chat message: {e}")
@@ -229,8 +222,6 @@ class ChatHandler(MessageHandler):
         instead of HTTP SSE.
         """
         try:
-            print(f"[ChatHandler] Calling generate_chat_stream with session_id={result['session_id']}, agent_profile={result['agent_profile']}, enable_memory={enable_memory}, user_message_id={result.get('id')}")
-
             # Import chat stream handler which includes status notifications
             from backend.presentation.streaming.chat_stream import generate_chat_stream
 
@@ -241,7 +232,6 @@ class ChatHandler(MessageHandler):
                 agent_profile=result['agent_profile'],
                 user_message_id=result.get('id')
             )
-            print(f"[ChatHandler] generate_chat_stream completed")
 
         except Exception as e:
             logger.error(f"Error in streaming response: {e}")
@@ -315,24 +305,18 @@ class WebSocketMessageProcessor:
             raw_message: Raw JSON message string
         """
         try:
-            print(f"[WebSocket] Processing message from session {session_id}: {raw_message[:200]}...")
-
             # Parse message into typed object
             message = parse_message(raw_message)
-            print(f"[WebSocket] Parsed message type: {message.type}")
 
             # Route to appropriate handler
             handler = self.handlers.get(message.type)
             if handler:
-                print(f"[WebSocket] Found handler for {message.type}, processing...")
                 response = await handler.handle(session_id, message)
 
                 # Send response if handler returned one
                 if response:
                     await handler.send_response(session_id, response)
-                print(f"[WebSocket] Message {message.type} processed successfully")
             else:
-                print(f"[WebSocket] WARNING: No handler for message type: {message.type}")
                 logger.warning(f"No handler for message type: {message.type}")
                 await self._send_unsupported_message_error(session_id, message.type)
                 

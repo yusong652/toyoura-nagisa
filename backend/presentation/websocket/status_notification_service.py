@@ -141,7 +141,6 @@ def get_status_notification_service(
     global _status_service
 
     if connection_manager:
-        print(f"[STATUS_SERVICE] Creating new status service with provided connection manager")
         _status_service = MessageStatusNotificationService(connection_manager)
     elif _status_service is None:
         # Try to get connection manager from WebSocket handler
@@ -149,16 +148,10 @@ def get_status_notification_service(
             from backend.presentation.websocket.websocket_handler import get_websocket_handler
             handler = get_websocket_handler()
             if handler and handler.connection_manager:
-                print(f"[STATUS_SERVICE] Creating status service with handler's connection manager")
                 _status_service = MessageStatusNotificationService(handler.connection_manager)
             else:
-                print(f"[STATUS_SERVICE] WARNING: WebSocket handler or connection manager not available")
+                logger.warning(f"WebSocket handler or connection manager not available")
         except Exception as e:
-            print(f"[STATUS_SERVICE] WARNING: Could not initialize status service: {e}")
-    else:
-        print(f"[STATUS_SERVICE] Using existing status service instance")
-
-    if _status_service is None:
-        print(f"[STATUS_SERVICE] ERROR: Status service could not be initialized")
+            logger.warning(f"Could not initialize status service: {e}")
 
     return _status_service
