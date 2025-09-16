@@ -71,6 +71,7 @@ class HeartbeatMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.HEARTBEAT
 
 
+
 class LocationRequestMessage(BaseWebSocketMessage):
     """Location request message schema"""
     type: MessageType = MessageType.LOCATION_REQUEST
@@ -153,7 +154,6 @@ class TTSChunk(BaseWebSocketMessage):
 class MessageCreateMessage(BaseWebSocketMessage):
     """Message creation message schema for dynamic bot message creation"""
     type: MessageType = MessageType.MESSAGE_CREATE
-    message_id: str
     sender: str = "bot"
     initial_text: Optional[str] = None
     streaming: bool = True

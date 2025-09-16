@@ -126,9 +126,20 @@ class ConnectionManager:
             self._heartbeat_tasks[session_id].cancel()
             del self._heartbeat_tasks[session_id]
         
-        # Close WebSocket
+        # Close WebSocket if not already closed
         try:
-            await conn_info.websocket.close(code, reason)
+            # Check if WebSocket is still open before attempting to close
+            if hasattr(conn_info.websocket, 'client_state'):
+                state_val = getattr(conn_info.websocket.client_state, 'value', conn_info.websocket.client_state)
+                if state_val == 1:  # CONNECTED state
+                    await conn_info.websocket.close(code, reason)
+            elif hasattr(conn_info.websocket, 'state'):
+                state_val = getattr(conn_info.websocket.state, 'value', conn_info.websocket.state)
+                if state_val == 1:  # CONNECTED state
+                    await conn_info.websocket.close(code, reason)
+            else:
+                # Fallback: attempt close and handle any exception
+                await conn_info.websocket.close(code, reason)
         except Exception as e:
             logger.warning(f"Error closing WebSocket for session {session_id}: {e}")
         

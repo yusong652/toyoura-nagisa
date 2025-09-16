@@ -24,7 +24,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const locationRequestHandler = useRef<((data: any) => void) | null>(null)
   
   // Reconnection management
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef<number>(0)
   const currentSessionIdRef = useRef<string | null>(null)
   const maxReconnectAttempts = 5
@@ -206,8 +206,28 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
         console.log(`[WebSocket] Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} after ${delay}ms`)
 
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectToSession(sessionId)
+        reconnectTimeoutRef.current = setTimeout(async () => {
+          // Validate session still exists before reconnecting
+          try {
+            const response = await fetch(`/api/history/${sessionId}`)
+            if (response.ok) {
+              connectToSession(sessionId)
+            } else {
+              console.log(`[WebSocket] Session ${sessionId} no longer exists, stopping reconnection`)
+              currentSessionIdRef.current = null
+              setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+            }
+          } catch (error) {
+            console.error(`[WebSocket] Error validating session ${sessionId}:`, error)
+            // If we can't validate, try once more then stop
+            if (reconnectAttemptsRef.current >= maxReconnectAttempts - 1) {
+              console.log("[WebSocket] Cannot validate session, stopping reconnection")
+              currentSessionIdRef.current = null
+              setConnectionStatus(() => ConnectionStatus.ERROR)
+            } else {
+              connectToSession(sessionId)
+            }
+          }
         }, delay)
       }
     }
@@ -233,6 +253,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           }
           ws.send(JSON.stringify(heartbeatAck))
         }
+
         
         // Handle TTS chunks - dispatch custom events for TTS processors
         if (data.type === 'TTS_CHUNK') {
@@ -336,6 +357,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     }
     setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
   }, [])
+
 
   // Send WebSocket message
   const sendWebSocketMessage = useCallback((message: any) => {
