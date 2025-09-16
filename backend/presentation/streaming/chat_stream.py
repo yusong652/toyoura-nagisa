@@ -5,9 +5,8 @@ This module provides the high-level chat streaming functionality,
 orchestrating memory injection, LLM response handling, and conversation persistence.
 """
 
-import json
 import uuid
-from typing import List, AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional
 from backend.presentation.streaming.llm_response_handler import handle_llm_response
 from backend.presentation.streaming.memory_injection_handler import (
     save_session_conversation_memory
@@ -69,11 +68,4 @@ async def generate_chat_stream(
         # Send error status via WebSocket
         if status_service and user_message_id:
             await status_service.notify_error(session_id, user_message_id, str(e))
-        
-        yield f"data: {json.dumps({'type': 'NAGISA_TOOL_USE_CONCLUDED'})}\n\n"
-        error_data = {
-            'type': 'error',
-            'error': str(e)
-        }
-        yield f"data: {json.dumps(error_data)}\n\n"
         raise e

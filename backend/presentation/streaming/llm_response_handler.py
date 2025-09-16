@@ -72,12 +72,6 @@ async def handle_llm_response(
                 if status_service:
                     await status_service.notify_error(session_id, user_message_id, error_msg)
 
-            error_data = create_error_message(
-                error=error_msg,
-                session_id=session_id,
-                recoverable=False
-            )
-            yield f"data: {json.dumps(error_data)}\n\n"
             return
         ACTIVE_REQUESTS[session_id] = request_id
 
@@ -114,8 +108,8 @@ async def handle_llm_response(
                 final_message, execution_metadata = item
                 break
             elif isinstance(item, dict):
-                # Real-time notification: tool call status updates
-                yield f"data: {json.dumps(item)}\n\n"
+                # Skip dict notifications - WebSocket handles all status updates
+                continue
         
         # ========== PHASE 4: Content processing pipeline ==========
         if final_message:

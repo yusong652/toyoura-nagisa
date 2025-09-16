@@ -149,13 +149,10 @@ class LLMClientBase(ABC):
             
             # Send tool use concluded notification if tools were used
             if metadata['tool_calls_executed'] > 0:
-                # Send both SSE and WebSocket notifications
+                # Send WebSocket notification
                 concluded_notification = {
                     'type': 'NAGISA_TOOL_USE_CONCLUDED'
                 }
-                yield concluded_notification
-                
-                # Also send WebSocket notification
                 await self._send_websocket_tool_notification(
                     session_id, concluded_notification
                 )
@@ -176,12 +173,6 @@ class LLMClientBase(ABC):
             if debug:
                 provider_name = self.__class__.__name__.replace('Client', '')
                 print(f"[DEBUG] {provider_name} execution failed: {e}")
-            
-            # Yield error notification
-            yield {
-                'type': 'error',
-                'error': f"Execution failed: {e}"
-            }
             
             raise Exception(f"Execution failed: {e}")
 
@@ -429,10 +420,7 @@ class LLMClientBase(ABC):
                 if thinking_content:
                     notification['thinking'] = thinking_content
                 
-                # Send both SSE and WebSocket notifications
-                yield notification
-                
-                # Also send WebSocket notification
+                # Send WebSocket notification
                 await self._send_websocket_tool_notification(
                     session_id, notification
                 )
@@ -469,10 +457,6 @@ class LLMClientBase(ABC):
         
         # Check if maximum iterations reached
         if iteration >= max_iterations:
-            yield {
-                'type': 'error',
-                'error': f"Exceeded max iterations ({max_iterations})"
-            }
             raise Exception(f"Exceeded max iterations ({max_iterations})")
         
         # Tool calling loop completed - let get_response handle final notifications
