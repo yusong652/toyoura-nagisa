@@ -34,7 +34,10 @@ export enum MessageType {
   
   // TTS related
   TTS_CHUNK = "TTS_CHUNK",
-  TTS_COMPLETE = "TTS_COMPLETE"
+  TTS_COMPLETE = "TTS_COMPLETE",
+
+  // Emotion and animation
+  EMOTION_KEYWORD = "EMOTION_KEYWORD"
 }
 
 export interface BaseWebSocketMessage {
@@ -129,6 +132,12 @@ export interface ChatMessage extends BaseWebSocketMessage {
   metadata?: Record<string, any>;
 }
 
+export interface EmotionKeywordMessage extends BaseWebSocketMessage {
+  type: MessageType.EMOTION_KEYWORD;
+  keyword: string;
+  message_id?: string;
+}
+
 export type WebSocketMessage =
   | ConnectionMessage
   | HeartbeatMessage
@@ -140,7 +149,8 @@ export type WebSocketMessage =
   | LocationResponseMessage
   | TTSChunkMessage
   | TTSMessage
-  | ChatMessage;
+  | ChatMessage
+  | EmotionKeywordMessage;
 
 // Message validation helpers
 export function isValidMessageType(type: string): type is MessageType {

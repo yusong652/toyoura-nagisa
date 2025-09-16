@@ -218,10 +218,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         }
         
         if (data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
-          
+
           // Dispatch custom event for other components to listen to
-          window.dispatchEvent(new CustomEvent('toolUseConcluded', { 
-            detail: data 
+          window.dispatchEvent(new CustomEvent('toolUseConcluded', {
+            detail: data
+          }))
+        }
+
+        // Handle emotion keyword notifications
+        if (data.type === 'EMOTION_KEYWORD') {
+          // Dispatch custom event for keyword handling (Live2D animations)
+          window.dispatchEvent(new CustomEvent('emotionKeyword', {
+            detail: data
           }))
         }
       } catch (error) {

@@ -79,9 +79,12 @@ async def process_content_pipeline(
     # Send message ID for client tracking
     yield f"data: {json.dumps({'message_id': ai_msg_id})}\n\n"
     
-    # Send emotional keywords if available
+    # Send emotional keywords via WebSocket if available
     if extracted_keyword:
-        yield f"data: {json.dumps({'keyword': extracted_keyword})}\n\n"
+        from backend.presentation.websocket.status_notification_service import get_status_notification_service
+        status_service = get_status_notification_service()
+        if status_service:
+            await status_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     
     # Process TTS pipeline if text content is available
     if text_content.strip():

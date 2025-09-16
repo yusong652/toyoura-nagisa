@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { playMotion } from '../../utils/live2d'
 
 interface UseStreamEventHandlersProps {
@@ -34,10 +34,38 @@ export const useStreamEventHandlers = ({
   processChunk,
   updateTTSMessageId
 }: UseStreamEventHandlersProps): StreamEventHandlers => {
-  
+
+  /**
+   * Handle keyword for Live2D motion.
+   *
+   * Triggers Live2D animation based on keyword.
+   */
+  const handleKeyword = useCallback((data: any) => {
+    if (data.keyword) {
+      playMotion(data.keyword)
+    }
+  }, [])
+
+  // Listen to WebSocket emotion keyword events
+  useEffect(() => {
+    const handleEmotionKeyword = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const data = customEvent.detail
+      if (data && data.keyword) {
+        handleKeyword(data)
+      }
+    }
+
+    window.addEventListener('emotionKeyword', handleEmotionKeyword)
+
+    return () => {
+      window.removeEventListener('emotionKeyword', handleEmotionKeyword)
+    }
+  }, [handleKeyword])
+
   /**
    * Handle title update event.
-   * 
+   *
    * Refreshes session list when title is updated.
    */
   const handleTitleUpdate = useCallback((data: any) => {
@@ -108,25 +136,13 @@ export const useStreamEventHandlers = ({
   }, [updateMessageId, updateTTSMessageId])
 
   /**
-   * Handle keyword for Live2D motion.
-   * 
-   * Triggers Live2D animation based on keyword.
-   */
-  const handleKeyword = useCallback((data: any) => {
-    if (data.keyword) {
-      playMotion(data.keyword)
-    }
-  }, [])
-
-/**
    * Handle content update (text/audio).
-   * 
+   *
    * Delegates to chunk processor for handling.
    */
   const handleContentUpdate = useCallback(async (data: any, messageId: string) => {
     if (!data) return
-    
-    
+
     await processChunk(data, messageId)
   }, [processChunk])
 

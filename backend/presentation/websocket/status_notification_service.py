@@ -95,6 +95,32 @@ class MessageStatusNotificationService:
         """Notify that message processing failed."""
         await self.notify_status(session_id, message_id, "error", error_message)
 
+    async def notify_emotion_keyword(
+        self,
+        session_id: str,
+        keyword: str,
+        message_id: Optional[str] = None
+    ) -> None:
+        """
+        Notify about emotion keyword for Live2D animation triggers.
+
+        Args:
+            session_id: Session identifier
+            keyword: Emotion keyword (e.g., "happy", "sad", "excited")
+            message_id: Optional message identifier
+        """
+        try:
+            message = create_message(
+                MessageType.EMOTION_KEYWORD,
+                session_id=session_id,
+                keyword=keyword,
+                message_id=message_id
+            )
+            await self.connection_manager.send_json(session_id, message.model_dump())
+            logger.debug(f"Sent emotion keyword notification: {keyword} for session {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to send emotion keyword notification: {e}")
+
 
 # Global instance for easy access
 _status_service: Optional[MessageStatusNotificationService] = None

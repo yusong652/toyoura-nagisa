@@ -47,6 +47,9 @@ class MessageType(str, Enum):
     # TTS streaming
     TTS_CHUNK = "TTS_CHUNK"
 
+    # Emotion and animation
+    EMOTION_KEYWORD = "EMOTION_KEYWORD"
+
     # Future extensions
     VOICE_MESSAGE = "VOICE_MESSAGE"
     IMAGE_GENERATION = "IMAGE_GENERATION"
@@ -140,6 +143,13 @@ class TTSChunk(BaseWebSocketMessage):
     is_final: bool = False
 
 
+class EmotionKeywordMessage(BaseWebSocketMessage):
+    """Emotion keyword message schema for Live2D animation triggers"""
+    type: MessageType = MessageType.EMOTION_KEYWORD
+    keyword: str
+    message_id: Optional[str] = None
+
+
 # Message type to schema mapping
 MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT: HeartbeatMessage,
@@ -154,6 +164,7 @@ MESSAGE_SCHEMAS = {
     MessageType.ERROR: ErrorMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TTS_CHUNK: TTSChunk,
+    MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
 }
 
 
