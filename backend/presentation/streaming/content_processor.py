@@ -10,7 +10,7 @@ from typing import Dict, Any, AsyncGenerator, Optional
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history
-from backend.shared.utils.helpers import process_ai_text_message
+from backend.shared.utils.helpers import process_assistant_text_message
 from backend.presentation.websocket.message_types import MessageType, create_message
 # Import will be resolved at runtime - avoid circular import
 # from backend.presentation.streaming.tts_processor import process_tts_pipeline
@@ -69,7 +69,7 @@ async def process_content_pipeline(
         _, extracted_keyword = parse_llm_output(text_content)
     
     # Save complete content including thinking blocks to conversation history
-    ai_msg_id, processed_content = process_ai_text_message(
+    ai_msg_id, processed_content = process_assistant_text_message(
         content,  # Save complete content including thinking
         extracted_keyword,  # Use extracted keywords
         history_msgs,

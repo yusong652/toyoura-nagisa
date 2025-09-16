@@ -9,7 +9,7 @@ import json
 import uuid
 import asyncio
 import logging
-from typing import Dict, Any, List, AsyncGenerator, Optional
+from typing import Dict, AsyncGenerator, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
@@ -28,31 +28,29 @@ ACTIVE_REQUESTS_LOCK = asyncio.Lock()
 
 
 async def handle_llm_response(
-    recent_msgs: List[BaseMessage],
     session_id: str,
     llm_client: LLMClientBase,
     agent_profile: str = "general",
     enable_memory: bool = True,
     user_message_id: Optional[str] = None
-) -> AsyncGenerator[Dict[str, Any], None]:
+) -> AsyncGenerator[str, None]:
     """
     Enhanced LLM Response Handler - Real-time streaming architecture.
-    
+
     Modern real-time streaming design optimized for immediate tool call notifications:
     1. Real-time tool call notifications - Immediate status push during tool execution
     2. Streaming response processing - Maintains existing TTS and content processing logic
     3. State isolation - Anti-duplication mechanism separated from business logic
     4. Error propagation - Unified error handling and recovery
     5. Observability - Complete execution tracking and monitoring
-    
+
     Args:
-        recent_msgs: Recent conversation messages
-        session_id: Current session ID
+        session_id: Current session ID for loading conversation history
         llm_client: LLM client instance
         agent_profile: Agent profile type for tool filtering and prompt customization
         enable_memory: Whether to enable memory injection (controlled by frontend toggle)
         user_message_id: Optional message ID for WebSocket status updates
-    
+
     Yields:
         Streaming response chunks in SSE format
     """
@@ -82,9 +80,21 @@ async def handle_llm_response(
         ACTIVE_REQUESTS[session_id] = request_id
 
     try:
+        # ========== PHASE 2: Load conversation history ==========
+        # Load conversation history without images for LLM processing
+        from backend.infrastructure.storage.session_manager import load_history
+        from backend.domain.models.message_factory import message_factory_no_thinking
+        from backend.config import get_llm_settings
+
+        recent_history = load_history(session_id)
+        # Create messages without thinking blocks
+        recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
+        recent_messages_length = get_llm_settings().recent_messages_length
+        recent_msgs = recent_msgs[-recent_messages_length:]
+
         final_message = None
         execution_metadata = None
-        
+
         # Use new streaming method - Real-time tool call notifications
         # Pass enhanced system prompt if available
         get_response_kwargs = {
@@ -92,11 +102,11 @@ async def handle_llm_response(
             "agent_profile": agent_profile,
             "enable_memory": enable_memory
         }
-        
+
         print(f"[DEBUG] handle_llm_response: calling llm_client.get_response with agent_profile={agent_profile}, session_id={session_id}, enable_memory={enable_memory}")
-        
+
         async for item in llm_client.get_response(
-            recent_msgs, 
+            recent_msgs,
             **get_response_kwargs
         ):
             if isinstance(item, tuple):
@@ -154,7 +164,7 @@ async def process_post_pipeline(
     session_id: str,
     llm_client: LLMClientBase,
     request_id: str
-) -> AsyncGenerator[Dict[str, Any], None]:
+) -> AsyncGenerator[str, None]:
     """
     Post-processing pipeline - Handle title generation and other background tasks.
     

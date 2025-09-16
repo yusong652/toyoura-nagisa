@@ -23,8 +23,6 @@ def parse_message_data(data: dict) -> tuple:
     session_id = data.get('session_id', "default_session")
     agent_profile = data.get('agent_profile', "general")  # Default to general
     
-    print(f"[DEBUG] parse_message_data: agent_profile={agent_profile}, session_id={session_id}")
-    
     if not message_data:
         return None, session_id, agent_profile
     msg_obj = json.loads(message_data)
@@ -64,9 +62,9 @@ def process_user_message(parsed_data: dict, session_id: str, history_msgs: list)
     
     return user_msg
 
-def process_ai_text_message(content: List[Dict[str, Any]], keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
+def process_assistant_text_message(content: List[Dict[str, Any]], keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
     """
-    Process AI text message, save to history and vector database, return message ID and processed content.
+    Process AI assistant text message, save to history and vector database, return message ID and processed content.
     
     Args:
         content: Structured content list, each element is a dict with type field

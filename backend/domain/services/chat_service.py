@@ -115,7 +115,6 @@ class ChatService:
         llm_client: LLMClientBase,
         agent_profile: str = "general",
         enable_memory: bool = True,
-        additional_messages: Optional[List[Any]] = None,
         user_message_id: Optional[str] = None
     ) -> StreamingResponse:
         """
@@ -136,7 +135,6 @@ class ChatService:
                 - Streaming audio output
             agent_profile: Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
             enable_memory: Whether to enable memory injection (controlled by frontend toggle)
-            additional_messages: Optional extra messages for context
                 
         Returns:
             StreamingResponse: FastAPI streaming response with:
@@ -155,16 +153,12 @@ class ChatService:
             stream generation, maintaining compatibility with current
             streaming infrastructure.
         """
-        if additional_messages is None:
-            additional_messages = []
-            
         return StreamingResponse(
             generate_chat_stream(
                 session_id,
-                additional_messages,
                 llm_client,
-                agent_profile=agent_profile,
                 enable_memory=enable_memory,
+                agent_profile=agent_profile,
                 user_message_id=user_message_id
             ),
             media_type="text/event-stream"

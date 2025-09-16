@@ -12,8 +12,6 @@ from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory_no_thinking
 from backend.infrastructure.storage.session_manager import load_history
-from backend.infrastructure.tts.base import BaseTTS
-from backend.config import get_llm_settings
 from backend.presentation.streaming.llm_response_handler import handle_llm_response
 from backend.presentation.streaming.memory_injection_handler import (
     save_conversation_memory
@@ -23,7 +21,6 @@ from backend.presentation.websocket.status_notification_service import get_statu
 
 async def generate_chat_stream(
     session_id: str,
-    recent_msgs: List[BaseMessage],
     llm_client: LLMClientBase,
     enable_memory: bool = True,
     agent_profile: str = "general",
@@ -33,14 +30,11 @@ async def generate_chat_stream(
     Enhanced chat stream generator with memory injection.
 
     This function integrates the complete streaming pipeline with memory context:
-    1. Load conversation history
-    2. Inject relevant memory context
-    3. Generate LLM response with streaming
-    4. Save conversation to memory for future retrieval
+    1. Generate LLM response with streaming (messages loaded internally)
+    2. Save conversation to memory for future retrieval
 
     Args:
         session_id: Current session ID
-        recent_msgs: Recent conversation messages (unused, loaded from history)
         llm_client: LLM client instance
         enable_memory: Whether to enable memory injection
         agent_profile: Agent profile type for tool selection
@@ -58,31 +52,23 @@ async def generate_chat_stream(
         await status_service.notify_sent(session_id, user_message_id)
 
     try:
-        # Load conversation history without images
-        recent_history = load_history(session_id)
-        # Create messages without thinking blocks
-        recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
-        recent_messages_length = get_llm_settings().recent_messages_length
-        recent_msgs = recent_msgs[-recent_messages_length:]
-        
         # Extract latest user message for memory saving
+        recent_history = load_history(session_id)
+        recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
+
         latest_user_message = None
         for msg in reversed(recent_msgs):
             if hasattr(msg, 'role') and msg.role == 'user':
                 latest_user_message = msg
                 break
-        
-        # Memory injection is now handled internally by LLM clients
-        # based on agent_profile, session_id, and enable_memory flag
 
         # Send WebSocket read status just before LLM processing starts
         if status_service and user_message_id:
             await status_service.notify_read(session_id, user_message_id)
 
-        # Process LLM response with messages and enhanced system prompt
+        # Process LLM response (messages loaded internally)
         assistant_response = None
         async for chunk in handle_llm_response(
-            recent_msgs,
             session_id,
             llm_client,
             agent_profile=agent_profile,

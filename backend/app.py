@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
 
         # Initialize MCP server and client
         app.state.mcp = mcp
-        mcp.app = app  # Set app reference for MCP tools to access FastAPI state
+        mcp.app = app  # type: ignore # Set app reference for MCP tools to access FastAPI state
         mcp_client = Client(mcp)
         app.state.mcp_client = mcp_client
 
