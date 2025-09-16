@@ -101,41 +101,40 @@ async def get_browser_location(
         # Check if WebSocket connection exists
         connection_manager = websocket_handler.get_connection_manager()
         active_sessions = connection_manager.get_active_sessions()
-        
+
         if session_id not in connection_manager.connections:
-            print(f"[DEBUG] Session {session_id} not found in WebSocket connections")
             return None
         
         try:
             # Send location request via new handler and wait for response
             from backend.presentation.websocket.message_types import create_message, MessageType
-            
+
             # Create location request message
             request_msg = create_message(
                 MessageType.LOCATION_REQUEST,
                 session_id=session_id,
                 request_id=f"location_{session_id}_{int(asyncio.get_event_loop().time())}"
             )
-            
+
             # First, handle the location request through the handler to set up event
             await location_handler.handle(session_id, request_msg)
-            
+
             # Wait for response using location handler
             response_data = await location_handler.wait_for_location_response(session_id, timeout)
             
             # Check if successful
             if response_data.get("success") and response_data.get("location_data"):
                 location_data = response_data["location_data"]
-                
+
                 # Get city/region/country via reverse geocoding
                 geocode_data = _reverse_geocode_full(
                     location_data["latitude"],
                     location_data["longitude"]
                 )
-                
+
                 # Import here to avoid circular imports
                 from backend.infrastructure.mcp.location_manager import LocationData
-                
+
                 return LocationData(
                     latitude=location_data["latitude"],
                     longitude=location_data["longitude"],
@@ -148,6 +147,8 @@ async def get_browser_location(
                     country=geocode_data.get("country")
                 )
         except asyncio.TimeoutError:
+            pass
+        except Exception as e:
             pass
             
     except Exception:
@@ -178,7 +179,7 @@ async def get_user_location(
             browser_loc = await get_browser_location(context, timeout=wait_time)
             if browser_loc:
                 return browser_loc
-        
+
         # Fallback to server IP geolocation
         server_data = _fetch_server_location()
         if server_data:

@@ -75,6 +75,7 @@ class ToolNotificationService:
             success = await handler.send_to_session(session_id, ws_message.model_dump())
             
             if success:
+                logger.info(f"Sent tool use started notification to session {session_id}")
             else:
                 logger.warning(f"Failed to send tool use started notification to session {session_id}")
                 
@@ -126,6 +127,7 @@ class ToolNotificationService:
             success = await handler.send_to_session(session_id, ws_message.model_dump())
             
             if success:
+                logger.info(f"Sent tool use concluded notification to session {session_id}")
             else:
                 logger.warning(f"Failed to send tool use concluded notification to session {session_id}")
                 
@@ -178,6 +180,7 @@ class ToolNotificationService:
             success = await handler.send_to_session(session_id, ws_message.model_dump())
             
             if success:
+                logger.info(f"Sent tool error notification to session {session_id}")
             else:
                 logger.warning(f"Failed to send tool error notification to session {session_id}")
                 

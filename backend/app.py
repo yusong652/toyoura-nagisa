@@ -24,9 +24,6 @@ from backend.shared.utils.app_context import set_app
 import threading
 
 
-# Initialize MCP client
-mcp_client = Client(mcp)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle events."""
@@ -42,7 +39,7 @@ async def lifespan(app: FastAPI):
         await tts_engine.initialize()
         app.state.tts_engine = tts_engine
         print("[INIT] TTS Engine initialized successfully")
-        
+
         # Initialize LLM Factory
         llm_factory = initialize_factory()
         llm_client = llm_factory.create_client()
@@ -50,12 +47,13 @@ async def lifespan(app: FastAPI):
         app.state.llm_factory = llm_factory
         print(f"[INIT] LLM Factory initialized successfully")
         print(f"[INIT] LLM Client initialized: {type(llm_client).__name__}")
-        
-        # Initialize MCP server
+
+        # Initialize MCP server and client
         app.state.mcp = mcp
-        mcp.app = app
+        mcp.app = app  # Set app reference for MCP tools to access FastAPI state
+        mcp_client = Client(mcp)
         app.state.mcp_client = mcp_client
-        
+
         mcp_thread = threading.Thread(target=lambda: mcp.run(transport="sse", port=9000), daemon=True)
         mcp_thread.start()
         print("[INIT] MCP Server started on SSE port 9000")
