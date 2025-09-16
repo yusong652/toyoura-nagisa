@@ -194,7 +194,7 @@ class ChatService:
         self,
         result: MessageParseResult,
         enable_memory: bool = True
-    ) -> StreamingResponse:
+    ) -> None:
         """
         Create streaming response for chat conversation.
 
@@ -224,12 +224,7 @@ class ChatService:
             Uses the existing generate_chat_stream function for actual
             stream generation, eliminating parameter redundancy.
         """
-        return StreamingResponse(
-            generate_chat_stream(
-                result['session_id'],
-                enable_memory=enable_memory,
-                agent_profile=result['agent_profile'],
-                user_message_id=result.get('id')
-            ),
-            media_type="text/event-stream"
-        )
+        await generate_chat_stream(result['session_id'],
+                                    enable_memory=enable_memory,
+                                    agent_profile=result['agent_profile'],
+                                    user_message_id=result.get('id'))

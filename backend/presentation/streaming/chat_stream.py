@@ -6,6 +6,7 @@ orchestrating memory injection, LLM response handling, and conversation persiste
 """
 
 import uuid
+import logging
 from typing import AsyncGenerator, Optional
 from backend.presentation.streaming.llm_response_handler import handle_llm_response
 from backend.presentation.streaming.memory_injection_handler import (
@@ -13,13 +14,15 @@ from backend.presentation.streaming.memory_injection_handler import (
 )
 from backend.presentation.websocket.status_notification_service import get_status_notification_service
 
+logger = logging.getLogger(__name__)
+
 
 async def generate_chat_stream(
     session_id: str,
     enable_memory: bool = True,
     agent_profile: str = "general",
     user_message_id: Optional[str] = None
-) -> AsyncGenerator[str, None]:
+) -> None:
     """
     Enhanced chat stream generator with memory injection.
 
@@ -42,22 +45,24 @@ async def generate_chat_stream(
     # Send WebSocket status update if service is available and message ID provided
     status_service = get_status_notification_service()
     if status_service and user_message_id:
+        print(f"[STATUS] Sending 'sent' status for message {user_message_id} in session {session_id}")
         await status_service.notify_sent(session_id, user_message_id)
+    elif user_message_id:
+        print(f"[WARNING] Status service not available for session {session_id}")
 
     try:
         # Send WebSocket read status just before LLM processing starts
         if status_service and user_message_id:
+            print(f"[STATUS] Sending 'read' status for message {user_message_id} in session {session_id}")
             await status_service.notify_read(session_id, user_message_id)
+        elif user_message_id:
+            print(f"[WARNING] Cannot send read status - service not available for session {session_id}")
 
         # Process LLM response (messages loaded internally)
-        async for chunk in handle_llm_response(
-            session_id,
-            agent_profile=agent_profile,
-            enable_memory=enable_memory,
-            user_message_id=user_message_id
-        ):
-            yield chunk
-
+        await handle_llm_response(session_id,
+                                  agent_profile=agent_profile,
+                                  enable_memory=enable_memory,
+                                  user_message_id=user_message_id)
         # Save conversation to memory after successful response
         if enable_memory:
             await save_session_conversation_memory(session_id)

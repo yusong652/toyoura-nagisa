@@ -6,7 +6,7 @@ including message saving, keyword extraction, and TTS preparation.
 """
 
 import json
-from typing import Dict, Any, AsyncGenerator, Optional
+from typing import Dict, Any, AsyncGenerator, Optional, List, Union
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history
@@ -44,16 +44,23 @@ async def process_content_pipeline(
         return
     
     content = final_message.content
-    
+
+    # Normalize content to List[Dict[str, Any]] format for consistent processing
+    normalized_content: List[Dict[str, Any]] = []
+    if isinstance(content, list):
+        normalized_content = [
+            dict(item) if isinstance(item, dict) else {"type": "text", "text": str(item)}
+            for item in content
+        ]
+    else:
+        # Convert string content to structured format
+        normalized_content = [{"type": "text", "text": str(content)}]
+
     # Extract text content for TTS (excluding thinking blocks)
     text_content = ""
-    if isinstance(content, list):
-        for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text':
-                text_content += item.get('text', '')
-            # thinking content is saved to history but not used for TTS
-    else:
-        text_content = str(content)
+    for item in normalized_content:
+        if isinstance(item, dict) and item.get('type') == 'text':
+            text_content += item.get('text', '')
     
     # Load conversation history for message processing
     loaded_history = load_all_message_history(session_id)
@@ -70,7 +77,7 @@ async def process_content_pipeline(
     
     # Save complete content including thinking blocks to conversation history
     ai_msg_id, processed_content = process_assistant_text_message(
-        content,  # Save complete content including thinking
+        normalized_content,  # Save normalized content including thinking
         extracted_keyword,  # Use extracted keywords
         history_msgs,
         session_id

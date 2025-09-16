@@ -14,7 +14,7 @@ router = APIRouter(tags=["chat"])
 async def chat_endpoint(
     request: Request,
     service: ChatService = Depends(get_chat_service)
-) -> StreamingResponse:
+) -> None:
     """
     Stream chat responses with real-time LLM generation and optional TTS.
     
@@ -64,7 +64,7 @@ async def chat_endpoint(
         service.save_user_message_to_session(result)
 
         # Generate streaming response
-        return await service.create_streaming_response(result, enable_memory)
+        await service.create_streaming_response(result, enable_memory)
         
     except HTTPException:
         raise

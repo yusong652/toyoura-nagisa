@@ -174,7 +174,6 @@ class GeminiClient(LLMClientBase):
         if debug:
             print(f"[DEBUG] API call with {len(context_contents)} context items")
             # Print complete system prompt for debugging
-            GeminiDebugger.print_full_system_prompt(system_prompt)
             GeminiDebugger.print_debug_request(context_contents, config)
 
         try:

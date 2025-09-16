@@ -289,7 +289,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         console.error("[WebSocket] failed to parse message:", error)
       }
     }
-  }, [handleLocationRequest])
+  }, [handleLocationRequest, setConnectionStatus, setConnectionError])
 
   // 断开WebSocket连接
   const disconnect = useCallback(() => {
