@@ -29,7 +29,6 @@ ACTIVE_REQUESTS_LOCK = asyncio.Lock()
 
 async def handle_llm_response(
     session_id: str,
-    llm_client: LLMClientBase,
     agent_profile: str = "general",
     enable_memory: bool = True,
     user_message_id: Optional[str] = None
@@ -46,7 +45,6 @@ async def handle_llm_response(
 
     Args:
         session_id: Current session ID for loading conversation history
-        llm_client: LLM client instance
         agent_profile: Agent profile type for tool filtering and prompt customization
         enable_memory: Whether to enable memory injection (controlled by frontend toggle)
         user_message_id: Optional message ID for WebSocket status updates
@@ -56,6 +54,10 @@ async def handle_llm_response(
     """
     # ========== PHASE 1: Request initialization and deduplication ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
+
+    # Get LLM client from app state
+    from backend.shared.utils.app_context import get_llm_client
+    llm_client = get_llm_client()
     
     # Optimized anti-duplication mechanism - reduce lock contention
     async with ACTIVE_REQUESTS_LOCK:
@@ -126,7 +128,7 @@ async def handle_llm_response(
         
         # ========== PHASE 5: Post-processing pipeline ==========
         if execution_metadata:
-            async for chunk in process_post_pipeline(session_id, llm_client, request_id):
+            async for chunk in process_post_pipeline(session_id, request_id):
                 yield chunk
         
     except Exception as e:
@@ -162,7 +164,6 @@ async def handle_llm_response(
 
 async def process_post_pipeline(
     session_id: str,
-    llm_client: LLMClientBase,
     request_id: str
 ) -> AsyncGenerator[str, None]:
     """
@@ -172,16 +173,19 @@ async def process_post_pipeline(
     
     Args:
         session_id: Current session ID
-        llm_client: LLM client instance
         request_id: Request ID for debugging
     
     Yields:
         Post-processing results like title updates
     """
     try:
+        # Get LLM client from app state
+        from backend.shared.utils.app_context import get_llm_client
+        llm_client = get_llm_client()
+
         loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-        
+
         if should_generate_title(session_id, history_msgs):
             new_title = await generate_title_for_session(session_id, llm_client)
             if new_title:

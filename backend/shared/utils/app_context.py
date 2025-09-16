@@ -74,40 +74,6 @@ def get_llm_client():
     return app.state.llm_client
 
 
-def get_llm_client_dependency(request=None):
-    """
-    FastAPI dependency function for LLM client.
-
-    This is a wrapper around get_llm_client() for FastAPI dependency injection.
-    The request parameter is accepted for compatibility but not used since we
-    access the app instance globally.
-
-    Args:
-        request: FastAPI request object (unused, for compatibility)
-
-    Returns:
-        LLMClientBase: LLM client instance from app state
-    """
-    return get_llm_client()
-
-
-def get_tts_engine_dependency(request=None):
-    """
-    FastAPI dependency function for TTS engine.
-
-    This is a wrapper around get_tts_engine() for FastAPI dependency injection.
-    The request parameter is accepted for compatibility but not used since we
-    access the app instance globally.
-
-    Args:
-        request: FastAPI request object (unused, for compatibility)
-
-    Returns:
-        BaseTTS: TTS engine instance from app state
-    """
-    return get_tts_engine()
-
-
 def get_mcp_client():
     """
     Get MCP client from app state.

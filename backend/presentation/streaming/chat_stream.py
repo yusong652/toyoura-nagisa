@@ -21,7 +21,6 @@ from backend.presentation.websocket.status_notification_service import get_statu
 
 async def generate_chat_stream(
     session_id: str,
-    llm_client: LLMClientBase,
     enable_memory: bool = True,
     agent_profile: str = "general",
     user_message_id: Optional[str] = None
@@ -35,7 +34,6 @@ async def generate_chat_stream(
 
     Args:
         session_id: Current session ID
-        llm_client: LLM client instance
         enable_memory: Whether to enable memory injection
         agent_profile: Agent profile type for tool selection
         user_message_id: Optional user message ID for status tracking
@@ -70,7 +68,6 @@ async def generate_chat_stream(
         assistant_response = None
         async for chunk in handle_llm_response(
             session_id,
-            llm_client,
             agent_profile=agent_profile,
             enable_memory=enable_memory,
             user_message_id=user_message_id

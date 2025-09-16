@@ -6,8 +6,6 @@ This module handles chat streaming endpoints following Clean Architecture princi
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from backend.domain.services.chat_service import ChatService, get_chat_service
-from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.shared.utils.app_context import get_llm_client_dependency
 
 router = APIRouter(tags=["chat"])
 
@@ -15,8 +13,7 @@ router = APIRouter(tags=["chat"])
 @router.post("/chat/stream")
 async def chat_endpoint(
     request: Request,
-    service: ChatService = Depends(get_chat_service),
-    llm_client: LLMClientBase = Depends(get_llm_client_dependency)
+    service: ChatService = Depends(get_chat_service)
 ) -> StreamingResponse:
     """
     Stream chat responses with real-time LLM generation and optional TTS.
@@ -62,33 +59,30 @@ async def chat_endpoint(
     try:
         # Parse and validate request data
         data = await request.json()
-        parsed_data, session_id, agent_profile = service.parse_request_data(data)
-        
-        if not parsed_data:
+        result = service.parse_request_data(data)
+
+        if not result['content']:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid message data format"
             )
-        
+
         # Extract enable_memory flag from request (default to True)
         enable_memory = data.get("enable_memory", True)
-        
+
         # Extract user message ID for status tracking
-        user_message_id = parsed_data.get("id") if parsed_data else None
+        user_message_id = result.get("id")
 
         # Load conversation history
-        history_msgs = service.load_and_prepare_history(session_id)
-        
+        history_msgs = service.load_and_prepare_history(result['session_id'])
+
         # Process user message
-        service.process_user_message_for_session(
-            parsed_data, session_id, history_msgs
-        )
+        service.process_user_message_for_session(result, history_msgs)
         
         # Generate streaming response with message ID for status updates
         return await service.create_streaming_response(
-            session_id=session_id,
-            llm_client=llm_client,
-            agent_profile=agent_profile,
+            session_id=result['session_id'],
+            agent_profile=result['agent_profile'],
             enable_memory=enable_memory,
             user_message_id=user_message_id
         )

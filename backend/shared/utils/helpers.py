@@ -10,21 +10,36 @@ from backend.config import get_llm_settings
 from backend.domain.models.message_factory import message_factory
 from backend.domain.models.messages import AssistantMessage, UserMessage, BaseMessage
 # Memory imports removed - preparing for memory system refactoring
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional, TypedDict
 import re
 from backend.shared.utils.text_clean import extract_response_without_think
 
 # Memory manager initialization removed - preparing for memory system refactoring
 # memory_manager = MemoryManager()
 
-def parse_message_data(data: dict) -> tuple:
-    """Parse message data, return message content, session ID and agent profile"""
+class MessageParseResult(TypedDict):
+    """Type definition for message parsing result"""
+    content: Optional[List[Dict[str, Any]]]
+    timestamp: Optional[int]
+    id: Optional[str]
+    session_id: str
+    agent_profile: str
+
+def parse_message_data(data: dict) -> MessageParseResult:
+    """Parse message data, return content, session ID and agent profile in unified format"""
     message_data = data.get('messageData')
     session_id = data.get('session_id', "default_session")
     agent_profile = data.get('agent_profile', "general")  # Default to general
-    
+
     if not message_data:
-        return None, session_id, agent_profile
+        return {
+            'content': None,
+            'timestamp': None,
+            'id': None,
+            'session_id': session_id,
+            'agent_profile': agent_profile
+        }
+
     msg_obj = json.loads(message_data)
     text = msg_obj.get('text', '')
     files = msg_obj.get('files', [])
@@ -42,24 +57,30 @@ def parse_message_data(data: dict) -> tuple:
                     "data": b64
                 }
             })
+
     return {
         'content': content,
         'timestamp': timestamp,
-        'id': msg_id  # Fix: return id field
-    }, session_id, agent_profile
+        'id': msg_id,
+        'session_id': session_id,
+        'agent_profile': agent_profile
+    }
 
-def process_user_message(parsed_data: dict, session_id: str, history_msgs: list) -> UserMessage:
+def process_user_message(result: MessageParseResult, history_msgs: list) -> UserMessage:
     """Process user message, create and return message object, save to history and vector database"""
-    timestamp = parsed_data.get('timestamp')
+    if not result['content']:
+        raise ValueError("Invalid message content")
+
+    timestamp = result.get('timestamp')
     user_msg = UserMessage(
-        content=parsed_data['content'],
+        content=result['content'],
         timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
-        id=parsed_data.get('id')  # Use ID from frontend
+        id=result.get('id')  # Use ID from frontend
     )
     # Save to history
     history_msgs.append(user_msg)
-    save_history(session_id, history_msgs)
-    
+    save_history(result['session_id'], history_msgs)
+
     return user_msg
 
 def process_assistant_text_message(content: List[Dict[str, Any]], keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:

@@ -4,12 +4,11 @@ Chat Service - Business logic for chat stream operations.
 This service handles chat streaming operations including message processing,
 conversation history management, and response generation.
 """
-from typing import AsyncGenerator, List, Any, Dict, Tuple, Optional
+from typing import AsyncGenerator, List, Any, Dict, Optional
 from fastapi.responses import StreamingResponse
-from backend.infrastructure.llm import LLMClientBase
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
-from backend.shared.utils.helpers import parse_message_data, process_user_message
+from backend.shared.utils.helpers import parse_message_data, process_user_message, MessageParseResult
 from backend.presentation.streaming.chat_stream import generate_chat_stream
 
 
@@ -31,28 +30,30 @@ class ChatService:
     managing conversation history, and generating streaming responses.
     """
     
-    def parse_request_data(self, data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str], str]:
+    def parse_request_data(self, data: Dict[str, Any]) -> MessageParseResult:
         """
         Parse and validate chat request data.
-        
+
         Extracts and validates message data from incoming chat requests,
         ensuring proper format and session identification.
-        
+
         Args:
             data: Raw request data dictionary containing:
                 - message content and metadata
                 - session_id for conversation context
                 - agent_profile for tool selection
-                
+
         Returns:
-            Tuple[Optional[Dict[str, Any]], Optional[str], str]: Parsed data, session ID and agent profile:
-                - parsed_data: Dict containing validated message data or None if invalid
-                - session_id: str - Session UUID for conversation context or None if missing
+            MessageParseResult: Unified message parsing result with structure:
+                - content: Optional[List[Dict[str, Any]]] - Message content items or None if invalid
+                - timestamp: Optional[int] - Message timestamp
+                - id: Optional[str] - Message unique identifier
+                - session_id: str - Session UUID for conversation context (required)
                 - agent_profile: str - Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
-        
+
         Example:
-            parsed_data, session_id, agent_profile = chat_service.parse_request_data(request_json)
-            if not parsed_data:
+            result = chat_service.parse_request_data(request_json)
+            if not result['content']:
                 return error_response
         """
         return parse_message_data(data)
@@ -84,35 +85,34 @@ class ChatService:
     
     def process_user_message_for_session(
         self,
-        parsed_data: Dict[str, Any],
-        session_id: str,
+        result: MessageParseResult,
         history_msgs: List[Any]
     ) -> None:
         """
         Process and store user message in session history.
-        
+
         Handles user message processing including validation, formatting,
         and persistence to session storage for conversation continuity.
-        
+
         Args:
-            parsed_data: Validated message data with structure:
-                - content: Message text content
-                - type: Message type identifier
-                - metadata: Additional message context
-            session_id: Session UUID for message association
+            result: Unified MessageParseResult with structure:
+                - content: Optional[List[Dict[str, Any]]] - Message content items
+                - timestamp: Optional[int] - Message timestamp
+                - id: Optional[str] - Message unique identifier
+                - session_id: str - Session UUID for message association
+                - agent_profile: str - Agent profile type
             history_msgs: Current conversation history for context
-            
+
         Note:
             Modifies session storage by adding the processed message
             to the conversation history. Uses existing helper function
             for consistent message processing.
         """
-        process_user_message(parsed_data, session_id, history_msgs)
+        process_user_message(result, history_msgs)
     
     async def create_streaming_response(
         self,
         session_id: str,
-        llm_client: LLMClientBase,
         agent_profile: str = "general",
         enable_memory: bool = True,
         user_message_id: Optional[str] = None
@@ -125,16 +125,9 @@ class ChatService:
         
         Args:
             session_id: Session UUID for conversation context
-            llm_client: LLM client for text generation with structure:
-                - Supports streaming text generation
-                - Tool calling capabilities
-                - Conversation history processing
-            tts_engine: TTS engine for audio synthesis with structure:
-                - Audio generation from text
-                - Voice configuration support
-                - Streaming audio output
             agent_profile: Agent profile for tool selection ("general", "coding", "lifestyle", etc.)
             enable_memory: Whether to enable memory injection (controlled by frontend toggle)
+            user_message_id: Optional user message ID for status tracking
                 
         Returns:
             StreamingResponse: FastAPI streaming response with:
@@ -144,7 +137,7 @@ class ChatService:
         
         Example:
             response = await chat_service.create_streaming_response(
-                session_id, llm_client, tts_engine
+                session_id, agent_profile="general", enable_memory=True
             )
             return response
         
@@ -156,7 +149,6 @@ class ChatService:
         return StreamingResponse(
             generate_chat_stream(
                 session_id,
-                llm_client,
                 enable_memory=enable_memory,
                 agent_profile=agent_profile,
                 user_message_id=user_message_id
