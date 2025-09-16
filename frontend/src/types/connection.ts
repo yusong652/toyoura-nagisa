@@ -16,4 +16,5 @@ export interface ConnectionContextType {
   sendWebSocketMessage: (message: any) => void
   onLocationRequest: (handler: (data: any) => void) => void
   checkConnection: () => Promise<boolean>
+  waitForConnection: (timeout?: number) => Promise<boolean>
 }

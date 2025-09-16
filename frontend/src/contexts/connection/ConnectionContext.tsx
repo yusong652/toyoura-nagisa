@@ -107,8 +107,16 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     }
   }, [])
 
+  // Reconnect logic is now inline in onclose to avoid circular dependencies
+
   // 连接到指定会话的WebSocket
   const connectToSession = useCallback((sessionId: string) => {
+    // Clear any existing reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+
     // Close previous ws if any
     if (wsRef.current) {
       try {
@@ -119,6 +127,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
     if (!sessionId) return
 
+    // Store current session ID for reconnection
+    currentSessionIdRef.current = sessionId
+
     const protocol = window.location.protocol === "https:" ? "wss" : "ws"
     // WebSocket 连接应该指向后端服务器端口 8000，而不是前端 Vite 端口 5173
     const wsHost = window.location.hostname
@@ -126,14 +137,51 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     wsRef.current = ws
 
     ws.onopen = () => {
-      console.log("[WebSocket] connected for session", sessionId)
-      setConnectionStatus(ConnectionStatus.CONNECTED)
-      setConnectionError(null)
+      try {
+        console.log("[WebSocket] connected for session", sessionId)
+        setConnectionStatus(ConnectionStatus.CONNECTED)
+        setConnectionError(null)
+
+        // Reset reconnect attempts on successful connection
+        if (reconnectAttemptsRef.current !== undefined) {
+          reconnectAttemptsRef.current = 0
+        }
+
+        // Expose WebSocket connection globally for services
+        (window as any).__wsConnection = ws
+      } catch (error) {
+        console.error("[WebSocket] Error in onopen handler:", error)
+      }
     }
-    
-    ws.onclose = () => {
-      console.log("[WebSocket] closed for session", sessionId)
+
+    ws.onclose = (event) => {
+      console.log("[WebSocket] closed for session", sessionId, "Code:", event.code, "Reason:", event.reason)
       setConnectionStatus(ConnectionStatus.DISCONNECTED)
+
+      // Clear global WebSocket reference
+      (window as any).__wsConnection = null
+
+      // Only attempt reconnect if it wasn't a clean close and we have a session ID
+      if (event.code !== 1000 && currentSessionIdRef.current) {
+        console.log("[WebSocket] Connection lost, attempting to reconnect...")
+
+        // Inline reconnect logic to avoid circular dependency
+        if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          console.log("[WebSocket] Max reconnect attempts reached")
+          setConnectionStatus(ConnectionStatus.ERROR)
+          setConnectionError("达到最大重连次数")
+          return
+        }
+
+        reconnectAttemptsRef.current++
+        const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1), 30000)
+
+        console.log(`[WebSocket] Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} after ${delay}ms`)
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectToSession(sessionId)
+        }, delay)
+      }
     }
 
     ws.onerror = (e) => {
@@ -245,9 +293,16 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
   // 断开WebSocket连接
   const disconnect = useCallback(() => {
+    // Clear reconnection attempts when manually disconnecting
+    currentSessionIdRef.current = null
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+
     if (wsRef.current) {
       try {
-        wsRef.current.close()
+        wsRef.current.close(1000, "Manual disconnect") // Clean close
       } catch (_) {}
       wsRef.current = null
     }
@@ -263,19 +318,77 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     }
   }, [])
 
+  // 等待WebSocket连接建立
+  const waitForConnection = useCallback((timeout: number = 10000): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        resolve(true)
+        return
+      }
+
+      const checkConnection = () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          resolve(true)
+        } else if (connectionStatus === ConnectionStatus.ERROR ||
+                   connectionStatus === ConnectionStatus.DISCONNECTED) {
+          resolve(false)
+        } else {
+          setTimeout(checkConnection, 100)
+        }
+      }
+
+      setTimeout(() => resolve(false), timeout)
+      checkConnection()
+    })
+  }, [connectionStatus])
+
   // 注册位置请求处理器
   const onLocationRequest = useCallback((handler: (data: any) => void) => {
     locationRequestHandler.current = handler
   }, [])
 
+  // Expose WebSocket connection globally for services
+  useEffect(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      // Expose WebSocket connection for ChatService
+      (window as any).__wsConnection = wsRef.current
+    } else {
+      (window as any).__wsConnection = null
+    }
+
+    // Expose waitForConnection method
+    (window as any).__waitForConnection = waitForConnection
+  }, [connectionStatus, waitForConnection])
+
+  // Handle requests for WebSocket connection
+  useEffect(() => {
+    const handleConnectionRequest = () => {
+      return wsRef.current
+    }
+
+    window.addEventListener('getWebSocketConnection', handleConnectionRequest)
+
+    return () => {
+      window.removeEventListener('getWebSocketConnection', handleConnectionRequest)
+    }
+  }, [])
+
   // 清理WebSocket连接
   useEffect(() => {
     return () => {
+      // Clear any pending reconnect timeouts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+
       if (wsRef.current) {
         try {
           wsRef.current.close()
         } catch (_) {}
       }
+
+      // Clean up global reference
+      (window as any).__wsConnection = null
     }
   }, [])
 
@@ -288,7 +401,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       disconnect,
       sendWebSocketMessage,
       onLocationRequest,
-      checkConnection
+      checkConnection,
+      waitForConnection
     }}>
       {children}
     </ConnectionContext.Provider>

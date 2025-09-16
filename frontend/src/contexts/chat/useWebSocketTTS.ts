@@ -17,7 +17,7 @@ interface ChunkData {
 }
 
 interface WebSocketTTSHandler {
-  setupTTSHandler: (messageId: string) => void
+  setupTTSHandler: () => void
   cleanupTTSHandler: () => void
   resetTTSProcessor: () => void
   updateMessageId: (oldId: string, newId: string) => void
@@ -219,7 +219,7 @@ export const useWebSocketTTS = ({
   /**
    * Setup TTS event handler - simplified since we get message_id from chunks.
    */
-  const setupTTSHandler = useCallback((messageId?: string) => {
+  const setupTTSHandler = useCallback(() => {
     // Reset processor state
     resetTTSProcessor()
 

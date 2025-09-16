@@ -70,19 +70,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log(`Starting audio playback #${count}, waiting for completion...`);
       // Wait for audio playback to complete before returning
-      const startTime = Date.now();
       await queueAndPlayAudio(audioData);
-      const duration = (Date.now() - startTime) / 1000;
-      console.log(`Audio #${count} playback completed, duration: ${duration.toFixed(2)}s`);
       return true;
     } catch (error) {
       console.error(`Audio #${count} processing failed:`, error);
       return false;
     }
   }, [queueAndPlayAudio])
-
 
   // Use message state manager for WebSocket TTS processing
   const { updateMessageText, finalizeMessage } = useMessageStateManager({ setMessages })

@@ -1,8 +1,11 @@
 /**
  * Chat API service for handling message-related operations.
- * 
- * Provides methods for sending messages, processing streams, deleting messages,
+ *
+ * Provides methods for sending messages via WebSocket, deleting messages,
  * and managing chat-related functionality in the aiNagisa application.
+ *
+ * Note: Chat messaging has been migrated from HTTP SSE to WebSocket for
+ * better real-time performance and unified architecture.
  */
 
 import { apiClient } from './httpClient'
@@ -39,8 +42,8 @@ export interface MessageDeleteResponse {
 
 export class ChatService {
   /**
-   * Send a chat message and return streaming response for processing.
-   * 
+   * Send a chat message via WebSocket connection.
+   *
    * @param text - Message text content
    * @param files - Optional file attachments
    * @param sessionId - Current session identifier
@@ -48,7 +51,7 @@ export class ChatService {
    * @param agentProfile - Agent profile for tool selection
    * @param ttsEnabled - Whether TTS is enabled for response
    * @param memoryEnabled - Whether memory injection is enabled (default: true)
-   * @returns Promise resolving to Response object for stream processing
+   * @returns Promise resolving to mock Response for compatibility (WebSocket doesn't return Response)
    */
   async sendMessage(
     text: string,
@@ -59,26 +62,95 @@ export class ChatService {
     ttsEnabled: boolean,
     memoryEnabled: boolean = true
   ): Promise<Response> {
-    const messageData: MessageRequest = {
-      id: userMessageId,
-      text,
-      timestamp: Date.now(),
+    // Get WebSocket connection from connection context
+    let wsRef = this.getWebSocketConnection()
+
+    // If WebSocket is not ready, try to wait for connection
+    if (!wsRef || wsRef.readyState !== WebSocket.OPEN) {
+      console.log('[ChatService] WebSocket not ready, attempting to wait for connection...')
+
+      // Try to get connection via context (if available)
+      const waitForConnection = (window as any).__waitForConnection
+      if (waitForConnection) {
+        const connected = await waitForConnection(5000) // 5 second timeout
+        if (connected) {
+          wsRef = this.getWebSocketConnection()
+        }
+      }
+
+      // Final check
+      if (!wsRef) {
+        throw new Error('WebSocket connection not established. Please check your connection and try again.')
+      }
+
+      if (wsRef.readyState !== WebSocket.OPEN) {
+        throw new Error(`WebSocket connection not ready (${this.getReadyStateText(wsRef.readyState)}). Please wait for connection to establish.`)
+      }
+    }
+
+    // Create WebSocket message format
+    const websocketMessage = {
+      type: 'CHAT_MESSAGE',
+      session_id: sessionId,
+      message_id: userMessageId,
+      message: text,
+      agent_profile: agentProfile,
+      enable_memory: memoryEnabled,
+      tts_enabled: ttsEnabled,
       files: files.map(file => ({
         name: file.name,
         type: file.type,
         data: file.data
-      }))
+      })),
+      stream_response: true,
+      timestamp: new Date().toISOString()
     }
 
-    const streamRequest: ChatStreamRequest = {
-      messageData: JSON.stringify(messageData),
-      session_id: sessionId,
-      agent_profile: agentProfile,
-      tts_enabled: ttsEnabled,
-      enable_memory: memoryEnabled
+    // Send via WebSocket
+    wsRef.send(JSON.stringify(websocketMessage))
+
+    // Return mock Response for compatibility with existing code
+    // The actual response will come via WebSocket events
+    return new Response('{"status": "sent_via_websocket"}', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  /**
+   * Get WebSocket connection from global context.
+   *
+   * @returns WebSocket connection or null if not available
+   */
+  private getWebSocketConnection(): WebSocket | null {
+    // First try to get from window global (set by ConnectionContext)
+    const wsConnection = (window as any).__wsConnection
+
+    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+      return wsConnection
     }
 
-    return await apiClient.postStream('/api/chat/stream', streamRequest)
+    // If not available, log debug info
+    console.debug('[ChatService] WebSocket connection status:', {
+      exists: !!wsConnection,
+      readyState: wsConnection?.readyState,
+      readyStateText: this.getReadyStateText(wsConnection?.readyState)
+    })
+
+    return null
+  }
+
+  /**
+   * Get human-readable WebSocket ready state text.
+   */
+  private getReadyStateText(readyState: number | undefined): string {
+    switch (readyState) {
+      case WebSocket.CONNECTING: return 'CONNECTING'
+      case WebSocket.OPEN: return 'OPEN'
+      case WebSocket.CLOSING: return 'CLOSING'
+      case WebSocket.CLOSED: return 'CLOSED'
+      default: return 'UNKNOWN'
+    }
   }
 
   /**
