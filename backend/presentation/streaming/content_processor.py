@@ -86,7 +86,7 @@ async def process_content_pipeline(
     
     # Send emotional keywords via WebSocket if available
     if extracted_keyword:
-        from backend.presentation.websocket.status_notification_service import get_status_notification_service
+        from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
         status_service = get_status_notification_service()
         if status_service:
             await status_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
@@ -128,7 +128,7 @@ async def send_message_create_via_websocket(session_id: str, message_id: str):
     """
     try:
         # Get WebSocket connection manager
-        from backend.presentation.websocket.connection import get_connection_manager
+        from backend.infrastructure.websocket.connection_manager import get_connection_manager
         connection_manager = get_connection_manager()
 
         if not connection_manager or not connection_manager.is_connected_sync(session_id):
@@ -168,7 +168,7 @@ async def send_tts_chunk_via_websocket(session_id: str, sse_chunk: str, message_
     """
     try:
         # Get WebSocket connection manager
-        from backend.presentation.websocket.connection import get_connection_manager
+        from backend.infrastructure.websocket.connection_manager import get_connection_manager
         connection_manager = get_connection_manager()
 
         if not connection_manager or not connection_manager.is_connected_sync(session_id):

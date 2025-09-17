@@ -12,7 +12,7 @@ from backend.presentation.streaming.llm_response_handler import handle_llm_respo
 from backend.presentation.streaming.memory_injection_handler import (
     save_session_conversation_memory
 )
-from backend.presentation.websocket.status_notification_service import get_status_notification_service
+from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
 
 logger = logging.getLogger(__name__)
 

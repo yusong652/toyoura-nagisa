@@ -9,9 +9,9 @@ import logging
 from typing import Optional
 from fastapi import WebSocket, WebSocketDisconnect
 
-from backend.presentation.websocket.connection import ConnectionManager, set_connection_manager
+from backend.infrastructure.websocket.connection_manager import ConnectionManager, set_connection_manager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
-from backend.presentation.websocket.status_notification_service import (
+from backend.infrastructure.websocket.services.status_notification_service import (
     MessageStatusNotificationService,
     get_status_notification_service
 )

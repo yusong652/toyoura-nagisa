@@ -7,7 +7,7 @@ replacing the SSE-based tool notification system with unified WebSocket architec
 
 import logging
 from typing import Dict, Any, Optional, List
-from backend.presentation.websocket.websocket_handler import get_websocket_handler
+from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import create_message, MessageType
 
 logger = logging.getLogger(__name__)
@@ -16,20 +16,27 @@ logger = logging.getLogger(__name__)
 class ToolNotificationService:
     """
     Service for sending real-time tool calling notifications via WebSocket.
-    
+
     This service provides a clean interface for LLM clients to send tool calling
-    status updates without directly coupling to WebSocket infrastructure.
+    status updates without directly coupling to WebSocket presentation layer.
     """
-    
-    def __init__(self):
+
+    def __init__(self, connection_manager: Optional[ConnectionManager] = None):
         """Initialize the tool notification service."""
-        self._websocket_handler = None
-    
-    def _get_websocket_handler(self):
-        """Get WebSocket handler instance with lazy initialization."""
-        if self._websocket_handler is None:
-            self._websocket_handler = get_websocket_handler()
-        return self._websocket_handler
+        self._connection_manager = connection_manager
+
+    def _get_connection_manager(self) -> ConnectionManager:
+        """Get connection manager instance with lazy initialization."""
+        if self._connection_manager is None:
+            # Try to get the global connection manager first
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            global_manager = get_connection_manager()
+            if global_manager is not None:
+                self._connection_manager = global_manager
+            else:
+                # Fallback to creating a new instance
+                self._connection_manager = ConnectionManager()
+        return self._connection_manager
     
     async def notify_tool_use_started(
         self,
@@ -51,7 +58,7 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            handler = self._get_websocket_handler()
+            connection_manager = self._get_connection_manager()
             
             # Create tool use started message
             message_data = {
@@ -72,7 +79,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            success = await connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool use started notification to session {session_id}")
@@ -103,7 +110,7 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            handler = self._get_websocket_handler()
+            connection_manager = self._get_connection_manager()
             
             # Create tool use concluded message
             message_data = {
@@ -124,7 +131,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            success = await connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool use concluded notification to session {session_id}")
@@ -157,7 +164,7 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            handler = self._get_websocket_handler()
+            connection_manager = self._get_connection_manager()
             
             # Create error message
             error_data = {
@@ -177,7 +184,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await handler.send_to_session(session_id, ws_message.model_dump())
+            success = await connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool error notification to session {session_id}")
@@ -201,8 +208,8 @@ class ToolNotificationService:
             bool: Whether session has active WebSocket connection
         """
         try:
-            handler = self._get_websocket_handler()
-            connection_manager = handler.get_connection_manager()
+            connection_manager = self._get_connection_manager()
+            # connection_manager already available from _get_connection_manager()
             return session_id in connection_manager.connections
         except Exception:
             return False

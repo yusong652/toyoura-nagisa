@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Type
 from datetime import datetime
 
-from backend.presentation.websocket.connection import ConnectionManager
+from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import (
     MessageType, BaseWebSocketMessage, parse_message, create_message
 )

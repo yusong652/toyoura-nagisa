@@ -67,7 +67,7 @@ async def handle_llm_response(
 
             # Send error status via WebSocket if message ID is available
             if user_message_id:
-                from backend.presentation.websocket.status_notification_service import get_status_notification_service
+                from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
                 status_service = get_status_notification_service()
                 if status_service:
                     await status_service.notify_error(session_id, user_message_id, error_msg)
@@ -130,7 +130,7 @@ async def handle_llm_response(
 
         # Send error status via WebSocket if message ID is available
         if user_message_id:
-            from backend.presentation.websocket.status_notification_service import get_status_notification_service
+            from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
             status_service = get_status_notification_service()
             if status_service:
                 await status_service.notify_error(session_id, user_message_id, str(e))

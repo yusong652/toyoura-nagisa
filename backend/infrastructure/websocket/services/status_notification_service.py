@@ -6,7 +6,7 @@ enabling real-time status notifications for message lifecycle events.
 """
 import logging
 from typing import Optional
-from backend.presentation.websocket.connection import ConnectionManager
+from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import MessageType, create_message
 
 logger = logging.getLogger(__name__)
@@ -145,12 +145,15 @@ def get_status_notification_service(
     elif _status_service is None:
         # Try to get connection manager from WebSocket handler
         try:
-            from backend.presentation.websocket.websocket_handler import get_websocket_handler
-            handler = get_websocket_handler()
-            if handler and handler.connection_manager:
-                _status_service = MessageStatusNotificationService(handler.connection_manager)
+            # Try to get the global connection manager first
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager, ConnectionManager
+            global_manager = get_connection_manager()
+            if global_manager is not None:
+                connection_manager = global_manager
             else:
-                logger.warning(f"WebSocket handler or connection manager not available")
+                # Fallback to creating a new instance
+                connection_manager = ConnectionManager()
+            _status_service = MessageStatusNotificationService(connection_manager)
         except Exception as e:
             logger.warning(f"Could not initialize status service: {e}")
 

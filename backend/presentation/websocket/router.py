@@ -9,7 +9,7 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any
 from fastapi import WebSocket, WebSocketDisconnect
-from backend.presentation.websocket.connection import ConnectionManager
+from backend.infrastructure.websocket.connection_manager import ConnectionManager
 import logging
 
 logger = logging.getLogger(__name__)
