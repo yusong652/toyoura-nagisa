@@ -7,7 +7,7 @@ Focuses on message CRUD operations within chat sessions.
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 from backend.presentation.models.api_models import DeleteMessageRequest
-from backend.domain.services.message_service import MessageService
+from backend.application.services.message_service import MessageService
 
 router = APIRouter(tags=["messages"])
 

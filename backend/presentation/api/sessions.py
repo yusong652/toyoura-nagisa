@@ -11,7 +11,7 @@ from backend.presentation.models.api_models import (
     DeleteSessionRequest,
     NewHistoryRequest,
 )
-from backend.domain.services.session_service import SessionService
+from backend.application.services.session_service import SessionService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter(tags=["sessions"])

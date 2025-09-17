@@ -7,7 +7,7 @@ and image generation following Clean Architecture principles.
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.presentation.models.api_models import GenerateImageRequest, GenerateVideoRequest
-from backend.domain.services.content_service import ContentService
+from backend.application.services.content_service import ContentService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter(tags=["content"])

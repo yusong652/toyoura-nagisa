@@ -160,7 +160,7 @@ class ChatHandler(MessageHandler):
     def __init__(self, connection_manager: ConnectionManager):
         super().__init__(connection_manager)
         # Import chat service for LLM processing
-        from backend.domain.services.chat_service import get_chat_service
+        from backend.application.services.chat_service import get_chat_service
         self.chat_service = get_chat_service()
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
@@ -227,7 +227,7 @@ class ChatHandler(MessageHandler):
 
             # Use the complete chat stream pipeline which includes status updates
             await generate_chat_stream(
-                session_id=result['session_id'],
+                session_id=session_id,  # Use the WebSocket session_id, not the result's session_id
                 enable_memory=enable_memory,
                 agent_profile=result['agent_profile'],
                 user_message_id=result.get('id')

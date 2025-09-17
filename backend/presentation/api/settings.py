@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from backend.presentation.models.api_models import (
     UpdateTTSEnabledRequest
 )
-from backend.domain.services.settings_service import SettingsService, get_settings_service
+from backend.application.services.settings_service import SettingsService, get_settings_service
 
 router = APIRouter(tags=["settings"])
 

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
-from backend.domain.services.content_service import ContentService
+from backend.application.services.content_service import ContentService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter()
