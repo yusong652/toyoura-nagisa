@@ -1,8 +1,13 @@
 """
-WebSocket Tool Notification Service
+Tool Notification Application Service - DDD Application Layer
 
-This service provides real-time tool calling notifications through WebSocket,
-replacing the SSE-based tool notification system with unified WebSocket architecture.
+This service handles tool execution notification use cases by coordinating
+between LLM tool calling logic and WebSocket infrastructure.
+
+DDD Role: Application Service
+- Implements tool notification use cases
+- Uses ConnectionManager (infrastructure) for WebSocket delivery
+- Contains business logic for tool calling status updates
 """
 
 import logging
@@ -15,10 +20,15 @@ logger = logging.getLogger(__name__)
 
 class ToolNotificationService:
     """
-    Service for sending real-time tool calling notifications via WebSocket.
+    Application Service for Tool Execution Notifications.
 
-    This service provides a clean interface for LLM clients to send tool calling
-    status updates without directly coupling to WebSocket presentation layer.
+    Coordinates tool notification use cases:
+    - notify_tool_use_started: When tools begin execution
+    - notify_tool_use_concluded: When tools finish execution
+    - notify_tool_error: When tool execution fails
+
+    Uses ConnectionManager (infrastructure layer) for actual WebSocket delivery.
+    Provides clean interface for LLM clients without coupling to WebSocket details.
     """
 
     def __init__(self, connection_manager: Optional[ConnectionManager] = None):

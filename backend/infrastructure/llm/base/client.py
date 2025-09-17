@@ -704,7 +704,7 @@ class LLMClientBase(ABC):
         
         try:
             # Import here to avoid circular dependencies
-            from backend.infrastructure.websocket.services.tool_notification_service import (
+            from backend.application.services.notifications import (
                 notify_tool_started, notify_tool_concluded
             )
             

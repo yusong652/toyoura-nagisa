@@ -86,8 +86,8 @@ async def process_content_pipeline(
     
     # Send emotional keywords via WebSocket if available
     if extracted_keyword:
-        from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
-        status_service = get_status_notification_service()
+        from backend.application.services.notifications import get_message_status_service
+        status_service = get_message_status_service()
         if status_service:
             await status_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     

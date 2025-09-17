@@ -12,7 +12,7 @@ from backend.presentation.streaming.llm_response_handler import handle_llm_respo
 from backend.presentation.streaming.memory_injection_handler import (
     save_session_conversation_memory
 )
-from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
+from backend.application.services.notifications import get_message_status_service
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ async def generate_chat_stream(
     request_id = str(uuid.uuid4())[:8]
 
     # Send WebSocket status update if service is available and message ID provided
-    status_service = get_status_notification_service()
+    status_service = get_message_status_service()
     if status_service and user_message_id:
         await status_service.notify_sent(session_id, user_message_id)
 

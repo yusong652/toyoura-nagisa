@@ -22,7 +22,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager, set_connection_manager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
-from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
+from backend.application.services.notifications import get_message_status_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class WebSocketHandler:
         """
         self.connection_manager = ConnectionManager()  # Infrastructure layer
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)  # Presentation layer
-        self.status_service = get_status_notification_service(self.connection_manager)  # Infrastructure service
+        self.status_service = get_message_status_service(self.connection_manager)  # Application service
 
         # Set global instances for external services to access
         set_connection_manager(self.connection_manager)  # For TTS streaming, notifications

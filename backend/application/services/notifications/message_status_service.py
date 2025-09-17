@@ -1,8 +1,13 @@
 """
-Message status notification service for WebSocket.
+Message Status Application Service - DDD Application Layer
 
-This module provides centralized message status update functionality,
-enabling real-time status notifications for message lifecycle events.
+This service handles message status notification use cases by coordinating
+between business logic and WebSocket infrastructure.
+
+DDD Role: Application Service
+- Implements message status notification use cases
+- Uses ConnectionManager (infrastructure) for WebSocket delivery
+- Contains business logic for different status types
 """
 import logging
 from typing import Optional
@@ -12,15 +17,18 @@ from backend.presentation.websocket.message_types import MessageType, create_mes
 logger = logging.getLogger(__name__)
 
 
-class MessageStatusNotificationService:
+class MessageStatusService:
     """
-    Service for sending message status updates via WebSocket.
-    
-    Provides real-time notifications for message lifecycle events:
+    Application Service for Message Status Notifications.
+
+    Coordinates message status notification use cases:
     - sending: Message is being sent
     - sent: Message received by backend
     - read: Message is being processed by LLM
     - error: Message processing failed
+    - emotion_keyword: Emotion keywords for Live2D animations
+
+    Uses ConnectionManager (infrastructure layer) for actual WebSocket delivery.
     """
     
     def __init__(self, connection_manager: ConnectionManager):
@@ -122,39 +130,52 @@ class MessageStatusNotificationService:
             logger.error(f"Failed to send emotion keyword notification: {e}")
 
 
-# Global instance for easy access
-_status_service: Optional[MessageStatusNotificationService] = None
+# Global service instance
+_status_service: Optional[MessageStatusService] = None
 
 
-def get_status_notification_service(
+def get_message_status_service(
     connection_manager: Optional[ConnectionManager] = None
-) -> Optional[MessageStatusNotificationService]:
+) -> Optional[MessageStatusService]:
     """
-    Get or create the global status notification service.
+    Get or initialize the global message status service.
 
     Args:
-        connection_manager: Connection manager to use for new instance
+        connection_manager: Optional connection manager for initialization.
+                          If provided, initializes a new service instance.
+                          If None, returns existing global instance.
 
     Returns:
-        MessageStatusNotificationService instance or None if not initialized
+        MessageStatusService instance or None if not initialized
+
+    Usage:
+        # Initialize (typically in application startup)
+        service = get_message_status_service(connection_manager)
+
+        # Get existing instance (in business logic)
+        service = get_message_status_service()
     """
     global _status_service
 
     if connection_manager:
-        _status_service = MessageStatusNotificationService(connection_manager)
+        # Initialize new service instance
+        _status_service = MessageStatusService(connection_manager)
+        return _status_service
     elif _status_service is None:
-        # Try to get connection manager from WebSocket handler
+        # Try to auto-initialize with global connection manager
         try:
-            # Try to get the global connection manager first
             from backend.infrastructure.websocket.connection_manager import get_connection_manager, ConnectionManager
             global_manager = get_connection_manager()
             if global_manager is not None:
-                connection_manager = global_manager
+                _status_service = MessageStatusService(global_manager)
             else:
                 # Fallback to creating a new instance
-                connection_manager = ConnectionManager()
-            _status_service = MessageStatusNotificationService(connection_manager)
+                _status_service = MessageStatusService(ConnectionManager())
         except Exception as e:
             logger.warning(f"Could not initialize status service: {e}")
 
     return _status_service
+
+
+
+
