@@ -206,23 +206,6 @@ class ToolNotificationService:
         except Exception as e:
             logger.error(f"Error sending tool error notification: {e}")
             return False
-    
-    def is_session_connected(self, session_id: str) -> bool:
-        """
-        Check if a session has an active WebSocket connection.
-        
-        Args:
-            session_id: Session ID to check
-            
-        Returns:
-            bool: Whether session has active WebSocket connection
-        """
-        try:
-            connection_manager = self._get_connection_manager()
-            # connection_manager already available from _get_connection_manager()
-            return session_id in connection_manager.connections
-        except Exception:
-            return False
 
 
 # Global service instance
