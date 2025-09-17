@@ -53,7 +53,6 @@ class WebSocketMessageProcessor:
     - CHAT_MESSAGE → ChatHandler (main user interaction)
     - LOCATION_* → LocationHandler (geolocation for tools)
     - HEARTBEAT_ACK → HeartbeatHandler (connection health)
-    - TOOL_CALL_REQUEST → ToolCallHandler (direct tool calls)
 
     This is the main entry point for all WebSocket message processing.
     """
@@ -65,14 +64,12 @@ class WebSocketMessageProcessor:
         heartbeat_handler = HeartbeatHandler(connection_manager)
         location_handler = LocationHandler(connection_manager)
         chat_handler = ChatHandler(connection_manager)
-        tool_handler = ToolCallHandler(connection_manager)
-        
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_REQUEST: location_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Same instance for shared state
             MessageType.CHAT_MESSAGE: chat_handler,
-            MessageType.TOOL_CALL_REQUEST: tool_handler,
         }
         
         # Store location handler for external tool access
@@ -363,34 +360,4 @@ class ChatHandler(MessageHandler):
             )
 
 
-class ToolCallHandler(MessageHandler):
-    """
-    Handle direct tool call requests from frontend.
-
-    Purpose: Process explicit tool execution requests sent by frontend.
-    Note: Most tool calls are actually triggered by LLM during chat processing,
-    not directly from frontend. This handler is for potential future use.
-    """
-
-    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
-        if message.type == MessageType.TOOL_CALL_REQUEST:
-            await self._handle_tool_call(session_id, message)
-        return None
-
-    async def _handle_tool_call(self, session_id: str, message: BaseWebSocketMessage):
-        # TODO: Integrate with MCP tool system when direct tool calls are needed
-        tool_name = getattr(message, 'tool_name', 'unknown')
-        request_id = getattr(message, 'request_id', '')
-
-        response = create_message(
-            MessageType.TOOL_CALL_RESULT,
-            session_id=session_id,
-            data={
-                "tool_name": tool_name,
-                "request_id": request_id,
-                "status": "acknowledged",
-                "result": "Direct tool calls not yet implemented"
-            }
-        )
-        await self.send_response(session_id, response)
 

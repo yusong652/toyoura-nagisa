@@ -44,8 +44,6 @@ backend/infrastructure/websocket/
 | `CHAT_STREAM_START` | Server→Client | Start of streaming response | ChatHandler |
 | `CHAT_STREAM_CHUNK` | Server→Client | Streaming content chunk | ChatHandler |
 | `CHAT_STREAM_END` | Server→Client | End of streaming response | ChatHandler |
-| `TOOL_CALL_REQUEST` | Client→Server | Tool execution request | ToolCallHandler |
-| `TOOL_CALL_RESULT` | Server→Client | Tool execution result | ToolCallHandler |
 | `ERROR` | Server→Client | Error notification | All handlers |
 | `STATUS_UPDATE` | Server→Client | Status information | All handlers |
 

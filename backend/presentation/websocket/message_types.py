@@ -27,9 +27,6 @@ class MessageType(str, Enum):
     CHAT_STREAM_CHUNK = "CHAT_STREAM_CHUNK"
     CHAT_STREAM_END = "CHAT_STREAM_END"
     
-    # Tool integration
-    TOOL_CALL_REQUEST = "TOOL_CALL_REQUEST"
-    TOOL_CALL_RESULT = "TOOL_CALL_RESULT"
     
     # Tool use notifications (for frontend display)
     NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
@@ -52,6 +49,10 @@ class MessageType(str, Enum):
 
     # Emotion and animation
     EMOTION_KEYWORD = "EMOTION_KEYWORD"
+
+    # Bash command confirmation
+    BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
+    BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
 
     # Future extensions
     VOICE_MESSAGE = "VOICE_MESSAGE"
@@ -107,13 +108,6 @@ class ChatStreamChunk(BaseWebSocketMessage):
     is_final: bool = False
 
 
-class ToolCallRequest(BaseWebSocketMessage):
-    """Tool call request message schema"""
-    type: MessageType = MessageType.TOOL_CALL_REQUEST
-    tool_name: str
-    parameters: Dict[str, Any]
-    request_id: str
-
 
 class ToolUseNotification(BaseWebSocketMessage):
     """Tool use notification message schema"""
@@ -166,6 +160,21 @@ class EmotionKeywordMessage(BaseWebSocketMessage):
     message_id: Optional[str] = None
 
 
+class BashConfirmationRequestMessage(BaseWebSocketMessage):
+    """Bash command confirmation request message schema"""
+    type: MessageType = MessageType.BASH_CONFIRMATION_REQUEST
+    confirmation_id: str
+    command: str
+    description: Optional[str] = None
+
+
+class BashConfirmationResponseMessage(BaseWebSocketMessage):
+    """Bash command confirmation response message schema"""
+    type: MessageType = MessageType.BASH_CONFIRMATION_RESPONSE
+    confirmation_id: str
+    approved: bool
+
+
 # Message type to schema mapping
 MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT: HeartbeatMessage,
@@ -174,7 +183,6 @@ MESSAGE_SCHEMAS = {
     MessageType.LOCATION_RESPONSE: LocationResponseMessage,
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
     MessageType.CHAT_STREAM_CHUNK: ChatStreamChunk,
-    MessageType.TOOL_CALL_REQUEST: ToolCallRequest,
     MessageType.NAGISA_IS_USING_TOOL: ToolUseNotification,
     MessageType.NAGISA_TOOL_USE_CONCLUDED: ToolUseNotification,
     MessageType.ERROR: ErrorMessage,
@@ -182,6 +190,8 @@ MESSAGE_SCHEMAS = {
     MessageType.TTS_CHUNK: TTSChunk,
     MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
+    MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
+    MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
 }
 
 
@@ -238,3 +248,86 @@ def parse_message(data: Union[str, Dict[str, Any]]) -> BaseWebSocketMessage:
         return schema_class(**data)
     except Exception as e:
         raise ValueError(f"Invalid message format for type {message_type}: {e}")
+
+
+def create_error_message(
+    error: str,
+    session_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Create error message
+
+    Args:
+        error: Error description
+        session_id: Session ID
+        details: Additional error details
+
+    Returns:
+        Error message dictionary
+    """
+    msg = ErrorMessage(
+        type=MessageType.ERROR,
+        error_code="GENERAL_ERROR",
+        error_message=error,
+        session_id=session_id,
+        details=details
+    )
+    return msg.model_dump(mode="json")
+
+
+def create_tool_use_message(
+    is_using: bool,
+    tool_name: Optional[str] = None,
+    action: Optional[str] = None,
+    result: Optional[Dict[str, Any]] = None,
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create tool use message
+
+    Args:
+        is_using: Whether currently using tool
+        tool_name: Tool name
+        action: Action description
+        result: Tool result
+        session_id: Session ID
+
+    Returns:
+        Tool use message dictionary
+    """
+    msg_type = MessageType.NAGISA_IS_USING_TOOL if is_using else MessageType.NAGISA_TOOL_USE_CONCLUDED
+
+    msg = ToolUseNotification(
+        type=msg_type,
+        tool_names=[tool_name] if tool_name else None,
+        action=action,
+        results=result,
+        session_id=session_id
+    )
+    return msg.model_dump(mode="json", exclude_none=True)
+
+
+def create_bash_confirmation_request(
+    confirmation_id: str,
+    command: str,
+    description: Optional[str] = None,
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create Bash command confirmation request message
+
+    Args:
+        confirmation_id: Unique ID for confirmation request
+        command: Bash command to execute
+        description: Command description (optional)
+        session_id: Session ID
+
+    Returns:
+        Bash confirmation request message dictionary
+    """
+    msg = BashConfirmationRequestMessage(
+        type=MessageType.BASH_CONFIRMATION_REQUEST,
+        confirmation_id=confirmation_id,
+        command=command,
+        description=description,
+        session_id=session_id
+    )
+    return msg.model_dump(mode="json", exclude_none=True)

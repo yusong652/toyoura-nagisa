@@ -15,7 +15,7 @@ from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history, update_session_title
 from backend.shared.utils.helpers import should_generate_title, generate_title_for_session
-from backend.presentation.models.websocket_messages import (
+from backend.presentation.websocket.message_types import (
     create_error_message, create_tool_use_message
 )
 from backend.presentation.streaming.content_processor import process_content_pipeline
