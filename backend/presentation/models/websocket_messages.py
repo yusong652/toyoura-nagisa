@@ -1,137 +1,128 @@
-"""WebSocket消息模型定义 - 确保前后端消息类型一致性"""
+"""WebSocket message model definitions - ensuring frontend-backend message type consistency"""
 
-from typing import Optional, Dict, Any, Literal, Union
+from typing import Optional, Dict, Any, Literal, Union, TypeVar, Generic
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from enum import Enum
 
 
 class MessageType(str, Enum):
-    """WebSocket消息类型枚举"""
-    # 系统消息
+    """WebSocket message type enumeration"""
+    # System messages
     CONNECTION_ESTABLISHED = "CONNECTION_ESTABLISHED"
     CONNECTION_CLOSED = "CONNECTION_CLOSED"
     HEARTBEAT = "HEARTBEAT"
     HEARTBEAT_ACK = "HEARTBEAT_ACK"
     ERROR = "error"
     
-    # 聊天消息
+    # Chat messages
     CHAT_MESSAGE = "CHAT_MESSAGE"
     CHAT_RESPONSE = "CHAT_RESPONSE"
     STATUS_UPDATE = "STATUS_UPDATE"
     
-    # 工具相关
+    # Tool-related
     NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
     NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED"
     
-    # 标题更新
+    # Title updates
     TITLE_UPDATE = "TITLE_UPDATE"
     
-    # 位置相关
+    # Location-related
     REQUEST_LOCATION = "REQUEST_LOCATION"
     LOCATION_RESPONSE = "LOCATION_RESPONSE"
     
-    # TTS相关
+    # TTS-related
     TTS_CHUNK = "TTS_CHUNK"
     TTS_COMPLETE = "TTS_COMPLETE"
     
-    # Bash命令确认相关
+    # Bash command confirmation-related
     BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
     BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
 
 
-class BaseWebSocketMessage(BaseModel):
-    """WebSocket消息基类"""
-    type: MessageType
+MessageTypeVar = TypeVar('MessageTypeVar', bound=MessageType)
+
+class BaseWebSocketMessage(BaseModel, Generic[MessageTypeVar]):
+    """Base WebSocket message class"""
+    type: MessageTypeVar
     timestamp: datetime = Field(default_factory=datetime.now)
     session_id: Optional[str] = None
-    
+
     model_config = ConfigDict(use_enum_values=True)
 
 
-class ConnectionMessage(BaseWebSocketMessage):
-    """连接相关消息"""
-    type: Literal[MessageType.CONNECTION_ESTABLISHED, MessageType.CONNECTION_CLOSED]
+class ConnectionMessage(BaseWebSocketMessage[Literal[MessageType.CONNECTION_ESTABLISHED, MessageType.CONNECTION_CLOSED]]):
+    """Connection-related messages"""
     code: Optional[int] = None
     reason: Optional[str] = None
 
 
-class HeartbeatMessage(BaseWebSocketMessage):
-    """心跳消息"""
-    type: Literal[MessageType.HEARTBEAT, MessageType.HEARTBEAT_ACK]
+class HeartbeatMessage(BaseWebSocketMessage[Literal[MessageType.HEARTBEAT, MessageType.HEARTBEAT_ACK]]):
+    """Heartbeat messages"""
+    pass
 
 
-class ErrorMessage(BaseWebSocketMessage):
-    """错误消息"""
-    type: Literal[MessageType.ERROR]
+class ErrorMessage(BaseWebSocketMessage[Literal[MessageType.ERROR]]):
+    """Error messages"""
     error: str
     details: Optional[Dict[str, Any]] = None
     recoverable: bool = True
 
 
-class StatusMessage(BaseWebSocketMessage):
-    """状态更新消息"""
-    type: Literal[MessageType.STATUS_UPDATE]
+class StatusMessage(BaseWebSocketMessage[Literal[MessageType.STATUS_UPDATE]]):
+    """Status update messages"""
     status: Literal["sent", "read", "typing", "thinking", "complete", "retrieving_memories", "memory_injected", "memory_injection_skipped", "memory_error"]
     message_id: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
 
 
-class ToolUseMessage(BaseWebSocketMessage):
-    """工具使用消息"""
-    type: Literal[MessageType.NAGISA_IS_USING_TOOL, MessageType.NAGISA_TOOL_USE_CONCLUDED]
+class ToolUseMessage(BaseWebSocketMessage[Literal[MessageType.NAGISA_IS_USING_TOOL, MessageType.NAGISA_TOOL_USE_CONCLUDED]]):
+    """Tool use messages"""
     tool_name: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
     action: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
 
 
-class TitleUpdateMessage(BaseWebSocketMessage):
-    """标题更新消息"""
-    type: Literal[MessageType.TITLE_UPDATE]
-    payload: Dict[str, str] = Field(description="包含session_id和title")
+class TitleUpdateMessage(BaseWebSocketMessage[Literal[MessageType.TITLE_UPDATE]]):
+    """Title update messages"""
+    payload: Dict[str, str] = Field(description="Contains session_id and title")
 
 
-class LocationRequestMessage(BaseWebSocketMessage):
-    """位置请求消息"""
-    type: Literal[MessageType.REQUEST_LOCATION]
+class LocationRequestMessage(BaseWebSocketMessage[Literal[MessageType.REQUEST_LOCATION]]):
+    """Location request messages"""
     reason: Optional[str] = None
 
 
-class LocationResponseMessage(BaseWebSocketMessage):
-    """位置响应消息"""
-    type: Literal[MessageType.LOCATION_RESPONSE]
+class LocationResponseMessage(BaseWebSocketMessage[Literal[MessageType.LOCATION_RESPONSE]]):
+    """Location response messages"""
     location_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
 
-class TTSMessage(BaseWebSocketMessage):
-    """TTS消息"""
-    type: Literal[MessageType.TTS_CHUNK, MessageType.TTS_COMPLETE]
+class TTSMessage(BaseWebSocketMessage[Literal[MessageType.TTS_CHUNK, MessageType.TTS_COMPLETE]]):
+    """TTS messages"""
     audio_url: Optional[str] = None
     text: Optional[str] = None
     chunk_index: Optional[int] = None
     total_chunks: Optional[int] = None
 
 
-class BashConfirmationRequestMessage(BaseWebSocketMessage):
-    """Bash命令确认请求消息"""
-    type: Literal[MessageType.BASH_CONFIRMATION_REQUEST]
+class BashConfirmationRequestMessage(BaseWebSocketMessage[Literal[MessageType.BASH_CONFIRMATION_REQUEST]]):
+    """Bash command confirmation request messages"""
     confirmation_id: str
     command: str
     description: Optional[str] = None
 
 
-class BashConfirmationResponseMessage(BaseWebSocketMessage):
-    """Bash命令确认响应消息"""
-    type: Literal[MessageType.BASH_CONFIRMATION_RESPONSE]
+class BashConfirmationResponseMessage(BaseWebSocketMessage[Literal[MessageType.BASH_CONFIRMATION_RESPONSE]]):
+    """Bash command confirmation response messages"""
     confirmation_id: str
     approved: bool
 
 
-class ChatMessage(BaseWebSocketMessage):
-    """聊天消息"""
-    type: Literal[MessageType.CHAT_MESSAGE, MessageType.CHAT_RESPONSE]
+class ChatMessage(BaseWebSocketMessage[Literal[MessageType.CHAT_MESSAGE, MessageType.CHAT_RESPONSE]]):
+    """Chat messages"""
     content: Union[str, Dict[str, Any], list]
     message_id: str
     role: Literal["user", "assistant", "system"]
@@ -139,7 +130,7 @@ class ChatMessage(BaseWebSocketMessage):
     metadata: Optional[Dict[str, Any]] = None
 
 
-# 消息类型映射
+# Message type mapping
 MESSAGE_TYPE_MAP = {
     MessageType.CONNECTION_ESTABLISHED: ConnectionMessage,
     MessageType.CONNECTION_CLOSED: ConnectionMessage,
@@ -162,16 +153,16 @@ MESSAGE_TYPE_MAP = {
 
 
 def validate_websocket_message(data: Dict[str, Any]) -> BaseWebSocketMessage:
-    """验证并解析WebSocket消息
-    
+    """Validate and parse WebSocket message
+
     Args:
-        data: 原始消息数据
-        
+        data: Raw message data
+
     Returns:
-        验证后的消息对象
-        
+        Validated message object
+
     Raises:
-        ValueError: 如果消息格式无效
+        ValueError: If message format is invalid
     """
     if "type" not in data:
         raise ValueError("Message must have a 'type' field")
@@ -202,16 +193,16 @@ def create_error_message(
     details: Optional[Dict[str, Any]] = None,
     recoverable: bool = True
 ) -> Dict[str, Any]:
-    """创建错误消息
-    
+    """Create error message
+
     Args:
-        error: 错误描述
-        session_id: 会话ID
-        details: 额外的错误详情
-        recoverable: 是否可恢复
-        
+        error: Error description
+        session_id: Session ID
+        details: Additional error details
+        recoverable: Whether the error is recoverable
+
     Returns:
-        错误消息字典
+        Error message dictionary
     """
     msg = ErrorMessage(
         type=MessageType.ERROR,
@@ -224,21 +215,21 @@ def create_error_message(
 
 
 def create_status_message(
-    status: str,
+    status: Literal["sent", "read", "typing", "thinking", "complete", "retrieving_memories", "memory_injected", "memory_injection_skipped", "memory_error"],
     session_id: Optional[str] = None,
     message_id: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """创建状态消息
-    
+    """Create status message
+
     Args:
-        status: 状态值
-        session_id: 会话ID
-        message_id: 消息ID
-        details: 额外的状态详情
-        
+        status: Status value
+        session_id: Session ID
+        message_id: Message ID
+        details: Additional status details
+
     Returns:
-        状态消息字典
+        Status message dictionary
     """
     msg = StatusMessage(
         type=MessageType.STATUS_UPDATE,
@@ -258,18 +249,18 @@ def create_tool_use_message(
     result: Optional[Dict[str, Any]] = None,
     session_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """创建工具使用消息
-    
+    """Create tool use message
+
     Args:
-        is_using: 是否正在使用工具
-        tool_name: 工具名称
-        parameters: 工具参数
-        action: 动作描述
-        result: 工具结果
-        session_id: 会话ID
-        
+        is_using: Whether currently using tool
+        tool_name: Tool name
+        parameters: Tool parameters
+        action: Action description
+        result: Tool result
+        session_id: Session ID
+
     Returns:
-        工具使用消息字典
+        Tool use message dictionary
     """
     msg_type = MessageType.NAGISA_IS_USING_TOOL if is_using else MessageType.NAGISA_TOOL_USE_CONCLUDED
     
@@ -290,16 +281,16 @@ def create_bash_confirmation_request(
     description: Optional[str] = None,
     session_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """创建Bash命令确认请求消息
-    
+    """Create Bash command confirmation request message
+
     Args:
-        confirmation_id: 确认请求的唯一ID
-        command: 待执行的bash命令
-        description: 命令描述（可选）
-        session_id: 会话ID
-        
+        confirmation_id: Unique ID for confirmation request
+        command: Bash command to execute
+        description: Command description (optional)
+        session_id: Session ID
+
     Returns:
-        Bash确认请求消息字典
+        Bash confirmation request message dictionary
     """
     msg = BashConfirmationRequestMessage(
         type=MessageType.BASH_CONFIRMATION_REQUEST,
