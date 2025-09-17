@@ -21,6 +21,11 @@ from .tool_notification_service import (
     notify_tool_error
 )
 
+from .emotion_notification_service import (
+    EmotionNotificationService,
+    get_emotion_notification_service
+)
+
 __all__ = [
     # Message Status Services
     'MessageStatusService',
@@ -30,5 +35,8 @@ __all__ = [
     'get_tool_notification_service',
     'notify_tool_started',
     'notify_tool_concluded',
-    'notify_tool_error'
+    'notify_tool_error',
+    # Emotion Notification Services
+    'EmotionNotificationService',
+    'get_emotion_notification_service'
 ]
