@@ -1,9 +1,20 @@
 """
-Unified WebSocket handler - replaces router.py with simplified architecture.
+WebSocket Connection Lifecycle Manager for aiNagisa.
 
-This module provides a single entry point for all WebSocket connections,
-integrating connection management with message processing in a clean,
-maintainable architecture.
+This module manages the WebSocket connection lifecycle - NOT message content processing.
+
+Key Responsibilities:
+1. Accept/reject WebSocket connections from FastAPI routes
+2. Manage connection establishment and authentication
+3. Handle connection cleanup on disconnect/error
+4. Coordinate between infrastructure (ConnectionManager) and presentation (MessageProcessor)
+5. Initialize global services for external access
+
+Difference from message_handler.py:
+- websocket_handler.py: Connection LIFECYCLE (connect/disconnect/cleanup)
+- message_handler.py: Message CONTENT processing (parse/route/handle)
+
+Flow: FastAPI route → websocket_handler.py → message_handler.py → specific handlers
 """
 import logging
 from typing import Optional
@@ -11,39 +22,64 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager, set_connection_manager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
-from backend.infrastructure.websocket.services.status_notification_service import (
-    MessageStatusNotificationService,
-    get_status_notification_service
-)
+from backend.infrastructure.websocket.services.status_notification_service import get_status_notification_service
 
 logger = logging.getLogger(__name__)
 
 
 class WebSocketHandler:
     """
-    Unified WebSocket handler that manages connections and message processing.
-    
-    This class replaces the previous router.py + connection.py separation,
-    providing a single, cohesive interface for WebSocket operations.
+    WebSocket Connection Lifecycle Coordinator.
+
+    Purpose: Handle WebSocket connections at the FastAPI integration level.
+    This is NOT about message content - it's about connection management.
+
+    Responsibilities:
+    - Accept WebSocket connections from FastAPI routes
+    - Initialize connection manager and message processor
+    - Run the connection message loop (websocket.iter_text())
+    - Handle disconnections and cleanup resources
+    - Bridge between FastAPI and internal message processing
+
+    Note: Actual message parsing and handling happens in message_handler.py
     """
     
     def __init__(self):
-        self.connection_manager = ConnectionManager()
-        self.message_processor = WebSocketMessageProcessor(self.connection_manager)
-        self.status_service = get_status_notification_service(self.connection_manager)
-        # Set global connection manager instance for TTS streaming
-        set_connection_manager(self.connection_manager)
+        """
+        Initialize WebSocket lifecycle components.
+
+        Creates and coordinates the main WebSocket infrastructure:
+        - ConnectionManager: Low-level WebSocket connection handling
+        - MessageProcessor: High-level message parsing and routing
+        - StatusService: WebSocket notification services
+        - Global instances: For external service access (TTS, notifications, etc.)
+        """
+        self.connection_manager = ConnectionManager()  # Infrastructure layer
+        self.message_processor = WebSocketMessageProcessor(self.connection_manager)  # Presentation layer
+        self.status_service = get_status_notification_service(self.connection_manager)  # Infrastructure service
+
+        # Set global instances for external services to access
+        set_connection_manager(self.connection_manager)  # For TTS streaming, notifications
+        from backend.presentation.websocket.message_handler import set_message_processor
+        set_message_processor(self.message_processor)  # For external message broadcasting
     
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """
-        Handle complete WebSocket connection lifecycle.
+        Main connection lifecycle handler - called by FastAPI WebSocket route.
 
-        This method manages connection establishment, message processing loop,
-        and cleanup on disconnection.
+        This method handles the entire connection from establishment to cleanup:
+        1. Establish connection via ConnectionManager (infrastructure)
+        2. Run message receiving loop (websocket.iter_text())
+        3. Delegate message parsing/handling to MessageProcessor (presentation)
+        4. Handle disconnections and ensure proper cleanup
 
         Args:
-            websocket: WebSocket connection instance
-            session_id: Unique session identifier
+            websocket: FastAPI WebSocket connection instance
+            session_id: Unique session identifier from route parameter
+
+        Note: This is the bridge between FastAPI's WebSocket and our internal
+        message processing system. Raw message content handling happens in
+        message_handler.py, not here.
         """
         # Establish connection
         connected = await self.connection_manager.connect(websocket, session_id)
@@ -52,16 +88,18 @@ class WebSocketHandler:
             return
         
         try:
-            # Message processing loop
-            async for message in websocket.iter_text():
-                await self.message_processor.process_message(session_id, message)
-                
+            # Main message receiving loop - this is the core WebSocket lifecycle
+            async for raw_message in websocket.iter_text():
+                # Delegate message content processing to message_handler.py
+                # We just receive the raw text and pass it along
+                await self.message_processor.process_message(session_id, raw_message)
+
         except WebSocketDisconnect:
             logger.info(f"WebSocket disconnected for session {session_id}")
         except Exception as e:
             logger.error(f"Unexpected error in WebSocket handler for session {session_id}: {e}")
         finally:
-            # Ensure cleanup
+            # Critical: Always clean up connection resources
             await self.connection_manager.disconnect(session_id)
     
     def get_connection_manager(self) -> ConnectionManager:
@@ -72,48 +110,6 @@ class WebSocketHandler:
         """Get message processor for external access"""
         return self.message_processor
     
-    async def broadcast_message(self, message_data: dict, exclude_sessions: Optional[set] = None):
-        """
-        Broadcast message to all connected sessions.
-        
-        Args:
-            message_data: Message data to broadcast
-            exclude_sessions: Set of session IDs to exclude from broadcast
-        """
-        exclude_sessions = exclude_sessions or set()
-        
-        for session_id in self.connection_manager.get_active_sessions():
-            if session_id not in exclude_sessions:
-                await self.connection_manager.send_json(session_id, message_data)
-    
-    async def send_to_session(self, session_id: str, message_data: dict) -> bool:
-        """
-        Send message to specific session.
-        
-        Args:
-            session_id: Target session ID
-            message_data: Message data to send
-            
-        Returns:
-            bool: Whether message was sent successfully
-        """
-        return await self.connection_manager.send_json(session_id, message_data)
-    
-    def get_connection_stats(self) -> dict:
-        """
-        Get current connection statistics.
-        
-        Returns:
-            dict: Connection statistics with active session count and details
-        """
-        active_sessions = self.connection_manager.get_active_sessions()
-        
-        return {
-            "active_connections": len(active_sessions),
-            "session_ids": active_sessions,
-            "supported_message_types": list(self.message_processor.handlers.keys()),
-            "connection_manager_type": type(self.connection_manager).__name__
-        }
 
 
 # Global handler instance for application use
@@ -135,13 +131,16 @@ def get_websocket_handler() -> WebSocketHandler:
 
 def initialize_websocket_handler() -> WebSocketHandler:
     """
-    Initialize and return WebSocket handler.
-    
-    This function can be called during application startup to ensure
-    the handler is properly initialized.
-    
+    Application startup initialization for WebSocket system.
+
+    Called by app.py during FastAPI startup to initialize the WebSocket
+    connection handling system and set up global instances.
+
     Returns:
-        WebSocketHandler: Initialized handler instance
+        WebSocketHandler: Initialized connection lifecycle manager
+
+    Note: This sets up the global infrastructure that other services
+    (TTS, notifications, etc.) will use to send messages via WebSocket.
     """
     global _websocket_handler
     _websocket_handler = WebSocketHandler()
@@ -152,49 +151,21 @@ def initialize_websocket_handler() -> WebSocketHandler:
 # Convenience functions for external use
 async def handle_websocket_connection(websocket: WebSocket, session_id: str):
     """
-    Convenience function to handle WebSocket connection.
-    
+    FastAPI route convenience function.
+
+    This is the function that gets called directly by FastAPI WebSocket routes.
+    It's the entry point from the web framework into our WebSocket system.
+
     Args:
-        websocket: WebSocket connection instance
-        session_id: Session identifier
+        websocket: FastAPI WebSocket connection instance
+        session_id: Session identifier from route parameter (/ws/{session_id})
+
+    Usage in routes.py:
+        @app.websocket("/ws/{session_id}")
+        async def websocket_endpoint(websocket: WebSocket, session_id: str):
+            await handle_websocket_connection(websocket, session_id)
     """
     handler = get_websocket_handler()
     await handler.handle_connection(websocket, session_id)
 
 
-async def send_message_to_session(session_id: str, message_data: dict) -> bool:
-    """
-    Convenience function to send message to specific session.
-    
-    Args:
-        session_id: Target session ID
-        message_data: Message data to send
-        
-    Returns:
-        bool: Whether message was sent successfully
-    """
-    handler = get_websocket_handler()
-    return await handler.send_to_session(session_id, message_data)
-
-
-async def broadcast_message_to_all(message_data: dict, exclude_sessions: Optional[set] = None):
-    """
-    Convenience function to broadcast message to all sessions.
-    
-    Args:
-        message_data: Message data to broadcast
-        exclude_sessions: Sessions to exclude from broadcast
-    """
-    handler = get_websocket_handler()
-    await handler.broadcast_message(message_data, exclude_sessions)
-
-
-def get_connection_statistics() -> dict:
-    """
-    Convenience function to get connection statistics.
-    
-    Returns:
-        dict: Current connection statistics
-    """
-    handler = get_websocket_handler()
-    return handler.get_connection_stats()

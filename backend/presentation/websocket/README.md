@@ -10,13 +10,15 @@ This document describes the new unified WebSocket architecture for aiNagisa, whi
 
 ```
 backend/presentation/websocket/
-├── websocket_handler.py      # Unified handler (replaces router.py)
-├── connection.py             # Connection management (optimized)
+├── websocket_handler.py      # Unified connection lifecycle management
 ├── message_types.py          # Message type definitions and schemas
 ├── message_handler.py        # Extensible message processing system
-├── chat_stream_handler.py    # WebSocket chat streaming (replaces SSE)
 ├── routes.py                 # Route registration (simplified)
 └── README.md                # This documentation
+
+backend/infrastructure/websocket/
+├── connection_manager.py     # Low-level connection management
+└── services/                # WebSocket notification services
 ```
 
 ### Key Improvements
@@ -102,23 +104,30 @@ ws.onmessage = (event) => {
 ### Backend Message Sending
 
 ```python
-from backend.presentation.websocket.websocket_handler import get_websocket_handler
+# Direct connection manager access (infrastructure layer)
+from backend.infrastructure.websocket.connection_manager import get_connection_manager
+from backend.presentation.websocket.message_types import create_message, MessageType
 
-handler = get_websocket_handler()
+connection_manager = get_connection_manager()
 
-# Send chat message
-await handler.send_to_session(session_id, {
-    "type": "CHAT_STREAM_CHUNK",
-    "content": "Hello from server!",
-    "chunk_type": "text"
-})
+# Send message to specific session
+message = create_message(
+    MessageType.CHAT_STREAM_CHUNK,
+    session_id=session_id,
+    content="Hello from server!",
+    chunk_type="text"
+)
+await connection_manager.send_json(session_id, message.model_dump())
 
-# Broadcast to all sessions
-await handler.broadcast_message({
-    "type": "STATUS_UPDATE",
-    "status": "system_maintenance",
-    "data": {"message": "System will restart in 5 minutes"}
-})
+# For broadcasting, iterate through active sessions
+for active_session in connection_manager.get_active_sessions():
+    status_message = create_message(
+        MessageType.STATUS_UPDATE,
+        session_id=active_session,
+        status="system_maintenance",
+        data={"message": "System will restart in 5 minutes"}
+    )
+    await connection_manager.send_json(active_session, status_message.model_dump())
 ```
 
 ### Adding New Message Handlers
@@ -256,11 +265,17 @@ The system provides comprehensive error handling:
 ### Monitoring
 ```python
 # Get connection statistics
-from backend.presentation.websocket.websocket_handler import get_connection_statistics
+from backend.infrastructure.websocket.connection_manager import get_connection_manager
+from backend.presentation.websocket.message_handler import get_message_processor
 
-stats = get_connection_statistics()
-print(f"Active connections: {stats['active_connections']}")
-print(f"Supported message types: {len(stats['supported_message_types'])}")
+connection_manager = get_connection_manager()
+if connection_manager:
+    active_sessions = connection_manager.get_active_sessions()
+    print(f"Active connections: {len(active_sessions)}")
+
+processor = get_message_processor()
+if processor:
+    print(f"Supported message types: {len(processor.handlers.keys())}")
 ```
 
 ## Testing

@@ -1,13 +1,26 @@
 """
-Unified WebSocket message handler architecture.
+WebSocket Message Handler System for aiNagisa.
 
-This module provides a centralized, extensible message handling system
-for all WebSocket communication in the aiNagisa platform.
+This module handles incoming WebSocket messages from the frontend and routes them
+to appropriate processors. The main purpose is to:
+
+1. Process user chat messages and trigger LLM response generation
+2. Handle location requests/responses for geolocation tools
+3. Manage heartbeat messages for connection health
+4. Create assistant messages in the frontend UI
+
+Key Flow:
+- User sends CHAT_MESSAGE → ChatHandler processes → Streaming LLM response
+- Backend needs to show assistant message → MESSAGE_CREATE sent to frontend
+- TTS/content chunks sent via WebSocket for real-time display
 """
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
 from datetime import datetime
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
@@ -17,6 +30,101 @@ from backend.presentation.websocket.message_types import (
 
 logger = logging.getLogger(__name__)
 
+# ==== Global Message Processor Management ====
+# Allows external services to send messages via WebSocket when needed
+
+_global_message_processor: Optional['WebSocketMessageProcessor'] = None
+
+def set_message_processor(processor: 'WebSocketMessageProcessor') -> None:
+    """Set global message processor instance"""
+    global _global_message_processor
+    _global_message_processor = processor
+
+def get_message_processor() -> Optional['WebSocketMessageProcessor']:
+    """Get global message processor instance"""
+    return _global_message_processor
+
+
+class WebSocketMessageProcessor:
+    """
+    Central WebSocket message router for aiNagisa.
+
+    Routes incoming WebSocket messages from frontend to appropriate handlers:
+    - CHAT_MESSAGE → ChatHandler (main user interaction)
+    - LOCATION_* → LocationHandler (geolocation for tools)
+    - HEARTBEAT_ACK → HeartbeatHandler (connection health)
+    - TOOL_CALL_REQUEST → ToolCallHandler (direct tool calls)
+
+    This is the main entry point for all WebSocket message processing.
+    """
+    
+    def __init__(self, connection_manager: ConnectionManager):
+        self.connection_manager = connection_manager
+        
+        # Initialize handlers (use same instance for related message types)
+        heartbeat_handler = HeartbeatHandler(connection_manager)
+        location_handler = LocationHandler(connection_manager)
+        chat_handler = ChatHandler(connection_manager)
+        tool_handler = ToolCallHandler(connection_manager)
+        
+        self.handlers: Dict[MessageType, MessageHandler] = {
+            MessageType.HEARTBEAT_ACK: heartbeat_handler,
+            MessageType.LOCATION_REQUEST: location_handler,
+            MessageType.LOCATION_RESPONSE: location_handler,  # Same instance for shared state
+            MessageType.CHAT_MESSAGE: chat_handler,
+            MessageType.TOOL_CALL_REQUEST: tool_handler,
+        }
+        
+        # Store location handler for external tool access
+        self.location_handler = location_handler
+    
+    async def process_message(self, session_id: str, raw_message: str):
+        """
+        Process incoming WebSocket message.
+
+        Args:
+            session_id: WebSocket session ID
+            raw_message: Raw JSON message string
+        """
+        try:
+            # Parse message into typed object
+            message = parse_message(raw_message)
+
+            # Route to appropriate handler
+            handler = self.handlers.get(message.type)
+            if handler:
+                response = await handler.handle(session_id, message)
+
+                # Send response if handler returned one
+                if response:
+                    await handler.send_response(session_id, response)
+            else:
+                logger.warning(f"No handler for message type: {message.type}")
+                await self._send_error(
+                    session_id,
+                    "UNSUPPORTED_MESSAGE_TYPE",
+                    f"Message type '{message.type}' is not supported",
+                    {"supported_types": list(self.handlers.keys())}
+                )
+
+        except ValueError as e:
+            logger.error(f"Invalid message format from session {session_id}: {e}")
+            await self._send_error(session_id, "MESSAGE_PARSE_ERROR", "Failed to parse message", {"error": str(e)})
+        except Exception as e:
+            logger.error(f"Error processing message from session {session_id}: {e}")
+            await self._send_error(session_id, "INTERNAL_ERROR", "Internal server error occurred", {"error": str(e)})
+    
+    async def _send_error(self, session_id: str, error_code: str, error_message: str, details: Optional[Dict[str, Any]] = None):
+        """Send error message to client"""
+        error_msg = create_message(
+            MessageType.ERROR,
+            session_id=session_id,
+            error_code=error_code,
+            error_message=error_message,
+            details=details or {}
+        )
+        await self.connection_manager.send_json(session_id, error_msg.model_dump())
+    
 
 class MessageHandler(ABC):
     """Abstract base class for message handlers"""
@@ -56,18 +164,28 @@ class MessageHandler(ABC):
 
 
 class HeartbeatHandler(MessageHandler):
-    """Handle heartbeat messages"""
-    
+    """
+    Handle WebSocket connection heartbeat messages.
+
+    Purpose: Maintain connection health by responding to heartbeat acknowledgments
+    from the frontend. Prevents connection timeout and monitors client availability.
+    """
+
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.HEARTBEAT_ACK:
-            # Update heartbeat timestamp
             await self.connection_manager.handle_heartbeat_response(session_id)
-        
-        return None  # Heartbeat doesn't send response
+        return None
 
 
 class LocationHandler(MessageHandler):
-    """Handle location-related messages"""
+    """
+    Handle geolocation requests and responses.
+
+    Purpose: Coordinate with location-based tools by:
+    1. Sending location requests to frontend when tools need GPS data
+    2. Receiving location responses from browser geolocation API
+    3. Providing location data to waiting tools via event synchronization
+    """
     
     def __init__(self, connection_manager: ConnectionManager):
         super().__init__(connection_manager)
@@ -83,79 +201,77 @@ class LocationHandler(MessageHandler):
         return None
     
     async def _handle_location_response(self, session_id: str, message: BaseWebSocketMessage):
-        """Process location response from client"""
-        
-        # Store location data and trigger waiting events
-        if session_id in self.location_events:
-            event_info = self.location_events[session_id]
+        """Process location response from frontend and notify waiting tools"""
+        if session_id not in self.location_events:
+            return
 
-            # Extract location data from message
-            location_data = getattr(message, 'location_data', None)
-            error = getattr(message, 'error', None)
+        event_info = self.location_events[session_id]
+        location_data = getattr(message, 'location_data', None)
+        error = getattr(message, 'error', None)
 
-            if location_data:
-                event_info["location_data"] = location_data
-                event_info["timestamp"] = message.timestamp
-                event_info["success"] = True
-            else:
-                event_info["error"] = error or "Unknown error"
-                event_info["success"] = False
+        if location_data:
+            event_info.update({
+                "location_data": location_data,
+                "timestamp": message.timestamp,
+                "success": True
+            })
+        else:
+            event_info.update({
+                "error": error or "Unknown error",
+                "success": False
+            })
 
-            # Trigger event for waiting tools
-            event_info["event"].set()
+        event_info["event"].set()
     
     async def _handle_location_request(self, session_id: str, message: BaseWebSocketMessage):
-        """Handle location request from tools/backend"""
+        """Handle location request from backend tools"""
         request_id = getattr(message, 'request_id', None)
-        
-        # Create event for response waiting
-        event = asyncio.Event()
+
+        # Create event for response synchronization
         self.location_events[session_id] = {
             "request_id": request_id,
-            "event": event,
+            "event": asyncio.Event(),
             "timestamp": datetime.now().timestamp()
         }
-        
-        # Forward request to client
+
         await self.send_response(session_id, message)
     
     async def wait_for_location_response(self, session_id: str, timeout: float = 30.0) -> Dict[str, Any]:
-        """
-        Wait for location response from client (used by tools).
-        
-        Args:
-            session_id: Session ID to wait for
-            timeout: Timeout in seconds
-            
-        Returns:
-            Dict containing location data or error
-        """
+        """Wait for location response from client (used by geolocation tools)"""
         if session_id not in self.location_events:
             return {"success": False, "error": "No location request pending"}
-        
+
         event_info = self.location_events[session_id]
-        
+
         try:
             await asyncio.wait_for(event_info["event"].wait(), timeout=timeout)
-            
-            # Return result and cleanup
             result = {
                 "success": event_info.get("success", False),
                 "location_data": event_info.get("location_data"),
                 "error": event_info.get("error"),
                 "timestamp": event_info.get("timestamp")
             }
-            
             del self.location_events[session_id]
             return result
-            
         except asyncio.TimeoutError:
             del self.location_events[session_id]
             return {"success": False, "error": f"Location request timeout after {timeout}s"}
 
 
 class ChatHandler(MessageHandler):
-    """Handle chat and streaming messages via WebSocket"""
+    """
+    Handle user chat messages and trigger LLM response generation.
+
+    Purpose: This is the main handler that processes user messages and:
+    1. Parses user input from frontend CHAT_MESSAGE events
+    2. Saves user message to conversation history
+    3. Triggers LLM response generation via existing chat service
+    4. Initiates streaming response delivery to frontend
+
+    Note: The actual assistant message creation (MESSAGE_CREATE) and content
+    streaming (TTS_CHUNK) happens in the content processing pipeline,
+    not directly in this handler.
+    """
 
     def __init__(self, connection_manager: ConnectionManager):
         super().__init__(connection_manager)
@@ -171,14 +287,16 @@ class ChatHandler(MessageHandler):
 
     async def _handle_chat_message(self, session_id: str, message: BaseWebSocketMessage):
         """
-        Process incoming chat message with full LLM integration.
+        Process user chat message and initiate LLM response.
 
-        Replicates HTTP chat endpoint functionality in WebSocket architecture:
-        1. Parse and validate message data
-        2. Save user message to session
-        3. Generate streaming LLM response
-        4. Process TTS if enabled
-        5. Handle tool calls and memory injection
+        Flow:
+        1. Convert WebSocket message to internal request format
+        2. Save user message to conversation history
+        3. Trigger streaming LLM response via chat service
+
+        Note: The assistant message creation (MESSAGE_CREATE) happens later
+        in the content processing pipeline, not here. This handler only
+        initiates the processing chain.
         """
         try:
             # Convert WebSocket message to HTTP-compatible request format
@@ -202,7 +320,7 @@ class ChatHandler(MessageHandler):
             )
 
     async def _convert_websocket_message_to_request(self, session_id: str, message: BaseWebSocketMessage) -> dict:
-        """Convert WebSocket ChatMessageRequest to HTTP request format"""
+        """Convert WebSocket message to internal request format for chat service"""
         return {
             "message": getattr(message, 'message', ''),
             "session_id": session_id,
@@ -216,10 +334,13 @@ class ChatHandler(MessageHandler):
 
     async def _process_streaming_response(self, session_id: str, result: Any, enable_memory: bool):
         """
-        Process streaming LLM response using existing chat service architecture.
+        Initiate LLM response generation via existing streaming pipeline.
 
-        Integrates with existing streaming pipeline but outputs via WebSocket
-        instead of HTTP SSE.
+        This delegates to the chat_stream module which handles:
+        - LLM response generation
+        - MESSAGE_CREATE events (to create assistant messages in frontend)
+        - TTS_CHUNK streaming (for real-time text/audio display)
+        - Status updates and error handling
         """
         try:
             # Import chat stream handler which includes status notifications
@@ -243,19 +364,21 @@ class ChatHandler(MessageHandler):
 
 
 class ToolCallHandler(MessageHandler):
-    """Handle tool call requests"""
-    
+    """
+    Handle direct tool call requests from frontend.
+
+    Purpose: Process explicit tool execution requests sent by frontend.
+    Note: Most tool calls are actually triggered by LLM during chat processing,
+    not directly from frontend. This handler is for potential future use.
+    """
+
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.TOOL_CALL_REQUEST:
             await self._handle_tool_call(session_id, message)
-
         return None
 
     async def _handle_tool_call(self, session_id: str, message: BaseWebSocketMessage):
-        """Process tool call request"""
-        
-        # TODO: Integrate with MCP tool system
-        # For now, send acknowledgment
+        # TODO: Integrate with MCP tool system when direct tool calls are needed
         tool_name = getattr(message, 'tool_name', 'unknown')
         request_id = getattr(message, 'request_id', '')
 
@@ -266,103 +389,8 @@ class ToolCallHandler(MessageHandler):
                 "tool_name": tool_name,
                 "request_id": request_id,
                 "status": "acknowledged",
-                "result": "Tool integration coming soon"
+                "result": "Direct tool calls not yet implemented"
             }
         )
-        
         await self.send_response(session_id, response)
 
-
-class WebSocketMessageProcessor:
-    """Central message processor that routes messages to appropriate handlers"""
-    
-    def __init__(self, connection_manager: ConnectionManager):
-        self.connection_manager = connection_manager
-        
-        # Initialize handlers (use same instance for related message types)
-        heartbeat_handler = HeartbeatHandler(connection_manager)
-        location_handler = LocationHandler(connection_manager)
-        chat_handler = ChatHandler(connection_manager)
-        tool_handler = ToolCallHandler(connection_manager)
-        
-        self.handlers: Dict[MessageType, MessageHandler] = {
-            MessageType.HEARTBEAT_ACK: heartbeat_handler,
-            MessageType.LOCATION_REQUEST: location_handler,
-            MessageType.LOCATION_RESPONSE: location_handler,  # Same instance for shared state
-            MessageType.CHAT_MESSAGE: chat_handler,
-            MessageType.TOOL_CALL_REQUEST: tool_handler,
-        }
-        
-        # Store handler instances for cross-handler communication
-        self.location_handler = location_handler
-    
-    async def process_message(self, session_id: str, raw_message: str):
-        """
-        Process incoming WebSocket message.
-
-        Args:
-            session_id: WebSocket session ID
-            raw_message: Raw JSON message string
-        """
-        try:
-            # Parse message into typed object
-            message = parse_message(raw_message)
-
-            # Route to appropriate handler
-            handler = self.handlers.get(message.type)
-            if handler:
-                response = await handler.handle(session_id, message)
-
-                # Send response if handler returned one
-                if response:
-                    await handler.send_response(session_id, response)
-            else:
-                logger.warning(f"No handler for message type: {message.type}")
-                await self._send_unsupported_message_error(session_id, message.type)
-                
-        except ValueError as e:
-            logger.error(f"Invalid message format from session {session_id}: {e}")
-            await self._send_parse_error(session_id, str(e))
-        except Exception as e:
-            logger.error(f"Error processing message from session {session_id}: {e}")
-            await self._send_internal_error(session_id, str(e))
-    
-    async def _send_unsupported_message_error(self, session_id: str, message_type: str):
-        """Send unsupported message type error"""
-        error_msg = create_message(
-            MessageType.ERROR,
-            session_id=session_id,
-            error_code="UNSUPPORTED_MESSAGE_TYPE",
-            error_message=f"Message type '{message_type}' is not supported",
-            details={"supported_types": list(self.handlers.keys())}
-        )
-        await self.connection_manager.send_json(session_id, error_msg.model_dump())
-    
-    async def _send_parse_error(self, session_id: str, error_details: str):
-        """Send message parsing error"""
-        error_msg = create_message(
-            MessageType.ERROR,
-            session_id=session_id,
-            error_code="MESSAGE_PARSE_ERROR",
-            error_message="Failed to parse message",
-            details={"error": error_details}
-        )
-        await self.connection_manager.send_json(session_id, error_msg.model_dump())
-    
-    async def _send_internal_error(self, session_id: str, error_details: str):
-        """Send internal processing error"""
-        error_msg = create_message(
-            MessageType.ERROR,
-            session_id=session_id,
-            error_code="INTERNAL_ERROR",
-            error_message="Internal server error occurred",
-            details={"error": error_details}
-        )
-        await self.connection_manager.send_json(session_id, error_msg.model_dump())
-    
-    def get_handler(self, handler_type: Type[MessageHandler]) -> Optional[MessageHandler]:
-        """Get handler instance by type for cross-handler communication"""
-        for handler in self.handlers.values():
-            if isinstance(handler, handler_type):
-                return handler
-        return None
