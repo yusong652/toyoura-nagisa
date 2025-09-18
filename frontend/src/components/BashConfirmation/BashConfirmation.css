@@ -1,0 +1,309 @@
+/* Bash Confirmation Dialog Styles */
+
+.bash-confirmation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.bash-confirmation-dialog {
+  background: var(--bg-secondary, white);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #ff9800;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.bash-confirmation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.bash-confirmation-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary, #333);
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+/* Progress Bar */
+.bash-confirmation-progress {
+  height: 3px;
+  background-color: var(--progress-bg, #e0e0e0);
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  transition: width 1s linear, background-color 0.3s;
+}
+
+/* Content */
+.bash-confirmation-content {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.warning-box {
+  background-color: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.warning-box p {
+  margin: 0;
+  color: #e65100;
+  font-size: 14px;
+}
+
+.description-section,
+.command-section,
+.reject-input-section {
+  margin-bottom: 16px;
+}
+
+.description-section label,
+.command-section label,
+.reject-input-section label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.description-section p {
+  margin: 0;
+  color: var(--text-primary, #333);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.command-box {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  overflow-x: auto;
+}
+
+.command-box pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.reject-input-section textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  background-color: var(--input-bg, white);
+  color: var(--text-primary, #333);
+}
+
+.reject-input-section textarea:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+.timer-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.timer-label {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  padding: 4px 8px;
+  background-color: var(--timer-bg, #f5f5f5);
+  border-radius: 12px;
+}
+
+/* Actions */
+.bash-confirmation-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  background-color: var(--footer-bg, #fafafa);
+}
+
+.button {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.button-cancel {
+  background-color: transparent;
+  color: var(--text-secondary, #666);
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.button-cancel:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+.button-reject {
+  background-color: #f44336;
+  color: white;
+}
+
+.button-reject:hover {
+  background-color: #d32f2f;
+}
+
+.button-approve {
+  background-color: #4caf50;
+  color: white;
+}
+
+.button-approve:hover {
+  background-color: #45a049;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .bash-confirmation-dialog {
+  background: #1e1e1e;
+  border-color: #ff9800;
+}
+
+[data-theme="dark"] .bash-confirmation-header {
+  border-bottom-color: #333;
+}
+
+[data-theme="dark"] .bash-confirmation-header h3 {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .close-button {
+  color: #999;
+}
+
+[data-theme="dark"] .close-button:hover {
+  background-color: #333;
+}
+
+[data-theme="dark"] .bash-confirmation-progress {
+  background-color: #333;
+}
+
+[data-theme="dark"] .warning-box {
+  background-color: #332200;
+  border-color: #ff9800;
+}
+
+[data-theme="dark"] .warning-box p {
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .description-section label,
+[data-theme="dark"] .command-section label,
+[data-theme="dark"] .reject-input-section label {
+  color: #999;
+}
+
+[data-theme="dark"] .description-section p {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .reject-input-section textarea {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border-color: #444;
+}
+
+[data-theme="dark"] .timer-label {
+  background-color: #2a2a2a;
+  color: #999;
+}
+
+[data-theme="dark"] .bash-confirmation-actions {
+  background-color: #252525;
+  border-top-color: #333;
+}
+
+[data-theme="dark"] .button-cancel {
+  color: #999;
+  border-color: #444;
+}
+
+[data-theme="dark"] .button-cancel:hover {
+  background-color: #333;
+}
