@@ -25,8 +25,9 @@ def _fetch_server_location() -> Optional[Dict[str, Any]]:
                 "region": data.get("regionName"),
                 "source": "server_ip"
             }
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error fetching server location: {e}")
+        raise
     return None
 
 def _reverse_geocode(lat: float, lon: float) -> Optional[str]:
@@ -39,8 +40,9 @@ def _reverse_geocode(lat: float, lon: float) -> Optional[str]:
         if resp.status_code == 200:
             addr = resp.json().get("address", {})
             return addr.get("city") or addr.get("town") or addr.get("village")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error in reverse geocoding: {e}")
+        raise
     return None
 
 def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
@@ -57,8 +59,9 @@ def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
                 "region": addr.get("state"),
                 "country": addr.get("country"),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error in full reverse geocoding: {e}")
+        raise
     return {"city": None, "region": None, "country": None}
 
 async def get_browser_location(
@@ -91,16 +94,14 @@ async def get_browser_location(
             return None
             
         # Get location handler from message processor
-        from backend.presentation.websocket.message_handler import LocationHandler
         message_processor = websocket_handler.get_message_processor()
-        location_handler = message_processor.get_handler(LocationHandler)
+        location_handler = message_processor.location_handler
         
         if not location_handler:
             return None
         
         # Check if WebSocket connection exists
         connection_manager = websocket_handler.get_connection_manager()
-        active_sessions = connection_manager.get_active_sessions()
 
         if session_id not in connection_manager.connections:
             return None
@@ -146,14 +147,17 @@ async def get_browser_location(
                     region=geocode_data.get("region"),
                     country=geocode_data.get("country")
                 )
-        except asyncio.TimeoutError:
-            pass
+        except asyncio.TimeoutError as e:
+            print(f"Timeout waiting for browser location: {e}")
+            raise
         except Exception as e:
-            pass
-            
-    except Exception:
-        pass
-    
+            print(f"Error getting browser location: {e}")
+            raise
+
+    except Exception as e:
+        print(f"Error in get_browser_location: {e}")
+        raise
+
     return None
 
 
@@ -195,9 +199,10 @@ async def get_user_location(
                 session_id=context.client_id
             )
 
-    except Exception:
-        pass
-    
+    except Exception as e:
+        print(f"Error in get_user_location: {e}")
+        raise
+
     return None
 
 
