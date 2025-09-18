@@ -16,7 +16,7 @@ from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history, update_session_title
 from backend.shared.utils.helpers import should_generate_title, generate_title_for_session
 from backend.presentation.websocket.message_types import (
-    create_error_message, create_tool_use_message
+    create_error_message, create_tool_use_message, create_message, MessageType
 )
 from backend.presentation.streaming.content_processor import process_content_pipeline
 
@@ -25,6 +25,46 @@ logger = logging.getLogger(__name__)
 # Global request state management
 ACTIVE_REQUESTS: Dict[str, str] = {}  # session_id -> request_id
 ACTIVE_REQUESTS_LOCK = asyncio.Lock()
+
+
+async def send_title_update_notification(session_id: str, new_title: str) -> None:
+    """
+    Send title update notification via WebSocket.
+
+    Args:
+        session_id: Session ID for which the title was updated
+        new_title: The new title for the session
+    """
+    try:
+        # Get WebSocket connection manager
+        from backend.presentation.websocket.message_handler import get_message_processor
+
+        message_processor = get_message_processor()
+        if not message_processor:
+            logger.warning(f"No message processor available for title update notification")
+            return
+
+        # Create title update message
+        title_update_msg = create_message(
+            MessageType.TITLE_UPDATE,
+            session_id=session_id,
+            payload={
+                "session_id": session_id,
+                "title": new_title
+            }
+        )
+
+        # Send via WebSocket
+        await message_processor.connection_manager.send_json(
+            session_id,
+            title_update_msg.model_dump()
+        )
+
+        logger.info(f"Title update notification sent for session {session_id}: {new_title}")
+
+    except Exception as e:
+        logger.error(f"Failed to send title update notification: {e}")
+        # Don't re-raise - this is a non-critical notification
 
 
 async def handle_llm_response(
@@ -174,8 +214,8 @@ async def process_post_pipeline(
             if new_title:
                 update_success = update_session_title(session_id, new_title)
                 if update_success:
-                    # Send title update via WebSocket instead of SSE
-                    # TODO: Implement WebSocket title update notification
+                    # Send title update via WebSocket
+                    await send_title_update_notification(session_id, new_title)
                     print(f"[INFO] Title updated for session {session_id}: {new_title}")
     except Exception as e:
         # Post-processing failures should not affect the main flow, just log

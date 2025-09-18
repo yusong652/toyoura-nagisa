@@ -50,6 +50,9 @@ class MessageType(str, Enum):
     # Emotion and animation
     EMOTION_KEYWORD = "EMOTION_KEYWORD"
 
+    # Session management
+    TITLE_UPDATE = "TITLE_UPDATE"
+
     # Bash command confirmation
     BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
     BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
@@ -175,6 +178,12 @@ class BashConfirmationResponseMessage(BaseWebSocketMessage):
     approved: bool
 
 
+class TitleUpdateMessage(BaseWebSocketMessage):
+    """Title update message schema for session title changes"""
+    type: MessageType = MessageType.TITLE_UPDATE
+    payload: Dict[str, Any]  # Contains session_id and title
+
+
 # Message type to schema mapping
 MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT: HeartbeatMessage,
@@ -190,6 +199,7 @@ MESSAGE_SCHEMAS = {
     MessageType.TTS_CHUNK: TTSChunk,
     MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
+    MessageType.TITLE_UPDATE: TitleUpdateMessage,
     MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
     MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
 }

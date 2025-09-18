@@ -71,6 +71,23 @@ export const useStreamEventHandlers = ({
     }
   }, [sessionRefreshSessions])
 
+  // Listen to WebSocket title update events
+  useEffect(() => {
+    const handleTitleUpdateEvent = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const data = customEvent.detail
+      if (data) {
+        handleTitleUpdate(data)
+      }
+    }
+
+    window.addEventListener('titleUpdate', handleTitleUpdateEvent)
+
+    return () => {
+      window.removeEventListener('titleUpdate', handleTitleUpdateEvent)
+    }
+  }, [handleTitleUpdate])
+
   /**
    * Handle session refresh event.
    * 

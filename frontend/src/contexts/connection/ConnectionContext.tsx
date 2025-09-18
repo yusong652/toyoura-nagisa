@@ -346,6 +346,14 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           }))
         }
 
+        // Handle title update notifications
+        if (data.type === 'TITLE_UPDATE') {
+          // Dispatch custom event for title updates
+          window.dispatchEvent(new CustomEvent('titleUpdate', {
+            detail: data
+          }))
+        }
+
         // Handle emotion keyword notifications
         if (data.type === 'EMOTION_KEYWORD') {
           // Dispatch custom event for keyword handling (Live2D animations)
