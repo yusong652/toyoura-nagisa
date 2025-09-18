@@ -191,73 +191,110 @@ class LocationHandler(MessageHandler):
     
     def __init__(self, connection_manager: ConnectionManager):
         super().__init__(connection_manager)
-        # Store location request events for tool integration
-        self.location_events: Dict[str, Dict[str, Any]] = {}
+        # Store location request futures for tool integration - Future-based pattern
+        self.pending_requests: Dict[str, asyncio.Future] = {}
     
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.LOCATION_RESPONSE:
+            print(f"[LocationHandler] Processing LOCATION_RESPONSE from session {session_id}", flush=True)
             await self._handle_location_response(session_id, message)
         elif message.type == MessageType.LOCATION_REQUEST:
+            print(f"[LocationHandler] Processing LOCATION_REQUEST for session {session_id}", flush=True)
             await self._handle_location_request(session_id, message)
 
         return None
     
     async def _handle_location_response(self, session_id: str, message: BaseWebSocketMessage):
         """Process location response from frontend and notify waiting tools"""
-        if session_id not in self.location_events:
+        print(f"[LocationHandler] Processing location response for session {session_id}", flush=True)
+
+        # Get request_id from message to find the corresponding Future
+        # The request_id should be in the parsed message data
+        request_id = getattr(message, 'request_id', None)
+        if not request_id:
+            print(f"[LocationHandler] No request_id in message, cannot correlate response", flush=True)
             return
 
-        event_info = self.location_events[session_id]
+        if request_id not in self.pending_requests:
+            print(f"[LocationHandler] No pending location request found for request_id {request_id}", flush=True)
+            return
+
+        future = self.pending_requests[request_id]
         location_data = getattr(message, 'location_data', None)
         error = getattr(message, 'error', None)
 
-        if location_data:
-            event_info.update({
-                "location_data": location_data,
-                "timestamp": message.timestamp,
-                "success": True
-            })
-        else:
-            event_info.update({
-                "error": error or "Unknown error",
-                "success": False
-            })
+        try:
+            if location_data:
+                print(f"[LocationHandler] Received location data for request {request_id}: {location_data}", flush=True)
+                result = {
+                    "success": True,
+                    "location_data": location_data,
+                    "timestamp": message.timestamp
+                }
+            else:
+                print(f"[LocationHandler] Received location error for request {request_id}: {error}", flush=True)
+                result = {
+                    "success": False,
+                    "error": error or "Unknown error"
+                }
 
-        event_info["event"].set()
+            # Set Future result - this will wake up the waiting coroutine
+            print(f"[LocationHandler] Setting Future result for request {request_id}", flush=True)
+            future.set_result(result)
+
+        except Exception as e:
+            print(f"[LocationHandler] Error setting Future result: {e}", flush=True)
+            if not future.done():
+                future.set_exception(e)
+        finally:
+            # Clean up
+            if request_id in self.pending_requests:
+                del self.pending_requests[request_id]
     
     async def _handle_location_request(self, session_id: str, message: BaseWebSocketMessage):
         """Handle location request from backend tools"""
         request_id = getattr(message, 'request_id', None)
+        print(f"[LocationHandler] Creating location request Future for session {session_id}, request_id: {request_id}", flush=True)
 
-        # Create event for response synchronization
-        self.location_events[session_id] = {
-            "request_id": request_id,
-            "event": asyncio.Event(),
-            "timestamp": datetime.now().timestamp()
-        }
+        # Create Future for response - this is registered elsewhere by the tool
+        print(f"[LocationHandler] Future should already be registered for request_id: {request_id}", flush=True)
 
+        print(f"[LocationHandler] Sending location request to frontend for session {session_id}", flush=True)
         await self.send_response(session_id, message)
+        print(f"[LocationHandler] Location request sent to session {session_id}", flush=True)
     
-    async def wait_for_location_response(self, session_id: str, timeout: float = 30.0) -> Dict[str, Any]:
-        """Wait for location response from client (used by geolocation tools)"""
-        if session_id not in self.location_events:
-            return {"success": False, "error": "No location request pending"}
+    async def create_location_request(self, request_id: str, timeout: float = 30.0) -> Dict[str, Any]:
+        """
+        Create a location request and wait for response using Future pattern.
 
-        event_info = self.location_events[session_id]
+        This is the new elegant solution that doesn't block the event loop.
+        """
+        print(f"[LocationHandler] Creating location request Future for request_id: {request_id} (timeout: {timeout}s)", flush=True)
+
+        # Create Future for this request
+        future = asyncio.Future()
+        self.pending_requests[request_id] = future
 
         try:
-            await asyncio.wait_for(event_info["event"].wait(), timeout=timeout)
-            result = {
-                "success": event_info.get("success", False),
-                "location_data": event_info.get("location_data"),
-                "error": event_info.get("error"),
-                "timestamp": event_info.get("timestamp")
-            }
-            del self.location_events[session_id]
+            # Wait for the Future to be resolved by _handle_location_response
+            # This is NON-BLOCKING - other coroutines can continue processing
+            result = await asyncio.wait_for(future, timeout=timeout)
+            print(f"[LocationHandler] Location request completed for {request_id}: success={result.get('success')}", flush=True)
             return result
+
         except asyncio.TimeoutError:
-            del self.location_events[session_id]
+            print(f"[LocationHandler] Location request timeout for {request_id} after {timeout}s", flush=True)
+            # Clean up on timeout
+            if request_id in self.pending_requests:
+                del self.pending_requests[request_id]
             return {"success": False, "error": f"Location request timeout after {timeout}s"}
+
+        except Exception as e:
+            print(f"[LocationHandler] Location request error for {request_id}: {e}", flush=True)
+            # Clean up on error
+            if request_id in self.pending_requests:
+                del self.pending_requests[request_id]
+            return {"success": False, "error": f"Location request error: {str(e)}"}
 
 
 class ChatHandler(MessageHandler):

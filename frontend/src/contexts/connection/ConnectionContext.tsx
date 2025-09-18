@@ -70,33 +70,38 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       const locationData = await geolocationService.requestLocation()
 
       if (locationData) {
-        // Reply location data directly via WebSocket
+        // Reply location data directly via WebSocket - align with HEARTBEAT_ACK pattern
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           const locationResponse = {
             type: 'LOCATION_RESPONSE',
             session_id: currentSessionId,
+            request_id: data.request_id, // Include request_id for Future correlation
             location_data: locationData,
             timestamp: new Date().toISOString()
           }
 
           wsRef.current.send(JSON.stringify(locationResponse))
-          console.log('Location information sent to backend via WebSocket:', locationData)
+          console.log('[LOCATION] Location response sent via wsRef.current:', locationData)
         } else {
-          console.warn('WebSocket connection unavailable, cannot send location information')
+          console.warn('[LOCATION] wsRef.current is not available or not open, cannot send location response')
         }
       } else {
-        console.warn('Unable to get location information')
+        console.warn('[LOCATION] Unable to get location information')
 
-        // Send location acquisition failure response
+        // Send location acquisition failure response - align with HEARTBEAT_ACK pattern
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           const errorResponse = {
             type: 'LOCATION_RESPONSE',
             session_id: currentSessionId,
+            request_id: data.request_id, // Include request_id for Future correlation
             error: 'Failed to get location',
             timestamp: new Date().toISOString()
           }
-          
+
           wsRef.current.send(JSON.stringify(errorResponse))
+          console.log('[LOCATION] Location error response sent via wsRef.current')
+        } else {
+          console.warn('[LOCATION] wsRef.current is not available or not open, cannot send error response')
         }
       }
     } catch (error) {
@@ -301,7 +306,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
         // Handle location requests
         if (data.type === 'LOCATION_REQUEST') {
-          console.log('WebSocket received location request')
+          console.log('[LOCATION] WebSocket received location request:', data)
           await handleLocationRequest(data, sessionId)
         }
 

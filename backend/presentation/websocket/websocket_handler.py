@@ -97,6 +97,10 @@ class WebSocketHandler:
                 print(f"[WebSocket] Raw message received for session {session_id}: {raw_message}", flush=True)
                 print(f"[WebSocket] Message received at: {datetime.now().isoformat()}", flush=True)
 
+                # Special debug for LOCATION messages like HEARTBEAT_ACK
+                if "LOCATION_RESPONSE" in raw_message:
+                    print(f"[LOCATION] Frontend sent LOCATION_RESPONSE to backend: {raw_message}", flush=True)
+
                 # Delegate message content processing to message_handler.py
                 # We just receive the raw text and pass it along
                 await self.message_processor.process_message(session_id, raw_message)
