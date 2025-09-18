@@ -83,9 +83,11 @@ class WebSocketMessageProcessor:
             session_id: WebSocket session ID
             raw_message: Raw JSON message string
         """
+        processing_start = datetime.now()
         try:
             # Parse message into typed object
             message = parse_message(raw_message)
+            print(f"[WebSocket] Backend received message type: {message.type} from session {session_id} at {processing_start.isoformat()}", flush=True)
 
             # Route to appropriate handler
             handler = self.handlers.get(message.type)
@@ -170,7 +172,10 @@ class HeartbeatHandler(MessageHandler):
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.HEARTBEAT_ACK:
+            handle_time = datetime.now().isoformat()
+            print(f"[HeartbeatHandler] Processing HEARTBEAT_ACK from session {session_id} at {handle_time}", flush=True)
             await self.connection_manager.handle_heartbeat_response(session_id)
+            print(f"[HeartbeatHandler] Completed HEARTBEAT_ACK processing for session {session_id} at {datetime.now().isoformat()}", flush=True)
         return None
 
 

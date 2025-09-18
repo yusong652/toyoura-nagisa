@@ -270,7 +270,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             type: 'HEARTBEAT_ACK',
             timestamp: new Date().toISOString()
           }
-          ws.send(JSON.stringify(heartbeatAck))
+          // Use wsRef.current instead of ws to ensure we're using the correct WebSocket instance
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify(heartbeatAck))
+            console.log('HEARTBEAT_ACK sent via wsRef.current')
+          } else {
+            console.warn('wsRef.current is not available or not open, cannot send HEARTBEAT_ACK')
+          }
         }
 
         

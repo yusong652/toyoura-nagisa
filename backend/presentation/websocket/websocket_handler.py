@@ -18,6 +18,7 @@ Flow: FastAPI route → websocket_handler.py → message_handler.py → specific
 """
 import logging
 from typing import Optional
+from datetime import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager, set_connection_manager
@@ -88,13 +89,20 @@ class WebSocketHandler:
             return
         
         try:
-            # Main message receiving loop - this is the core WebSocket lifecycle
-            async for raw_message in websocket.iter_text():
+            # Main message receiving loop - use receive_text() for immediate processing
+            # iter_text() may buffer messages, causing delays in processing
+            while True:
+                # Receive message immediately without buffering
+                raw_message = await websocket.receive_text()
+                print(f"[WebSocket] Raw message received for session {session_id}: {raw_message}", flush=True)
+                print(f"[WebSocket] Message received at: {datetime.now().isoformat()}", flush=True)
+
                 # Delegate message content processing to message_handler.py
                 # We just receive the raw text and pass it along
                 await self.message_processor.process_message(session_id, raw_message)
 
         except WebSocketDisconnect:
+            print(f"[WebSocket] Client disconnected for session {session_id}")
             logger.info(f"WebSocket disconnected for session {session_id}")
         except Exception as e:
             logger.error(f"Unexpected error in WebSocket handler for session {session_id}: {e}")

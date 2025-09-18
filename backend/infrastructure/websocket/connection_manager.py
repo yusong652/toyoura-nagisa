@@ -221,19 +221,32 @@ class ConnectionManager:
 
     async def _send_heartbeat(self, session_id: str) -> bool:
         """Send heartbeat message
-        
+
         Returns:
             bool: Whether heartbeat send was successful
         """
-        return await self.send_json(session_id, {
+        heartbeat_time = datetime.now().isoformat()
+        print(f"[HEARTBEAT] Sending heartbeat to session {session_id} at {heartbeat_time}", flush=True)
+        result = await self.send_json(session_id, {
             "type": "HEARTBEAT",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": heartbeat_time
         })
+        if result:
+            print(f"[HEARTBEAT] Successfully sent heartbeat to session {session_id}", flush=True)
+        else:
+            print(f"[HEARTBEAT] Failed to send heartbeat to session {session_id}", flush=True)
+        return result
 
     async def handle_heartbeat_response(self, session_id: str):
         """Handle heartbeat response"""
+        response_time = datetime.now().isoformat()
         if session_id in self.connections:
             self.connections[session_id].update_heartbeat()
+            print(f"[HEARTBEAT] Backend received ACK from session {session_id} at {response_time}", flush=True)
+            last_heartbeat = self.connections[session_id].last_heartbeat.isoformat()
+            print(f"[HEARTBEAT] Last heartbeat updated to: {last_heartbeat}", flush=True)
+        else:
+            print(f"[HEARTBEAT] Backend received ACK from unknown session {session_id} at {response_time}", flush=True)
 
     async def _send_system_message(self, session_id: str, data: dict):
         """Send system message"""
