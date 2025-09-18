@@ -134,24 +134,32 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
   // Connect to specified session WebSocket
   const connectToSession = useCallback((sessionId: string) => {
+    if (!sessionId) return
+
+    // If we're already connected to this session, don't create another connection
+    if (currentSessionIdRef.current === sessionId &&
+        wsRef.current &&
+        wsRef.current.readyState === WebSocket.OPEN) {
+      console.log(`[WebSocket] Already connected to session ${sessionId}, skipping`)
+      return
+    }
+
     // Clear any existing reconnect timeout
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
       reconnectTimeoutRef.current = null
     }
 
+    // Store current session ID for reconnection
+    currentSessionIdRef.current = sessionId
+
     // Close previous ws if any
     if (wsRef.current) {
       try {
-        wsRef.current.close()
+        wsRef.current.close(1000, "Switching session")
       } catch (_) {}
       wsRef.current = null
     }
-
-    if (!sessionId) return
-
-    // Store current session ID for reconnection
-    currentSessionIdRef.current = sessionId
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws"
     // WebSocket connection should point to backend server port 8000, not frontend Vite port 5173
@@ -189,9 +197,12 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       // Clear global WebSocket reference
       (window as any).__wsConnection = null
 
-      // Only attempt reconnect if it wasn't a clean close and we have a session ID
-      if (event.code !== 1000 && currentSessionIdRef.current) {
-        console.log("[WebSocket] Connection lost, attempting to reconnect...")
+      // Only attempt reconnect if:
+      // 1. It wasn't a clean close (code !== 1000)
+      // 2. This session is still the current session
+      // 3. We have a valid session ID
+      if (event.code !== 1000 && currentSessionIdRef.current === sessionId && sessionId) {
+        console.log("[WebSocket] Connection lost for current session, attempting to reconnect...")
 
         // Inline reconnect logic to avoid circular dependency
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
@@ -207,6 +218,12 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         console.log(`[WebSocket] Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} after ${delay}ms`)
 
         reconnectTimeoutRef.current = setTimeout(async () => {
+          // Double check this is still the current session before reconnecting
+          if (currentSessionIdRef.current !== sessionId) {
+            console.log(`[WebSocket] Session changed during reconnect delay, aborting reconnect for ${sessionId}`)
+            return
+          }
+
           // Validate session still exists before reconnecting
           try {
             const response = await fetch(`/api/history/${sessionId}`)
@@ -229,6 +246,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             }
           }
         }, delay)
+      } else if (currentSessionIdRef.current !== sessionId) {
+        console.log(`[WebSocket] Connection closed for old session ${sessionId}, not reconnecting (current: ${currentSessionIdRef.current})`)
       }
     }
 

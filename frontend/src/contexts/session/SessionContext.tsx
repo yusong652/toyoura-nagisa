@@ -224,7 +224,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     if (currentSessionId) {
       connectToSession(currentSessionId)
     }
-  }, [currentSessionId, connectToSession])
+  }, [currentSessionId]) // Remove connectToSession from dependencies to prevent unnecessary reconnects
 
   // 尝试在重新连接后加载会话
   useEffect(() => {
