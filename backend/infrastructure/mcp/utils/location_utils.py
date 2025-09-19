@@ -69,19 +69,23 @@ async def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[st
 
 async def get_browser_location(
     context: Context,
-    timeout: float = 5.0
+    timeout: float = 30.0
 ) -> Optional['LocationData']:
     """
     Get user location from browser via WebSocket.
-    
+
     Args:
         context: FastMCP context containing session information
         timeout: Timeout in seconds for waiting for browser response
-    
+
     Returns:
         LocationData object with browser location data or None if unavailable
     """
     try:
+        import threading
+        current_loop = asyncio.get_event_loop()
+        current_thread = threading.current_thread()
+        print(f"[LOCATION] get_browser_location running in thread: {current_thread.name}, event loop: {id(current_loop)}", flush=True)
         session_id = context.client_id
         if not session_id:
             return None
@@ -123,18 +127,26 @@ async def get_browser_location(
 
             print(f"[LOCATION] Sending location request to session {session_id}: {request_msg.model_dump()}", flush=True)
 
-            # Create Future-based location request (elegant non-blocking solution)
-            # This creates a Future and registers it BEFORE sending the request
-            future_task = asyncio.create_task(location_handler.create_location_request(request_id, timeout))
+            # Create Future BEFORE sending the request (register it first)
+            future = asyncio.Future()
+            location_handler.pending_requests[request_id] = future
 
             # Send the request to frontend via WebSocket
             await location_handler.handle(session_id, request_msg)
 
             print(f"[LOCATION] Waiting for location response using Future pattern (timeout: {timeout}s)", flush=True)
 
-            # Wait for the Future to be resolved by WebSocket response handler
-            # This is completely non-blocking and elegant!
-            response_data = await future_task
+            # Now wait for the Future to be resolved by the WebSocket response
+            try:
+                # Use wait_for with the registered future directly
+                response_data = await asyncio.wait_for(future, timeout=timeout)
+                print(f"[LOCATION] Response received successfully")
+            except asyncio.TimeoutError:
+                print(f"[LOCATION] Timeout waiting for response after {timeout}s")
+                response_data = {"success": False, "error": f"Location request timeout after {timeout}s"}
+                # Clean up the pending request
+                if request_id in location_handler.pending_requests:
+                    del location_handler.pending_requests[request_id]
 
             print(f"[LOCATION] Received location response from session {session_id}: {response_data}", flush=True)
             

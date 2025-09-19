@@ -238,14 +238,20 @@ class LocationHandler(MessageHandler):
                     "error": error or "Unknown error"
                 }
 
-            # Set Future result - this will wake up the waiting coroutine
-            print(f"[LocationHandler] Setting Future result for request {request_id}", flush=True)
-            future.set_result(result)
+            # Set Future result using thread-safe callback to handle cross-event-loop communication
+            print(f"[LocationHandler] Setting Future result for request {request_id} using call_soon_threadsafe", flush=True)
+            loop = future.get_loop()
+            loop.call_soon_threadsafe(future.set_result, result)
 
         except Exception as e:
             print(f"[LocationHandler] Error setting Future result: {e}", flush=True)
             if not future.done():
-                future.set_exception(e)
+                # Use thread-safe callback for exception too
+                try:
+                    loop = future.get_loop()
+                    loop.call_soon_threadsafe(future.set_exception, e)
+                except Exception as loop_error:
+                    print(f"[LocationHandler] Failed to set exception via call_soon_threadsafe: {loop_error}", flush=True)
         finally:
             # Clean up
             if request_id in self.pending_requests:

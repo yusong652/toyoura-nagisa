@@ -34,7 +34,7 @@ def register_location_tools(mcp: FastMCP):
 
             # Get user location using unified function
             print(f"[DEBUG] Getting user location for session {session_id}")
-            location_data = await get_user_location(context, wait_time=5)
+            location_data = await get_user_location(context, wait_time=30)
             
             if location_data:
                 # Determine accuracy level

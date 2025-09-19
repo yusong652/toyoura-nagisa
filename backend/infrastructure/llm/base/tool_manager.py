@@ -9,7 +9,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Set
 from fastmcp import Client as MCPClient
-from mcp.types import Implementation, CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
@@ -32,15 +32,9 @@ class BaseToolManager(ABC):
     
     def __init__(self):
         """Initialize base state."""
-        
-        # Lazy import to avoid circular dependency
-        from backend.infrastructure.mcp.smart_mcp_server import mcp as GLOBAL_MCP
-        
-        # Single shared MCP client - FastMCP handles session isolation per request
-        self._mcp_client = MCPClient(
-            GLOBAL_MCP,
-            client_info=Implementation(name="aiNagisa_shared", version="0.1.0")
-        )
+
+        # MCP client will be retrieved from app state when needed
+        self._mcp_client = None
         
         # Tool caching mechanism
         self.tool_cache: Dict[str, Any] = {}
@@ -50,12 +44,15 @@ class BaseToolManager(ABC):
     
     def get_mcp_client(self) -> MCPClient:
         """
-        Return the shared MCP client. FastMCP handles session isolation per request
+        Return the shared MCP client from app state. FastMCP handles session isolation per request
         through the _meta.client_id parameter in tool calls.
-        
+
         Returns:
-            MCPClient: Shared client instance
+            MCPClient: Shared client instance from app state
         """
+        if self._mcp_client is None:
+            from backend.shared.utils.app_context import get_mcp_client
+            self._mcp_client = get_mcp_client()
         return self._mcp_client
     
     def is_meta_tool(self, tool_name: str) -> bool:
@@ -367,10 +364,11 @@ class BaseToolManager(ABC):
         mcp_client = self.get_mcp_client()
         async with mcp_client as mcp_async_client:
             # Session isolation is handled by FastMCP per request via _meta.client_id
+            # Create params with _meta as dict (FastMCP will handle conversion)
             params = CallToolRequestParams(
                 name=tool_name,
                 arguments=tool_args,
-                **{"_meta": {"client_id": session_id}},
+                _meta={"client_id": session_id}  # type: ignore
             )
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
