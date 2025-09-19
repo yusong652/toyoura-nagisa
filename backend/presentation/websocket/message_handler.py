@@ -17,10 +17,8 @@ Key Flow:
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type, TYPE_CHECKING
+from typing import Dict, Any, Optional, Type
 
-if TYPE_CHECKING:
-    from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
 from datetime import datetime
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
@@ -183,126 +181,39 @@ class LocationHandler(MessageHandler):
     """
     Handle geolocation requests and responses.
 
-    Purpose: Coordinate with location-based tools by:
-    1. Sending location requests to frontend when tools need GPS data
-    2. Receiving location responses from browser geolocation API
-    3. Providing location data to waiting tools via event synchronization
+    Purpose: Process location responses from frontend (like heartbeat ACK)
     """
-    
-    def __init__(self, connection_manager: ConnectionManager):
-        super().__init__(connection_manager)
-        # Store location request futures for tool integration - Future-based pattern
-        self.pending_requests: Dict[str, asyncio.Future] = {}
-    
+
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> Optional[BaseWebSocketMessage]:
         if message.type == MessageType.LOCATION_RESPONSE:
             print(f"[LocationHandler] Processing LOCATION_RESPONSE from session {session_id}", flush=True)
             await self._handle_location_response(session_id, message)
-        elif message.type == MessageType.LOCATION_REQUEST:
-            print(f"[LocationHandler] Processing LOCATION_REQUEST for session {session_id}", flush=True)
-            await self._handle_location_request(session_id, message)
 
         return None
     
     async def _handle_location_response(self, session_id: str, message: BaseWebSocketMessage):
-        """Process location response from frontend and notify waiting tools"""
-        print(f"[LocationHandler] Processing location response for session {session_id}", flush=True)
+        """Process location response from frontend (like heartbeat ACK)"""
+        handle_time = datetime.now().isoformat()
+        print(f"[LocationHandler] Processing LOCATION_RESPONSE from session {session_id} at {handle_time}", flush=True)
 
-        # Get request_id from message to find the corresponding Future
-        # The request_id should be in the parsed message data
-        request_id = getattr(message, 'request_id', None)
-        if not request_id:
-            print(f"[LocationHandler] No request_id in message, cannot correlate response", flush=True)
-            return
-
-        if request_id not in self.pending_requests:
-            print(f"[LocationHandler] No pending location request found for request_id {request_id}", flush=True)
-            return
-
-        future = self.pending_requests[request_id]
+        # Extract location data from message
         location_data = getattr(message, 'location_data', None)
         error = getattr(message, 'error', None)
 
-        try:
-            if location_data:
-                print(f"[LocationHandler] Received location data for request {request_id}: {location_data}", flush=True)
-                result = {
-                    "success": True,
-                    "location_data": location_data,
-                    "timestamp": message.timestamp
-                }
-            else:
-                print(f"[LocationHandler] Received location error for request {request_id}: {error}", flush=True)
-                result = {
-                    "success": False,
-                    "error": error or "Unknown error"
-                }
+        if location_data:
+            print(f"[LocationHandler] Received location data: lat={location_data.get('latitude')}, "
+                  f"lng={location_data.get('longitude')}, accuracy={location_data.get('accuracy')}", flush=True)
 
-            # Set Future result using thread-safe callback to handle cross-event-loop communication
-            print(f"[LocationHandler] Setting Future result for request {request_id} using call_soon_threadsafe", flush=True)
-            loop = future.get_loop()
-            loop.call_soon_threadsafe(future.set_result, result)
+            # Store in cache for MCP tools to access
+            from backend.infrastructure.websocket.message_cache import get_message_cache
+            cache = get_message_cache()
+            cache.store_message("location", session_id, location_data)
 
-        except Exception as e:
-            print(f"[LocationHandler] Error setting Future result: {e}", flush=True)
-            if not future.done():
-                # Use thread-safe callback for exception too
-                try:
-                    loop = future.get_loop()
-                    loop.call_soon_threadsafe(future.set_exception, e)
-                except Exception as loop_error:
-                    print(f"[LocationHandler] Failed to set exception via call_soon_threadsafe: {loop_error}", flush=True)
-        finally:
-            # Clean up
-            if request_id in self.pending_requests:
-                del self.pending_requests[request_id]
+        else:
+            print(f"[LocationHandler] Received location error: {error}", flush=True)
+
+        print(f"[LocationHandler] Completed LOCATION_RESPONSE processing for session {session_id} at {datetime.now().isoformat()}", flush=True)
     
-    async def _handle_location_request(self, session_id: str, message: BaseWebSocketMessage):
-        """Handle location request from backend tools"""
-        request_id = getattr(message, 'request_id', None)
-        print(f"[LocationHandler] Creating location request Future for session {session_id}, request_id: {request_id}", flush=True)
-
-        # Create Future for response - this is registered elsewhere by the tool
-        print(f"[LocationHandler] Future should already be registered for request_id: {request_id}", flush=True)
-
-        print(f"[LocationHandler] Sending location request to frontend for session {session_id}", flush=True)
-        await self.send_response(session_id, message)
-        print(f"[LocationHandler] Location request sent to session {session_id}", flush=True)
-    
-    async def create_location_request(self, request_id: str, timeout: float = 30.0) -> Dict[str, Any]:
-        """
-        Create a location request and wait for response using Future pattern.
-
-        This is the new elegant solution that doesn't block the event loop.
-        """
-        print(f"[LocationHandler] Creating location request Future for request_id: {request_id} (timeout: {timeout}s)", flush=True)
-
-        # Create Future for this request
-        future = asyncio.Future()
-        self.pending_requests[request_id] = future
-
-        try:
-            # Wait for the Future to be resolved by _handle_location_response
-            # This is NON-BLOCKING - other coroutines can continue processing
-            result = await asyncio.wait_for(future, timeout=timeout)
-            print(f"[LocationHandler] Location request completed for {request_id}: success={result.get('success')}", flush=True)
-            return result
-
-        except asyncio.TimeoutError:
-            print(f"[LocationHandler] Location request timeout for {request_id} after {timeout}s", flush=True)
-            # Clean up on timeout
-            if request_id in self.pending_requests:
-                del self.pending_requests[request_id]
-            return {"success": False, "error": f"Location request timeout after {timeout}s"}
-
-        except Exception as e:
-            print(f"[LocationHandler] Location request error for {request_id}: {e}", flush=True)
-            # Clean up on error
-            if request_id in self.pending_requests:
-                del self.pending_requests[request_id]
-            return {"success": False, "error": f"Location request error: {str(e)}"}
-
-
 class ChatHandler(MessageHandler):
     """
     Handle user chat messages and trigger LLM response generation.
@@ -353,8 +264,8 @@ class ChatHandler(MessageHandler):
             # Save user message to session
             self.chat_service.save_user_message_to_session(result)
 
-            # Generate streaming response via existing chat service pipeline
-            await self._process_streaming_response(session_id, result, enable_memory)
+            # Generate streaming response in background task (non-blocking)
+            asyncio.create_task(self._process_streaming_response(session_id, result, enable_memory))
 
         except Exception as e:
             logger.error(f"Error processing chat message: {e}")
