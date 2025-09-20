@@ -314,7 +314,7 @@ class BaseToolManager(ABC):
 
         return False
 
-    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], session_id: str) -> bool:
+    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], session_id: str) -> tuple[bool, Optional[str]]:
         """
         Request user confirmation for tool execution.
 
@@ -324,7 +324,9 @@ class BaseToolManager(ABC):
             session_id: Session ID for the confirmation request
 
         Returns:
-            bool: True if user approved, False if rejected or timed out
+            tuple[bool, Optional[str]]: (approved, user_message) - True if user approved,
+                                      False if rejected or timed out. user_message contains
+                                      optional feedback from user when rejecting
         """
         try:
             from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
@@ -332,7 +334,7 @@ class BaseToolManager(ABC):
             confirmation_service = get_bash_confirmation_service()
             if not confirmation_service:
                 print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
-                return False
+                return (False, "Confirmation service not available")
 
             # Extract command from tool arguments
             command = tool_args.get("command", "")
@@ -359,9 +361,9 @@ class BaseToolManager(ABC):
                 if user_message:
                     print(f"[BaseToolManager] User message: {user_message}")
 
-            return approved
+            return (approved, user_message)
 
         except Exception as e:
             print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
             # On error, default to rejecting for security
-            return False
+            return (False, f"Error during confirmation: {str(e)}")

@@ -114,7 +114,6 @@ class BashConfirmationService:
                                         False if rejected or timed out. user_message contains
                                         optional message from user when rejecting
         """
-        print(f"[BashConfirmationService] request_confirmation called for session {session_id}, command: {command}")
 
         # Generate unique confirmation ID
         confirmation_id = str(uuid.uuid4())
@@ -122,7 +121,6 @@ class BashConfirmationService:
         # Create pending confirmation
         pending = PendingConfirmation(confirmation_id, command, description)
         self.pending_confirmations[confirmation_id] = pending
-        print(f"[BashConfirmationService] Stored pending confirmation {confirmation_id}, total pending: {len(self.pending_confirmations)}")
 
         try:
             # Send confirmation request to frontend
@@ -186,8 +184,6 @@ class BashConfirmationService:
         Returns:
             bool: True if confirmation was found and processed, False otherwise
         """
-        print(f"[BashConfirmationService] handle_confirmation_response called: id={confirmation_id}, approved={approved}, pending_count={len(self.pending_confirmations)}")
-        print(f"[BashConfirmationService] Pending confirmations: {list(self.pending_confirmations.keys())}")
 
         pending = self.pending_confirmations.get(confirmation_id)
 
@@ -271,7 +267,6 @@ def get_bash_confirmation_service(
     if connection_manager:
         # Only initialize if not already initialized
         if _bash_confirmation_service is None:
-            print(f"[BashConfirmationService] Initializing new service with connection_manager")
             _bash_confirmation_service = BashConfirmationService(connection_manager)
         else:
             print(f"[BashConfirmationService] Service already initialized, keeping existing instance")

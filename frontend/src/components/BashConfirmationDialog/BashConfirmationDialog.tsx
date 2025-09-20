@@ -49,9 +49,6 @@ const BashConfirmationDialog: React.FC = () => {
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [copied, setCopied] = useState(false)
 
-  // Debug logging
-  console.log('[BashConfirmationDialog] Component rendered, isOpen:', isOpen, 'request:', request)
-
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (isOpen) {
