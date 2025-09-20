@@ -264,15 +264,19 @@ The system provides comprehensive error handling:
 ```python
 # Get connection statistics
 from backend.infrastructure.websocket.connection_manager import get_connection_manager
-from backend.presentation.websocket.message_handler import get_message_processor
 
 connection_manager = get_connection_manager()
 if connection_manager:
     active_sessions = connection_manager.get_active_sessions()
     print(f"Active connections: {len(active_sessions)}")
 
-processor = get_message_processor()
-if processor:
+# Access message processor through WebSocket handler instance
+# Note: This requires access to the FastAPI app instance
+from fastapi import FastAPI
+app = FastAPI()  # Your app instance
+websocket_handler = getattr(app.state, 'websocket_handler', None)
+if websocket_handler:
+    processor = websocket_handler.get_message_processor()
     print(f"Supported message types: {len(processor.handlers.keys())}")
 ```
 

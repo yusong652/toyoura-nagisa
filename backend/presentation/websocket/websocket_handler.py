@@ -61,8 +61,6 @@ class WebSocketHandler:
 
         # Set global instances for external services to access
         set_connection_manager(self.connection_manager)  # For TTS streaming, notifications
-        from backend.presentation.websocket.message_handler import set_message_processor
-        set_message_processor(self.message_processor)  # For external message broadcasting
     
     async def handle_connection(self, websocket: WebSocket, session_id: str):
         """

@@ -36,12 +36,12 @@ async def send_title_update_notification(session_id: str, new_title: str) -> Non
         new_title: The new title for the session
     """
     try:
-        # Get WebSocket connection manager
-        from backend.presentation.websocket.message_handler import get_message_processor
+        # Get WebSocket connection manager directly
+        from backend.infrastructure.websocket.connection_manager import get_connection_manager
 
-        message_processor = get_message_processor()
-        if not message_processor:
-            logger.warning(f"No message processor available for title update notification")
+        connection_manager = get_connection_manager()
+        if not connection_manager:
+            logger.warning(f"No connection manager available for title update notification")
             return
 
         # Create title update message
@@ -55,7 +55,7 @@ async def send_title_update_notification(session_id: str, new_title: str) -> Non
         )
 
         # Send via WebSocket
-        await message_processor.connection_manager.send_json(
+        await connection_manager.send_json(
             session_id,
             title_update_msg.model_dump()
         )
