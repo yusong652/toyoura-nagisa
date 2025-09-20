@@ -201,7 +201,8 @@ class ChatHandler(MessageHandler):
         if message.type == MessageType.CHAT_MESSAGE:
             try:
                 # Convert WebSocket message to internal request format
-                request_data = await self._convert_websocket_message_to_request(session_id, message)
+                from backend.presentation.websocket.utils import convert_websocket_message_to_request
+                request_data = convert_websocket_message_to_request(session_id, message)
 
                 # Parse request using chat service
                 result, enable_memory = await self.chat_service.parse_websocket_request(request_data)
@@ -226,15 +227,3 @@ class ChatHandler(MessageHandler):
                     f"Failed to process chat message: {str(e)}"
                 )
 
-    async def _convert_websocket_message_to_request(self, session_id: str, message: BaseWebSocketMessage) -> dict:
-        """Convert WebSocket message to internal request format for chat service"""
-        return {
-            "message": getattr(message, 'message', ''),
-            "session_id": session_id,
-            "agent_profile": getattr(message, 'agent_profile', 'general'),
-            "type": getattr(message, 'type', 'text'),
-            "message_id": message.message_id,
-            "enable_memory": getattr(message, 'enable_memory', True),
-            "tts_enabled": getattr(message, 'tts_enabled', False),
-            "files": getattr(message, 'files', [])
-        }

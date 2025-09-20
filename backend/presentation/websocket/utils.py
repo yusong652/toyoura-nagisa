@@ -1,0 +1,31 @@
+"""
+WebSocket utility functions for aiNagisa.
+
+This module contains utility functions for WebSocket message processing,
+including data conversion and transformation utilities.
+"""
+from typing import Dict, Any
+from backend.presentation.websocket.message_types import BaseWebSocketMessage
+
+
+def convert_websocket_message_to_request(session_id: str, message: BaseWebSocketMessage) -> Dict[str, Any]:
+    """
+    Convert WebSocket message to internal request format for chat service.
+
+    Args:
+        session_id: WebSocket session ID
+        message: Parsed WebSocket message object
+
+    Returns:
+        Dict containing request data in format expected by chat service
+    """
+    return {
+        "message": getattr(message, 'message', ''),
+        "session_id": session_id,
+        "agent_profile": getattr(message, 'agent_profile', 'general'),
+        "type": getattr(message, 'type', 'text'),
+        "message_id": message.message_id,
+        "enable_memory": getattr(message, 'enable_memory', True),
+        "tts_enabled": getattr(message, 'tts_enabled', False),
+        "files": getattr(message, 'files', [])
+    }
