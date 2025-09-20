@@ -48,10 +48,14 @@ class WebSocketMessageProcessor:
         location_handler = LocationHandler(connection_manager)
         chat_handler = ChatHandler(connection_manager)
 
+        # Initialize bash confirmation handler
+        bash_confirmation_handler = BashConfirmationHandler(connection_manager)
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
             MessageType.CHAT_MESSAGE: chat_handler,
+            MessageType.BASH_CONFIRMATION_RESPONSE: bash_confirmation_handler,
         }
         
         # Store location handler for external tool access
@@ -225,5 +229,71 @@ class ChatHandler(MessageHandler):
                     session_id,
                     "CHAT_PROCESSING_ERROR",
                     f"Failed to process chat message: {str(e)}"
+                )
+
+
+class BashConfirmationHandler(MessageHandler):
+    """
+    Handle bash command confirmation responses from frontend.
+
+    Purpose: Process user responses to bash command confirmation requests.
+    When user approves/rejects a bash command in the frontend, this handler
+    routes the response to the BashConfirmationService to unblock waiting tools.
+    """
+
+    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
+        if message.type == MessageType.BASH_CONFIRMATION_RESPONSE:
+            try:
+                print(f"[BashConfirmationHandler] Processing BASH_CONFIRMATION_RESPONSE from session {session_id}", flush=True)
+
+                # Extract confirmation data from message
+                confirmation_id = getattr(message, 'confirmation_id', None)
+                approved = getattr(message, 'approved', False)
+
+                if not confirmation_id:
+                    logger.error("Received bash confirmation response without confirmation_id")
+                    await self.send_error(
+                        session_id,
+                        "INVALID_CONFIRMATION_RESPONSE",
+                        "Confirmation response missing confirmation_id"
+                    )
+                    return
+
+                print(f"[BashConfirmationHandler] confirmation_id={confirmation_id}, approved={approved}", flush=True)
+
+                # Get confirmation service and handle response
+                from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
+                confirmation_service = get_bash_confirmation_service()
+
+                if confirmation_service:
+                    # Handle the confirmation response
+                    handled = confirmation_service.handle_confirmation_response(
+                        confirmation_id=confirmation_id,
+                        approved=approved
+                    )
+
+                    if handled:
+                        print(f"[BashConfirmationHandler] Successfully processed confirmation {confirmation_id}", flush=True)
+                    else:
+                        logger.warning(f"Confirmation service could not handle confirmation {confirmation_id}")
+                        await self.send_error(
+                            session_id,
+                            "CONFIRMATION_NOT_FOUND",
+                            f"Unknown confirmation ID: {confirmation_id}"
+                        )
+                else:
+                    logger.error("Bash confirmation service not available")
+                    await self.send_error(
+                        session_id,
+                        "SERVICE_UNAVAILABLE",
+                        "Bash confirmation service is not available"
+                    )
+
+            except Exception as e:
+                logger.error(f"Error processing bash confirmation response: {e}")
+                await self.send_error(
+                    session_id,
+                    "CONFIRMATION_PROCESSING_ERROR",
+                    f"Failed to process confirmation response: {str(e)}"
                 )
 

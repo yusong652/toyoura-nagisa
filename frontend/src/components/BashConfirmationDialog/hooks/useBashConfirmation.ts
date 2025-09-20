@@ -122,8 +122,12 @@ export const useBashConfirmation = () => {
   }, [state.request, sendResponse])
 
   useEffect(() => {
+    console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest')
+
     const handleBashConfirmationRequest = (event: CustomEvent) => {
+      console.log('[BashConfirmation] Event received:', event)
       const data = event.detail
+      console.log('[BashConfirmation] Event detail data:', data)
 
       // Parse request
       const request: BashConfirmationRequest = {
@@ -134,8 +138,9 @@ export const useBashConfirmation = () => {
         timestamp: data.timestamp || new Date().toISOString()
       }
 
+      console.log('[BashConfirmation] Parsed request:', request)
       setState({ request, isOpen: true })
-      console.log('[BashConfirmation] Received request:', request)
+      console.log('[BashConfirmation] State updated with request')
 
       // Set auto-reject timeout (60 seconds)
       if (timeoutRef.current) {

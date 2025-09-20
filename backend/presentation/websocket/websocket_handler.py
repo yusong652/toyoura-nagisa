@@ -142,5 +142,17 @@ def create_websocket_handler() -> WebSocketHandler:
     """
     handler = WebSocketHandler()
     logger.info("WebSocket handler created")
+
+    # Initialize bash confirmation service with the connection manager
+    try:
+        from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
+        confirmation_service = get_bash_confirmation_service(handler.connection_manager)
+        if confirmation_service:
+            logger.info("Bash confirmation service initialized")
+        else:
+            logger.warning("Failed to initialize bash confirmation service")
+    except Exception as e:
+        logger.error(f"Error initializing bash confirmation service: {e}")
+
     return handler
 

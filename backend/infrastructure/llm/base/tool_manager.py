@@ -47,7 +47,6 @@ class BaseToolManager(ABC):
             from backend.shared.utils.app_context import get_mcp_client
             self._mcp_client = get_mcp_client()
         return self._mcp_client
-    
 
     async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
         """
@@ -129,19 +128,20 @@ class BaseToolManager(ABC):
         """
         pass
 
-    async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
+    async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any],
                                session_id: Optional[str] = None) -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
-        
+        Includes user confirmation logic for security-sensitive tools.
+
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
             session_id: Session ID (required for all tools)
-            
+
         Returns:
             CallToolResult: MCP tool execution result containing content, structuredContent, and isError fields
-            
+
         Raises:
             ValueError: If session ID is not provided
         """
@@ -151,7 +151,25 @@ class BaseToolManager(ABC):
                 f"Tool '{tool_name}' requires session ID for dependency injection. "
                 f"All tools must be executed with session context."
             )
-        
+
+        # Check if tool requires user confirmation
+        if self._requires_user_confirmation(tool_name, tool_args):
+            approved = await self._request_user_confirmation(tool_name, tool_args, session_id)
+            if not approved:
+                # Create a mock CallToolResult for rejection
+                from mcp.types import TextContent
+                return CallToolResult(
+                    content=[TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "status": "error",
+                            "message": "Command execution cancelled by user",
+                            "error": "User rejected the command execution request"
+                        })
+                    )],
+                    isError=False  # Not an MCP error, just user rejection
+                )
+
         mcp_client = self.get_mcp_client()
         async with mcp_client as mcp_async_client:
             # Session isolation is handled by FastMCP per request via _meta.client_id
@@ -264,3 +282,86 @@ class BaseToolManager(ABC):
             if debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
+
+    def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
+        """
+        Check if a tool requires user confirmation before execution.
+
+        Args:
+            tool_name: Name of the tool to execute
+            tool_args: Arguments for the tool (may be used for specific command filtering)
+
+        Returns:
+            bool: True if user confirmation is required, False otherwise
+        """
+        # Define tools that require user confirmation
+        CONFIRMATION_REQUIRED_TOOLS = {
+            "bash": True,  # All bash commands require confirmation
+            # Add other tools here as needed
+            # "file_write": True,  # Example: file writing might need confirmation
+            # "system_command": True,  # Example: other system commands
+        }
+
+        # Basic tool-level check
+        if CONFIRMATION_REQUIRED_TOOLS.get(tool_name, False):
+            # Future enhancement: could check specific commands within tool_args
+            # For example, allow safe commands like 'ls', 'pwd' without confirmation
+            # command = tool_args.get("command", "")
+            # safe_commands = ["ls", "pwd", "echo", "date", "whoami"]
+            # if any(command.startswith(safe_cmd) for safe_cmd in safe_commands):
+            #     return False
+            return True
+
+        return False
+
+    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], session_id: str) -> bool:
+        """
+        Request user confirmation for tool execution.
+
+        Args:
+            tool_name: Name of the tool to execute
+            tool_args: Arguments for the tool
+            session_id: Session ID for the confirmation request
+
+        Returns:
+            bool: True if user approved, False if rejected or timed out
+        """
+        try:
+            from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
+
+            confirmation_service = get_bash_confirmation_service()
+            if not confirmation_service:
+                print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
+                return False
+
+            # Extract command from tool arguments
+            command = tool_args.get("command", "")
+            description = tool_args.get("description", None)
+
+            # Generate a more descriptive message for the user
+            if not description and tool_name == "bash":
+                description = f"Execute bash command: {command}"
+
+            print(f"[BaseToolManager] Requesting user confirmation for {tool_name}: {command}")
+
+            # Request confirmation with 60 second timeout
+            approved, user_message = await confirmation_service.request_confirmation(
+                session_id=session_id,
+                command=command,
+                description=description,
+                timeout_seconds=60
+            )
+
+            if approved:
+                print(f"[BaseToolManager] User approved {tool_name} execution")
+            else:
+                print(f"[BaseToolManager] User rejected {tool_name} execution")
+                if user_message:
+                    print(f"[BaseToolManager] User message: {user_message}")
+
+            return approved
+
+        except Exception as e:
+            print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
+            # On error, default to rejecting for security
+            return False

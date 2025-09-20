@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 
 from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response

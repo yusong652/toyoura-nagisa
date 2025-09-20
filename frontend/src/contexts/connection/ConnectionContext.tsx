@@ -372,6 +372,17 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             detail: data
           }))
         }
+
+        // Handle bash confirmation requests
+        if (data.type === 'BASH_CONFIRMATION_REQUEST') {
+          console.log('[ConnectionContext] Dispatching bashConfirmationRequest event with data:', data)
+          // Dispatch custom event for bash confirmation dialog
+          const event = new CustomEvent('bashConfirmationRequest', {
+            detail: data
+          })
+          window.dispatchEvent(event)
+          console.log('[ConnectionContext] bashConfirmationRequest event dispatched')
+        }
       } catch (error) {
         console.error("[WebSocket] failed to parse message:", error)
       }

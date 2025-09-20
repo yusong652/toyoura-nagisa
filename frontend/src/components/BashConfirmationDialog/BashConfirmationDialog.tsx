@@ -19,7 +19,8 @@ import {
   ContentCopy as CopyIcon,
   Check as CheckIcon
 } from '@mui/icons-material'
-import useBashConfirmation from '../../hooks/useBashConfirmation'
+import { useBashConfirmation } from './hooks'
+import { dialogStyles, combineSx } from './BashConfirmationDialog.styles'
 
 /**
  * Bash Command Confirmation Dialog Component
@@ -47,6 +48,9 @@ const BashConfirmationDialog: React.FC = () => {
   const [showRejectInput, setShowRejectInput] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [copied, setCopied] = useState(false)
+
+  // Debug logging
+  console.log('[BashConfirmationDialog] Component rendered, isOpen:', isOpen, 'request:', request)
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -109,11 +113,7 @@ const BashConfirmationDialog: React.FC = () => {
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          borderRadius: 2,
-          border: '2px solid',
-          borderColor: 'warning.main'
-        }
+        sx: dialogStyles.paper
       }}
     >
       {/* Header */}
@@ -195,9 +195,9 @@ const BashConfirmationDialog: React.FC = () => {
                 bash
               </Typography>
             </Box>
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            <Typography component="pre" sx={dialogStyles.commandText}>
               {request.command}
-            </pre>
+            </Typography>
           </Box>
         </Box>
 
