@@ -8,7 +8,7 @@ from typing import Optional
 
 class LocationData:
     """
-    用于封装地理位置数据的结构体
+    Location data structure
     """
     def __init__(self, latitude: float, longitude: float, accuracy: Optional[float] = None, timestamp: Optional[int] = None, city: Optional[str] = None, country: Optional[str] = None, session_id: Optional[str] = None):
         self.latitude = latitude
@@ -21,6 +21,6 @@ class LocationData:
 
     def to_dict(self):
         """
-        将位置数据转换为字典
+        Convert to dictionary, excluding None values
         """
         return {k: v for k, v in self.__dict__.items() if v is not None}
