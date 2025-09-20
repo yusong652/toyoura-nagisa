@@ -185,29 +185,3 @@ async def get_user_location(
         raise
 
     return None
-
-
-async def get_user_city(context: Context, wait_time: int = 8) -> Optional[str]:
-    """
-    Get user's city name using location services.
-    
-    Args:
-        context: FastMCP context containing session information
-        wait_time: Timeout for location retrieval (defaults to 8 seconds)
-    
-    Returns:
-        City name string or None if could not be determined
-    """
-    location_data = await get_user_location(context, wait_time)
-    
-    if location_data and location_data.city:
-        return location_data.city
-    elif location_data and location_data.latitude and location_data.longitude:
-        # Try reverse geocoding if city not available
-        geocode_result = await _reverse_geocode(
-            location_data.latitude,
-            location_data.longitude
-        )
-        return geocode_result.get("city")
-    
-    return None 
