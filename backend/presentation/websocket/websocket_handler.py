@@ -127,7 +127,6 @@ class WebSocketHandler:
         return self.message_processor
     
 
-
 def create_websocket_handler() -> WebSocketHandler:
     """
     Create a new WebSocket handler instance for application use.

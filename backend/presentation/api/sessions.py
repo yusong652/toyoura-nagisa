@@ -65,7 +65,8 @@ async def create_session(
         HTTPException: 500 if session creation fails
     """
     try:
-        result = await service.create_session(session_name=request.name)
+        session_name = request.name or "New Session"
+        result = await service.create_session(session_name=session_name)
         return result
     except Exception as e:
         raise HTTPException(
