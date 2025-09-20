@@ -7,14 +7,13 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 
 import json
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Set
+from typing import Dict, Any, Optional
 from fastmcp import Client as MCPClient
 from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
-from backend.shared.utils.tool_utils import is_meta_tool
-from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager, AgentProfile
+from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager
 # Security imports removed - all tools now require session ID
 
 
@@ -35,12 +34,6 @@ class BaseToolManager(ABC):
 
         # MCP client will be retrieved from app state when needed
         self._mcp_client = None
-        
-        # Tool caching mechanism
-        self.tool_cache: Dict[str, Any] = {}
-        self.meta_tools: Set[str] = set()
-        # Session-level tool cache: {session_id: List[ToolSchema]}
-        self.session_tool_cache: Dict[str, List[ToolSchema]] = {}
     
     def get_mcp_client(self) -> MCPClient:
         """
@@ -55,101 +48,13 @@ class BaseToolManager(ABC):
             self._mcp_client = get_mcp_client()
         return self._mcp_client
     
-    def is_meta_tool(self, tool_name: str) -> bool:
-        """
-        Check if this is a meta tool.
-        
-        Args:
-            tool_name: Tool name
-            
-        Returns:
-            bool: True if it's a meta tool
-        """
-        return is_meta_tool(tool_name)
-    
-    async def extract_tools_from_meta_result(self, meta_result: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Extract tool information from meta tool result and get live schemas from MCP server.
-        
-        Args:
-            meta_result: Meta tool execution result (standard ToolResult format)
-            
-        Returns:
-            List: Parsed tool information list with live schemas
-        """
-        # Extract tools data from meta result - guaranteed standard format
-        tools_data = meta_result["data"]["tools"] # Format: [{"name": "tool_name", ...}, ...]
-        
-        # Extract tool names from meta result - simplified format
-        discovered_tool_names = [tool_info["name"] for tool_info in tools_data]
-        
-        # Get live schemas from MCP server for all discovered tools
-        mcp_client = self.get_mcp_client()
-        async with mcp_client:
-            registered_mcp_tools = await mcp_client.list_tools()
-            
-            # Build tool name to MCP tool mapping for O(1) lookup
-            mcp_tools_map = {tool.name: tool for tool in registered_mcp_tools}
-            
-            # Match and build final tools with live schemas
-            return [
-                {
-                    "name": tool_name,
-                    "description": mcp_tools_map[tool_name].description or "",
-                    "inputSchema": getattr(mcp_tools_map[tool_name], "inputSchema", {}) or {}
-                }
-                for tool_name in discovered_tool_names
-                if tool_name in mcp_tools_map
-            ]
-    
-    def cache_tools_for_session(self, session_id: str, tools: List[Dict[str, Any]]) -> None:
-        """
-        Cache tools for specific session. Converts dict tools to ToolSchema objects.
-        
-        Args:
-            session_id: Session ID
-            tools: Tools list to cache (in dict format)
-        """
-        if session_id not in self.session_tool_cache:
-            self.session_tool_cache[session_id] = []
-        
-        # Convert dict tools to ToolSchema objects and add new tools, avoid duplicates
-        existing_names = {tool.name for tool in self.session_tool_cache[session_id]}
-        for tool_dict in tools:
-            tool_name = tool_dict["name"]
-            if tool_name not in existing_names:
-                tool_schema = ToolSchema.from_dict(tool_dict)
-                self.session_tool_cache[session_id].append(tool_schema)
-                existing_names.add(tool_name)
-    
-    def get_cached_tools_for_session(self, session_id: str) -> List[ToolSchema]:
-        """
-        Get cached tools for specific session.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            List[ToolSchema]: Cached tools list
-        """
-        return self.session_tool_cache.get(session_id, [])
-    
-    def clear_session_tool_cache(self, session_id: str) -> None:
-        """
-        Clear tool cache for specific session.
-        
-        Args:
-            session_id: Session ID to clear cache for
-        """
-        if session_id in self.session_tool_cache:
-            del self.session_tool_cache[session_id]
-    
+
     async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
         """
         Get standardized ToolSchema objects based on agent profile.
-        
+
         Args:
-            session_id: Session ID for tool caching (required)
+            session_id: Session ID (required)
             agent_profile: Agent profile name ("coding", "lifestyle", "general", or None for all tools)
             debug: Whether to enable debug output
             
@@ -215,7 +120,7 @@ class BaseToolManager(ABC):
         Uses get_standardized_tools() internally, then converts to provider format.
         
         Args:
-            session_id: Session ID for tool caching (required)
+            session_id: Session ID (required)
             agent_profile: Agent profile name for tool filtering
             debug: Whether to enable debug output
             
@@ -223,121 +128,7 @@ class BaseToolManager(ABC):
             Tool schema list adapted for target LLM format (format varies by client)
         """
         pass
-    
-    async def _handle_meta_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, 
-                               session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
-        """
-        Handle meta tool call.
-        
-        Meta tools (like search_tools) return standardized ToolResult dictionaries
-        that are passed directly to the LLM for interpretation.
-        
-        Args:
-            tool_name: Tool name
-            tool_args: Tool arguments
-            tool_id: Tool call ID (preserved for context managers)
-            session_id: Optional session ID for caching discovered tools
-            debug: Whether to enable debug output
-            
-        Returns:
-            Dict[str, Any]: ToolResult dictionary with structure:
-                - status: Literal["success", "error"] - Operation outcome
-                - message: str - User-facing summary for display
-                - llm_content: Optional[Any] - Structured data for LLM conversation
-                - data: Optional[Dict[str, Any]] - Tool-specific payload:
-                    - For search_tools: {"tools": [{"name": str, "description": str}, ...]}
-                - error: Optional[str] - Detailed error info when status="error"
-                - is_error: bool - Added when MCP marks result as error
-        """
-        # tool_id is not used by MCP but preserved for LLM context managers
-        # which need it to properly format tool results in conversation history
-        _ = tool_id
-        
-        if debug:
-            print(f"[DEBUG] Handling meta tool: {tool_name}")
-        
-        try:
-            # Execute meta tool
-            result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            tool_result = extract_tool_result_from_mcp(result)
-            
-            # Cache results from search tools
-            if tool_name in ["search_tools"] and session_id:
-                await self._cache_meta_tool_results(tool_result, session_id, debug)
-            
-            return tool_result
-            
-        except Exception as e:
-            # System/infrastructure errors - re-raise for upper layer handling
-            if debug:
-                print(f"Error calling meta tool {tool_name}: {str(e)}")
-            raise RuntimeError(f"Meta tool '{tool_name}' execution failed: {str(e)}") from e
-    
-    async def _handle_regular_tool(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str,
-                                  session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
-        """
-        Handle regular tool call.
-        
-        Regular tools return a unified structure for both multimodal and non-multimodal content,
-        allowing LLM providers to handle content appropriately.
-        
-        Args:
-            tool_name: Tool name
-            tool_args: Tool arguments
-            tool_id: Tool call ID (preserved for context managers)
-            session_id: Optional session ID (required for all tools)
-            debug: Whether to enable debug output
-            
-        Returns:
-            Dict[str, Any]: Unified tool result with structure:
-                - inline_data: Dict[str, Any] - Multimodal content when present:
-                    - mime_type: str - Content MIME type (e.g., "image/png")
-                    - data: str - Base64-encoded content
-                  Empty dict {} for non-multimodal results and errors
-                - llm_content: Optional[Any] - Tool's textual/structured response
-                  For errors: "<error>Error message</error>" format
-        """
-        # tool_id is not used by MCP but preserved for LLM context managers
-        # which need it to properly format tool results in conversation history
-        _ = tool_id
-        
-        try:
-            # Execute regular tool
-            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
-            tool_result = extract_tool_result_from_mcp(call_tool_result)
-            
-            # Check MCP-level errors (is_error field) - return unified format with error info
-            if tool_result.get("is_error"):
-                return {
-                    "inline_data": {},
-                    "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
-                }
-            
-            # Check tool-level errors (status="error") - return unified format with error info
-            if tool_result.get("status") == "error":
-                error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
-                return {
-                    "inline_data": {},
-                    "llm_content": f"<error>{error_message}</error>"
-                }
-            
-            # Unified handling: always return inline_data + llm_content structure
-            if self._has_multimodal_content(tool_result):
-                inline_data = self._extract_multimodal_content(tool_result)
-            else:
-                inline_data = {}  # Empty for non-multimodal content
-            
-            return {
-                "inline_data": inline_data,
-                "llm_content": tool_result.get("llm_content")
-            }
-            
-        except Exception as e:
-            # System/infrastructure errors - re-raise for upper layer handling
-            if debug:
-                print(f"Error calling tool {tool_name}: {str(e)}")
-            raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
-    
+
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any], 
                                session_id: Optional[str] = None) -> CallToolResult:
         """
@@ -373,30 +164,6 @@ class BaseToolManager(ABC):
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
     
-    async def _cache_meta_tool_results(self, tool_result: Dict[str, Any], 
-                                      session_id: str, debug: bool = False) -> None:
-        """
-        Cache meta tool search results.
-        
-        Args:
-            tool_result: Extracted tool result dictionary from extract_tool_result_from_mcp
-            session_id: Session ID
-            debug: Whether to enable debug output
-        """
-        
-        try:
-            # tool_result is already processed by extract_tool_result_from_mcp
-            # Extract and cache tool information directly
-            extracted_tools = await self.extract_tools_from_meta_result(tool_result)
-            self.cache_tools_for_session(session_id, extracted_tools)
-            if debug:
-                print(f"[DEBUG] Cached {len(extracted_tools)} tools for session {session_id}")
-                    
-        except Exception as e:
-            if debug:
-                print(f"[DEBUG] Failed to cache tools from meta result: {e}")
-                import traceback
-                print(f"[DEBUG] Traceback: {traceback.format_exc()}")
     
     def _has_multimodal_content(self, tool_result: Dict[str, Any]) -> bool:
         """
@@ -434,11 +201,8 @@ class BaseToolManager(ABC):
     
     async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
         """
-        Handle LLM-generated function_call requests, gracefully dispatch to corresponding tool handlers.
-        
-        Dispatches to either _handle_meta_tool or _handle_regular_tool based on tool type,
-        returning their respective result structures.
-        
+        Handle LLM-generated function_call requests.
+
         Args:
             function_call: Function call dictionary containing:
                 - name: str - Tool name to execute
@@ -446,19 +210,12 @@ class BaseToolManager(ABC):
                 - id: str - Tool call ID for tracking (optional, defaults to "")
             session_id: Optional session ID for context-aware tools (required for execution)
             debug: Whether to enable debug output
-            
+
         Returns:
-            Dict[str, Any]: Tool execution result with structure dependent on tool type:
-            
-            For meta tools (e.g., search_tools):
-                - ToolResult dictionary as documented in _handle_meta_tool
-                
-            For regular tools:
-                - Unified structure as documented in _handle_regular_tool:
-                    - inline_data: Dict with multimodal content or empty {}
-                    - llm_content: Tool's response
-                - Or complete ToolResult dict when is_error=True
-                
+            Dict[str, Any]: Unified tool result structure:
+                - inline_data: Dict with multimodal content or empty {}
+                - llm_content: Tool's response
+
         Raises:
             RuntimeError: When tool execution fails due to infrastructure errors
             ValueError: When required session_id is not provided
@@ -466,9 +223,44 @@ class BaseToolManager(ABC):
         tool_name = function_call["name"]
         tool_args = function_call.get("arguments", {})
         tool_id = function_call.get("id", "")
-        
-        # Dispatch to appropriate handler based on tool type
-        if self.is_meta_tool(tool_name):
-            return await self._handle_meta_tool(tool_name, tool_args, tool_id, session_id, debug)
-        else:
-            return await self._handle_regular_tool(tool_name, tool_args, tool_id, session_id, debug)
+
+        # tool_id is not used by MCP but preserved for LLM context managers
+        # which need it to properly format tool results in conversation history
+        _ = tool_id
+
+        try:
+            # Execute tool
+            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
+            tool_result = extract_tool_result_from_mcp(call_tool_result)
+
+            # Check MCP-level errors (is_error field) - return unified format with error info
+            if tool_result.get("is_error"):
+                return {
+                    "inline_data": {},
+                    "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
+                }
+
+            # Check tool-level errors (status="error") - return unified format with error info
+            if tool_result.get("status") == "error":
+                error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
+                return {
+                    "inline_data": {},
+                    "llm_content": f"<error>{error_message}</error>"
+                }
+
+            # Unified handling: always return inline_data + llm_content structure
+            if self._has_multimodal_content(tool_result):
+                inline_data = self._extract_multimodal_content(tool_result)
+            else:
+                inline_data = {}  # Empty for non-multimodal content
+
+            return {
+                "inline_data": inline_data,
+                "llm_content": tool_result.get("llm_content")
+            }
+
+        except Exception as e:
+            # System/infrastructure errors - re-raise for upper layer handling
+            if debug:
+                print(f"Error calling tool {tool_name}: {str(e)}")
+            raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
