@@ -8,7 +8,7 @@ router = APIRouter()
 # Navigate from backend/presentation/api/ to project root
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "chat" / "data"
 
-@router.get("/api/images/{image_path:path}")
+@router.get("/images/{image_path:path}")
 async def get_image(image_path: str):
     """
     API route for image file access.

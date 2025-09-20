@@ -40,7 +40,7 @@ def get_llm_client(request: Request) -> LLMClientBase:
     """
     return request.app.state.llm_client
 
-@router.get("/api/videos/{video_path:path}")
+@router.get("/videos/{video_path:path}")
 async def get_video(video_path: str):
     """
     API route for video file access.
@@ -81,7 +81,7 @@ async def get_video(video_path: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/generate-video")
+@router.post("/generate-video")
 async def generate_video(
     request: VideoGenerationRequest,
     service: ContentService = Depends(get_content_service),

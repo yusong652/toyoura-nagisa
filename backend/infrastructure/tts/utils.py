@@ -15,7 +15,7 @@ WHITESPACE_PATTERN = re.compile(r'\s+')
 # 从配置文件获取默认值
 tts_settings = get_tts_settings()
 DEFAULT_SPLIT_PUNCTUATIONS = getattr(tts_settings, 'split_punctuations', ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'])
-DEFAULT_PUNCTUATION_LIMIT = getattr(tts_settings, 'split_size', 4)
+DEFAULT_PUNCTUATION_LIMIT = getattr(tts_settings, 'split_size', 12)
 
 # 新增：提取并替换emoji和kaomoji为占位符
 KAOMOJI_PLACEHOLDER = "__KAOMOJI_{}__"

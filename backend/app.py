@@ -90,8 +90,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(images.router)
-app.include_router(videos.router)
+app.include_router(images.router, prefix="/api")
+app.include_router(videos.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
