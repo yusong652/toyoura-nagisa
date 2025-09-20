@@ -108,7 +108,7 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
     ).model_dump()
 
 
-def error_response(message: str) -> Dict[str, Any]:
+def error_response(message: str, **data) -> Dict[str, Any]:
     """Create a standardized error response for all MCP tools.
     
     This function provides a unified way for all tools to return error responses,
@@ -126,5 +126,6 @@ def error_response(message: str) -> Dict[str, Any]:
     return ToolResult(
         status="error",
         message=message,
-        llm_content=f"<error>{message}</error>"
+        llm_content=f"<error>{message}</error>",
+        data=data if data else None,
     ).model_dump() 

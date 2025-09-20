@@ -120,7 +120,7 @@ def _create_and_save_image_message(session_id: str, filename: str) -> None:
         id=str(uuid.uuid4()),
         timestamp=datetime.now()
     )
-    
+
     # Add image message to history
     print("[DEBUG] Loading current history to append image message")
     history = load_all_message_history(session_id)

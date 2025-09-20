@@ -29,7 +29,7 @@ class LLMClientBase(ABC):
     - Consistent: unified streaming interface avoiding redundant wrappers
     """
     
-    def __init__(self, extra_config: Dict[str, Any] = None):
+    def __init__(self, extra_config: Optional[Dict[str, Any]] = None):
         """
         Initialize LLM client base class.
         

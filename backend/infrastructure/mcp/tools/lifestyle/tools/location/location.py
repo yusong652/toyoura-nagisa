@@ -15,12 +15,11 @@ __all__ = ["register_location_tools"]
 def register_location_tools(mcp: FastMCP):
     """Register location-related tools with proper tags synchronization."""
 
-    common_kwargs_location = dict(
-        tags={"location", "geolocation", "geography", "coordinates", "position"}, 
-        annotations={"category": "location", "tags": ["location", "geolocation", "geography", "coordinates", "position"]}
+    @mcp.tool(
+        name="get_location",
+        description="Get the user's current geographic location",
+        tags={"location", "geolocation", "geography", "coordinates", "position"}
     )
-
-    @mcp.tool(**common_kwargs_location)
     async def get_location(context: Context) -> Dict[str, Any]:
         """Get the user's current geographic location.
         
@@ -37,22 +36,20 @@ def register_location_tools(mcp: FastMCP):
             location_data = await get_user_location(context, wait_time=30)
             
             if location_data:
-                # Determine accuracy level
-                accuracy = "high" if location_data.source == "browser_geolocation" else "low"
+                # Determine accuracy level based on accuracy field
+                accuracy = "high" if (location_data.accuracy and location_data.accuracy != "low") else "low"
                 
                 # Build natural location description
                 location_parts = []
                 if location_data.city:
                     location_parts.append(location_data.city)
-                if location_data.region:
-                    location_parts.append(location_data.region)
                 if location_data.country:
                     location_parts.append(location_data.country)
                 
                 location_desc = ", ".join(location_parts) if location_parts else "Unknown location"
                 
                 # Create simple, natural language content for LLM
-                llm_content = f"Location: {location_desc}\nCoordinates: {location_data.latitude:.6f}, {location_data.longitude:.6f}"
+                llm_content = f"Location: {location_desc}\nCoordinates: {location_data.latitude:.2f}, {location_data.longitude:.2f}"
                 if accuracy == "high":
                     llm_content += " (high accuracy from browser)"
                 else:
@@ -60,7 +57,6 @@ def register_location_tools(mcp: FastMCP):
                 
                 message = f"Location determined: {location_desc} ({accuracy} accuracy)"
                 
-                print(f"[DEBUG] Location found: {location_desc}, source: {location_data.source}")
                 return success_response(
                     message,
                     llm_content,
@@ -68,9 +64,7 @@ def register_location_tools(mcp: FastMCP):
                         "latitude": location_data.latitude,
                         "longitude": location_data.longitude,
                         "city": location_data.city,
-                        "region": location_data.region,
                         "country": location_data.country,
-                        "source": location_data.source,
                         "accuracy": accuracy
                     }
                 )

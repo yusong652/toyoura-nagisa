@@ -10,16 +10,14 @@ class LocationData:
     """
     用于封装地理位置数据的结构体
     """
-    def __init__(self, latitude: float, longitude: float, source: str, accuracy: Optional[float] = None, timestamp: Optional[int] = None, city: Optional[str] = None, country: Optional[str] = None, region: Optional[str] = None, session_id: Optional[str] = None):
+    def __init__(self, latitude: float, longitude: float, accuracy: Optional[float] = None, timestamp: Optional[int] = None, city: Optional[str] = None, country: Optional[str] = None, session_id: Optional[str] = None):
         self.latitude = latitude
         self.longitude = longitude
         self.accuracy = accuracy
         self.timestamp = timestamp or int(time.time())
-        self.source = source
         self.session_id = session_id
         self.city = city
         self.country = country
-        self.region = region
 
     def to_dict(self):
         """

@@ -24,8 +24,7 @@ async def _fetch_server_location() -> Optional[Dict[str, Any]]:
                     "longitude": data["lon"],
                     "city": data.get("city"),
                     "country": data.get("country"),
-                    "region": data.get("regionName"),
-                    "source": "server_ip"
+                    "accuracy": "low"
                 }
     except Exception as e:
         print(f"Error fetching server location: {e}")
@@ -45,33 +44,28 @@ async def _reverse_geocode(lat: float, lon: float) -> Dict[str, Optional[str]]:
                 addr = resp.json().get("address", {})
                 return {
                     "city": addr.get("city") or addr.get("town") or addr.get("village"),
-                    "region": addr.get("state"),
                     "country": addr.get("country"),
                 }
     except Exception as e:
         print(f"Error in full reverse geocoding: {e}")
         raise
-    return {"city": None, "region": None, "country": None}
+    return {"city": None, "country": None}
 
-async def get_browser_location(
+async def _fetch_browser_location(
     context: Context,
     timeout: float = 30.0
 ) -> Optional[Dict[str, Any]]:
     """
-    Get user location from browser via WebSocket.
+    Fetch user location from browser via WebSocket.
 
     Args:
         context: FastMCP context containing session information
         timeout: Timeout in seconds for waiting for browser response
 
     Returns:
-        Dict containing raw location data with geocoding info or None if unavailable
+        Dict containing location data with consistent structure or None if unavailable
     """
     try:
-        import threading
-        current_loop = asyncio.get_event_loop()
-        current_thread = threading.current_thread()
-        print(f"[LOCATION] get_browser_location running in thread: {current_thread.name}, event loop: {id(current_loop)}", flush=True)
         session_id = context.client_id
         if not session_id:
             return None
@@ -98,14 +92,19 @@ async def get_browser_location(
             # Poll cache for response
             from backend.infrastructure.websocket.message_cache import get_message_cache
             cache = get_message_cache()
-            for _ in range(int(timeout * 10)): 
+            for _ in range(int(timeout * 10)):
                 location_data = cache.get_message("location", session_id)
                 if location_data:
-                    return location_data
+                    # Standardize browser location data structure
+                    return {
+                        "latitude": location_data.get("latitude"),
+                        "longitude": location_data.get("longitude"),
+                        "city": location_data.get("city"),
+                        "country": location_data.get("country"),
+                        "accuracy": location_data.get("accuracy")
+                    }
 
                 await asyncio.sleep(0.1)
-
-            print(f"[LOCATION] Timeout after {timeout}s, no response received", flush=True)
             return None
 
         except Exception as e:
@@ -139,7 +138,7 @@ async def get_user_location(
 
         # Try browser location first if preferred
         if prefer_browser:
-            browser_data = await get_browser_location(context, timeout=wait_time)
+            browser_data = await _fetch_browser_location(context, timeout=wait_time)
             if not browser_data:
                 print(f"[LOCATION] Browser location unavailable, falling back to server IP")
 
@@ -148,36 +147,30 @@ async def get_user_location(
             server_data = await _fetch_server_location()
 
         # Unified LocationData assembly with geocoding
-        if browser_data:
-            # Browser data: get geocoding info
-            geocode_data = await _reverse_geocode(
-                browser_data["latitude"],
-                browser_data["longitude"]
-            )
+        location_data = browser_data or server_data
+        if location_data:
+            # Get additional geocoding info if needed (for browser data without city)
+            if browser_data and not location_data.get("city"):
+                geocode_data = await _reverse_geocode(
+                    location_data["latitude"],
+                    location_data["longitude"]
+                )
+                # Use geocoded data if original data lacks location info
+                city = geocode_data.get("city")
+                country = geocode_data.get("country")
+            else:
+                # Use existing location info from the data source
+                city = location_data.get("city")
+                country = location_data.get("country")
 
             from backend.infrastructure.mcp.location_manager import LocationData
             return LocationData(
-                latitude=browser_data["latitude"],
-                longitude=browser_data["longitude"],
-                accuracy=browser_data.get("accuracy"),
-                source="browser_geolocation",
+                latitude=location_data["latitude"],
+                longitude=location_data["longitude"],
+                accuracy=location_data.get("accuracy"),
                 session_id=context.client_id,
-                city=geocode_data.get("city"),
-                region=geocode_data.get("region"),
-                country=geocode_data.get("country")
-            )
-
-        elif server_data:
-            # Server data: already has basic geocoding info
-            from backend.infrastructure.mcp.location_manager import LocationData
-            return LocationData(
-                latitude=server_data["latitude"],
-                longitude=server_data["longitude"],
-                source="server_ip_geolocation",
-                session_id=context.client_id,
-                city=server_data.get("city"),
-                region=server_data.get("region"),
-                country=server_data.get("country")
+                city=city,
+                country=country
             )
 
     except Exception as e:

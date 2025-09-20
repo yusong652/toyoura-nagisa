@@ -330,23 +330,23 @@ def register_image_to_video_tools(mcp: FastMCP) -> None:
         description="Generate dynamic video with AI-powered motion using WAN 2.2 image-to-video"
     )
     async def _tool_generate_video_from_image(
+        context: Context,
         image_base64: str,
         prompt: str,
         motion_style: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate video from static image.
-        
+
         Args:
+            context: FastMCP context containing session information
             image_base64: Base64 encoded input image
             prompt: Description of desired motion and video content
             motion_style: Optional motion style (e.g., 'cinematic camera movement')
-        
+
         Returns:
             Video in base64 format with metadata
         """
-        # Get context from MCP
-        context = mcp.get_current_context()
         return await generate_video_from_image(
             context=context,
             image_base64=image_base64,

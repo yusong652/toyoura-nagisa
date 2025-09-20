@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from mcp.types import CallToolResult
 
 def extract_tool_result_from_mcp(result: CallToolResult) -> Dict[str, Any]:
@@ -29,8 +29,14 @@ def extract_tool_result_from_mcp(result: CallToolResult) -> Dict[str, Any]:
         ensuring consistent structure across the MCP ecosystem.
     """
     # Extract and parse ToolResult JSON from TextContent
-    text_content = result.content[0].text
-    tool_result = json.loads(text_content)
+    content_block = result.content[0]
+
+    # Type guard to ensure we have TextContent with text attribute
+    if hasattr(content_block, 'text') and hasattr(content_block, 'type') and content_block.type == 'text':
+        text_content = content_block.text  # type: ignore
+        tool_result = json.loads(text_content)
+    else:
+        raise ValueError(f"Expected TextContent but got {type(content_block).__name__} with type {getattr(content_block, 'type', 'unknown')}")
     
     # Apply MCP error flag if present
     if result.isError:
@@ -38,7 +44,7 @@ def extract_tool_result_from_mcp(result: CallToolResult) -> Dict[str, Any]:
         
     return tool_result
 
-def ensure_future_datetime(dt: datetime, now: datetime = None) -> datetime:
+def ensure_future_datetime(dt: datetime, now: Optional[datetime] = None) -> datetime:
     """
     Ensure datetime is in the future by adjusting year if necessary.
     
