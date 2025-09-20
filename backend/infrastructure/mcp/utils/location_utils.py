@@ -32,23 +32,8 @@ async def _fetch_server_location() -> Optional[Dict[str, Any]]:
         raise
     return None
 
-async def _reverse_geocode(lat: float, lon: float) -> Optional[str]:
-    """Use OpenStreetMap Nominatim to reverse-geocode coordinates to city name"""
-    try:
-        url = "https://nominatim.openstreetmap.org/reverse"
-        params = {"format": "json", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1}
-        headers = {"User-Agent": "Nagisa-FastMCP/1.0"}
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(url, params=params, headers=headers)
-            if resp.status_code == 200:
-                addr = resp.json().get("address", {})
-                return addr.get("city") or addr.get("town") or addr.get("village")
-    except Exception as e:
-        print(f"Error in reverse geocoding: {e}")
-        raise
-    return None
 
-async def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[str]]:
+async def _reverse_geocode(lat: float, lon: float) -> Dict[str, Optional[str]]:
     """Use OpenStreetMap Nominatim to reverse-geocode coordinates to full address"""
     try:
         url = "https://nominatim.openstreetmap.org/reverse"
@@ -71,7 +56,7 @@ async def _reverse_geocode_full(lat: float, lon: float) -> Dict[str, Optional[st
 async def get_browser_location(
     context: Context,
     timeout: float = 30.0
-) -> Optional['LocationData']:
+) -> Optional[Dict[str, Any]]:
     """
     Get user location from browser via WebSocket.
 
@@ -80,7 +65,7 @@ async def get_browser_location(
         timeout: Timeout in seconds for waiting for browser response
 
     Returns:
-        LocationData object with browser location data or None if unavailable
+        Dict containing raw location data with geocoding info or None if unavailable
     """
     try:
         import threading
@@ -91,33 +76,15 @@ async def get_browser_location(
         if not session_id:
             return None
 
-        # Get app and websocket handler
-        app = getattr(getattr(context, "fastmcp", None), "app", None)
-        if not app or not hasattr(app.state, "websocket_handler"):
-            return None
-
-        # Get WebSocket handler and location handler
-        websocket_handler = getattr(app.state, 'websocket_handler', None)
-        if not websocket_handler:
-            return None
-            
-        # Get location handler from message processor
-        message_processor = websocket_handler.get_message_processor()
-        location_handler = message_processor.location_handler
-        
-        if not location_handler:
-            return None
-        
-        # Check if WebSocket connection exists
-        connection_manager = websocket_handler.get_connection_manager()
-
-        if session_id not in connection_manager.connections:
+        # Get FastAPI app from MCP context
+        try:
+            app = context.fastmcp.app # type: ignore
+            websocket_handler = app.state.websocket_handler
+            connection_manager = websocket_handler.get_connection_manager()
+        except AttributeError:
             return None
         
         try:
-            # Send location request directly like heartbeat - no Future needed
-            print(f"[LOCATION] Sending location request to session {session_id} (heartbeat-style)", flush=True)
-
             result = await connection_manager.send_json(session_id, {
                 "type": "LOCATION_REQUEST",
                 "session_id": session_id,
@@ -125,40 +92,16 @@ async def get_browser_location(
                 "accuracy_level": "high"
             })
 
-            if result:
-                print(f"[LOCATION] Successfully sent location request to session {session_id}", flush=True)
-            else:
-                print(f"[LOCATION] Failed to send location request to session {session_id}", flush=True)
+            if not result:
                 return None
 
             # Poll cache for response
             from backend.infrastructure.websocket.message_cache import get_message_cache
             cache = get_message_cache()
-
-            print(f"[LOCATION] Polling cache for response (timeout: {timeout}s)", flush=True)
-            for i in range(int(timeout * 10)):  # Poll every 100ms
+            for _ in range(int(timeout * 10)): 
                 location_data = cache.get_message("location", session_id)
-                print(f"[LOCATION] Polling attempt {i+1}, got: {location_data}", flush=True)
                 if location_data:
-                    print(f"[LOCATION] Got cached response after {i * 0.1:.1f}s", flush=True)
-
-                    # Process location data and return LocationData object
-                    geocode_data = await _reverse_geocode_full(
-                        location_data["latitude"],
-                        location_data["longitude"]
-                    )
-
-                    from backend.infrastructure.mcp.location_manager import LocationData
-                    return LocationData(
-                        latitude=location_data["latitude"],
-                        longitude=location_data["longitude"],
-                        accuracy=location_data.get("accuracy"),
-                        source="browser_geolocation",
-                        session_id=session_id,
-                        city=geocode_data.get("city"),
-                        region=geocode_data.get("region"),
-                        country=geocode_data.get("country")
-                    )
+                    return location_data
 
                 await asyncio.sleep(0.1)
 
@@ -175,43 +118,66 @@ async def get_browser_location(
 
 
 async def get_user_location(
-    context: Context, 
+    context: Context,
     wait_time: int = 10,
     prefer_browser: bool = True
 ) -> Optional['LocationData']:
     """
     Get user location with browser priority.
-    
+
     Args:
         context: FastMCP context containing session information
         wait_time: Timeout for browser location (defaults to 10 seconds)
         prefer_browser: If True, try browser location first (default True)
-    
+
     Returns:
         LocationData object with location data or None if unavailable
     """
     try:
+        browser_data = None
+        server_data = None
+
         # Try browser location first if preferred
         if prefer_browser:
-            browser_loc = await get_browser_location(context, timeout=wait_time)
-            if browser_loc:
-                return browser_loc
-            else:
+            browser_data = await get_browser_location(context, timeout=wait_time)
+            if not browser_data:
                 print(f"[LOCATION] Browser location unavailable, falling back to server IP")
 
-        # Always fallback to server IP geolocation
-        server_data = await _fetch_server_location()
-        if server_data:
-            # Import here to avoid circular imports
+        # Fallback to server IP geolocation if browser location failed
+        if not browser_data:
+            server_data = await _fetch_server_location()
+
+        # Unified LocationData assembly with geocoding
+        if browser_data:
+            # Browser data: get geocoding info
+            geocode_data = await _reverse_geocode(
+                browser_data["latitude"],
+                browser_data["longitude"]
+            )
+
+            from backend.infrastructure.mcp.location_manager import LocationData
+            return LocationData(
+                latitude=browser_data["latitude"],
+                longitude=browser_data["longitude"],
+                accuracy=browser_data.get("accuracy"),
+                source="browser_geolocation",
+                session_id=context.client_id,
+                city=geocode_data.get("city"),
+                region=geocode_data.get("region"),
+                country=geocode_data.get("country")
+            )
+
+        elif server_data:
+            # Server data: already has basic geocoding info
             from backend.infrastructure.mcp.location_manager import LocationData
             return LocationData(
                 latitude=server_data["latitude"],
                 longitude=server_data["longitude"],
                 source="server_ip_geolocation",
+                session_id=context.client_id,
                 city=server_data.get("city"),
-                country=server_data.get("country"),
                 region=server_data.get("region"),
-                session_id=context.client_id
+                country=server_data.get("country")
             )
 
     except Exception as e:
@@ -238,9 +204,10 @@ async def get_user_city(context: Context, wait_time: int = 8) -> Optional[str]:
         return location_data.city
     elif location_data and location_data.latitude and location_data.longitude:
         # Try reverse geocoding if city not available
-        return await _reverse_geocode(
+        geocode_result = await _reverse_geocode(
             location_data.latitude,
             location_data.longitude
         )
+        return geocode_result.get("city")
     
     return None 
