@@ -18,7 +18,6 @@ Flow: FastAPI route → websocket_handler.py → message_handler.py → specific
 """
 import logging
 import asyncio
-from typing import Optional
 from datetime import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -131,60 +130,20 @@ class WebSocketHandler:
     
 
 
-# Global handler instance for application use
-_websocket_handler: Optional[WebSocketHandler] = None
-
-
-def get_websocket_handler() -> WebSocketHandler:
+def create_websocket_handler() -> WebSocketHandler:
     """
-    Get singleton WebSocket handler instance.
-    
-    Returns:
-        WebSocketHandler: Global handler instance
-    """
-    global _websocket_handler
-    if _websocket_handler is None:
-        _websocket_handler = WebSocketHandler()
-    return _websocket_handler
+    Create a new WebSocket handler instance for application use.
 
-
-def initialize_websocket_handler() -> WebSocketHandler:
-    """
-    Application startup initialization for WebSocket system.
-
-    Called by app.py during FastAPI startup to initialize the WebSocket
-    connection handling system and set up global instances.
+    Called by app.py during FastAPI startup to create the WebSocket
+    connection handling system.
 
     Returns:
-        WebSocketHandler: Initialized connection lifecycle manager
+        WebSocketHandler: New connection lifecycle manager instance
 
-    Note: This sets up the global infrastructure that other services
-    (TTS, notifications, etc.) will use to send messages via WebSocket.
+    Note: The returned instance should be stored in app.state.websocket_handler
+    for access throughout the application.
     """
-    global _websocket_handler
-    _websocket_handler = WebSocketHandler()
-    logger.info("WebSocket handler initialized")
-    return _websocket_handler
-
-
-# Convenience functions for external use
-async def handle_websocket_connection(websocket: WebSocket, session_id: str):
-    """
-    FastAPI route convenience function.
-
-    This is the function that gets called directly by FastAPI WebSocket routes.
-    It's the entry point from the web framework into our WebSocket system.
-
-    Args:
-        websocket: FastAPI WebSocket connection instance
-        session_id: Session identifier from route parameter (/ws/{session_id})
-
-    Usage in routes.py:
-        @app.websocket("/ws/{session_id}")
-        async def websocket_endpoint(websocket: WebSocket, session_id: str):
-            await handle_websocket_connection(websocket, session_id)
-    """
-    handler = get_websocket_handler()
-    await handler.handle_connection(websocket, session_id)
-
+    handler = WebSocketHandler()
+    logger.info("WebSocket handler created")
+    return handler
 

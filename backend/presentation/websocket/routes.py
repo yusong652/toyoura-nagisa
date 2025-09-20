@@ -5,7 +5,6 @@ This module provides WebSocket routes using the new unified handler architecture
 simplifying the routing layer and providing better extensibility.
 """
 from fastapi import FastAPI, WebSocket
-from backend.presentation.websocket.websocket_handler import handle_websocket_connection
 from backend.presentation.websocket.message_types import MessageType
 
 
@@ -28,14 +27,14 @@ def register_websocket_routes(app: FastAPI):
     async def websocket_session_endpoint(websocket: WebSocket, session_id: str):
         """
         Unified WebSocket endpoint for session-based real-time communication.
-        
+
         Handles all WebSocket connections using the new message handler architecture,
         supporting multiple message types including chat, location, tools, and more.
-        
+
         Args:
             websocket: WebSocket connection instance
             session_id: Session UUID for connection context
-            
+
         Features:
             - Unified message processing with type validation
             - Extensible handler system for new message types
@@ -45,7 +44,10 @@ def register_websocket_routes(app: FastAPI):
         """
         print(f"[WebSocket] Connection attempt for session: {session_id}")
         try:
-            await handle_websocket_connection(websocket, session_id)
+            # Directly use the WebSocket handler from app state
+            # No need for wrapper function - simpler and clearer
+            handler = app.state.websocket_handler
+            await handler.handle_connection(websocket, session_id)
         except Exception as e:
             print(f"[WebSocket] Error in unified handler: {e}")
             raise
