@@ -25,28 +25,20 @@ class ToolNotificationService:
     Coordinates tool notification use cases:
     - notify_tool_use_started: When tools begin execution
     - notify_tool_use_concluded: When tools finish execution
-    - notify_tool_error: When tool execution fails
+    - notify_tool_use_error: When tool execution fails
 
     Uses ConnectionManager (infrastructure layer) for actual WebSocket delivery.
     Provides clean interface for LLM clients without coupling to WebSocket details.
     """
 
-    def __init__(self, connection_manager: Optional[ConnectionManager] = None):
-        """Initialize the tool notification service."""
-        self._connection_manager = connection_manager
+    def __init__(self, connection_manager: ConnectionManager):
+        """
+        Initialize the tool notification service.
 
-    def _get_connection_manager(self) -> ConnectionManager:
-        """Get connection manager instance with lazy initialization."""
-        if self._connection_manager is None:
-            # Try to get the global connection manager first
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-            global_manager = get_connection_manager()
-            if global_manager is not None:
-                self._connection_manager = global_manager
-            else:
-                # Fallback to creating a new instance
-                self._connection_manager = ConnectionManager()
-        return self._connection_manager
+        Args:
+            connection_manager: WebSocket connection manager instance
+        """
+        self.connection_manager = connection_manager
     
     async def notify_tool_use_started(
         self,
@@ -68,7 +60,6 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            connection_manager = self._get_connection_manager()
             
             # Create tool use started message
             message_data = {
@@ -89,7 +80,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await connection_manager.send_json(session_id, ws_message.model_dump())
+            success = await self.connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool use started notification to session {session_id}")
@@ -120,7 +111,6 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            connection_manager = self._get_connection_manager()
             
             # Create tool use concluded message
             message_data = {
@@ -141,7 +131,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await connection_manager.send_json(session_id, ws_message.model_dump())
+            success = await self.connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool use concluded notification to session {session_id}")
@@ -154,7 +144,7 @@ class ToolNotificationService:
             logger.error(f"Error sending tool use concluded notification: {e}")
             return False
     
-    async def notify_tool_error(
+    async def notify_tool_use_error(
         self,
         session_id: str,
         tool_name: str,
@@ -174,7 +164,6 @@ class ToolNotificationService:
             bool: Whether notification was sent successfully
         """
         try:
-            connection_manager = self._get_connection_manager()
             
             # Create error message
             error_data = {
@@ -194,7 +183,7 @@ class ToolNotificationService:
             )
             
             # Send via WebSocket
-            success = await connection_manager.send_json(session_id, ws_message.model_dump())
+            success = await self.connection_manager.send_json(session_id, ws_message.model_dump())
             
             if success:
                 logger.info(f"Sent tool error notification to session {session_id}")
@@ -208,83 +197,37 @@ class ToolNotificationService:
             return False
 
 
-# Global service instance
-_tool_notification_service: Optional[ToolNotificationService] = None
-
-
-def get_tool_notification_service() -> ToolNotificationService:
+def get_tool_notification_service() -> Optional[ToolNotificationService]:
     """
-    Get singleton tool notification service instance.
-    
+    Get tool notification service from WebSocketHandler.
+
     Returns:
-        ToolNotificationService: Global service instance
-    """
-    global _tool_notification_service
-    if _tool_notification_service is None:
-        _tool_notification_service = ToolNotificationService()
-    return _tool_notification_service
+        ToolNotificationService instance or None if not initialized
 
+    Note:
+        The service is initialized and managed by WebSocketHandler,
+        avoiding global state and ensuring proper lifecycle management.
+    """
+    try:
+        from backend.shared.utils.app_context import get_app
 
-# Convenience functions for easy integration
-async def notify_tool_started(
-    session_id: str,
-    tool_names: List[str],
-    action: str,
-    thinking: Optional[str] = None
-) -> bool:
-    """
-    Convenience function to send tool use started notification.
-    
-    Args:
-        session_id: Target session ID
-        tool_names: List of tool names being executed
-        action: Human-readable action description
-        thinking: Optional thinking content
-        
-    Returns:
-        bool: Whether notification was sent successfully
-    """
-    service = get_tool_notification_service()
-    return await service.notify_tool_use_started(session_id, tool_names, action, thinking)
+        app = get_app()
+        if not app:
+            logger.warning("FastAPI app not initialized")
+            return None
 
+        if not hasattr(app.state, 'websocket_handler'):
+            logger.warning("WebSocket handler not found in app state")
+            return None
 
-async def notify_tool_concluded(
-    session_id: str,
-    tool_names: Optional[List[str]] = None,
-    results: Optional[Dict[str, Any]] = None
-) -> bool:
-    """
-    Convenience function to send tool use concluded notification.
-    
-    Args:
-        session_id: Target session ID
-        tool_names: List of tool names that were executed
-        results: Optional results summary
-        
-    Returns:
-        bool: Whether notification was sent successfully
-    """
-    service = get_tool_notification_service()
-    return await service.notify_tool_use_concluded(session_id, tool_names, results)
+        handler = app.state.websocket_handler
+        if not hasattr(handler, 'tool_notification_service'):
+            logger.warning("Tool notification service not found in WebSocket handler")
+            return None
 
+        return handler.tool_notification_service
 
-async def notify_tool_error(
-    session_id: str,
-    tool_name: str,
-    error_message: str,
-    error_details: Optional[Dict[str, Any]] = None
-) -> bool:
-    """
-    Convenience function to send tool error notification.
-    
-    Args:
-        session_id: Target session ID
-        tool_name: Name of the tool that failed
-        error_message: Error description
-        error_details: Optional detailed error information
-        
-    Returns:
-        bool: Whether notification was sent successfully
-    """
-    service = get_tool_notification_service()
-    return await service.notify_tool_error(session_id, tool_name, error_message, error_details)
+    except Exception as e:
+        logger.warning(f"Could not get tool notification service: {e}")
+        return None
+

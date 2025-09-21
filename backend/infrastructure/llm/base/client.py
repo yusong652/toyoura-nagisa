@@ -704,21 +704,24 @@ class LLMClientBase(ABC):
         
         try:
             # Import here to avoid circular dependencies
-            from backend.application.services.notifications import (
-                notify_tool_started, notify_tool_concluded
-            )
-            
+            from backend.application.services.notifications import get_tool_notification_service
+
+            service = get_tool_notification_service()
+            if not service:
+                logger.warning("Tool notification service not available")
+                return
+
             notification_type = notification.get('type')
-            
+
             if notification_type == 'NAGISA_IS_USING_TOOL':
-                await notify_tool_started(
+                await service.notify_tool_use_started(
                     session_id=session_id,
                     tool_names=notification.get('tool_names', []),
                     action=notification.get('action', ''),
                     thinking=notification.get('thinking')
                 )
             elif notification_type == 'NAGISA_TOOL_USE_CONCLUDED':
-                await notify_tool_concluded(
+                await service.notify_tool_use_concluded(
                     session_id=session_id,
                     tool_names=notification.get('tool_names'),
                     results=notification.get('results')

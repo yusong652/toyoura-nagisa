@@ -74,48 +74,36 @@ class EmotionNotificationService:
             logger.error(f"Failed to send emotion keyword notification: {e}")
 
 
-# Global service instance
-_emotion_service: Optional[EmotionNotificationService] = None
-
-
-def get_emotion_notification_service(
-    connection_manager: Optional[ConnectionManager] = None
-) -> Optional[EmotionNotificationService]:
+def get_emotion_notification_service() -> Optional[EmotionNotificationService]:
     """
-    Get or initialize the global emotion notification service.
-
-    Args:
-        connection_manager: Optional connection manager for initialization.
-                          If provided, initializes a new service instance.
-                          If None, returns existing global instance.
+    Get emotion notification service from WebSocketHandler.
 
     Returns:
         EmotionNotificationService instance or None if not initialized
 
-    Usage:
-        # Initialize (typically in application startup)
-        service = get_emotion_notification_service(connection_manager)
-
-        # Get existing instance (in business logic)
-        service = get_emotion_notification_service()
+    Note:
+        The service is initialized and managed by WebSocketHandler,
+        avoiding global state and ensuring proper lifecycle management.
     """
-    global _emotion_service
+    try:
+        from backend.shared.utils.app_context import get_app
 
-    if connection_manager:
-        # Initialize new service instance
-        _emotion_service = EmotionNotificationService(connection_manager)
-        return _emotion_service
-    elif _emotion_service is None:
-        # Try to auto-initialize with global connection manager
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager, ConnectionManager
-            global_manager = get_connection_manager()
-            if global_manager is not None:
-                _emotion_service = EmotionNotificationService(global_manager)
-            else:
-                # Fallback to creating a new instance
-                _emotion_service = EmotionNotificationService(ConnectionManager())
-        except Exception as e:
-            logger.warning(f"Could not initialize emotion service: {e}")
+        app = get_app()
+        if not app:
+            logger.warning("FastAPI app not initialized")
+            return None
 
-    return _emotion_service
+        if not hasattr(app.state, 'websocket_handler'):
+            logger.warning("WebSocket handler not found in app state")
+            return None
+
+        handler = app.state.websocket_handler
+        if not hasattr(handler, 'emotion_service'):
+            logger.warning("Emotion notification service not found in WebSocket handler")
+            return None
+
+        return handler.emotion_service
+
+    except Exception as e:
+        logger.warning(f"Could not get emotion notification service: {e}")
+        return None
