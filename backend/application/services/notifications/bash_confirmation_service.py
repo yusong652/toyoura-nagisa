@@ -11,32 +11,13 @@ DDD Role: Application Service
 """
 import asyncio
 import logging
-import uuid
 from typing import Optional, Dict
-from datetime import datetime
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import create_bash_confirmation_request
 
 logger = logging.getLogger(__name__)
 
 
-class PendingConfirmation:
-    """Represents a pending bash command confirmation request."""
-
-    def __init__(self, confirmation_id: str, command: str, description: Optional[str] = None):
-        """
-        Initialize pending confirmation.
-
-        Args:
-            confirmation_id: Unique ID for this confirmation
-            command: The bash command to execute
-            description: Optional description of what the command does
-        """
-        self.confirmation_id = confirmation_id
-        self.command = command
-        self.description = description
-        self.created_at = datetime.now()
-        self.future: asyncio.Future[tuple[bool, Optional[str]]] = asyncio.Future()  # (approved, user_message)
 
 
 class BashConfirmationService:
@@ -58,7 +39,7 @@ class BashConfirmationService:
             connection_manager: WebSocket connection manager instance
         """
         self.connection_manager = connection_manager
-        self.pending_confirmations: Dict[str, PendingConfirmation] = {}
+        self.active_confirmations: Dict[str, asyncio.Future[tuple[bool, Optional[str]]]] = {}  # session_id -> Future
 
     async def request_confirmation(
         self,
@@ -84,17 +65,14 @@ class BashConfirmationService:
                                         optional message from user when rejecting
         """
 
-        # Generate unique confirmation ID
-        confirmation_id = str(uuid.uuid4())
-
-        # Create pending confirmation
-        pending = PendingConfirmation(confirmation_id, command, description)
-        self.pending_confirmations[confirmation_id] = pending
+        # Create Future for this session's confirmation
+        confirmation_future: asyncio.Future[tuple[bool, Optional[str]]] = asyncio.Future()
+        self.active_confirmations[session_id] = confirmation_future
 
         try:
             # Send confirmation request to frontend
             request_msg = create_bash_confirmation_request(
-                confirmation_id=confirmation_id,
+                confirmation_id=session_id,  # Use session_id as confirmation_id
                 command=command,
                 description=description,
                 session_id=session_id
@@ -103,50 +81,38 @@ class BashConfirmationService:
             # Check if session is connected
             if await self.connection_manager.is_connected(session_id):
                 await self.connection_manager.send_json(session_id, request_msg)
-                logger.info(f"Sent bash confirmation request {confirmation_id} for command: {command}")
+                logger.info(f"Sent bash confirmation request for session {session_id}, command: {command}")
             else:
                 logger.warning(f"Session {session_id} not connected, auto-rejecting bash command")
                 return (False, None)
 
-            # Wait for response with timeout - use non-blocking approach
-            start_time = datetime.now()
-            check_interval = 0.1  # Check every 100ms
-
-            while True:
-                # Check if we have a response
-                if pending.future.done():
-                    approved, user_message = pending.future.result()
-                    logger.info(f"Confirmation {confirmation_id} result: {'approved' if approved else 'rejected'}")
-                    if user_message:
-                        logger.info(f"User message: {user_message}")
-                    # Clean up after successful response
-                    if confirmation_id in self.pending_confirmations:
-                        del self.pending_confirmations[confirmation_id]
-                    return (approved, user_message)
-
-                # Check for timeout
-                elapsed = (datetime.now() - start_time).total_seconds()
-                if elapsed >= timeout_seconds:
-                    logger.warning(f"Confirmation {confirmation_id} timed out after {timeout_seconds}s")
-                    # Clean up after timeout
-                    if confirmation_id in self.pending_confirmations:
-                        del self.pending_confirmations[confirmation_id]
-                    return (False, None)
-
-                # Sleep briefly to allow other tasks to run
-                await asyncio.sleep(check_interval)
+            # Wait for response with timeout
+            try:
+                approved, user_message = await asyncio.wait_for(
+                    confirmation_future,
+                    timeout=timeout_seconds
+                )
+                logger.info(f"Session {session_id} confirmation result: {'approved' if approved else 'rejected'}")
+                if user_message:
+                    logger.info(f"User message: {user_message}")
+                return (approved, user_message)
+            except asyncio.TimeoutError:
+                logger.warning(f"Session {session_id} confirmation timed out after {timeout_seconds}s")
+                return (False, None)
 
         finally:
-            pass  # Don't clean up here - only clean up after we get a result or timeout
+            # Clean up the Future
+            if session_id in self.active_confirmations:
+                del self.active_confirmations[session_id]
 
-    def handle_confirmation_response(self, confirmation_id: str, approved: bool, user_message: Optional[str] = None) -> bool:
+    def handle_confirmation_response(self, session_id: str, approved: bool, user_message: Optional[str] = None) -> bool:
         """
         Handle confirmation response from frontend.
 
         Called by the WebSocket message handler when a BASH_CONFIRMATION_RESPONSE is received.
 
         Args:
-            confirmation_id: The confirmation ID from the response
+            session_id: The session ID from the response
             approved: Whether the command was approved
             user_message: Optional message from user when rejecting
 
@@ -154,31 +120,31 @@ class BashConfirmationService:
             bool: True if confirmation was found and processed, False otherwise
         """
 
-        pending = self.pending_confirmations.get(confirmation_id)
+        confirmation_future = self.active_confirmations.get(session_id)
 
-        if pending is None:
-            logger.warning(f"Received response for unknown confirmation: {confirmation_id}")
+        if confirmation_future is None:
+            logger.warning(f"Received response for unknown session: {session_id}")
             return False
 
-        if pending.future.done():
-            logger.warning(f"Received duplicate response for confirmation: {confirmation_id}")
+        if confirmation_future.done():
+            logger.warning(f"Received duplicate response for session: {session_id}")
             return False
 
         # Set the result to wake up the waiting coroutine
-        pending.future.set_result((approved, user_message))
-        logger.info(f"Processed confirmation {confirmation_id}: {'approved' if approved else 'rejected'}")
+        confirmation_future.set_result((approved, user_message))
+        logger.info(f"Processed confirmation for session {session_id}: {'approved' if approved else 'rejected'}")
         if user_message:
             logger.info(f"With user message: {user_message}")
         return True
 
     async def cleanup(self):
         """Clean up service resources."""
-        # Reject all pending confirmations
-        for pending in self.pending_confirmations.values():
-            if not pending.future.done():
-                pending.future.set_result((False, None))
+        # Reject all active confirmations
+        for confirmation_future in self.active_confirmations.values():
+            if not confirmation_future.done():
+                confirmation_future.set_result((False, None))
 
-        self.pending_confirmations.clear()
+        self.active_confirmations.clear()
 
 def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     """
