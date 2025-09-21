@@ -18,8 +18,6 @@ from backend.presentation.websocket.message_types import create_bash_confirmatio
 logger = logging.getLogger(__name__)
 
 
-
-
 class BashConfirmationService:
     """
     Application Service for Bash Command Confirmations.
@@ -137,7 +135,6 @@ class BashConfirmationService:
             logger.info(f"With user message: {user_message}")
         return True
 
-
 def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     """
     Get bash confirmation service from WebSocketHandler.
@@ -171,3 +168,4 @@ def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     except Exception as e:
         logger.warning(f"Could not get bash confirmation service: {e}")
         return None
+    

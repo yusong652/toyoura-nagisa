@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface BashConfirmationRequest {
-  confirmationId: string
   command: string
   description?: string
-  sessionId?: string
+  sessionId: string
   timestamp: string
 }
 
@@ -41,7 +40,7 @@ export const useBashConfirmation = () => {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Send response via WebSocket - using global connection like location response
-  const sendResponse = useCallback(async (confirmationId: string, approved: boolean, userMessage?: string) => {
+  const sendResponse = useCallback(async (sessionId: string, approved: boolean, userMessage?: string) => {
 
     // Try to get WebSocket connection with retry logic
     let ws = (window as any).__wsConnection
@@ -72,7 +71,7 @@ export const useBashConfirmation = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       const response = {
         type: 'BASH_CONFIRMATION_RESPONSE',
-        confirmation_id: confirmationId,
+        confirmation_id: sessionId,  // Backend expects confirmation_id field but uses session_id value
         approved,
         user_message: userMessage,
         timestamp: new Date().toISOString()
@@ -96,7 +95,7 @@ export const useBashConfirmation = () => {
   // Approve command execution
   const approve = useCallback(async (userMessage?: string) => {
     if (state.request) {
-      await sendResponse(state.request.confirmationId, true, userMessage)
+      await sendResponse(state.request.sessionId, true, userMessage)
       setState({ request: null, isOpen: false })
 
       // Clear timeout
@@ -110,7 +109,7 @@ export const useBashConfirmation = () => {
   // Reject command execution
   const reject = useCallback(async (userMessage?: string) => {
     if (state.request) {
-      await sendResponse(state.request.confirmationId, false, userMessage)
+      await sendResponse(state.request.sessionId, false, userMessage)
       setState({ request: null, isOpen: false })
 
       // Clear timeout
@@ -131,7 +130,6 @@ export const useBashConfirmation = () => {
 
       // Parse request
       const request: BashConfirmationRequest = {
-        confirmationId: data.confirmation_id,
         command: data.command,
         description: data.description,
         sessionId: data.session_id || data.sessionId, // Handle both forms

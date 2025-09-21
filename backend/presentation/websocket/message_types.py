@@ -176,6 +176,7 @@ class BashConfirmationResponseMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.BASH_CONFIRMATION_RESPONSE
     confirmation_id: str
     approved: bool
+    user_message: Optional[str] = None
 
 
 class TitleUpdateMessage(BaseWebSocketMessage):

@@ -21,7 +21,7 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-__all__ = ["ToolResult", "success_response", "error_response"]
+__all__ = ["ToolResult", "success_response", "error_response", "user_rejected_response"]
 
 
 class ToolResult(BaseModel):
@@ -128,4 +128,36 @@ def error_response(message: str, **data) -> Dict[str, Any]:
         message=message,
         llm_content=f"<error>{message}</error>",
         data=data if data else None,
-    ).model_dump() 
+    ).model_dump()
+
+
+def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]:
+    """Create a standardized user rejection response for all MCP tools.
+
+    This function provides a unified way for tools to return user rejection responses,
+    indicating that the user chose not to proceed with the operation. This is NOT an error,
+    but a valid user decision that should be communicated clearly to the LLM.
+
+    Args:
+        user_message: Optional message from the user explaining the rejection
+
+    Returns:
+        Dict[str, Any]: ToolResult dictionary with status="error" but clear rejection context
+
+    Example:
+        return user_rejected_response(user_message="This command looks dangerous")
+    """
+    # Follow Claude Code's rejection message pattern
+    if user_message:
+        message = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
+        llm_content = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
+    else:
+        message = "The user doesn't want to proceed with this tool use. The tool use was rejected."
+        llm_content = "The user doesn't want to proceed with this tool use. The tool use was rejected."
+
+    return ToolResult(
+        status="error",
+        message=message,
+        llm_content=llm_content,
+        data=None
+    ).model_dump()

@@ -248,8 +248,11 @@ class BashConfirmationHandler(MessageHandler):
 
                 # Extract confirmation data from message
                 approved = getattr(message, 'approved', False)
+                user_message = getattr(message, 'user_message', None)
 
                 print(f"[BashConfirmationHandler] session_id={session_id}, approved={approved}", flush=True)
+                if user_message:
+                    print(f"[BashConfirmationHandler] user_message={user_message}", flush=True)
 
                 # Get confirmation service and handle response
                 from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
@@ -259,7 +262,8 @@ class BashConfirmationHandler(MessageHandler):
                     # Handle the confirmation response
                     handled = confirmation_service.handle_confirmation_response(
                         session_id=session_id,
-                        approved=approved
+                        approved=approved,
+                        user_message=user_message
                     )
 
                     if handled:

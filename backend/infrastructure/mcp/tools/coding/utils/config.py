@@ -28,12 +28,11 @@ class ToolsConfig:
 # Global mutable instance (can be swapped by set_tools_config)
 # ---------------------------------------------------------------------------
 
-# By default use an isolated workspace directory for safety
-# This prevents the agent from accessing its own source code
+# Use project root directory as workspace for full development participation
+# Now that we have bash confirmation, agent can safely work in project root
 # "repo_root" is six levels up from this file:
 # config.py → tools → coding → tools → mcp → infrastructure → backend → <repo_root>
-_DEFAULT_ROOT = Path(__file__).resolve().parents[6] / "workspace" / "default"
-_DEFAULT_ROOT.mkdir(parents=True, exist_ok=True)
+_DEFAULT_ROOT = Path(__file__).resolve().parents[6]
 
 _CONFIG: ToolsConfig = ToolsConfig(root_dir=_DEFAULT_ROOT)
 

@@ -154,18 +154,19 @@ class BaseToolManager(ABC):
 
         # Check if tool requires user confirmation
         if self._requires_user_confirmation(tool_name, tool_args):
-            approved = await self._request_user_confirmation(tool_name, tool_args, session_id)
+            approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
             if not approved:
-                # Create a mock CallToolResult for rejection
+                # Create a standard ToolResult for user rejection
                 from mcp.types import TextContent
+                from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+
+                # Use standard user_rejected_response format
+                rejection_result = user_rejected_response(user_message=user_message)
+
                 return CallToolResult(
                     content=[TextContent(
                         type="text",
-                        text=json.dumps({
-                            "status": "error",
-                            "message": "Command execution cancelled by user",
-                            "error": "User rejected the command execution request"
-                        })
+                        text=json.dumps(rejection_result)
                     )],
                     isError=False  # Not an MCP error, just user rejection
                 )
