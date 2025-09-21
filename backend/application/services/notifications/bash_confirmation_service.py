@@ -137,14 +137,6 @@ class BashConfirmationService:
             logger.info(f"With user message: {user_message}")
         return True
 
-    async def cleanup(self):
-        """Clean up service resources."""
-        # Reject all active confirmations
-        for confirmation_future in self.active_confirmations.values():
-            if not confirmation_future.done():
-                confirmation_future.set_result((False, None))
-
-        self.active_confirmations.clear()
 
 def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     """
