@@ -1,7 +1,6 @@
 from fastmcp import FastMCP
 from datetime import datetime
 import pytz
-from typing import Optional
 from fastmcp.server.context import Context  # type: ignore
 
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -28,10 +27,10 @@ def register_time_tools(mcp: FastMCP):
 
             # Get user location (prioritizes browser, falls back to server IP)
             location_info = await get_user_location(context, wait_time=5, prefer_browser=True)
-            
+
             if location_info and location_info.latitude and location_info.longitude:
                 detected_tz = get_timezone_from_location(
-                    location_info.latitude, 
+                    location_info.latitude,
                     location_info.longitude
                 )
                 if detected_tz:
@@ -58,24 +57,12 @@ def register_time_tools(mcp: FastMCP):
             # Simple, natural string for LLM consumption
             llm_content = f"Current time in {timezone_name}: {primary_format}"
 
-            # Convert location_info to serializable dict
-            location_dict = None
-            if location_info:
-                location_dict = {
-                    "latitude": location_info.latitude,
-                    "longitude": location_info.longitude,
-                    "city": location_info.city,
-                    "country": location_info.country,
-                    "source": location_info.source
-                }
-            
             return success_response(
                 f"Current time retrieved successfully ({timezone_name})",
                 llm_content,
                 time_data={
                     "primary_format": primary_format,
-                    "timezone": timezone_name,
-                    "location_info": location_dict
+                    "timezone": timezone_name
                 }
             )
             

@@ -8,11 +8,11 @@ _tf = TimezoneFinder()
 
 def get_timezone_from_location(latitude: float, longitude: float) -> Optional[str]:
     """Convert latitude/longitude to timezone string using TimezoneFinder.
-    
+
     Args:
         latitude: Latitude coordinate
         longitude: Longitude coordinate
-    
+
     Returns:
         Timezone string (e.g., 'America/New_York') or None if detection fails
     """

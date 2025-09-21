@@ -12,7 +12,7 @@ DDD Role: Application Service
 import asyncio
 import logging
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from datetime import datetime, timedelta
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import create_bash_confirmation_request
@@ -202,23 +202,6 @@ class BashConfirmationService:
             logger.info(f"With user message: {user_message}")
         return True
 
-    def get_pending_confirmations(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Get information about all pending confirmations.
-
-        Returns:
-            Dict mapping confirmation IDs to confirmation details
-        """
-        return {
-            conf_id: {
-                "command": pending.command,
-                "description": pending.description,
-                "created_at": pending.created_at.isoformat(),
-                "is_expired": pending.is_expired()
-            }
-            for conf_id, pending in self.pending_confirmations.items()
-        }
-
     async def cleanup(self):
         """Clean up service resources."""
         # Cancel cleanup task
@@ -237,53 +220,36 @@ class BashConfirmationService:
         self.pending_confirmations.clear()
 
 
-# Global service instance
-_bash_confirmation_service: Optional[BashConfirmationService] = None
-
-
-def get_bash_confirmation_service(
-    connection_manager: Optional[ConnectionManager] = None
-) -> Optional[BashConfirmationService]:
+def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     """
-    Get or initialize the global bash confirmation service.
-
-    Args:
-        connection_manager: Optional connection manager for initialization.
-                          If provided, initializes a new service instance.
-                          If None, returns existing global instance.
+    Get bash confirmation service from WebSocketHandler.
 
     Returns:
         BashConfirmationService instance or None if not initialized
 
-    Usage:
-        # Initialize (typically in application startup)
-        service = get_bash_confirmation_service(connection_manager)
-
-        # Get existing instance (in MCP tools)
-        service = get_bash_confirmation_service()
+    Note:
+        The service is initialized and managed by WebSocketHandler,
+        avoiding global state and ensuring proper lifecycle management.
     """
-    global _bash_confirmation_service
+    try:
+        from backend.shared.utils.app_context import get_app
 
-    if connection_manager:
-        # Only initialize if not already initialized
-        if _bash_confirmation_service is None:
-            _bash_confirmation_service = BashConfirmationService(connection_manager)
-        else:
-            print(f"[BashConfirmationService] Service already initialized, keeping existing instance")
-        return _bash_confirmation_service
-    elif _bash_confirmation_service is None:
-        # Try to auto-initialize with global connection manager
-        try:
-            print(f"[BashConfirmationService] Service not initialized, trying auto-init")
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-            global_manager = get_connection_manager()
-            if global_manager is not None:
-                print(f"[BashConfirmationService] Auto-initializing with global connection manager")
-                _bash_confirmation_service = BashConfirmationService(global_manager)
-            else:
-                print(f"[BashConfirmationService] Cannot initialize - no global connection manager")
-                logger.warning("Cannot initialize bash confirmation service without connection manager")
-        except Exception as e:
-            logger.warning(f"Could not initialize bash confirmation service: {e}")
+        app = get_app()
+        if not app:
+            logger.warning("FastAPI app not initialized")
+            return None
 
-    return _bash_confirmation_service
+        if not hasattr(app.state, 'websocket_handler'):
+            logger.warning("WebSocket handler not found in app state")
+            return None
+
+        handler = app.state.websocket_handler
+        if not hasattr(handler, 'bash_confirmation_service'):
+            logger.warning("Bash confirmation service not found in WebSocket handler")
+            return None
+
+        return handler.bash_confirmation_service
+
+    except Exception as e:
+        logger.warning(f"Could not get bash confirmation service: {e}")
+        return None

@@ -16,7 +16,7 @@ WHITESPACE_PATTERN = re.compile(r'\s+')
 # Get default values from configuration file
 tts_settings = get_tts_settings()
 DEFAULT_SPLIT_PUNCTUATIONS = getattr(tts_settings, 'split_punctuations', ['。', '！', '？', '!', '?', '.', '，', ',', '~', '、', '…', '—', '：', '；', '...', '..'])
-DEFAULT_PUNCTUATION_LIMIT = getattr(tts_settings, 'split_size', 12)
+DEFAULT_PUNCTUATION_LIMIT = getattr(tts_settings, 'split_size', 8)
 
 # Extract and replace emoji and kaomoji with placeholders
 KAOMOJI_PLACEHOLDER = "__KAOMOJI_{}__"
