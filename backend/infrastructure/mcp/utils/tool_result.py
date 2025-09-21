@@ -26,7 +26,7 @@ __all__ = ["ToolResult", "success_response", "error_response", "user_rejected_re
 
 class ToolResult(BaseModel):
     """Unified success/error wrapper for all tool outputs.
-    
+
     **Core Fields**:
     - `status`: Operation outcome ("success" | "error")
     - `message`: User-facing summary for display
@@ -142,7 +142,7 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
         user_message: Optional message from the user explaining the rejection
 
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="error" but clear rejection context
+        Dict[str, Any]: ToolResult dictionary with status="success" indicating successful capture of user decision
 
     Example:
         return user_rejected_response(user_message="This command looks dangerous")
@@ -156,7 +156,7 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
         llm_content = "The user doesn't want to proceed with this tool use. The tool use was rejected."
 
     return ToolResult(
-        status="error",
+        status="success",  # Successfully captured user's decision
         message=message,
         llm_content=llm_content,
         data=None
