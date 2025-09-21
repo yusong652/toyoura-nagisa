@@ -23,7 +23,6 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager, set_connection_manager
 from backend.presentation.websocket.message_handler import WebSocketMessageProcessor
-from backend.application.services.notifications import get_message_status_service
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +56,11 @@ class WebSocketHandler:
         """
         self.connection_manager = ConnectionManager()  # Infrastructure layer
         self.message_processor = WebSocketMessageProcessor(self.connection_manager)  # Presentation layer
-        self.status_service = get_message_status_service(self.connection_manager)  # Application service
 
-        # Initialize bash confirmation service
+        # Initialize application services
+        from backend.application.services.notifications.message_status_service import MessageStatusService
         from backend.application.services.notifications.bash_confirmation_service import BashConfirmationService
+        self.status_service = MessageStatusService(self.connection_manager)
         self.bash_confirmation_service = BashConfirmationService(self.connection_manager)
 
         # Set global instances for external services to access

@@ -102,50 +102,36 @@ class MessageStatusService:
         """Notify that message processing failed."""
         await self.notify_status(session_id, message_id, "error", error_message)
 
-
-
-# Global service instance
-_status_service: Optional[MessageStatusService] = None
-
-
-def get_message_status_service(
-    connection_manager: Optional[ConnectionManager] = None
-) -> Optional[MessageStatusService]:
+def get_message_status_service() -> Optional[MessageStatusService]:
     """
-    Get or initialize the global message status service.
-
-    Args:
-        connection_manager: Optional connection manager for initialization.
-                          If provided, initializes a new service instance.
-                          If None, returns existing global instance.
+    Get message status service from WebSocketHandler.
 
     Returns:
         MessageStatusService instance or None if not initialized
 
-    Usage:
-        # Initialize (typically in application startup)
-        service = get_message_status_service(connection_manager)
-
-        # Get existing instance (in business logic)
-        service = get_message_status_service()
+    Note:
+        The service is initialized and managed by WebSocketHandler,
+        avoiding global state and ensuring proper lifecycle management.
     """
-    global _status_service
+    try:
+        from backend.shared.utils.app_context import get_app
 
-    if connection_manager:
-        # Initialize new service instance
-        _status_service = MessageStatusService(connection_manager)
-        return _status_service
-    elif _status_service is None:
-        # Try to auto-initialize with global connection manager
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager, ConnectionManager
-            global_manager = get_connection_manager()
-            if global_manager is not None:
-                _status_service = MessageStatusService(global_manager)
-            else:
-                # Fallback to creating a new instance
-                _status_service = MessageStatusService(ConnectionManager())
-        except Exception as e:
-            logger.warning(f"Could not initialize status service: {e}")
+        app = get_app()
+        if not app:
+            logger.warning("FastAPI app not initialized")
+            return None
 
-    return _status_service
+        if not hasattr(app.state, 'websocket_handler'):
+            logger.warning("WebSocket handler not found in app state")
+            return None
+
+        handler = app.state.websocket_handler
+        if not hasattr(handler, 'status_service'):
+            logger.warning("Message status service not found in WebSocket handler")
+            return None
+
+        return handler.status_service
+
+    except Exception as e:
+        logger.warning(f"Could not get message status service: {e}")
+        return None

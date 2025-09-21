@@ -219,7 +219,6 @@ class BashConfirmationService:
 
         self.pending_confirmations.clear()
 
-
 def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
     """
     Get bash confirmation service from WebSocketHandler.
