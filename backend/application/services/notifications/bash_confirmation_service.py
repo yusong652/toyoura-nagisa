@@ -13,7 +13,7 @@ import asyncio
 import logging
 import uuid
 from typing import Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import create_bash_confirmation_request
 
@@ -38,10 +38,6 @@ class PendingConfirmation:
         self.created_at = datetime.now()
         self.future: asyncio.Future[tuple[bool, Optional[str]]] = asyncio.Future()  # (approved, user_message)
 
-    def is_expired(self, timeout_seconds: int = 60) -> bool:
-        """Check if confirmation request has expired."""
-        return datetime.now() > self.created_at + timedelta(seconds=timeout_seconds)
-
 
 class BashConfirmationService:
     """
@@ -63,33 +59,6 @@ class BashConfirmationService:
         """
         self.connection_manager = connection_manager
         self.pending_confirmations: Dict[str, PendingConfirmation] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._start_cleanup_task()
-
-    def _start_cleanup_task(self):
-        """Start background task to clean up expired confirmations."""
-        if self._cleanup_task is None or self._cleanup_task.done():
-            self._cleanup_task = asyncio.create_task(self._cleanup_expired())
-
-    async def _cleanup_expired(self):
-        """Background task to clean up expired confirmation requests."""
-        while True:
-            try:
-                await asyncio.sleep(10)  # Check every 10 seconds
-
-                expired_ids = []
-                for conf_id, pending in self.pending_confirmations.items():
-                    if pending.is_expired():
-                        expired_ids.append(conf_id)
-                        if not pending.future.done():
-                            pending.future.set_result((False, None))  # Auto-reject expired requests
-
-                for conf_id in expired_ids:
-                    del self.pending_confirmations[conf_id]
-                    logger.info(f"Cleaned up expired confirmation: {conf_id}")
-
-            except Exception as e:
-                logger.error(f"Error in cleanup task: {e}")
 
     async def request_confirmation(
         self,
@@ -204,14 +173,6 @@ class BashConfirmationService:
 
     async def cleanup(self):
         """Clean up service resources."""
-        # Cancel cleanup task
-        if self._cleanup_task and not self._cleanup_task.done():
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
-
         # Reject all pending confirmations
         for pending in self.pending_confirmations.values():
             if not pending.future.done():
