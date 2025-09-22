@@ -16,7 +16,7 @@ class MessageService:
     Service layer for message management operations.
     
     Provides high-level operations for managing individual messages
-    within chat sessions.
+    within chat sessions. (Nagisa's Note: Consider adding message creation and update logic here for better encapsulation and elegance.)
     """
     
     async def delete_message(
