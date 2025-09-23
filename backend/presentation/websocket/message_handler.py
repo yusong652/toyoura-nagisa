@@ -17,7 +17,7 @@ Key Flow:
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional
 
 from datetime import datetime
 
@@ -211,14 +211,18 @@ class ChatHandler(MessageHandler):
                 # Process user message with pending rejection handling
                 processing_result = await self.chat_service.process_user_message(request_data)
 
-                # Generate streaming response in background task (non-blocking)
-                from backend.presentation.streaming.chat_stream import generate_chat_stream
-                asyncio.create_task(generate_chat_stream(
-                    session_id=processing_result['session_id'],
-                    enable_memory=processing_result['enable_memory'],
-                    agent_profile=processing_result['agent_profile'],
-                    user_message_id=processing_result['message_id']
-                ))
+                # Only generate streaming response if this was NOT rejection feedback
+                if not processing_result['was_rejection_feedback']:
+                    # Generate streaming response in background task (non-blocking)
+                    from backend.presentation.streaming.chat_stream import generate_chat_stream
+                    asyncio.create_task(generate_chat_stream(
+                        session_id=processing_result['session_id'],
+                        enable_memory=processing_result['enable_memory'],
+                        agent_profile=processing_result['agent_profile'],
+                        user_message_id=processing_result['message_id']
+                    ))
+                else:
+                    print(f"[ChatHandler] Rejection feedback processed for session {session_id}, no new chat stream created")
 
             except Exception as e:
                 logger.error(f"Error processing chat message: {e}")

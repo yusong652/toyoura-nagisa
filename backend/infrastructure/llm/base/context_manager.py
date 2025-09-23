@@ -12,6 +12,7 @@ Key Features:
 - Session-based context persistence
 """
 
+import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
@@ -296,17 +297,23 @@ class BaseContextManager(ABC):
 
     # ========== REJECTION STATE MANAGEMENT ==========
 
-    def set_pending_rejection(self, tool_call_id: str, tool_name: str) -> None:
+    def set_pending_rejection(self, tool_call_id: str, tool_name: str) -> asyncio.Future:
         """
-        Set pending rejection state waiting for user feedback.
+        Set pending rejection state and return Future for user feedback.
 
         Args:
             tool_call_id: Tool call ID for locating the tool result in context
             tool_name: Tool name for debugging and logging
+
+        Returns:
+            asyncio.Future: Future that will be resolved with user feedback
         """
+        import asyncio
         self._pending_rejection.tool_call_id = tool_call_id
         self._pending_rejection.tool_name = tool_name
         self._pending_rejection.active = True
+        self._pending_rejection.feedback_future = asyncio.Future()
+        return self._pending_rejection.feedback_future
 
     def has_pending_rejection(self) -> bool:
         """
@@ -331,6 +338,25 @@ class BaseContextManager(ABC):
             }
         return {}
 
+    def resolve_pending_rejection(self, user_feedback: Dict[str, Any]) -> bool:
+        """
+        Resolve pending rejection with user feedback.
+
+        Args:
+            user_feedback: User's feedback dictionary with action and optional data
+
+        Returns:
+            bool: True if feedback was resolved, False if no pending rejection
+        """
+        if not self._pending_rejection.active or not self._pending_rejection.feedback_future:
+            return False
+
+        # Resolve the Future with user feedback
+        if not self._pending_rejection.feedback_future.done():
+            self._pending_rejection.feedback_future.set_result(user_feedback)
+
+        return True
+
     def clear_pending_rejection(self) -> None:
         """
         Clear pending rejection state.
@@ -338,3 +364,4 @@ class BaseContextManager(ABC):
         self._pending_rejection.active = False
         self._pending_rejection.tool_call_id = ""
         self._pending_rejection.tool_name = ""
+        self._pending_rejection.feedback_future = None

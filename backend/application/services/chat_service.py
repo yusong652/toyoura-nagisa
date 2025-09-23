@@ -4,7 +4,7 @@ Chat Service - Business logic for chat stream operations.
 This service handles chat streaming operations including message processing,
 conversation history management, and response generation.
 """
-from typing import List, Any, Dict
+from typing import List, Any
 from fastapi import Request
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
@@ -242,7 +242,7 @@ class ChatService:
 
         Args:
             session_id: Session identifier
-            result: Parsed message result to potentially modify
+            result: Parsed message result containing user feedback
 
         Returns:
             bool: True if message was processed as rejection feedback, False otherwise
@@ -260,13 +260,13 @@ class ChatService:
                 tool_name = rejection_info.get('tool_name', '')
 
                 print(f"[ChatService] Processing rejection feedback for tool {tool_name} (call_id: {tool_call_id})")
-                print(f"[ChatService] User feedback: {result['message']}")
 
-                # TODO: Update the corresponding tool result in context with user feedback
-                # This will be implemented when we complete the feedback integration
+                # Extract user feedback message
+                user_feedback = result.get('message', '')
+                print(f"[ChatService] User feedback: {user_feedback}")
 
-                # Clear pending rejection state
-                context_manager.clear_pending_rejection()
+                # Resolve the pending rejection with user feedback
+                context_manager.resolve_pending_rejection(user_feedback)
 
                 return True
 

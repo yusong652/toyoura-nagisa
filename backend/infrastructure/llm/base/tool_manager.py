@@ -5,6 +5,7 @@ Designed for aiNagisa's multi-LLM architecture as a unified tool management inte
 Defines core methods that all Tool Managers must implement to ensure consistency and extensibility.
 """
 
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
@@ -47,6 +48,24 @@ class BaseToolManager(ABC):
             from backend.shared.utils.app_context import get_mcp_client
             self._mcp_client = get_mcp_client()
         return self._mcp_client
+
+    def _get_context_manager(self, session_id: str):
+        """
+        Get context manager for the session to access rejection state.
+
+        Args:
+            session_id: Session ID to get context manager for
+
+        Returns:
+            BaseContextManager: Context manager for the session, or None if not available
+        """
+        try:
+            from backend.shared.utils.app_context import get_llm_client
+            llm_client = get_llm_client()
+            return llm_client.get_context_manager(session_id)
+        except Exception as e:
+            print(f"[BaseToolManager] Error getting context manager: {e}")
+            return None
 
     async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
         """
@@ -234,15 +253,49 @@ class BaseToolManager(ABC):
             if self._requires_user_confirmation(tool_name, tool_args):
                 approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
                 if not approved:
-                    # TODO: Set pending rejection state for elegant feedback collection
-                    # For now, return standard rejection response
-                    from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-                    rejection_result = user_rejected_response(user_message=user_message)
+                    # Set pending rejection state and wait for user feedback
+                    context_manager = self._get_context_manager(session_id)
+                    if context_manager:
+                        print(f"[BaseToolManager] User rejected {tool_name}, waiting for feedback...")
 
-                    return {
-                        "inline_data": {},
-                        "llm_content": rejection_result.get("llm_content", "Tool execution rejected by user")
-                    }
+                        # Create Future for user feedback
+                        feedback_future = context_manager.set_pending_rejection(tool_id, tool_name)
+
+                        try:
+                            # Wait for user feedback (this pauses execution here)
+                            user_feedback = await feedback_future
+                            print(f"[BaseToolManager] Received user feedback: {user_feedback}")
+
+                            # User provided rejection feedback, return it as the tool result
+                            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+                            rejection_result = user_rejected_response(user_message=user_feedback)
+                            return {
+                                "inline_data": {},
+                                "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected with feedback: {user_feedback}")
+                            }
+
+                        except asyncio.TimeoutError:
+                            # Timeout waiting for feedback
+                            print(f"[BaseToolManager] Timeout waiting for feedback on {tool_name}")
+                            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+                            rejection_result = user_rejected_response(user_message="Timeout waiting for user feedback")
+                            return {
+                                "inline_data": {},
+                                "llm_content": rejection_result.get("llm_content", "Tool execution timed out")
+                            }
+
+                        finally:
+                            # Clean up pending rejection state
+                            context_manager.clear_pending_rejection()
+
+                    else:
+                        # Fallback if no context manager available
+                        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+                        rejection_result = user_rejected_response(user_message=user_message)
+                        return {
+                            "inline_data": {},
+                            "llm_content": rejection_result.get("llm_content", "Tool execution rejected by user")
+                        }
 
             # Execute tool after approval
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
