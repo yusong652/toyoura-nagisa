@@ -73,8 +73,8 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific response processor."""
         return AnthropicResponseProcessor
 
-    def _get_context_manager(self):
-        """Get Anthropic-specific context manager."""
+    def _get_context_manager_class(self):
+        """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
 
     def _get_provider_config(self):

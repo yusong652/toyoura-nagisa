@@ -205,8 +205,8 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific response processor."""
         return OpenAIResponseProcessor
 
-    def _get_context_manager(self):
-        """Get OpenAI-specific context manager."""
+    def _get_context_manager_class(self):
+        """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
 
     def _get_provider_config(self):

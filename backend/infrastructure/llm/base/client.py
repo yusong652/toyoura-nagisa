@@ -42,9 +42,8 @@ class LLMClientBase(ABC):
         self.client = None  # Will be set by concrete implementations
         self.tool_manager = None  # Will be initialized by concrete implementations
 
-        # Enhanced context manager for runtime tool history preservation
-        # Will be initialized with provider name and session_id when needed
-        self.context_manager = None
+        # Session-based context manager management
+        self._session_context_managers: Dict[str, BaseContextManager] = {}
 
     # ========== CORE STREAMING INTERFACE ==========
 
@@ -82,27 +81,19 @@ class LLMClientBase(ABC):
         if debug:
             provider_name = self.__class__.__name__.replace('Client', '')
 
-        # Initialize or reuse enhanced context manager
-        if self.context_manager is None or self.context_manager.session_id != session_id:
-            # Need to create new enhanced context manager for this session
-            # Get provider name for context manager
-            provider_name = self.__class__.__name__.replace('Client', '').lower()
+        # Get or create context manager for this session
+        context_manager = self.get_or_create_context_manager(session_id or "default")
 
-            # Create enhanced context manager with session tracking
-            context_manager_class = self._get_context_manager()
-            self.context_manager = context_manager_class(
-                provider_name=provider_name,
-                session_id=session_id or "default"
-            )
-
-            self.context_manager.initialize_session_from_history(messages)
+        # Initialize session from history if not already done
+        if not context_manager._initialized_from_history:
+            context_manager.initialize_session_from_history(messages)
         else:
             # Existing session - just add the new user message
             if messages:
                 # Assume the last message is the new user input
-                self.context_manager.add_user_message(messages[-1])
+                context_manager.add_user_message(messages[-1])
         
-        context_manager = self.context_manager
+        # context_manager already defined above
         
         # Execution metadata - unified across all providers
         metadata = {
@@ -511,15 +502,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    @abstractmethod
-    def _get_context_manager(self) -> Type[BaseContextManager]:
-        """
-        Get provider-specific context manager class.
-
-        Returns:
-            Type[BaseContextManager]: Provider-specific context manager class (e.g., GeminiContextManager)
-        """
-        pass
 
     @abstractmethod
     def _get_provider_config(self):
@@ -674,15 +656,10 @@ class LLMClientBase(ABC):
 
     # ========== SHARED UTILITY METHODS ==========
 
-    async def _clear_session_tool_cache(self, session_id: str):
-        """Clear session tool cache - shared implementation."""
-        if self.tool_manager and hasattr(self.tool_manager, 'clear_session_tool_cache'):
-            self.tool_manager.clear_session_tool_cache(session_id)
-        
-        # Also clear enhanced context manager if it's for this session
-        if self.context_manager and self.context_manager.session_id == session_id:
-            self.context_manager.clear_runtime_context()
-            self.context_manager = None  # Reset for next session
+    async def _clear_session_context(self, session_id: str):
+        """Clear session context - shared implementation."""
+        # Clear session-specific context manager
+        self.cleanup_session_context(session_id)
     
     async def _send_websocket_tool_notification(
         self, 
@@ -731,4 +708,60 @@ class LLMClientBase(ABC):
             # Don't fail the main execution if WebSocket notification fails
             provider_name = self.__class__.__name__.replace('Client', '')
             print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
-    
+
+    # ========== SESSION CONTEXT MANAGER MANAGEMENT ==========
+
+    @abstractmethod
+    def _get_context_manager_class(self) -> Type[BaseContextManager]:
+        """
+        Get provider-specific context manager class.
+
+        Returns:
+            Type[BaseContextManager]: Context manager class for this provider
+        """
+        pass
+
+    def get_or_create_context_manager(self, session_id: str) -> BaseContextManager:
+        """
+        Get existing context manager or create new one for session.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            BaseContextManager: Context manager instance for the session
+        """
+        if session_id not in self._session_context_managers:
+            # Create new context manager for this session
+            context_manager_class = self._get_context_manager_class()
+            provider_name = self.__class__.__name__.replace('Client', '').lower()
+
+            self._session_context_managers[session_id] = context_manager_class(
+                provider_name=provider_name,
+                session_id=session_id
+            )
+
+        return self._session_context_managers[session_id]
+
+    def get_context_manager(self, session_id: str) -> Optional[BaseContextManager]:
+        """
+        Get existing context manager for session.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Optional[BaseContextManager]: Context manager if exists, None otherwise
+        """
+        return self._session_context_managers.get(session_id)
+
+    def cleanup_session_context(self, session_id: str) -> None:
+        """
+        Clean up context manager for ended session.
+
+        Args:
+            session_id: Session identifier to clean up
+        """
+        if session_id in self._session_context_managers:
+            self._session_context_managers[session_id].clear_runtime_context()
+            del self._session_context_managers[session_id]
