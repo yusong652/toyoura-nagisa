@@ -4,29 +4,34 @@
   min-width: 400px; /* Reduced min-width */
   animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  overflow: visible; /* Allow action to be visible outside thinking area */
+  overflow: hidden; /* Contain shimmer animation completely */
   max-height: none; /* Remove height limit to allow action display */
   border-radius: 16px;
+  /* Create stacking context to isolate shimmer */
+  isolation: isolate;
+  z-index: 0;
 }
 
 .message-tool-state::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
-  width: 60%;
+  left: -50%;
+  width: 100%;
   height: 100%;
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.15),
-    rgba(255, 255, 255, 0.3),
-    rgba(255, 255, 255, 0.15),
+    rgba(59, 130, 246, 0.08),
+    rgba(59, 130, 246, 0.12),
+    rgba(59, 130, 246, 0.08),
     transparent
   );
-  animation: shimmer 3s ease-in-out infinite;
+  animation: shimmer 4s ease-in-out infinite;
   pointer-events: none;
   border-radius: 16px;
+  /* Ensure shimmer stays within container bounds */
+  clip-path: inset(0);
 }
 
 .message-tool-state-content {
@@ -42,7 +47,7 @@
   color: var(--text-color);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: 
+  box-shadow:
     0 4px 20px rgba(59, 130, 246, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -54,6 +59,8 @@
   gap: 8px;
   position: relative;
   overflow: hidden;
+  /* Clip shimmer animation to content bounds */
+  isolation: isolate;
 }
 
 /* New thinking container and scrolling styles */
@@ -293,14 +300,14 @@
 
 @keyframes shimmer {
   0% {
-    left: -100%;
+    left: -50%;
     opacity: 0;
   }
   50% {
     opacity: 1;
   }
   100% {
-    left: 200%;
+    left: 100%;
     opacity: 0;
   }
 }
@@ -380,6 +387,17 @@
   font-weight: 600;
 }
 
+[data-theme="dark"] .message-tool-state::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.06),
+    rgba(59, 130, 246, 0.1),
+    rgba(59, 130, 246, 0.06),
+    transparent
+  );
+}
+
 @media (prefers-color-scheme: dark) {
   .message-tool-state-content {
     background: linear-gradient(
@@ -456,9 +474,9 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0.15),
-      rgba(255, 255, 255, 0.08),
+      rgba(59, 130, 246, 0.06),
+      rgba(59, 130, 246, 0.1),
+      rgba(59, 130, 246, 0.06),
       transparent
     );
   }
@@ -481,6 +499,9 @@
   border-radius: 8px;
   font-size: 13px;
   box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
+  /* Ensure action stays within container bounds */
+  position: relative;
+  z-index: 1;
 }
 
 .tool-action-label {
