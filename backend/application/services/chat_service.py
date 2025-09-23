@@ -215,7 +215,6 @@ class ChatService:
         # 1. Parse request data using unified parsing logic
         try:
             parsed_data = parse_message_data(request_data)
-            enable_memory = request_data.get('enable_memory', True)
 
         except Exception as e:
             raise ValueError(f"WebSocket message parsing failed: {str(e)}")
@@ -232,7 +231,7 @@ class ChatService:
             'session_id': session_id,
             'agent_profile': parsed_data['agent_profile'],
             'message_id': parsed_data.get('id'),
-            'enable_memory': enable_memory,
+            'enable_memory': parsed_data['enable_memory'],
             'was_rejection_feedback': was_rejection_feedback
         }
 
@@ -254,16 +253,8 @@ class ChatService:
             context_manager = llm_client.get_context_manager(session_id)
 
             if context_manager and context_manager.has_pending_rejection():
-                # Get pending rejection info
-                rejection_info = context_manager.get_pending_rejection_info()
-                tool_call_id = rejection_info.get('tool_call_id', '')
-                tool_name = rejection_info.get('tool_name', '')
-
-                print(f"[ChatService] Processing rejection feedback for tool {tool_name} (call_id: {tool_call_id})")
-
                 # Extract user feedback message
                 user_feedback = result.get('message', '')
-                print(f"[ChatService] User feedback: {user_feedback}")
 
                 # Resolve the pending rejection with user feedback
                 context_manager.resolve_pending_rejection(user_feedback)

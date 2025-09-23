@@ -26,6 +26,7 @@ class MessageParseResult(TypedDict):
     agent_profile: str
     message: str  # Add text message field
     request_id: str  # Add request ID field
+    enable_memory: bool  # Add memory setting field
 
 def parse_message_data(data: dict) -> MessageParseResult:
     """Parse WebSocket message data in unified format"""
@@ -34,6 +35,7 @@ def parse_message_data(data: dict) -> MessageParseResult:
     text = data.get('message', '')
     files = data.get('files', [])
     msg_id = data.get('message_id')
+    enable_memory = data.get('enable_memory', True)  # Default to True, simplified
 
     # Convert ISO timestamp to milliseconds if present
     timestamp = None
@@ -68,7 +70,8 @@ def parse_message_data(data: dict) -> MessageParseResult:
         'session_id': session_id,
         'agent_profile': agent_profile,
         'message': text,  # Add text message for streaming handler
-        'request_id': str(uuid.uuid4())  # Generate unique request ID
+        'request_id': str(uuid.uuid4()),  # Generate unique request ID
+        'enable_memory': enable_memory  # Add memory setting
     }
 
 def process_user_message(result: MessageParseResult, history_msgs: list) -> UserMessage:
