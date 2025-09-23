@@ -32,16 +32,16 @@ class LLMClientBase(ABC):
     def __init__(self, extra_config: Optional[Dict[str, Any]] = None):
         """
         Initialize LLM client base class.
-        
+
         Args:
             extra_config: Additional configuration parameters
         """
         self.extra_config = extra_config or {}
-        
+
         # Common client attributes that all implementations should have
         self.client = None  # Will be set by concrete implementations
         self.tool_manager = None  # Will be initialized by concrete implementations
-        
+
         # Enhanced context manager for runtime tool history preservation
         # Will be initialized with provider name and session_id when needed
         self.context_manager = None

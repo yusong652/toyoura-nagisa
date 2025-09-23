@@ -15,6 +15,7 @@ Key Features:
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
+from backend.domain.models.tool_state import PendingRejection
 from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
@@ -54,6 +55,9 @@ class BaseContextManager(ABC):
         
         # Message management
         self._message_history: List[BaseMessage] = []
+
+        # Tool rejection state management
+        self._pending_rejection: Optional[PendingRejection] = None
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
