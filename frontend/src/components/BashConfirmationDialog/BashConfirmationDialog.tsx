@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Chip } from '@mui/material'
 import {
   ContentCopy as CopyIcon,
@@ -110,21 +110,9 @@ const BashConfirmationDialog: React.FC = () => {
 
   return (
     <div className="bash-confirmation-container">
-      {/* Title */}
-      <div className="bash-confirmation-title">
-        Confirm Bash Command
-      </div>
-
-      {/* Content */}
+      {/* Compact content */}
       <div className="bash-confirmation-content">
-        {/* AI Description if provided */}
-        {request.description && (
-          <div className="bash-confirmation-description">
-            {request.description}
-          </div>
-        )}
-
-        {/* Code display box with copy button */}
+        {/* Code display box with copy button - most important info */}
         <div className="bash-confirmation-code-box">
           <button
             className="bash-confirmation-copy-button"
@@ -136,37 +124,32 @@ const BashConfirmationDialog: React.FC = () => {
             {request.command}
           </pre>
         </div>
+      </div>
 
-        {/* Simple info text */}
-        <div className="bash-confirmation-info">
-          This command will run on your system. You can provide feedback through chat if you reject.
-        </div>
-
-        {/* Timeout indicator */}
-        <div className="bash-confirmation-timeout">
+      {/* Compact actions with timeout */}
+      <div className="bash-confirmation-actions">
+        <div className="bash-confirmation-timeout-inline">
           <Chip
-            label={`Auto-reject in ${timeRemaining}s`}
+            label={`${timeRemaining}s`}
             size="small"
             color={timeRemaining > 10 ? 'default' : 'error'}
             className="bash-confirmation-timeout-chip"
           />
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="bash-confirmation-actions">
-        <button
-          onClick={handleReject}
-          className={`bash-confirmation-button bash-confirmation-reject ${selectedButton === 'reject' ? 'selected' : ''}`}
-        >
-          Reject
-        </button>
-        <button
-          onClick={handleApprove}
-          className={`bash-confirmation-button bash-confirmation-approve ${selectedButton === 'approve' ? 'selected' : ''}`}
-        >
-          Approve
-        </button>
+        <div className="bash-confirmation-buttons">
+          <button
+            onClick={handleReject}
+            className={`bash-confirmation-button bash-confirmation-reject ${selectedButton === 'reject' ? 'selected' : ''}`}
+          >
+            Reject
+          </button>
+          <button
+            onClick={handleApprove}
+            className={`bash-confirmation-button bash-confirmation-approve ${selectedButton === 'approve' ? 'selected' : ''}`}
+          >
+            Approve
+          </button>
+        </div>
       </div>
     </div>
   )
