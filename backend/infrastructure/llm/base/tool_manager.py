@@ -251,10 +251,12 @@ class BaseToolManager(ABC):
         try:
             # Check if tool requires user confirmation
             if self._requires_user_confirmation(tool_name, tool_args):
+                if session_id is None:
+                    raise ValueError(f"Tool '{tool_name}' requires session ID for user confirmation. Session ID must not be None.")
                 approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
                 if not approved:
                     # Set pending rejection state and wait for user feedback
-                    context_manager = self._get_context_manager(session_id)
+                    context_manager = self._get_context_manager(session_id) if session_id is not None else None
                     if context_manager:
                         print(f"[BaseToolManager] User rejected {tool_name}, waiting for feedback...")
 
