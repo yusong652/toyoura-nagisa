@@ -6,7 +6,6 @@ import {
   DialogActions,
   Button,
   Typography,
-  TextField,
   Box,
   Alert,
   Chip,
@@ -20,7 +19,7 @@ import {
   Check as CheckIcon
 } from '@mui/icons-material'
 import { useBashConfirmation } from './hooks'
-import { dialogStyles, combineSx } from './BashConfirmationDialog.styles'
+import { dialogStyles } from './BashConfirmationDialog.styles'
 
 /**
  * Bash Command Confirmation Dialog Component
@@ -31,29 +30,26 @@ import { dialogStyles, combineSx } from './BashConfirmationDialog.styles'
  * Features:
  * - Clear command display with syntax highlighting
  * - Optional command description from AI
- * - User can provide rejection reason
+ * - Simple approve/reject actions
  * - 60-second auto-reject timeout
  * - Copy command to clipboard functionality
  * - Visual security warnings
+ * - Guidance for providing rejection feedback through chat
  *
  * Design:
  * - Material-UI dialog with warning theme
  * - Terminal-style command display
  * - Clear approve/reject actions
- * - Optional user message input when rejecting
+ * - Info about using chat for feedback after rejection
  */
 const BashConfirmationDialog: React.FC = () => {
   const { request, isOpen, approve, reject } = useBashConfirmation()
-  const [userMessage, setUserMessage] = useState('')
-  const [showRejectInput, setShowRejectInput] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [copied, setCopied] = useState(false)
 
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (isOpen) {
-      setUserMessage('')
-      setShowRejectInput(false)
       setTimeRemaining(60)
       setCopied(false)
     }
@@ -84,19 +80,9 @@ const BashConfirmationDialog: React.FC = () => {
     approve()
   }
 
-  // Handle reject
+  // Handle reject - simplified to just reject immediately
   const handleReject = () => {
-    if (showRejectInput) {
-      reject(userMessage || undefined)
-    } else {
-      setShowRejectInput(true)
-    }
-  }
-
-  // Cancel reject input
-  const handleCancelReject = () => {
-    setShowRejectInput(false)
-    setUserMessage('')
+    reject('Command rejected by user')
   }
 
   if (!request) {
@@ -198,25 +184,13 @@ const BashConfirmationDialog: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Rejection Input */}
-        {showRejectInput && (
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Rejection Reason (optional):
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              value={userMessage}
-              onChange={(e) => setUserMessage(e.target.value)}
-              placeholder="Provide feedback to help the AI understand why you're rejecting this command..."
-              variant="outlined"
-              autoFocus
-              sx={{ mb: 1 }}
-            />
-          </Box>
-        )}
+        {/* Note about rejection feedback */}
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            If you reject this command, you can provide feedback through the normal chat input
+            to help the AI understand your concerns.
+          </Typography>
+        </Alert>
 
         {/* Timeout Warning */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
@@ -231,25 +205,12 @@ const BashConfirmationDialog: React.FC = () => {
 
       {/* Actions */}
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        {showRejectInput ? (
-          <>
-            <Button onClick={handleCancelReject} color="inherit">
-              Cancel
-            </Button>
-            <Button onClick={handleReject} color="error" variant="contained">
-              Send Rejection
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button onClick={handleReject} color="error">
-              Reject
-            </Button>
-            <Button onClick={handleApprove} variant="contained" color="success">
-              Approve & Execute
-            </Button>
-          </>
-        )}
+        <Button onClick={handleReject} color="error">
+          Reject
+        </Button>
+        <Button onClick={handleApprove} variant="contained" color="success">
+          Approve & Execute
+        </Button>
       </DialogActions>
     </Dialog>
   )
