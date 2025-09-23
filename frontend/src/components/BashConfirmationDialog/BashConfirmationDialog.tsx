@@ -7,14 +7,10 @@ import {
   Button,
   Typography,
   Box,
-  Alert,
   Chip,
-  LinearProgress,
   IconButton
 } from '@mui/material'
 import {
-  Terminal as TerminalIcon,
-  Warning as WarningIcon,
   ContentCopy as CopyIcon,
   Check as CheckIcon
 } from '@mui/icons-material'
@@ -24,28 +20,40 @@ import { dialogStyles } from './BashConfirmationDialog.styles'
 /**
  * Bash Command Confirmation Dialog Component
  *
- * Displays a confirmation dialog when the AI wants to execute a bash command,
- * following Claude Code's user-in-the-loop design pattern.
+ * Clean, minimal dialog for bash command confirmation.
+ * Matches the design patterns of message and tool components.
  *
  * Features:
- * - Clear command display with syntax highlighting
- * - Optional command description from AI
- * - Simple approve/reject actions
+ * - Simple command display in code box
+ * - Description from AI when provided
+ * - Approve/reject actions
  * - 60-second auto-reject timeout
- * - Copy command to clipboard functionality
- * - Visual security warnings
- * - Guidance for providing rejection feedback through chat
- *
- * Design:
- * - Material-UI dialog with warning theme
- * - Terminal-style command display
- * - Clear approve/reject actions
- * - Info about using chat for feedback after rejection
+ * - Copy command functionality
  */
 const BashConfirmationDialog: React.FC = () => {
   const { request, isOpen, approve, reject } = useBashConfirmation()
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [copied, setCopied] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  // Detect theme from body's data-theme attribute
+  useEffect(() => {
+    const checkTheme = () => {
+      const theme = document.body.getAttribute('data-theme')
+      setIsDarkMode(theme === 'dark')
+    }
+
+    checkTheme()
+
+    // Observe theme changes
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -93,123 +101,70 @@ const BashConfirmationDialog: React.FC = () => {
     <Dialog
       open={isOpen}
       onClose={() => reject('Dialog closed by user')}
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: dialogStyles.paper
+        sx: dialogStyles.paper(isDarkMode)
       }}
     >
-      {/* Header */}
-      <DialogTitle sx={{ pb: 1 }}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <WarningIcon color="warning" />
-          <Typography variant="h6" component="span">
-            Bash Command Confirmation Required
-          </Typography>
-        </Box>
+      {/* Simple title */}
+      <DialogTitle sx={dialogStyles.dialogTitle(isDarkMode)}>
+        Confirm Bash Command
       </DialogTitle>
 
-      {/* Progress bar for timeout */}
-      <LinearProgress
-        variant="determinate"
-        value={(timeRemaining / 60) * 100}
-        sx={{
-          height: 3,
-          backgroundColor: 'action.disabledBackground',
-          '& .MuiLinearProgress-bar': {
-            backgroundColor: timeRemaining > 10 ? 'warning.main' : 'error.main'
-          }
-        }}
-      />
-
       {/* Content */}
-      <DialogContent sx={{ pt: 2 }}>
-        {/* Security Warning */}
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <Typography variant="body2">
-            The AI assistant wants to execute a bash command. Please review it carefully
-            before approving. This command will run on your system.
-          </Typography>
-        </Alert>
-
-        {/* Command Description */}
+      <DialogContent sx={dialogStyles.dialogContent}>
+        {/* AI Description if provided */}
         {request.description && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              AI's Description:
-            </Typography>
-            <Typography variant="body1">{request.description}</Typography>
-          </Box>
+          <Typography sx={dialogStyles.descriptionText(isDarkMode)}>
+            {request.description}
+          </Typography>
         )}
 
-        {/* Command Display */}
-        <Box mb={2}>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Command to Execute:
-            </Typography>
-            <IconButton
-              size="small"
-              onClick={handleCopy}
-              color={copied ? 'success' : 'default'}
-            >
-              {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
-            </IconButton>
-          </Box>
-
-          <Box
-            sx={{
-              backgroundColor: '#1e1e1e',
-              color: '#d4d4d4',
-              p: 2,
-              borderRadius: 1,
-              fontFamily: 'monospace',
-              fontSize: '0.9rem',
-              position: 'relative',
-              overflowX: 'auto'
-            }}
+        {/* Code display box with copy button */}
+        <Box sx={dialogStyles.codeBox(isDarkMode)}>
+          <IconButton
+            size="small"
+            onClick={handleCopy}
+            sx={dialogStyles.copyButton(isDarkMode)}
           >
-            <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <TerminalIcon sx={{ fontSize: '1rem', color: '#4ec9b0' }} />
-              <Typography
-                component="span"
-                sx={{ color: '#4ec9b0', fontFamily: 'monospace', fontSize: '0.8rem' }}
-              >
-                bash
-              </Typography>
-            </Box>
-            <Typography component="pre" sx={dialogStyles.commandText}>
-              {request.command}
-            </Typography>
-          </Box>
+            {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
+          </IconButton>
+          <Typography component="pre" sx={dialogStyles.commandText}>
+            {request.command}
+          </Typography>
         </Box>
 
-        {/* Note about rejection feedback */}
-        <Alert severity="info" sx={{ mb: 2 }}>
-          <Typography variant="body2">
-            If you reject this command, you can provide feedback through the normal chat input
-            to help the AI understand your concerns.
-          </Typography>
-        </Alert>
+        {/* Simple info text */}
+        <Typography sx={dialogStyles.infoText(isDarkMode)}>
+          This command will run on your system. You can provide feedback through chat if you reject.
+        </Typography>
 
-        {/* Timeout Warning */}
-        <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
+        {/* Timeout indicator */}
+        <Box display="flex" justifyContent="center">
           <Chip
             label={`Auto-reject in ${timeRemaining}s`}
             size="small"
             color={timeRemaining > 10 ? 'default' : 'error'}
-            variant="outlined"
+            sx={dialogStyles.timeoutChip(isDarkMode)}
           />
         </Box>
       </DialogContent>
 
       {/* Actions */}
-      <DialogActions sx={{ p: 2, pt: 0 }}>
-        <Button onClick={handleReject} color="error">
+      <DialogActions sx={dialogStyles.dialogActions(isDarkMode)}>
+        <Button
+          onClick={handleReject}
+          sx={dialogStyles.rejectButton(isDarkMode)}
+        >
           Reject
         </Button>
-        <Button onClick={handleApprove} variant="contained" color="success">
-          Approve & Execute
+        <Button
+          onClick={handleApprove}
+          variant="contained"
+          sx={dialogStyles.approveButton(isDarkMode)}
+        >
+          Approve
         </Button>
       </DialogActions>
     </Dialog>
