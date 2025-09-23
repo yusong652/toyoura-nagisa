@@ -10,6 +10,12 @@
   /* Create stacking context to isolate shimmer */
   isolation: isolate;
   z-index: 0;
+  /* Position tool state to the left for agent-like feel */
+  margin-left: 0;
+  margin-right: auto;
+  align-self: flex-start;
+  width: 400px;
+  max-width: 400px;
 }
 
 .message-tool-state::before {

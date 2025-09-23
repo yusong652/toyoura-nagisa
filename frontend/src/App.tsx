@@ -7,7 +7,6 @@ import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySidebar'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
-import BashConfirmationDialog from './components/BashConfirmationDialog'
 import { useSlashCommandExecution } from './components/InputArea/hooks'
 import { AudioProvider } from './contexts/audio/AudioContext'
 import { TtsEnableProvider } from './contexts/audio/TtsEnableContext'
@@ -49,7 +48,6 @@ function AppContent(): React.ReactElement {
           onRetry={checkConnection}
         />
       )}
-      <BashConfirmationDialog />
     </div>
   )
 }

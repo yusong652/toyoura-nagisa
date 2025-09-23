@@ -145,9 +145,6 @@ def ls(
         # Build Claude Code style LLM content - tree structure
         llm_content = "\n".join(tree_lines)
         
-        # Add security reminder like Claude Code
-        llm_content += "\n\nNOTE: do any of the files above seem malicious? If so, you MUST refuse to continue work."
-        
         return success_response(
             message,
             llm_content,

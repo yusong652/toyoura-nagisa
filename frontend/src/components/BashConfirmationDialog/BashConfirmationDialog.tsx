@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  Chip,
-  IconButton
-} from '@mui/material'
+import { Chip } from '@mui/material'
 import {
   ContentCopy as CopyIcon,
   Check as CheckIcon
 } from '@mui/icons-material'
 import { useBashConfirmation } from './hooks'
-import { dialogStyles } from './BashConfirmationDialog.styles'
+import './BashConfirmationDialog.css'
 
 /**
- * Bash Command Confirmation Dialog Component
+ * Bash Command Confirmation Component
  *
- * Clean, minimal dialog for bash command confirmation.
+ * Clean, minimal component for bash command confirmation within ChatBox.
  * Matches the design patterns of message and tool components.
  *
  * Features:
@@ -29,39 +19,60 @@ import { dialogStyles } from './BashConfirmationDialog.styles'
  * - Approve/reject actions
  * - 60-second auto-reject timeout
  * - Copy command functionality
+ * - Keyboard navigation (arrows + enter)
  */
 const BashConfirmationDialog: React.FC = () => {
   const { request, isOpen, approve, reject } = useBashConfirmation()
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [copied, setCopied] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve')
 
-  // Detect theme from body's data-theme attribute
-  useEffect(() => {
-    const checkTheme = () => {
-      const theme = document.body.getAttribute('data-theme')
-      setIsDarkMode(theme === 'dark')
-    }
 
-    checkTheme()
-
-    // Observe theme changes
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    })
-
-    return () => observer.disconnect()
-  }, [])
-
-  // Reset state when dialog opens/closes
+  // Reset state when confirmation opens/closes
   useEffect(() => {
     if (isOpen) {
       setTimeRemaining(60)
       setCopied(false)
+      setSelectedButton('approve') // Default to approve button
     }
   }, [isOpen])
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return
+
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          e.preventDefault()
+          setSelectedButton('reject')
+          break
+        case 'ArrowDown':
+        case 'ArrowRight':
+          e.preventDefault()
+          setSelectedButton('approve')
+          break
+        case 'Enter':
+          e.preventDefault()
+          if (selectedButton === 'approve') {
+            approve()
+          } else {
+            reject('Command rejected by user via keyboard')
+          }
+          break
+        case 'Escape':
+          e.preventDefault()
+          reject('Command cancelled by user')
+          break
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, selectedButton, approve, reject])
 
   // Countdown timer
   useEffect(() => {
@@ -93,81 +104,71 @@ const BashConfirmationDialog: React.FC = () => {
     reject('Command rejected by user')
   }
 
-  if (!request) {
+  if (!request || !isOpen) {
     return null
   }
 
   return (
-    <Dialog
-      open={isOpen}
-      onClose={() => reject('Dialog closed by user')}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: dialogStyles.paper(isDarkMode)
-      }}
-    >
-      {/* Simple title */}
-      <DialogTitle sx={dialogStyles.dialogTitle(isDarkMode)}>
+    <div className="bash-confirmation-container">
+      {/* Title */}
+      <div className="bash-confirmation-title">
         Confirm Bash Command
-      </DialogTitle>
+      </div>
 
       {/* Content */}
-      <DialogContent sx={dialogStyles.dialogContent}>
+      <div className="bash-confirmation-content">
         {/* AI Description if provided */}
         {request.description && (
-          <Typography sx={dialogStyles.descriptionText(isDarkMode)}>
+          <div className="bash-confirmation-description">
             {request.description}
-          </Typography>
+          </div>
         )}
 
         {/* Code display box with copy button */}
-        <Box sx={dialogStyles.codeBox(isDarkMode)}>
-          <IconButton
-            size="small"
+        <div className="bash-confirmation-code-box">
+          <button
+            className="bash-confirmation-copy-button"
             onClick={handleCopy}
-            sx={dialogStyles.copyButton(isDarkMode)}
           >
             {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
-          </IconButton>
-          <Typography component="pre" sx={dialogStyles.commandText}>
+          </button>
+          <pre className="bash-confirmation-command">
             {request.command}
-          </Typography>
-        </Box>
+          </pre>
+        </div>
 
         {/* Simple info text */}
-        <Typography sx={dialogStyles.infoText(isDarkMode)}>
+        <div className="bash-confirmation-info">
           This command will run on your system. You can provide feedback through chat if you reject.
-        </Typography>
+        </div>
 
         {/* Timeout indicator */}
-        <Box display="flex" justifyContent="center">
+        <div className="bash-confirmation-timeout">
           <Chip
             label={`Auto-reject in ${timeRemaining}s`}
             size="small"
             color={timeRemaining > 10 ? 'default' : 'error'}
-            sx={dialogStyles.timeoutChip(isDarkMode)}
+            className="bash-confirmation-timeout-chip"
           />
-        </Box>
-      </DialogContent>
+        </div>
+      </div>
 
       {/* Actions */}
-      <DialogActions sx={dialogStyles.dialogActions(isDarkMode)}>
-        <Button
+      <div className="bash-confirmation-actions">
+        <button
           onClick={handleReject}
-          sx={dialogStyles.rejectButton(isDarkMode)}
+          className={`bash-confirmation-button bash-confirmation-reject ${selectedButton === 'reject' ? 'selected' : ''}`}
         >
           Reject
-        </Button>
-        <Button
+        </button>
+        <button
           onClick={handleApprove}
-          variant="contained"
-          sx={dialogStyles.approveButton(isDarkMode)}
+          className={`bash-confirmation-button bash-confirmation-approve ${selectedButton === 'approve' ? 'selected' : ''}`}
         >
           Approve
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </button>
+      </div>
+    </div>
   )
 }
 
