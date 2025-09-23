@@ -208,19 +208,16 @@ class ChatHandler(MessageHandler):
                 from backend.presentation.websocket.utils import convert_websocket_message_to_request
                 request_data = convert_websocket_message_to_request(session_id, message)
 
-                # Parse request using chat service
-                result, enable_memory = await self.chat_service.parse_websocket_request(request_data)
-
-                # Save user message to session
-                self.chat_service.save_user_message_to_session(result)
+                # Process user message with pending rejection handling
+                processing_result = await self.chat_service.process_user_message(request_data)
 
                 # Generate streaming response in background task (non-blocking)
                 from backend.presentation.streaming.chat_stream import generate_chat_stream
                 asyncio.create_task(generate_chat_stream(
-                    session_id=session_id,
-                    enable_memory=enable_memory,
-                    agent_profile=result['agent_profile'],
-                    user_message_id=result.get('id')
+                    session_id=processing_result['session_id'],
+                    enable_memory=processing_result['enable_memory'],
+                    agent_profile=processing_result['agent_profile'],
+                    user_message_id=processing_result['message_id']
                 ))
 
             except Exception as e:
