@@ -132,7 +132,7 @@ class BaseToolManager(ABC):
                                session_id: Optional[str] = None) -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
-        Includes user confirmation logic for security-sensitive tools.
+        Pure tool execution logic - confirmation should be handled by caller.
 
         Args:
             tool_name: Tool name
@@ -152,24 +152,6 @@ class BaseToolManager(ABC):
                 f"All tools must be executed with session context."
             )
 
-        # Check if tool requires user confirmation
-        if self._requires_user_confirmation(tool_name, tool_args):
-            approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
-            if not approved:
-                # Create a standard ToolResult for user rejection
-                from mcp.types import TextContent
-                from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-
-                # Use standard user_rejected_response format
-                rejection_result = user_rejected_response(user_message=user_message)
-
-                return CallToolResult(
-                    content=[TextContent(
-                        type="text",
-                        text=json.dumps(rejection_result)
-                    )],
-                    isError=False  # Not an MCP error, just user rejection
-                )
 
         mcp_client = self.get_mcp_client()
         async with mcp_client as mcp_async_client:
@@ -248,7 +230,21 @@ class BaseToolManager(ABC):
         _ = tool_id
 
         try:
-            # Execute tool
+            # Check if tool requires user confirmation
+            if self._requires_user_confirmation(tool_name, tool_args):
+                approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
+                if not approved:
+                    # TODO: Set pending rejection state for elegant feedback collection
+                    # For now, return standard rejection response
+                    from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+                    rejection_result = user_rejected_response(user_message=user_message)
+
+                    return {
+                        "inline_data": {},
+                        "llm_content": rejection_result.get("llm_content", "Tool execution rejected by user")
+                    }
+
+            # Execute tool after approval
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
 

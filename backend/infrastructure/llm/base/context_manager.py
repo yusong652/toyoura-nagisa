@@ -57,7 +57,11 @@ class BaseContextManager(ABC):
         self._message_history: List[BaseMessage] = []
 
         # Tool rejection state management
-        self._pending_rejection: Optional[PendingRejection] = None
+        self._pending_rejection = PendingRejection(
+            tool_call_id="",
+            tool_name="",
+            active=False
+        )
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -288,3 +292,49 @@ class BaseContextManager(ABC):
         self._message_history.clear()
         self.working_contents.clear()
         self._initialized_from_history = False
+        self._pending_rejection.active = False
+
+    # ========== REJECTION STATE MANAGEMENT ==========
+
+    def set_pending_rejection(self, tool_call_id: str, tool_name: str) -> None:
+        """
+        Set pending rejection state waiting for user feedback.
+
+        Args:
+            tool_call_id: Tool call ID for locating the tool result in context
+            tool_name: Tool name for debugging and logging
+        """
+        self._pending_rejection.tool_call_id = tool_call_id
+        self._pending_rejection.tool_name = tool_name
+        self._pending_rejection.active = True
+
+    def has_pending_rejection(self) -> bool:
+        """
+        Check if there is an active pending rejection waiting for user feedback.
+
+        Returns:
+            bool: True if active pending rejection exists, False otherwise
+        """
+        return self._pending_rejection.active
+
+    def get_pending_rejection_info(self) -> Dict[str, str]:
+        """
+        Get pending rejection information.
+
+        Returns:
+            Dict[str, str]: Dictionary with 'tool_call_id' and 'tool_name' if active, empty dict if inactive
+        """
+        if self._pending_rejection.active:
+            return {
+                'tool_call_id': self._pending_rejection.tool_call_id,
+                'tool_name': self._pending_rejection.tool_name
+            }
+        return {}
+
+    def clear_pending_rejection(self) -> None:
+        """
+        Clear pending rejection state.
+        """
+        self._pending_rejection.active = False
+        self._pending_rejection.tool_call_id = ""
+        self._pending_rejection.tool_name = ""

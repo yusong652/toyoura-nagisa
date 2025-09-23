@@ -708,7 +708,7 @@ class LLMClientBase(ABC):
 
             service = get_tool_notification_service()
             if not service:
-                logger.warning("Tool notification service not available")
+                print("[DEBUG] Tool notification service not available")
                 return
 
             notification_type = notification.get('type')

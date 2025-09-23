@@ -18,3 +18,4 @@ class PendingRejection:
     """
     tool_call_id: str
     tool_name: str
+    active: bool = True
