@@ -205,19 +205,15 @@ class ChatHandler(MessageHandler):
                 from backend.presentation.websocket.utils import convert_websocket_message_to_request
                 request_data = convert_websocket_message_to_request(session_id, message)
 
-                # Process user message with pending rejection handling
+                # Process user message (all messages treated uniformly)
                 processing_result = await self.chat_service.process_user_message(request_data)
 
-                # Only generate streaming response if this was NOT rejection feedback
-                if not processing_result['was_rejection_feedback']:
-                    # Generate streaming response in background task (non-blocking)
-                    from backend.presentation.streaming.llm_response_handler import process_chat_request
-                    asyncio.create_task(process_chat_request(
-                        session_id=processing_result['session_id'],
-                        user_message_id=processing_result['message_id']
-                    ))
-                else:
-                    print(f"[ChatHandler] Rejection feedback processed for session {session_id}, no new chat stream created")
+                # Always generate streaming response for user messages
+                from backend.presentation.streaming.llm_response_handler import process_chat_request
+                asyncio.create_task(process_chat_request(
+                    session_id=processing_result['session_id'],
+                    user_message_id=processing_result['message_id']
+                ))
 
             except Exception as e:
                 logger.error(f"Error processing chat message: {e}")

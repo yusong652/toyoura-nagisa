@@ -12,11 +12,9 @@ Key Features:
 - Session-based context persistence
 """
 
-import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.tool_state import PendingRejection
 from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
 
@@ -56,13 +54,6 @@ class BaseContextManager(ABC):
         
         # Message management
         self._message_history: List[BaseMessage] = []
-
-        # Tool rejection state management
-        self._pending_rejection = PendingRejection(
-            tool_call_id="",
-            tool_name="",
-            active=False
-        )
 
         # Request configuration storage
         self.agent_profile = "general"
@@ -322,75 +313,4 @@ class BaseContextManager(ABC):
         self._message_history.clear()
         self.working_contents.clear()
         self._initialized_from_history = False
-        self._pending_rejection.active = False
 
-    # ========== REJECTION STATE MANAGEMENT ==========
-
-    def set_pending_rejection(self, tool_call_id: str, tool_name: str) -> asyncio.Future:
-        """
-        Set pending rejection state and return Future for user feedback.
-
-        Args:
-            tool_call_id: Tool call ID for locating the tool result in context
-            tool_name: Tool name for debugging and logging
-
-        Returns:
-            asyncio.Future: Future that will be resolved with user feedback
-        """
-        import asyncio
-        self._pending_rejection.tool_call_id = tool_call_id
-        self._pending_rejection.tool_name = tool_name
-        self._pending_rejection.active = True
-        self._pending_rejection.feedback_future = asyncio.Future()
-        return self._pending_rejection.feedback_future
-
-    def has_pending_rejection(self) -> bool:
-        """
-        Check if there is an active pending rejection waiting for user feedback.
-
-        Returns:
-            bool: True if active pending rejection exists, False otherwise
-        """
-        return self._pending_rejection.active
-
-    def get_pending_rejection_info(self) -> Dict[str, str]:
-        """
-        Get pending rejection information.
-
-        Returns:
-            Dict[str, str]: Dictionary with 'tool_call_id' and 'tool_name' if active, empty dict if inactive
-        """
-        if self._pending_rejection.active:
-            return {
-                'tool_call_id': self._pending_rejection.tool_call_id,
-                'tool_name': self._pending_rejection.tool_name
-            }
-        return {}
-
-    def resolve_pending_rejection(self, user_feedback: Dict[str, Any]) -> bool:
-        """
-        Resolve pending rejection with user feedback.
-
-        Args:
-            user_feedback: User's feedback dictionary with action and optional data
-
-        Returns:
-            bool: True if feedback was resolved, False if no pending rejection
-        """
-        if not self._pending_rejection.active or not self._pending_rejection.feedback_future:
-            return False
-
-        # Resolve the Future with user feedback
-        if not self._pending_rejection.feedback_future.done():
-            self._pending_rejection.feedback_future.set_result(user_feedback)
-
-        return True
-
-    def clear_pending_rejection(self) -> None:
-        """
-        Clear pending rejection state.
-        """
-        self._pending_rejection.active = False
-        self._pending_rejection.tool_call_id = ""
-        self._pending_rejection.tool_name = ""
-        self._pending_rejection.feedback_future = None

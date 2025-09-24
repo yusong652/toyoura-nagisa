@@ -255,49 +255,22 @@ class BaseToolManager(ABC):
                     raise ValueError(f"Tool '{tool_name}' requires session ID for user confirmation. Session ID must not be None.")
                 approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
                 if not approved:
-                    # Set pending rejection state and wait for user feedback
-                    context_manager = self._get_context_manager(session_id) if session_id is not None else None
-                    if context_manager:
-                        print(f"[BaseToolManager] User rejected {tool_name}, waiting for feedback...")
+                    # User rejected - return rejection result immediately
+                    # Following Claude Code standard: tool response maintains 1:1 mapping
+                    # User feedback will come as a new user message in next request
+                    print(f"[BaseToolManager] User rejected {tool_name}")
 
-                        # Create Future for user feedback
-                        feedback_future = context_manager.set_pending_rejection(tool_id, tool_name)
+                    from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+                    rejection_result = user_rejected_response(
+                        user_message=user_message or f"User rejected {tool_name}"
+                    )
 
-                        try:
-                            # Wait for user feedback (this pauses execution here)
-                            user_feedback = await feedback_future
-                            print(f"[BaseToolManager] Received user feedback: {user_feedback}")
-
-                            # User provided rejection feedback, return it as the tool result
-                            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-                            rejection_result = user_rejected_response(user_message=user_feedback)
-                            return {
-                                "inline_data": {},
-                                "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected with feedback: {user_feedback}")
-                            }
-
-                        except asyncio.TimeoutError:
-                            # Timeout waiting for feedback
-                            print(f"[BaseToolManager] Timeout waiting for feedback on {tool_name}")
-                            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-                            rejection_result = user_rejected_response(user_message="Timeout waiting for user feedback")
-                            return {
-                                "inline_data": {},
-                                "llm_content": rejection_result.get("llm_content", "Tool execution timed out")
-                            }
-
-                        finally:
-                            # Clean up pending rejection state
-                            context_manager.clear_pending_rejection()
-
-                    else:
-                        # Fallback if no context manager available
-                        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-                        rejection_result = user_rejected_response(user_message=user_message)
-                        return {
-                            "inline_data": {},
-                            "llm_content": rejection_result.get("llm_content", "Tool execution rejected by user")
-                        }
+                    # Mark as user rejected for interruption detection
+                    return {
+                        "inline_data": {},
+                        "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected by user"),
+                        "user_rejected": True  # Critical flag for interruption detection
+                    }
 
             # Execute tool after approval
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)

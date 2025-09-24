@@ -11,7 +11,8 @@ from typing import List, Optional, Dict, Any, Tuple, Type
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor    
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.shared.exceptions import UserRejectionInterruption    
 
 
 class LLMClientBase(ABC):
@@ -155,6 +156,9 @@ class LLMClientBase(ABC):
 
         Returns:
             Tuple[BaseMessage, Dict[str, Any]]: Final message and execution metadata
+
+        Raises:
+            UserRejectionInterruption: When user rejects tool execution (not an error)
         """
         # Get the session's context manager
         context_manager = self.get_or_create_context_manager(session_id)
@@ -169,12 +173,12 @@ class LLMClientBase(ABC):
         }
 
         try:
-            # Call simplified tool calling loop
+            # Call recursive tool calling loop
             final_response = await self._tool_calling_loop_from_session(
                 session_id, metadata
             )
 
-            # Handle final response
+            # Normal completion - handle final response
             metadata['status'] = 'completed'
 
             # Extract keyword and other post-processing
@@ -200,7 +204,18 @@ class LLMClientBase(ABC):
 
             return (final_message, metadata)
 
+        except UserRejectionInterruption as interruption:
+            # User rejection interruption - update metadata and re-raise
+            metadata['status'] = 'interrupted_by_user'
+            metadata['interruption_type'] = 'user_rejection'
+            metadata['rejected_tools'] = interruption.rejected_tools
+
+            # Context already saved by recursive tool calling
+            # Re-raise to let upper layer handle gracefully (no TTS, no content processing)
+            raise interruption
+
         except Exception as e:
+            # Real errors
             metadata['status'] = 'failed'
             metadata['error'] = str(e)
             raise Exception(f"Execution failed: {e}")
@@ -211,7 +226,7 @@ class LLMClientBase(ABC):
         metadata: Dict[str, Any]
     ) -> Any:
         """
-        Tool calling loop from session that returns final response.
+        Recursive tool calling that stops immediately on user rejection.
 
         Args:
             session_id: Session ID for getting context manager and configuration
@@ -219,20 +234,53 @@ class LLMClientBase(ABC):
 
         Returns:
             Any: Final LLM response after tool calling completion
+
+        Raises:
+            UserRejectionInterruption: When user rejects any tool execution
         """
-        # Get all required state through session_id
+        # Get configuration
+        from backend.config import get_llm_settings
+        max_iterations = get_llm_settings().max_tool_iterations
+
+        return await self._recursive_tool_calling(session_id, metadata, max_iterations)
+
+    async def _recursive_tool_calling(
+        self,
+        session_id: str,
+        metadata: Dict[str, Any],
+        max_iterations: int
+    ) -> Any:
+        """
+        Recursive tool calling implementation with user rejection interruption.
+
+        Args:
+            session_id: Session ID
+            metadata: Execution metadata
+            max_iterations: Maximum allowed iterations
+
+        Returns:
+            Any: Final LLM response
+
+        Raises:
+            UserRejectionInterruption: When user rejects any tool
+        """
+        # Check iteration limit
+        if metadata['iterations'] >= max_iterations:
+            raise Exception(f"Exceeded max iterations ({max_iterations})")
+
+        metadata['iterations'] += 1
+
+        # Get current state
         context_manager = self.get_or_create_context_manager(session_id)
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
-        # Get configuration
         from backend.config import get_llm_settings
-        max_iterations = get_llm_settings().max_tool_iterations
         recent_messages_length = get_llm_settings().recent_messages_length
         provider_config = self._get_provider_config()
         debug = getattr(provider_config, 'debug', False)
 
-        # Get initial response
+        # Get LLM response
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
             working_contents,
@@ -242,78 +290,70 @@ class LLMClientBase(ABC):
         )
         metadata['api_calls'] += 1
 
-        # Tool calling loop
-        iteration = 0
-        while iteration < max_iterations:
-            metadata['iterations'] = iteration + 1
+        # Check if we need to continue tool calling
+        if not self._should_continue_tool_calling(current_response):
+            return current_response  # Normal completion
 
-            if not self._should_continue_tool_calling(current_response):
-                break
+        # Process tool calls
+        context_manager.add_response(current_response)
+        tool_calls = self._extract_tool_calls(current_response)
 
-            context_manager.add_response(current_response)
-            tool_calls = self._extract_tool_calls(current_response)
+        if tool_calls:
+            num_tools = len(tool_calls)
+            metadata['tool_calls_executed'] += num_tools
 
-            if tool_calls:
-                num_tools = len(tool_calls)
-                metadata['tool_calls_executed'] += num_tools
+            # Send tool use notification
+            extracted_text = self._extract_text_from_response(current_response)
+            thinking_content = self._extract_thinking_content(current_response)
+            tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
 
-                # Extract text and send notifications
-                extracted_text = self._extract_text_from_response(current_response)
-                thinking_content = self._extract_thinking_content(current_response)
-
-                tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
-
-                if extracted_text and len(extracted_text.strip()) > 0:
-                    action = extracted_text.strip()
-                    if len(action) > 150:
-                        action = action[:147] + "..."
+            if extracted_text and len(extracted_text.strip()) > 0:
+                action = extracted_text.strip()
+                if len(action) > 150:
+                    action = action[:147] + "..."
+            else:
+                if num_tools == 1:
+                    action = f"Using {tool_names[0]}..."
                 else:
-                    if num_tools == 1:
-                        action = f"Using {tool_names[0]}..."
-                    else:
-                        action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+                    action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
 
-                notification = {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_names': tool_names,
-                    'action': action
-                }
+            notification = {
+                'type': 'NAGISA_IS_USING_TOOL',
+                'tool_names': tool_names,
+                'action': action
+            }
 
-                if thinking_content:
-                    notification['thinking'] = thinking_content
+            if thinking_content:
+                notification['thinking'] = thinking_content
 
-                await self._send_websocket_tool_notification(session_id, notification)
+            await self._send_websocket_tool_notification(session_id, notification)
 
-                # Execute tools in parallel
-                tasks = []
-                for tc in tool_calls:
-                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, debug))
+            # Execute tools
+            tasks = []
+            for tc in tool_calls:
+                tasks.append(self._execute_single_tool_call(tc, session_id, debug))
 
-                results = await asyncio.gather(*tasks, return_exceptions=False)
+            results = await asyncio.gather(*tasks, return_exceptions=False)
 
-                # Process results
-                for tool_call, result in zip(tool_calls, results):
-                    context_manager.add_tool_result(
-                        tool_call['id'],
-                        tool_call['name'],
-                        result
-                    )
+            # Check for rejections and add results to context
+            rejected_tools = []
+            for tool_call, result in zip(tool_calls, results):
+                context_manager.add_tool_result(
+                    tool_call['id'],
+                    tool_call['name'],
+                    result
+                )
 
-            # Next round
-            working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
-            current_response = await self.call_api_with_context(
-                working_contents,
-                session_id=session_id,
-                agent_profile=agent_profile,
-                enable_memory=enable_memory
-            )
-            metadata['api_calls'] += 1
-            iteration += 1
+                # Check if this tool was rejected
+                if self._is_tool_rejected(result):
+                    rejected_tools.append(tool_call['name'])
 
-        if iteration >= max_iterations:
-            raise Exception(f"Exceeded max iterations ({max_iterations})")
+            # If any tool was rejected, interrupt immediately
+            if rejected_tools:
+                raise UserRejectionInterruption(session_id, rejected_tools)
 
-        return current_response
+        # Continue recursively (no rejections)
+        return await self._recursive_tool_calling(session_id, metadata, max_iterations)
 
     # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
 
@@ -429,6 +469,18 @@ class LLMClientBase(ABC):
         """
         pass
 
+    def _is_tool_rejected(self, tool_result: Dict[str, Any]) -> bool:
+        """
+        Check if tool execution was rejected by user.
+
+        Args:
+            tool_result: Tool execution result dictionary
+
+        Returns:
+            bool: True if tool was rejected by user, False otherwise
+        """
+        return tool_result.get('user_rejected', False)
+
     def _extract_thinking_content(self, response) -> Optional[str]:
         """
         Extract thinking content from provider response (optional override).
@@ -538,37 +590,6 @@ class LLMClientBase(ABC):
             # Re-raise the exception to stop tool calling loop
             raise e
 
-    async def _execute_tool_for_parallel_batch(
-        self,
-        tool_call: Dict[str, Any],
-        session_id: Optional[str],
-        debug: bool
-    ) -> Dict[str, Any]:
-        """
-        Execute a single tool as part of a parallel batch execution.
-        
-        Thin wrapper around _execute_single_tool_call for parallel execution.
-        The tool manager handles all normal error cases and returns proper ToolResult dicts.
-        
-        Args:
-            tool_call: Tool call specification with structure:
-                - id: str - Unique tool call identifier
-                - name: str - Tool name to execute
-                - args/arguments: Dict[str, Any] - Tool parameters
-            session_id: Session ID for context-specific tool execution
-            debug: Enable detailed debug logging
-            
-        Returns:
-            Dict[str, Any]: Tool execution result with ToolResult structure
-        """
-        if debug:
-            tool_name = tool_call.get('name', 'unknown')
-            print(f"[DEBUG] Parallel batch tool call for {tool_name}:")
-            print(f"[DEBUG] - Tool call structure: {tool_call}")
-            
-        return await self._execute_single_tool_call(
-            tool_call, session_id, debug
-        )
 
     # ========== SHARED UTILITY METHODS ==========
 

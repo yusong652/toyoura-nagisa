@@ -22,6 +22,7 @@ from backend.presentation.streaming.content_processor import process_content_pip
 from backend.presentation.streaming.memory_injection_handler import save_session_conversation_memory
 from backend.application.services.notifications import get_message_status_service
 from backend.application.services.request_manager import request_manager
+from backend.shared.exceptions import UserRejectionInterruption
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +112,6 @@ async def process_chat_request(
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
 
-            final_message = None
-            execution_metadata = None
-
             # Use simplified session-based response method - All configuration retrieved from context manager
             final_message, execution_metadata = await llm_client.get_response_from_session(session_id)
 
@@ -135,6 +133,15 @@ async def process_chat_request(
             context_manager = llm_client.get_context_manager(session_id)
             if context_manager and getattr(context_manager, 'enable_memory', True):
                 await save_session_conversation_memory(session_id)
+
+        except UserRejectionInterruption as interruption:
+            # User rejected tool execution - this is NOT an error
+            print(f"[INFO] Request interrupted by user rejection in session {session_id}: {interruption.rejected_tools}")
+
+            # Context already saved by tool calling loop
+            # NO content processing (TTS, post-processing, etc.)
+            # Simply return and wait for user's next input
+            return
 
         except Exception as e:
             print(f"[ERROR] Streaming request {request_id} failed: {e}")

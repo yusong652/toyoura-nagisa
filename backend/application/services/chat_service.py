@@ -138,14 +138,11 @@ class ChatService:
         Returns:
             dict: Complete message processing result with structure:
                 - session_id: str - Session identifier
-                - agent_profile: str - Agent profile type
                 - message_id: str - Message unique identifier
-                - enable_memory: bool - Memory injection setting
-                - was_rejection_feedback: bool - Whether message was processed as rejection feedback
 
         Note:
-            This method encapsulates the complete user message processing pipeline,
-            including pending rejection feedback handling for elegant user interaction.
+            This method processes all user messages uniformly.
+            User rejection feedback is handled as a normal user message in the new architecture.
         """
         # 1. Parse request data using unified parsing logic
         try:
@@ -154,53 +151,20 @@ class ChatService:
         except Exception as e:
             raise ValueError(f"WebSocket message parsing failed: {str(e)}")
 
-        # 2. Check for pending rejection state and handle feedback
+        # 2. Extract session ID
         session_id = parsed_data['session_id']
-        was_rejection_feedback = await self._check_and_process_pending_rejection(session_id, parsed_data)
 
-        # 3. Save user message and add to LLM client context (only if not rejection feedback)
-        if not was_rejection_feedback:
-            # Save to persistent storage first (for data safety)
-            self.save_user_message_to_session(parsed_data)
+        # 3. Save user message and add to LLM client context (always process user messages)
+        # Save to persistent storage first (for data safety)
+        self.save_user_message_to_session(parsed_data)
 
-            # Add message to LLM client's context manager
-            from backend.shared.utils.app_context import get_llm_client
-            llm_client = get_llm_client()
-            llm_client.add_user_message_to_session(session_id, parsed_data)
+        # Add message to LLM client's context manager
+        from backend.shared.utils.app_context import get_llm_client
+        llm_client = get_llm_client()
+        llm_client.add_user_message_to_session(session_id, parsed_data)
 
         return {
             'session_id': session_id,
-            'message_id': parsed_data.get('id'),
-            'was_rejection_feedback': was_rejection_feedback
+            'message_id': parsed_data.get('id')
         }
 
-    async def _check_and_process_pending_rejection(self, session_id: str, result: MessageParseResult) -> bool:
-        """
-        Check for pending rejection state and process user feedback if needed.
-
-        Args:
-            session_id: Session identifier
-            result: Parsed message result containing user feedback
-
-        Returns:
-            bool: True if message was processed as rejection feedback, False otherwise
-        """
-        try:
-            # Get LLM client and context manager for this session
-            from backend.shared.utils.app_context import get_llm_client
-            llm_client = get_llm_client()
-            context_manager = llm_client.get_context_manager(session_id)
-
-            if context_manager and context_manager.has_pending_rejection():
-                # Extract user feedback message
-                user_feedback = result.get('message', '')
-
-                # Resolve the pending rejection with user feedback
-                context_manager.resolve_pending_rejection(user_feedback)
-
-                return True
-
-        except Exception as e:
-            print(f"[ChatService] Error checking pending rejection: {e}")
-
-        return False
