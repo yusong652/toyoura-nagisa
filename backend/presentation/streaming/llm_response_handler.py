@@ -19,6 +19,8 @@ from backend.presentation.websocket.message_types import (
     create_error_message, create_tool_use_message, create_message, MessageType
 )
 from backend.presentation.streaming.content_processor import process_content_pipeline
+from backend.presentation.streaming.memory_injection_handler import save_session_conversation_memory
+from backend.application.services.notifications import get_message_status_service
 
 logger = logging.getLogger(__name__)
 
@@ -67,17 +69,20 @@ async def send_title_update_notification(session_id: str, new_title: str) -> Non
         # Don't re-raise - this is a non-critical notification
 
 
-async def handle_llm_response(
+async def process_chat_request(
     session_id: str,
     agent_profile: str = "general",
     enable_memory: bool = True,
     user_message_id: Optional[str] = None
 ) -> None:
     """
-    Enhanced LLM Response Handler - Real-time streaming architecture.
+    Complete chat request processing pipeline.
 
-    Modern real-time streaming design optimized for immediate tool call notifications:
-    1. Real-time tool call notifications - Immediate status push during tool execution
+    Handles the entire chat request lifecycle:
+    1. Status notifications (sent/read/error)
+    2. LLM response processing with real-time tool notifications
+    3. Memory persistence after successful completion
+    4. Comprehensive error handling
     2. Streaming response processing - Maintains existing TTS and content processing logic
     3. State isolation - Anti-duplication mechanism separated from business logic
     4. Error propagation - Unified error handling and recovery
@@ -107,7 +112,6 @@ async def handle_llm_response(
 
             # Send error status via WebSocket if message ID is available
             if user_message_id:
-                from backend.application.services.notifications import get_message_status_service
                 status_service = get_message_status_service()
                 if status_service:
                     await status_service.notify_error(session_id, user_message_id, error_msg)
@@ -115,7 +119,16 @@ async def handle_llm_response(
             return
         ACTIVE_REQUESTS[session_id] = request_id
 
+    # ========== PHASE 1.5: Status notifications ==========
+    # Send WebSocket status update if service is available and message ID provided
+    status_service = get_message_status_service()
+    if status_service and user_message_id:
+        await status_service.notify_sent(session_id, user_message_id)
+
     try:
+        # Send WebSocket read status just before LLM processing starts
+        if status_service and user_message_id:
+            await status_service.notify_read(session_id, user_message_id)
         # ========== PHASE 2: Load conversation history ==========
         # Load conversation history without images for LLM processing
         from backend.infrastructure.storage.session_manager import load_history
@@ -162,7 +175,12 @@ async def handle_llm_response(
         if execution_metadata:
             # Post-processing no longer yields - handled via WebSocket
             await process_post_pipeline(session_id, request_id)
-        
+
+        # ========== PHASE 5.5: Memory persistence ==========
+        # Save conversation to memory after successful response
+        if enable_memory:
+            await save_session_conversation_memory(session_id)
+
     except Exception as e:
         print(f"[ERROR] Streaming request {request_id} failed: {e}")
         import traceback
@@ -170,8 +188,6 @@ async def handle_llm_response(
 
         # Send error status via WebSocket if message ID is available
         if user_message_id:
-            from backend.application.services.notifications import get_message_status_service
-            status_service = get_message_status_service()
             if status_service:
                 await status_service.notify_error(session_id, user_message_id, str(e))
 

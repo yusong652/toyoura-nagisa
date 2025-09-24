@@ -8,7 +8,7 @@ orchestrating memory injection, LLM response handling, and conversation persiste
 import uuid
 import logging
 from typing import AsyncGenerator, Optional
-from backend.presentation.streaming.llm_response_handler import handle_llm_response
+from backend.presentation.streaming.llm_response_handler import process_chat_request
 from backend.presentation.streaming.memory_injection_handler import (
     save_session_conversation_memory
 )
@@ -39,32 +39,8 @@ async def generate_chat_stream(
     Yields:
         SSE formatted response chunks
     """
-    # Generate unique request ID for debugging
-    request_id = str(uuid.uuid4())[:8]
-
-    # Send WebSocket status update if service is available and message ID provided
-    status_service = get_message_status_service()
-    if status_service and user_message_id:
-        await status_service.notify_sent(session_id, user_message_id)
-
-    try:
-        # Send WebSocket read status just before LLM processing starts
-        if status_service and user_message_id:
-            await status_service.notify_read(session_id, user_message_id)
-
-        # Process LLM response (messages loaded internally)
-        await handle_llm_response(session_id,
-                                  agent_profile=agent_profile,
-                                  enable_memory=enable_memory,
-                                  user_message_id=user_message_id)
-        # Save conversation to memory after successful response
-        if enable_memory:
-            await save_session_conversation_memory(session_id)
-            
-    except Exception as e:
-        print(f"[ERROR] API Request {request_id} - Exception in generate(): {e}")
-        
-        # Send error status via WebSocket
-        if status_service and user_message_id:
-            await status_service.notify_error(session_id, user_message_id, str(e))
-        raise e
+    # Process complete chat request (all logic now handled internally)
+    await process_chat_request(session_id,
+                              agent_profile=agent_profile,
+                              enable_memory=enable_memory,
+                              user_message_id=user_message_id)
