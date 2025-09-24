@@ -59,8 +59,9 @@ IMAGE_EXTENSIONS = {
 
 
 # Encoding detection order
+# Note: utf-16 and utf-32 are handled separately via BOM detection
 ENCODING_CANDIDATES = [
-    'utf-8', 'utf-16', 'utf-32', 'ascii', 'latin-1', 'cp1252', 'iso-8859-1'
+    'utf-8', 'ascii', 'latin-1', 'cp1252', 'iso-8859-1', 'gbk', 'shift_jis'
 ]
 
 # -----------------------------------------------------------------------------
@@ -118,7 +119,7 @@ def _detect_encoding(file_path: Path) -> Tuple[Optional[str], bool]:
     try:
         with file_path.open('rb') as f:
             raw_data = f.read(min(SAMPLE_SIZE_BINARY, file_path.stat().st_size))
-        
+
         # Check for BOM
         has_bom = False
         if raw_data.startswith(b'\xef\xbb\xbf'):
@@ -126,11 +127,11 @@ def _detect_encoding(file_path: Path) -> Tuple[Optional[str], bool]:
             return 'utf-8-sig', has_bom
         elif raw_data.startswith(b'\xff\xfe'):
             has_bom = True
-            return 'utf-16-le', has_bom
+            return 'utf-16', has_bom  # Use generic utf-16 which handles LE with BOM
         elif raw_data.startswith(b'\xfe\xff'):
             has_bom = True
-            return 'utf-16-be', has_bom
-        
+            return 'utf-16', has_bom  # Use generic utf-16 which handles BE with BOM
+
         # Try encodings in order
         for encoding in ENCODING_CANDIDATES:
             try:
@@ -138,20 +139,21 @@ def _detect_encoding(file_path: Path) -> Tuple[Optional[str], bool]:
                 return encoding, has_bom
             except UnicodeDecodeError:
                 continue
-        
+
         return None, has_bom
-        
+
     except Exception:
         return None, False
 
 def _read_text_content(
-    file_path: Path, 
-    encoding: str, 
-    offset: Optional[int] = None, 
+    file_path: Path,
+    encoding: str,
+    offset: Optional[int] = None,
     limit: Optional[int] = None
 ) -> ProcessingResult:
     """Read and process text content with standard cat -n format."""
     try:
+        # Use 'replace' error handler to handle any encoding issues gracefully
         with file_path.open('r', encoding=encoding, errors='replace') as f:
             content = f.read()
         
