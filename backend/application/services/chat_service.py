@@ -97,32 +97,6 @@ class ChatService:
             for msg in loaded_history
         ]
     
-    def process_user_message_for_session(
-        self,
-        result: MessageParseResult,
-        history_msgs: List[Any]
-    ) -> None:
-        """
-        Process and store user message in session history.
-
-        Handles user message processing including validation, formatting,
-        and persistence to session storage for conversation continuity.
-
-        Args:
-            result: Unified MessageParseResult with structure:
-                - content: Optional[List[Dict[str, Any]]] - Message content items
-                - timestamp: Optional[int] - Message timestamp
-                - id: Optional[str] - Message unique identifier
-                - session_id: str - Session UUID for message association
-                - agent_profile: str - Agent profile type
-            history_msgs: Current conversation history for context
-
-        Note:
-            Modifies session storage by adding the processed message
-            to the conversation history. Uses existing helper function
-            for consistent message processing.
-        """
-        process_user_message(result, history_msgs)
 
     def save_user_message_to_session(self, result: MessageParseResult) -> None:
         """
@@ -142,7 +116,7 @@ class ChatService:
         history_msgs = self.load_and_prepare_history(result['session_id'])
 
         # Process and save user message
-        self.process_user_message_for_session(result, history_msgs)
+        process_user_message(result, history_msgs)
 
 
     async def process_user_message(self, request_data: dict) -> dict:
