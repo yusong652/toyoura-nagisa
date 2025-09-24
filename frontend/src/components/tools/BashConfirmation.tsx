@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useBashConfirmation } from './hooks'
 import './ToolStateDisplay.css'
 
@@ -11,6 +11,12 @@ import './ToolStateDisplay.css'
  */
 const BashConfirmation: React.FC = () => {
   const { request: bashRequest, isOpen: bashConfirmationOpen, approve, reject } = useBashConfirmation()
+
+  // All hooks must be called before any conditional returns
+  const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve') // Default to approve
+  const containerRef = useRef<HTMLDivElement>(null)
+  const rejectButtonRef = useRef<HTMLButtonElement>(null)
+  const approveButtonRef = useRef<HTMLButtonElement>(null)
 
   // Debug logging for component state
   useEffect(() => {
@@ -27,76 +33,142 @@ const BashConfirmation: React.FC = () => {
     command: bashRequest?.command
   })
 
+  // Conditional return MUST come after all hooks
+
+  // Handle keyboard navigation - only when component should be visible
+  useEffect(() => {
+    if (!bashConfirmationOpen || !bashRequest) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          e.preventDefault()
+          setSelectedButton('reject')
+          break
+        case 'ArrowDown':
+        case 'ArrowRight':
+          e.preventDefault()
+          setSelectedButton('approve')
+          break
+        case 'Enter':
+          e.preventDefault()
+          if (selectedButton === 'approve') {
+            approve()
+          } else {
+            reject('Command rejected by user')
+          }
+          break
+        case 'y':
+        case 'Y':
+          e.preventDefault()
+          approve()
+          break
+        case 'n':
+        case 'N':
+          e.preventDefault()
+          reject('Command rejected by user')
+          break
+        case 'Escape':
+          e.preventDefault()
+          reject('Command rejected by user')
+          break
+      }
+    }
+
+    // Focus the container to enable keyboard events
+    if (containerRef.current) {
+      containerRef.current.focus()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [bashConfirmationOpen, bashRequest, selectedButton, approve, reject])
+
+  // Now safe to return conditionally after all hooks are called
   if (!bashConfirmationOpen || !bashRequest) {
     return null
   }
 
-  // 保持可见但样式更合适的版本
+  // Simple styling matching ToolStateDisplay design
   return (
-    <div style={{
-      marginTop: '8px',
-      padding: '12px',
-      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-      border: '2px solid rgba(239, 68, 68, 0.3)',
-      borderRadius: '8px',
-      position: 'relative',
-      zIndex: 10
-    }}>
-      <div style={{ marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: '#dc2626' }}>
-        <strong>Bash Command Confirmation:</strong>
-      </div>
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      style={{
+        marginTop: '2px',
+        padding: '8px',
+        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.04) 100%)',
+        border: '1px solid rgba(239, 68, 68, 0.15)',
+        borderRadius: '16px',
+        position: 'relative',
+        zIndex: 10,
+        width: '400px',
+        maxWidth: '400px',
+        minWidth: '400px',
+        outline: 'none',
+        backdropFilter: 'blur(20px) saturate(150%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+      }}>
       <div style={{
-        marginBottom: '12px',
+        marginBottom: '6px',
         padding: '6px 8px',
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        borderRadius: '4px',
-        border: '1px solid rgba(0, 0, 0, 0.1)'
+        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.03) 0%, rgba(0, 0, 0, 0.01) 100%)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '8px',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)'
       }}>
         <code style={{
           fontFamily: 'Monaco, Consolas, Courier New, monospace',
           fontSize: '12px',
-          color: '#dc2626',
-          fontWeight: 500
+          color: '#71717a',
+          fontWeight: 400,
+          opacity: 0.9,
+          letterSpacing: '0.2px',
+          userSelect: 'text',
+          cursor: 'text'
         }}>
           {bashRequest.command}
         </code>
       </div>
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', fontSize: '12px' }}>
         <button
+          ref={rejectButtonRef}
           onClick={() => reject('Command rejected by user')}
+          onMouseEnter={() => setSelectedButton('reject')}
           style={{
-            padding: '6px 12px',
-            backgroundColor: 'rgba(239, 68, 68, 0.2)',
-            color: '#dc2626',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 600,
+            background: 'none',
+            border: 'none',
+            color: selectedButton === 'reject' ? '#dc2626' : '#71717a',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            fontSize: '12px',
+            fontWeight: selectedButton === 'reject' ? 600 : 400,
+            fontFamily: 'Monaco, Consolas, Courier New, monospace',
+            padding: '2px 4px',
+            textDecoration: selectedButton === 'reject' ? 'underline' : 'none'
           }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.3)'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'}
         >
-          Reject
+          [n] reject
         </button>
         <button
+          ref={approveButtonRef}
           onClick={() => approve()}
+          onMouseEnter={() => setSelectedButton('approve')}
           style={{
-            padding: '6px 12px',
-            backgroundColor: 'rgba(34, 197, 94, 0.2)',
-            color: '#059669',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: 600,
+            background: 'none',
+            border: 'none',
+            color: selectedButton === 'approve' ? '#059669' : '#71717a',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            fontSize: '12px',
+            fontWeight: selectedButton === 'approve' ? 600 : 400,
+            fontFamily: 'Monaco, Consolas, Courier New, monospace',
+            padding: '2px 4px',
+            textDecoration: selectedButton === 'approve' ? 'underline' : 'none'
           }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)'}
         >
-          Approve
+          [y] approve
         </button>
       </div>
     </div>
