@@ -23,7 +23,7 @@ from datetime import datetime
 
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
 from backend.presentation.websocket.message_types import (
-    MessageType, BaseWebSocketMessage, parse_message, create_message
+    MessageType, BaseWebSocketMessage, parse_incoming_websocket_message, create_message
 )
 
 logger = logging.getLogger(__name__)
@@ -69,12 +69,9 @@ class WebSocketMessageProcessor:
             session_id: WebSocket session ID
             raw_message: Raw JSON message string
         """
-        processing_start = datetime.now()
         try:
             # Parse message into typed object
-            message = parse_message(raw_message)
-            print(f"[WebSocket] Backend received message type: {message.type} from session {session_id} at {processing_start.isoformat()}", flush=True)
-
+            message = parse_incoming_websocket_message(raw_message)
             # Route to appropriate handler
             handler = self.handlers.get(message.type)
             if handler:

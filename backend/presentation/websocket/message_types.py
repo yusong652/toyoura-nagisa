@@ -3,9 +3,16 @@ WebSocket message type definitions and schemas.
 
 This module defines all supported WebSocket message types and their
 corresponding data structures for the aiNagisa real-time communication system.
+
+Architecture Overview:
+- Frontend sends JSON strings via WebSocket: ws.send(JSON.stringify(message))
+- Backend receives as event.data (string) or pre-parsed dict (framework-dependent)
+- parse_incoming_websocket_message() handles both formats
+- Only specific message types are accepted from frontend (INCOMING_MESSAGE_SCHEMAS)
+- Backend-to-frontend messages use create_message() for consistent formatting
 """
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -185,24 +192,29 @@ class TitleUpdateMessage(BaseWebSocketMessage):
     payload: Dict[str, Any]  # Contains session_id and title
 
 
-# Message type to schema mapping
-MESSAGE_SCHEMAS = {
-    MessageType.HEARTBEAT: HeartbeatMessage,
+# Incoming message schemas (messages that frontend sends to backend)
+INCOMING_MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT_ACK: HeartbeatMessage,
-    MessageType.LOCATION_REQUEST: LocationRequestMessage,
     MessageType.LOCATION_RESPONSE: LocationResponseMessage,
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
+    MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
+}
+
+# Outgoing message schemas (backend creates these messages to send to frontend)
+# Only includes message types that are actually used in the codebase
+OUTGOING_MESSAGE_SCHEMAS = {
+    # Used via create_message()
     MessageType.CHAT_STREAM_CHUNK: ChatStreamChunk,
+    MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
+    MessageType.ERROR: ErrorMessage,
+    MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.NAGISA_IS_USING_TOOL: ToolUseNotification,
     MessageType.NAGISA_TOOL_USE_CONCLUDED: ToolUseNotification,
-    MessageType.ERROR: ErrorMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
-    MessageType.TTS_CHUNK: TTSChunk,
-    MessageType.MESSAGE_CREATE: MessageCreateMessage,
-    MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
+    MessageType.TTS_CHUNK: TTSChunk,
+    # Used via specialized creation functions
     MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
-    MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
 }
 
 
@@ -221,44 +233,62 @@ def create_message(message_type: MessageType, **kwargs) -> BaseWebSocketMessage:
         msg = create_message(MessageType.CHAT_MESSAGE, 
                            message="Hello", stream_response=True)
     """
-    schema_class = MESSAGE_SCHEMAS.get(message_type, BaseWebSocketMessage)
+    schema_class = OUTGOING_MESSAGE_SCHEMAS.get(message_type, BaseWebSocketMessage)
     return schema_class(type=message_type, **kwargs)
 
 
-def parse_message(data: Union[str, Dict[str, Any]]) -> BaseWebSocketMessage:
+def parse_incoming_websocket_message(data: str) -> BaseWebSocketMessage:
     """
-    Parse incoming message data into typed message object.
-    
+    Parse incoming WebSocket message data from frontend into typed message object.
+
+    Frontend sends JSON strings via WebSocket which are parsed here into typed objects.
+
     Args:
-        data: Raw message data (JSON string or dict)
-        
+        data: JSON string from frontend WebSocket message (event.data)
+
     Returns:
-        BaseWebSocketMessage: Parsed message instance
-        
+        BaseWebSocketMessage: Typed message instance for routing to handlers
+
     Raises:
-        ValueError: If message format is invalid
+        ValueError: If message format is invalid or type is unsupported
+
+    Example:
+        # From WebSocket handler
+        raw_message = '{"type": "CHAT_MESSAGE", "message": "Hello"}'
+        message = parse_incoming_websocket_message(raw_message)
+
+    Note:
+        This function specifically handles messages FROM frontend TO backend.
+        For outgoing messages, use create_message() instead.
     """
-    if isinstance(data, str):
-        import json
-        try:
-            data = json.loads(data)
-        except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON message: {data}")
-    
-    if not isinstance(data, dict) or "type" not in data:
-        raise ValueError("Message must contain 'type' field")
-    
+    # Parse JSON string from WebSocket
+    import json
     try:
-        message_type = MessageType(data["type"])
+        parsed_data = json.loads(data)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in WebSocket message: {e}")
+
+    # Validate basic message structure
+    if not isinstance(parsed_data, dict) or "type" not in parsed_data:
+        raise ValueError("WebSocket message must be JSON object with 'type' field")
+
+    # Validate message type
+    try:
+        message_type = MessageType(parsed_data["type"])
     except ValueError:
-        raise ValueError(f"Unknown message type: {data['type']}")
-    
-    schema_class = MESSAGE_SCHEMAS.get(message_type, BaseWebSocketMessage)
-    
+        raise ValueError(f"Unsupported WebSocket message type: {parsed_data['type']}")
+
+    # Use incoming-specific schemas for validation (more restrictive)
+    schema_class = INCOMING_MESSAGE_SCHEMAS.get(message_type)
+    if not schema_class:
+        raise ValueError(f"Message type '{message_type}' not accepted from frontend")
+
+    # Parse and validate message data
     try:
-        return schema_class(**data)
+        return schema_class(**parsed_data)
     except Exception as e:
-        raise ValueError(f"Invalid message format for type {message_type}: {e}")
+        raise ValueError(f"Invalid message format for '{message_type}': {e}")
+
 
 
 def create_error_message(

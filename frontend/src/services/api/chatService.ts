@@ -106,7 +106,7 @@ export class ChatService {
       timestamp: new Date().toISOString()
     }
 
-    // Send via WebSocket
+    // Send via WebSocket - serialize to JSON here for consistency
     wsRef.send(JSON.stringify(websocketMessage))
 
     // Return mock Response for compatibility with existing code

@@ -285,11 +285,11 @@ if websocket_handler:
 ### Unit Testing
 ```python
 import pytest
-from backend.presentation.websocket.message_types import parse_message, MessageType
+from backend.presentation.websocket.message_types import parse_incoming_websocket_message, MessageType
 
 def test_message_parsing():
     raw_message = '{"type": "CHAT_MESSAGE", "message": "Hello"}'
-    parsed = parse_message(raw_message)
+    parsed = parse_incoming_websocket_message(raw_message)
     assert parsed.type == MessageType.CHAT_MESSAGE
     assert parsed.message == "Hello"
 ```

@@ -179,6 +179,7 @@ export class WebSocketManager extends EventEmitter {
 
   /**
    * Send message through WebSocket
+   * Accepts message objects and handles JSON serialization internally
    */
   public async sendMessage(message: WebSocketMessage): Promise<boolean> {
     if (this.state !== ConnectionState.CONNECTED) {
@@ -187,13 +188,16 @@ export class WebSocketManager extends EventEmitter {
         this.pendingMessages.push(message);
         return false;
       }
-      
+
       this.emit('error', new Error('Cannot send message: WebSocket not connected'));
       return false;
     }
 
     try {
-      this.websocket!.send(JSON.stringify(message));
+      // Centralized JSON serialization - all frontend code passes objects,
+      // WebSocket manager handles the string conversion
+      const messageString = JSON.stringify(message);
+      this.websocket!.send(messageString);
       this.stats.messagesSent++;
       this.emit('messageSent', message);
       return true;
