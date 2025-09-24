@@ -9,7 +9,6 @@ from fastapi import Request
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
 from backend.shared.utils.helpers import parse_message_data, process_user_message, MessageParseResult
-from backend.presentation.streaming.chat_stream import generate_chat_stream
 
 
 def get_chat_service() -> "ChatService":
@@ -145,44 +144,6 @@ class ChatService:
         # Process and save user message
         self.process_user_message_for_session(result, history_msgs)
 
-    async def create_streaming_response(
-        self,
-        result: MessageParseResult,
-        enable_memory: bool = True
-    ) -> None:
-        """
-        Create streaming response for chat conversation.
-
-        Generates a streaming HTTP response that provides real-time
-        LLM-generated content with optional memory injection.
-
-        Args:
-            result: MessageParseResult containing all message data including:
-                - session_id: Session UUID for conversation context
-                - agent_profile: Agent profile for tool selection
-                - id: User message ID for status tracking
-            enable_memory: Whether to enable memory injection
-
-        Returns:
-            StreamingResponse: FastAPI streaming response with:
-                - media_type: "text/event-stream" for SSE protocol
-                - content: AsyncGenerator yielding chat stream events
-                - headers: Proper SSE headers for client consumption
-
-        Example:
-            response = await chat_service.create_streaming_response(
-                result, enable_memory=True
-            )
-            return response
-
-        Note:
-            Uses the existing generate_chat_stream function for actual
-            stream generation, eliminating parameter redundancy.
-        """
-        await generate_chat_stream(result['session_id'],
-                                    enable_memory=enable_memory,
-                                    agent_profile=result['agent_profile'],
-                                    user_message_id=result.get('id'))
 
     async def process_user_message(self, request_data: dict) -> dict:
         """

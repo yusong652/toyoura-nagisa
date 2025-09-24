@@ -211,8 +211,8 @@ class ChatHandler(MessageHandler):
                 # Only generate streaming response if this was NOT rejection feedback
                 if not processing_result['was_rejection_feedback']:
                     # Generate streaming response in background task (non-blocking)
-                    from backend.presentation.streaming.chat_stream import generate_chat_stream
-                    asyncio.create_task(generate_chat_stream(
+                    from backend.presentation.streaming.llm_response_handler import process_chat_request
+                    asyncio.create_task(process_chat_request(
                         session_id=processing_result['session_id'],
                         enable_memory=processing_result['enable_memory'],
                         agent_profile=processing_result['agent_profile'],
