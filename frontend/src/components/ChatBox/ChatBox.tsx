@@ -18,7 +18,6 @@ import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
 import { LiveToolStateDisplay } from '../Tools'
-import BashConfirmationDialog from '../BashConfirmationDialog'
 import './ChatBox.css'
 
 /**
@@ -91,9 +90,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
           
           {/* Live Tool State Display - shows real-time tool usage */}
           <LiveToolStateDisplay />
-
-          {/* Bash Confirmation Dialog - positioned within scrollable message area */}
-          <BashConfirmationDialog />
 
           {/* Scroll anchor for maintaining position */}
           <div className="scroll-anchor" />

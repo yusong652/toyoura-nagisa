@@ -29,6 +29,8 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
   const action = toolState?.action
   const thinking = toolState?.thinking
   const thinkingContent = thinking || 'Processing...'
+
+
   
   useEffect(() => {
     // 在 useEffect 内部处理条件逻辑
@@ -99,14 +101,14 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
               <div className="message-tool-name">
                 <div className="tool-name-icon"></div>
                 <span className="tool-name-text">
-                  {toolNames.length === 1 
-                    ? toolNames[0] 
+                  {toolNames.length === 1
+                    ? toolNames[0]
                     : `${toolNames.length} tools: ${toolNames.join(', ')}`
                   }
                 </span>
               </div>
             )}
-            <div 
+            <div
               className={`message-tool-thinking-content ${isScrolling ? 'scrolling' : ''}`}
               style={{
                 animationDuration: `${animationDuration}s`,
@@ -122,7 +124,7 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
               </span>
             </div>
           </div>
-          
+
           {/* Action text显示在thinking viewport外部，避免被遮挡 */}
           {action && (
             <div className="message-tool-action">
@@ -131,6 +133,7 @@ const ToolStateDisplay: React.FC<ToolStateDisplayProps> = ({ toolState }) => {
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

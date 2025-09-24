@@ -563,3 +563,130 @@
     color: #ffffff;
   }
 }
+
+/* Bash confirmation inline styles */
+.bash-confirmation-inline {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.bash-confirmation-header {
+  margin-bottom: 6px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bash-confirmation-command {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.bash-confirmation-command code {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.bash-confirmation-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.bash-reject-btn,
+.bash-approve-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bash-reject-btn {
+  background: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.bash-reject-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.bash-approve-btn {
+  background: rgba(34, 197, 94, 0.2);
+  color: #059669;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.bash-approve-btn:hover {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+/* Dark mode styles for bash confirmation */
+[data-theme="dark"] .bash-confirmation-inline {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .bash-confirmation-command {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .bash-confirmation-command code {
+  color: #f87171;
+}
+
+[data-theme="dark"] .bash-reject-btn {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+[data-theme="dark"] .bash-approve-btn {
+  background: rgba(34, 197, 94, 0.3);
+  color: #34d399;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :not([data-theme]) .bash-confirmation-inline {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.25);
+  }
+
+  :not([data-theme]) .bash-confirmation-command {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  :not([data-theme]) .bash-confirmation-command code {
+    color: #f87171;
+  }
+
+  :not([data-theme]) .bash-reject-btn {
+    background: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+
+  :not([data-theme]) .bash-approve-btn {
+    background: rgba(34, 197, 94, 0.3);
+    color: #34d399;
+    border-color: rgba(34, 197, 94, 0.4);
+  }
+}

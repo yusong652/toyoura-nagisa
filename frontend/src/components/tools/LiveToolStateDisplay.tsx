@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import ToolStateDisplay from './ToolStateDisplay'
+import BashConfirmation from './BashConfirmation'
 import { useWebSocketToolStateSimple } from '../../hooks/useWebSocketToolState'
 
 /**
@@ -51,15 +52,17 @@ const LiveToolStateDisplay: React.FC = () => {
     }
   }, [toolState?.action, toolState?.thinking, toolState?.isUsingTool, toolState?.toolNames])
 
-  // Only render when there's an active tool state from WebSocket
-  if (!toolState) {
-    return null
-  }
-
   return (
-    <div ref={displayRef}>
-      <ToolStateDisplay toolState={toolState} />
-    </div>
+    <>
+      {/* Only render ToolStateDisplay when there's an active tool state from WebSocket */}
+      {toolState && (
+        <div ref={displayRef}>
+          <ToolStateDisplay toolState={toolState} />
+        </div>
+      )}
+      {/* BashConfirmation always rendered to maintain persistent event listener */}
+      <BashConfirmation />
+    </>
   )
 }
 

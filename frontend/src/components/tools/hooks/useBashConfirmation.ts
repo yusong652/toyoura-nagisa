@@ -36,6 +36,15 @@ export const useBashConfirmation = () => {
     isOpen: false
   })
 
+  // Debug: Log all state changes
+  useEffect(() => {
+    console.log('[BashConfirmation Hook] State changed:', {
+      request: state.request?.command,
+      isOpen: state.isOpen,
+      timestamp: new Date().toISOString()
+    })
+  }, [state])
+
   // Auto-reject timeout reference
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -92,36 +101,67 @@ export const useBashConfirmation = () => {
     }
   }, [])
 
-  // Approve command execution
+  // Approve command execution - 无状态设计，使用refs获取最新值
   const approve = useCallback(async (userMessage?: string) => {
-    if (state.request) {
-      await sendResponse(state.request.sessionId, true, userMessage)
+    console.log('[BashConfirmation] Approve called:', {
+      currentState: stateRef.current,
+      userMessage
+    })
+
+    if (stateRef.current.request) {
+      const sessionId = stateRef.current.request.sessionId
+      console.log('[BashConfirmation] Sending approval for session:', sessionId)
+
+      await sendResponseRef.current(sessionId, true, userMessage)
       setState({ request: null, isOpen: false })
+
+      console.log('[BashConfirmation] State cleared after approval')
 
       // Clear timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+    } else {
+      console.warn('[BashConfirmation] Approve called but no request found')
     }
-  }, [state.request, sendResponse])
+  }, []) // 空依赖数组，真正无状态
 
-  // Reject command execution
+  // Reject command execution - 无状态设计，使用refs获取最新值
   const reject = useCallback(async (userMessage?: string) => {
-    if (state.request) {
-      await sendResponse(state.request.sessionId, false, userMessage)
+    console.log('[BashConfirmation] Reject called:', {
+      currentState: stateRef.current,
+      userMessage
+    })
+
+    if (stateRef.current.request) {
+      const sessionId = stateRef.current.request.sessionId
+      console.log('[BashConfirmation] Sending rejection for session:', sessionId)
+
+      await sendResponseRef.current(sessionId, false, userMessage)
       setState({ request: null, isOpen: false })
+
+      console.log('[BashConfirmation] State cleared after rejection')
 
       // Clear timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+    } else {
+      console.warn('[BashConfirmation] Reject called but no request found')
     }
-  }, [state.request, sendResponse])
+  }, []) // 空依赖数组，真正无状态
+
+  // 使用useRef来存储当前的状态和函数，避免依赖问题
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  const sendResponseRef = useRef(sendResponse)
+  sendResponseRef.current = sendResponse
 
   useEffect(() => {
-    console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest')
+    console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest (mount only)')
 
     const handleBashConfirmationRequest = (event: CustomEvent) => {
       console.log('[BashConfirmation] Event received:', event)
@@ -147,7 +187,10 @@ export const useBashConfirmation = () => {
 
       timeoutRef.current = setTimeout(() => {
         console.log('[BashConfirmation] Auto-rejecting due to timeout')
-        reject('Command confirmation timed out')
+        // Use the current sendResponse function from ref
+        sendResponseRef.current(request.sessionId, false, 'Command confirmation timed out').then(() => {
+          setState({ request: null, isOpen: false })
+        })
       }, 60000)
     }
 
@@ -162,7 +205,7 @@ export const useBashConfirmation = () => {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [reject])
+  }, []) // 空依赖数组，只在mount/unmount时执行
 
   return {
     request: state.request,
