@@ -135,16 +135,16 @@ class BaseContextManager(ABC):
 
     def add_user_message_from_data(self, parsed_data: dict) -> None:
         """
-        从解析数据创建用户消息并更新配置
+        Create user message from parsed data and update configuration.
 
         Args:
-            parsed_data: 解析后的消息数据，包含 agent_profile, enable_memory 等配置
+            parsed_data: Parsed message data including agent_profile, enable_memory configuration
         """
-        # 更新配置
+        # Update configuration
         self.agent_profile = parsed_data.get('agent_profile', 'general')
         self.enable_memory = parsed_data.get('enable_memory', True)
 
-        # 创建用户消息
+        # Create user message
         from backend.domain.models.messages import UserMessage
         from datetime import datetime
 
@@ -155,7 +155,7 @@ class BaseContextManager(ABC):
             id=parsed_data.get('id')
         )
 
-        # 添加到上下文
+        # Add to context
         self.add_user_message(user_message)
 
     @abstractmethod

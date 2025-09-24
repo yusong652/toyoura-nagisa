@@ -47,131 +47,6 @@ class LLMClientBase(ABC):
 
     # ========== CORE STREAMING INTERFACE ==========
 
-    async def get_response(
-        self,
-        messages: List[BaseMessage],
-        session_id: Optional[str] = None,
-        agent_profile: str = "general",
-        enable_memory: bool = True,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
-        """
-        [Core Interface] Get LLM response with real-time tool calling notifications.
-        
-        Unified implementation for all providers using provider-specific components.
-        This method centralizes the common workflow while delegating provider-specific
-        operations to abstract methods implemented by each provider.
-        
-        Args:
-            messages: Input message list
-            session_id: Session ID for tool and context management
-            agent_profile: Agent profile type ("general", "coding", "lifestyle", "disabled", etc.)
-            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
-            **kwargs: Additional parameters (like max_iterations, temperature, etc.)
-            
-        Yields:
-            Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]]:
-            - Dict[str, Any]: Intermediate notifications (tool calling status updates)
-            - Tuple[BaseMessage, Dict[str, Any]]: Final result (final_message, execution_metadata)
-        """
-        # === INITIALIZATION PHASE ===
-        provider_config = self._get_provider_config()
-        debug = getattr(provider_config, 'debug', False)
-        
-        if debug:
-            provider_name = self.__class__.__name__.replace('Client', '')
-
-        # Get or create context manager for this session
-        context_manager = self.get_or_create_context_manager(session_id or "default")
-
-        # Initialize session from history if not already done
-        if not context_manager._initialized_from_history:
-            context_manager.initialize_session_from_history(messages)
-        else:
-            # Existing session - just add the new user message
-            if messages:
-                # Assume the last message is the new user input
-                context_manager.add_user_message(messages[-1])
-        
-        # context_manager already defined above
-        
-        # Execution metadata - unified across all providers
-        metadata = {
-            'session_id': session_id,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'status': 'running'
-        }
-        
-        try:
-            # === EXECUTION PHASE - Streaming tool calling loop ===
-            from backend.config import get_llm_settings
-            max_iterations = get_llm_settings().max_tool_iterations
-            
-            print(f"[DEBUG] LLMClientBase.get_response: about to call _streaming_tool_calling_loop with agent_profile={agent_profile}")
-            
-            final_response = None
-            async for item in self._streaming_tool_calling_loop(
-                context_manager, session_id, max_iterations, metadata, debug, agent_profile, enable_memory, **kwargs
-            ):
-                if isinstance(item, dict):
-                    # Intermediate notification - yield directly to API layer
-                    yield item
-                else:
-                    # Final response - save for subsequent processing
-                    final_response = item
-            
-            # === FINALIZATION PHASE ===
-            metadata['status'] = 'completed'
-            
-            # Extract thinking content if supported
-            thinking_content = self._extract_thinking_content(final_response)
-            if thinking_content:
-                metadata['thinking_preserved'] = True
-            
-            # Extract keyword using shared utility
-            processor = self._get_response_processor()
-            original_text = processor.extract_text_content(final_response) if processor else ""
-            if original_text:
-                from backend.shared.utils.text_parser import parse_llm_output
-                _, extracted_keyword = parse_llm_output(original_text)
-                metadata['keyword'] = extracted_keyword
-            
-            # Send tool use concluded notification if tools were used
-            if metadata['tool_calls_executed'] > 0:
-                # Send WebSocket notification
-                concluded_notification = {
-                    'type': 'NAGISA_TOOL_USE_CONCLUDED'
-                }
-                await self._send_websocket_tool_notification(
-                    session_id, concluded_notification
-                )
-            
-            # Create final storage message using provider-specific processor
-            if processor:
-                final_message = processor.format_response_for_storage(final_response)
-            else:
-                # Fallback: create a basic assistant message
-                from backend.domain.models.messages import AssistantMessage
-                final_message = AssistantMessage(content="Response processing unavailable")
-            
-            # Add final response to context manager for next round
-            context_manager.add_response(final_message)
-            
-            # Yield final result
-            yield (final_message, metadata)
-            
-        except Exception as e:
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
-            
-            if debug:
-                provider_name = self.__class__.__name__.replace('Client', '')
-                print(f"[DEBUG] {provider_name} execution failed: {e}")
-            
-            raise Exception(f"Execution failed: {e}")
-
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
     @abstractmethod
@@ -245,23 +120,27 @@ class LLMClientBase(ABC):
 
     def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
         """
-        向指定会话添加用户消息
+        Add user message to specified session.
 
         Args:
-            session_id: 会话 ID
-            parsed_data: 解析后的消息数据，包含 agent_profile, enable_memory 等配置
+            session_id: Session ID
+            parsed_data: Parsed message data including agent_profile, enable_memory configuration
         """
         context_manager = self.get_or_create_context_manager(session_id)
 
-        # 初始化 context manager（如果需要）
+        # Initialize context manager if needed
         if not context_manager._initialized_from_history:
             from backend.infrastructure.storage.session_manager import load_history
             from backend.domain.models.message_factory import message_factory_no_thinking
             recent_history = load_history(session_id)
+            # Exclude the last message from history since we'll add the current user message separately
+            # This prevents duplicate user messages when the current message was already saved to storage
+            if recent_history:
+                recent_history = recent_history[:-1]
             recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
             context_manager.initialize_session_from_history(recent_msgs)
 
-        # 添加用户消息并设置配置
+        # Add user message and set configuration
         context_manager.add_user_message_from_data(parsed_data)
 
     async def get_response_from_session(
@@ -269,19 +148,19 @@ class LLMClientBase(ABC):
         session_id: str
     ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
         """
-        从指定会话生成响应
+        Generate response from specified session.
 
         Args:
-            session_id: 会话 ID
+            session_id: Session ID
         """
-        # 获取该会话的 context manager
+        # Get the session's context manager
         context_manager = self.get_or_create_context_manager(session_id)
 
-        # 从 context manager 获取配置
+        # Get configuration from context manager
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
-        # 执行元数据
+        # Execution metadata
         metadata = {
             'session_id': session_id,
             'iterations': 0,
@@ -291,7 +170,7 @@ class LLMClientBase(ABC):
         }
 
         try:
-            # 直接调用内部的工具调用循环
+            # Call internal tool calling loop directly
             final_response = None
             async for item in self._streaming_tool_calling_loop_from_session(
                 session_id, metadata
@@ -301,10 +180,10 @@ class LLMClientBase(ABC):
                 else:
                     final_response = item
 
-            # 处理最终响应
+            # Handle final response
             metadata['status'] = 'completed'
 
-            # 提取关键词等后处理
+            # Extract keyword and other post-processing
             processor = self._get_response_processor()
             original_text = processor.extract_text_content(final_response) if processor else ""
             if original_text:
@@ -312,12 +191,12 @@ class LLMClientBase(ABC):
                 _, extracted_keyword = parse_llm_output(original_text)
                 metadata['keyword'] = extracted_keyword
 
-            # 发送工具使用结束通知
+            # Send tool use concluded notification
             if metadata['tool_calls_executed'] > 0:
                 concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
                 await self._send_websocket_tool_notification(session_id, concluded_notification)
 
-            # 创建最终消息并添加到 context manager
+            # Create final message and add to context manager
             if processor:
                 final_message = processor.format_response_for_storage(final_response)
                 context_manager.add_response(final_message)
@@ -338,25 +217,25 @@ class LLMClientBase(ABC):
         metadata: Dict[str, Any]
     ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
         """
-        从会话进行工具调用循环
+        Streaming tool calling loop from session.
 
         Args:
-            session_id: 会话 ID（用于获取 context manager 和配置）
-            metadata: 执行元数据
+            session_id: Session ID for getting context manager and configuration
+            metadata: Execution metadata
         """
-        # 通过 session_id 获取所有需要的状态
+        # Get all required state through session_id
         context_manager = self.get_or_create_context_manager(session_id)
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
-        # 获取配置
+        # Get configuration
         from backend.config import get_llm_settings
         max_iterations = get_llm_settings().max_tool_iterations
         recent_messages_length = get_llm_settings().recent_messages_length
         provider_config = self._get_provider_config()
         debug = getattr(provider_config, 'debug', False)
 
-        # 获取初始响应
+        # Get initial response
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
             working_contents,
@@ -366,7 +245,7 @@ class LLMClientBase(ABC):
         )
         metadata['api_calls'] += 1
 
-        # 工具调用循环
+        # Tool calling loop
         iteration = 0
         while iteration < max_iterations:
             metadata['iterations'] = iteration + 1
@@ -381,7 +260,7 @@ class LLMClientBase(ABC):
                 num_tools = len(tool_calls)
                 metadata['tool_calls_executed'] += num_tools
 
-                # 提取文本和发送通知
+                # Extract text and send notifications
                 extracted_text = self._extract_text_from_response(current_response)
                 thinking_content = self._extract_thinking_content(current_response)
 
@@ -408,14 +287,14 @@ class LLMClientBase(ABC):
 
                 await self._send_websocket_tool_notification(session_id, notification)
 
-                # 并行执行工具
+                # Execute tools in parallel
                 tasks = []
                 for tc in tool_calls:
                     tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, debug))
 
                 results = await asyncio.gather(*tasks, return_exceptions=False)
 
-                # 处理结果
+                # Process results
                 for tool_call, result in zip(tool_calls, results):
                     context_manager.add_tool_result(
                         tool_call['id'],
@@ -423,7 +302,7 @@ class LLMClientBase(ABC):
                         result
                     )
 
-            # 下一轮
+            # Next round
             working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
             current_response = await self.call_api_with_context(
                 working_contents,
@@ -499,164 +378,6 @@ class LLMClientBase(ABC):
             f"{self.__class__.__name__} does not support web search"
         )
 
-    # ========== ABSTRACT TOOL CALLING METHODS ==========
-
-    async def _streaming_tool_calling_loop(
-        self,
-        context_manager: BaseContextManager,
-        session_id: Optional[str],
-        max_iterations: int,
-        metadata: Dict[str, Any],
-        debug: bool,
-        agent_profile: str = "general",
-        enable_memory: bool = True,
-        **kwargs
-    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
-        """
-        Core streaming tool calling loop with real-time notifications.
-        
-        Implements the tool calling state machine with event-driven architecture for
-        real-time status updates during tool execution sequences. This unified implementation
-        works across all LLM providers by leveraging provider-specific components.
-        
-        Args:
-            context_manager: Provider-specific context manager for conversation state:
-                - Manages conversation history and working contents
-                - Handles response integration and tool result addition
-                - Provider-specific implementation (GeminiContextManager, etc.)
-            session_id: Session ID for tool and context management
-            max_iterations: Maximum number of tool calling iterations allowed
-            metadata: Execution metadata dictionary with structure:
-                - iterations: int - Current iteration count
-                - api_calls: int - Total API calls made
-                - tool_calls_executed: int - Number of tool calls executed
-            debug: Enable detailed debug logging and tracing
-            **kwargs: Additional API configuration parameters
-            
-        Yields:
-            Union[Dict[str, Any], Any]:
-            - Dict[str, Any]: Real-time notifications with structure:
-                - type: str - Notification type ('NAGISA_IS_USING_TOOL', 'error', etc.)
-                - tool_name: str - Name of tool being executed
-                - action: str - Human-readable action description
-            - Any: Final provider-specific response object for processing
-            
-        Raises:
-            Exception: If maximum iterations exceeded or system-level errors occur
-            
-        Note:
-            This method implements the core tool calling workflow:
-            1. Execute API calls and check for tool calls
-            2. Yield real-time notifications for each tool execution phase
-            3. Maintain execution state and handle iteration limits
-            4. Return final response for downstream processing
-        """
-        
-        # Get initial response using provider-specific context with truncation
-        from backend.config import get_llm_settings
-        recent_messages_length = get_llm_settings().recent_messages_length
-        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
-        current_response = await self.call_api_with_context(
-            working_contents, session_id=session_id or "default", agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
-        )
-        metadata['api_calls'] += 1
-        
-        # Tool calling state machine
-        iteration = 0
-        while iteration < max_iterations:
-            metadata['iterations'] = iteration + 1
-            
-            # State check: whether to continue tool calling (provider-specific)
-            if not self._should_continue_tool_calling(current_response):
-                break
-            
-            # Tool calls detected - no flag needed, tool_calls_executed will track this
-            
-            # Add current response to context
-            context_manager.add_response(current_response)
-            
-            # Extract and execute tool calls (provider-specific)
-            tool_calls = self._extract_tool_calls(current_response)
-            
-            # Execute tool calls - parallel execution when multiple tools requested
-            if tool_calls:
-                num_tools = len(tool_calls)
-                metadata['tool_calls_executed'] += num_tools
-                
-                # Extract LLM text content from current response
-                extracted_text = self._extract_text_from_response(current_response)
-                
-                # Extract thinking content if available
-                thinking_content = self._extract_thinking_content(current_response)
-                
-                # Extract tool names once for reuse
-                tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
-                
-                # Determine action text: use extracted LLM text or fallback to generic message
-                if extracted_text and len(extracted_text.strip()) > 0:
-                    action = extracted_text.strip()
-                    # Limit text length for display purposes
-                    if len(action) > 150:
-                        action = action[:147] + "..."
-                else:
-                    # Fallback to tool-specific message
-                    if num_tools == 1:
-                        action = f"Using {tool_names[0]}..."
-                    else:
-                        action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
-                
-                notification = {
-                    'type': 'NAGISA_IS_USING_TOOL',
-                    'tool_names': tool_names,  # Always provide array of tool names
-                    'action': action
-                }
-                
-                if thinking_content:
-                    notification['thinking'] = thinking_content
-                
-                # Send WebSocket notification
-                await self._send_websocket_tool_notification(
-                    session_id, notification
-                )
-                
-                # Execute all tools in parallel
-                tasks = []
-                for tc in tool_calls:
-                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, debug))
-                
-                results = await asyncio.gather(*tasks, return_exceptions=False)
-                
-                # Process results and add to context
-                for tool_call, result in zip(tool_calls, results):
-                    context_manager.add_tool_result(
-                        tool_call['id'],
-                        tool_call['name'],
-                        result
-                    )
-                
-                # Skip completion notifications - let LLM response show naturally
-            
-            # Get next round response with truncation
-            working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
-            
-            if debug:
-                print(f"[DEBUG] Tool calling iteration {iteration + 1}")
-            
-            current_response = await self.call_api_with_context(
-                working_contents, session_id=session_id or "default", agent_profile=agent_profile, enable_memory=enable_memory, **kwargs
-            )
-            metadata['api_calls'] += 1
-            
-            iteration += 1
-        
-        # Check if maximum iterations reached
-        if iteration >= max_iterations:
-            raise Exception(f"Exceeded max iterations ({max_iterations})")
-        
-        # Tool calling loop completed - let get_response handle final notifications
-        
-        # Return final response
-        yield current_response
 
     # ========== ABSTRACT HELPER METHODS FOR PROVIDER-SPECIFIC LOGIC ==========
 
