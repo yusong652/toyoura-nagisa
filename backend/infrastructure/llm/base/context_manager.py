@@ -63,6 +63,10 @@ class BaseContextManager(ABC):
             tool_name="",
             active=False
         )
+
+        # Request configuration storage
+        self.agent_profile = "general"
+        self.enable_memory = True
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -128,7 +132,32 @@ class BaseContextManager(ABC):
         formatted_message = formatter_class.format_single_message(user_message)
         
         self.working_contents.append(formatted_message)
-    
+
+    def add_user_message_from_data(self, parsed_data: dict) -> None:
+        """
+        从解析数据创建用户消息并更新配置
+
+        Args:
+            parsed_data: 解析后的消息数据，包含 agent_profile, enable_memory 等配置
+        """
+        # 更新配置
+        self.agent_profile = parsed_data.get('agent_profile', 'general')
+        self.enable_memory = parsed_data.get('enable_memory', True)
+
+        # 创建用户消息
+        from backend.domain.models.messages import UserMessage
+        from datetime import datetime
+
+        timestamp = parsed_data.get('timestamp')
+        user_message = UserMessage(
+            content=parsed_data['content'],
+            timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
+            id=parsed_data.get('id')
+        )
+
+        # 添加到上下文
+        self.add_user_message(user_message)
+
     @abstractmethod
     def add_response(self, response: Any) -> None:
         """

@@ -68,27 +68,22 @@ async def send_title_update_notification(session_id: str, new_title: str) -> Non
 
 async def process_chat_request(
     session_id: str,
-    agent_profile: str = "general",
-    enable_memory: bool = True,
     user_message_id: Optional[str] = None
 ) -> None:
     """
-    Complete chat request processing pipeline.
+    Complete chat request processing pipeline using session-based approach.
 
-    Handles the entire chat request lifecycle:
+    Handles the entire chat request lifecycle using simplified parameter passing:
     1. Status notifications (sent/read/error)
     2. LLM response processing with real-time tool notifications
     3. Memory persistence after successful completion
     4. Comprehensive error handling
-    2. Streaming response processing - Maintains existing TTS and content processing logic
-    3. State isolation - Anti-duplication mechanism separated from business logic
-    4. Error propagation - Unified error handling and recovery
-    5. Observability - Complete execution tracking and monitoring
+
+    All configuration (agent_profile, enable_memory) is retrieved from the session's
+    context manager, eliminating the need for complex parameter passing.
 
     Args:
-        session_id: Current session ID for loading conversation history
-        agent_profile: Agent profile type for tool filtering and prompt customization
-        enable_memory: Whether to enable memory injection (controlled by frontend toggle)
+        session_id: Current session ID for accessing context manager and configuration
         user_message_id: Optional message ID for WebSocket status updates
 
     Returns:
@@ -96,10 +91,6 @@ async def process_chat_request(
     """
     # ========== PHASE 1: Request initialization and deduplication ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
-
-    # Get LLM client from app state
-    from backend.shared.utils.app_context import get_llm_client
-    llm_client = get_llm_client()
 
     # Use elegant request context manager for automatic lifecycle management
     async with request_manager.request_context(session_id, request_id, user_message_id):
@@ -115,33 +106,16 @@ async def process_chat_request(
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
 
-            # ========== PHASE 2: Load conversation history ==========
-            # Load conversation history without images for LLM processing
-            from backend.infrastructure.storage.session_manager import load_history
-            from backend.domain.models.message_factory import message_factory_no_thinking
-            from backend.config import get_llm_settings
-
-            recent_history = load_history(session_id)
-            # Create messages without thinking blocks
-            recent_msgs = [message_factory_no_thinking(msg) if isinstance(msg, dict) else msg for msg in recent_history]
-            recent_messages_length = get_llm_settings().recent_messages_length
-            recent_msgs = recent_msgs[-recent_messages_length:]
+            # ========== PHASE 2: Get LLM response using session-based approach ==========
+            # Get LLM client from app state
+            from backend.shared.utils.app_context import get_llm_client
+            llm_client = get_llm_client()
 
             final_message = None
             execution_metadata = None
 
-            # Use new streaming method - Real-time tool call notifications
-            # Pass enhanced system prompt if available
-            get_response_kwargs = {
-                "session_id": session_id,
-                "agent_profile": agent_profile,
-                "enable_memory": enable_memory
-            }
-
-            async for item in llm_client.get_response(
-                recent_msgs,
-                **get_response_kwargs
-            ):
+            # Use new session-based response method - All configuration retrieved from context manager
+            async for item in llm_client.get_response_from_session(session_id):
                 if isinstance(item, tuple):
                     # Final result: (final_message, execution_metadata)
                     final_message, execution_metadata = item
@@ -150,21 +124,23 @@ async def process_chat_request(
                     # Skip dict notifications - WebSocket handles all status updates
                     continue
 
-            # ========== PHASE 4: Content processing pipeline ==========
+            # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
-                # Process content via WebSocket - no longer yields SSE chunks
+                # Process content via WebSocket
                 await process_content_pipeline(
                     final_message, session_id, request_id, execution_metadata
                 )
 
-            # ========== PHASE 5: Post-processing pipeline ==========
+            # ========== PHASE 4: Post-processing pipeline ==========
             if execution_metadata:
-                # Post-processing no longer yields - handled via WebSocket
+                # Post-processing handled via WebSocket
                 await process_post_pipeline(session_id, request_id)
 
-            # ========== PHASE 5.5: Memory persistence ==========
+            # ========== PHASE 5: Memory persistence ==========
             # Save conversation to memory after successful response
-            if enable_memory:
+            # Get enable_memory from the session's context manager
+            context_manager = llm_client.get_context_manager(session_id)
+            if context_manager and getattr(context_manager, 'enable_memory', True):
                 await save_session_conversation_memory(session_id)
 
         except Exception as e:

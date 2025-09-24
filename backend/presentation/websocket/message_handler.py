@@ -214,8 +214,6 @@ class ChatHandler(MessageHandler):
                     from backend.presentation.streaming.llm_response_handler import process_chat_request
                     asyncio.create_task(process_chat_request(
                         session_id=processing_result['session_id'],
-                        enable_memory=processing_result['enable_memory'],
-                        agent_profile=processing_result['agent_profile'],
                         user_message_id=processing_result['message_id']
                     ))
                 else:

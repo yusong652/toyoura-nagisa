@@ -241,6 +241,204 @@ class LLMClientBase(ABC):
         """
         pass
 
+    # ========== SESSION-BASED OPERATION INTERFACES ==========
+
+    def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
+        """
+        向指定会话添加用户消息
+
+        Args:
+            session_id: 会话 ID
+            parsed_data: 解析后的消息数据，包含 agent_profile, enable_memory 等配置
+        """
+        context_manager = self.get_or_create_context_manager(session_id)
+
+        # 初始化 context manager（如果需要）
+        if not context_manager._initialized_from_history:
+            from backend.infrastructure.storage.session_manager import load_history
+            from backend.domain.models.message_factory import message_factory_no_thinking
+            recent_history = load_history(session_id)
+            recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
+            context_manager.initialize_session_from_history(recent_msgs)
+
+        # 添加用户消息并设置配置
+        context_manager.add_user_message_from_data(parsed_data)
+
+    async def get_response_from_session(
+        self,
+        session_id: str
+    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
+        """
+        从指定会话生成响应
+
+        Args:
+            session_id: 会话 ID
+        """
+        # 获取该会话的 context manager
+        context_manager = self.get_or_create_context_manager(session_id)
+
+        # 从 context manager 获取配置
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        enable_memory = getattr(context_manager, 'enable_memory', True)
+
+        # 执行元数据
+        metadata = {
+            'session_id': session_id,
+            'iterations': 0,
+            'api_calls': 0,
+            'tool_calls_executed': 0,
+            'status': 'running'
+        }
+
+        try:
+            # 直接调用内部的工具调用循环
+            final_response = None
+            async for item in self._streaming_tool_calling_loop_from_session(
+                session_id, metadata
+            ):
+                if isinstance(item, dict):
+                    yield item
+                else:
+                    final_response = item
+
+            # 处理最终响应
+            metadata['status'] = 'completed'
+
+            # 提取关键词等后处理
+            processor = self._get_response_processor()
+            original_text = processor.extract_text_content(final_response) if processor else ""
+            if original_text:
+                from backend.shared.utils.text_parser import parse_llm_output
+                _, extracted_keyword = parse_llm_output(original_text)
+                metadata['keyword'] = extracted_keyword
+
+            # 发送工具使用结束通知
+            if metadata['tool_calls_executed'] > 0:
+                concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
+                await self._send_websocket_tool_notification(session_id, concluded_notification)
+
+            # 创建最终消息并添加到 context manager
+            if processor:
+                final_message = processor.format_response_for_storage(final_response)
+                context_manager.add_response(final_message)
+            else:
+                from backend.domain.models.messages import AssistantMessage
+                final_message = AssistantMessage(content="Response processing unavailable")
+
+            yield (final_message, metadata)
+
+        except Exception as e:
+            metadata['status'] = 'failed'
+            metadata['error'] = str(e)
+            raise Exception(f"Execution failed: {e}")
+
+    async def _streaming_tool_calling_loop_from_session(
+        self,
+        session_id: str,
+        metadata: Dict[str, Any]
+    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
+        """
+        从会话进行工具调用循环
+
+        Args:
+            session_id: 会话 ID（用于获取 context manager 和配置）
+            metadata: 执行元数据
+        """
+        # 通过 session_id 获取所有需要的状态
+        context_manager = self.get_or_create_context_manager(session_id)
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        enable_memory = getattr(context_manager, 'enable_memory', True)
+
+        # 获取配置
+        from backend.config import get_llm_settings
+        max_iterations = get_llm_settings().max_tool_iterations
+        recent_messages_length = get_llm_settings().recent_messages_length
+        provider_config = self._get_provider_config()
+        debug = getattr(provider_config, 'debug', False)
+
+        # 获取初始响应
+        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+        current_response = await self.call_api_with_context(
+            working_contents,
+            session_id=session_id,
+            agent_profile=agent_profile,
+            enable_memory=enable_memory
+        )
+        metadata['api_calls'] += 1
+
+        # 工具调用循环
+        iteration = 0
+        while iteration < max_iterations:
+            metadata['iterations'] = iteration + 1
+
+            if not self._should_continue_tool_calling(current_response):
+                break
+
+            context_manager.add_response(current_response)
+            tool_calls = self._extract_tool_calls(current_response)
+
+            if tool_calls:
+                num_tools = len(tool_calls)
+                metadata['tool_calls_executed'] += num_tools
+
+                # 提取文本和发送通知
+                extracted_text = self._extract_text_from_response(current_response)
+                thinking_content = self._extract_thinking_content(current_response)
+
+                tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
+
+                if extracted_text and len(extracted_text.strip()) > 0:
+                    action = extracted_text.strip()
+                    if len(action) > 150:
+                        action = action[:147] + "..."
+                else:
+                    if num_tools == 1:
+                        action = f"Using {tool_names[0]}..."
+                    else:
+                        action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+
+                notification = {
+                    'type': 'NAGISA_IS_USING_TOOL',
+                    'tool_names': tool_names,
+                    'action': action
+                }
+
+                if thinking_content:
+                    notification['thinking'] = thinking_content
+
+                await self._send_websocket_tool_notification(session_id, notification)
+
+                # 并行执行工具
+                tasks = []
+                for tc in tool_calls:
+                    tasks.append(self._execute_tool_for_parallel_batch(tc, session_id, debug))
+
+                results = await asyncio.gather(*tasks, return_exceptions=False)
+
+                # 处理结果
+                for tool_call, result in zip(tool_calls, results):
+                    context_manager.add_tool_result(
+                        tool_call['id'],
+                        tool_call['name'],
+                        result
+                    )
+
+            # 下一轮
+            working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+            current_response = await self.call_api_with_context(
+                working_contents,
+                session_id=session_id,
+                agent_profile=agent_profile,
+                enable_memory=enable_memory
+            )
+            metadata['api_calls'] += 1
+            iteration += 1
+
+        if iteration >= max_iterations:
+            raise Exception(f"Exceeded max iterations ({max_iterations})")
+
+        yield current_response
+
     # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
 
     async def generate_title_from_messages(

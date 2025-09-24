@@ -158,15 +158,19 @@ class ChatService:
         session_id = parsed_data['session_id']
         was_rejection_feedback = await self._check_and_process_pending_rejection(session_id, parsed_data)
 
-        # 3. Save user message to session (only if not rejection feedback)
+        # 3. Save user message and add to LLM client context (only if not rejection feedback)
         if not was_rejection_feedback:
+            # Save to persistent storage first (for data safety)
             self.save_user_message_to_session(parsed_data)
+
+            # Add message to LLM client's context manager
+            from backend.shared.utils.app_context import get_llm_client
+            llm_client = get_llm_client()
+            llm_client.add_user_message_to_session(session_id, parsed_data)
 
         return {
             'session_id': session_id,
-            'agent_profile': parsed_data['agent_profile'],
             'message_id': parsed_data.get('id'),
-            'enable_memory': parsed_data['enable_memory'],
             'was_rejection_feedback': was_rejection_feedback
         }
 
