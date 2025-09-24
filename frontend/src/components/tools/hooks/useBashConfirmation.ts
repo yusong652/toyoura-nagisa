@@ -148,6 +148,16 @@ export const useBashConfirmation = () => {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+
+      // Dispatch event to clear tool state immediately on rejection
+      window.dispatchEvent(new CustomEvent('toolUseConcluded', {
+        detail: {
+          session_id: sessionId,
+          reason: 'user_rejection',
+          timestamp: new Date().toISOString()
+        }
+      }))
+      console.log('[BashConfirmation] Dispatched toolUseConcluded event after rejection')
     } else {
       console.warn('[BashConfirmation] Reject called but no request found')
     }
@@ -190,6 +200,16 @@ export const useBashConfirmation = () => {
         // Use the current sendResponse function from ref
         sendResponseRef.current(request.sessionId, false, 'Command confirmation timed out').then(() => {
           setState({ request: null, isOpen: false })
+
+          // Dispatch event to clear tool state on timeout rejection
+          window.dispatchEvent(new CustomEvent('toolUseConcluded', {
+            detail: {
+              session_id: request.sessionId,
+              reason: 'user_rejection',
+              timestamp: new Date().toISOString()
+            }
+          }))
+          console.log('[BashConfirmation] Dispatched toolUseConcluded event after timeout rejection')
         })
       }, 60000)
     }

@@ -9,6 +9,8 @@ interface WebSocketToolData {
   thinking?: string
   results?: any
   timestamp?: string
+  session_id?: string
+  reason?: string  // Added for rejection handling
 }
 
 interface WebSocketToolStateReturn {
@@ -52,13 +54,17 @@ export const useWebSocketToolState = (): WebSocketToolStateReturn => {
     const handleToolConcluded = (event: CustomEvent) => {
       const data = event.detail as WebSocketToolData
       console.log('[useWebSocketToolState] Tool concluded:', data)
-      
+
+      // Clear tool state immediately for all conclusions
       setIsActive(false)
-      // Keep tool state visible briefly before clearing
-      setTimeout(() => {
-        setToolState(null)
-        setSessionId(null)
-      }, 1500) // Show completion state for 1.5 seconds
+      setToolState(null)
+      setSessionId(null)
+
+      if (data.reason === 'user_rejection') {
+        console.log('[useWebSocketToolState] Tool concluded due to user rejection')
+      } else {
+        console.log('[useWebSocketToolState] Tool concluded normally')
+      }
     }
 
     // Listen to custom events from ConnectionContext
