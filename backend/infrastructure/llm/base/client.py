@@ -7,7 +7,7 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union, Type
+from typing import List, Optional, Dict, Any, Tuple, Type
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
@@ -146,19 +146,18 @@ class LLMClientBase(ABC):
     async def get_response_from_session(
         self,
         session_id: str
-    ) -> AsyncGenerator[Union[Dict[str, Any], Tuple[BaseMessage, Dict[str, Any]]], None]:
+    ) -> Tuple[BaseMessage, Dict[str, Any]]:
         """
         Generate response from specified session.
 
         Args:
             session_id: Session ID
+
+        Returns:
+            Tuple[BaseMessage, Dict[str, Any]]: Final message and execution metadata
         """
         # Get the session's context manager
         context_manager = self.get_or_create_context_manager(session_id)
-
-        # Get configuration from context manager
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-        enable_memory = getattr(context_manager, 'enable_memory', True)
 
         # Execution metadata
         metadata = {
@@ -170,15 +169,10 @@ class LLMClientBase(ABC):
         }
 
         try:
-            # Call internal tool calling loop directly
-            final_response = None
-            async for item in self._streaming_tool_calling_loop_from_session(
+            # Call simplified tool calling loop
+            final_response = await self._tool_calling_loop_from_session(
                 session_id, metadata
-            ):
-                if isinstance(item, dict):
-                    yield item
-                else:
-                    final_response = item
+            )
 
             # Handle final response
             metadata['status'] = 'completed'
@@ -204,24 +198,27 @@ class LLMClientBase(ABC):
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(content="Response processing unavailable")
 
-            yield (final_message, metadata)
+            return (final_message, metadata)
 
         except Exception as e:
             metadata['status'] = 'failed'
             metadata['error'] = str(e)
             raise Exception(f"Execution failed: {e}")
 
-    async def _streaming_tool_calling_loop_from_session(
+    async def _tool_calling_loop_from_session(
         self,
         session_id: str,
         metadata: Dict[str, Any]
-    ) -> AsyncGenerator[Union[Dict[str, Any], Any], None]:
+    ) -> Any:
         """
-        Streaming tool calling loop from session.
+        Tool calling loop from session that returns final response.
 
         Args:
             session_id: Session ID for getting context manager and configuration
             metadata: Execution metadata
+
+        Returns:
+            Any: Final LLM response after tool calling completion
         """
         # Get all required state through session_id
         context_manager = self.get_or_create_context_manager(session_id)
@@ -316,7 +313,7 @@ class LLMClientBase(ABC):
         if iteration >= max_iterations:
             raise Exception(f"Exceeded max iterations ({max_iterations})")
 
-        yield current_response
+        return current_response
 
     # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
 

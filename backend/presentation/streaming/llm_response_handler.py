@@ -114,15 +114,8 @@ async def process_chat_request(
             final_message = None
             execution_metadata = None
 
-            # Use new session-based response method - All configuration retrieved from context manager
-            async for item in llm_client.get_response_from_session(session_id):
-                if isinstance(item, tuple):
-                    # Final result: (final_message, execution_metadata)
-                    final_message, execution_metadata = item
-                    break
-                elif isinstance(item, dict):
-                    # Skip dict notifications - WebSocket handles all status updates
-                    continue
+            # Use simplified session-based response method - All configuration retrieved from context manager
+            final_message, execution_metadata = await llm_client.get_response_from_session(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
