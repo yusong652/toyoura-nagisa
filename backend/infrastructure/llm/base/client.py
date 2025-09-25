@@ -173,9 +173,13 @@ class LLMClientBase(ABC):
         }
 
         try:
-            # Call recursive tool calling loop
-            final_response = await self._tool_calling_loop_from_session(
-                session_id, metadata
+            # Get configuration
+            from backend.config import get_llm_settings
+            max_iterations = get_llm_settings().max_tool_iterations
+
+            # Call recursive tool calling loop directly
+            final_response = await self._recursive_tool_calling(
+                session_id, metadata, max_iterations
             )
 
             # Normal completion - handle final response
@@ -220,29 +224,6 @@ class LLMClientBase(ABC):
             metadata['error'] = str(e)
             raise Exception(f"Execution failed: {e}")
 
-    async def _tool_calling_loop_from_session(
-        self,
-        session_id: str,
-        metadata: Dict[str, Any]
-    ) -> Any:
-        """
-        Recursive tool calling that stops immediately on user rejection.
-
-        Args:
-            session_id: Session ID for getting context manager and configuration
-            metadata: Execution metadata
-
-        Returns:
-            Any: Final LLM response after tool calling completion
-
-        Raises:
-            UserRejectionInterruption: When user rejects any tool execution
-        """
-        # Get configuration
-        from backend.config import get_llm_settings
-        max_iterations = get_llm_settings().max_tool_iterations
-
-        return await self._recursive_tool_calling(session_id, metadata, max_iterations)
 
     async def _recursive_tool_calling(
         self,
