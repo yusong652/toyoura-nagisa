@@ -95,7 +95,7 @@ class AnthropicClient(LLMClientBase):
             List[Dict[str, Any]]: Tool schemas in Anthropic format
         """
         debug = self.anthropic_config.debug
-        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
 
     async def call_api_with_context(
         self,
@@ -118,10 +118,10 @@ class AnthropicClient(LLMClientBase):
         debug = self.anthropic_config.debug
         
         # 获取工具 schemas (API format)
-        tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
         
         # Get tool schemas for system prompt embedding (clean dict format)
-        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
         
         # Build unified system prompt with memory injection and embedded tool schemas
         from backend.shared.utils.prompt.builder import build_system_prompt

@@ -94,7 +94,7 @@ class GeminiClient(LLMClientBase):
             List[types.Tool]: Tool schemas in Gemini format
         """
         debug = self.gemini_config.debug
-        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
 
     async def call_api_with_context(
         self, 
@@ -147,7 +147,7 @@ class GeminiClient(LLMClientBase):
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
         
         # Get tool schemas for system prompt embedding (clean dict format)
-        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile, debug)
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
         
         # Build unified system prompt with memory injection
         from backend.shared.utils.prompt.builder import build_system_prompt

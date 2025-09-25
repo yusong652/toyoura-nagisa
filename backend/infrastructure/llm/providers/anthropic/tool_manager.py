@@ -55,7 +55,7 @@ class AnthropicToolManager(BaseToolManager):
             "input_schema": input_schema
         }
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取MCP工具的schema，返回Anthropic格式，支持agent profile过滤
         
@@ -86,13 +86,14 @@ class AnthropicToolManager(BaseToolManager):
                 "parameters": input_schema_dict
             })
             anthropic_tools.append(anthropic_tool)
-        
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
         if debug:
             print(f"[DEBUG] Final Anthropic tools count: {len(anthropic_tools)}")
         
         return anthropic_tools
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
         
@@ -110,7 +111,8 @@ class AnthropicToolManager(BaseToolManager):
         
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
         if not tools_dict:
             return []
         

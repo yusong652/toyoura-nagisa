@@ -48,9 +48,7 @@ class AnthropicContextManager(BaseContextManager):
             # Handle original Anthropic API response
             if not hasattr(response, 'content') or not response.content:
                 raise ValueError("Invalid Anthropic API response format")
-            
-            # ✅ Per official documentation: Filter response object, keep only API-supported fields
-            # Official API only supports role and content fields
+
             filtered_message = {
                 "role": response.role,
                 "content": response.content
