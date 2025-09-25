@@ -15,6 +15,7 @@ from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, Cal
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
 from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager
+from backend.config.llm import get_llm_settings
 # Security imports removed - all tools now require session ID
 
 
@@ -64,7 +65,9 @@ class BaseToolManager(ABC):
             llm_client = get_llm_client()
             return llm_client.get_context_manager(session_id)
         except Exception as e:
-            print(f"[BaseToolManager] Error getting context manager: {e}")
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Error getting context manager: {e}")
             return None
 
     async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
@@ -252,7 +255,7 @@ class BaseToolManager(ABC):
         try:
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
-                confirmation_result = await self._handle_user_confirmation(tool_name, tool_args, session_id, debug)
+                confirmation_result = await self._handle_user_confirmation(tool_name, tool_args, session_id)
                 if confirmation_result is not None:
                     # User rejected - return rejection result
                     return confirmation_result
@@ -279,8 +282,7 @@ class BaseToolManager(ABC):
         self,
         tool_name: str,
         tool_args: Dict[str, Any],
-        session_id: Optional[str],
-        debug: bool
+        session_id: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """
         Handle user confirmation for tool execution.
@@ -289,7 +291,6 @@ class BaseToolManager(ABC):
             tool_name: Name of the tool requiring confirmation
             tool_args: Tool arguments
             session_id: Session ID for confirmation
-            debug: Debug flag
 
         Returns:
             None if approved, rejection response dict if rejected
@@ -309,7 +310,8 @@ class BaseToolManager(ABC):
 
         if not approved:
             # User rejected - format and return rejection response
-            if debug:
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
                 print(f"[BaseToolManager] User rejected {tool_name}")
 
             from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
@@ -424,7 +426,9 @@ class BaseToolManager(ABC):
 
             confirmation_service = get_bash_confirmation_service()
             if not confirmation_service:
-                print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
                 return (False, "Confirmation service not available")
 
             # Extract command from tool arguments
@@ -435,7 +439,9 @@ class BaseToolManager(ABC):
             if not description and tool_name == "bash":
                 description = f"Execute bash command: {command}"
 
-            print(f"[BaseToolManager] Requesting user confirmation for {tool_name}: {command}")
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Requesting user confirmation for {tool_name}: {command}")
 
             # Request confirmation with 60 second timeout
             approved, user_message = await confirmation_service.request_confirmation(
@@ -445,16 +451,20 @@ class BaseToolManager(ABC):
                 timeout_seconds=60
             )
 
-            if approved:
-                print(f"[BaseToolManager] User approved {tool_name} execution")
-            else:
-                print(f"[BaseToolManager] User rejected {tool_name} execution")
-                if user_message:
-                    print(f"[BaseToolManager] User message: {user_message}")
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                if approved:
+                    print(f"[BaseToolManager] User approved {tool_name} execution")
+                else:
+                    print(f"[BaseToolManager] User rejected {tool_name} execution")
+                    if user_message:
+                        print(f"[BaseToolManager] User message: {user_message}")
 
             return (approved, user_message)
 
         except Exception as e:
-            print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
             # On error, default to rejecting for security
             return (False, f"Error during confirmation: {str(e)}")
