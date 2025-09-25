@@ -77,6 +77,30 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
 
+    def _prepare_complete_context(
+        self,
+        working_contents: List[Dict[str, Any]],
+        tool_schemas: List[Dict[str, Any]],
+        system_prompt: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Prepare complete context with tool schemas and system prompt for Anthropic API.
+
+        Args:
+            working_contents: Base message contents from context manager
+            tool_schemas: Tool schemas in Anthropic format
+            system_prompt: System prompt with tool descriptions
+
+        Returns:
+            List[Dict[str, Any]]: Complete context ready for Anthropic API call
+        """
+        # Store configuration for API call
+        self._current_tools = tool_schemas
+        self._current_system_prompt = system_prompt
+
+        # Return working contents - system prompt and tools are passed separately to Anthropic API
+        return working_contents
+
     def _get_provider_config(self):
         """Get Anthropic-specific configuration object."""
         return self.anthropic_config
@@ -99,48 +123,40 @@ class AnthropicClient(LLMClientBase):
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
-        session_id: str,
-        agent_profile: str = "general",
-        enable_memory: bool = True,
-        **_kwargs
+        **kwargs
     ):
         """
-        使用上下文调用Anthropic API
+        Execute direct Anthropic API call with complete pre-formatted context.
+
+        Performs a pure API call using complete context that already includes
+        all necessary tool schemas and system prompts prepared by _prepare_complete_context.
 
         Args:
-            context_contents: Pre-formatted Anthropic API messages
-            session_id: Session ID for tool schema retrieval and dependency injection
-            agent_profile: Agent profile type for tool filtering and prompt customization
-            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
-            **_kwargs: Additional API configuration parameters (currently unused)
+            context_contents: Complete Anthropic context contents with messages
+            **kwargs: Additional API configuration parameters
+
+        Returns:
+            Anthropic API response
+
+        Note:
+            This is a pure API call method. All context preparation including tool schemas
+            and system prompts should be handled by _prepare_complete_context.
         """
         debug = self.anthropic_config.debug
-        
-        # 获取工具 schemas (API format)
-        tools = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
-        
-        # Get tool schemas for system prompt embedding (clean dict format)
-        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
-        
-        # Build unified system prompt with memory injection and embedded tool schemas
-        from backend.shared.utils.prompt.builder import build_system_prompt
-        system_prompt = await build_system_prompt(
-            agent_profile=agent_profile,
-            session_id=session_id,
-            enable_memory=enable_memory,
-            tool_schemas=prompt_tool_schemas
-        )
-        
-        # Still pass tools to API for proper function calling support
-        # The embedding in system prompt provides better context, while API tools enable calling
-        api_tools = tools if tools else []
-        
+
+        # Use configuration prepared by _prepare_complete_context
+        tools = getattr(self, '_current_tools', [])
+        system_prompt = getattr(self, '_current_system_prompt', None)
+
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(
-            system_prompt=system_prompt,
+            system_prompt=system_prompt or "",  # Provide empty string fallback
             messages=context_contents,
-            tools=api_tools
+            tools=tools
         )
+
+        # Apply any additional kwargs
+        kwargs_api.update(kwargs)
 
         if debug:
             # Log basic API call information with tool embedding info

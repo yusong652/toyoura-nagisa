@@ -107,7 +107,7 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
         client,  # Gemini client instance
         query: str,
         debug: bool = False,
-        max_uses: int = 5
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Perform a web search using Google Search via the Gemini API.
@@ -115,6 +115,9 @@ class GeminiWebSearchGenerator(BaseWebSearchGenerator):
         Uses Gemini's modern google_search tool with shared result processing.
         """
         try:
+            # Extract max_uses from kwargs with default value
+            max_uses = kwargs.get('max_uses', 5)
+
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_start(query, debug)
             

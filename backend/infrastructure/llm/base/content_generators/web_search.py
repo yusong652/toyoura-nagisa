@@ -5,7 +5,7 @@ Handles web search with proper error handling and debugging support.
 """
 
 from abc import abstractmethod
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union, Awaitable
 from backend.domain.models.messages import UserMessage
 from .base import BaseContentGenerator
 
@@ -26,18 +26,22 @@ class BaseWebSearchGenerator(BaseContentGenerator):
         query: str,
         debug: bool = False,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Awaitable[Dict[str, Any]]]:
         """
         Perform a web search using the LLM's web search capabilities.
-        
+
+        Supports both synchronous and asynchronous implementations depending
+        on the specific provider requirements.
+
         Args:
             client: LLM client instance for API calls
             query: The search query to find information on the web
             debug: Enable debug output
             **kwargs: Additional search parameters (max_uses, etc.)
-            
+
         Returns:
-            Dictionary containing search results or error information
+            Dictionary containing search results or error information,
+            or awaitable for async implementations
         """
         pass
     

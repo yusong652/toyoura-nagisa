@@ -1,6 +1,7 @@
 """Web Search Tool Factory for Multi-LLM Support."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, cast, Awaitable
+import asyncio
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.client import LLMClientBase
 
@@ -78,33 +79,45 @@ class WebSearchToolFactory:
                 debug = llm_settings.debug
             
             # Perform the search with appropriate parameters
+            # Extract the raw client for all providers
+            client = getattr(llm_client, 'client', llm_client)
+
             if llm_type.lower() == 'gemini':
-                # Gemini client expects the raw client
-                client = getattr(llm_client, 'client', llm_client)
-                return await WebSearchGenerator.perform_web_search(
-                    client=client,
+                # Gemini web search is async
+                result = WebSearchGenerator.perform_web_search(
+                    client=cast(Any, client),  # Type cast for Gemini client
                     query=query,
                     debug=debug,
                     max_uses=max_uses  # Will be ignored but accepted for API compatibility
                 )
+                # Handle async result
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
             elif llm_type.lower() == 'anthropic':
-                # Anthropic client can be passed directly
-                client = getattr(llm_client, 'client', llm_client)
-                return await WebSearchGenerator.perform_web_search(
-                    client=client,
+                # Anthropic web search is sync
+                result = WebSearchGenerator.perform_web_search(
+                    client=cast(Any, client),  # Type cast for Anthropic client
                     query=query,
                     debug=debug,
                     max_uses=max_uses
                 )
+                # Ensure we return Dict[str, Any] for sync methods
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
             elif llm_type.lower() == 'openai':
-                # OpenAI client expects the raw client
-                client = getattr(llm_client, 'client', llm_client)
-                return await WebSearchGenerator.perform_web_search(
-                    client=client,
+                # OpenAI web search is sync
+                result = WebSearchGenerator.perform_web_search(
+                    client=cast(Any, client),  # Type cast for OpenAI client
                     query=query,
                     debug=debug,
                     max_uses=max_uses  # Accepted for compatibility but not used
                 )
+                # Ensure we return Dict[str, Any] for sync methods
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
             else:
                 return {
                     "error": f"Unsupported LLM type: {llm_type}",

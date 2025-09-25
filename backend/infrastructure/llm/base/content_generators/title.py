@@ -5,7 +5,7 @@ Handles conversation title generation using LLM APIs.
 """
 
 from abc import abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Union, Awaitable
 from backend.domain.models.messages import BaseMessage, UserMessage
 from .base import BaseContentGenerator
 
@@ -22,16 +22,22 @@ class BaseTitleGenerator(BaseContentGenerator):
     @staticmethod
     @abstractmethod
     def generate_title_from_messages(
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
+        *args, **kwargs
+    ) -> Union[Optional[str], Awaitable[Optional[str]]]:
         """
         Generate a concise conversation title based on recent messages.
 
-        Args:
+        This method signature allows for provider-specific implementations
+        with different parameter requirements (client, debug flags, etc.)
+        and supports both sync and async implementations.
+
+        Common Args:
             latest_messages: Recent conversation messages to generate title from
+            client (optional): LLM client instance for API calls
+            debug (optional): Enable debug output
 
         Returns:
-            Generated title string, or None if generation fails
+            Generated title string, None if generation fails, or awaitable for async implementations
         """
         pass
     

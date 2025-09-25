@@ -5,7 +5,7 @@ Handles text-to-image prompt generation using conversation context and few-shot 
 """
 
 from abc import abstractmethod
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union, Awaitable
 from backend.domain.models.messages import BaseMessage, UserMessage, AssistantMessage
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from backend.config import get_text_to_image_settings
@@ -31,17 +31,21 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         client,  # LLM client instance
         session_id: Optional[str] = None,
         debug: bool = False
-    ) -> Optional[Dict[str, str]]:
+    ) -> Union[Optional[Dict[str, str]], Awaitable[Optional[Dict[str, str]]]]:
         """
         Generate high-quality text-to-image prompts using recent conversation context.
-        
+
+        Supports both synchronous and asynchronous implementations depending
+        on the specific provider requirements.
+
         Args:
             client: LLM client instance for API calls
             session_id: Optional session ID for conversation context
             debug: Enable debug output
-            
+
         Returns:
-            Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
+            Dictionary with 'text_prompt' and 'negative_prompt' keys, None if failed,
+            or awaitable for async implementations
         """
         pass
     

@@ -64,56 +64,49 @@ class LLMClientBase(ABC):
         """
         pass
 
-    @abstractmethod 
+    @abstractmethod
     async def call_api_with_context(
-        self, 
-        context_contents: List[Dict[str, Any]], 
-        session_id: str,
-        agent_profile: str = "general",
-        enable_memory: bool = True,
+        self,
+        context_contents: List[Dict[str, Any]],
         **kwargs
     ) -> Any:
         """
-        Execute direct LLM API call with provider-specific context format and tool integration.
-        
-        Performs a complete API call using pre-formatted context contents while maintaining
-        provider-specific response structure. Automatically retrieves session-specific tool
-        schemas and applies configuration overrides for optimal provider performance.
-        
+        Execute direct LLM API call with complete pre-formatted context.
+
+        Performs a pure API call using complete context contents that already include
+        all necessary tool schemas and system prompts. This is a clean separation
+        between context preparation and API execution.
+
         Args:
-            context_contents: Pre-formatted context contents in provider-specific format with structure:
+            context_contents: Complete context contents in provider-specific format with structure:
                 - Provider-specific message format (e.g., Gemini, OpenAI, Anthropic formats)
                 - Message roles and content parts as required by each provider
-                - Function call definitions and tool schemas when applicable
-            session_id: Session ID for tool schema retrieval and dependency injection
-            agent_profile: Agent profile type for tool filtering and prompt customization
-            enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
+                - Tool schemas already integrated into context
+                - System prompts with tool descriptions already included
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_output_tokens: Optional[int] - Maximum output tokens override
                 - top_p: Optional[float] - Nucleus sampling parameter (provider-dependent)
                 - top_k: Optional[int] - Top-k sampling parameter (provider-dependent)
                 - Additional provider-specific parameters
-                
+
         Returns:
             Any: Raw API response object in provider-specific format:
                 - Response structure varies by provider (Gemini, OpenAI, Anthropic formats)
                 - Contains response candidates, usage metadata, and tool call results
                 - Maintains complete original response structure for downstream processing
-                
+
         Raises:
             Exception: If API call fails, returns invalid response, or encounters authentication errors
             NotImplementedError: If concrete implementation is not provided by subclass
-            
+
         Example:
-            # Provider-specific implementation required
-            context = provider_formatter.format_messages(messages)
-            response = await client.call_api_with_context(context, session_id="123")
-            
+            # Complete context already prepared by upper layer
+            response = await client.call_api_with_context(complete_context)
+
         Note:
-            Each provider implementation must handle session-specific tool schemas
-            and integrate with their respective tool managers and debug systems.
-            Response format preservation is critical for tool calling sequences.
+            This method should be a pure API call without session or tool dependencies.
+            All context preparation including tool schemas should be handled by caller.
         """
         pass
 
@@ -236,14 +229,41 @@ class LLMClientBase(ABC):
 
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
-        # Get LLM response
-        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
-        current_response = await self.call_api_with_context(
-            working_contents,
-            session_id=session_id,
+
+        # Get tool schemas and system prompt at the proper layer
+        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
+
+        # Get prompt tool schemas if tool manager is available
+        prompt_tool_schemas = None
+        if hasattr(self, 'tool_manager') and self.tool_manager is not None:
+            try:
+                # Type: ignore because tool_manager is dynamically set by concrete implementations
+                prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)  # type: ignore
+            except (AttributeError, NotImplementedError):
+                # Tool manager doesn't support this method
+                prompt_tool_schemas = None
+
+        # Build system prompt with tool schemas and memory
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
-            enable_memory=enable_memory
+            session_id=session_id,
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
         )
+
+        # Get working contents and create complete context
+        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+
+        # Prepare complete context with tools and system prompt
+        complete_context = self._prepare_complete_context(
+            working_contents=working_contents,
+            tool_schemas=tool_schemas,
+            system_prompt=system_prompt
+        )
+
+        # Pure API call with complete context
+        current_response = await self.call_api_with_context(complete_context)
 
         # Check if we need to continue tool calling
         if not self._should_continue_tool_calling(current_response):
@@ -399,6 +419,26 @@ class LLMClientBase(ABC):
 
         Returns:
             Any: Provider-specific config object with debug flag and other settings
+        """
+        pass
+
+    @abstractmethod
+    def _prepare_complete_context(
+        self,
+        working_contents: List[Dict[str, Any]],
+        tool_schemas: List[Any],
+        system_prompt: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Prepare complete context with tool schemas and system prompt.
+
+        Args:
+            working_contents: Base message contents from context manager
+            tool_schemas: Tool schemas for API in provider-specific format
+            system_prompt: System prompt with tool descriptions
+
+        Returns:
+            List[Dict[str, Any]]: Complete context ready for API call
         """
         pass
 
