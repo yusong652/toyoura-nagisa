@@ -235,6 +235,7 @@ class BaseToolManager(ABC):
             Dict[str, Any]: Unified tool result structure:
                 - inline_data: Dict with multimodal content or empty {}
                 - llm_content: Tool's response
+                - user_rejected: Optional[bool] - True if user rejected the tool
 
         Raises:
             RuntimeError: When tool execution fails due to infrastructure errors
@@ -249,64 +250,129 @@ class BaseToolManager(ABC):
         _ = tool_id
 
         try:
-            # Check if tool requires user confirmation
+            # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
-                if session_id is None:
-                    raise ValueError(f"Tool '{tool_name}' requires session ID for user confirmation. Session ID must not be None.")
-                approved, user_message = await self._request_user_confirmation(tool_name, tool_args, session_id)
-                if not approved:
-                    # User rejected - return rejection result immediately
-                    # Following Claude Code standard: tool response maintains 1:1 mapping
-                    # User feedback will come as a new user message in next request
-                    print(f"[BaseToolManager] User rejected {tool_name}")
+                confirmation_result = await self._handle_user_confirmation(tool_name, tool_args, session_id, debug)
+                if confirmation_result is not None:
+                    # User rejected - return rejection result
+                    return confirmation_result
 
-                    from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-                    rejection_result = user_rejected_response(
-                        user_message=user_message or f"User rejected {tool_name}"
-                    )
-
-                    # Mark as user rejected for interruption detection
-                    return {
-                        "inline_data": {},
-                        "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected by user"),
-                        "user_rejected": True  # Critical flag for interruption detection
-                    }
-
-            # Execute tool after approval
+            # Step 2: Execute the tool (user approved or no confirmation needed)
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
 
-            # Check MCP-level errors (is_error field) - return unified format with error info
-            if tool_result.get("is_error"):
-                return {
-                    "inline_data": {},
-                    "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
-                }
+            # Step 3: Handle execution errors
+            error_response = self._check_for_errors(tool_result)
+            if error_response is not None:
+                return error_response
 
-            # Check tool-level errors (status="error") - return unified format with error info
-            if tool_result.get("status") == "error":
-                error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
-                return {
-                    "inline_data": {},
-                    "llm_content": f"<error>{error_message}</error>"
-                }
-
-            # Unified handling: always return inline_data + llm_content structure
-            if self._has_multimodal_content(tool_result):
-                inline_data = self._extract_multimodal_content(tool_result)
-            else:
-                inline_data = {}  # Empty for non-multimodal content
-
-            return {
-                "inline_data": inline_data,
-                "llm_content": tool_result.get("llm_content")
-            }
+            # Step 4: Format successful response
+            return self._format_successful_response(tool_result)
 
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
             if debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
+
+    async def _handle_user_confirmation(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        session_id: Optional[str],
+        debug: bool
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Handle user confirmation for tool execution.
+
+        Args:
+            tool_name: Name of the tool requiring confirmation
+            tool_args: Tool arguments
+            session_id: Session ID for confirmation
+            debug: Debug flag
+
+        Returns:
+            None if approved, rejection response dict if rejected
+
+        Raises:
+            ValueError: If session_id is not provided when required
+        """
+        if session_id is None:
+            raise ValueError(
+                f"Tool '{tool_name}' requires session ID for user confirmation. "
+                f"Session ID must not be None."
+            )
+
+        approved, user_message = await self._request_user_confirmation(
+            tool_name, tool_args, session_id
+        )
+
+        if not approved:
+            # User rejected - format and return rejection response
+            if debug:
+                print(f"[BaseToolManager] User rejected {tool_name}")
+
+            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+            rejection_result = user_rejected_response(
+                user_message=user_message or f"User rejected {tool_name}"
+            )
+
+            return {
+                "inline_data": {},
+                "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected by user"),
+                "user_rejected": True  # Critical flag for interruption detection
+            }
+
+        # User approved - return None to continue execution
+        return None
+
+    def _check_for_errors(self, tool_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Check tool result for errors and format error response if needed.
+
+        Args:
+            tool_result: Tool execution result
+
+        Returns:
+            Error response dict if error found, None otherwise
+        """
+        # Check MCP-level errors (is_error field)
+        if tool_result.get("is_error"):
+            return {
+                "inline_data": {},
+                "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
+            }
+
+        # Check tool-level errors (status="error")
+        if tool_result.get("status") == "error":
+            error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
+            return {
+                "inline_data": {},
+                "llm_content": f"<error>{error_message}</error>"
+            }
+
+        return None
+
+    def _format_successful_response(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format successful tool execution response.
+
+        Args:
+            tool_result: Successful tool execution result
+
+        Returns:
+            Formatted response with inline_data and llm_content
+        """
+        # Extract multimodal content if present
+        if self._has_multimodal_content(tool_result):
+            inline_data = self._extract_multimodal_content(tool_result)
+        else:
+            inline_data = {}
+
+        return {
+            "inline_data": inline_data,
+            "llm_content": tool_result.get("llm_content")
+        }
 
     def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
         """
