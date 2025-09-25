@@ -70,7 +70,10 @@ def register_create_event_tool(mcp: FastMCP):
                     # Note: This is a simple overflow handling
                     # More complex month/year overflow would need additional logic
 
-            # Parameter processing
+            # Parameter processing - convert datetime objects to ISO strings
+            start_str = None
+            end_str = None
+
             try:
                 # Convert simple datetime parameters to ISO strings
                 processed_params = parse_calendar_datetime_params(
@@ -80,10 +83,10 @@ def register_create_event_tool(mcp: FastMCP):
                     location=location,
                     description=description
                 )
-                
+
                 summary = processed_params.get('summary', summary)
-                start = processed_params.get('start', start)
-                end = processed_params.get('end', end)
+                start_str = processed_params.get('start', start)
+                end_str = processed_params.get('end', end)
                 location = processed_params.get('location', location)
                 description = processed_params.get('description', description)
                 
@@ -94,20 +97,20 @@ def register_create_event_tool(mcp: FastMCP):
             warnings = []  # No warnings for now
             # Validate and parse datetime
             try:
-                start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-                end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
             except ValueError as e:
                 return error_response(f"Invalid datetime format: {str(e)}. Please use RFC3339 format")
-            
+
             # Validate time order
-            time_error = validate_event_times(start, end)
+            time_error = validate_event_times(start_str, end_str)
             if time_error:
                 return error_response(time_error)
-            
+
             # No auto-correction - use exact times as provided by user
-            
-            start = start_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
-            end = end_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
+
+            start_iso = start_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
+            end_iso = end_dt.strftime('%Y-%m-%dT%H:%M:%S%z').replace('+0000', 'Z').replace('-0000', 'Z')
             
             # Get user email and build service
             user_email = get_user_email()
@@ -116,8 +119,8 @@ def register_create_event_tool(mcp: FastMCP):
             # Prepare event data
             event_data = {
                 'summary': summary,
-                'start': {'dateTime': start},
-                'end': {'dateTime': end}
+                'start': {'dateTime': start_iso},
+                'end': {'dateTime': end_iso}
             }
             
             if location:
@@ -160,10 +163,4 @@ def register_create_event_tool(mcp: FastMCP):
                 return error_response(f"Invalid event data: {str(e)}")
             else:
                 return error_response(f"Unexpected error creating event: {str(e)}")
-                
-        except Exception as e:
-            print(f"DEBUG: Global unexpected error in create_calendar_event: {e}")
-            print(f"DEBUG: Exception type: {type(e)}")
-            import traceback
-            print(f"DEBUG: Traceback: {traceback.format_exc()}")
-            return error_response(f"Global error in create_calendar_event: {str(e)}")
+            

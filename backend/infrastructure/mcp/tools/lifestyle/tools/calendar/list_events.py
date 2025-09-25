@@ -75,35 +75,38 @@ def register_list_events_tool(mcp: FastMCP):
                 max_results = DEFAULT_MAX_EVENTS
 
             # Convert simple datetime parameters to ISO strings
+            time_min_str = None
+            time_max_str = None
+
             try:
                 processed_params = parse_calendar_datetime_params(
                     time_min=time_min,
                     time_max=time_max
                 )
-                
-                time_min = processed_params.get('time_min')
-                time_max = processed_params.get('time_max')
+
+                time_min_str = processed_params.get('time_min')
+                time_max_str = processed_params.get('time_max')
                 
             except ValueError as e:
                 print(f"DEBUG: ValueError in parameter processing: {e}")
                 return error_response(f"Invalid parameters: {str(e)}")
 
             # If no time_min provided, default to today's start (00:00) to get all of today's events
-            if time_min is None:
+            if time_min_str is None:
                 # Get today's date at 00:00 in UTC
                 today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-                time_min = today_start.isoformat()
-                print(f"DEBUG: No time_min provided, defaulting to today's start: {time_min}")
+                time_min_str = today_start.isoformat()
+                print(f"DEBUG: No time_min provided, defaulting to today's start: {time_min_str}")
 
             # If no time_max provided, default to 1 year from time_min to prevent endless recurring events
-            if time_max is None and time_min:
+            if time_max_str is None and time_min_str:
                 # Parse the time_min to add 1 year
-                start_time = datetime.fromisoformat(time_min.replace('Z', '+00:00'))
+                start_time = datetime.fromisoformat(time_min_str.replace('Z', '+00:00'))
                 end_time = start_time + timedelta(days=365)  # 1 year
-                time_max = end_time.isoformat()
-                print(f"DEBUG: No time_max provided, defaulting to 1 year from start: {time_max}")
+                time_max_str = end_time.isoformat()
+                print(f"DEBUG: No time_max provided, defaulting to 1 year from start: {time_max_str}")
 
-            print(f"DEBUG: After parameter processing - time_min={time_min}, time_max={time_max}")
+            print(f"DEBUG: After parameter processing - time_min={time_min_str}, time_max={time_max_str}")
 
             # Validate parameters
             if max_results <= 0 or max_results > MAX_EVENTS_HARD_LIMIT:
@@ -132,10 +135,10 @@ def register_list_events_tool(mcp: FastMCP):
             }
             
             # Set time bounds
-            if time_min:
-                query_params['timeMin'] = time_min
-            if time_max:
-                query_params['timeMax'] = time_max
+            if time_min_str:
+                query_params['timeMin'] = time_min_str
+            if time_max_str:
+                query_params['timeMax'] = time_max_str
             
             # Execute calendar operation
             print(f"DEBUG: Executing calendar operation with params: {query_params}")
