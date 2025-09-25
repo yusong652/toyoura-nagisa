@@ -303,29 +303,7 @@ class LLMClientBase(ABC):
             metadata['tool_calls_executed'] += num_tools
 
             # Send tool use notification
-            extracted_text = self._extract_text_from_response(current_response)
-            thinking_content = self._extract_thinking_content(current_response)
-            tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
-
-            if extracted_text and len(extracted_text.strip()) > 0:
-                action = extracted_text.strip()
-                if len(action) > 150:
-                    action = action[:147] + "..."
-            else:
-                if num_tools == 1:
-                    action = f"Using {tool_names[0]}..."
-                else:
-                    action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
-
-            notification = {
-                'type': 'NAGISA_IS_USING_TOOL',
-                'tool_names': tool_names,
-                'action': action
-            }
-
-            if thinking_content:
-                notification['thinking'] = thinking_content
-
+            notification = self._create_tool_notification(tool_calls, current_response)
             await self._send_websocket_tool_notification(session_id, notification)
 
             # Execute tools
@@ -568,7 +546,7 @@ class LLMClientBase(ABC):
             # Tool manager always returns Dict[str, Any]
             if self.tool_manager:
                 result = await self.tool_manager.handle_function_call(
-                    tool_call, session_id, debug
+                    tool_call, session_id
                 ) # type: ignore
             else:
                 result = {
@@ -592,6 +570,50 @@ class LLMClientBase(ABC):
 
 
     # ========== SHARED UTILITY METHODS ==========
+
+    def _create_tool_notification(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        current_response: Any
+    ) -> Dict[str, Any]:
+        """
+        Create tool use notification data structure.
+
+        Args:
+            tool_calls: List of tool call dictionaries
+            current_response: Current LLM response containing text and thinking content
+
+        Returns:
+            Dict[str, Any]: Notification dictionary ready for WebSocket transmission
+        """
+        num_tools = len(tool_calls)
+        extracted_text = self._extract_text_from_response(current_response)
+        thinking_content = self._extract_thinking_content(current_response)
+        tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
+
+        # Generate action description based on extracted text or tool names
+        if extracted_text and len(extracted_text.strip()) > 0:
+            action = extracted_text.strip()
+            if len(action) > 150:
+                action = action[:147] + "..."
+        else:
+            if num_tools == 1:
+                action = f"Using {tool_names[0]}..."
+            else:
+                action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
+
+        # Build notification structure
+        notification = {
+            'type': 'NAGISA_IS_USING_TOOL',
+            'tool_names': tool_names,
+            'action': action
+        }
+
+        # Add thinking content if available
+        if thinking_content:
+            notification['thinking'] = thinking_content
+
+        return notification
 
     async def _clear_session_context(self, session_id: str):
         """Clear session context - shared implementation."""

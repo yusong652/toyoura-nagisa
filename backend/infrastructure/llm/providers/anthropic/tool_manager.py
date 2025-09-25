@@ -69,7 +69,7 @@ class AnthropicToolManager(BaseToolManager):
         """
         
         # 使用基类的标准化工具获取方法
-        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile)
         
         if not tools_dict:
             return []
@@ -109,7 +109,7 @@ class AnthropicToolManager(BaseToolManager):
         """
         
         # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile)
         
         if not tools_dict:
             return []

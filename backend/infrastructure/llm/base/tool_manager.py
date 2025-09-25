@@ -70,15 +70,14 @@ class BaseToolManager(ABC):
                 print(f"[BaseToolManager] Error getting context manager: {e}")
             return None
 
-    async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Dict[str, ToolSchema]:
+    async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = 'general') -> Dict[str, ToolSchema]:
         """
         Get standardized ToolSchema objects based on agent profile.
 
         Args:
             session_id: Session ID (required)
             agent_profile: Agent profile name ("coding", "lifestyle", "general", or None for all tools)
-            debug: Whether to enable debug output
-            
+
         Returns:
             Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
         """
@@ -86,33 +85,34 @@ class BaseToolManager(ABC):
         tools_dict: Dict[str, ToolSchema] = {}
         
         try:
+            llm_settings = get_llm_settings()
             mcp_client = self.get_mcp_client()
             async with mcp_client as mcp_async_client:
                 # Get all MCP tools - list_tools() always returns a list
                 mcp_tools = await mcp_async_client.list_tools()
-                
+
                 # 确定要加载的工具集合
                 if agent_profile:
                     profile_enum = ToolProfileManager.validate_profile(agent_profile)
                     if profile_enum and ToolProfileManager.should_disable_all_tools(profile_enum):
                         # DISABLED 状态：不加载任何工具
-                        if debug:
+                        if llm_settings.debug:
                             print(f"[DEBUG] Disabling all tools (profile: {agent_profile})")
                         return {}
                     elif profile_enum and not ToolProfileManager.should_load_all_tools(profile_enum):
                         # 使用指定profile的工具集合
                         allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
-                        if debug:
+                        if llm_settings.debug:
                             print(f"[DEBUG] Loading tools for profile '{agent_profile}': {len(allowed_tools)} tools")
                     else:
                         # Profile无效或为general，加载所有工具
                         allowed_tools = None
-                        if debug:
+                        if llm_settings.debug:
                             print(f"[DEBUG] Loading all tools (profile: {agent_profile})")
                 else:
                     # 未指定profile，加载所有工具
                     allowed_tools = None
-                    if debug:
+                    if llm_settings.debug:
                         print("[DEBUG] Loading all tools (no profile specified)")
                 
                 # 添加工具到字典
@@ -124,34 +124,34 @@ class BaseToolManager(ABC):
                     tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
                     tools_dict[tool_schema.name] = tool_schema
 
-                if debug:
+                if llm_settings.debug:
                     print(f"[DEBUG] Loaded {len(tools_dict)} tools for session {session_id}")
-                
+
                 return tools_dict
-                
+
         except Exception as e:
-            if debug:
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
                 print(f"[DEBUG] Error getting standardized tools: {e}")
             return {}
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Any:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> Any:
         """
         Get tool schemas formatted for the specific LLM provider.
         Uses get_standardized_tools() internally, then converts to provider format.
-        
+
         Args:
             session_id: Session ID (required)
             agent_profile: Agent profile name for tool filtering
-            debug: Whether to enable debug output
-            
+
         Returns:
             Tool schema list adapted for target LLM format (format varies by client)
         """
         pass
 
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any],
-                               session_id: Optional[str] = None) -> CallToolResult:
+                               session_id: str) -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
         Pure tool execution logic - confirmation should be handled by caller.
@@ -159,20 +159,12 @@ class BaseToolManager(ABC):
         Args:
             tool_name: Tool name
             tool_args: Tool arguments
-            session_id: Session ID (required for all tools)
+            session_id: Session ID for dependency injection (required for all tools)
 
         Returns:
             CallToolResult: MCP tool execution result containing content, structuredContent, and isError fields
-
-        Raises:
-            ValueError: If session ID is not provided
         """
         # All tools now require session ID for dependency injection
-        if session_id is None:
-            raise ValueError(
-                f"Tool '{tool_name}' requires session ID for dependency injection. "
-                f"All tools must be executed with session context."
-            )
 
 
         mcp_client = self.get_mcp_client()
@@ -222,7 +214,7 @@ class BaseToolManager(ABC):
         # Extract inline_data from data.processing_result.content
         return tool_result["data"]["processing_result"]["content"]["inline_data"]
     
-    async def handle_function_call(self, function_call: dict, session_id: Optional[str] = None, debug: bool = False) -> Dict[str, Any]:
+    async def handle_function_call(self, function_call: dict, session_id: str) -> Dict[str, Any]:
         """
         Handle LLM-generated function_call requests.
 
@@ -231,8 +223,7 @@ class BaseToolManager(ABC):
                 - name: str - Tool name to execute
                 - arguments: Dict[str, Any] - Tool arguments (optional, defaults to {})
                 - id: str - Tool call ID for tracking (optional, defaults to "")
-            session_id: Optional session ID for context-aware tools (required for execution)
-            debug: Whether to enable debug output
+            session_id: Session ID for context-aware tools and dependency injection (required)
 
         Returns:
             Dict[str, Any]: Unified tool result structure:
@@ -244,7 +235,7 @@ class BaseToolManager(ABC):
             RuntimeError: When tool execution fails due to infrastructure errors
             ValueError: When required session_id is not provided
         """
-        tool_name = function_call["name"]
+        tool_name = function_call.get("name", "")
         tool_args = function_call.get("arguments", {})
         tool_id = function_call.get("id", "")
 
@@ -274,7 +265,8 @@ class BaseToolManager(ABC):
 
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
-            if debug:
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
                 print(f"Error calling tool {tool_name}: {str(e)}")
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
 
@@ -282,7 +274,7 @@ class BaseToolManager(ABC):
         self,
         tool_name: str,
         tool_args: Dict[str, Any],
-        session_id: Optional[str]
+        session_id: str
     ) -> Optional[Dict[str, Any]]:
         """
         Handle user confirmation for tool execution.
@@ -290,19 +282,11 @@ class BaseToolManager(ABC):
         Args:
             tool_name: Name of the tool requiring confirmation
             tool_args: Tool arguments
-            session_id: Session ID for confirmation
+            session_id: Session ID for confirmation (required)
 
         Returns:
             None if approved, rejection response dict if rejected
-
-        Raises:
-            ValueError: If session_id is not provided when required
         """
-        if session_id is None:
-            raise ValueError(
-                f"Tool '{tool_name}' requires session ID for user confirmation. "
-                f"Session ID must not be None."
-            )
 
         approved, user_message = await self._request_user_confirmation(
             tool_name, tool_args, session_id
@@ -376,13 +360,13 @@ class BaseToolManager(ABC):
             "llm_content": tool_result.get("llm_content")
         }
 
-    def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
+    def _requires_user_confirmation(self, tool_name: str, _tool_args: Dict[str, Any]) -> bool:
         """
         Check if a tool requires user confirmation before execution.
 
         Args:
             tool_name: Name of the tool to execute
-            tool_args: Arguments for the tool (may be used for specific command filtering)
+            _tool_args: Arguments for the tool (reserved for future command filtering)
 
         Returns:
             bool: True if user confirmation is required, False otherwise
@@ -397,9 +381,9 @@ class BaseToolManager(ABC):
 
         # Basic tool-level check
         if CONFIRMATION_REQUIRED_TOOLS.get(tool_name, False):
-            # Future enhancement: could check specific commands within tool_args
+            # Future enhancement: could check specific commands within _tool_args
             # For example, allow safe commands like 'ls', 'pwd' without confirmation
-            # command = tool_args.get("command", "")
+            # command = _tool_args.get("command", "")
             # safe_commands = ["ls", "pwd", "echo", "date", "whoami"]
             # if any(command.startswith(safe_cmd) for safe_cmd in safe_commands):
             #     return False
@@ -424,9 +408,9 @@ class BaseToolManager(ABC):
         try:
             from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
 
+            llm_settings = get_llm_settings()
             confirmation_service = get_bash_confirmation_service()
             if not confirmation_service:
-                llm_settings = get_llm_settings()
                 if llm_settings.debug:
                     print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
                 return (False, "Confirmation service not available")
@@ -439,7 +423,6 @@ class BaseToolManager(ABC):
             if not description and tool_name == "bash":
                 description = f"Execute bash command: {command}"
 
-            llm_settings = get_llm_settings()
             if llm_settings.debug:
                 print(f"[BaseToolManager] Requesting user confirmation for {tool_name}: {command}")
 
@@ -451,7 +434,6 @@ class BaseToolManager(ABC):
                 timeout_seconds=60
             )
 
-            llm_settings = get_llm_settings()
             if llm_settings.debug:
                 if approved:
                     print(f"[BaseToolManager] User approved {tool_name} execution")

@@ -32,7 +32,7 @@ class GeminiToolManager(BaseToolManager):
             List[types.Tool]: Tool schemas formatted for Gemini API
         """
         # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile)
         
         if not tools_dict:
             return []
@@ -69,7 +69,7 @@ class GeminiToolManager(BaseToolManager):
             List[dict]: Tool schemas in standardized dictionary format for system prompt
         """
         # Get standardized tools from base class
-        tools_dict = await self.get_standardized_tools(session_id, agent_profile, debug)
+        tools_dict = await self.get_standardized_tools(session_id, agent_profile)
         
         if not tools_dict:
             return []
