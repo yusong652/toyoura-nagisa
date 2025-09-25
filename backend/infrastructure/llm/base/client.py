@@ -163,38 +163,22 @@ class LLMClientBase(ABC):
         # Get the session's context manager
         context_manager = self.get_or_create_context_manager(session_id)
 
-        # Execution metadata
-        metadata = {
-            'session_id': session_id,
-            'iterations': 0,
-            'api_calls': 0,
-            'tool_calls_executed': 0,
-            'status': 'running'
-        }
-
         try:
-            # Get configuration
-            from backend.config import get_llm_settings
-            max_iterations = get_llm_settings().max_tool_iterations
-
-            # Call recursive tool calling loop directly
-            final_response = await self._recursive_tool_calling(
-                session_id, metadata, max_iterations
+            # Call recursive tool calling loop
+            final_response, tool_count = await self._recursive_tool_calling(
+                session_id, iterations=0
             )
 
-            # Normal completion - handle final response
-            metadata['status'] = 'completed'
-
-            # Extract keyword and other post-processing
+            # Extract keyword from response
+            keyword = None
             processor = self._get_response_processor()
             original_text = processor.extract_text_content(final_response) if processor else ""
             if original_text:
                 from backend.shared.utils.text_parser import parse_llm_output
-                _, extracted_keyword = parse_llm_output(original_text)
-                metadata['keyword'] = extracted_keyword
+                _, keyword = parse_llm_output(original_text)
 
-            # Send tool use concluded notification
-            if metadata['tool_calls_executed'] > 0:
+            # Send tool use concluded notification if tools were used
+            if tool_count > 0:
                 concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
                 await self._send_websocket_tool_notification(session_id, concluded_notification)
 
@@ -206,50 +190,49 @@ class LLMClientBase(ABC):
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(content="Response processing unavailable")
 
+            # Return simplified metadata with only what's actually used
+            metadata = {'keyword': keyword} if keyword else {}
             return (final_message, metadata)
 
-        except UserRejectionInterruption as interruption:
-            # User rejection interruption - update metadata and re-raise
-            metadata['status'] = 'interrupted_by_user'
-            metadata['interruption_type'] = 'user_rejection'
-            metadata['rejected_tools'] = interruption.rejected_tools
-
-            # Context already saved by recursive tool calling
-            # Re-raise to let upper layer handle gracefully (no TTS, no content processing)
-            raise interruption
+        except UserRejectionInterruption:
+            # User rejection is not an error - re-raise as-is
+            raise
 
         except Exception as e:
-            # Real errors
-            metadata['status'] = 'failed'
-            metadata['error'] = str(e)
+            # Real error - log and raise with context
+            import traceback
+            print(f"[ERROR] Exception in execute_with_thinking: {e}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
             raise Exception(f"Execution failed: {e}")
 
 
     async def _recursive_tool_calling(
         self,
         session_id: str,
-        metadata: Dict[str, Any],
-        max_iterations: int
-    ) -> Any:
+        iterations: int = 0,
+        tool_count: int = 0
+    ) -> Tuple[Any, int]:
         """
         Recursive tool calling implementation with user rejection interruption.
 
         Args:
             session_id: Session ID
-            metadata: Execution metadata
-            max_iterations: Maximum allowed iterations
+            iterations: Current iteration count
+            tool_count: Total number of tools executed
 
         Returns:
-            Any: Final LLM response
+            Tuple[Any, int]: (Final LLM response, Total tool count)
 
         Raises:
             UserRejectionInterruption: When user rejects any tool
         """
-        # Check iteration limit
-        if metadata['iterations'] >= max_iterations:
-            raise Exception(f"Exceeded max iterations ({max_iterations})")
+        # Get max iterations from config
+        from backend.config import get_llm_settings
+        max_iterations = get_llm_settings().max_tool_iterations
 
-        metadata['iterations'] += 1
+        # Check iteration limit
+        if iterations >= max_iterations:
+            raise Exception(f"Exceeded max iterations ({max_iterations})")
 
         # Get current state
         context_manager = self.get_or_create_context_manager(session_id)
@@ -258,9 +241,6 @@ class LLMClientBase(ABC):
 
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
-        provider_config = self._get_provider_config()
-        debug = getattr(provider_config, 'debug', False)
-
         # Get LLM response
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
         current_response = await self.call_api_with_context(
@@ -269,11 +249,10 @@ class LLMClientBase(ABC):
             agent_profile=agent_profile,
             enable_memory=enable_memory
         )
-        metadata['api_calls'] += 1
 
         # Check if we need to continue tool calling
         if not self._should_continue_tool_calling(current_response):
-            return current_response  # Normal completion
+            return (current_response, tool_count)  # Normal completion
 
         # Process tool calls
         context_manager.add_response(current_response)
@@ -281,7 +260,7 @@ class LLMClientBase(ABC):
 
         if tool_calls:
             num_tools = len(tool_calls)
-            metadata['tool_calls_executed'] += num_tools
+            tool_count += num_tools
 
             # Send tool use notification
             notification = self._create_tool_notification(tool_calls, current_response)
@@ -290,8 +269,7 @@ class LLMClientBase(ABC):
             # Execute tools
             tasks = []
             for tc in tool_calls:
-                tasks.append(self._execute_single_tool_call(tc, session_id, debug))
-
+                tasks.append(self._execute_single_tool_call(tc, session_id))
             results = await asyncio.gather(*tasks, return_exceptions=False)
 
             # Check for rejections and add results to context
@@ -312,7 +290,7 @@ class LLMClientBase(ABC):
                 raise UserRejectionInterruption(session_id, rejected_tools)
 
         # Continue recursively (no rejections)
-        return await self._recursive_tool_calling(session_id, metadata, max_iterations)
+        return await self._recursive_tool_calling(session_id, iterations + 1, tool_count)
 
     # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
 
@@ -488,8 +466,7 @@ class LLMClientBase(ABC):
     async def _execute_single_tool_call(
         self,
         tool_call: Dict[str, Any],
-        session_id: Optional[str],
-        debug: bool
+        session_id: Optional[str]
     ) -> Dict[str, Any]:
         """
         Execute single tool call with comprehensive error handling.
@@ -521,9 +498,8 @@ class LLMClientBase(ABC):
             all error cases and returns proper dictionaries, not error strings.
         """
         try:
-            if debug:
-                print(f"[DEBUG] Executing tool: {tool_call.get('name', 'unknown')}")
-            
+            from backend.config import get_llm_settings
+
             # Tool manager always returns Dict[str, Any]
             if self.tool_manager:
                 result = await self.tool_manager.handle_function_call(
@@ -536,13 +512,12 @@ class LLMClientBase(ABC):
                     'error': 'Tool execution unavailable'
                 }
             
-            if debug:
-                print(f"[DEBUG] Tool execution completed: {tool_call.get('name', 'unknown')}")
-            
             return result
             
         except Exception as e:
             # Tool execution failed - log and re-raise to stop execution
+            from backend.config import get_llm_settings
+            debug = get_llm_settings().debug
             if debug:
                 print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
             
