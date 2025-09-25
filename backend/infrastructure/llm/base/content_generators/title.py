@@ -22,16 +22,14 @@ class BaseTitleGenerator(BaseContentGenerator):
     @staticmethod
     @abstractmethod
     def generate_title_from_messages(
-        client,  # LLM client instance
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
-        
+
         Args:
-            client: LLM client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            
+
         Returns:
             Generated title string, or None if generation fails
         """
@@ -48,7 +46,7 @@ class BaseTitleGenerator(BaseContentGenerator):
         Returns:
             True if messages are valid for title generation
         """
-        return latest_messages and len(latest_messages) >= 2
+        return bool(latest_messages) and len(latest_messages) >= 2
     
     @staticmethod
     def prepare_title_generation_messages(

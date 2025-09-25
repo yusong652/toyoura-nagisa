@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Tuple, AsyncGenerator, Union
+from typing import List, Optional, Dict, Any
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 import anthropic
@@ -94,7 +94,6 @@ class AnthropicClient(LLMClientBase):
         Returns:
             List[Dict[str, Any]]: Tool schemas in Anthropic format
         """
-        debug = self.anthropic_config.debug
         return await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
 
     async def call_api_with_context(
@@ -103,7 +102,7 @@ class AnthropicClient(LLMClientBase):
         session_id: str,
         agent_profile: str = "general",
         enable_memory: bool = True,
-        **kwargs
+        **_kwargs
     ):
         """
         使用上下文调用Anthropic API
@@ -113,7 +112,7 @@ class AnthropicClient(LLMClientBase):
             session_id: Session ID for tool schema retrieval and dependency injection
             agent_profile: Agent profile type for tool filtering and prompt customization
             enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
-            **kwargs: Additional API configuration parameters
+            **_kwargs: Additional API configuration parameters (currently unused)
         """
         debug = self.anthropic_config.debug
         
@@ -191,10 +190,7 @@ class AnthropicClient(LLMClientBase):
         Args:
             latest_messages: Recent conversation messages to generate title from
         """
-        return TitleGenerator.generate_title_from_messages(
-            self.client,
-            latest_messages
-        ) 
+        return TitleGenerator.generate_title_from_messages(latest_messages) 
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """

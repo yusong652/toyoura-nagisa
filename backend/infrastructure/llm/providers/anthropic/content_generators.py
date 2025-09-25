@@ -5,8 +5,6 @@ Specialized generators for creating titles, image prompts, and other derived con
 based on conversation context. Separates content generation concerns from the main client.
 """
 
-import re
-import json
 from typing import Optional, Dict, List, Any, cast
 import anthropic
 from backend.domain.models.messages import BaseMessage, UserMessage
@@ -21,7 +19,6 @@ from backend.infrastructure.llm.shared.utils.text_processing import parse_title_
 from .message_formatter import MessageFormatter
 from backend.config import get_llm_settings
 from .config import get_anthropic_client_config
-from .debug import AnthropicDebugger
 
 
 class TitleGenerator(BaseTitleGenerator):
@@ -35,63 +32,65 @@ class TitleGenerator(BaseTitleGenerator):
 
     @staticmethod
     def generate_title_from_messages(
-        client: anthropic.Anthropic,
-        latest_messages: List[BaseMessage],
-        debug: bool = False
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
-        
+
         Args:
-            client: Anthropic Claude client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            debug: Enable debug logging for API calls
-            
+
         Returns:
             Generated title string, or None if generation fails
         """
         try:
             if not latest_messages or len(latest_messages) < 2:
                 return None
-            
+
+            # Get debug setting from configuration
+            llm_settings = get_llm_settings()
+            debug = llm_settings.debug
+
+            # Get Anthropic configuration and create client
+            anthropic_config = get_anthropic_client_config()
+            api_key = llm_settings.get_anthropic_config().anthropic_api_key
+            client = anthropic.Anthropic(api_key=api_key)
+
             # Use shared system prompt for consistency
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
-            
+
             # 构造消息序列
             messages = list(latest_messages) + [
                 UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
             ]
-            
+
             # 使用MessageFormatter进行消息格式转换
             formatted_messages = MessageFormatter.format_messages(messages)
-            
-            # Use the new Anthropic configuration system
-            anthropic_config = get_anthropic_client_config()
-            
+
             # Build API call parameters using the configuration system
             api_kwargs = anthropic_config.get_api_call_kwargs(
                 system_prompt=system_prompt,
                 messages=formatted_messages
             )
-            
+
             # Override parameters specific to title generation
             api_kwargs.update({
                 "max_tokens": 1024,
                 "temperature": 1.0
             })
-            
+
             response = client.messages.create(**api_kwargs)
-            
+
             if response.content and len(response.content) > 0:
                 # Handle different content block types safely
                 first_content = response.content[0]
                 title_response_text = getattr(first_content, 'text', str(first_content))
-                
+
                 # Parse title using shared utility function
                 # Using max_length=30 to match original Anthropic behavior
                 return parse_title_response(title_response_text, max_length=30, debug=debug)
             return None
-            
+
         except Exception as e:
             print(f"Anthropic生成标题时出错: {str(e)}")
             return None
