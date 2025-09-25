@@ -18,16 +18,15 @@ class GeminiToolManager(BaseToolManager):
     Gemini-specific schema formatting and tool execution.
     """
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[types.Tool]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> List[types.Tool]:
         """
         Get MCP tool schemas in Gemini format based on agent profile.
         Uses get_standardized_tools() from base class, then converts to Gemini format.
-        
+
         Args:
             session_id: Session ID for tool caching (required)
             agent_profile: Agent profile name for tool filtering
-            debug: Whether to enable debug output
-            
+
         Returns:
             List[types.Tool]: Tool schemas formatted for Gemini API
         """
@@ -44,7 +43,9 @@ class GeminiToolManager(BaseToolManager):
             if func_decl:
                 function_declarations.append(func_decl)
         
-        if debug:
+        from backend.config.llm import get_llm_settings
+        llm_settings = get_llm_settings()
+        if llm_settings.debug:
             print(f"[DEBUG] Final Gemini tools count: {len(function_declarations)}")
         
         # Return as Tool objects
@@ -53,27 +54,29 @@ class GeminiToolManager(BaseToolManager):
         else:
             return []
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[dict]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None) -> List[dict]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
-        
+
         This method returns a clean dictionary format specifically designed for embedding
         tool schemas into system prompts, separate from the API-specific formats.
-        
+
         Args:
             session_id: Session ID for tool caching (required)
             agent_profile: Agent profile name for tool filtering
-            debug: Whether to enable debug output
-            
+
         Returns:
             List[dict]: Tool schemas in standardized dictionary format for system prompt
         """
         # Get standardized tools from base class
+        from backend.config.llm import get_llm_settings
+        llm_settings = get_llm_settings()
+
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        
+
         if not tools_dict:
             return []
-        
+
         # Convert ToolSchema objects to clean dictionary format for system prompt
         prompt_schemas = []
         for tool_name, tool_schema in tools_dict.items():
@@ -86,11 +89,11 @@ class GeminiToolManager(BaseToolManager):
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
-                if debug:
+                if llm_settings.debug:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
-        
-        if debug:
+
+        if llm_settings.debug:
             print(f"[DEBUG] Gemini system prompt schemas count: {len(prompt_schemas)}")
         
         return prompt_schemas
@@ -106,18 +109,16 @@ class GeminiToolManager(BaseToolManager):
             types.FunctionDeclaration: Gemini function declaration, or None if conversion failed
         """
         try:
-            # Build function declaration
-            func_decl_dict = {
-                "name": tool_schema.name,
-                "description": tool_schema.description
-            }
-            
             # Get the input schema and sanitize for Gemini
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
             sanitized_schema = self._sanitize_jsonschema_for_gemini(input_schema_dict)
-            func_decl_dict["parameters"] = sanitized_schema
-            
-            return types.FunctionDeclaration(**func_decl_dict)
+
+            # Create FunctionDeclaration with properly typed parameters
+            return types.FunctionDeclaration(
+                name=tool_schema.name,
+                description=tool_schema.description,
+                parameters=types.Schema(**sanitized_schema)
+            )
             
         except Exception as e:
             print(f"[WARNING] Failed to convert tool {tool_schema.name} to Gemini format: {e}")
