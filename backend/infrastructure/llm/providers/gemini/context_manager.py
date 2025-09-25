@@ -63,11 +63,7 @@ class GeminiContextManager(BaseContextManager):
                 candidate = response.candidates[0]
             except (AttributeError, IndexError):
                 raise ValueError("Invalid Gemini API response format")
-            
-            # ✅ Official best practice: Use candidate.content directly without restructuring
-            # This ensures complete preservation of all original fields including thinking chain, validation fields, etc.
             raw_content = candidate.content
-            
             # Add to working context
             self.working_contents.append(raw_content)
     
@@ -84,7 +80,6 @@ class GeminiContextManager(BaseContextManager):
         """
         # Use message formatter to handle tool result format
         working_content = GeminiMessageFormatter.format_tool_result_for_context(tool_name, result)
-        
         # Add to working context
         self.working_contents.append(working_content)
     
@@ -114,8 +109,9 @@ class GeminiContextManager(BaseContextManager):
                 
             for part in parts:
                 # Part can be either a dict or a SDK Part object
-                if isinstance(part, dict) and 'function_call' in part:
-                    return True
+                if isinstance(part, dict):
+                    if 'function_call' in part:
+                        return True
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Handle SDK Part objects in dict message format
                     return True
@@ -160,8 +156,9 @@ class GeminiContextManager(BaseContextManager):
                 
             for part in parts:
                 # Part can be either a dict or a SDK Part object
-                if isinstance(part, dict) and 'function_response' in part:
-                    return True
+                if isinstance(part, dict):
+                    if 'function_response' in part:
+                        return True
                 elif hasattr(part, 'function_response') and part.function_response:
                     # Handle SDK Part objects in dict message format
                     return True
