@@ -165,7 +165,7 @@ class LLMClientBase(ABC):
 
         try:
             # Call recursive tool calling loop
-            final_response, tool_count = await self._recursive_tool_calling(
+            final_response = await self._recursive_tool_calling(
                 session_id, iterations=0
             )
 
@@ -176,11 +176,6 @@ class LLMClientBase(ABC):
             if original_text:
                 from backend.shared.utils.text_parser import parse_llm_output
                 _, keyword = parse_llm_output(original_text)
-
-            # Send tool use concluded notification if tools were used
-            if tool_count > 0:
-                concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
-                await self._send_websocket_tool_notification(session_id, concluded_notification)
 
             # Create final message and add to context manager
             if processor:
@@ -210,18 +205,18 @@ class LLMClientBase(ABC):
         self,
         session_id: str,
         iterations: int = 0,
-        tool_count: int = 0
-    ) -> Tuple[Any, int]:
+        had_tools_in_previous_round: bool = False
+    ) -> Any:
         """
         Recursive tool calling implementation with user rejection interruption.
 
         Args:
             session_id: Session ID
             iterations: Current iteration count
-            tool_count: Total number of tools executed
+            had_tools_in_previous_round: Whether tools were executed in the previous iteration
 
         Returns:
-            Tuple[Any, int]: (Final LLM response, Total tool count)
+            Any: Final LLM response
 
         Raises:
             UserRejectionInterruption: When user rejects any tool
@@ -252,16 +247,17 @@ class LLMClientBase(ABC):
 
         # Check if we need to continue tool calling
         if not self._should_continue_tool_calling(current_response):
-            return (current_response, tool_count)  # Normal completion
+            # If previous round had tools and now we're done, send concluded notification
+            if had_tools_in_previous_round:
+                concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
+                await self._send_websocket_tool_notification(session_id, concluded_notification)
+            return current_response  # Normal completion
 
         # Process tool calls
         context_manager.add_response(current_response)
         tool_calls = self._extract_tool_calls(current_response)
 
         if tool_calls:
-            num_tools = len(tool_calls)
-            tool_count += num_tools
-
             # Send tool use notification
             notification = self._create_tool_notification(tool_calls, current_response)
             await self._send_websocket_tool_notification(session_id, notification)
@@ -289,8 +285,8 @@ class LLMClientBase(ABC):
             if rejected_tools:
                 raise UserRejectionInterruption(session_id, rejected_tools)
 
-        # Continue recursively (no rejections)
-        return await self._recursive_tool_calling(session_id, iterations + 1, tool_count)
+        # Continue recursively - pass True if we executed tools this round
+        return await self._recursive_tool_calling(session_id, iterations + 1, bool(tool_calls))
 
     # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
 

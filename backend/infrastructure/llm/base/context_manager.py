@@ -58,6 +58,9 @@ class BaseContextManager(ABC):
         # Request configuration storage
         self.agent_profile = "general"
         self.enable_memory = True
+
+        # Tool call tracking
+        self._has_tool_calls = False
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
