@@ -251,6 +251,10 @@ class LLMClientBase(ABC):
             enable_memory=enable_memory,
             tool_schemas=prompt_tool_schemas
         )
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
+        if debug:
+            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
 
         # Get working contents and create complete context
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
