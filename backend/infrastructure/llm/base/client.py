@@ -460,12 +460,12 @@ class LLMClientBase(ABC):
 
 
     @abstractmethod
-    def _get_provider_config(self):
+    def _get_provider_config(self) -> Any:
         """
         Get provider-specific configuration object.
-        
+
         Returns:
-            Provider-specific config object with debug flag and other settings
+            Any: Provider-specific config object with debug flag and other settings
         """
         pass
 

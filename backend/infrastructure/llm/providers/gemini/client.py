@@ -5,7 +5,7 @@ This implementation inherits from the base LLMClientBase and uses shared compone
 where possible, while implementing Gemini-specific functionality.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, cast
 
 from google import genai
 from google.genai import types
@@ -178,17 +178,14 @@ class GeminiClient(LLMClientBase):
 
         try:
             # Direct API call with preserved context
+            # Type cast to satisfy Gemini API content format requirements
             response = self.client.models.generate_content(
                 model=self.gemini_config.model_settings.model,
-                contents=context_contents,
+                contents=cast(Any, context_contents),
                 config=config,
             )
             
             # Validate response structure
-            if hasattr(response, 'error'):
-                error_message = f"Gemini API error: {response.error.message if hasattr(response.error, 'message') else str(response.error)}"
-                raise Exception(error_message)
-            
             if not hasattr(response, 'candidates') or not response.candidates:
                 raise Exception("Gemini API returned empty response")
             
@@ -264,8 +261,8 @@ class GeminiClient(LLMClientBase):
         return GeminiResponseProcessor.extract_tool_calls(response)
 
     def _get_response_processor(self):
-        """Get Gemini-specific response processor."""
-        return GeminiResponseProcessor
+        """Get Gemini-specific response processor instance."""
+        return GeminiResponseProcessor()
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""

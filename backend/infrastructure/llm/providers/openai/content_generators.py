@@ -31,7 +31,7 @@ class TitleGenerator(BaseTitleGenerator):
     """
 
     @staticmethod
-    async def generate_title_from_messages(
+    def generate_title_from_messages(
         client,  # OpenAI client instance
         latest_messages: List[BaseMessage],
         debug: bool = False
@@ -105,7 +105,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
     """
 
     @staticmethod
-    async def generate_text_to_image_prompt(
+    def generate_text_to_image_prompt(
         client,  # OpenAI client instance
         session_id: Optional[str] = None,
         debug: bool = False
@@ -192,7 +192,7 @@ class WebSearchGenerator(BaseWebSearchGenerator):
     """
 
     @staticmethod
-    async def perform_web_search(
+    def perform_web_search(
         client,  # OpenAI client instance
         query: str,
         debug: bool = False,
@@ -252,11 +252,14 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             print("[WebSearchGenerator] Making API call...")
             # Check if client is async or sync
             if hasattr(client, 'chat') and hasattr(client.chat, 'completions'):
-                response = client.chat.completions.create(**api_kwargs)     
-            # Debug response
-            if debug:
-                print("[DEBUG] Web search response:")
-                OpenAIDebugger.log_raw_response(response)
+                response = client.chat.completions.create(**api_kwargs)
+
+                # Debug response
+                if debug:
+                    print("[DEBUG] Web search response:")
+                    OpenAIDebugger.log_raw_response(response)
+            else:
+                raise ValueError("Invalid OpenAI client - missing chat.completions interface")
             
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)

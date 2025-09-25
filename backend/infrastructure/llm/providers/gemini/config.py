@@ -121,7 +121,7 @@ class GeminiClientConfig(BaseModel):
         description="Whether to enable tool calling function"
     )
     
-    def get_generation_config_kwargs(self, system_prompt: str, tool_schemas: List[Dict] = None) -> Dict[str, Any]:
+    def get_generation_config_kwargs(self, system_prompt: str, tool_schemas: List[types.Tool] = None) -> Dict[str, Any]:
         """
         Get GenerateContentConfig parameters for Gemini API
         

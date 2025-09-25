@@ -7,7 +7,7 @@ based on conversation context. Separates content generation concerns from the ma
 
 import re
 import json
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, cast
 import anthropic
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
@@ -83,7 +83,9 @@ class TitleGenerator(BaseTitleGenerator):
             response = client.messages.create(**api_kwargs)
             
             if response.content and len(response.content) > 0:
-                title_response_text = response.content[0].text
+                # Handle different content block types safely
+                first_content = response.content[0]
+                title_response_text = getattr(first_content, 'text', str(first_content))
                 
                 # Parse title using shared utility function
                 # Using max_length=30 to match original Anthropic behavior
@@ -104,27 +106,29 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
     """
 
     @staticmethod
-    async def perform_web_search(
+    def perform_web_search(
         client: anthropic.Anthropic,
         query: str,
         debug: bool = False,
-        max_uses: int = 5
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Perform a web search using the native web search tool via Anthropic API.
-        
+
         Uses the web_search_20250305 tool. The model will automatically
         decide whether to perform a search based on the query requirements.
-        
+
         Args:
             client: Anthropic Claude client instance
             query: The search query to find information on the web
             debug: Enable debug output
-            max_uses: Maximum number of search tool uses (default: 5)
-            
+            **kwargs: Additional search parameters:
+                - max_uses: Maximum number of search tool uses (default: 5)
+
         Returns:
             Dictionary containing search results or error information
         """
+        max_uses = kwargs.get('max_uses', 5)
         try:
             # Create user message with search query
             user_message = UserMessage(role="user", content=query)
@@ -209,7 +213,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
     """
 
     @staticmethod
-    async def generate_text_to_image_prompt(
+    def generate_text_to_image_prompt(
         client: anthropic.Anthropic,
         session_id: Optional[str] = None,
         debug: bool = False
@@ -261,11 +265,13 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
                 max_tokens=4096,
                 temperature=context.get('temperature', 1.0),
                 system=context['system_prompt'],
-                messages=formatted_messages
+                messages=cast(Any, formatted_messages)
             )
 
             if response.content and len(response.content) > 0:
-                prompt_text = response.content[0].text
+                # Handle different content block types safely
+                first_content = response.content[0]
+                prompt_text = getattr(first_content, 'text', str(first_content))
                 
                 # Process response using inherited method
                 return ImagePromptGenerator.process_generation_response(
@@ -278,94 +284,3 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
                 print(f"[text_to_image] Error during prompt generation: {str(e)}")
             return None
 
-
-class AnalysisGenerator:
-    """
-    Handles various analysis tasks using Anthropic Claude API.
-    
-    Provides structured analysis capabilities that leverage Claude's
-    analytical strengths for tasks like code review, document analysis, etc.
-    """
-
-    @staticmethod
-    def analyze_conversation_sentiment(
-        client: anthropic.Anthropic,
-        messages: List[BaseMessage],
-        debug: bool = False
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Analyze the sentiment and tone of a conversation.
-        
-        Args:
-            client: Anthropic Claude client instance
-            messages: List of messages to analyze
-            debug: Enable debug output
-            
-        Returns:
-            Dictionary with sentiment analysis results
-        """
-        try:
-            if not messages:
-                return None
-                
-            # 构造分析提示
-            conversation_text = "Please analyze the sentiment and tone of this conversation:\n\n"
-            for msg in messages[-5:]:  # Analyze last 5 messages
-                if isinstance(msg.content, list):
-                    text_parts = []
-                    for item in msg.content:
-                        if isinstance(item, dict) and "text" in item:
-                            text_parts.append(item["text"])
-                    content = " ".join(text_parts)
-                else:
-                    content = str(msg.content)
-                conversation_text += f"{msg.role}: {content}\n"
-            
-            conversation_text += "\nProvide analysis in JSON format with keys: overall_sentiment, confidence, key_themes, tone."
-            
-            analysis_messages = MessageFormatter.format_messages([
-                UserMessage(role="user", content=conversation_text)
-            ])
-            
-            # Use the new Anthropic configuration system
-            anthropic_config = get_anthropic_client_config()
-            
-            # Build API call parameters using the configuration system
-            api_kwargs = anthropic_config.get_api_call_kwargs(
-                system_prompt="",  # No system prompt for analysis
-                messages=analysis_messages
-            )
-            
-            # Override parameters specific to sentiment analysis
-            api_kwargs.update({
-                "max_tokens": 1024,
-                "temperature": 0.1  # Lower temperature for consistent analysis
-            })
-            
-            # Remove system prompt as we don't need it for this analysis
-            api_kwargs.pop("system", None)
-            
-            response = client.messages.create(**api_kwargs)
-            
-            if response.content and len(response.content) > 0:
-                analysis_text = response.content[0].text
-                
-                # Try to extract JSON from response
-                try:
-                    # Look for JSON in the response
-                    json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
-                    if json_match:
-                        analysis_data = json.loads(json_match.group(0))
-                        return analysis_data
-                    else:
-                        # Fallback: parse structured text response
-                        return {"raw_analysis": analysis_text}
-                except json.JSONDecodeError:
-                    return {"raw_analysis": analysis_text}
-                    
-            return None
-            
-        except Exception as e:
-            if debug:
-                print(f"[sentiment_analysis] Error: {str(e)}")
-            return None

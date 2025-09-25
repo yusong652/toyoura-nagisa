@@ -69,9 +69,9 @@ class AnthropicClient(LLMClientBase):
         """Extract tool calls from Anthropic response."""
         return AnthropicResponseProcessor.extract_tool_calls(response)
 
-    def _get_response_processor(self):
-        """Get Anthropic-specific response processor."""
-        return AnthropicResponseProcessor
+    def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
+        """Get Anthropic-specific response processor instance."""
+        return AnthropicResponseProcessor()
 
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
@@ -99,17 +99,17 @@ class AnthropicClient(LLMClientBase):
 
     async def call_api_with_context(
         self,
-        anthropic_messages: List[Dict[str, Any]],
-        session_id: Optional[str] = None,
+        context_contents: List[Dict[str, Any]],
+        session_id: str,
         agent_profile: str = "general",
         enable_memory: bool = True,
         **kwargs
     ):
         """
         使用上下文调用Anthropic API
-        
+
         Args:
-            anthropic_messages: Pre-formatted Anthropic API messages
+            context_contents: Pre-formatted Anthropic API messages
             session_id: Session ID for tool schema retrieval and dependency injection
             agent_profile: Agent profile type for tool filtering and prompt customization
             enable_memory: Whether to enable memory injection in system prompt (controlled by frontend)
@@ -139,7 +139,7 @@ class AnthropicClient(LLMClientBase):
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(
             system_prompt=system_prompt,
-            messages=anthropic_messages,
+            messages=context_contents,
             tools=api_tools
         )
 
@@ -214,25 +214,26 @@ class AnthropicClient(LLMClientBase):
             self.anthropic_config.debug
         )
 
-    async def perform_web_search(self, query: str, max_uses: int = 5) -> Dict[str, Any]:
+    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
         """
         Perform a web search using the native web search tool via Anthropic API.
-        
+
         This method uses the project's unified client configuration and provides
         comprehensive error handling and debugging support.
-        
+
         Args:
             query: The search query to find information on the web
-            max_uses: Maximum number of search tool uses
-            
+            **kwargs: Additional search parameters:
+                - max_uses: Maximum number of search tool uses (default: 5)
+
         Returns:
             Dictionary containing search results with sources and metadata
         """
         from .content_generators import AnthropicWebSearchGenerator
         return AnthropicWebSearchGenerator.perform_web_search(
-            self.client, 
-            query, 
+            self.client,
+            query,
             self.anthropic_config.debug,
-            max_uses
+            **kwargs
         )
 

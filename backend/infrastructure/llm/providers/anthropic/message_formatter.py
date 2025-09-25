@@ -223,7 +223,7 @@ class MessageFormatter(BaseMessageFormatter):
                 })
             
             # Map role and add to messages
-            mapped_role = MessageFormatter.map_role(msg.role)
+            mapped_role = MessageFormatter.map_role(getattr(msg, 'role', 'user'))
             formatted_messages.append({
                 "role": mapped_role,
                 "content": content
@@ -270,7 +270,7 @@ class MessageFormatter(BaseMessageFormatter):
         
         # Map role and return formatted message
         if content:
-            mapped_role = MessageFormatter.map_role(message.role)
+            mapped_role = MessageFormatter.map_role(getattr(message, 'role', 'user'))
             return {
                 "role": mapped_role,
                 "content": content

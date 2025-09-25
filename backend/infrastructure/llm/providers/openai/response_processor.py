@@ -10,9 +10,10 @@ import json
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import AssistantMessage
 from backend.shared.utils.text_parser import parse_llm_output
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
-class OpenAIResponseProcessor:
+class OpenAIResponseProcessor(BaseResponseProcessor):
     """
     Process OpenAI API responses and extract relevant information
     

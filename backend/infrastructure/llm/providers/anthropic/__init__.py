@@ -21,7 +21,7 @@ Anthropic Claude客户端模块
 from .client import AnthropicClient
 from .message_formatter import MessageFormatter
 from .response_processor import AnthropicResponseProcessor
-from .content_generators import TitleGenerator, ImagePromptGenerator, AnalysisGenerator
+from .content_generators import TitleGenerator, ImagePromptGenerator
 from .debug import AnthropicDebugger
 from .config import get_anthropic_config, AnthropicClientConfig
 from .constants import SUPPORTED_MODELS, DEFAULT_MODEL
@@ -32,7 +32,6 @@ __all__ = [
     "AnthropicResponseProcessor",
     "TitleGenerator",
     "ImagePromptGenerator",
-    "AnalysisGenerator",
     "AnthropicDebugger",
     "get_anthropic_config",
     "AnthropicClientConfig",

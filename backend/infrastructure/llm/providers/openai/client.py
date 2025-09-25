@@ -75,21 +75,22 @@ class OpenAIClient(LLMClientBase):
         """
         Get all MCP tool schemas in OpenAI format.
         Only return meta tools + cached tools, not all regular tools.
-        
+
         Args:
             session_id: Session ID for context-specific tools (required for dependency injection)
             agent_profile: Agent profile type for tool filtering
-            
+
         Returns:
             List[Dict[str, Any]]: Tool schemas in OpenAI format
         """
         debug = getattr(self, 'debug', False)  # Fallback for debug flag
-        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        return schemas or []  # Return empty list if None
 
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
-        session_id: Optional[str] = None,
+        session_id: str,
         agent_profile: str = "general",
         enable_memory: bool = True,
         **kwargs
@@ -202,8 +203,8 @@ class OpenAIClient(LLMClientBase):
         return OpenAIResponseProcessor.extract_tool_calls(response)
 
     def _get_response_processor(self):
-        """Get OpenAI-specific response processor."""
-        return OpenAIResponseProcessor
+        """Get OpenAI-specific response processor instance."""
+        return OpenAIResponseProcessor()
 
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
@@ -212,9 +213,6 @@ class OpenAIClient(LLMClientBase):
     def _get_provider_config(self):
         """Get OpenAI-specific configuration object."""
         return self.openai_config
-
-    # _streaming_tool_calling_loop is inherited from LLMClientBase
-    # _execute_single_tool_call is inherited from LLMClientBase
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
@@ -232,7 +230,7 @@ class OpenAIClient(LLMClientBase):
             Generated title string, or None if failed
         """
         debug = self.openai_config.debug
-        return await TitleGenerator.generate_title_from_messages(
+        return TitleGenerator.generate_title_from_messages(
             self.client,
             latest_messages,
             debug
@@ -251,7 +249,7 @@ class OpenAIClient(LLMClientBase):
             Dictionary containing text prompt and negative prompt, or None if failed
         """
         debug = self.openai_config.debug
-        return await ImagePromptGenerator.generate_text_to_image_prompt(
+        return ImagePromptGenerator.generate_text_to_image_prompt(
             self.client,
             session_id,
             debug
@@ -272,7 +270,7 @@ class OpenAIClient(LLMClientBase):
             Dictionary containing search results with sources and metadata
         """
         debug = self.openai_config.debug
-        return await WebSearchGenerator.perform_web_search(
+        return WebSearchGenerator.perform_web_search(
             self.client,
             query,
             debug,
