@@ -8,7 +8,6 @@ multimodal content, and error handling.
 import json
 from typing import Any, Dict, List, Optional, Tuple
 from backend.domain.models.response_models import LLMResponse
-from backend.shared.utils.text_parser import parse_llm_output
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
@@ -235,11 +234,7 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
             elif item.type == "thinking":
                 content_list.append({"type": "thinking", "thinking": item.thinking})
 
-        # Extract keyword from text content
-        keyword = None
-        if text_content:
-            parsed_result = parse_llm_output(text_content)
-            keyword = parsed_result['keyword']
+        # Note: keyword parsing is handled at display layer, preserve original text
 
         return AssistantMessage(
             role="assistant",
