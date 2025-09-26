@@ -169,7 +169,7 @@ class LLMClientBase(ABC):
                 final_message = processor.format_response_for_storage(final_response)
             else:
                 from backend.domain.models.messages import AssistantMessage
-                final_message = AssistantMessage(content="Response processing unavailable")
+                final_message = AssistantMessage(content=[{"type": "text", "text": "Response processing unavailable"}])
 
             return final_message
 

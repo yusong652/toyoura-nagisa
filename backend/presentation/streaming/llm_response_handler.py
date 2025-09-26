@@ -103,15 +103,13 @@ async def process_chat_request(
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
-            # Send WebSocket read status just before LLM processing starts
-            if status_service and user_message_id:
-                await status_service.notify_read(session_id, user_message_id)
-
             # ========== PHASE 2: Get LLM response using session-based approach ==========
             # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
-
+            # Send WebSocket read status just before LLM processing starts
+            if status_service and user_message_id:
+                await status_service.notify_read(session_id, user_message_id)
             # Use simplified session-based response method - All configuration retrieved from context manager
             final_message = await llm_client.get_response_from_session(session_id)
 
@@ -120,7 +118,7 @@ async def process_chat_request(
                 # Process content via WebSocket
                 # Note: keyword extraction is handled in content_processor
                 await process_content_pipeline(
-                    final_message, session_id, request_id, {}
+                    final_message, session_id
                 )
 
             # ========== PHASE 4: Post-processing pipeline ==========

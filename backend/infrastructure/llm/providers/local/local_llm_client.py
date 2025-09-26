@@ -138,9 +138,10 @@ class LocalLLMClient(LLMClientBase):
                     if isinstance(item, dict) and item.get('type') == 'text':
                         item['text'] = extract_response_without_think(item['text'])
             elif isinstance(cleaned_content, str):
-                # Process string format content
-                cleaned_content = extract_response_without_think(cleaned_content)
-            
+                # Process string format content and convert to structured format
+                processed_text = extract_response_without_think(cleaned_content)
+                cleaned_content = [{"type": "text", "text": processed_text}]
+
             # Create a message from the cleaned response
             final_message = AssistantMessage(content=cleaned_content)
             
@@ -157,7 +158,7 @@ class LocalLLMClient(LLMClientBase):
         except Exception as e:
             logger.error(f"Local LLM get_response failed: {e}")
             # Yield error message
-            error_message = AssistantMessage(content=f"Error: {str(e)}")
+            error_message = AssistantMessage(content=[{"type": "text", "text": f"Error: {str(e)}"}])
             yield (error_message, {"error": str(e)})
 
     async def check_health(self) -> bool:

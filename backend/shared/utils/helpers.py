@@ -91,61 +91,35 @@ def process_user_message(result: MessageParseResult, history_msgs: list) -> User
 
     return user_msg
 
-def process_assistant_text_message(content: List[Dict[str, Any]], keyword: str, history_msgs: list, session_id: str) -> tuple[str, str]:
+def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> str:
     """
-    Process AI assistant text message, save to history and vector database, return message ID and processed content.
-    
+    Save AI assistant message to history and return message ID.
+
     Args:
-        content: Structured content list, each element is a dict with type field
-        keyword: Keyword
-        history_msgs: History message list
+        content: Structured content list from LLM response
         session_id: Session ID
-        
+
     Returns:
-        tuple[str, str]: (Message ID, processed message content)
+        str: Generated message ID
     """
     message_id = str(uuid.uuid4())
-    
-    # Extract current text content for checking
-    extracted_text = ""
-    for content_item in content:
-        if isinstance(content_item, dict) and content_item.get("type") == "text":
-            extracted_text += content_item.get("text", "") + " "
-    
-    # Handle keyword-only cases: ensure keyword info is saved to history
-    processed_content = content.copy() if isinstance(content, list) else content
-    if keyword and not extracted_text.strip():
-        # Add keyword marker to content, ensure keyword info is preserved in history
-        if isinstance(processed_content, list):
-            # Try to find existing text item and update
-            text_item_found = False
-            for content_item in processed_content:
-                if isinstance(content_item, dict) and content_item.get('type') == 'text':
-                    # Keep keyword marker in text, frontend can parse
-                    content_item['text'] = f"[[{keyword}]]"
-                    text_item_found = True
-                    break
-            
-            if not text_item_found:
-                processed_content.append({
-                    "type": "text",
-                    "text": f"[[{keyword}]]"
-                })
-    
-    # Create assistant message object
+
+    # Load complete history including images and other content
+    from backend.infrastructure.storage.session_manager import load_all_message_history
+    history = load_all_message_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+    # Create assistant message object - save content as-is
     assistant_message = AssistantMessage(
-        content=processed_content,
+        content=content,
         id=message_id
     )
+
+    # Add to history and save
     history_msgs.append(assistant_message)
     save_history(session_id, history_msgs)
 
-    processed_text = ""
-    for content_item in processed_content:
-        if isinstance(content_item, dict) and content_item.get("type") == "text":
-            processed_text += content_item.get("text", "") + " "
-
-    return message_id, processed_text.strip()
+    return message_id
 
 
 async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:

@@ -9,18 +9,15 @@ import json
 from typing import Dict, Any, AsyncGenerator, Optional, List, Union
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
-from backend.infrastructure.storage.session_manager import load_all_message_history
-from backend.shared.utils.helpers import process_assistant_text_message
+from backend.shared.utils.helpers import save_assistant_message
 from backend.presentation.websocket.message_types import MessageType, create_message
 # Import will be resolved at runtime - avoid circular import
 # from backend.presentation.streaming.tts_processor import process_tts_pipeline
 
 
 async def process_content_pipeline(
-    final_message: BaseMessage,
-    session_id: str,
-    request_id: str,
-    execution_metadata: Optional[Dict[str, Any]] = None
+    final_message: BaseMessage,  # AssistantMessage with List content
+    session_id: str
 ) -> None:
     """
     Content processing pipeline for final LLM responses.
@@ -34,55 +31,28 @@ async def process_content_pipeline(
     Args:
         final_message: Final LLM response message
         session_id: Current session ID
-        request_id: Request ID for debugging
-        execution_metadata: Optional execution metadata with keywords
 
     Returns:
         None: All processing is handled via WebSocket communication
     """
-    if not hasattr(final_message, 'content'):
-        return
-    
-    content = final_message.content
+    # Type assertion: AssistantMessage always has List content at this point
+    content = final_message.content  # type: ignore
 
-    # Normalize content to List[Dict[str, Any]] format for consistent processing
-    normalized_content: List[Dict[str, Any]] = []
-    if isinstance(content, list):
-        normalized_content = [
-            dict(item) if isinstance(item, dict) else {"type": "text", "text": str(item)}
-            for item in content
-        ]
-    else:
-        # Convert string content to structured format
-        normalized_content = [{"type": "text", "text": str(content)}]
-
-    # Extract text content for TTS (excluding thinking blocks)
+    # Extract text content for keyword parsing and TTS (excluding thinking blocks)
     text_content = ""
-    for item in normalized_content:
+    for item in content:
         if isinstance(item, dict) and item.get('type') == 'text':
             text_content += item.get('text', '')
-    
-    # Load conversation history for message processing
-    loaded_history = load_all_message_history(session_id)
-    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-    
-    # Extract keywords from metadata or parse from text
-    extracted_keyword = None
-    if execution_metadata and 'keyword' in execution_metadata:
-        extracted_keyword = execution_metadata['keyword']
-    else:
-        # Fallback: parse emotional keywords from text content
-        from backend.shared.utils.text_parser import parse_llm_output
-        _, extracted_keyword = parse_llm_output(text_content)
-    
+
+    # Extract emotional keywords from text content
+    from backend.shared.utils.text_parser import parse_llm_output
+    _, extracted_keyword = parse_llm_output(text_content)
+
     # Save complete content including thinking blocks to conversation history
-    ai_msg_id, processed_content = process_assistant_text_message(
-        normalized_content,  # Save normalized content including thinking
-        extracted_keyword,  # Use extracted keywords
-        history_msgs,
+    ai_msg_id = save_assistant_message(
+        content,  # Content is guaranteed to be List[Dict[str, Any]]
         session_id
     )
-    
     
     # Send emotional keywords via WebSocket if available
     if extracted_keyword:
