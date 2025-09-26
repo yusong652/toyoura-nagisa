@@ -140,7 +140,7 @@ class LLMClientBase(ABC):
     async def get_response_from_session(
         self,
         session_id: str
-    ) -> Tuple[BaseMessage, Dict[str, Any]]:
+    ) -> BaseMessage:
         """
         Generate response from specified session.
 
@@ -148,7 +148,7 @@ class LLMClientBase(ABC):
             session_id: Session ID
 
         Returns:
-            Tuple[BaseMessage, Dict[str, Any]]: Final message and execution metadata
+            BaseMessage: Final response message
 
         Raises:
             UserRejectionInterruption: When user rejects tool execution (not an error)
@@ -163,24 +163,15 @@ class LLMClientBase(ABC):
                 session_id, iterations=0
             )
 
-            # Extract keyword from response
-            keyword = None
-            processor = self._get_response_processor()
-            original_text = processor.extract_text_content(final_response) if processor else ""
-            if original_text:
-                from backend.shared.utils.text_parser import parse_llm_output
-                _, keyword = parse_llm_output(original_text)
-
             # Format response for storage (but don't add to context manager - already added)
+            processor = self._get_response_processor()
             if processor:
                 final_message = processor.format_response_for_storage(final_response)
             else:
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(content="Response processing unavailable")
 
-            # Return simplified metadata with only what's actually used
-            metadata = {'keyword': keyword} if keyword else {}
-            return (final_message, metadata)
+            return final_message
 
         except UserRejectionInterruption:
             # User rejection is not an error - re-raise as-is

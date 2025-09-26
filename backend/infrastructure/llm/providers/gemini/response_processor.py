@@ -103,27 +103,24 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         Returns:
             BaseMessage: Formatted message for storage
         """
-        # Extract text content
-        text_content = GeminiResponseProcessor.extract_text_content(response)
-        
         # Build content array for multimodal support
         content = []
-        
+
         if not hasattr(response, 'candidates') or not response.candidates:
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
-        
+
         candidate = response.candidates[0]
         if not hasattr(candidate, 'content') or not candidate.content:
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
         
-        # Extract thinking content
+        # Extract thinking content and main text
         thinking_parts = []
-        text_parts = []
-        
+        main_text = None
+
         # Extract top-level thought
         if hasattr(candidate, 'thought') and candidate.thought:
             thinking_parts.append(str(candidate.thought))
-        
+
         # Process all parts from the response
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
@@ -131,8 +128,8 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     # Categorize text content
                     if getattr(part, 'thought', False):
                         thinking_parts.append(part.text)
-                    else:
-                        text_parts.append(part.text)
+                    elif main_text is None:  # Capture first non-thinking text part
+                        main_text = part.text
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Include function calls in storage format
                     func_call = part.function_call
@@ -142,7 +139,7 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         "name": func_call.name,
                         "input": dict(func_call.args) if hasattr(func_call, 'args') else {}
                     })
-        
+
         # Build content list for storage
         if thinking_parts:
             full_thinking_content = "\n".join(thinking_parts).strip()
@@ -151,20 +148,17 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     "type": "thinking",
                     "thinking": full_thinking_content,
                 })
-        
-        # Process text content and extract keyword
-        full_text_content = "".join(text_parts).strip()
-        if full_text_content:
-            from backend.shared.utils.text_parser import parse_llm_output
-            response_text, _ = parse_llm_output(full_text_content)
+
+        # Add main text content - preserve original format
+        if main_text:
             content.append({
                 "type": "text",
-                "text": response_text
+                "text": main_text  # Keep original format for proper markdown rendering
             })
         
         # If no content was extracted, add empty text
         if not content:
-            content = [{"type": "text", "text": text_content}]
+            content = [{"type": "text", "text": ""}]
         
         return AssistantMessage(role="assistant", content=content)
     

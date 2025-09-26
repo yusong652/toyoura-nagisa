@@ -113,19 +113,19 @@ async def process_chat_request(
             llm_client = get_llm_client()
 
             # Use simplified session-based response method - All configuration retrieved from context manager
-            final_message, execution_metadata = await llm_client.get_response_from_session(session_id)
+            final_message = await llm_client.get_response_from_session(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
                 # Process content via WebSocket
+                # Note: keyword extraction is handled in content_processor
                 await process_content_pipeline(
-                    final_message, session_id, request_id, execution_metadata
+                    final_message, session_id, request_id, {}
                 )
 
             # ========== PHASE 4: Post-processing pipeline ==========
-            if execution_metadata:
-                # Post-processing handled via WebSocket
-                await process_post_pipeline(session_id, request_id)
+            # Post-processing handled via WebSocket
+            await process_post_pipeline(session_id, request_id)
 
             # ========== PHASE 5: Memory persistence ==========
             # Save conversation to memory after successful response
