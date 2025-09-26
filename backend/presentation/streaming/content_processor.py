@@ -46,7 +46,8 @@ async def process_content_pipeline(
 
     # Extract emotional keywords from text content
     from backend.shared.utils.text_parser import parse_llm_output
-    _, extracted_keyword = parse_llm_output(text_content)
+    parsed_result = parse_llm_output(text_content)
+    extracted_keyword = parsed_result['keyword']
 
     # Save complete content including thinking blocks to conversation history
     ai_msg_id = save_assistant_message(
@@ -61,8 +62,8 @@ async def process_content_pipeline(
         if emotion_service:
             await emotion_service.notify_emotion_keyword(session_id, extracted_keyword, ai_msg_id)
     
-    # Process TTS pipeline if text content is available
-    if text_content.strip():
+    # Process TTS pipeline if clean text content is available
+    if parsed_result['text'].strip():
         # Send MESSAGE_CREATE first to create the bot message
         await send_message_create_via_websocket(session_id, ai_msg_id)
 
@@ -72,7 +73,8 @@ async def process_content_pipeline(
 
         # Dynamic import to avoid circular dependency
         from backend.presentation.streaming.tts_processor import process_tts_pipeline
-        async for chunk in process_tts_pipeline(text_content, tts_engine):
+        # Use cleaned text without keyword markers for TTS
+        async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
             # Send TTS chunks only via WebSocket (no SSE for TTS)
             await send_tts_chunk_via_websocket(session_id, chunk, ai_msg_id)
     else:

@@ -5,7 +5,7 @@ Provides parsing functionality for LLM output text, including keyword extraction
 """
 
 import re
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from pathlib import Path
 
 
@@ -42,30 +42,33 @@ def get_allowed_keywords_from_prompt_file() -> List[str]:
     return _allowed_keywords_cache
 
 
-def parse_llm_output(llm_full_response: str) -> Tuple[str, str]:
+def parse_llm_output(llm_full_response: str) -> dict:
     """
     Parse LLM output to extract reply text and keywords.
     Args:
         llm_full_response: Complete response text from LLM
     Returns:
-        (response_text, keyword) tuple
+        Dictionary with 'text' and 'keyword' keys
     """
     allowed_keywords = get_allowed_keywords_from_prompt_file()
-    
+
     keyword = "neutral"  # Default keyword
-    response_text = llm_full_response.strip()
+    text_with_no_keyword = llm_full_response.strip()
 
     match = re.search(r'\[\[(\w+)\]\]\s*$', llm_full_response.strip())
     if match:
         extracted_keyword = match.group(1).lower()
         if extracted_keyword in allowed_keywords:
             keyword = extracted_keyword
-            response_text = llm_full_response[:match.start()].strip()
+            text_with_no_keyword = llm_full_response[:match.start()].strip()
         else:
             print(f"Warning: LLM returned undefined keyword '{extracted_keyword}'")
-            response_text = llm_full_response[:match.start()].strip()
+            text_with_no_keyword = llm_full_response[:match.start()].strip()
 
-    return response_text, keyword
+    return {
+        'text': text_with_no_keyword,
+        'keyword': keyword
+    }
 
 
 def clear_keywords_cache() -> None:

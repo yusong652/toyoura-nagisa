@@ -238,7 +238,8 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         # Extract keyword from text content
         keyword = None
         if text_content:
-            _, keyword = parse_llm_output(text_content)
+            parsed_result = parse_llm_output(text_content)
+            keyword = parsed_result['keyword']
 
         return AssistantMessage(
             role="assistant",

@@ -178,7 +178,8 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         visible_content = OpenAIResponseProcessor.extract_visible_content(response)
         if visible_content:
             # Parse for keywords using shared utility
-            response_text, keyword = parse_llm_output(visible_content)
+            parsed_result = parse_llm_output(visible_content)
+            response_text, keyword = parsed_result['text'], parsed_result['keyword']
             content_blocks.append({
                 "type": "text",
                 "text": response_text
