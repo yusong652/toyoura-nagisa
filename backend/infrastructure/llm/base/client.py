@@ -158,6 +158,7 @@ class LLMClientBase(ABC):
 
         try:
             # Call recursive tool calling loop
+            # Note: final_response is already added to context_manager within _recursive_tool_calling
             final_response = await self._recursive_tool_calling(
                 session_id, iterations=0
             )
@@ -170,10 +171,9 @@ class LLMClientBase(ABC):
                 from backend.shared.utils.text_parser import parse_llm_output
                 _, keyword = parse_llm_output(original_text)
 
-            # Create final message and add to context manager
+            # Format response for storage (but don't add to context manager - already added)
             if processor:
                 final_message = processor.format_response_for_storage(final_response)
-                context_manager.add_response(final_message)
             else:
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(content="Response processing unavailable")
@@ -275,6 +275,9 @@ class LLMClientBase(ABC):
             if had_tools_in_previous_round:
                 concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
                 await self._send_websocket_tool_notification(session_id, concluded_notification)
+
+            # Add final response to context manager before returning
+            context_manager.add_response(current_response)
             return current_response  # Normal completion
 
         # Process tool calls
