@@ -9,7 +9,6 @@ import re
 import json
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import AssistantMessage
-from backend.shared.utils.text_parser import parse_llm_output
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
@@ -105,46 +104,7 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         
         return tool_calls
     
-    @staticmethod
-    def extract_thinking_content(response) -> Optional[str]:
-        """
-        Extract thinking content from OpenAI response
-        
-        Args:
-            response: OpenAI API response object
-            
-        Returns:
-            Extracted thinking content or None if not found
-        """
-        text_content = OpenAIResponseProcessor.extract_text_content(response)
-        if not text_content:
-            return None
-        
-        # Extract thinking blocks using regex
-        thinking_matches = re.findall(r'<thinking>(.*?)</thinking>', text_content, re.DOTALL)
-        if thinking_matches:
-            return "\n".join(match.strip() for match in thinking_matches)
-        
-        return None
     
-    @staticmethod
-    def extract_visible_content(response) -> str:
-        """
-        Extract visible content (non-thinking) from OpenAI response
-        
-        Args:
-            response: OpenAI API response object
-            
-        Returns:
-            Visible content with thinking blocks removed
-        """
-        text_content = OpenAIResponseProcessor.extract_text_content(response)
-        if not text_content:
-            return ""
-        
-        # Remove thinking blocks
-        visible_content = re.sub(r'<thinking>.*?</thinking>', '', text_content, flags=re.DOTALL)
-        return visible_content.strip()
     
     @staticmethod
     def format_response_for_storage(response) -> AssistantMessage:
@@ -166,23 +126,12 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         choice = response.choices[0].message
         content_blocks = []
         
-        # Handle thinking content
-        thinking_content = OpenAIResponseProcessor.extract_thinking_content(response)
-        if thinking_content:
-            content_blocks.append({
-                "type": "thinking",
-                "thinking": thinking_content
-            })
-        
-        # Handle visible text content
-        visible_content = OpenAIResponseProcessor.extract_visible_content(response)
-        if visible_content:
-            # Parse for keywords using shared utility
-            parsed_result = parse_llm_output(visible_content)
-            response_text, keyword = parsed_result['text'], parsed_result['keyword']
+        # Handle text content - preserve original format
+        text_content = OpenAIResponseProcessor.extract_text_content(response)
+        if text_content:
             content_blocks.append({
                 "type": "text",
-                "text": response_text
+                "text": text_content
             })
         
         # Handle tool calls
