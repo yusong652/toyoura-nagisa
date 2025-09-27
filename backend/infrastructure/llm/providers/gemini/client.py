@@ -227,10 +227,6 @@ class GeminiClient(LLMClientBase):
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
-    def _should_continue_tool_calling(self, response: Any) -> bool:
-        """Check if Gemini response contains tool calls that require execution."""
-        return GeminiResponseProcessor.has_tool_calls(response)
-
 
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""

@@ -227,8 +227,9 @@ class LLMClientBase(ABC):
         # Stateless API call with context and configuration
         current_response = await self.call_api_with_context(complete_context, api_config)
         context_manager = self.get_or_create_context_manager(session_id)
-        # Check if we need to continue tool calling
-        if not self._should_continue_tool_calling(current_response):
+        # Check if response contains tool calls
+        processor = self._get_response_processor()
+        if not (processor and processor.has_tool_calls(current_response)):
             # If previous round had tools and now we're done, send concluded notification
             if had_tools_in_previous_round:
                 concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
@@ -338,18 +339,6 @@ class LLMClientBase(ABC):
 
     # ========== ABSTRACT HELPER METHODS FOR PROVIDER-SPECIFIC LOGIC ==========
 
-    @abstractmethod
-    def _should_continue_tool_calling(self, response: Any) -> bool:
-        """
-        Check if response contains tool calls that require execution.
-        
-        Args:
-            response: Provider-specific response object to check
-            
-        Returns:
-            bool: True if tool calls are present and execution should continue
-        """
-        pass
 
     @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:

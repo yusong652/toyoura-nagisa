@@ -61,10 +61,6 @@ class AnthropicClient(LLMClientBase):
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
-    def _should_continue_tool_calling(self, response: Any) -> bool:
-        """Check if Anthropic response contains tool calls that require execution."""
-        return AnthropicResponseProcessor.has_tool_calls(response)
-
 
     def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
         """Get Anthropic-specific response processor instance."""

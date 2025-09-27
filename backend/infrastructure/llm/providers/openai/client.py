@@ -175,10 +175,6 @@ class OpenAIClient(LLMClientBase):
 
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
-    def _should_continue_tool_calling(self, response: Any) -> bool:
-        """Check if OpenAI response contains tool calls that require execution."""
-        return OpenAIResponseProcessor.has_tool_calls(response)
-
 
     def _get_response_processor(self):
         """Get OpenAI-specific response processor instance."""
