@@ -278,9 +278,5 @@ class GeminiClient(LLMClientBase):
         """Get Gemini-specific configuration object."""
         return self.gemini_config
 
-    def _extract_thinking_content(self, response) -> Optional[str]:
-        """Extract thinking content from Gemini response."""
-        return GeminiResponseProcessor.extract_thinking_content(response)
-
     # _streaming_tool_calling_loop is inherited from LLMClientBase
     # _execute_single_tool_call is inherited from LLMClientBase

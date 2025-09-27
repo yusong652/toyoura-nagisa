@@ -449,24 +449,6 @@ class LLMClientBase(ABC):
         """
         return tool_result.get('user_rejected', False)
 
-    def _extract_thinking_content(self, response) -> Optional[str]:
-        """
-        Extract thinking content from provider response (optional override).
-        
-        Args:
-            response: Provider-specific response object
-            
-        Returns:
-            Optional[str]: Thinking content if available, None otherwise
-        """
-        # Default implementation - providers can override if they support thinking
-        try:
-            processor = self._get_response_processor()
-            if processor and hasattr(processor, 'extract_thinking_content'):
-                return processor.extract_thinking_content(response)
-        except Exception:
-            pass
-        return None
 
 
     async def _execute_single_tool_call(
@@ -549,13 +531,22 @@ class LLMClientBase(ABC):
             Dict[str, Any]: Notification dictionary ready for WebSocket transmission
         """
         num_tools = len(tool_calls)
-        # Extract text content directly from response processor
+        # Extract text and thinking content from response processor
+        processor = self._get_response_processor()
+
+        # Extract text content
         try:
-            processor = self._get_response_processor()
             extracted_text = processor.extract_text_content(current_response) if processor else ""
         except Exception:
             extracted_text = ""
-        thinking_content = self._extract_thinking_content(current_response)
+
+        # Extract thinking content
+        thinking_content = None
+        try:
+            if processor and hasattr(processor, 'extract_thinking_content'):
+                thinking_content = processor.extract_thinking_content(current_response)
+        except Exception:
+            pass
         tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
 
         # Generate action description based on extracted text or tool names
