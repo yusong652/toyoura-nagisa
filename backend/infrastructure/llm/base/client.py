@@ -181,7 +181,6 @@ class LLMClientBase(ABC):
             print(f"[ERROR] Traceback: {traceback.format_exc()}")
             raise Exception(f"Execution failed: {e}")
 
-
     async def _recursive_tool_calling(
         self,
         session_id: str,
@@ -270,7 +269,10 @@ class LLMClientBase(ABC):
 
         # Process tool calls
         context_manager.add_response(current_response)
-        tool_calls = self._extract_tool_calls(current_response)
+
+        # Extract tool calls using response processor
+        processor = self._get_response_processor()
+        tool_calls = processor.extract_tool_calls(current_response) if processor else []
 
         if tool_calls:
             # Send tool use notification
@@ -363,7 +365,6 @@ class LLMClientBase(ABC):
             f"{self.__class__.__name__} does not support web search"
         )
 
-
     # ========== ABSTRACT HELPER METHODS FOR PROVIDER-SPECIFIC LOGIC ==========
 
     @abstractmethod
@@ -380,22 +381,6 @@ class LLMClientBase(ABC):
         pass
 
     @abstractmethod
-    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
-        """
-        Extract tool calls from provider-specific response.
-        
-        Args:
-            response: Provider-specific response object
-            
-        Returns:
-            List[Dict[str, Any]]: List of tool call dictionaries with structure:
-                - id: str - Tool call identifier
-                - name: str - Tool name
-                - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
-        """
-        pass
-
-    @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
         """
         Get provider-specific response processor instance.
@@ -405,7 +390,6 @@ class LLMClientBase(ABC):
                                            Returns None if not implemented by provider
         """
         pass
-
 
     @abstractmethod
     def _get_provider_config(self) -> Any:
@@ -448,8 +432,6 @@ class LLMClientBase(ABC):
             bool: True if tool was rejected by user, False otherwise
         """
         return tool_result.get('user_rejected', False)
-
-
 
     async def _execute_single_tool_call(
         self,
@@ -511,7 +493,6 @@ class LLMClientBase(ABC):
             
             # Re-raise the exception to stop tool calling loop
             raise e
-
 
     # ========== SHARED UTILITY METHODS ==========
 
@@ -659,7 +640,6 @@ class LLMClientBase(ABC):
             )
 
         return self._session_context_managers[session_id]
-
 
     def cleanup_session_context(self, session_id: str) -> None:
         """

@@ -65,9 +65,6 @@ class AnthropicClient(LLMClientBase):
         """Check if Anthropic response contains tool calls that require execution."""
         return AnthropicResponseProcessor.has_tool_calls(response)
 
-    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
-        """Extract tool calls from Anthropic response."""
-        return AnthropicResponseProcessor.extract_tool_calls(response)
 
     def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
         """Get Anthropic-specific response processor instance."""

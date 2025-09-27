@@ -177,9 +177,6 @@ class OpenAIClient(LLMClientBase):
         """Check if OpenAI response contains tool calls that require execution."""
         return OpenAIResponseProcessor.should_continue_tool_calling(response)
 
-    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
-        """Extract tool calls from OpenAI response."""
-        return OpenAIResponseProcessor.extract_tool_calls(response)
 
     def _get_response_processor(self):
         """Get OpenAI-specific response processor instance."""

@@ -233,9 +233,6 @@ class GeminiClient(LLMClientBase):
         """Check if Gemini response contains tool calls that require execution."""
         return GeminiResponseProcessor.should_continue_tool_calling(response)
 
-    def _extract_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
-        """Extract tool calls from Gemini response."""
-        return GeminiResponseProcessor.extract_tool_calls(response)
 
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""
