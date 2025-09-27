@@ -122,7 +122,6 @@ class ContentService:
         """
         try:
             # Step 1: Generate image prompts from conversation
-            print(f"[DEBUG] Generating image prompts for session {session_id}")
             prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
             
             if not prompt_result:

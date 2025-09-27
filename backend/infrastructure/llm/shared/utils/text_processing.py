@@ -17,7 +17,7 @@ try:
 except ImportError:
     # Fallback values if constants are not available
     DEFAULT_NEGATIVE_PROMPT = "low quality, worst quality, blurry"
-    TEXT_TO_IMAGE_PROMPT_PATTERN = r'<text_to_image_prompt>(.*?)</text_to_image_prompt>'
+    TEXT_TO_IMAGE_PROMPT_PATTERN = r'<prompt>(.*?)</prompt>'
     NEGATIVE_PROMPT_PATTERN = r'<negative_prompt>(.*?)</negative_prompt>'
     TITLE_PROMPT_PATTERN = r'<title>(.*?)</title>'
 
