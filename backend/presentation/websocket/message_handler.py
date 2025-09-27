@@ -239,12 +239,17 @@ class BashConfirmationHandler(MessageHandler):
                 print(f"[BashConfirmationHandler] Processing BASH_CONFIRMATION_RESPONSE from session {session_id}", flush=True)
 
                 # Extract confirmation data from message
+                confirmation_id = getattr(message, 'confirmation_id', None)
                 approved = getattr(message, 'approved', False)
                 user_message = getattr(message, 'user_message', None)
 
-                print(f"[BashConfirmationHandler] session_id={session_id}, approved={approved}", flush=True)
+                print(f"[BashConfirmationHandler] confirmation_id={confirmation_id}, session_id={session_id}, approved={approved}", flush=True)
                 if user_message:
                     print(f"[BashConfirmationHandler] user_message={user_message}", flush=True)
+
+                if not confirmation_id:
+                    logger.warning(f"Missing confirmation_id in BASH_CONFIRMATION_RESPONSE from session {session_id}")
+                    return
 
                 # Get confirmation service and handle response
                 from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
@@ -253,15 +258,15 @@ class BashConfirmationHandler(MessageHandler):
                 if confirmation_service:
                     # Handle the confirmation response
                     handled = confirmation_service.handle_confirmation_response(
-                        session_id=session_id,
+                        confirmation_id=confirmation_id,
                         approved=approved,
                         user_message=user_message
                     )
 
                     if handled:
-                        print(f"[BashConfirmationHandler] Successfully processed confirmation for session {session_id}", flush=True)
+                        print(f"[BashConfirmationHandler] Successfully processed confirmation {confirmation_id} for session {session_id}", flush=True)
                     else:
-                        logger.warning(f"Confirmation service could not handle confirmation for session {session_id}")
+                        logger.warning(f"Confirmation service could not handle confirmation {confirmation_id} for session {session_id}")
                         await self.send_error(
                             session_id,
                             "CONFIRMATION_NOT_FOUND",

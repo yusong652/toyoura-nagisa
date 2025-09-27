@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface BashConfirmationRequest {
+  id: string  // Frontend generated ID for local tracking
+  confirmationId: string  // Backend confirmation ID for response
   command: string
   description?: string
   sessionId: string
@@ -8,38 +10,43 @@ export interface BashConfirmationRequest {
 }
 
 interface BashConfirmationState {
-  request: BashConfirmationRequest | null
+  queue: BashConfirmationRequest[]
+  currentRequest: BashConfirmationRequest | null
   isOpen: boolean
 }
 
 /**
- * Hook for managing bash command confirmation requests from WebSocket.
+ * Hook for managing bash command confirmation requests queue from WebSocket.
  *
- * This hook listens to WebSocket bash confirmation request events and provides
- * methods to approve or reject the command execution.
+ * This hook listens to WebSocket bash confirmation request events and manages
+ * a queue of pending requests, showing one confirmation dialog at a time.
  *
  * Features:
- * - Listens to BASH_CONFIRMATION_REQUEST WebSocket messages
- * - Provides approve/reject methods
- * - Sends BASH_CONFIRMATION_RESPONSE back via WebSocket
- * - Auto-reject on timeout (60 seconds)
+ * - Queue-based management of multiple bash confirmation requests
+ * - One-at-a-time confirmation dialog display
+ * - Auto-processing of queue after each confirmation
+ * - Auto-reject on timeout (60 seconds) for current request
+ * - Unique ID generation for each bash command
  *
  * Returns:
- * - request: Current bash confirmation request
+ * - currentRequest: Currently displayed bash confirmation request
+ * - queueLength: Number of pending requests in queue
  * - isOpen: Whether confirmation dialog should be shown
- * - approve: Function to approve command with optional message
- * - reject: Function to reject command with optional message
+ * - approve: Function to approve current command with optional message
+ * - reject: Function to reject current command with optional message
  */
 export const useBashConfirmation = () => {
   const [state, setState] = useState<BashConfirmationState>({
-    request: null,
+    queue: [],
+    currentRequest: null,
     isOpen: false
   })
 
   // Debug: Log all state changes
   useEffect(() => {
     console.log('[BashConfirmation Hook] State changed:', {
-      request: state.request?.command,
+      currentRequest: state.currentRequest?.command,
+      queueLength: state.queue.length,
       isOpen: state.isOpen,
       timestamp: new Date().toISOString()
     })
@@ -49,7 +56,7 @@ export const useBashConfirmation = () => {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Send response via WebSocket - using global connection like location response
-  const sendResponse = useCallback(async (sessionId: string, approved: boolean, userMessage?: string) => {
+  const sendResponse = useCallback(async (confirmationId: string, approved: boolean, userMessage?: string) => {
 
     // Try to get WebSocket connection with retry logic
     let ws = (window as any).__wsConnection
@@ -80,7 +87,7 @@ export const useBashConfirmation = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       const response = {
         type: 'BASH_CONFIRMATION_RESPONSE',
-        confirmation_id: sessionId,  // Backend expects confirmation_id field but uses session_id value
+        confirmation_id: confirmationId,  // Use actual confirmation ID from backend
         approved,
         user_message: userMessage,
         timestamp: new Date().toISOString()
@@ -101,6 +108,27 @@ export const useBashConfirmation = () => {
     }
   }, [])
 
+  // Process next request in queue
+  const processNextRequest = useCallback(() => {
+    setState(prevState => {
+      if (prevState.queue.length > 0) {
+        const [nextRequest, ...remainingQueue] = prevState.queue
+        console.log('[BashConfirmation] Processing next request from queue:', nextRequest.command)
+        return {
+          queue: remainingQueue,
+          currentRequest: nextRequest,
+          isOpen: true
+        }
+      } else {
+        return {
+          queue: [],
+          currentRequest: null,
+          isOpen: false
+        }
+      }
+    })
+  }, [])
+
   // Approve command execution - 无状态设计，使用refs获取最新值
   const approve = useCallback(async (userMessage?: string) => {
     console.log('[BashConfirmation] Approve called:', {
@@ -108,22 +136,24 @@ export const useBashConfirmation = () => {
       userMessage
     })
 
-    if (stateRef.current.request) {
-      const sessionId = stateRef.current.request.sessionId
-      console.log('[BashConfirmation] Sending approval for session:', sessionId)
+    if (stateRef.current.currentRequest) {
+      const request = stateRef.current.currentRequest
+      console.log('[BashConfirmation] Sending approval for request:', request.id)
 
-      await sendResponseRef.current(sessionId, true, userMessage)
-      setState({ request: null, isOpen: false })
-
-      console.log('[BashConfirmation] State cleared after approval')
+      await sendResponseRef.current(request.confirmationId, true, userMessage)
 
       // Clear timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+
+      // Process next request in queue
+      processNextRequestRef.current()
+
+      console.log('[BashConfirmation] Processed approval and moved to next request')
     } else {
-      console.warn('[BashConfirmation] Approve called but no request found')
+      console.warn('[BashConfirmation] Approve called but no current request found')
     }
   }, []) // 空依赖数组，真正无状态
 
@@ -134,14 +164,11 @@ export const useBashConfirmation = () => {
       userMessage
     })
 
-    if (stateRef.current.request) {
-      const sessionId = stateRef.current.request.sessionId
-      console.log('[BashConfirmation] Sending rejection for session:', sessionId)
+    if (stateRef.current.currentRequest) {
+      const request = stateRef.current.currentRequest
+      console.log('[BashConfirmation] Sending rejection for request:', request.id)
 
-      await sendResponseRef.current(sessionId, false, userMessage)
-      setState({ request: null, isOpen: false })
-
-      console.log('[BashConfirmation] State cleared after rejection')
+      await sendResponseRef.current(request.confirmationId, false, userMessage)
 
       // Clear timeout
       if (timeoutRef.current) {
@@ -152,14 +179,19 @@ export const useBashConfirmation = () => {
       // Dispatch event to clear tool state immediately on rejection
       window.dispatchEvent(new CustomEvent('toolUseConcluded', {
         detail: {
-          session_id: sessionId,
+          session_id: request.sessionId,
           reason: 'user_rejection',
           timestamp: new Date().toISOString()
         }
       }))
       console.log('[BashConfirmation] Dispatched toolUseConcluded event after rejection')
+
+      // Process next request in queue
+      processNextRequestRef.current()
+
+      console.log('[BashConfirmation] Processed rejection and moved to next request')
     } else {
-      console.warn('[BashConfirmation] Reject called but no request found')
+      console.warn('[BashConfirmation] Reject called but no current request found')
     }
   }, []) // 空依赖数组，真正无状态
 
@@ -170,6 +202,9 @@ export const useBashConfirmation = () => {
   const sendResponseRef = useRef(sendResponse)
   sendResponseRef.current = sendResponse
 
+  const processNextRequestRef = useRef(processNextRequest)
+  processNextRequestRef.current = processNextRequest
+
   useEffect(() => {
     console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest (mount only)')
 
@@ -178,8 +213,13 @@ export const useBashConfirmation = () => {
       const data = event.detail
       console.log('[BashConfirmation] Event detail data:', data)
 
+      // Generate unique ID for this request
+      const requestId = `bash_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+
       // Parse request
       const request: BashConfirmationRequest = {
+        id: requestId,  // Frontend generated ID for local tracking
+        confirmationId: data.confirmation_id,  // Backend confirmation ID
         command: data.command,
         description: data.description,
         sessionId: data.session_id || data.sessionId, // Handle both forms
@@ -187,31 +227,28 @@ export const useBashConfirmation = () => {
       }
 
       console.log('[BashConfirmation] Parsed request:', request)
-      setState({ request, isOpen: true })
+
+      setState(prevState => {
+        // If no current request, set this as current
+        if (!prevState.currentRequest) {
+          console.log('[BashConfirmation] Setting as current request (no queue)')
+          return {
+            queue: prevState.queue,
+            currentRequest: request,
+            isOpen: true
+          }
+        } else {
+          // Add to queue
+          console.log('[BashConfirmation] Adding to queue (current request exists)')
+          return {
+            queue: [...prevState.queue, request],
+            currentRequest: prevState.currentRequest,
+            isOpen: prevState.isOpen
+          }
+        }
+      })
+
       console.log('[BashConfirmation] State updated with request')
-
-      // Set auto-reject timeout (60 seconds)
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        console.log('[BashConfirmation] Auto-rejecting due to timeout')
-        // Use the current sendResponse function from ref
-        sendResponseRef.current(request.sessionId, false, 'Command confirmation timed out').then(() => {
-          setState({ request: null, isOpen: false })
-
-          // Dispatch event to clear tool state on timeout rejection
-          window.dispatchEvent(new CustomEvent('toolUseConcluded', {
-            detail: {
-              session_id: request.sessionId,
-              reason: 'user_rejection',
-              timestamp: new Date().toISOString()
-            }
-          }))
-          console.log('[BashConfirmation] Dispatched toolUseConcluded event after timeout rejection')
-        })
-      }, 60000)
     }
 
     // Listen to custom event from ConnectionContext
@@ -223,12 +260,48 @@ export const useBashConfirmation = () => {
       // Clean up timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
       }
     }
   }, []) // 空依赖数组，只在mount/unmount时执行
 
+  // Set up timeout for current request
+  useEffect(() => {
+    if (state.currentRequest && state.isOpen) {
+      console.log('[BashConfirmation] Setting timeout for current request:', state.currentRequest.id)
+
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        console.log('[BashConfirmation] Auto-rejecting due to timeout:', state.currentRequest?.id)
+        const currentRequest = stateRef.current.currentRequest
+        if (currentRequest) {
+          // Use the current sendResponse function from ref
+          sendResponseRef.current(currentRequest.confirmationId, false, 'Command confirmation timed out').then(() => {
+            // Dispatch event to clear tool state on timeout rejection
+            window.dispatchEvent(new CustomEvent('toolUseConcluded', {
+              detail: {
+                session_id: currentRequest.sessionId,
+                reason: 'user_rejection',
+                timestamp: new Date().toISOString()
+              }
+            }))
+            console.log('[BashConfirmation] Dispatched toolUseConcluded event after timeout rejection')
+
+            // Process next request in queue
+            processNextRequestRef.current()
+          })
+        }
+      }, 60000)
+    }
+  }, [state.currentRequest, state.isOpen])
+
   return {
-    request: state.request,
+    currentRequest: state.currentRequest,
+    queueLength: state.queue.length,
     isOpen: state.isOpen,
     approve,
     reject
