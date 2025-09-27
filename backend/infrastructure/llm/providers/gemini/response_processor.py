@@ -81,16 +81,15 @@ class GeminiResponseProcessor(BaseResponseProcessor):
     @staticmethod
     def should_continue_tool_calling(response) -> bool:
         """
-        Determine if tool calling should continue based on Gemini response.
-        
+        Legacy method for backwards compatibility. Use has_tool_calls instead.
+
         Args:
             response: Raw Gemini API response object
-            
+
         Returns:
-            bool: True if response contains tool calls that need execution
+            bool: True if response contains tool calls
         """
-        tool_calls = GeminiResponseProcessor.extract_tool_calls(response)
-        return len(tool_calls) > 0
+        return GeminiResponseProcessor.has_tool_calls(response)
     
     @staticmethod
     def format_response_for_storage(response) -> BaseMessage:

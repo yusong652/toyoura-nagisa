@@ -177,7 +177,7 @@ class OpenAIClient(LLMClientBase):
 
     def _should_continue_tool_calling(self, response: Any) -> bool:
         """Check if OpenAI response contains tool calls that require execution."""
-        return OpenAIResponseProcessor.should_continue_tool_calling(response)
+        return OpenAIResponseProcessor.has_tool_calls(response)
 
 
     def _get_response_processor(self):

@@ -41,28 +41,41 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         return choice.message.content or ""
     
     @staticmethod
-    def should_continue_tool_calling(response) -> bool:
+    def has_tool_calls(response) -> bool:
         """
-        Check if response contains tool calls requiring execution
-        
+        Check if response contains tool calls
+
         Args:
             response: OpenAI API response object
-            
+
         Returns:
-            True if tool calls are present and need execution
+            True if tool calls are present in the response
         """
         if not hasattr(response, 'choices') or not response.choices:
             return False
-        
+
         choice = response.choices[0]
         if not hasattr(choice, 'message'):
             return False
-        
+
         return (
-            hasattr(choice.message, 'tool_calls') and 
-            choice.message.tool_calls and 
+            hasattr(choice.message, 'tool_calls') and
+            choice.message.tool_calls and
             len(choice.message.tool_calls) > 0
         )
+
+    @staticmethod
+    def should_continue_tool_calling(response) -> bool:
+        """
+        Legacy method for backwards compatibility. Use has_tool_calls instead.
+
+        Args:
+            response: OpenAI API response object
+
+        Returns:
+            True if tool calls are present in the response
+        """
+        return OpenAIResponseProcessor.has_tool_calls(response)
     
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
@@ -75,7 +88,7 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         Returns:
             List of tool call dictionaries with name, arguments, and id
         """
-        if not OpenAIResponseProcessor.should_continue_tool_calling(response):
+        if not OpenAIResponseProcessor.has_tool_calls(response):
             return []
         
         choice = response.choices[0]
