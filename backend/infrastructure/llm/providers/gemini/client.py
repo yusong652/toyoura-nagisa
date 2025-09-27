@@ -73,7 +73,7 @@ class GeminiClient(LLMClientBase):
         
         self.gemini_config = get_gemini_client_config(**config_overrides)
         
-        print(f"Enhanced Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
+        print(f"Gemini Client initialized with model: {self.gemini_config.model_settings.model}")
 
         # Initialize component managers with unified architecture
         self.tool_manager = GeminiToolManager()
@@ -99,20 +99,21 @@ class GeminiClient(LLMClientBase):
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
         **kwargs
     ) -> types.GenerateContentResponse:
         """
-        Execute direct Gemini API call with complete pre-formatted context.
+        Execute direct Gemini API call with complete pre-formatted context and config.
 
-        Performs a pure API call using complete context that already includes
-        all necessary tool schemas and system prompts. Configuration is handled
-        by the _prepare_complete_context method.
+        Performs a stateless API call using provided context and configuration.
+        This method is thread-safe and supports concurrent sessions.
 
         Args:
             context_contents: Complete Gemini context contents with structure:
                 - role: str - Message role ("user", "model", "system")
                 - parts: List[Dict] - Content parts including text and function calls
-                - Tool schemas already integrated via _prepare_complete_context
+            api_config: Gemini-specific configuration dictionary:
+                - config: types.GenerateContentConfig - Complete Gemini config object
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_output_tokens: Optional[int] - Maximum output tokens override
@@ -126,23 +127,22 @@ class GeminiClient(LLMClientBase):
             Exception: If API call fails, returns invalid response, or encounters authentication errors
 
         Note:
-            This is a pure API call method. All context preparation including tool schemas
-            and system prompts should be handled by _prepare_complete_context.
+            This method is completely stateless. All configuration is passed via parameters.
         """
         debug = self.gemini_config.debug
 
-        # Use configuration prepared by _prepare_complete_context
-        config = getattr(self, '_current_config', None)
+        # Extract Gemini config from api_config
+        config = api_config.get('config')
         if not config:
-            # Fallback to basic config if _prepare_complete_context wasn't called
+            # Fallback to basic config if not provided
             config_kwargs = self.gemini_config.get_generation_config_kwargs(
-                system_prompt="",  # Empty fallback system prompt
-                tool_schemas=[]    # Empty tool schemas for fallback
+                system_prompt="",
+                tool_schemas=[]
             )
             config_kwargs.update(kwargs)
             config = types.GenerateContentConfig(**config_kwargs)
         else:
-            # Apply any additional kwargs to the prepared config
+            # Apply any additional kwargs to the provided config
             if kwargs:
                 config_dict = config.model_dump()
                 config_dict.update(kwargs)
@@ -150,28 +150,26 @@ class GeminiClient(LLMClientBase):
 
         if debug:
             print(f"[DEBUG] API call with {len(context_contents)} context items")
-            # Print complete system prompt for debugging
             GeminiDebugger.print_debug_request(context_contents, config)
 
         try:
             # Direct API call with preserved context
-            # Type cast to satisfy Gemini API content format requirements
             response = self.client.models.generate_content(
                 model=self.gemini_config.model_settings.model,
                 contents=cast(Any, context_contents),
                 config=config,
             )
-            
+
             # Validate response structure
             if not hasattr(response, 'candidates') or not response.candidates:
                 raise Exception("Gemini API returned empty response")
-            
+
             if debug:
                 print(f"[DEBUG] API call successful, response received")
                 GeminiDebugger.print_debug_response(response)
-            
+
             return response
-                
+
         except Exception as e:
             error_message = f"Gemini API call failed: {str(e)}"
             if debug:
@@ -245,17 +243,20 @@ class GeminiClient(LLMClientBase):
     async def _prepare_complete_context(
         self,
         session_id: str
-    ) -> tuple[List[Dict[str, Any]], List[types.Tool], str]:
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Prepare complete context with tool schemas and system prompt for Gemini API.
+        Prepare complete context and API configuration for stateless Gemini API call.
 
-        This method consolidates all context preparation logic for Gemini.
+        This method consolidates all context preparation logic for Gemini
+        and returns all necessary configuration for thread-safe API calls.
 
         Args:
             session_id: Session identifier
 
         Returns:
-            Tuple containing complete context, tool schemas, and system prompt
+            Tuple containing:
+            - context_contents: Messages for Gemini API
+            - api_config: Dictionary with 'config' key containing GenerateContentConfig
         """
         # Get context manager and extract its properties
         context_manager = self.get_or_create_context_manager(session_id)
@@ -265,6 +266,7 @@ class GeminiClient(LLMClientBase):
         # Get recent messages length from configuration
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
+
         # Get tool schemas for API
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 
@@ -273,7 +275,6 @@ class GeminiClient(LLMClientBase):
 
         # Build system prompt with tool schemas and memory
         from backend.shared.utils.prompt.builder import build_system_prompt
-        from backend.config import get_llm_settings
 
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
@@ -289,17 +290,18 @@ class GeminiClient(LLMClientBase):
         # Get working contents from context manager
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
 
-        # Build API configuration with tool schemas
+        # Build API configuration with tool schemas and system prompt
         config_kwargs = self.gemini_config.get_generation_config_kwargs(
             system_prompt=system_prompt or "",
             tool_schemas=tool_schemas
         )
 
-        # Store config for API call
-        self._current_config = types.GenerateContentConfig(**config_kwargs)
+        # Create config object for stateless API call
+        config = types.GenerateContentConfig(**config_kwargs)
 
-        # Return working contents - system prompt and tools are handled by config
-        return working_contents, tool_schemas, system_prompt
+        # Return context and config as separate values for thread-safe API call
+        api_config = {'config': config}
+        return working_contents, api_config
 
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""

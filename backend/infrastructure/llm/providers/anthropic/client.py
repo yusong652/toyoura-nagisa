@@ -77,17 +77,20 @@ class AnthropicClient(LLMClientBase):
     async def _prepare_complete_context(
         self,
         session_id: str
-    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], str]:
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Prepare complete context with tool schemas and system prompt for Anthropic API.
+        Prepare complete context and API configuration for stateless Anthropic API call.
 
-        This method consolidates all context preparation logic for Anthropic.
+        This method consolidates all context preparation logic for Anthropic
+        and returns all necessary configuration for thread-safe API calls.
 
         Args:
             session_id: Session identifier
 
         Returns:
-            Tuple containing complete context, tool schemas, and system prompt
+            Tuple containing:
+            - context_contents: Messages for Anthropic API (without system prompt)
+            - api_config: Dictionary with 'tools' and 'system_prompt' keys
         """
         # Get context manager and extract its properties
         context_manager = self.get_or_create_context_manager(session_id)
@@ -97,6 +100,7 @@ class AnthropicClient(LLMClientBase):
         # Get recent messages length from configuration
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
+
         # Get tool schemas for API
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 
@@ -105,7 +109,6 @@ class AnthropicClient(LLMClientBase):
 
         # Build system prompt with tool schemas and memory
         from backend.shared.utils.prompt.builder import build_system_prompt
-        from backend.config import get_llm_settings
 
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
@@ -121,12 +124,12 @@ class AnthropicClient(LLMClientBase):
         # Get working contents from context manager
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
 
-        # Store configuration for API call
-        self._current_tools = tool_schemas
-        self._current_system_prompt = system_prompt
-
-        # Return working contents - system prompt and tools are passed separately to Anthropic API
-        return working_contents, tool_schemas, system_prompt
+        # Return context and config as separate values for thread-safe API call
+        api_config = {
+            'tools': tool_schemas,
+            'system_prompt': system_prompt
+        }
+        return working_contents, api_config
 
     def _get_provider_config(self):
         """Get Anthropic-specific configuration object."""
@@ -150,34 +153,37 @@ class AnthropicClient(LLMClientBase):
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
         **kwargs
     ):
         """
-        Execute direct Anthropic API call with complete pre-formatted context.
+        Execute direct Anthropic API call with complete pre-formatted context and config.
 
-        Performs a pure API call using complete context that already includes
-        all necessary tool schemas and system prompts prepared by _prepare_complete_context.
+        Performs a stateless API call using provided context and configuration.
+        This method is thread-safe and supports concurrent sessions.
 
         Args:
             context_contents: Complete Anthropic context contents with messages
+            api_config: Anthropic-specific configuration dictionary:
+                - tools: List[Dict] - Tool schemas in Anthropic format
+                - system_prompt: str - System prompt for Anthropic
             **kwargs: Additional API configuration parameters
 
         Returns:
             Anthropic API response
 
         Note:
-            This is a pure API call method. All context preparation including tool schemas
-            and system prompts should be handled by _prepare_complete_context.
+            This method is completely stateless. All configuration is passed via parameters.
         """
         debug = self.anthropic_config.debug
 
-        # Use configuration prepared by _prepare_complete_context
-        tools = getattr(self, '_current_tools', [])
-        system_prompt = getattr(self, '_current_system_prompt', None)
+        # Extract configuration from api_config
+        tools = api_config.get('tools', [])
+        system_prompt = api_config.get('system_prompt', '')
 
         # 使用配置系统构建API参数
         kwargs_api = self.anthropic_config.get_api_call_kwargs(
-            system_prompt=system_prompt or "",  # Provide empty string fallback
+            system_prompt=system_prompt,
             messages=context_contents,
             tools=tools
         )
@@ -188,20 +194,20 @@ class AnthropicClient(LLMClientBase):
         try:
             # 调用Anthropic API
             response = self.client.messages.create(**kwargs_api)
-            
+
             # 打印raw response (如果启用调试)
             if debug:
                 AnthropicDebugger.log_raw_response(response)
-            
+
             return response
-            
+
         except Exception as e:
             # 确保在API调用失败时也能看到payload信息
             if debug:
                 print(f"[DEBUG] API call failed with error: {str(e)}")
                 print(f"[DEBUG] Failed request payload:")
                 AnthropicDebugger.print_debug_request_payload(kwargs_api)
-            
+
             # 重新抛出异常
             raise
 

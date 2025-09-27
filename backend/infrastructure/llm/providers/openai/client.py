@@ -90,13 +90,14 @@ class OpenAIClient(LLMClientBase):
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
         **kwargs
     ):
         """
-        Execute direct OpenAI API call with complete pre-formatted context.
+        Execute direct OpenAI API call with complete pre-formatted context and config.
 
-        Performs a pure API call using complete context that already includes
-        all necessary tool schemas and system prompts prepared by _prepare_complete_context.
+        Performs a stateless API call using provided context and configuration.
+        This method is thread-safe and supports concurrent sessions.
 
         Args:
             context_contents: Complete OpenAI context messages with structure:
@@ -104,6 +105,8 @@ class OpenAIClient(LLMClientBase):
                 - content: str - Message content
                 - tool_calls: Optional[List] - Tool calls from assistant
                 - tool_call_id: Optional[str] - ID for tool responses
+            api_config: OpenAI-specific configuration dictionary:
+                - tools: List[Dict] - Tool schemas in OpenAI format (if applicable)
             **kwargs: Additional API configuration parameters:
                 - temperature: Optional[float] - Sampling temperature override
                 - max_tokens: Optional[int] - Maximum output tokens override
@@ -114,21 +117,20 @@ class OpenAIClient(LLMClientBase):
             OpenAI ChatCompletion response object
 
         Note:
-            This is a pure API call method. All context preparation including tool schemas
-            and system prompts should be handled by _prepare_complete_context.
+            This method is completely stateless. All configuration is passed via parameters.
         """
         debug = self.openai_config.debug
 
-        # Use configuration prepared by _prepare_complete_context
-        tools = getattr(self, '_current_tools', [])
+        # Extract tools from api_config
+        tools = api_config.get('tools', [])
 
         # Build API configuration
         kwargs_api = self.openai_config.get_api_call_kwargs(
-            system_prompt="",  # System prompt already integrated into messages by _prepare_complete_context
+            system_prompt="",  # System prompt already in messages
             messages=context_contents,
             tools=tools
         )
-        
+
         # Apply any kwargs overrides
         if 'temperature' in kwargs:
             kwargs_api['temperature'] = kwargs['temperature']
@@ -136,34 +138,34 @@ class OpenAIClient(LLMClientBase):
             kwargs_api['max_tokens'] = kwargs['max_tokens']
         if 'top_p' in kwargs:
             kwargs_api['top_p'] = kwargs['top_p']
-        
+
         if debug:
             # Log basic API call information
             OpenAIDebugger.log_api_call_info(
                 tools_count=len(tools) if tools else 0,
                 model=self.openai_config.model_settings.model
             )
-            
+
             # Print simplified debug payload
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
-        
+
         try:
             # Call OpenAI API
             response = self.client.chat.completions.create(**kwargs_api)
-            
+
             # Print raw response (if debug enabled)
             if debug:
                 OpenAIDebugger.log_raw_response(response)
-            
+
             return response
-            
+
         except Exception as e:
             # Ensure payload info is visible on API call failure
             if debug:
                 print(f"[DEBUG] API call failed with error: {str(e)}")
                 print(f"[DEBUG] Failed request payload:")
                 OpenAIDebugger.print_debug_request_payload(kwargs_api)
-            
+
             # Re-raise exception
             raise
 
@@ -189,17 +191,20 @@ class OpenAIClient(LLMClientBase):
     async def _prepare_complete_context(
         self,
         session_id: str
-    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], str]:
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Prepare complete context with tool schemas and system prompt for OpenAI API.
+        Prepare complete context and API configuration for stateless OpenAI API call.
 
-        This method consolidates all context preparation logic for OpenAI.
+        This method consolidates all context preparation logic for OpenAI
+        and returns all necessary configuration for thread-safe API calls.
 
         Args:
             session_id: Session identifier
 
         Returns:
-            Tuple containing complete context, tool schemas, and system prompt
+            Tuple containing:
+            - context_contents: Messages with system prompt injected for OpenAI
+            - api_config: Dictionary with 'tools' key containing tool schemas
         """
         # Get context manager and extract its properties
         context_manager = self.get_or_create_context_manager(session_id)
@@ -209,6 +214,7 @@ class OpenAIClient(LLMClientBase):
         # Get recent messages length from configuration
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
+
         # Get tool schemas for API
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 
@@ -217,7 +223,6 @@ class OpenAIClient(LLMClientBase):
 
         # Build system prompt with tool schemas and memory
         from backend.shared.utils.prompt.builder import build_system_prompt
-        from backend.config import get_llm_settings
 
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
@@ -233,10 +238,7 @@ class OpenAIClient(LLMClientBase):
         # Get working contents from context manager
         working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
 
-        # Store configuration for API call
-        self._current_tools = tool_schemas
-
-        # For OpenAI, we need to inject system prompt into messages if provided
+        # For OpenAI, inject system prompt into messages if provided
         if system_prompt:
             # Check if first message is already a system message
             if not working_contents or working_contents[0].get('role') != 'system':
@@ -250,7 +252,9 @@ class OpenAIClient(LLMClientBase):
                 # Update existing system message
                 working_contents[0]['content'] = system_prompt
 
-        return working_contents, tool_schemas, system_prompt
+        # Return context and config as separate values for thread-safe API call
+        api_config = {'tools': tool_schemas}
+        return working_contents, api_config
 
     def _get_provider_config(self):
         """Get OpenAI-specific configuration object."""

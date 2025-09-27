@@ -72,45 +72,50 @@ class LLMClientBase(ABC):
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
         **kwargs
     ) -> Any:
         """
-        Execute direct LLM API call with complete pre-formatted context.
+        Execute direct LLM API call with complete pre-formatted context and configuration.
 
-        Performs a pure API call using complete context contents that already include
-        all necessary tool schemas and system prompts. This is a clean separation
-        between context preparation and API execution.
+        Performs a pure, stateless API call using complete context and configuration.
+        This method is thread-safe and supports concurrent sessions without state conflicts.
 
         Args:
-            context_contents: Complete context contents in provider-specific format with structure:
+            context_contents: Complete context contents in provider-specific format:
                 - Provider-specific message format (e.g., Gemini, OpenAI, Anthropic formats)
                 - Message roles and content parts as required by each provider
-                - Tool schemas already integrated into context
-                - System prompts with tool descriptions already included
-            **kwargs: Additional API configuration parameters:
+                - For OpenAI: includes system message if needed
+                - For Anthropic/Gemini: messages without system prompt
+            api_config: Provider-specific API configuration dictionary:
+                - tools: List[Any] - Tool schemas in provider format (if applicable)
+                - system_prompt: str - System prompt (for Anthropic)
+                - config: Any - Provider-specific config object (for Gemini)
+                - Any other provider-specific configuration
+            **kwargs: Additional runtime API parameters:
                 - temperature: Optional[float] - Sampling temperature override
-                - max_output_tokens: Optional[int] - Maximum output tokens override
-                - top_p: Optional[float] - Nucleus sampling parameter (provider-dependent)
-                - top_k: Optional[int] - Top-k sampling parameter (provider-dependent)
-                - Additional provider-specific parameters
+                - max_tokens/max_output_tokens: Optional[int] - Maximum output override
+                - top_p: Optional[float] - Nucleus sampling parameter
+                - top_k: Optional[int] - Top-k sampling (provider-dependent)
 
         Returns:
             Any: Raw API response object in provider-specific format:
-                - Response structure varies by provider (Gemini, OpenAI, Anthropic formats)
+                - Response structure varies by provider (Gemini, OpenAI, Anthropic)
                 - Contains response candidates, usage metadata, and tool call results
-                - Maintains complete original response structure for downstream processing
+                - Maintains complete original response structure
 
         Raises:
-            Exception: If API call fails, returns invalid response, or encounters authentication errors
-            NotImplementedError: If concrete implementation is not provided by subclass
+            Exception: If API call fails or returns invalid response
+            NotImplementedError: If not implemented by provider
 
         Example:
-            # Complete context already prepared by upper layer
-            response = await client.call_api_with_context(complete_context)
+            # Thread-safe concurrent usage
+            context, config = await self._prepare_complete_context(session_id)
+            response = await self.call_api_with_context(context, config)
 
         Note:
-            This method should be a pure API call without session or tool dependencies.
-            All context preparation including tool schemas should be handled by caller.
+            This method is stateless and thread-safe. All session-specific
+            configuration is passed as parameters, not stored as instance state.
         """
         pass
 
@@ -214,13 +219,13 @@ class LLMClientBase(ABC):
             raise Exception(f"Exceeded max iterations ({max_iterations})")
 
         # Prepare complete context with all necessary components
-        # All configuration and context manager handling done internally
-        complete_context, tool_schemas, system_prompt = await self._prepare_complete_context(
+        # Returns both context and configuration for stateless API call
+        complete_context, api_config = await self._prepare_complete_context(
             session_id=session_id
         )
 
-        # Pure API call with complete context
-        current_response = await self.call_api_with_context(complete_context)
+        # Stateless API call with context and configuration
+        current_response = await self.call_api_with_context(complete_context, api_config)
         context_manager = self.get_or_create_context_manager(session_id)
         # Check if we need to continue tool calling
         if not self._should_continue_tool_calling(current_response):
@@ -371,9 +376,9 @@ class LLMClientBase(ABC):
     async def _prepare_complete_context(
         self,
         session_id: str
-    ) -> tuple[List[Dict[str, Any]], List[Any], str]:
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Prepare complete context with tool schemas and system prompt.
+        Prepare complete context and API configuration for stateless API call.
 
         This method consolidates all context preparation logic including:
         - Getting or creating context manager for the session
@@ -383,16 +388,25 @@ class LLMClientBase(ABC):
         - Getting tool schemas for system prompt
         - Building system prompt with memory and tools
         - Getting working contents from context manager
-        - Preparing the final context for API call
+        - Preparing provider-specific API configuration
 
         Args:
             session_id: Session identifier
 
         Returns:
             Tuple containing:
-            - Complete context ready for API call
-            - Tool schemas for API in provider-specific format
-            - System prompt with tool descriptions
+            - context_contents: List[Dict[str, Any]] - Messages ready for API call
+                - For OpenAI: includes system message in the list
+                - For others: just conversation messages
+            - api_config: Dict[str, Any] - Provider-specific configuration:
+                - tools: Tool schemas in provider format (optional)
+                - system_prompt: System prompt string (for Anthropic)
+                - config: GenerateContentConfig (for Gemini)
+                - Any other provider-specific settings
+
+        Note:
+            This method must be stateless and return all necessary configuration.
+            Do NOT store configuration in instance attributes to avoid concurrency issues.
         """
         pass
 
