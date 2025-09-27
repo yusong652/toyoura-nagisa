@@ -38,8 +38,7 @@ class ToolProfileManager:
         "read",
         "edit",   # 文件编辑工具
         "bash",   # Updated from run_shell_command
-        "ls",     # Updated from list_directory
-        "glob",
+        "glob",   # File pattern matching (replaces ls functionality)
         "grep",
         "web_search"  # 编程时也需要搜索
     ]
@@ -70,8 +69,7 @@ class ToolProfileManager:
         "edit",
         # System command tools - for running PFC-related commands
         "bash",
-        "ls",
-        "glob",
+        "glob",  # File pattern matching for PFC data files
         "grep",
         # Search tools - for finding PFC documentation and examples
         "web_search",

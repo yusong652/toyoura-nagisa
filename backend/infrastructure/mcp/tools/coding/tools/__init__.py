@@ -5,20 +5,16 @@ This package hosts individual tool implementations migrated from the legacy
 structure used by Google's gemini-cli project.
 """
 
-from ..utils.path_security import validate_path_in_workspace
 from .write import write, register_write_tool
-from .ls import ls, register_ls_tool
 from .read import read, register_read_tool
 from .bash import bash, register_bash_tool
 from .glob import glob, register_glob_tool  # New simplified glob tool
 from .grep import grep, register_grep_tool
 from .edit import edit, register_edit_tool
 from ...builtin.web_search import web_search, register_web_search_tool
-from ..utils import constants
 
 __all__ = [
     "register_coding_tools",
-    "ls",
     "glob",
     "write",
     "read",
@@ -36,7 +32,6 @@ def register_coding_tools(mcp):
     """
     # workspace tools removed (stateful cd no longer needed)
     register_write_tool(mcp)
-    register_ls_tool(mcp)  # New simplified ls tool
     register_read_tool(mcp)
     register_bash_tool(mcp)
     register_glob_tool(mcp)  # New simplified glob tool

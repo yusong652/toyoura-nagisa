@@ -4,7 +4,6 @@
 
 from .tools import (
     # Public tool functions
-    ls,  # New simplified directory listing tool
     glob,  # New simplified glob pattern matching tool
     write,
     read,
@@ -21,7 +20,6 @@ from .tools import (
 
 __all__ = [
     'register_coding_tools',
-    'ls',  # New simplified directory listing tool
     'glob',  # New simplified glob pattern matching tool
     'write',
     'read',
