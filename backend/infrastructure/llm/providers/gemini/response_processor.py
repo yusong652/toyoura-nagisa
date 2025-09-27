@@ -77,20 +77,6 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     tool_calls.append(tool_call)
         
         return tool_calls
-    
-    @staticmethod
-    def should_continue_tool_calling(response) -> bool:
-        """
-        Legacy method for backwards compatibility. Use has_tool_calls instead.
-
-        Args:
-            response: Raw Gemini API response object
-
-        Returns:
-            bool: True if response contains tool calls
-        """
-        return GeminiResponseProcessor.has_tool_calls(response)
-    
     @staticmethod
     def format_response_for_storage(response) -> BaseMessage:
         """

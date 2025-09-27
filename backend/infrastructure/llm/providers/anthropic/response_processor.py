@@ -103,19 +103,6 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         return False
 
     @staticmethod
-    def should_continue_tool_calling(response: Any) -> bool:
-        """
-        Determine if tool calling should continue based on Claude API response.
-
-        Args:
-            response: Raw response from Anthropic Claude API
-
-        Returns:
-            bool: True if response contains tool calls that need execution
-        """
-        return AnthropicResponseProcessor.has_tool_calls(response)
-
-    @staticmethod
     def format_error_response(error: Exception) -> LLMResponse:
         """
         Format an error into a standardized LLMResponse.

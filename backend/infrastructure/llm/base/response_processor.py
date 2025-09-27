@@ -48,20 +48,6 @@ class BaseResponseProcessor(ABC):
     
     @staticmethod
     @abstractmethod
-    def should_continue_tool_calling(response) -> bool:
-        """
-        Determine if tool calling should continue based on response.
-        
-        Args:
-            response: Raw LLM API response object
-            
-        Returns:
-            bool: True if response contains tool calls that need execution
-        """
-        pass
-    
-    @staticmethod
-    @abstractmethod
     def format_response_for_storage(response) -> BaseMessage:
         """
         Format LLM API response for storage in conversation history.

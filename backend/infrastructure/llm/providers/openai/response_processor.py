@@ -63,19 +63,6 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
             choice.message.tool_calls and
             len(choice.message.tool_calls) > 0
         )
-
-    @staticmethod
-    def should_continue_tool_calling(response) -> bool:
-        """
-        Legacy method for backwards compatibility. Use has_tool_calls instead.
-
-        Args:
-            response: OpenAI API response object
-
-        Returns:
-            True if tool calls are present in the response
-        """
-        return OpenAIResponseProcessor.has_tool_calls(response)
     
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
