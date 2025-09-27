@@ -16,7 +16,6 @@ from backend.infrastructure.mcp.tools.lifestyle.tools.email import register_emai
 from backend.infrastructure.mcp.tools.lifestyle.tools.calendar import register_calendar_tools
 from backend.infrastructure.mcp.tools.coding import register_coding_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import register_text_to_image_tools
-from backend.infrastructure.mcp.tools.lifestyle.tools.image_to_video import register_image_to_video_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.contacts import register_contact_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_places_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
@@ -39,7 +38,6 @@ register_email_tools(mcp)
 register_calendar_tools(mcp)
 register_coding_tools(mcp)
 register_text_to_image_tools(mcp)
-register_image_to_video_tools(mcp)
 register_contact_tools(mcp)
 register_places_tools(mcp)
 register_location_tools(mcp)

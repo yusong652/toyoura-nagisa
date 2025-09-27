@@ -241,7 +241,7 @@ class LLMClientBase(ABC):
             # Execute tools
             tasks = []
             for tc in tool_calls:
-                tasks.append(self._execute_single_tool_call(tc, session_id))
+                tasks.append(self.tool_manager.handle_function_call(tc, session_id or ""))
             results = await asyncio.gather(*tasks, return_exceptions=False)
 
             # Check for rejections and add results to context
@@ -397,58 +397,6 @@ class LLMClientBase(ABC):
             bool: True if tool was rejected by user, False otherwise
         """
         return tool_result.get('user_rejected', False)
-
-    async def _execute_single_tool_call(
-        self,
-        tool_call: Dict[str, Any],
-        session_id: Optional[str]
-    ) -> Dict[str, Any]:
-        """
-        Execute single tool call with comprehensive error handling.
-        
-        Unified implementation for all providers. Returns standardized tool result 
-        dictionaries from the tool manager layer.
-        
-        Args:
-            tool_call: Tool call specification with structure:
-                - id: str - Unique tool call identifier
-                - name: str - Tool name to execute
-                - args/arguments: Dict[str, Any] - Tool parameters (key varies by provider)
-            session_id: Session ID for context-specific tool execution
-            debug: Enable detailed debug logging and error tracing
-            
-        Returns:
-            Dict[str, Any]: Tool execution result from tool manager with structure:
-                - inline_data: Dict - Multimodal content or empty {}
-                - llm_content: Any - Tool's textual/structured response
-                
-                For error cases, the tool manager returns a ToolResult dict with:
-                - status: "error"
-                - message: User-facing error message
-                - llm_content: Formatted error for LLM
-                - data: Error details and metadata
-                      
-        Note:
-            All providers use this unified implementation. The tool manager handles
-            all error cases and returns proper dictionaries, not error strings.
-        """
-        try:
-            # Tool manager is always initialized by concrete implementations
-            result = await self.tool_manager.handle_function_call(
-                tool_call,
-                session_id or ""  # Provide empty string if session_id is None
-            )
-            return result
-            
-        except Exception as e:
-            # Tool execution failed - log and re-raise to stop execution
-            from backend.config import get_llm_settings
-            debug = get_llm_settings().debug
-            if debug:
-                print(f"[DEBUG] Tool execution failed: {tool_call.get('name', 'unknown')} - {str(e)}")
-            
-            # Re-raise the exception to stop tool calling loop
-            raise e
 
     # ========== SHARED UTILITY METHODS ==========
 

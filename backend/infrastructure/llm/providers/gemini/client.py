@@ -288,4 +288,3 @@ class GeminiClient(LLMClientBase):
         return self.gemini_config
 
     # _streaming_tool_calling_loop is inherited from LLMClientBase
-    # _execute_single_tool_call is inherited from LLMClientBase

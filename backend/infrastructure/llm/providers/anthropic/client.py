@@ -192,7 +192,6 @@ class AnthropicClient(LLMClientBase):
             # 重新抛出异常
             raise
 
-    # _execute_single_tool_call is inherited from LLMClientBase
 
     async def generate_title_from_messages(
         self,
