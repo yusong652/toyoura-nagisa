@@ -42,12 +42,16 @@ class LocalLLMClient(LLMClientBase):
             timeout: Request timeout in seconds
         """
         super().__init__(**kwargs)
-        
+
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
-        
+
+        # Initialize NoOpToolManager for local LLM (no tool support)
+        from backend.infrastructure.llm.base.noop_tool_manager import NoOpToolManager
+        self.tool_manager = NoOpToolManager()
+
         logger.info(f"Local LLM client initialized at {server_url}")
     
     async def generate(self, messages: List[BaseMessage], **kwargs) -> LLMResponse:

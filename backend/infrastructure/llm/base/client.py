@@ -7,7 +7,7 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Tuple, Type
+from typing import List, Optional, Dict, Any, Type
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
@@ -41,7 +41,11 @@ class LLMClientBase(ABC):
 
         # Common client attributes that all implementations should have
         self.client = None  # Will be set by concrete implementations
-        self.tool_manager = None  # Will be initialized by concrete implementations
+
+        # Tool manager will be set by concrete implementations
+        # Each provider has its own tool manager (GeminiToolManager, OpenAIToolManager, etc.)
+        # We use Any type here because concrete implementations always set it, never None in practice
+        self.tool_manager: Any = None  # Will be BaseToolManager subclass
 
         # Session-based context manager management
         self._session_context_managers: Dict[str, BaseContextManager] = {}
@@ -217,28 +221,24 @@ class LLMClientBase(ABC):
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
 
-        # Get tool schemas and system prompt at the proper layer
+        # Get tool schemas for API and system prompt
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 
-        # Get prompt tool schemas if tool manager is available
-        prompt_tool_schemas = None
-        if hasattr(self, 'tool_manager') and self.tool_manager is not None:
-            try:
-                # Type: ignore because tool_manager is dynamically set by concrete implementations
-                prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)  # type: ignore
-            except (AttributeError, NotImplementedError):
-                # Tool manager doesn't support this method
-                prompt_tool_schemas = None
+        # Get tool schemas formatted for system prompt
+        # Tool manager is shared across sessions, session_id is just a parameter
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
 
         # Build system prompt with tool schemas and memory
         from backend.shared.utils.prompt.builder import build_system_prompt
+        from backend.config import get_llm_settings
+
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
             session_id=session_id,
             enable_memory=enable_memory,
             tool_schemas=prompt_tool_schemas
         )
-        from backend.config import get_llm_settings
+
         debug = get_llm_settings().debug
         if debug:
             print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
@@ -468,20 +468,11 @@ class LLMClientBase(ABC):
             all error cases and returns proper dictionaries, not error strings.
         """
         try:
-            from backend.config import get_llm_settings
-
-            # Tool manager always returns Dict[str, Any]
-            if self.tool_manager:
-                result = await self.tool_manager.handle_function_call(
-                    tool_call, session_id
-                ) # type: ignore
-            else:
-                result = {
-                    'status': 'error',
-                    'message': 'Tool manager not initialized',
-                    'error': 'Tool execution unavailable'
-                }
-            
+            # Tool manager is always initialized by concrete implementations
+            result = await self.tool_manager.handle_function_call(
+                tool_call,
+                session_id or ""  # Provide empty string if session_id is None
+            )
             return result
             
         except Exception as e:
