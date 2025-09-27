@@ -50,25 +50,6 @@ class BaseToolManager(ABC):
             self._mcp_client = get_mcp_client()
         return self._mcp_client
 
-    def _get_context_manager(self, session_id: str):
-        """
-        Get context manager for the session to access rejection state.
-
-        Args:
-            session_id: Session ID to get context manager for
-
-        Returns:
-            BaseContextManager: Context manager for the session, or None if not available
-        """
-        try:
-            from backend.shared.utils.app_context import get_llm_client
-            llm_client = get_llm_client()
-            return llm_client.get_context_manager(session_id)
-        except Exception as e:
-            llm_settings = get_llm_settings()
-            if llm_settings.debug:
-                print(f"[BaseToolManager] Error getting context manager: {e}")
-            return None
 
     async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = 'general') -> Dict[str, ToolSchema]:
         """

@@ -669,17 +669,6 @@ class LLMClientBase(ABC):
 
         return self._session_context_managers[session_id]
 
-    def get_context_manager(self, session_id: str) -> Optional[BaseContextManager]:
-        """
-        Get existing context manager for session.
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            Optional[BaseContextManager]: Context manager if exists, None otherwise
-        """
-        return self._session_context_managers.get(session_id)
 
     def cleanup_session_context(self, session_id: str) -> None:
         """

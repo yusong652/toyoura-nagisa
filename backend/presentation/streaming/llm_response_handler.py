@@ -128,7 +128,7 @@ async def process_chat_request(
             # ========== PHASE 5: Memory persistence ==========
             # Save conversation to memory after successful response
             # Get enable_memory from the session's context manager
-            context_manager = llm_client.get_context_manager(session_id)
+            context_manager = llm_client.get_or_create_context_manager(session_id)
             if context_manager and getattr(context_manager, 'enable_memory', True):
                 await save_session_conversation_memory(session_id)
 
