@@ -181,27 +181,29 @@ class BaseContextManager(ABC):
         """
         pass
     
-    def get_working_contents(self, recent_messages_length: int = 23) -> List[Dict[str, Any]]:
+    def get_working_contents(self) -> List[Dict[str, Any]]:
         """
         Get working contents with smart truncation preserving tool integrity.
-        
+
+        Automatically retrieves recent_messages_length from configuration.
         Ensures that exactly recent_messages_length non-tool messages are retained while
         preserving the integrity of tool calls and their results. Guarantees
         clean start boundary by ensuring the result starts with a non-tool message.
-        
+
         This method ensures that:
         1. Tool calls and results are kept together
         2. Most recent messages are prioritized
         3. Clean message boundaries (no orphaned tool results)
-        
-        Args:
-            recent_messages_length: Maximum number of non-tool messages to keep
-            
+
         Returns:
             List[Dict[str, Any]]: Truncated messages with clean start boundary
         """
+        # Get recent_messages_length from configuration
+        from backend.config import get_llm_settings
+        recent_messages_length = get_llm_settings().recent_messages_length
+
         messages = self.working_contents
-        
+
         # Debug: Print message details
         print(f"[DEBUG] Total messages: {len(messages)}")
         print(f"[DEBUG] recent_messages_length: {recent_messages_length}")

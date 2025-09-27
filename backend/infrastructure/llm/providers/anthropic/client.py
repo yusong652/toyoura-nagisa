@@ -97,10 +97,6 @@ class AnthropicClient(LLMClientBase):
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
-        # Get recent messages length from configuration
-        from backend.config import get_llm_settings
-        recent_messages_length = get_llm_settings().recent_messages_length
-
         # Get tool schemas for API
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 
@@ -109,6 +105,7 @@ class AnthropicClient(LLMClientBase):
 
         # Build system prompt with tool schemas and memory
         from backend.shared.utils.prompt.builder import build_system_prompt
+        from backend.config import get_llm_settings
 
         system_prompt = await build_system_prompt(
             agent_profile=agent_profile,
@@ -121,8 +118,8 @@ class AnthropicClient(LLMClientBase):
         if debug:
             print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
 
-        # Get working contents from context manager
-        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+        # Get working contents from context manager (config obtained internally)
+        working_contents = context_manager.get_working_contents()
 
         # Return context and config as separate values for thread-safe API call
         api_config = {
