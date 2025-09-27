@@ -76,11 +76,7 @@ class AnthropicClient(LLMClientBase):
 
     async def _prepare_complete_context(
         self,
-        context_manager,
-        session_id: str,
-        agent_profile: str,
-        enable_memory: bool,
-        recent_messages_length: int
+        session_id: str
     ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], str]:
         """
         Prepare complete context with tool schemas and system prompt for Anthropic API.
@@ -88,15 +84,19 @@ class AnthropicClient(LLMClientBase):
         This method consolidates all context preparation logic for Anthropic.
 
         Args:
-            context_manager: Session's context manager
             session_id: Session identifier
-            agent_profile: Agent profile for tool filtering
-            enable_memory: Whether to enable memory features
-            recent_messages_length: Number of recent messages to include
 
         Returns:
             Tuple containing complete context, tool schemas, and system prompt
         """
+        # Get context manager and extract its properties
+        context_manager = self.get_or_create_context_manager(session_id)
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        enable_memory = getattr(context_manager, 'enable_memory', True)
+
+        # Get recent messages length from configuration
+        from backend.config import get_llm_settings
+        recent_messages_length = get_llm_settings().recent_messages_length
         # Get tool schemas for API
         tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
 

@@ -213,26 +213,15 @@ class LLMClientBase(ABC):
         if iterations >= max_iterations:
             raise Exception(f"Exceeded max iterations ({max_iterations})")
 
-        # Get current state
-        context_manager = self.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-        enable_memory = getattr(context_manager, 'enable_memory', True)
-
-        from backend.config import get_llm_settings
-        recent_messages_length = get_llm_settings().recent_messages_length
-
         # Prepare complete context with all necessary components
+        # All configuration and context manager handling done internally
         complete_context, tool_schemas, system_prompt = await self._prepare_complete_context(
-            context_manager=context_manager,
-            session_id=session_id,
-            agent_profile=agent_profile,
-            enable_memory=enable_memory,
-            recent_messages_length=recent_messages_length
+            session_id=session_id
         )
 
         # Pure API call with complete context
         current_response = await self.call_api_with_context(complete_context)
-
+        context_manager = self.get_or_create_context_manager(session_id)
         # Check if we need to continue tool calling
         if not self._should_continue_tool_calling(current_response):
             # If previous round had tools and now we're done, send concluded notification
@@ -244,7 +233,7 @@ class LLMClientBase(ABC):
             context_manager.add_response(current_response)
             return current_response  # Normal completion
 
-        # Process tool calls
+        # Process tool calls - add response to context manager
         context_manager.add_response(current_response)
 
         # Extract tool calls using response processor
@@ -381,16 +370,15 @@ class LLMClientBase(ABC):
     @abstractmethod
     async def _prepare_complete_context(
         self,
-        context_manager,
-        session_id: str,
-        agent_profile: str,
-        enable_memory: bool,
-        recent_messages_length: int
+        session_id: str
     ) -> tuple[List[Dict[str, Any]], List[Any], str]:
         """
         Prepare complete context with tool schemas and system prompt.
 
         This method consolidates all context preparation logic including:
+        - Getting or creating context manager for the session
+        - Extracting agent_profile and enable_memory from context manager
+        - Getting recent_messages_length from configuration
         - Getting tool schemas for API
         - Getting tool schemas for system prompt
         - Building system prompt with memory and tools
@@ -398,11 +386,7 @@ class LLMClientBase(ABC):
         - Preparing the final context for API call
 
         Args:
-            context_manager: Session's context manager
             session_id: Session identifier
-            agent_profile: Agent profile for tool filtering
-            enable_memory: Whether to enable memory features
-            recent_messages_length: Number of recent messages to include
 
         Returns:
             Tuple containing:
