@@ -242,26 +242,56 @@ class GeminiClient(LLMClientBase):
         """Get Gemini-specific context manager class."""
         return GeminiContextManager
 
-    def _prepare_complete_context(
+    async def _prepare_complete_context(
         self,
-        working_contents: List[Dict[str, Any]],
-        tool_schemas: List[types.Tool],
-        system_prompt: Optional[str]
-    ) -> List[Dict[str, Any]]:
+        context_manager,
+        session_id: str,
+        agent_profile: str,
+        enable_memory: bool,
+        recent_messages_length: int
+    ) -> tuple[List[Dict[str, Any]], List[types.Tool], str]:
         """
         Prepare complete context with tool schemas and system prompt for Gemini API.
 
+        This method consolidates all context preparation logic for Gemini.
+
         Args:
-            working_contents: Base message contents from context manager
-            tool_schemas: Tool schemas in Gemini format
-            system_prompt: System prompt with tool descriptions
+            context_manager: Session's context manager
+            session_id: Session identifier
+            agent_profile: Agent profile for tool filtering
+            enable_memory: Whether to enable memory features
+            recent_messages_length: Number of recent messages to include
 
         Returns:
-            List[Dict[str, Any]]: Complete context ready for Gemini API call
+            Tuple containing complete context, tool schemas, and system prompt
         """
+        # Get tool schemas for API
+        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
+
+        # Get tool schemas formatted for system prompt
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
+
+        # Build system prompt with tool schemas and memory
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        from backend.config import get_llm_settings
+
+        system_prompt = await build_system_prompt(
+            agent_profile=agent_profile,
+            session_id=session_id,
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
+        )
+
+        debug = get_llm_settings().debug
+        if debug:
+            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
+
+        # Get working contents from context manager
+        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+
         # Build API configuration with tool schemas
         config_kwargs = self.gemini_config.get_generation_config_kwargs(
-            system_prompt=system_prompt or "",  # Provide empty string fallback
+            system_prompt=system_prompt or "",
             tool_schemas=tool_schemas
         )
 
@@ -269,7 +299,7 @@ class GeminiClient(LLMClientBase):
         self._current_config = types.GenerateContentConfig(**config_kwargs)
 
         # Return working contents - system prompt and tools are handled by config
-        return working_contents
+        return working_contents, tool_schemas, system_prompt
 
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""

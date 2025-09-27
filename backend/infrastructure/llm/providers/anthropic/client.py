@@ -74,29 +74,59 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
 
-    def _prepare_complete_context(
+    async def _prepare_complete_context(
         self,
-        working_contents: List[Dict[str, Any]],
-        tool_schemas: List[Dict[str, Any]],
-        system_prompt: Optional[str]
-    ) -> List[Dict[str, Any]]:
+        context_manager,
+        session_id: str,
+        agent_profile: str,
+        enable_memory: bool,
+        recent_messages_length: int
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], str]:
         """
         Prepare complete context with tool schemas and system prompt for Anthropic API.
 
+        This method consolidates all context preparation logic for Anthropic.
+
         Args:
-            working_contents: Base message contents from context manager
-            tool_schemas: Tool schemas in Anthropic format
-            system_prompt: System prompt with tool descriptions
+            context_manager: Session's context manager
+            session_id: Session identifier
+            agent_profile: Agent profile for tool filtering
+            enable_memory: Whether to enable memory features
+            recent_messages_length: Number of recent messages to include
 
         Returns:
-            List[Dict[str, Any]]: Complete context ready for Anthropic API call
+            Tuple containing complete context, tool schemas, and system prompt
         """
+        # Get tool schemas for API
+        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
+
+        # Get tool schemas formatted for system prompt
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
+
+        # Build system prompt with tool schemas and memory
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        from backend.config import get_llm_settings
+
+        system_prompt = await build_system_prompt(
+            agent_profile=agent_profile,
+            session_id=session_id,
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
+        )
+
+        debug = get_llm_settings().debug
+        if debug:
+            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
+
+        # Get working contents from context manager
+        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
+
         # Store configuration for API call
         self._current_tools = tool_schemas
         self._current_system_prompt = system_prompt
 
         # Return working contents - system prompt and tools are passed separately to Anthropic API
-        return working_contents
+        return working_contents, tool_schemas, system_prompt
 
     def _get_provider_config(self):
         """Get Anthropic-specific configuration object."""
@@ -155,21 +185,6 @@ class AnthropicClient(LLMClientBase):
         # Apply any additional kwargs
         kwargs_api.update(kwargs)
 
-        if debug:
-            # Log basic API call information with tool embedding info
-            AnthropicDebugger.log_api_call_info(
-                tools_count=len(tools) if tools else 0,
-                model=self.anthropic_config.model_settings.model,
-                thinking_enabled=self.anthropic_config.model_settings.supports_thinking() and self.anthropic_config.model_settings.enable_thinking
-            )
-            
-            # Log tool embedding status
-            if tools:
-                print(f"[Anthropic Debug] Tool schemas embedded in system prompt: {len(tools)} tools")
-            
-            # Print simplified debug payload
-            AnthropicDebugger.print_debug_request_payload(kwargs_api)
-        
         try:
             # 调用Anthropic API
             response = self.client.messages.create(**kwargs_api)

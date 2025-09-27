@@ -221,36 +221,13 @@ class LLMClientBase(ABC):
         from backend.config import get_llm_settings
         recent_messages_length = get_llm_settings().recent_messages_length
 
-        # Get tool schemas for API and system prompt
-        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
-
-        # Get tool schemas formatted for system prompt
-        # Tool manager is shared across sessions, session_id is just a parameter
-        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
-
-        # Build system prompt with tool schemas and memory
-        from backend.shared.utils.prompt.builder import build_system_prompt
-        from backend.config import get_llm_settings
-
-        system_prompt = await build_system_prompt(
-            agent_profile=agent_profile,
+        # Prepare complete context with all necessary components
+        complete_context, tool_schemas, system_prompt = await self._prepare_complete_context(
+            context_manager=context_manager,
             session_id=session_id,
+            agent_profile=agent_profile,
             enable_memory=enable_memory,
-            tool_schemas=prompt_tool_schemas
-        )
-
-        debug = get_llm_settings().debug
-        if debug:
-            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
-
-        # Get working contents and create complete context
-        working_contents = context_manager.get_working_contents(recent_messages_length=recent_messages_length)
-
-        # Prepare complete context with tools and system prompt
-        complete_context = self._prepare_complete_context(
-            working_contents=working_contents,
-            tool_schemas=tool_schemas,
-            system_prompt=system_prompt
+            recent_messages_length=recent_messages_length
         )
 
         # Pure API call with complete context
@@ -402,22 +379,36 @@ class LLMClientBase(ABC):
         pass
 
     @abstractmethod
-    def _prepare_complete_context(
+    async def _prepare_complete_context(
         self,
-        working_contents: List[Dict[str, Any]],
-        tool_schemas: List[Any],
-        system_prompt: Optional[str]
-    ) -> List[Dict[str, Any]]:
+        context_manager,
+        session_id: str,
+        agent_profile: str,
+        enable_memory: bool,
+        recent_messages_length: int
+    ) -> tuple[List[Dict[str, Any]], List[Any], str]:
         """
         Prepare complete context with tool schemas and system prompt.
 
+        This method consolidates all context preparation logic including:
+        - Getting tool schemas for API
+        - Getting tool schemas for system prompt
+        - Building system prompt with memory and tools
+        - Getting working contents from context manager
+        - Preparing the final context for API call
+
         Args:
-            working_contents: Base message contents from context manager
-            tool_schemas: Tool schemas for API in provider-specific format
-            system_prompt: System prompt with tool descriptions
+            context_manager: Session's context manager
+            session_id: Session identifier
+            agent_profile: Agent profile for tool filtering
+            enable_memory: Whether to enable memory features
+            recent_messages_length: Number of recent messages to include
 
         Returns:
-            List[Dict[str, Any]]: Complete context ready for API call
+            Tuple containing:
+            - Complete context ready for API call
+            - Tool schemas for API in provider-specific format
+            - System prompt with tool descriptions
         """
         pass
 
