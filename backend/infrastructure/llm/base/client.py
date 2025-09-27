@@ -153,9 +153,6 @@ class LLMClientBase(ABC):
         Raises:
             UserRejectionInterruption: When user rejects tool execution (not an error)
         """
-        # Get the session's context manager
-        context_manager = self.get_or_create_context_manager(session_id)
-
         try:
             # Call recursive tool calling loop
             # Note: final_response is already added to context_manager within _recursive_tool_calling
@@ -471,31 +468,6 @@ class LLMClientBase(ABC):
             pass
         return None
 
-    def _extract_text_from_response(self, response: Any) -> str:
-        """
-        Extract text content from provider-specific response using response processor.
-        
-        This method provides a unified interface for extracting text content from
-        LLM responses across all providers. It delegates to provider-specific
-        response processors to handle format differences.
-        
-        Args:
-            response: Provider-specific response object
-            
-        Returns:
-            str: Extracted text content for display and processing
-            
-        Note:
-            This method is used to generate better action in tool calling
-            notifications by extracting the actual LLM response text instead
-            of using generic messages.
-        """
-        try:
-            processor = self._get_response_processor()
-            return processor.extract_text_content(response) if processor else ""
-        except Exception:
-            # Fallback to empty string on extraction failure
-            return ""
 
     async def _execute_single_tool_call(
         self,
@@ -577,7 +549,12 @@ class LLMClientBase(ABC):
             Dict[str, Any]: Notification dictionary ready for WebSocket transmission
         """
         num_tools = len(tool_calls)
-        extracted_text = self._extract_text_from_response(current_response)
+        # Extract text content directly from response processor
+        try:
+            processor = self._get_response_processor()
+            extracted_text = processor.extract_text_content(current_response) if processor else ""
+        except Exception:
+            extracted_text = ""
         thinking_content = self._extract_thinking_content(current_response)
         tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
 
