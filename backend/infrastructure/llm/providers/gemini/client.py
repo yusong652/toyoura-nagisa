@@ -82,19 +82,6 @@ class GeminiClient(LLMClientBase):
 
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[types.Tool]:
-        """
-        Get MCP tool schemas in Gemini format based on agent profile.
-        
-        Args:
-            session_id: Session ID for context-specific tools (required for dependency injection)
-            agent_profile: Agent profile type for tool filtering
-            
-        Returns:
-            List[types.Tool]: Tool schemas in Gemini format
-        """
-        debug = self.gemini_config.debug
-        return await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
 
     async def call_api_with_context(
         self,
@@ -260,7 +247,7 @@ class GeminiClient(LLMClientBase):
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
         # Get tool schemas for API
-        tool_schemas = await self.get_function_call_schemas(session_id, agent_profile)
+        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
 
         # Get tool schemas formatted for system prompt
         prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)

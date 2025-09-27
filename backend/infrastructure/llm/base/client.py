@@ -54,19 +54,6 @@ class LLMClientBase(ABC):
 
     # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
 
-    @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, agent_profile: str = "general") -> List[Any]:
-        """
-        Get function call schemas for tool registration.
-        
-        Args:
-            session_id: Session ID for context-specific tools (required for dependency injection)
-            agent_profile: Agent profile type for tool filtering
-            
-        Returns:
-            List[Any]: List of tool schemas in provider-specific format
-        """
-        pass
 
     @abstractmethod
     async def call_api_with_context(
