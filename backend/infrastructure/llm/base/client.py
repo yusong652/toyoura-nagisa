@@ -17,9 +17,9 @@ from backend.shared.exceptions import UserRejectionInterruption
 
 class LLMClientBase(ABC):
     """
-    Enhanced LLM client base class with unified streaming architecture.
+    LLM client base class with unified streaming architecture.
     
-    SOTA streaming architecture design focused on real-time tool call notifications:
+    Streaming architecture design focused on real-time tool call notifications:
     - Core interface: get_response() - streaming processing with real-time notifications
     - Specialized interfaces: generate_title_from_messages(), generate_text_to_image_prompt()
     - Configuration management: update_config() - dynamic configuration updates
@@ -238,13 +238,14 @@ class LLMClientBase(ABC):
             notification = self._create_tool_notification(tool_calls, current_response)
             await self._send_websocket_tool_notification(session_id, notification)
 
-            # Execute tools
-            tasks = []
-            for tc in tool_calls:
-                tasks.append(self.tool_manager.handle_function_call(tc, session_id or ""))
-            results = await asyncio.gather(*tasks, return_exceptions=False)
+            # Execute tools serially with rejection cascade
+            # This aligns with Claude Code's behavior: serial execution with intelligent cascade
+            results = await self.tool_manager.handle_multiple_function_calls(
+                tool_calls,
+                session_id or ""
+            )
 
-            # Check for rejections and add results to context
+            # Add results to context and check for rejections
             rejected_tools = []
             for tool_call, result in zip(tool_calls, results):
                 context_manager.add_tool_result(
@@ -253,11 +254,13 @@ class LLMClientBase(ABC):
                     result
                 )
 
-                # Check if this tool was rejected
+                # Check if this tool was directly rejected by user (not cascade blocked)
+                # Only direct rejections trigger interruption, cascade blocks are informational
                 if self._is_tool_rejected(result):
                     rejected_tools.append(tool_call['name'])
 
-            # If any tool was rejected, interrupt immediately
+            # If any tool was directly rejected, interrupt immediately
+            # Note: cascade_blocked tools are not considered rejections for interruption
             if rejected_tools:
                 raise UserRejectionInterruption(session_id, rejected_tools)
 

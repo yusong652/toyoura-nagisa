@@ -5,10 +5,8 @@ Designed for aiNagisa's multi-LLM architecture as a unified tool management inte
 Defines core methods that all Tool Managers must implement to ensure consistency and extensibility.
 """
 
-import asyncio
-import json
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastmcp import Client as MCPClient
 from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 
@@ -195,6 +193,70 @@ class BaseToolManager(ABC):
         # Extract inline_data from data.processing_result.content
         return tool_result["data"]["processing_result"]["content"]["inline_data"]
     
+    async def handle_multiple_function_calls(
+        self,
+        function_calls: List[dict],
+        session_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Handle multiple function calls serially with intelligent rejection cascade.
+
+        Executes tools one by one, stopping subsequent tools if user rejects any tool.
+        This aligns with Claude Code's behavior where rejection of one tool cascades
+        to block remaining tools with contextual error messages.
+
+        Args:
+            function_calls: List of function call dictionaries, each containing:
+                - name: str - Tool name to execute
+                - arguments: Dict[str, Any] - Tool arguments (optional)
+                - id: str - Tool call ID for tracking (optional)
+            session_id: Session ID for context-aware tools and dependency injection
+
+        Returns:
+            List[Dict[str, Any]]: List of tool results with structure:
+                - inline_data: Dict with multimodal content or empty {}
+                - llm_content: Tool's response or cascade blocking message
+                - user_rejected: Optional[bool] - True if directly rejected by user
+                - cascade_blocked: Optional[bool] - True if blocked due to earlier rejection
+
+        Note:
+            Implements Claude Code's intelligent cascade pattern with different
+            messages for direct rejection vs cascade blocking, providing better
+            context to the LLM about why each tool failed.
+        """
+        results = []
+        user_rejected_tool = None  # Track which tool was rejected
+
+        for function_call in function_calls:
+            tool_name = function_call.get("name", "unknown")
+
+            # If a previous tool was rejected, cascade block remaining tools
+            if user_rejected_tool is not None:
+                # Use different message to indicate cascade blocking (like Claude Code)
+                results.append({
+                    "inline_data": {},
+                    "llm_content": f"The user doesn't want to take this action right now. Skipping {tool_name} due to previous rejection.",
+                    "cascade_blocked": True  # Different flag to distinguish from direct rejection
+                })
+
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Cascade blocking {tool_name} due to rejection of {user_rejected_tool}")
+                continue
+
+            # Execute tool normally
+            result = await self.handle_function_call(function_call, session_id)
+            results.append(result)
+
+            # Check if this tool was rejected by user
+            if result.get('user_rejected', False):
+                user_rejected_tool = tool_name
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] User rejected {tool_name}, will cascade block remaining tools")
+
+        return results
+
     async def handle_function_call(self, function_call: dict, session_id: str) -> Dict[str, Any]:
         """
         Handle LLM-generated function_call requests.

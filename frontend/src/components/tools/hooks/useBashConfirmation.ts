@@ -10,34 +10,30 @@ export interface BashConfirmationRequest {
 }
 
 interface BashConfirmationState {
-  queue: BashConfirmationRequest[]
   currentRequest: BashConfirmationRequest | null
   isOpen: boolean
 }
 
 /**
- * Hook for managing bash command confirmation requests queue from WebSocket.
+ * Hook for managing bash command confirmation requests from WebSocket.
  *
  * This hook listens to WebSocket bash confirmation request events and manages
- * a queue of pending requests, showing one confirmation dialog at a time.
+ * the current confirmation dialog. Since backend executes tools serially,
+ * only one confirmation request is active at a time.
  *
  * Features:
- * - Queue-based management of multiple bash confirmation requests
- * - One-at-a-time confirmation dialog display
- * - Auto-processing of queue after each confirmation
- * - Auto-reject on timeout (60 seconds) for current request
- * - Unique ID generation for each bash command
+ * - Single confirmation dialog management
+ * - Auto-reject on timeout (60 seconds)
+ * - WebSocket message handling for approval/rejection
  *
  * Returns:
  * - currentRequest: Currently displayed bash confirmation request
- * - queueLength: Number of pending requests in queue
  * - isOpen: Whether confirmation dialog should be shown
  * - approve: Function to approve current command with optional message
  * - reject: Function to reject current command with optional message
  */
 export const useBashConfirmation = () => {
   const [state, setState] = useState<BashConfirmationState>({
-    queue: [],
     currentRequest: null,
     isOpen: false
   })
@@ -46,7 +42,6 @@ export const useBashConfirmation = () => {
   useEffect(() => {
     console.log('[BashConfirmation Hook] State changed:', {
       currentRequest: state.currentRequest?.command,
-      queueLength: state.queue.length,
       isOpen: state.isOpen,
       timestamp: new Date().toISOString()
     })
@@ -108,24 +103,11 @@ export const useBashConfirmation = () => {
     }
   }, [])
 
-  // Process next request in queue
-  const processNextRequest = useCallback(() => {
-    setState(prevState => {
-      if (prevState.queue.length > 0) {
-        const [nextRequest, ...remainingQueue] = prevState.queue
-        console.log('[BashConfirmation] Processing next request from queue:', nextRequest.command)
-        return {
-          queue: remainingQueue,
-          currentRequest: nextRequest,
-          isOpen: true
-        }
-      } else {
-        return {
-          queue: [],
-          currentRequest: null,
-          isOpen: false
-        }
-      }
+  // Clear current request
+  const clearCurrentRequest = useCallback(() => {
+    setState({
+      currentRequest: null,
+      isOpen: false
     })
   }, [])
 
@@ -148,10 +130,10 @@ export const useBashConfirmation = () => {
         timeoutRef.current = null
       }
 
-      // Process next request in queue
-      processNextRequestRef.current()
+      // Clear current request
+      clearCurrentRequestRef.current()
 
-      console.log('[BashConfirmation] Processed approval and moved to next request')
+      console.log('[BashConfirmation] Processed approval and cleared request')
     } else {
       console.warn('[BashConfirmation] Approve called but no current request found')
     }
@@ -186,10 +168,10 @@ export const useBashConfirmation = () => {
       }))
       console.log('[BashConfirmation] Dispatched toolUseConcluded event after rejection')
 
-      // Process next request in queue
-      processNextRequestRef.current()
+      // Clear current request
+      clearCurrentRequestRef.current()
 
-      console.log('[BashConfirmation] Processed rejection and moved to next request')
+      console.log('[BashConfirmation] Processed rejection and cleared request')
     } else {
       console.warn('[BashConfirmation] Reject called but no current request found')
     }
@@ -202,8 +184,8 @@ export const useBashConfirmation = () => {
   const sendResponseRef = useRef(sendResponse)
   sendResponseRef.current = sendResponse
 
-  const processNextRequestRef = useRef(processNextRequest)
-  processNextRequestRef.current = processNextRequest
+  const clearCurrentRequestRef = useRef(clearCurrentRequest)
+  clearCurrentRequestRef.current = clearCurrentRequest
 
   useEffect(() => {
     console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest (mount only)')
@@ -229,22 +211,15 @@ export const useBashConfirmation = () => {
       console.log('[BashConfirmation] Parsed request:', request)
 
       setState(prevState => {
-        // If no current request, set this as current
-        if (!prevState.currentRequest) {
-          console.log('[BashConfirmation] Setting as current request (no queue)')
-          return {
-            queue: prevState.queue,
-            currentRequest: request,
-            isOpen: true
-          }
-        } else {
-          // Add to queue
-          console.log('[BashConfirmation] Adding to queue (current request exists)')
-          return {
-            queue: [...prevState.queue, request],
-            currentRequest: prevState.currentRequest,
-            isOpen: prevState.isOpen
-          }
+        // Since backend executes serially, we should never have overlapping requests
+        // But if we do, log a warning and replace the current request
+        if (prevState.currentRequest) {
+          console.warn('[BashConfirmation] Received new request while another is active (unexpected with serial execution)')
+        }
+        console.log('[BashConfirmation] Setting as current request')
+        return {
+          currentRequest: request,
+          isOpen: true
         }
       })
 
@@ -291,8 +266,8 @@ export const useBashConfirmation = () => {
             }))
             console.log('[BashConfirmation] Dispatched toolUseConcluded event after timeout rejection')
 
-            // Process next request in queue
-            processNextRequestRef.current()
+            // Clear current request
+            clearCurrentRequestRef.current()
           })
         }
       }, 60000)
@@ -301,7 +276,6 @@ export const useBashConfirmation = () => {
 
   return {
     currentRequest: state.currentRequest,
-    queueLength: state.queue.length,
     isOpen: state.isOpen,
     approve,
     reject

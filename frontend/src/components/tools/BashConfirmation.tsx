@@ -10,7 +10,7 @@ import './ToolStateDisplay.css'
  * event listeners and ensure only one confirmation dialog is active.
  */
 const BashConfirmation: React.FC = () => {
-  const { currentRequest: bashRequest, queueLength, isOpen: bashConfirmationOpen, approve, reject } = useBashConfirmation()
+  const { currentRequest: bashRequest, isOpen: bashConfirmationOpen, approve, reject } = useBashConfirmation()
 
   // All hooks must be called before any conditional returns
   const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve') // Default to approve
@@ -23,15 +23,13 @@ const BashConfirmation: React.FC = () => {
     console.log('[BashConfirmation] Component render state:', {
       bashConfirmationOpen,
       bashRequest,
-      queueLength,
       shouldShow: !!(bashConfirmationOpen && bashRequest)
     })
-  }, [bashConfirmationOpen, bashRequest, queueLength])
+  }, [bashConfirmationOpen, bashRequest])
 
   console.log('[BashConfirmation] Render check:', {
     isOpen: bashConfirmationOpen,
     hasRequest: !!bashRequest,
-    queueLength,
     command: bashRequest?.command
   })
 
@@ -135,22 +133,6 @@ const BashConfirmation: React.FC = () => {
           {bashRequest.command}
         </code>
       </div>
-      {/* Queue indicator */}
-      {queueLength > 0 && (
-        <div style={{
-          marginBottom: '6px',
-          padding: '4px 8px',
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.04) 100%)',
-          border: '1px solid rgba(245, 158, 11, 0.15)',
-          borderRadius: '6px',
-          fontSize: '11px',
-          color: '#92400e',
-          textAlign: 'center',
-          fontFamily: 'Monaco, Consolas, Courier New, monospace'
-        }}>
-          +{queueLength} more command{queueLength > 1 ? 's' : ''} in queue
-        </div>
-      )}
       <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', fontSize: '12px' }}>
         <button
           ref={rejectButtonRef}
