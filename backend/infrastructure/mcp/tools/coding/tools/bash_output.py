@@ -50,7 +50,7 @@ def bash_output(
         # Verify the process belongs to this session
         if bash_id.strip() not in [pid for pid in process_manager.processes.keys()
                                   if process_manager.processes[pid].session_id == session_id]:
-            return error_response(f"Process {bash_id} not found in your session")
+            return error_response(f"No shell found with ID: {bash_id}")
 
         # Retrieve output from the specified process
         return process_manager.get_process_output(bash_id.strip(), filter)
