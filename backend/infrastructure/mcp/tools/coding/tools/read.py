@@ -436,8 +436,7 @@ Usage:
 
 def register_read_tool(mcp: FastMCP):
     """Register the read tool with proper tags synchronization."""
-    common = dict(
+    mcp.tool(
         tags={"coding", "filesystem", "read", "file", "content", "analysis", "metadata"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "file", "content", "analysis", "metadata"]}
-    )
-    mcp.tool(**common)(read) 
+    )(read) 

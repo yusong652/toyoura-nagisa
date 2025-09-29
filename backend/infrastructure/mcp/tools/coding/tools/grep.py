@@ -415,7 +415,8 @@ def grep(
 def register_grep_tool(mcp: FastMCP):
     """Register the grep tool with proper tags synchronization."""
     common = dict(
+    )
+    mcp.tool(
         tags={"coding", "filesystem", "search", "content", "regex", "grep"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "content", "regex", "grep"]}
-    )
-    mcp.tool(**common)(grep)
+        )(grep)

@@ -154,12 +154,13 @@ def write(
 def register_write_tool(mcp: FastMCP):
     """Register the write tool with comprehensive metadata."""
     common = dict(
+
+    )
+    mcp.tool(        
         tags={"coding", "filesystem", "write", "file", "create"}, 
         annotations={
             "category": "coding", 
             "tags": ["coding", "filesystem", "write", "file", "create"],
             "primary_use": "Create and modify text files with comprehensive safety checks",
             "prompt_optimization": "Enhanced for LLM interaction with clear guidance and contextual feedback"
-        }
-    )
-    mcp.tool(**common)(write) 
+        })(write) 
