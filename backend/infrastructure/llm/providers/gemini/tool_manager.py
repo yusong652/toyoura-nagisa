@@ -4,7 +4,7 @@ Gemini-specific tool manager using unified base.
 Handles Gemini-specific tool schema formatting while leveraging shared tool management logic.
 """
 
-from typing import List, Optional
+from typing import List
 from google.genai import types
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
@@ -18,14 +18,14 @@ class GeminiToolManager(BaseToolManager):
     Gemini-specific schema formatting and tool execution.
     """
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> List[types.Tool]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[types.Tool]:
         """
         Get MCP tool schemas in Gemini format based on agent profile.
         Uses get_standardized_tools() from base class, then converts to Gemini format.
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name for tool filtering
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
 
         Returns:
             List[types.Tool]: Tool schemas formatted for Gemini API
@@ -38,7 +38,7 @@ class GeminiToolManager(BaseToolManager):
         
         # Convert ToolSchema objects to Gemini FunctionDeclarations
         function_declarations = []
-        for tool_name, tool_schema in tools_dict.items():
+        for _, tool_schema in tools_dict.items():
             func_decl = self._convert_tool_schema_to_gemini_declaration(tool_schema)
             if func_decl:
                 function_declarations.append(func_decl)
@@ -54,7 +54,7 @@ class GeminiToolManager(BaseToolManager):
         else:
             return []
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None) -> List[dict]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[dict]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
 
@@ -63,7 +63,7 @@ class GeminiToolManager(BaseToolManager):
 
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name for tool filtering
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
 
         Returns:
             List[dict]: Tool schemas in standardized dictionary format for system prompt
@@ -98,7 +98,7 @@ class GeminiToolManager(BaseToolManager):
         
         return prompt_schemas
     
-    def _convert_tool_schema_to_gemini_declaration(self, tool_schema: ToolSchema) -> Optional[types.FunctionDeclaration]:
+    def _convert_tool_schema_to_gemini_declaration(self, tool_schema: ToolSchema) -> types.FunctionDeclaration | None:
         """
         Convert ToolSchema to Gemini FunctionDeclaration format.
         

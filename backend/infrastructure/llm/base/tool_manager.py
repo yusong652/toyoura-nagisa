@@ -12,7 +12,7 @@ from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, Cal
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
-from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager
+from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager, AgentProfile
 from backend.config.llm import get_llm_settings
 # Security imports removed - all tools now require session ID
 
@@ -49,20 +49,21 @@ class BaseToolManager(ABC):
         return self._mcp_client
 
 
-    async def get_standardized_tools(self, session_id: str, agent_profile: Optional[str] = 'general') -> Dict[str, ToolSchema]:
+    async def get_standardized_tools(self, session_id: str, agent_profile: str = 'general') -> Dict[str, ToolSchema]:
         """
         Get standardized ToolSchema objects based on agent profile.
 
         Args:
-            session_id: Session ID (required)
-            agent_profile: Agent profile name ("coding", "lifestyle", "general", or None for all tools)
+            session_id: Session ID (required for future session-specific tool filtering)
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
 
         Returns:
             Dict[str, ToolSchema]: Tool name -> ToolSchema mapping
         """
-        
+        _ = session_id  # Reserved for future session-specific tool filtering
+
         tools_dict: Dict[str, ToolSchema] = {}
-        
+
         try:
             llm_settings = get_llm_settings()
             mcp_client = self.get_mcp_client()
@@ -70,41 +71,18 @@ class BaseToolManager(ABC):
                 # Get all MCP tools - list_tools() always returns a list
                 mcp_tools = await mcp_async_client.list_tools()
 
-                # 确定要加载的工具集合
-                if agent_profile:
-                    profile_enum = ToolProfileManager.validate_profile(agent_profile)
-                    if profile_enum and ToolProfileManager.should_disable_all_tools(profile_enum):
-                        # DISABLED 状态：不加载任何工具
-                        if llm_settings.debug:
-                            print(f"[DEBUG] Disabling all tools (profile: {agent_profile})")
-                        return {}
-                    elif profile_enum and not ToolProfileManager.should_load_all_tools(profile_enum):
-                        # 使用指定profile的工具集合
-                        allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
-                        if llm_settings.debug:
-                            print(f"[DEBUG] Loading tools for profile '{agent_profile}': {len(allowed_tools)} tools")
-                    else:
-                        # Profile无效或为general，加载所有工具
-                        allowed_tools = None
-                        if llm_settings.debug:
-                            print(f"[DEBUG] Loading all tools (profile: {agent_profile})")
-                else:
-                    # 未指定profile，加载所有工具
-                    allowed_tools = None
-                    if llm_settings.debug:
-                        print("[DEBUG] Loading all tools (no profile specified)")
-                
-                # 添加工具到字典
+                # Get tools for the specified profile
+                profile_enum = AgentProfile(agent_profile)
+                allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
+
+                # Add tools to dictionary
                 for mcp_tool in mcp_tools:
-                    # 如果设置了allowed_tools，只加载允许的工具
-                    if allowed_tools is not None and mcp_tool.name not in allowed_tools:
+                    # Only load permitted tools
+                    if mcp_tool.name not in allowed_tools:
                         continue
-                        
+
                     tool_schema = ToolSchema.from_mcp_tool(mcp_tool)
                     tools_dict[tool_schema.name] = tool_schema
-
-                if llm_settings.debug:
-                    print(f"[DEBUG] Loaded {len(tools_dict)} tools for session {session_id}")
 
                 return tools_dict
 
@@ -115,14 +93,14 @@ class BaseToolManager(ABC):
             return {}
 
     @abstractmethod
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> Any:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> Any:
         """
         Get tool schemas formatted for the specific LLM provider.
         Uses get_standardized_tools() internally, then converts to provider format.
 
         Args:
             session_id: Session ID (required)
-            agent_profile: Agent profile name for tool filtering
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
 
         Returns:
             Tool schema list adapted for target LLM format (format varies by client)
@@ -403,17 +381,18 @@ class BaseToolManager(ABC):
             "llm_content": tool_result.get("llm_content")
         }
 
-    def _requires_user_confirmation(self, tool_name: str, _tool_args: Dict[str, Any]) -> bool:
+    def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
         """
         Check if a tool requires user confirmation before execution.
 
         Args:
             tool_name: Name of the tool to execute
-            _tool_args: Arguments for the tool (reserved for future command filtering)
+            tool_args: Arguments for the tool (reserved for future command filtering)
 
         Returns:
             bool: True if user confirmation is required, False otherwise
         """
+        _ = tool_args  # Reserved for future command filtering
         # Define tools that require user confirmation
         CONFIRMATION_REQUIRED_TOOLS = {
             "bash": True,  # All bash commands require confirmation

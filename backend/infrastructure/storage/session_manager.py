@@ -103,6 +103,13 @@ def get_all_sessions() -> List[Dict[str, Any]]:
 def delete_session_data(session_id: str) -> bool:
     """Delete chat history for specified session ID"""
     try:
+        # Clean up background processes for this session
+        try:
+            from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import cleanup_session_processes
+            cleanup_session_processes(session_id)
+        except Exception as e:
+            print(f"[WARNING] Failed to cleanup background processes for session {session_id}: {e}")
+
         session_dir = _get_session_dir(session_id)
         if os.path.exists(session_dir):
             shutil.rmtree(session_dir)

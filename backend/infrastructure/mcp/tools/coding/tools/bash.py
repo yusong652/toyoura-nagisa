@@ -26,6 +26,7 @@ MAX_OUTPUT_SIZE = 30000      # 30KB output limit (matching Claude Code)
 
 
 def bash(
+    context: Context,
     command: str = Field(
         ...,
         description="The command to execute"
@@ -111,9 +112,23 @@ Usage notes:
     # Set working directory to workspace root
     work_dir = Path(str(WORKSPACE_ROOT))
 
-    # Background execution not implemented in this simplified version
+    # Handle background execution
     if run_in_background:
-        return error_response("Background execution not yet implemented")
+        try:
+            # Get session ID from MCP context
+            session_id = getattr(context, 'client_id', None) if context else None
+            if not session_id:
+                return error_response("Session ID not available for background execution")
+
+            from ..utils.background_process_manager import get_process_manager
+            process_manager = get_process_manager()
+            return process_manager.start_process(
+                session_id=session_id,
+                command=command,
+                description=description
+            )
+        except Exception as e:
+            return error_response(f"Failed to start background process: {e}")
 
     try:
         # Execute command
