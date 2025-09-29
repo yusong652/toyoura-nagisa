@@ -144,14 +144,14 @@ def edit(
         description="Replace all occurrences of old_string (default: false - replaces only first occurrence).",
     ),
 ) -> Dict[str, Any]:
-    """Performs exact string replacements in files. 
+    """Performs exact string replacements in existing files.
 
 Usage:
-- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file. 
+- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
 - When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
-- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- This tool only edits existing files. The file must exist before calling this tool.
 - Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
-- The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`. 
+- The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`.
 - Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance."""
 
     # ------------------------------------------------------------------
@@ -209,64 +209,47 @@ Usage:
         # Validate file is suitable for editing
         can_edit, edit_error = _validate_file_for_editing(target_file)
         if not can_edit:
-            return error_response(edit_error)
+            return error_response(edit_error or "File validation failed")
 
-        # Read current content or prepare for new file creation
-        current_content = None
-        is_new_file = False
-        original_size = 0
+        # Read current file content
+        if not target_file.exists():
+            return error_response(f"File not found: {file_path}")
 
-        if target_file.exists():
-            try:
-                with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT, errors='replace') as f:
-                    current_content = f.read()
-                current_content = _normalize_line_endings(current_content)
-                original_size = len(current_content.encode(TEXT_CHARSET_DEFAULT))
-            except Exception as e:
-                return error_response(f"Cannot read file: {e}")
-        else:
-            # File doesn't exist
-            if old_string == "":
-                # Creating new file (Claude Edit tool pattern)
-                is_new_file = True
-                current_content = ""
-                original_size = 0
-            else:
-                return error_response("File not found. Use empty old_string to create a new file.")
+        try:
+            with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT, errors='replace') as f:
+                current_content = f.read()
+            current_content = _normalize_line_endings(current_content)
+        except Exception as e:
+            return error_response(f"Cannot read file: {e}")
 
         # ------------------------------------------------------------------
         # Replacement logic and validation
         # ------------------------------------------------------------------
 
-        if is_new_file:
-            # Creating new file
-            new_content = new_string
-            replacements_made = 0
+        # Validate old_string is not empty
+        if old_string == "":
+            return error_response("old_string cannot be empty for file editing")
+
+        # Check if old_string exists
+        occurrences = _count_occurrences(current_content, old_string)
+        if occurrences == 0:
+            error_msg = f"String to replace not found in file.\nString: {old_string[:200]}{'...' if len(old_string) > 200 else ''}"
+            return error_response(error_msg)
+
+        # Validate uniqueness for single replacement
+        unique_valid, unique_error = _validate_uniqueness(current_content, old_string, replace_all)
+        if not unique_valid:
+            return error_response(unique_error or "String uniqueness validation failed")
+
+        # Apply replacement based on replace_all flag
+        if replace_all:
+            new_content, _ = _apply_all_replacements(
+                current_content, old_string, new_string
+            )
         else:
-            # Editing existing file
-            if old_string == "":
-                return error_response("Cannot use empty old_string with existing file.")
-
-            # Check if old_string exists
-            occurrences = _count_occurrences(current_content, old_string)
-            if occurrences == 0:
-                error_msg = f"String to replace not found in file.\nString: {old_string[:200]}{'...' if len(old_string) > 200 else ''}"
-                return error_response(error_msg)
-
-            # Validate uniqueness for single replacement
-            unique_valid, unique_error = _validate_uniqueness(current_content, old_string, replace_all)
-            if not unique_valid:
-                return error_response(unique_error)
-
-            # Apply replacement based on replace_all flag
-            if replace_all:
-                new_content, replacements_made = _apply_all_replacements(
-                    current_content, old_string, new_string
-                )
-            else:
-                new_content, replacements_made = _apply_single_replacement(
-                    current_content, old_string, new_string
-                )
+            new_content, _ = _apply_single_replacement(
+                current_content, old_string, new_string
+            )
 
         # ------------------------------------------------------------------
         # Write file and generate results
@@ -282,24 +265,13 @@ Usage:
         except Exception as e:
             return error_response(f"Failed to write file: {e}")
 
-        # Calculate file changes
-        new_size = len(new_content.encode(TEXT_CHARSET_DEFAULT))
-        size_change = new_size - original_size
-        
-        # Count line changes
-        original_lines = (current_content or "").count('\n')
-        new_lines = new_content.count('\n')
-        line_change_count = new_lines - original_lines
         
         # ------------------------------------------------------------------
         # Build Claude Code aligned response  
         # ------------------------------------------------------------------
 
         # Build user-facing message aligned with Claude Code format
-        if is_new_file:
-            message = f"File created successfully at: {target_file.relative_to(WORKSPACE_ROOT)}"
-        else:
-            message = f"The file {target_file.relative_to(WORKSPACE_ROOT)} has been updated."
+        message = f"The file {target_file.relative_to(WORKSPACE_ROOT)} has been updated."
 
         # Build Claude Code style llm_content with file preview
         try:
@@ -307,28 +279,16 @@ Usage:
                 lines = f.readlines()
             preview_lines = []
             for i, line in enumerate(lines[:10], 1):  # Show first 10 lines like Claude
-                preview_lines.append(f"{i:6}→{line.rstrip()}")
+                preview_lines.append(f"{i:>6}→{line.rstrip()}")
             preview = "\n".join(preview_lines)
             llm_content = f"{message} Here's the result of running `cat -n` on a snippet of the edited file:\n{preview}"
         except Exception:
             # Fallback to simple message if file preview fails
             llm_content = message
 
-        # Additional data for backend/UI
-        response_data = {
-            "absolute_file_path": str(target_file),
-            "relative_path": str(target_file.relative_to(WORKSPACE_ROOT)),
-            "is_new_file": is_new_file,
-            "replacements_made": replacements_made,
-            "replace_all": replace_all,
-            "size_change": size_change,
-            "line_change_count": line_change_count,
-        }
-
         return success_response(
             message,
             llm_content,
-            **response_data,
         )
 
     except Exception as exc:
@@ -340,8 +300,8 @@ Usage:
 
 def register_edit_tool(mcp: FastMCP):
     """Register the edit tool with proper tags synchronization."""
-    common = dict(
+
+    mcp.tool(
         tags={"coding", "filesystem", "edit", "replace", "modify"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "edit", "replace", "modify"]}
-    )
-    mcp.tool(**common)(edit)
+    )(edit)
