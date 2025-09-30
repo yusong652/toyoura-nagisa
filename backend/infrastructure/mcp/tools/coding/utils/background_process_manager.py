@@ -317,7 +317,11 @@ class BackgroundProcessManager:
 
                 return success_response(
                     message=f"Command running in background with ID: {process_id}{hint}",
-                    llm_content=f"Command running in background with ID: {process_id}",
+                    llm_content={
+                        "parts": [
+                            {"type": "text", "text": f"Command running in background with ID: {process_id}"}
+                        ]
+                    },
                     process_id=process_id,
                     command=command,
                     background=True,
@@ -385,13 +389,13 @@ class BackgroundProcessManager:
             no_new_output = not stdout_text and not stderr_text and bg_process.status == "running"
 
             # Create LLM content similar to Claude Code format
-            llm_content_parts = [f"<status>{bg_process.status}</status>"]
+            llm_content_text_parts = [f"<status>{bg_process.status}</status>"]
 
             if bg_process.exit_code is not None:
-                llm_content_parts.append(f"<exit_code>{bg_process.exit_code}</exit_code>")
+                llm_content_text_parts.append(f"<exit_code>{bg_process.exit_code}</exit_code>")
 
             if stdout_text:
-                llm_content_parts.append(f"<stdout>\n{stdout_text}\n</stdout>")
+                llm_content_text_parts.append(f"<stdout>\n{stdout_text}\n</stdout>")
             elif no_new_output:
                 # Provide helpful context when no new output
                 time_running = (datetime.now() - bg_process.start_time).total_seconds()
@@ -402,27 +406,31 @@ class BackgroundProcessManager:
                     hint = " (Process may be idle or computing)"
 
                 # For incremental mode, indicate no new output
-                llm_content_parts.append(f"<info>No new output since last check{hint}</info>")
+                llm_content_text_parts.append(f"<info>No new output since last check{hint}</info>")
 
             if stderr_text:
-                llm_content_parts.append(f"<stderr>\n{stderr_text}\n</stderr>")
+                llm_content_text_parts.append(f"<stderr>\n{stderr_text}\n</stderr>")
 
-            llm_content_parts.append(f"<timestamp>{datetime.now().isoformat()}Z</timestamp>")
+            llm_content_text_parts.append(f"<timestamp>{datetime.now().isoformat()}Z</timestamp>")
 
             # Add statistics for monitoring
             with bg_process._output_lock:
                 total_stdout_lines = len(bg_process.stdout_buffer)
                 total_stderr_lines = len(bg_process.stderr_buffer)
 
-            llm_content_parts.append(f"<stats>")
-            llm_content_parts.append(f"  <new_lines>{len(new_stdout) + len(new_stderr)}</new_lines>")
-            llm_content_parts.append(f"  <total_lines>{total_stdout_lines + total_stderr_lines}</total_lines>")
-            llm_content_parts.append(f"  <runtime_seconds>{(datetime.now() - bg_process.start_time).total_seconds():.1f}</runtime_seconds>")
-            llm_content_parts.append(f"</stats>")
+            llm_content_text_parts.append(f"<stats>")
+            llm_content_text_parts.append(f"  <new_lines>{len(new_stdout) + len(new_stderr)}</new_lines>")
+            llm_content_text_parts.append(f"  <total_lines>{total_stdout_lines + total_stderr_lines}</total_lines>")
+            llm_content_text_parts.append(f"  <runtime_seconds>{(datetime.now() - bg_process.start_time).total_seconds():.1f}</runtime_seconds>")
+            llm_content_text_parts.append(f"</stats>")
 
             return success_response(
                 message="Retrieved incremental output from background process",
-                llm_content='\n\n'.join(llm_content_parts),
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": '\n\n'.join(llm_content_text_parts)}
+                    ]
+                },
                 process_id=process_id,
                 status=bg_process.status,
                 exit_code=bg_process.exit_code,
@@ -477,11 +485,14 @@ class BackgroundProcessManager:
 
                 # Format response similar to Claude Code
                 kill_message = f"Successfully killed shell: {process_id} ({bg_process.command})"
-                llm_content = f'{{"message":"{kill_message}","shell_id":"{process_id}"}}'
 
                 return success_response(
                     message=kill_message,
-                    llm_content=llm_content,
+                    llm_content={
+                        "parts": [
+                            {"type": "text", "text": f'{{"message":"{kill_message}","shell_id":"{process_id}"}}'}
+                        ]
+                    },
                     shell_id=process_id,
                     command=bg_process.command,
                     kill_successful=True,
