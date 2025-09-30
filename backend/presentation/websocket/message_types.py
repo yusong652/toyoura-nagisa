@@ -64,6 +64,12 @@ class MessageType(str, Enum):
     BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
     BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
 
+    # Background process notifications
+    BACKGROUND_PROCESS_STARTED = "BACKGROUND_PROCESS_STARTED"
+    BACKGROUND_PROCESS_OUTPUT_UPDATE = "BACKGROUND_PROCESS_OUTPUT_UPDATE"
+    BACKGROUND_PROCESS_COMPLETED = "BACKGROUND_PROCESS_COMPLETED"
+    BACKGROUND_PROCESS_KILLED = "BACKGROUND_PROCESS_KILLED"
+
     # Future extensions
     VOICE_MESSAGE = "VOICE_MESSAGE"
     IMAGE_GENERATION = "IMAGE_GENERATION"
@@ -192,6 +198,29 @@ class TitleUpdateMessage(BaseWebSocketMessage):
     payload: Dict[str, Any]  # Contains session_id and title
 
 
+class BackgroundProcessNotification(BaseWebSocketMessage):
+    """
+    Background process notification message schema for frontend display.
+
+    Provides real-time updates about background bash processes with recent output
+    for user monitoring. Designed to show command name and last 5 lines of output
+    in a compact UI panel.
+    """
+    type: MessageType
+    process_id: str
+    command: str
+    description: Optional[str] = None
+    status: str  # "running", "completed", "killed"
+
+    # Recent output for display (last 5 lines)
+    recent_output: List[str] = []
+    has_more_output: bool = False
+
+    # Statistics
+    runtime_seconds: float = 0
+    exit_code: Optional[int] = None
+
+
 # Incoming message schemas (messages that frontend sends to backend)
 INCOMING_MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT_ACK: HeartbeatMessage,
@@ -215,6 +244,11 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.TTS_CHUNK: TTSChunk,
     # Used via specialized creation functions
     MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
+    # Background process notifications
+    MessageType.BACKGROUND_PROCESS_STARTED: BackgroundProcessNotification,
+    MessageType.BACKGROUND_PROCESS_OUTPUT_UPDATE: BackgroundProcessNotification,
+    MessageType.BACKGROUND_PROCESS_COMPLETED: BackgroundProcessNotification,
+    MessageType.BACKGROUND_PROCESS_KILLED: BackgroundProcessNotification,
 }
 
 
@@ -369,6 +403,51 @@ def create_bash_confirmation_request(
         confirmation_id=confirmation_id,
         command=command,
         description=description,
+        session_id=session_id
+    )
+    return msg.model_dump(mode="json", exclude_none=True)
+
+
+def create_background_process_notification(
+    message_type: MessageType,
+    process_id: str,
+    command: str,
+    status: str,
+    recent_output: List[str],
+    runtime_seconds: float,
+    description: Optional[str] = None,
+    has_more_output: bool = False,
+    exit_code: Optional[int] = None,
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create background process notification message.
+
+    Args:
+        message_type: Notification type (STARTED/OUTPUT_UPDATE/COMPLETED/KILLED)
+        process_id: Unique process identifier
+        command: Shell command being executed
+        status: Process status ("running", "completed", "killed")
+        recent_output: Last 5 lines of output for display
+        runtime_seconds: Process runtime in seconds
+        description: Optional command description
+        has_more_output: Whether more output is available beyond recent_output
+        exit_code: Process exit code when completed/killed
+        session_id: Session ID
+
+    Returns:
+        Background process notification message dictionary
+    """
+    msg = BackgroundProcessNotification(
+        type=message_type,
+        process_id=process_id,
+        command=command,
+        description=description,
+        status=status,
+        recent_output=recent_output,
+        has_more_output=has_more_output,
+        runtime_seconds=runtime_seconds,
+        exit_code=exit_code,
         session_id=session_id
     )
     return msg.model_dump(mode="json", exclude_none=True)

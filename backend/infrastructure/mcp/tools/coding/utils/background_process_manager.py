@@ -7,6 +7,7 @@ Key improvements:
 3. Better align with Claude Code behavior while fixing its limitations
 """
 
+import asyncio
 import os
 import re
 import subprocess
@@ -82,6 +83,42 @@ class BackgroundProcessManager:
         if self._cleanup_thread is None or not self._cleanup_thread.is_alive():
             self._cleanup_thread = Thread(target=self._cleanup_worker, daemon=True)
             self._cleanup_thread.start()
+
+    def _start_notification_monitoring(
+        self,
+        session_id: str,
+        process_id: str,
+        command: str,
+        description: Optional[str] = None
+    ) -> None:
+        """
+        Start background process notification monitoring.
+
+        Args:
+            session_id: Session ID
+            process_id: Process ID
+            command: Shell command
+            description: Optional command description
+        """
+        try:
+            from backend.application.services.notifications.background_process_notification_service import (
+                get_background_process_notification_service
+            )
+
+            notification_service = get_background_process_notification_service()
+            if notification_service:
+                # Schedule the async monitoring task
+                asyncio.create_task(
+                    notification_service.start_monitoring(
+                        session_id=session_id,
+                        process_id=process_id,
+                        command=command,
+                        description=description
+                    )
+                )
+        except Exception as e:
+            # Don't fail process start if notification service unavailable
+            print(f"[BackgroundProcessManager] Could not start notification monitoring: {e}")
 
     def _cleanup_worker(self) -> None:
         """Background worker for cleaning up old processes."""
@@ -269,6 +306,9 @@ class BackgroundProcessManager:
                 if session_id not in self.session_processes:
                     self.session_processes[session_id] = set()
                 self.session_processes[session_id].add(process_id)
+
+                # Start notification service monitoring
+                self._start_notification_monitoring(session_id, process_id, command, description)
 
                 # Provide helpful hint for Python scripts
                 hint = ""
