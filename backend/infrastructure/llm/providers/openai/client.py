@@ -193,8 +193,7 @@ class OpenAIClient(LLMClientBase):
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
         # Get tool schemas for API
-        debug = getattr(self, 'debug', False)  # Fallback for debug flag
-        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
         tool_schemas = tool_schemas or []  # Return empty list if None
 
         # Get tool schemas formatted for system prompt
