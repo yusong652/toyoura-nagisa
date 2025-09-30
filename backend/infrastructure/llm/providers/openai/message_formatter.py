@@ -42,14 +42,14 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                     msg.content, preserve_thinking
                 )
                 formatted_messages.append({
-                    "role": msg.role,
+                    "role": msg.role, # type: ignore
                     "content": openai_content
                 })
             else:
                 # Simple text content
                 text_content = str(msg.content) if msg.content else ""
                 formatted_messages.append({
-                    "role": msg.role,
+                    "role": msg.role, # type: ignore
                     "content": text_content
                 })
         
@@ -79,14 +79,14 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 message.content, preserve_thinking
             )
             return {
-                "role": message.role,
+                "role": message.role, # type: ignore
                 "content": openai_content
             }
         else:
             # Simple text content
             text_content = str(message.content) if message.content else ""
             return {
-                "role": message.role,
+                "role": message.role, # type: ignore
                 "content": text_content
             }
     
@@ -220,39 +220,26 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             result = {"llm_content": {"parts": [{"type": "text", "text": "image"}, {"type": "inline_data", ...}]}}
             # Returns: 'image' (inline_data omitted due to API constraints)
         """
-        # Extract llm_content
-        llm_content = content.get("llm_content") if isinstance(content, dict) else None
+        # All tools use standardized parts format
+        llm_content = content["llm_content"]
+        content_parts = llm_content["parts"]
+        text_parts = []
 
-        # Process parts-based content structure
-        if isinstance(llm_content, dict) and "parts" in llm_content:
-            content_parts = llm_content["parts"]
-            text_parts = []
+        for part in content_parts:
+            part_type = part["type"]
 
-            for part in content_parts:
-                part_type = part.get("type")
+            if part_type == "text":
+                # Collect text content
+                text_content = part.get("text", "")
+                if text_content:
+                    text_parts.append(text_content)
+            elif part_type == "inline_data":
+                # OpenAI tool messages only support text, skip inline_data
+                # Note: This is an API limitation, not a choice
+                pass
 
-                if part_type == "text":
-                    # Collect text content
-                    text_content = part.get("text", "")
-                    if text_content:
-                        text_parts.append(text_content)
-                elif part_type == "inline_data":
-                    # OpenAI tool messages only support text, skip inline_data
-                    # Note: This is an API limitation, not a choice
-                    pass
+        # Return combined text or indicate content was processed
+        if text_parts:
+            return "\n".join(text_parts)
 
-            # Return combined text or indicate content was processed
-            if text_parts:
-                return "\n".join(text_parts)
-            else:
-                return '{"status": "content processed"}'
-
-        # Fallback for non-parts format
-        if isinstance(llm_content, dict):
-            return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
-        elif llm_content is not None:
-            return str(llm_content)
-
-        # Handle regular structured data
-        if isinstance(content, dict):
-            return OpenAIMessageFormatter.safe_json_serialize(content, ensure_ascii=False, indent=2)
+        return '{"status": "content processed"}'

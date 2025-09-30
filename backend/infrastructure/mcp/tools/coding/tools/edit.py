@@ -148,7 +148,8 @@ def edit(
 
 Usage:
 - You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
-- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + arrow (→). Everything after that arrow is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- IMPORTANT: When you see Read tool output like "     5→while i < 35:", the old_string should be "while i < 35:" (WITHOUT the "     5→" prefix). The line numbers and arrows are for reference only and are NOT part of the file content.
 - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
 - Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
 - The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`.
@@ -230,6 +231,20 @@ Usage:
         if old_string == "":
             return error_response("old_string cannot be empty for file editing")
 
+        # Check if old_string accidentally includes line number prefix
+        import re
+        line_prefix_pattern = r'^\s+\d+→'
+        if re.match(line_prefix_pattern, old_string):
+            # Extract the actual content after the arrow
+            actual_content = re.sub(r'^\s+\d+→', '', old_string)
+            return error_response(
+                f"The old_string appears to include the line number prefix from Read tool output.\n"
+                f"Line numbers and arrows (→) are for reference only and should NOT be included in old_string.\n"
+                f"You provided: {old_string[:100]}\n"
+                f"You should use: {actual_content[:100]}\n"
+                f"Please retry with only the actual file content (text after the arrow)."
+            )
+
         # Check if old_string exists
         occurrences = _count_occurrences(current_content, old_string)
         if occurrences == 0:
@@ -288,7 +303,11 @@ Usage:
 
         return success_response(
             message,
-            llm_content,
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": llm_content}
+                ]
+            },
         )
 
     except Exception as exc:

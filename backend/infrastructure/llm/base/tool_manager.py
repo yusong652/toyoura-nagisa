@@ -135,42 +135,7 @@ class BaseToolManager(ABC):
             )
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
-    
-    
-    def _has_multimodal_content(self, tool_result: Dict[str, Any]) -> bool:
-        """
-        Check if ToolResult contains multimodal content.
-        
-        Args:
-            tool_result: Complete ToolResult dictionary
-            
-        Returns:
-            bool: Whether it contains multimodal content
-        """
-        # For read_file tool: check data.processing_result.content_format
-        data = tool_result.get("data")
-        if data and isinstance(data, dict):
-            processing_result = data.get("processing_result")
-            if processing_result and isinstance(processing_result, dict):
-                return processing_result.get("content_format") == "inline_data"
-        
-        return False
-    
-    def _extract_multimodal_content(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Extract multimodal content inline_data.
-        
-        Precondition: _has_multimodal_content() has already confirmed presence of multimodal content.
-        
-        Args:
-            tool_result: Complete ToolResult dictionary
-            
-        Returns:
-            Dict: inline_data structure with mime_type and data
-        """
-        # Extract inline_data from data.processing_result.content
-        return tool_result["data"]["processing_result"]["content"]["inline_data"]
-    
+
     async def handle_multiple_function_calls(
         self,
         function_calls: List[dict],
@@ -191,9 +156,11 @@ class BaseToolManager(ABC):
             session_id: Session ID for context-aware tools and dependency injection
 
         Returns:
-            List[Dict[str, Any]]: List of tool results with structure:
-                - inline_data: Dict with multimodal content or empty {}
-                - llm_content: Tool's response or cascade blocking message
+            List[Dict[str, Any]]: List of ToolResult dictionaries with structure:
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-facing summary
+                - llm_content: Dict with parts structure
+                - data: Optional[Dict[str, Any]] - Tool-specific data
                 - user_rejected: Optional[bool] - True if directly rejected by user
                 - cascade_blocked: Optional[bool] - True if blocked due to earlier rejection
 
@@ -211,11 +178,17 @@ class BaseToolManager(ABC):
             # If a previous tool was rejected, cascade block remaining tools
             if user_rejected_tool is not None:
                 # Use different message to indicate cascade blocking (like Claude Code)
-                results.append({
-                    "inline_data": {},
-                    "llm_content": f"The user doesn't want to take this action right now. Skipping {tool_name} due to previous rejection.",
-                    "cascade_blocked": True  # Different flag to distinguish from direct rejection
-                })
+                from backend.infrastructure.mcp.utils.tool_result import success_response
+
+                cascade_message = f"The user doesn't want to take this action right now. Skipping {tool_name} due to previous rejection."
+                cascade_result = success_response(
+                    cascade_message,
+                    llm_content={
+                        "parts": [{"type": "text", "text": cascade_message}]
+                    }
+                )
+                cascade_result["cascade_blocked"] = True  # Different flag to distinguish from direct rejection
+                results.append(cascade_result)
 
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
@@ -247,9 +220,11 @@ class BaseToolManager(ABC):
             session_id: Session ID for context-aware tools and dependency injection (required)
 
         Returns:
-            Dict[str, Any]: Unified tool result structure:
-                - inline_data: Dict with multimodal content or empty {}
-                - llm_content: Tool's response
+            Dict[str, Any]: ToolResult dictionary with structure:
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-facing summary
+                - llm_content: Dict with parts structure
+                - data: Optional[Dict[str, Any]] - Tool-specific data
                 - user_rejected: Optional[bool] - True if user rejected the tool
 
         Raises:
@@ -267,22 +242,17 @@ class BaseToolManager(ABC):
         try:
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
-                confirmation_result = await self._handle_user_confirmation(tool_name, tool_args, session_id)
-                if confirmation_result is not None:
-                    # User rejected - return rejection result
-                    return confirmation_result
+                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, session_id)
+                if rejection_result is not None:
+                    # User rejected - return rejection result (already in ToolResult format)
+                    return rejection_result
 
             # Step 2: Execute the tool (user approved or no confirmation needed)
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
 
-            # Step 3: Handle execution errors
-            error_response = self._check_for_errors(tool_result)
-            if error_response is not None:
-                return error_response
-
-            # Step 4: Format successful response
-            return self._format_successful_response(tool_result)
+            # Step 3: Return tool result directly (already in standardized ToolResult format)
+            return tool_result
 
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
@@ -324,62 +294,12 @@ class BaseToolManager(ABC):
                 user_message=user_message or f"User rejected {tool_name}"
             )
 
-            return {
-                "inline_data": {},
-                "llm_content": rejection_result.get("llm_content", f"Tool {tool_name} was rejected by user"),
-                "user_rejected": True  # Critical flag for interruption detection
-            }
+            # Add user_rejected flag for interruption detection
+            rejection_result["user_rejected"] = True
+            return rejection_result
 
         # User approved - return None to continue execution
         return None
-
-    def _check_for_errors(self, tool_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Check tool result for errors and format error response if needed.
-
-        Args:
-            tool_result: Tool execution result
-
-        Returns:
-            Error response dict if error found, None otherwise
-        """
-        # Check MCP-level errors (is_error field)
-        if tool_result.get("is_error"):
-            return {
-                "inline_data": {},
-                "llm_content": f"<error>{tool_result.get('message', 'Unknown MCP error')}</error>"
-            }
-
-        # Check tool-level errors (status="error")
-        if tool_result.get("status") == "error":
-            error_message = tool_result.get("message", tool_result.get("error", "Unknown error"))
-            return {
-                "inline_data": {},
-                "llm_content": f"<error>{error_message}</error>"
-            }
-
-        return None
-
-    def _format_successful_response(self, tool_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Format successful tool execution response.
-
-        Args:
-            tool_result: Successful tool execution result
-
-        Returns:
-            Formatted response with inline_data and llm_content
-        """
-        # Extract multimodal content if present
-        if self._has_multimodal_content(tool_result):
-            inline_data = self._extract_multimodal_content(tool_result)
-        else:
-            inline_data = {}
-
-        return {
-            "inline_data": inline_data,
-            "llm_content": tool_result.get("llm_content")
-        }
 
     def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
         """

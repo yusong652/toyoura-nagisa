@@ -71,7 +71,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             
             # Map role and add to contents if we have parts
             if parts:
-                mapped_role = GeminiMessageFormatter._map_role(msg.role)
+                mapped_role = GeminiMessageFormatter._map_role(msg.role) # type: ignore
                 contents.append({"role": mapped_role, "parts": parts})
         
         return contents
@@ -173,7 +173,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         
         # Map role and return formatted message
         if parts:
-            mapped_role = GeminiMessageFormatter._map_role(message.role)
+            mapped_role = GeminiMessageFormatter._map_role(message.role) # type: ignore
             return {"role": mapped_role, "parts": parts}
         
         return {}
@@ -197,36 +197,24 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         from google.genai import types
 
         parts = []
+        # All tools use standardized parts format
+        llm_content = result["llm_content"]
+        content_parts = llm_content["parts"]
+        response_data = {"status": result.get("status", "success")}
 
-        # Extract llm_content for processing
-        llm_content = result.get("llm_content") if isinstance(result, dict) else None
+        for part in content_parts:
+            part_type = part["type"]
 
-        # Process parts-based content structure
-        if isinstance(llm_content, dict) and "parts" in llm_content:
-            content_parts = llm_content["parts"]
-            response_data = {"status": result.get("status", "success")}
-
-            for part in content_parts:
-                part_type = part.get("type")
-
-                if part_type == "inline_data":
-                    # Process inline_data part for multimodal content
-                    blob = GeminiMessageFormatter._process_inline_data(part)
-                    if blob:
-                        parts.append(types.Part(inline_data=blob))
-                elif part_type == "text":
-                    # Collect text content for function response
-                    text_content = part.get("text", "")
-                    if text_content:
-                        response_data["content"] = text_content
-        else:
-            # Fallback for non-parts format (legacy or simple text)
-            if isinstance(llm_content, dict):
-                response_data = llm_content
-            elif llm_content is not None:
-                response_data = {"content": str(llm_content)}
-            else:
-                response_data = result
+            if part_type == "inline_data":
+                # Process inline_data part for multimodal content
+                blob = GeminiMessageFormatter._process_inline_data(part)
+                if blob:
+                    parts.append(types.Part(inline_data=blob))
+            elif part_type == "text":
+                # Collect text content for function response
+                text_content = part.get("text", "")
+                if text_content:
+                    response_data["content"] = text_content
 
         # Create function response part
         function_response = types.FunctionResponse(

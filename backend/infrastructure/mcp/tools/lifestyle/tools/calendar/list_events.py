@@ -179,7 +179,15 @@ def register_list_events_tool(mcp: FastMCP):
             
             print(f"DEBUG: Returning success response - message: {message}")
             print(f"DEBUG: LLM content: {llm_content}")
-            response = success_response(message, llm_content, **result)
+            response = success_response(
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
+                **result
+            )
             print(f"DEBUG: Final response: {response}")
             return response
             

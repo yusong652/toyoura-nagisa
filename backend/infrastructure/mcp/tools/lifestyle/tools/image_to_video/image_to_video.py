@@ -303,7 +303,9 @@ async def generate_video_from_image(
         return success_response(
             message=f"Video generated successfully ({generation_time})",
             llm_content={
-                "description": f"Generated a {actual_length}s video"
+                "parts": [
+                    {"type": "text", "text": f"Generated a {actual_length}s video"}
+                ]
             },
             data={
                 "video_base64": video_result.get("video"),

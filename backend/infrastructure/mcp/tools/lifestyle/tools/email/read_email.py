@@ -152,7 +152,14 @@ def register_read_email_tool(mcp: FastMCP):
             # Build response
             message = f"Read email: {subject}"
             
-            return success_response(message, llm_content)
+            return success_response(
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                }
+            )
             
         except FileNotFoundError as e:
             return error_response(f"Authentication required: {str(e)}")

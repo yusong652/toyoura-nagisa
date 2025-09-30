@@ -195,13 +195,21 @@ def glob(
 
         # Simple user-facing message - use generic "items" to include both files and directories
         message = f"Found {total_found} matching items"
-        
-        # Simple LLM content - just the paths, one per line (empty string if no matches)
-        llm_content = "\n".join(file_paths) if file_paths else ""
-        
+
+        # Simple LLM content - just the paths, one per line
+        # Provide meaningful message when no results found
+        if file_paths:
+            llm_content = "\n".join(file_paths)
+        else:
+            llm_content = f"No items found matching pattern '{pattern}'"
+
         return success_response(
             message,
-            llm_content,
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": llm_content}
+                ]
+            },
             files=file_paths,
             pattern=pattern,
             total_found=total_found,

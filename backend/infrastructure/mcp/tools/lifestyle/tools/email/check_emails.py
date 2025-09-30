@@ -83,7 +83,14 @@ def register_check_emails_tool(mcp: FastMCP):
             if unread_only:
                 message += " (unread only)"
             
-            return success_response(message, llm_content)
+            return success_response(
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                }
+            )
             
         except FileNotFoundError as e:
             return error_response(f"Authentication required: {str(e)}")

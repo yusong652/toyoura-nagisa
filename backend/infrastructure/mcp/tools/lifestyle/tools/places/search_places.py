@@ -81,7 +81,11 @@ def register_search_places_tool(mcp: FastMCP):
             
             return success_response(
                 message,
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 places_data={
                     "places": places,
                     "total_found": len(places),

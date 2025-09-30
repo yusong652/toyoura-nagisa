@@ -115,49 +115,33 @@ class MessageFormatter(BaseMessageFormatter):
             result = {"llm_content": {"parts": [{"type": "text", "text": "image"}, {"type": "inline_data", ...}]}}
             # Returns: [{"type": "text", "text": "image"}, {"type": "image", ...}]
         """
-        # Extract llm_content
-        llm_content = result.get("llm_content") if isinstance(result, dict) else None
+        # All tools use standardized parts format
+        llm_content = result["llm_content"]
+        content_parts = llm_content["parts"]
+        formatted_parts = []
 
-        # Process parts-based content structure
-        if isinstance(llm_content, dict) and "parts" in llm_content:
-            content_parts = llm_content["parts"]
-            formatted_parts = []
+        for part in content_parts:
+            part_type = part["type"]
 
-            for part in content_parts:
-                part_type = part.get("type")
+            if part_type == "text":
+                # Add text block
+                text_content = part.get("text", "")
+                if text_content:
+                    formatted_parts.append({
+                        "type": "text",
+                        "text": text_content
+                    })
+            elif part_type == "inline_data":
+                # Process inline_data and convert to Anthropic image format
+                image_block = MessageFormatter.process_inline_data(part)
+                if image_block:
+                    formatted_parts.append(image_block)
 
-                if part_type == "text":
-                    # Add text block
-                    text_content = part.get("text", "")
-                    if text_content:
-                        formatted_parts.append({
-                            "type": "text",
-                            "text": text_content
-                        })
-                elif part_type == "inline_data":
-                    # Process inline_data and convert to Anthropic image format
-                    image_block = MessageFormatter.process_inline_data(part)
-                    if image_block:
-                        formatted_parts.append(image_block)
+        # Return as list for multimodal, or extract text for text-only
+        if len(formatted_parts) == 1 and formatted_parts[0]["type"] == "text":
+            return formatted_parts[0]["text"]
 
-            # Return as list for multimodal, or extract text for text-only
-            if len(formatted_parts) == 1 and formatted_parts[0].get("type") == "text":
-                return formatted_parts[0]["text"]
-            elif formatted_parts:
-                return formatted_parts
-
-        # Fallback for non-parts format
-        if isinstance(llm_content, dict):
-            return MessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
-        elif llm_content is not None:
-            return str(llm_content)
-
-        # Handle regular structured data
-        if isinstance(result, (dict, list)):
-            return MessageFormatter.safe_json_serialize(result, ensure_ascii=False, indent=2)
-
-        # Handle simple content
-        return str(result)
+        return formatted_parts
 
     @staticmethod
     def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:

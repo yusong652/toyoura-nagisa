@@ -59,7 +59,11 @@ def register_location_tools(mcp: FastMCP):
                 
                 return success_response(
                     message,
-                    llm_content,
+                    llm_content={
+                        "parts": [
+                            {"type": "text", "text": llm_content}
+                        ]
+                    },
                     location_data={
                         "latitude": location_data.latitude,
                         "longitude": location_data.longitude,

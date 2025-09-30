@@ -93,7 +93,11 @@ def register_search_contacts_tool(mcp: FastMCP):
             
             return success_response(
                 message,
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 contacts=contacts,
                 total_matches=len(contacts),
                 search_query=query,

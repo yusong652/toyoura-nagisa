@@ -182,7 +182,11 @@ Usage notes:
         # This matches real terminal behavior where you see all output regardless of exit code
         return success_response(
             message,
-            combined_output,  # Complete terminal output for LLM
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": combined_output}
+                ]
+            },
             exit_code=exit_code,
             execution_time=execution_time,
             stdout=stdout,

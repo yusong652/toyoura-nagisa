@@ -120,7 +120,11 @@ def write(
 
         return success_response(
             display_msg,
-            display_msg,  # Simple message content like Claude Code
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": display_msg}
+                ]
+            },
             file_path=str(rel_display),
             size_bytes=size_bytes,
             lines_count=lines_count,
