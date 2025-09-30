@@ -41,7 +41,7 @@ def bash(
     ),
     run_in_background: bool = Field(
         False,
-        description="Set to true to run this command in the background. Use BashOutput to read the output later."
+        description="Set to true to run in background without blocking, returns process ID immediately. Use BashOutput to monitor output. Default (false) blocks until completion and returns output directly. Use for: long builds, tests, dev servers."
     )
 ) -> Dict[str, Any]:
     """Executes a given bash command in a persistent shell session with optional timeout, ensuring proper handling and security measures.

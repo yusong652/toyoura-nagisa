@@ -5,6 +5,7 @@ Provides output retrieval functionality for aiNagisa's background bash execution
 designed to match Claude Code's BashOutput tool behavior.
 """
 
+import time
 from typing import Dict, Any, Optional
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
@@ -24,6 +25,10 @@ def bash_output(
     filter: Optional[str] = Field(
         None,
         description="Optional regular expression to filter the output lines. Only lines matching this regex will be included in the result. Any lines that do not match will no longer be available to read."
+    ),
+    wait: int = Field(
+        1,
+        description="Wait time in seconds before checking output (default: 1). Use longer wait times for long-running tasks to avoid excessive polling."
     )
 ) -> Dict[str, Any]:
     """
@@ -37,6 +42,10 @@ def bash_output(
     # Validate bash_id parameter
     if not bash_id or not bash_id.strip():
         return error_response("bash_id parameter is required and cannot be empty")
+
+    # Wait before checking output (prevents excessive polling)
+    if wait > 0:
+        time.sleep(wait)
 
     try:
         # Get session ID from MCP context for session isolation
