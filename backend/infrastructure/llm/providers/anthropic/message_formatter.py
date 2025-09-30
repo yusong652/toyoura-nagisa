@@ -90,93 +90,74 @@ class MessageFormatter(BaseMessageFormatter):
     def format_tool_result_content(result: Union[Dict[str, Any], Any]) -> Union[str, List[Dict[str, Any]]]:
         """
         Format tool result content for Anthropic API compatibility.
-        
+
         Transforms tool execution results into Anthropic API compatible format.
         Extracts llm_content from standardized ToolResult objects and formats
         according to Anthropic's content requirements.
-        
+
         Args:
-            result: Tool execution result, typically ToolResult.model_dump() containing:
-                - llm_content: Structured data for LLM consumption
-                - status: Operation outcome ("success" | "error")  
+            result: Tool execution result with standardized parts format:
+                - llm_content.parts: List of content parts (text and/or inline_data)
+                - status: Operation outcome ("success" | "error")
                 - message: User-facing summary
-                Or raw content for legacy compatibility
-        
+
         Returns:
             Union[str, List[Dict[str, Any]]]: Formatted content for Anthropic API:
                 - str: JSON serialized structured data or simple text
                 - List[Dict]: Multimodal content array with text and image blocks
-        
+
         Example:
             # ToolResult with text content
-            result = {"status": "success", "llm_content": {"data": "result"}}
-            # Returns: '{"data": "result"}'
-            
-            # Result with image content  
-            result = {"text": "chart", "inline_data": {"data": "base64..."}}
-            # Returns: [{"type": "text", "text": '{"text": "chart"}'}, {"type": "image", ...}]
+            result = {"status": "success", "llm_content": {"parts": [{"type": "text", "text": "result"}]}}
+            # Returns: 'result'
+
+            # Result with image content
+            result = {"llm_content": {"parts": [{"type": "text", "text": "image"}, {"type": "inline_data", ...}]}}
+            # Returns: [{"type": "text", "text": "image"}, {"type": "image", ...}]
         """
-        # Handle multimodal content with images
-        # Check new format: inline_data inside llm_content
-        if isinstance(result, dict) and 'llm_content' in result and isinstance(result['llm_content'], dict) and 'inline_data' in result['llm_content']:
-            # New format: prepare data for _format_multimodal_content
-            multimodal_data = {
-                'llm_content': result['llm_content'],
-                'inline_data': result['llm_content']['inline_data']
-            }
-            return MessageFormatter._format_multimodal_content(multimodal_data)
-        # Check legacy format: inline_data at root level
-        elif isinstance(result, dict) and 'inline_data' in result and result['inline_data']:
-            return MessageFormatter._format_multimodal_content(result)
-        
-        # Handle standardized ToolResult - extract llm_content
-        elif isinstance(result, dict) and 'llm_content' in result:
-            content = result['llm_content']
-            # Convert to JSON string for API compatibility
-            if isinstance(content, (dict, list)):
-                return MessageFormatter.safe_json_serialize(content, ensure_ascii=False, indent=2)
-            return str(content) if content is not None else str(result)
-            
+        # Extract llm_content
+        llm_content = result.get("llm_content") if isinstance(result, dict) else None
+
+        # Process parts-based content structure
+        if isinstance(llm_content, dict) and "parts" in llm_content:
+            content_parts = llm_content["parts"]
+            formatted_parts = []
+
+            for part in content_parts:
+                part_type = part.get("type")
+
+                if part_type == "text":
+                    # Add text block
+                    text_content = part.get("text", "")
+                    if text_content:
+                        formatted_parts.append({
+                            "type": "text",
+                            "text": text_content
+                        })
+                elif part_type == "inline_data":
+                    # Process inline_data and convert to Anthropic image format
+                    image_block = MessageFormatter.process_inline_data(part)
+                    if image_block:
+                        formatted_parts.append(image_block)
+
+            # Return as list for multimodal, or extract text for text-only
+            if len(formatted_parts) == 1 and formatted_parts[0].get("type") == "text":
+                return formatted_parts[0]["text"]
+            elif formatted_parts:
+                return formatted_parts
+
+        # Fallback for non-parts format
+        if isinstance(llm_content, dict):
+            return MessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
+        elif llm_content is not None:
+            return str(llm_content)
+
         # Handle regular structured data
         if isinstance(result, (dict, list)):
             return MessageFormatter.safe_json_serialize(result, ensure_ascii=False, indent=2)
-            
+
         # Handle simple content
         return str(result)
-    
-    @staticmethod
-    def _format_multimodal_content(content: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Format content containing inline_data for multimodal display.
-        
-        Args:
-            content: Dictionary containing inline_data with image information
-            
-        Returns:
-            List[Dict[str, Any]]: Multimodal content array with text and image blocks
-        """
-        inline_data = content['inline_data']
-        content_parts = []
-        
-        # Add text content from llm_content field
-        llm_content = content['llm_content']
-        content_parts.append({
-            "type": "text",
-            "text": llm_content if isinstance(llm_content, str) else MessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False)
-        })
-        
-        # Add image content
-        if inline_data['data']:
-            content_parts.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": inline_data.get('mime_type', 'image/png'),
-                    "data": inline_data['data']
-                }
-            })
-        
-        return content_parts
 
     @staticmethod
     def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:

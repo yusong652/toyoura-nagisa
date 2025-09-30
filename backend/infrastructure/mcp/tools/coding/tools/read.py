@@ -398,28 +398,32 @@ Usage:
             else:
                 message = f"Read {file_type.value} file: {file_path.name} (0 lines)"
 
-        # Build structured LLM content
+        # Build structured LLM content with unified parts format
         rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
-        
-        # Handle content based on file type - align with Claude Code format
+
+        # Build parts array for unified content structure
+        parts = []
+
         if processing_result.content_format == ContentFormat.INLINE_DATA:
-            # For binary/multimodal files, include metadata and inline_data for LLM provider compatibility
+            # For binary/multimodal files (images, etc.)
             if isinstance(processing_result.content, dict) and "inline_data" in processing_result.content:
-                # Include file metadata alongside inline_data for multimodal LLM consumption
-                llm_content = {
-                    "file_path": str(rel_display),
-                    "file_type": file_type.value,
-                    "inline_data": processing_result.content["inline_data"]
-                }
-            else:
-                llm_content = {"content": processing_result.content}
+                inline_data = processing_result.content["inline_data"]
+                # Add inline_data part
+                parts.append({
+                    "type": "inline_data",
+                    "mime_type": inline_data["mime_type"],
+                    "data": inline_data["data"]
+                })
         else:
-            # For text files, return content directly (cat -n format)
-            llm_content = processing_result.content
+            # For text files, add content as text part
+            parts.append({
+                "type": "text",
+                "text": processing_result.content
+            })
 
         return success_response(
             message,
-            llm_content,
+            llm_content={"parts": parts},
             file_path=str(rel_display),
             file_type=file_type.value,
             encoding=encoding,
