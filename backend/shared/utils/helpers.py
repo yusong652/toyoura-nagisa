@@ -122,7 +122,7 @@ def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> st
     return message_id
 
 
-async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> dict:
+async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> Optional[dict]:
     """Process TTS synthesis for single sentence"""
     if sentence is None or sentence == '':
         return None
@@ -175,10 +175,13 @@ def is_pure_text_assistant(msg):
         getattr(msg, "role", None) == "assistant" and not (getattr(msg, "tool_calls", None) or [])
     )
 
-async def generate_title_for_session(session_id: str, llm_client) -> str:
+async def generate_title_for_session(session_id: str, llm_client) -> Optional[str]:
     """
     Utility function: find latest user and pure text assistant messages by session_id and generate title.
     Search backward from end of history to find most recent pair of non-tool messages.
+
+    Returns:
+        Optional[str]: Generated title, or None if no suitable message pair found
     """
     history = load_history(session_id)
     history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
