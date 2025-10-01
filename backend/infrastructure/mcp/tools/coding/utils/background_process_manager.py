@@ -556,6 +556,57 @@ class BackgroundProcessManager:
 
             return active_ids
 
+    def get_system_reminders(self, session_id: str) -> List[str]:
+        """
+        Get system reminder messages for active background processes.
+
+        Returns formatted reminder strings for processes with new output,
+        following Claude Code's format.
+
+        Args:
+            session_id: Session ID to get reminders for
+
+        Returns:
+            List[str]: List of formatted reminder strings
+        """
+        with self._lock:
+            # Get active process IDs (inline to avoid nested lock)
+            if session_id not in self.session_processes:
+                return []
+
+            reminders = []
+            for process_id in self.session_processes[session_id]:
+                bg_process = self.processes.get(process_id)
+                if not bg_process:
+                    continue
+
+                # Update status if needed
+                if bg_process.status == "running" and bg_process.process.poll() is not None:
+                    bg_process.status = "completed"
+                    bg_process.exit_code = bg_process.process.returncode
+
+                # Only check running processes
+                if bg_process.status != "running":
+                    continue
+
+                # Check for new output
+                has_new_output = (
+                    len(bg_process.stdout_buffer) > bg_process.last_stdout_position or
+                    len(bg_process.stderr_buffer) > bg_process.last_stderr_position
+                )
+
+                if has_new_output:
+                    # Format reminder following Claude Code's format
+                    reminder = (
+                        f"Background Bash {process_id} "
+                        f"(command: {bg_process.command}) "
+                        f"(status: {bg_process.status}) "
+                        f"Has new output available. You can check its output using the BashOutput tool."
+                    )
+                    reminders.append(reminder)
+
+            return reminders
+
     def cleanup_session(self, session_id: str) -> None:
         """
         Kill all processes for a session and clean up resources.

@@ -117,6 +117,7 @@ class LLMClientBase(ABC):
             parsed_data: Parsed message data including agent_profile, enable_memory configuration
         """
         context_manager = self.get_or_create_context_manager(session_id)
+        print(f"[DEBUG] Adding user message to session {session_id}", flush=True)
 
         # Initialize context manager if needed
         if not context_manager._initialized_from_history:
@@ -129,7 +130,7 @@ class LLMClientBase(ABC):
                 recent_history = recent_history[:-1]
             recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
             context_manager.initialize_session_from_history(recent_msgs)
-
+            print(f"[DEBUG] Initialized context manager for session {session_id} from history with {len(recent_msgs)} messages", flush=True)
         # Add user message and set configuration
         context_manager.add_user_message_from_data(parsed_data)
 
@@ -247,11 +248,15 @@ class LLMClientBase(ABC):
 
             # Add results to context and check for rejections
             rejected_tools = []
-            for tool_call, result in zip(tool_calls, results):
+            for i, (tool_call, result) in enumerate(zip(tool_calls, results)):
+                # Check if this is the last tool result
+                is_last_tool = (i == len(tool_calls) - 1)
+
                 context_manager.add_tool_result(
                     tool_call['id'],
                     tool_call['name'],
-                    result
+                    result,
+                    inject_reminders=is_last_tool
                 )
 
                 # Check if this tool was directly rejected by user (not cascade blocked)

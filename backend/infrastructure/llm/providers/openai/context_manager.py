@@ -5,7 +5,7 @@ Manages conversation context and message history for OpenAI API calls.
 Handles message formatting, tool result integration, and state management.
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 from .message_formatter import OpenAIMessageFormatter
@@ -20,7 +20,7 @@ class OpenAIContextManager(BaseContextManager):
     maintaining compatibility with the base context manager interface.
     """
     
-    def __init__(self, provider_name: str = "openai", session_id: Optional[str] = None):
+    def __init__(self,session_id: str, provider_name: str = "openai"):
         """Initialize OpenAI context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
         # Unified use of working_contents, removing legacy _working_messages
@@ -38,13 +38,11 @@ class OpenAIContextManager(BaseContextManager):
         """
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
-            self._message_history.append(response)
-            
             # Format and add to working context
             from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
             formatter_class = get_message_formatter_class(self._provider_name)
             formatted_response = formatter_class.format_single_message(response)
-            
+
             self.working_contents.append(formatted_response)
         else:
             # Handle original OpenAI API response
@@ -74,25 +72,52 @@ class OpenAIContextManager(BaseContextManager):
             
             self.working_contents.append(assistant_message)
     
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
         Add tool execution result to context
-        
+
         Args:
             tool_call_id: Tool call identifier
             tool_name: Name of the executed tool
             result: Tool execution result (can contain inline_data for images)
+            inject_reminders: Whether to inject system reminders into this result
         """
+        # Inject system reminders to result content if needed
+        if inject_reminders:
+            reminders = self._get_background_task_reminders()
+            print(f"[DEBUG] OpenAIContextManager.add_tool_result: Got {len(reminders)} reminders")
+
+            if reminders:
+                reminder_text = "\n\n" + "\n\n".join([
+                    f"<system-reminder>\n{reminder}\n</system-reminder>"
+                    for reminder in reminders
+                ])
+
+                # Modify result llm_content to inject reminders
+                if isinstance(result, dict) and 'llm_content' in result:
+                    llm_content = result['llm_content']
+
+                    # Tool results use parts format: {"parts": [{"type": "text", "text": "..."}]}
+                    if isinstance(llm_content, dict) and 'parts' in llm_content:
+                        parts = llm_content.get('parts', [])
+                        if isinstance(parts, list):
+                            # Find last text part and append reminder
+                            for part in reversed(parts):
+                                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                                    part['text'] += reminder_text
+                                    print(f"[DEBUG] Injected reminders to tool result parts")
+                                    break
+
         # Format tool result content using message formatter
         content = OpenAIMessageFormatter._format_tool_result(result)
-        
+
         # Add tool result message
         tool_message = {
             "role": "tool",
             "content": content,
             "tool_call_id": tool_call_id
         }
-        
+
         self.working_contents.append(tool_message)
     
     def _is_tool_call(self, msg: Dict[str, Any]) -> bool:
@@ -131,7 +156,7 @@ class OpenAIContextManager(BaseContextManager):
         if not isinstance(msg, dict):
             return False
             
-        # Check if it's a tool role with tool_call_id  
-        return bool(msg.get('role') == 'tool' and 
-                   'tool_call_id' in msg and 
+        # Check if it's a tool role with tool_call_id
+        return bool(msg.get('role') == 'tool' and
+                   'tool_call_id' in msg and
                    msg.get('tool_call_id'))

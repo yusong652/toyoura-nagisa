@@ -204,8 +204,8 @@ class ChatHandler(MessageHandler):
                 # Convert WebSocket message to internal request format
                 from backend.presentation.websocket.utils import convert_websocket_message_to_request
                 request_data = convert_websocket_message_to_request(session_id, message)
-
                 # Process user message (all messages treated uniformly)
+                print(f"[ChatHandler] Processing CHAT_MESSAGE from session {session_id}", flush=True)
                 processing_result = await self.chat_service.process_user_message(request_data)
 
                 # Always generate streaming response for user messages
