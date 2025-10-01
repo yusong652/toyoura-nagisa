@@ -50,11 +50,6 @@ class LLMClientBase(ABC):
         # Session-based context manager management
         self._session_context_managers: Dict[str, BaseContextManager] = {}
 
-    # ========== CORE STREAMING INTERFACE ==========
-
-    # ========== ABSTRACT METHODS FOR PROVIDER-SPECIFIC IMPLEMENTATION ==========
-
-
     @abstractmethod
     async def call_api_with_context(
         self,
@@ -106,8 +101,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    # ========== SESSION-BASED OPERATION INTERFACES ==========
-
     def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
         """
         Add user message to specified session.
@@ -130,7 +123,6 @@ class LLMClientBase(ABC):
                 recent_history = recent_history[:-1]
             recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
             context_manager.initialize_session_from_history(recent_msgs)
-            print(f"[DEBUG] Initialized context manager for session {session_id} from history with {len(recent_msgs)} messages", flush=True)
         # Add user message and set configuration
         context_manager.add_user_message_from_data(parsed_data)
 
@@ -272,8 +264,6 @@ class LLMClientBase(ABC):
         # Continue recursively - pass True if we executed tools this round
         return await self._recursive_tool_calling(session_id, iterations + 1, bool(tool_calls))
 
-    # ========== SPECIALIZED CONTENT GENERATION INTERFACES ==========
-
     async def generate_title_from_messages(
         self,
         latest_messages: List[BaseMessage]
@@ -331,9 +321,6 @@ class LLMClientBase(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support web search"
         )
-
-    # ========== ABSTRACT HELPER METHODS FOR PROVIDER-SPECIFIC LOGIC ==========
-
 
     @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
@@ -405,8 +392,6 @@ class LLMClientBase(ABC):
             bool: True if tool was rejected by user, False otherwise
         """
         return tool_result.get('user_rejected', False)
-
-    # ========== SHARED UTILITY METHODS ==========
 
     def _create_tool_notification(
         self,
@@ -518,8 +503,6 @@ class LLMClientBase(ABC):
             # Don't fail the main execution if WebSocket notification fails
             provider_name = self.__class__.__name__.replace('Client', '')
             print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
-
-    # ========== SESSION CONTEXT MANAGER MANAGEMENT ==========
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:
