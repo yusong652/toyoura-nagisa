@@ -3,7 +3,7 @@ import base64
 import asyncio
 import uuid
 from datetime import datetime
-from backend.infrastructure.storage.session_manager import get_all_sessions, update_session_title, save_history, load_history
+from backend.infrastructure.storage.session_manager import save_history
 from backend.infrastructure.tts.base import BaseTTS
 # Removed legacy title_generator import - now using LLM client methods directly
 from backend.config import get_llm_settings
@@ -152,63 +152,6 @@ async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> Optional[d
     except Exception as e:
         print(f"TTS synthesis failed: {e}")
         return {'text': sentence, 'audio': None, 'error': str(e)}
-
-def should_generate_title(session_id: str, history_msgs: list) -> bool:
-    """Determine if title generation is needed: only if current is default title and has one pure text assistant message."""
-    sessions = get_all_sessions()
-    current_session = next((s for s in sessions if s['id'] == session_id), None)
-    has_default_title = (
-        current_session is not None and
-        (
-            current_session.get('name', '').startswith('New Chat')
-            or 'New Conversation' in current_session.get('name', '')
-        )
-    )
-    has_pure_text_assistant = any(is_pure_text_assistant(msg) for msg in history_msgs)
-    return has_default_title and has_pure_text_assistant
-
-def is_pure_text_assistant(msg):
-    """
-    Determine if assistant message is non-tool/function_call (tool_calls field doesn't exist or is empty).
-    """
-    return (
-        getattr(msg, "role", None) == "assistant" and not (getattr(msg, "tool_calls", None) or [])
-    )
-
-async def generate_title_for_session(session_id: str, llm_client) -> Optional[str]:
-    """
-    Utility function: find latest user and pure text assistant messages by session_id and generate title.
-    Search backward from end of history to find most recent pair of non-tool messages.
-
-    Returns:
-        Optional[str]: Generated title, or None if no suitable message pair found
-    """
-    history = load_history(session_id)
-    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-    
-    # Traverse backward to find most recent pair of non-tool messages
-    latest_user_msg = None
-    latest_assistant_msg = None
-    
-    for msg in reversed(history_msgs):
-        if not latest_user_msg and getattr(msg, 'role', None) == 'user':
-            latest_user_msg = msg
-        elif not latest_assistant_msg and is_pure_text_assistant(msg):
-            latest_assistant_msg = msg
-        
-        # Stop searching if found most recent pair of messages
-        if latest_user_msg and latest_assistant_msg:
-            break
-    
-    if not latest_user_msg or not latest_assistant_msg:
-        return None
-    
-    # Create a list of latest messages for title generation
-    latest_messages = [latest_user_msg, latest_assistant_msg]
-        
-    # Use LLM client's built-in title generation method directly
-    title = await llm_client.generate_title_from_messages(latest_messages)
-    return title
 
 def extract_response_without_think(response_text: str) -> str:
     """
