@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
-from backend.application.services.content_service import ContentService
+from backend.application.services.contents import VideoService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter()
@@ -19,14 +19,14 @@ class VideoGenerationRequest(BaseModel):
     session_id: str
     motion_style: Optional[str] = None
 
-def get_content_service() -> ContentService:
+def get_video_service() -> VideoService:
     """
-    Get Content service instance.
-    
+    Get Video service instance.
+
     Returns:
-        ContentService: Service instance for content operations
+        VideoService: Service instance for video operations
     """
-    return ContentService()
+    return VideoService()
 
 def get_llm_client(request: Request) -> LLMClientBase:
     """
@@ -84,7 +84,7 @@ async def get_video(video_path: str):
 @router.post("/generate-video")
 async def generate_video(
     request: VideoGenerationRequest,
-    service: ContentService = Depends(get_content_service),
+    service: VideoService = Depends(get_video_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
 ):
     """
