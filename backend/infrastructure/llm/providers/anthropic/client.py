@@ -74,6 +74,11 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific image prompt generator class."""
         return ImagePromptGenerator
 
+    def _get_web_search_generator(self):
+        """Get Anthropic-specific web search generator class."""
+        from .content_generators import AnthropicWebSearchGenerator
+        return AnthropicWebSearchGenerator
+
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
@@ -198,26 +203,4 @@ class AnthropicClient(LLMClientBase):
 
 
 
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform a web search using the native web search tool via Anthropic API.
-
-        This method uses the project's unified client configuration and provides
-        comprehensive error handling and debugging support.
-
-        Args:
-            query: The search query to find information on the web
-            **kwargs: Additional search parameters:
-                - max_uses: Maximum number of search tool uses (default: 5)
-
-        Returns:
-            Dictionary containing search results with sources and metadata
-        """
-        from .content_generators import AnthropicWebSearchGenerator
-        return AnthropicWebSearchGenerator.perform_web_search(
-            self.client,
-            query,
-            self.anthropic_config.debug,
-            **kwargs
-        )
 

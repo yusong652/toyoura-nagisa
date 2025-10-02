@@ -173,6 +173,10 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific image prompt generator class."""
         return ImagePromptGenerator
 
+    def _get_web_search_generator(self):
+        """Get OpenAI-specific web search generator class."""
+        return WebSearchGenerator
+
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
@@ -242,27 +246,3 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific configuration object."""
         return self.openai_config
 
-    # ========== SPECIALIZED CONTENT GENERATION ==========
-
-
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform web search using OpenAI API with tools.
-        
-        Note: OpenAI doesn't have built-in web search like Gemini, so this
-        uses MCP tools for web search functionality.
-        
-        Args:
-            query: Search query to find information on the web
-            **kwargs: Additional search parameters
-            
-        Returns:
-            Dictionary containing search results with sources and metadata
-        """
-        debug = self.openai_config.debug
-        return WebSearchGenerator.perform_web_search(
-            self.client,
-            query,
-            debug,
-            **kwargs
-        )
