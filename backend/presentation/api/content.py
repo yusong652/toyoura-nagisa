@@ -7,20 +7,40 @@ and image generation following Clean Architecture principles.
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.presentation.models.api_models import GenerateImageRequest, GenerateVideoRequest
-from backend.application.services.content_service import ContentService
+from backend.application.services.contents import TitleService, ImageService, VideoService
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 router = APIRouter(tags=["content"])
 
 
-def get_content_service() -> ContentService:
+def get_title_service() -> TitleService:
     """
-    Dependency injection for ContentService.
-    
+    Dependency injection for TitleService.
+
     Returns:
-        ContentService: Content generation service instance
+        TitleService: Title generation service instance
     """
-    return ContentService()
+    return TitleService()
+
+
+def get_image_service() -> ImageService:
+    """
+    Dependency injection for ImageService.
+
+    Returns:
+        ImageService: Image generation service instance
+    """
+    return ImageService()
+
+
+def get_video_service() -> VideoService:
+    """
+    Dependency injection for VideoService.
+
+    Returns:
+        VideoService: Video generation service instance
+    """
+    return VideoService()
 
 
 def get_llm_client(request: Request) -> LLMClientBase:
@@ -39,7 +59,7 @@ def get_llm_client(request: Request) -> LLMClientBase:
 @router.post("/history/generate-title", response_model=dict)
 async def generate_title(
     request: Request,
-    service: ContentService = Depends(get_content_service),
+    service: TitleService = Depends(get_title_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
 ) -> Dict[str, Any]:
     """
@@ -110,7 +130,7 @@ async def generate_title(
 @router.post("/generate-image", response_model=dict)
 async def generate_image(
     request: GenerateImageRequest,
-    service: ContentService = Depends(get_content_service),
+    service: ImageService = Depends(get_image_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
 ) -> Dict[str, Any]:
     """
@@ -157,7 +177,7 @@ async def generate_image(
 @router.post("/generate-video", response_model=dict)
 async def generate_video(
     request: GenerateVideoRequest,
-    service: ContentService = Depends(get_content_service),
+    service: VideoService = Depends(get_video_service),
     llm_client: LLMClientBase = Depends(get_llm_client)
 ) -> Dict[str, Any]:
     """

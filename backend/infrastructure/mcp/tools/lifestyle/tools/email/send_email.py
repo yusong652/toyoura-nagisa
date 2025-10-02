@@ -71,7 +71,14 @@ def register_send_email_tool(mcp: FastMCP):
             message_text = f"Email sent to {recipients_text}"
             llm_content = f"Sent email to {recipients_text} with subject: {subject}"
             
-            return success_response(message_text, llm_content)
+            return success_response(
+                message_text,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                }
+            )
             
         except FileNotFoundError as e:
             return error_response(f"Authentication required: {str(e)}")

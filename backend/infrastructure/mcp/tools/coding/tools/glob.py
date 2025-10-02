@@ -1,8 +1,8 @@
-"""glob tool – fast file pattern matching that works with any codebase size.
+"""glob tool – fast file and directory pattern matching that works with any codebase size.
 
 Supports glob patterns like "**/*.js" or "src/**/*.ts" and returns matching
-file paths sorted by modification time. Use this tool when you need to find
-files by name patterns.
+file and directory paths sorted by modification time. Use this tool when you need to find
+files or directories by name patterns.
 """
 
 from pathlib import Path
@@ -93,12 +93,12 @@ def _expand_glob_pattern(
                 # Non-recursive glob
                 matches = base_dir.glob(pat)
             
-            # Filter to files only and apply limit
+            # Filter to files and directories and apply limit
             for match in matches:
                 if len(matched_files) >= max_files:
                     break
-                
-                if match.is_file() and match not in matched_files:
+
+                if (match.is_file() or match.is_dir()) and match not in matched_files:
                     matched_files.append(match)
                     
     except Exception:
@@ -138,10 +138,10 @@ def glob(
         description="The directory to search in (defaults to current working directory if not specified)",
     ),
 ) -> Dict[str, Any]:
-    """- Fast file pattern matching tool that works with any codebase size
+    """- Fast file and directory pattern matching tool that works with any codebase size
 - Supports glob patterns like "**/*.js" or "src/**/*.ts"
-- Returns matching file paths sorted by modification time
-- Use this tool when you need to find files by name patterns"""
+- Returns matching file and directory paths sorted by modification time
+- Use this tool when you need to find files or directories by name patterns"""
 
     # Handle Pydantic FieldInfo objects when invoked programmatically
     if isinstance(path, FieldInfo):
@@ -187,21 +187,29 @@ def glob(
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
         
-        # Build Claude Code style response - simple file path list
+        # Build Claude Code style response - simple file/directory path list
         file_paths = [str(file_path) for file_path in sorted_files]
-        
+
         # Build Claude Code aligned response
         total_found = len(file_paths)
-        
-        # Simple user-facing message
-        message = f"Found {total_found} matching files"
-        
-        # Simple LLM content - just the file paths, one per line (empty string if no files)
-        llm_content = "\n".join(file_paths) if file_paths else ""
-        
+
+        # Simple user-facing message - use generic "items" to include both files and directories
+        message = f"Found {total_found} matching items"
+
+        # Simple LLM content - just the paths, one per line
+        # Provide meaningful message when no results found
+        if file_paths:
+            llm_content = "\n".join(file_paths)
+        else:
+            llm_content = f"No items found matching pattern '{pattern}'"
+
         return success_response(
             message,
-            llm_content,
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": llm_content}
+                ]
+            },
             files=file_paths,
             pattern=pattern,
             total_found=total_found,
@@ -216,8 +224,7 @@ def glob(
 
 def register_glob_tool(mcp: FastMCP):
     """Register the glob tool with proper tags synchronization."""
-    common = dict(
-        tags={"coding", "filesystem", "search", "pattern"}, 
+    mcp.tool(
+        tags={"coding", "filesystem", "search", "pattern"},
         annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "pattern"]}
-    )
-    mcp.tool(**common)(glob)
+    )(glob)

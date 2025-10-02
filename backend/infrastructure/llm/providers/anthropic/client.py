@@ -11,13 +11,12 @@ from .tool_manager import AnthropicToolManager
 
 class AnthropicClient(LLMClientBase):
     """
-    Anthropic Claude 客户端实现。
-    继承自 LLMClientBase，实现具体的 API 调用逻辑。
+    Anthropic Claude client class.
     """
     
     def __init__(self, api_key: str, **kwargs):
         """
-        初始化 Anthropic 客户端。
+        Initialize AnthropicClient instance.
         Args:
             api_key: Anthropic API key。
             **kwargs: Additional configuration parameters
@@ -28,7 +27,7 @@ class AnthropicClient(LLMClientBase):
         # Initialize Anthropic-specific configuration
         config_overrides = {}
         
-        # 从extra_config中提取相关配置进行覆盖
+        # Apply any extra configuration overrides
         if 'model' in self.extra_config:
             config_overrides['model_settings'] = {'model': self.extra_config['model']}
         if 'temperature' in self.extra_config:
@@ -50,21 +49,29 @@ class AnthropicClient(LLMClientBase):
         
         print(f"Enhanced Anthropic Client initialized with model: {self.anthropic_config.model_settings.model}")
         
-        # 初始化API客户端 - 使用统一的client属性名
+        # initialize Anthropic API client
         self.client = anthropic.Anthropic(api_key=self.api_key)
        
-        # 初始化统一工具管理器
+        # initialize tool manager
         self.tool_manager = AnthropicToolManager()
-
-    # get_response is now implemented in base class using provider-specific components
-
-
-    # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
 
     def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
         """Get Anthropic-specific response processor instance."""
         return AnthropicResponseProcessor()
+
+    def _get_title_generator(self):
+        """Get Anthropic-specific title generator class."""
+        return TitleGenerator
+
+    def _get_image_prompt_generator(self):
+        """Get Anthropic-specific image prompt generator class."""
+        return ImagePromptGenerator
+
+    def _get_web_search_generator(self):
+        """Get Anthropic-specific web search generator class."""
+        from .content_generators import AnthropicWebSearchGenerator
+        return AnthropicWebSearchGenerator
 
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
@@ -110,10 +117,6 @@ class AnthropicClient(LLMClientBase):
             tool_schemas=prompt_tool_schemas
         )
 
-        debug = get_llm_settings().debug
-        if debug:
-            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
-
         # Get working contents from context manager (config obtained internally)
         working_contents = context_manager.get_working_contents()
 
@@ -127,9 +130,6 @@ class AnthropicClient(LLMClientBase):
     def _get_provider_config(self):
         """Get Anthropic-specific configuration object."""
         return self.anthropic_config
-
-    # _streaming_tool_calling_loop is inherited from LLMClientBase
-
 
     async def call_api_with_context(
         self,
@@ -173,77 +173,16 @@ class AnthropicClient(LLMClientBase):
         kwargs_api.update(kwargs)
 
         try:
-            # 调用Anthropic API
+            # call the Anthropic API
             response = self.client.messages.create(**kwargs_api)
-
-            # 打印raw response (如果启用调试)
-            if debug:
-                AnthropicDebugger.log_raw_response(response)
 
             return response
 
         except Exception as e:
-            # 确保在API调用失败时也能看到payload信息
+            # Log debug information if in debug mode
             if debug:
                 print(f"[DEBUG] API call failed with error: {str(e)}")
                 print(f"[DEBUG] Failed request payload:")
                 AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
-            # 重新抛出异常
-            raise
-
-
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate a concise conversation title using the Anthropic API.
-        支持多模态 content。
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-        """
-        return TitleGenerator.generate_title_from_messages(latest_messages) 
-
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate a high-quality text-to-image prompt using the Anthropic API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-        
-        Returns:
-            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
-        """
-        return ImagePromptGenerator.generate_text_to_image_prompt(
-            self.client,
-            session_id,
-            self.anthropic_config.debug
-        )
-
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform a web search using the native web search tool via Anthropic API.
-
-        This method uses the project's unified client configuration and provides
-        comprehensive error handling and debugging support.
-
-        Args:
-            query: The search query to find information on the web
-            **kwargs: Additional search parameters:
-                - max_uses: Maximum number of search tool uses (default: 5)
-
-        Returns:
-            Dictionary containing search results with sources and metadata
-        """
-        from .content_generators import AnthropicWebSearchGenerator
-        return AnthropicWebSearchGenerator.perform_web_search(
-            self.client,
-            query,
-            self.anthropic_config.debug,
-            **kwargs
-        )
-
+            raise e

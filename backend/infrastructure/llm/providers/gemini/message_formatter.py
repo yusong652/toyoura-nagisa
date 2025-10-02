@@ -71,7 +71,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
             
             # Map role and add to contents if we have parts
             if parts:
-                mapped_role = GeminiMessageFormatter._map_role(msg.role)
+                mapped_role = GeminiMessageFormatter._map_role(msg.role) # type: ignore
                 contents.append({"role": mapped_role, "parts": parts})
         
         return contents
@@ -173,7 +173,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         
         # Map role and return formatted message
         if parts:
-            mapped_role = GeminiMessageFormatter._map_role(message.role)
+            mapped_role = GeminiMessageFormatter._map_role(message.role) # type: ignore
             return {"role": mapped_role, "parts": parts}
         
         return {}
@@ -182,70 +182,47 @@ class GeminiMessageFormatter(BaseMessageFormatter):
     def format_tool_result_for_context(tool_name: str, result: Any) -> Dict[str, Any]:
         """
         Format tool result for Gemini working context.
-        
+
         Creates complete working context entry with proper multimodal handling
         and function response formatting for Gemini API.
-        
+
         Args:
             tool_name: Name of the tool that was executed
-            result: Tool execution result (can contain inline_data for multimodal)
-            
+            result: Tool execution result with standardized parts format:
+                - llm_content.parts: List of content parts (text and/or inline_data)
+
         Returns:
             Dict[str, Any]: Complete working context entry for Gemini API
         """
         from google.genai import types
-        
+
         parts = []
-        
-        # Extract llm_content for processing
-        llm_content = result.get("llm_content") if isinstance(result, dict) else None
-        
-        # Handle multimodal content (inline_data) if present
-        inline_data = None
-        if isinstance(llm_content, dict) and 'inline_data' in llm_content:
-            # New format: inline_data is inside llm_content
-            inline_data = llm_content['inline_data']
-        elif isinstance(result, dict) and 'inline_data' in result:
-            # Legacy format: inline_data at root level (for backwards compatibility)
-            inline_data = result['inline_data']
-        
-        # Process inline_data if found
-        if inline_data and 'data' in inline_data and inline_data['data']:
-            blob = GeminiMessageFormatter._process_inline_data(inline_data)
-            if blob:
-                parts.append(types.Part(inline_data=blob))
-            
-            # For multimodal content, prepare response without inline_data
-            # The inline_data has been added as a separate part above
-            if isinstance(llm_content, dict):
-                # Extract non-inline_data fields from llm_content (like file_path, file_type)
-                response_data = {k: v for k, v in llm_content.items() if k != 'inline_data'}
-                # Ensure we have some response data
-                if not response_data:
-                    response_data = {"status": result.get("status", "success")}
-            else:
-                # Use result metadata without inline_data
-                response_data = {k: v for k, v in result.items() 
-                               if k not in ['inline_data', 'llm_content']}
-        else:
-            # For non-multimodal content, prepare response data
-            if llm_content is not None:
-                # If llm_content exists, use it (ensuring dictionary format)
-                if isinstance(llm_content, dict):
-                    response_data = llm_content
-                else:
-                    response_data = {"content": llm_content}
-            else:
-                # Fallback to the full result
-                response_data = result
-        
+        # All tools use standardized parts format
+        llm_content = result["llm_content"]
+        content_parts = llm_content["parts"]
+        response_data = {"status": result.get("status", "success")}
+
+        for part in content_parts:
+            part_type = part["type"]
+
+            if part_type == "inline_data":
+                # Process inline_data part for multimodal content
+                blob = GeminiMessageFormatter._process_inline_data(part)
+                if blob:
+                    parts.append(types.Part(inline_data=blob))
+            elif part_type == "text":
+                # Collect text content for function response
+                text_content = part.get("text", "")
+                if text_content:
+                    response_data["content"] = text_content
+
         # Create function response part
         function_response = types.FunctionResponse(
             name=tool_name,
             response=response_data
         )
         parts.append(types.Part(function_response=function_response))
-        
+
         # Return complete working context entry
         return {
             "role": "user",

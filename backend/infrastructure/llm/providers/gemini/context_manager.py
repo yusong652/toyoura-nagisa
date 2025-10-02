@@ -10,7 +10,7 @@ Core design principles:
 2. Focus on context state management during tool calls
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 from .message_formatter import GeminiMessageFormatter
@@ -31,7 +31,7 @@ class GeminiContextManager(BaseContextManager):
     3. Finalization: Create standardized messages for storage
     """
     
-    def __init__(self, provider_name: str = "gemini", session_id: Optional[str] = None):
+    def __init__(self, session_id: str, provider_name: str = "gemini"):
         """Initialize context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
         # working_contents already initialized in base class
@@ -49,13 +49,11 @@ class GeminiContextManager(BaseContextManager):
         """
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
-            self._message_history.append(response)
-            
             # Format and add to working context
             from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
             formatter_class = get_message_formatter_class(self._provider_name)
             formatted_response = formatter_class.format_single_message(response)
-            
+
             self.working_contents.append(formatted_response)
         else:
             # Handle original Gemini API response
@@ -67,17 +65,48 @@ class GeminiContextManager(BaseContextManager):
             # Add to working context
             self.working_contents.append(raw_content)
     
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
         Add tool execution result to context - unified implementation
-        
+
         Use message formatter to handle format, maintaining consistent architecture pattern with Anthropic
-        
+
         Args:
             tool_call_id: Unique identifier for tool call (required by interface, not used by Gemini)
             tool_name: Tool name
             result: Tool execution result
+            inject_reminders: Whether to inject system reminders into this result
         """
+        # Inject system reminders to result content if needed
+        if inject_reminders:
+            print(f"[DEBUG] GeminiContextManager.add_tool_result: inject_reminders=True for session {self.session_id}")
+            reminders = self._get_background_task_reminders()
+            print(f"[DEBUG] GeminiContextManager.add_tool_result: Got {len(reminders)} reminders")
+
+            if len(reminders) == 0:
+                print(f"[DEBUG] No reminders found for session {self.session_id}")
+
+            if reminders:
+                reminder_text = "\n\n" + "\n\n".join([
+                    f"<system-reminder>\n{reminder}\n</system-reminder>"
+                    for reminder in reminders
+                ])
+
+                # Modify result llm_content to inject reminders
+                if isinstance(result, dict) and 'llm_content' in result:
+                    llm_content = result['llm_content']
+
+                    # Tool results use parts format: {"parts": [{"type": "text", "text": "..."}]}
+                    if isinstance(llm_content, dict) and 'parts' in llm_content:
+                        parts = llm_content.get('parts', [])
+                        if isinstance(parts, list):
+                            # Find last text part and append reminder
+                            for part in reversed(parts):
+                                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                                    part['text'] += reminder_text
+                                    print(f"[DEBUG] Injected reminders to tool result parts")
+                                    break
+
         # Use message formatter to handle tool result format
         working_content = GeminiMessageFormatter.format_tool_result_for_context(tool_name, result)
         # Add to working context
@@ -174,5 +203,5 @@ class GeminiContextManager(BaseContextManager):
                 for part in msg.parts:
                     if hasattr(part, 'function_response') and part.function_response:
                         return True
-                
+
         return False

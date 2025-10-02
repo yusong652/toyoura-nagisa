@@ -13,8 +13,8 @@ from typing import Dict, Optional
 from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
-from backend.infrastructure.storage.session_manager import load_all_message_history, update_session_title
-from backend.shared.utils.helpers import should_generate_title, generate_title_for_session
+from backend.infrastructure.storage.session_manager import load_all_message_history
+from backend.application.services.contents import TitleService
 from backend.presentation.websocket.message_types import (
     create_error_message, create_tool_use_message, create_message, MessageType
 )
@@ -175,17 +175,18 @@ async def process_post_pipeline(
         from backend.shared.utils.app_context import get_llm_client
         llm_client = get_llm_client()
 
+        # Use TitleService for title generation logic
+        title_service = TitleService()
+
         loaded_history = load_all_message_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
 
-        if should_generate_title(session_id, history_msgs):
-            new_title = await generate_title_for_session(session_id, llm_client)
-            if new_title:
-                update_success = update_session_title(session_id, new_title)
-                if update_success:
-                    # Send title update via WebSocket
-                    await send_title_update_notification(session_id, new_title)
-                    print(f"[INFO] Title updated for session {session_id}: {new_title}")
+        if title_service.should_generate_title(session_id, history_msgs):
+            result = await title_service.generate_title_for_session(session_id, llm_client)
+            if result and result.get("success") and result.get("title"):
+                # Send title update via WebSocket
+                await send_title_update_notification(session_id, result["title"])
+                print(f"[INFO] Title updated for session {session_id}: {result['title']}")
     except Exception as e:
         # Post-processing failures should not affect the main flow, just log
         print(f"[WARNING] Post-processing failed for request {request_id}: {e}")

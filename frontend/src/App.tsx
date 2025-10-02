@@ -5,6 +5,7 @@ import InputArea from './components/InputArea'
 import { SlashCommandStatusPanel } from './components/SlashCommandStatusPanel'
 import Live2DCanvas from './components/Live2DCanvas'
 import ChatHistorySidebar from './components/ChatHistorySidebar/ChatHistorySidebar'
+import BackgroundTaskMonitor from './components/BackgroundTaskMonitor'
 import { ThemeToggle } from './components/Toggle/variants/ThemeToggle'
 import ConnectionError from './components/ConnectionError'
 import { useSlashCommandExecution } from './components/InputArea/hooks'
@@ -30,9 +31,9 @@ function AppContent(): React.ReactElement {
       <ThemeToggle />
       <div className="chat-container">
         <div className="chat-left-panel">
-          <ChatBox 
+          <ChatBox
             statusPanel={
-              <SlashCommandStatusPanel 
+              <SlashCommandStatusPanel
                 executionQueue={executionQueue}
                 position="chatbox-right"
               />
@@ -42,6 +43,7 @@ function AppContent(): React.ReactElement {
         </div>
       </div>
       <ChatHistorySidebar />
+      <BackgroundTaskMonitor />
       {connectionStatus !== ConnectionStatus.CONNECTED && connectionError && (
         <ConnectionError
           message={connectionError}

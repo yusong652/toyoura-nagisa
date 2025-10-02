@@ -5,7 +5,7 @@ Manages MCP tool integration for OpenAI client including schema formatting,
 tool execution, and result processing.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 
 
@@ -21,41 +21,42 @@ class OpenAIToolManager(BaseToolManager):
         """Initialize OpenAI tool manager"""
         super().__init__()
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> Optional[List[Dict[str, Any]]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]] | None:
         """
         Get MCP tools formatted for OpenAI function calling
-        
+
         Uses get_standardized_tools() from base class, then converts to OpenAI format.
         Supports agent profile filtering.
-        
+
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name for tool filtering
-            debug: Enable debug output
-            
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+
         Returns:
             List of OpenAI-formatted tool schemas or None if tools disabled
         """
         
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        
+
         if not tools_dict:
             return None
-        
+
         # Convert ToolSchema objects to OpenAI format
         openai_tools = []
-        for tool_name, tool_schema in tools_dict.items():
+        for _, tool_schema in tools_dict.items():
             openai_tool = self._convert_tool_schema_to_openai_format(tool_schema)
             if openai_tool:
                 openai_tools.append(openai_tool)
-        
-        if debug:
+
+        from backend.config.llm import get_llm_settings
+        llm_settings = get_llm_settings()
+        if llm_settings.debug:
             print(f"[DEBUG] Final OpenAI tools count: {len(openai_tools)}")
-        
+
         return openai_tools if openai_tools else None
     
-    def _convert_tool_schema_to_openai_format(self, tool_schema) -> Optional[Dict[str, Any]]:
+    def _convert_tool_schema_to_openai_format(self, tool_schema) -> Dict[str, Any] | None:
         """
         Convert ToolSchema to OpenAI function format.
         
@@ -109,30 +110,32 @@ class OpenAIToolManager(BaseToolManager):
             print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None, debug: bool = False) -> List[Dict[str, Any]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
-        
+
         This method returns a clean dictionary format specifically designed for embedding
         tool schemas into system prompts, separate from the API-specific formats.
-        
+
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name for tool filtering
-            debug: Whether to enable debug output
-            
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+
         Returns:
             List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt
         """
         
         # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        
+
         if not tools_dict:
             return []
-        
+
         # Convert ToolSchema objects to clean dictionary format for system prompt
         prompt_schemas = []
+        from backend.config.llm import get_llm_settings
+        llm_settings = get_llm_settings()
+
         for tool_name, tool_schema in tools_dict.items():
             try:
                 # Build clean schema dictionary
@@ -143,12 +146,12 @@ class OpenAIToolManager(BaseToolManager):
                 }
                 prompt_schemas.append(schema_dict)
             except Exception as e:
-                if debug:
+                if llm_settings.debug:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
-        
-        if debug:
+
+        if llm_settings.debug:
             print(f"[DEBUG] OpenAI system prompt schemas count: {len(prompt_schemas)}")
-        
+
         return prompt_schemas
     

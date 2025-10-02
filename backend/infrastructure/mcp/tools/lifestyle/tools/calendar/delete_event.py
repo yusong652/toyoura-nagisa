@@ -93,7 +93,15 @@ def register_delete_event_tool(mcp: FastMCP):
             else:
                 llm_content = f"<error>Failed to delete event: {result['error_message']}</error>"
             
-            return success_response(message, llm_content, **result)
+            return success_response(
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
+                **result
+            )
             
         except Exception as e:
             if 'Not Found' in str(e):

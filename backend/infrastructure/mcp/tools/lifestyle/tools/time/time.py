@@ -59,7 +59,11 @@ def register_time_tools(mcp: FastMCP):
 
             return success_response(
                 f"Current time retrieved successfully ({timezone_name})",
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 time_data={
                     "primary_format": primary_format,
                     "timezone": timezone_name

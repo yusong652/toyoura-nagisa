@@ -61,18 +61,22 @@ async def web_search(
         sources = search_result.get("sources", [])
         response_text = search_result.get("response_text", "")
 
-        llm_content = response_text if response_text else f"No results found for query: {query}"
-        
+        text_content = response_text if response_text else f"No results found for query: {query}"
+
         # Get LLM type for message
         llm_type = WebSearchToolFactory.detect_llm_type(llm_client)
         message = f"Found {len(sources)} sources for query: '{query}' using {llm_type.title()}"
         if response_text:
             message += f" (Response: {len(response_text)} chars)"
-        
+
         # Store full search result in data for reference
         return success_response(
             message=message,
-            llm_content=llm_content,  # Just the text, not structured data
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": text_content}
+                ]
+            },
             **search_result  # Full result with sources, response_text, etc.
         )
         

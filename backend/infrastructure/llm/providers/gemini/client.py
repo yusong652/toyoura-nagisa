@@ -163,61 +163,24 @@ class GeminiClient(LLMClientBase):
                 print(f"[DEBUG] {error_message}")
             raise Exception(error_message)
 
-    # ========== SPECIALIZED CONTENT GENERATION ==========
-
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate conversation title using Gemini API.
-        Customized implementation for Gemini API supporting multimodal content.
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-        """
-        return await GeminiTitleGenerator.generate_title_from_messages(
-            self.client, latest_messages
-        )
-
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate high-quality text-to-image prompt using the Gemini API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-            
-        Returns:
-            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
-        """
-        debug = self.gemini_config.debug
-        return await GeminiImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug)
-
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform a web search using Google Search via the Gemini API.
-        
-        This method uses the project's unified client configuration and provides
-        comprehensive error handling and debugging support.
-        
-        Args:
-            query: The search query to find information on the web
-            **kwargs: Additional search parameters
-            
-        Returns:
-            Dictionary containing search results with sources and metadata
-        """
-        debug = self.gemini_config.debug
-        return await GeminiWebSearchGenerator.perform_web_search(self.client, query, debug, **kwargs)
-
     # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
 
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""
         return GeminiResponseProcessor()
+
+    def _get_title_generator(self):
+        """Get Gemini-specific title generator class."""
+        return GeminiTitleGenerator
+
+    def _get_image_prompt_generator(self):
+        """Get Gemini-specific image prompt generator class."""
+        return GeminiImagePromptGenerator
+
+    def _get_web_search_generator(self):
+        """Get Gemini-specific web search generator class."""
+        return GeminiWebSearchGenerator
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""
@@ -262,10 +225,6 @@ class GeminiClient(LLMClientBase):
             enable_memory=enable_memory,
             tool_schemas=prompt_tool_schemas
         )
-
-        debug = get_llm_settings().debug
-        if debug:
-            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
 
         # Get working contents from context manager (config obtained internally)
         working_contents = context_manager.get_working_contents()

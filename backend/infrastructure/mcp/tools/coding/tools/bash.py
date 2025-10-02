@@ -26,6 +26,7 @@ MAX_OUTPUT_SIZE = 30000      # 30KB output limit (matching Claude Code)
 
 
 def bash(
+    context: Context,
     command: str = Field(
         ...,
         description="The command to execute"
@@ -40,7 +41,7 @@ def bash(
     ),
     run_in_background: bool = Field(
         False,
-        description="Set to true to run this command in the background. Use BashOutput to read the output later."
+        description="Set to true to run in background without blocking, returns process ID immediately. Use BashOutput to monitor output. Default (false) blocks until completion and returns output directly. Use for: long builds, tests, dev servers."
     )
 ) -> Dict[str, Any]:
     """Executes a given bash command in a persistent shell session with optional timeout, ensuring proper handling and security measures.
@@ -111,9 +112,23 @@ Usage notes:
     # Set working directory to workspace root
     work_dir = Path(str(WORKSPACE_ROOT))
 
-    # Background execution not implemented in this simplified version
+    # Handle background execution
     if run_in_background:
-        return error_response("Background execution not yet implemented")
+        try:
+            # Get session ID from MCP context
+            session_id = getattr(context, 'client_id', None) if context else None
+            if not session_id:
+                return error_response("Session ID not available for background execution")
+
+            from ..utils.background_process_manager import get_process_manager
+            process_manager = get_process_manager()
+            return process_manager.start_process(
+                session_id=session_id,
+                command=command,
+                description=description
+            )
+        except Exception as e:
+            return error_response(f"Failed to start background process: {e}")
 
     try:
         # Execute command
@@ -167,7 +182,11 @@ Usage notes:
         # This matches real terminal behavior where you see all output regardless of exit code
         return success_response(
             message,
-            combined_output,  # Complete terminal output for LLM
+            llm_content={
+                "parts": [
+                    {"type": "text", "text": combined_output}
+                ]
+            },
             exit_code=exit_code,
             execution_time=execution_time,
             stdout=stdout,

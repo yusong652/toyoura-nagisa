@@ -9,7 +9,6 @@ from .title import BaseTitleGenerator
 from .web_search import BaseWebSearchGenerator
 from .image_prompt import BaseImagePromptGenerator
 from .video_prompt import BaseVideoPromptGenerator
-from .unified import BaseUnifiedPromptGenerator, PromptType
 
 __all__ = [
     'BaseContentGenerator',
@@ -17,6 +16,4 @@ __all__ = [
     'BaseWebSearchGenerator',
     'BaseImagePromptGenerator',
     'BaseVideoPromptGenerator',
-    'BaseUnifiedPromptGenerator',
-    'PromptType',
 ]

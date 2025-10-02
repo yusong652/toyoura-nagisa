@@ -163,28 +163,25 @@ async def optimize_prompt_for_video(
         print(f"[DEBUG] LLM client type: {client_class_name}")
         
         if "Gemini" in client_class_name:
-            print(f"[DEBUG] Using Gemini unified prompt generator")
-            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiUnifiedPromptGenerator
-            from backend.infrastructure.llm.base.content_generators.unified import PromptType
-            
-            # Use unified generator with IMAGE_TO_VIDEO type
-            result = await GeminiUnifiedPromptGenerator.generate_prompt(
+            print(f"[DEBUG] Using Gemini video prompt generator")
+            from backend.infrastructure.llm.providers.gemini.content_generators import GeminiVideoPromptGenerator
+
+            # Use video prompt generator
+            result = await GeminiVideoPromptGenerator.generate_video_prompt(
                 client=llm_client.client,  # Use the native Gemini client
-                prompt_type=PromptType.IMAGE_TO_VIDEO,
+                original_prompt="",  # Not used in current implementation
                 session_id=session_id,  # Session provides conversation context and few-shot history
-                motion_style=motion_description,  # Pass motion description as style
-                debug=True  # Enable debug for video prompts
             )
-            print(f"[DEBUG] Unified generator returned: {result}")
+            print(f"[DEBUG] Video prompt generator returned: {result}")
             
         elif "OpenAI" in client_class_name:
-            # TODO: Implement OpenAIUnifiedPromptGenerator when needed
-            logger.warning("OpenAI unified prompt generator not yet implemented, using fallback")
+            # TODO: Implement OpenAIVideoPromptGenerator when needed
+            logger.warning("OpenAI video prompt generator not yet implemented, using fallback")
             result = None
-            
+
         elif "Anthropic" in client_class_name:
-            # TODO: Implement AnthropicUnifiedPromptGenerator when needed
-            logger.warning("Anthropic unified prompt generator not yet implemented, using fallback")
+            # TODO: Implement AnthropicVideoPromptGenerator when needed
+            logger.warning("Anthropic video prompt generator not yet implemented, using fallback")
             result = None
             
         else:
@@ -303,7 +300,9 @@ async def generate_video_from_image(
         return success_response(
             message=f"Video generated successfully ({generation_time})",
             llm_content={
-                "description": f"Generated a {actual_length}s video"
+                "parts": [
+                    {"type": "text", "text": f"Generated a {actual_length}s video"}
+                ]
             },
             data={
                 "video_base64": video_result.get("video"),

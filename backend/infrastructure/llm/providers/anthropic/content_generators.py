@@ -24,47 +24,46 @@ from .config import get_anthropic_client_config
 class TitleGenerator(BaseTitleGenerator):
     """
     Handles conversation title generation using Anthropic Claude API.
-    
+
     Generates concise, descriptive titles based on the first exchange
     in a conversation to help users identify and organize their chats.
     Inherits from BaseTitleGenerator for consistency with other providers.
     """
 
     @staticmethod
-    def generate_title_from_messages(
-        latest_messages: List[BaseMessage]
+    async def generate_title_from_messages(
+        client: anthropic.Anthropic,
+        latest_messages: List[BaseMessage],
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
+            client: Anthropic client instance for API calls
             latest_messages: Recent conversation messages to generate title from
+            debug: Enable debug output for troubleshooting
 
         Returns:
             Generated title string, or None if generation fails
         """
         try:
-            if not latest_messages or len(latest_messages) < 2:
+            # Use base class validation
+            if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
 
-            # Get debug setting from configuration
-            llm_settings = get_llm_settings()
-            debug = llm_settings.debug
-
-            # Get Anthropic configuration and create client
+            # Get Anthropic configuration
             anthropic_config = get_anthropic_client_config()
-            api_key = llm_settings.get_anthropic_config().anthropic_api_key
-            client = anthropic.Anthropic(api_key=api_key)
 
             # Use shared system prompt for consistency
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
-            # 构造消息序列
-            messages = list(latest_messages) + [
-                UserMessage(role="user", content=[{"type": "text", "text": "请为上面对话生成标题"}])
-            ]
+            # Use base class method to prepare messages
+            messages = BaseTitleGenerator.prepare_title_generation_messages(
+                latest_messages,
+                "Please generate a title for the above conversation"
+            )
 
-            # 使用MessageFormatter进行消息格式转换
+            # Use MessageFormatter for message format conversion
             formatted_messages = MessageFormatter.format_messages(messages)
 
             # Build API call parameters using the configuration system
@@ -78,6 +77,13 @@ class TitleGenerator(BaseTitleGenerator):
                 "max_tokens": 1024,
                 "temperature": 1.0
             })
+            from backend.config import get_llm_settings
+            llm_settings = get_llm_settings()
+            debug = llm_settings.debug
+            if debug:
+                print("[DEBUG] Anthropic title generation API kwargs:")
+                import pprint
+                pprint.pprint(api_kwargs)
 
             response = client.messages.create(**api_kwargs)
 
@@ -88,11 +94,11 @@ class TitleGenerator(BaseTitleGenerator):
 
                 # Parse title using shared utility function
                 # Using max_length=30 to match original Anthropic behavior
-                return parse_title_response(title_response_text, max_length=30, debug=debug)
+                return parse_title_response(title_response_text, max_length=30)
             return None
 
         except Exception as e:
-            print(f"Anthropic生成标题时出错: {str(e)}")
+            print(f"Anthropic title generation error: {str(e)}")
             return None
 
 
@@ -212,7 +218,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
     """
 
     @staticmethod
-    def generate_text_to_image_prompt(
+    async def generate_text_to_image_prompt(
         client: anthropic.Anthropic,
         session_id: Optional[str] = None,
         debug: bool = False
@@ -245,16 +251,6 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             
             # Use MessageFormatter for message format conversion
             formatted_messages = MessageFormatter.format_messages(messages)
-            
-            if debug:
-                print("\n[text_to_image] Messages for prompt generation:")
-                import pprint
-                pprint.pprint(messages)
-                print("[text_to_image] Formatted messages:")
-                pprint.pprint(formatted_messages)
-            
-            if debug:
-                print(f"\n[Anthropic][text_to_image] System prompt: {context['system_prompt']}")
             
             # Use the model from context (which now correctly uses Anthropic's model)
             model_for_text_to_image = context.get('model', llm_anthropic_config.model)

@@ -141,9 +141,9 @@ async def generate_image(context: Context) -> dict[str, Any]:
         return success_response(
             message="Image generated successfully",
             llm_content={
-                "operation": "generate_image",
-                "result": "success",
-                "summary": f"Successfully generated image in {generation_time}"
+                "parts": [
+                    {"type": "text", "text": f"Successfully generated image in {generation_time}"}
+                ]
             },
             image_type="image_base64",
             generation_time=generation_time,

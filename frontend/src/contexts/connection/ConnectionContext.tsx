@@ -383,6 +383,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           window.dispatchEvent(event)
           console.log('[ConnectionContext] bashConfirmationRequest event dispatched')
         }
+
+        // Handle background process notifications
+        if (data.type === 'BACKGROUND_PROCESS_STARTED' ||
+            data.type === 'BACKGROUND_PROCESS_OUTPUT_UPDATE' ||
+            data.type === 'BACKGROUND_PROCESS_COMPLETED' ||
+            data.type === 'BACKGROUND_PROCESS_KILLED') {
+          console.log('[ConnectionContext] Dispatching backgroundProcessNotification event:', data)
+          // Dispatch custom event for background process monitoring
+          window.dispatchEvent(new CustomEvent('backgroundProcessNotification', {
+            detail: data
+          }))
+        }
       } catch (error) {
         console.error("[WebSocket] failed to parse message:", error)
       }

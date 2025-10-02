@@ -8,6 +8,8 @@ from .tools import (
     write,
     read,
     bash,
+    bash_output,  # Background bash output tool
+    kill_shell,   # Background bash kill tool
     grep,
     edit,
     # Registration helper
@@ -24,6 +26,8 @@ __all__ = [
     'write',
     'read',
     'bash',
+    'bash_output',  # Background bash output tool
+    'kill_shell',   # Background bash kill tool
     'grep',
     'edit',
 ]

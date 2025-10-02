@@ -152,7 +152,15 @@ def register_create_event_tool(mcp: FastMCP):
                 message = result['error_message']
                 llm_content = f"<error>{message}</error>"
             
-            return success_response(message, llm_content, **result)
+            return success_response(
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
+                **result
+            )
             
         except ValueError as e:
             return error_response(str(e))

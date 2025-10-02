@@ -5,7 +5,7 @@ Context management implementation optimized for Anthropic API response formats a
 Adopts the same dual-track design as Gemini: maintain original API format for working context, standardized format for storage.
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 
@@ -19,7 +19,7 @@ class AnthropicContextManager(BaseContextManager):
     - Support context state management during tool calls
     """
     
-    def __init__(self, provider_name: str = "anthropic", session_id: Optional[str] = None):
+    def __init__(self, session_id: str, provider_name: str = "anthropic"):
         super().__init__(provider_name=provider_name, session_id=session_id)
         # Unified use of working_contents, removing legacy working_messages
     
@@ -36,13 +36,11 @@ class AnthropicContextManager(BaseContextManager):
         """
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
-            self._message_history.append(response)
-            
             # Format and add to working context
             from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
             formatter_class = get_message_formatter_class(self._provider_name)
             formatted_response = formatter_class.format_single_message(response)
-            
+
             self.working_contents.append(formatted_response)
         else:
             # Handle original Anthropic API response
@@ -55,22 +53,49 @@ class AnthropicContextManager(BaseContextManager):
             }
             self.working_contents.append(filtered_message)
     
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
         Add tool execution result to context - unified implementation
-        
+
         Use message formatter to handle format, maintaining architectural consistency
-        
+
         Args:
             tool_call_id: Unique identifier for tool call
             tool_name: Tool name
             result: Tool execution result
+            inject_reminders: Whether to inject system reminders into this result
         """
         from .message_formatter import MessageFormatter
-        
+
+        # Inject system reminders to result content if needed
+        if inject_reminders:
+            reminders = self._get_background_task_reminders()
+            print(f"[DEBUG] AnthropicContextManager.add_tool_result: Got {len(reminders)} reminders")
+
+            if reminders:
+                reminder_text = "\n\n" + "\n\n".join([
+                    f"<system-reminder>\n{reminder}\n</system-reminder>"
+                    for reminder in reminders
+                ])
+
+                # Modify result llm_content to inject reminders
+                if isinstance(result, dict) and 'llm_content' in result:
+                    llm_content = result['llm_content']
+
+                    # Tool results use parts format: {"parts": [{"type": "text", "text": "..."}]}
+                    if isinstance(llm_content, dict) and 'parts' in llm_content:
+                        parts = llm_content.get('parts', [])
+                        if isinstance(parts, list):
+                            # Find last text part and append reminder
+                            for part in reversed(parts):
+                                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                                    part['text'] += reminder_text
+                                    print(f"[DEBUG] Injected reminders to tool result parts")
+                                    break
+
         # Use message formatter to handle tool result format
         working_content = MessageFormatter.format_tool_result_for_context(tool_call_id, tool_name, result)
-        
+
         # Add to working context
         self.working_contents.append(working_content)
     
@@ -131,5 +156,5 @@ class AnthropicContextManager(BaseContextManager):
         for block in content:
             if isinstance(block, dict) and block.get('type') == 'tool_result':
                 return True
-                
+
         return False

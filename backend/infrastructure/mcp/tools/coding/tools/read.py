@@ -166,15 +166,16 @@ def _read_text_content(
         
         selected_lines = lines[start_line:end_line]
         
-        # Process lines with cat -n format (standard line numbers with tab separator)
+        # Process lines with Claude Code format (line numbers with arrow separator)
         processed_lines = []
         for i, line in enumerate(selected_lines, start=start_line + 1):
             # Truncate long lines
             if len(line) > MAX_LINE_LENGTH:
                 line = line[:MAX_LINE_LENGTH] + "... [line truncated]"
-            
-            # Format with line number and tab separator (cat -n format)
-            processed_lines.append(f"{i:6}\t{line}")
+
+            # Format with line number and arrow separator (Claude Code format)
+            # Using → instead of \t prevents LLM from including line numbers in edit strings
+            processed_lines.append(f"{i:6}→{line}")
         
         result_content = '\n'.join(processed_lines)
         truncated = end_line < total_lines
@@ -315,8 +316,8 @@ Usage:
 - By default, it reads up to 2000 lines starting from the beginning of the file
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
 - Any lines longer than 2000 characters will be truncated
-- Results are returned using cat -n format, with line numbers starting at 1 (format: "     1\t<content>")
-- The line numbers and tab character are for positioning reference - they are NOT part of the actual file content
+- Results are returned with line numbers starting at 1 (format: "     1→<content>")
+- The line numbers and arrow (→) are for positioning reference - they are NOT part of the actual file content
 - This tool allows reading images (PNG, JPG, etc). When reading an image file the contents are presented as base64 data for multimodal LLM consumption
 - This tool can read PDF files (.pdf). PDFs are processed page by page, extracting both text and visual content for analysis
 - This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs, combining code, text, and visualizations
@@ -398,28 +399,32 @@ Usage:
             else:
                 message = f"Read {file_type.value} file: {file_path.name} (0 lines)"
 
-        # Build structured LLM content
+        # Build structured LLM content with unified parts format
         rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
-        
-        # Handle content based on file type - align with Claude Code format
+
+        # Build parts array for unified content structure
+        parts = []
+
         if processing_result.content_format == ContentFormat.INLINE_DATA:
-            # For binary/multimodal files, include metadata and inline_data for LLM provider compatibility
+            # For binary/multimodal files (images, etc.)
             if isinstance(processing_result.content, dict) and "inline_data" in processing_result.content:
-                # Include file metadata alongside inline_data for multimodal LLM consumption
-                llm_content = {
-                    "file_path": str(rel_display),
-                    "file_type": file_type.value,
-                    "inline_data": processing_result.content["inline_data"]
-                }
-            else:
-                llm_content = {"content": processing_result.content}
+                inline_data = processing_result.content["inline_data"]
+                # Add inline_data part
+                parts.append({
+                    "type": "inline_data",
+                    "mime_type": inline_data["mime_type"],
+                    "data": inline_data["data"]
+                })
         else:
-            # For text files, return content directly (cat -n format)
-            llm_content = processing_result.content
+            # For text files, add content as text part
+            parts.append({
+                "type": "text",
+                "text": processing_result.content
+            })
 
         return success_response(
             message,
-            llm_content,
+            llm_content={"parts": parts},
             file_path=str(rel_display),
             file_type=file_type.value,
             encoding=encoding,
@@ -436,8 +441,7 @@ Usage:
 
 def register_read_tool(mcp: FastMCP):
     """Register the read tool with proper tags synchronization."""
-    common = dict(
+    mcp.tool(
         tags={"coding", "filesystem", "read", "file", "content", "analysis", "metadata"}, 
         annotations={"category": "coding", "tags": ["coding", "filesystem", "read", "file", "content", "analysis", "metadata"]}
-    )
-    mcp.tool(**common)(read) 
+    )(read) 

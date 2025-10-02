@@ -110,23 +110,28 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
 
 def error_response(message: str, **data) -> Dict[str, Any]:
     """Create a standardized error response for all MCP tools.
-    
+
     This function provides a unified way for all tools to return error responses,
     ensuring consistent error handling across coding, lifestyle, communication, and other tool categories.
-    
+
     Args:
         message: Brief user-friendly error message for UI display
-    
+        **data: Additional error context data
+
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="error"
-        
+        Dict[str, Any]: ToolResult dictionary with status="error" and parts-based llm_content
+
     Example:
-        return error_response("Operation failed")
+        return error_response("Operation failed", error_code=404)
     """
     return ToolResult(
         status="error",
         message=message,
-        llm_content=f"<error>{message}</error>",
+        llm_content={
+            "parts": [
+                {"type": "text", "text": f"<error>{message}</error>"}
+            ]
+        },
         data=data if data else None,
     ).model_dump()
 
@@ -142,22 +147,24 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
         user_message: Optional message from the user explaining the rejection
 
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="success" indicating successful capture of user decision
+        Dict[str, Any]: ToolResult dictionary with status="success" and parts-based llm_content
 
     Example:
         return user_rejected_response(user_message="This command looks dangerous")
     """
     # Follow Claude Code's rejection message pattern
     if user_message:
-        message = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
-        llm_content = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
+        text = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
     else:
-        message = "The user doesn't want to proceed with this tool use. The tool use was rejected."
-        llm_content = "The user doesn't want to proceed with this tool use. The tool use was rejected."
+        text = "The user doesn't want to proceed with this tool use. The tool use was rejected."
 
     return ToolResult(
         status="success",  # Successfully captured user's decision
-        message=message,
-        llm_content=llm_content,
+        message=text,
+        llm_content={
+            "parts": [
+                {"type": "text", "text": text}
+            ]
+        },
         data=None
     ).model_dump()

@@ -121,30 +121,50 @@ def _run_git_grep(
     cmd.append("--")
     
     # File filtering - git grep uses pathspecs after --
+    # Build pathspec relative to git root
+    git_root_result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        cwd=search_path if search_path.is_dir() else search_path.parent,
+        timeout=5
+    )
+    if git_root_result.returncode != 0:
+        raise Exception("Not in a git repository")
+
+    git_root = Path(git_root_result.stdout.strip())
+
+    # Calculate relative path from git root to search path
+    try:
+        relative_search_path = search_path.relative_to(git_root)
+        base_pathspec = str(relative_search_path)
+    except ValueError:
+        # search_path is not relative to git_root, use as-is
+        base_pathspec = ""
+
+    # Construct final pathspec
     if glob_pattern:
-        cmd.append(glob_pattern)
+        # Combine base path with glob pattern
+        if base_pathspec:
+            cmd.append(f"{base_pathspec}/{glob_pattern}")
+        else:
+            cmd.append(glob_pattern)
     elif file_type and file_type in FILE_TYPE_MAP:
-        cmd.append(FILE_TYPE_MAP[file_type])
+        # Combine base path with file type pattern
+        if base_pathspec:
+            cmd.append(f"{base_pathspec}/{FILE_TYPE_MAP[file_type]}")
+        else:
+            cmd.append(FILE_TYPE_MAP[file_type])
     else:
-        # Search all files if no filter specified
-        cmd.append("*")
-    
+        # Search in the specified path only
+        if base_pathspec:
+            cmd.append(base_pathspec)
+        else:
+            # Search all files in git root if no path specified
+            cmd.append("*")
+
     # Execute git grep from git root
     try:
-        # Find git root for this command execution
-        git_root_result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            cwd=search_path if search_path.is_dir() else search_path.parent,
-            timeout=5
-        )
-        if git_root_result.returncode != 0:
-            raise Exception("Not in a git repository")
-            
-        git_root = Path(git_root_result.stdout.strip())
-        # Running git grep from repository root
-        
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -349,13 +369,21 @@ def grep(
         if output_mode == "files_with_matches":
             total_files = len(output_lines)
             message = f"Found {total_files} file{'s' if total_files != 1 else ''}"
-            
-            # Simple LLM content - just the file paths, one per line (empty string if no files)
-            llm_content = "\n".join(output_lines) if output_lines else ""
-            
+
+            # Simple LLM content - just the file paths, one per line
+            # Provide meaningful message when no results found
+            if output_lines:
+                llm_content = "\n".join(output_lines)
+            else:
+                llm_content = f"No files found matching pattern '{pattern}'"
+
             return success_response(
                 message,
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 files=output_lines,
                 total_files=total_files,
                 pattern=pattern,
@@ -364,7 +392,7 @@ def grep(
         elif output_mode == "count":
             # Parse count output (file:count format)
             total_matches = 0
-            
+
             for line in output_lines:
                 if ':' in line:
                     _, count_str = line.rsplit(':', 1)
@@ -373,15 +401,23 @@ def grep(
                         total_matches += count
                     except ValueError:
                         continue
-                        
+
             message = f"Found {total_matches} matches in {len(output_lines)} files"
-            
+
             # Simple LLM content - just the count output, one per line
-            llm_content = "\n".join(output_lines)
-            
+            # Provide meaningful message when no results found
+            if output_lines:
+                llm_content = "\n".join(output_lines)
+            else:
+                llm_content = f"No matches found for pattern '{pattern}'"
+
             return success_response(
                 message,
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 total_matches=total_matches,
                 total_files=len(output_lines),
                 pattern=pattern,
@@ -391,13 +427,21 @@ def grep(
             # For content mode, Claude Code doesn't show a count message
             # Just return the matching lines directly
             message = f"Search results for pattern '{pattern}'"
-            
+
             # Simple LLM content - just the matching lines, one per line
-            llm_content = "\n".join(output_lines)
-            
+            # Provide meaningful message when no results found
+            if output_lines:
+                llm_content = "\n".join(output_lines)
+            else:
+                llm_content = f"No matches found for pattern '{pattern}'"
+
             return success_response(
                 message,
-                llm_content,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 content=output_lines,
                 total_lines=len(output_lines),
                 pattern=pattern,
@@ -414,8 +458,7 @@ def grep(
 
 def register_grep_tool(mcp: FastMCP):
     """Register the grep tool with proper tags synchronization."""
-    common = dict(
-        tags={"coding", "filesystem", "search", "content", "regex", "grep"}, 
+    mcp.tool(
+        tags={"coding", "filesystem", "search", "content", "regex", "grep"},
         annotations={"category": "coding", "tags": ["coding", "filesystem", "search", "content", "regex", "grep"]}
-    )
-    mcp.tool(**common)(grep)
+    )(grep)

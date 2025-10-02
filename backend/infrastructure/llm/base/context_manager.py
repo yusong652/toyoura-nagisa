@@ -13,7 +13,7 @@ Key Features:
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
@@ -35,25 +35,22 @@ class BaseContextManager(ABC):
     4. Session-persistent context management
     """
     
-    def __init__(self, provider_name: str, session_id: Optional[str] = None):
+    def __init__(self, provider_name: str, session_id: str):
         """
         Initialize context manager.
-        
+
         Args:
             provider_name: LLM provider name (e.g., 'gemini', 'anthropic', 'openai')
             session_id: Optional session ID for runtime context
         """
         self._provider_name = provider_name
         self.session_id = session_id
-        
+
         # Working contents will be populated by initialize methods
         self.working_contents: List[Dict[str, Any]] = []
-        
+
         # Track if we've initialized from history
         self._initialized_from_history = False
-        
-        # Message management
-        self._message_history: List[BaseMessage] = []
 
         # Request configuration storage
         self.agent_profile = "general"
@@ -61,6 +58,9 @@ class BaseContextManager(ABC):
 
         # Tool call tracking
         self._has_tool_calls = False
+
+        # Cached system reminders (captured before tool execution)
+        self._cached_system_reminders: List[str] = []
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -87,44 +87,61 @@ class BaseContextManager(ABC):
     def initialize_session_from_history(self, historical_messages: List[BaseMessage]) -> None:
         """
         Initialize context manager with historical messages at session start.
-        
+
         This should be called once when a session begins or switches,
         loading all historical messages and setting up the base context.
-        
+
         Args:
             historical_messages: All historical messages from storage
         """
-        # Store message history
-        self._message_history = historical_messages.copy()
-        
         # Initialize working contents from history
         self.initialize_from_messages(historical_messages)
-        
+
         # Mark as initialized
         self._initialized_from_history = True
     
     def add_user_message(self, user_message: BaseMessage) -> None:
         """
         Add a new user message to the context incrementally.
-        
+
         This method is called for each new user input, adding it to the
         existing context without re-processing historical messages.
-        
+
         Args:
             user_message: New user message to add
+            inject_reminders: Whether to inject system reminders into this message
         """
         if not self._initialized_from_history:
             # Fallback to old behavior if not properly initialized
             self.initialize_from_messages([user_message])
             return
-        
-        # Add to message history
-        self._message_history.append(user_message)
-        
+
+        # Inject system reminders to user message content BEFORE formatting and storing
+        reminders = self._get_background_task_reminders()
+        print(f"[DEBUG] add_user_message: Got {len(reminders)} reminders for session {self.session_id}")
+
+        if reminders:
+            reminder_text = "\n\n" + "\n\n".join([
+                f"<system-reminder>\n{reminder}\n</system-reminder>"
+                for reminder in reminders
+            ])
+
+            # Modify user_message.content to inject reminders
+            if isinstance(user_message.content, str):
+                user_message.content += reminder_text
+                print(f"[DEBUG] Injected reminders to string content")
+            elif isinstance(user_message.content, list):
+                # Find last text item and append
+                for item in reversed(user_message.content):
+                    if isinstance(item, dict) and 'text' in item:
+                        item['text'] += reminder_text
+                        print(f"[DEBUG] Injected reminders to list content")
+                        break
+
         # Format and add to working contents
         formatter_class = get_message_formatter_class(self._provider_name)
         formatted_message = formatter_class.format_single_message(user_message)
-        
+
         self.working_contents.append(formatted_message)
 
     def add_user_message_from_data(self, parsed_data: dict) -> None:
@@ -149,7 +166,7 @@ class BaseContextManager(ABC):
             id=parsed_data.get('id')
         )
 
-        # Add to context
+        # Add to context with reminder injection
         self.add_user_message(user_message)
 
     @abstractmethod
@@ -167,17 +184,20 @@ class BaseContextManager(ABC):
         pass
     
     @abstractmethod
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any) -> None:
+    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
         Add tool execution result to context.
-        
+
         Since we manage messages sequentially, tool results are simply
         appended after their corresponding tool calls.
-        
+
+        Provider implementations should inject system reminders to result content if inject_reminders=True.
+
         Args:
             tool_call_id: Unique identifier for tool call
             tool_name: Tool name
             result: Tool execution result
+            inject_reminders: Whether to inject system reminders into this result
         """
         pass
     
@@ -204,33 +224,6 @@ class BaseContextManager(ABC):
 
         messages = self.working_contents
 
-        # Debug: Print message details
-        print(f"[DEBUG] Total messages: {len(messages)}")
-        print(f"[DEBUG] recent_messages_length: {recent_messages_length}")
-        
-        for i, msg in enumerate(messages):
-            is_tool_call = self._is_tool_call(msg)
-            is_tool_result = self._is_tool_result(msg)
-            
-            if isinstance(msg, dict):
-                role = msg.get('role', 'unknown')
-                parts_info = "dict format"
-                # Debug parts structure for dict messages
-                if 'parts' in msg:
-                    parts = msg['parts']
-                    if isinstance(parts, list) and len(parts) > 0:
-                        first_part = parts[0]
-                        if isinstance(first_part, dict):
-                            part_keys = list(first_part.keys())
-                            print(f"[DEBUG]   First part keys: {part_keys}")
-                        else:
-                            print(f"[DEBUG]   First part type: {type(first_part)}")
-            else:
-                role = getattr(msg, 'role', 'unknown')
-                parts_info = "SDK object"
-            
-            print(f"[DEBUG] Message {i}: role={role}, is_tool_call={is_tool_call}, is_tool_result={is_tool_result}, format={parts_info}")
-        
         # Count non-tool messages
         non_tool_count = sum(
             1 for msg in messages 
@@ -300,7 +293,7 @@ class BaseContextManager(ABC):
     def get_runtime_summary(self) -> Dict[str, Any]:
         """
         Get summary of runtime context.
-        
+
         Returns:
             Summary dictionary with context statistics
         """
@@ -308,14 +301,30 @@ class BaseContextManager(ABC):
             'active': True,
             'session_id': self.session_id,
             'provider': self._provider_name,
-            'message_count': len(self._message_history),
             'working_contents_count': len(self.working_contents),
             'initialized': self._initialized_from_history
         }
     
     def clear_runtime_context(self) -> None:
         """Clear runtime context for session cleanup."""
-        self._message_history.clear()
         self.working_contents.clear()
         self._initialized_from_history = False
+
+    def _get_background_task_reminders(self) -> List[str]:
+        """
+        Get background task status reminders.
+
+        Returns:
+            List[str]: List of reminder strings for active background tasks
+        """
+        try:
+            from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
+
+            process_manager = get_process_manager()
+            return process_manager.get_system_reminders(self.session_id)
+
+        except Exception as e:
+            print(f"[DEBUG] Failed to get background task reminders: {e}")
+            return []
+
 

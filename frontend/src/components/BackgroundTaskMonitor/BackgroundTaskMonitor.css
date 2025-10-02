@@ -1,0 +1,352 @@
+/**
+ * BackgroundTaskMonitor styles - Terminal aesthetics.
+ *
+ * Design philosophy:
+ * - Monospace font for command-line feel
+ * - Minimal colors (green for running, gray for output)
+ * - Clean, readable output display
+ * - Positioned absolutely at right side of chat container
+ */
+
+/* =============================================================================
+   Main Monitor Container
+   ============================================================================= */
+
+.bg-task-monitor {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 400px;
+  max-height: calc(100vh - 160px);
+
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  z-index: 1000;
+
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* =============================================================================
+   Monitor Header
+   ============================================================================= */
+
+.bg-task-monitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bg-task-monitor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.bg-task-monitor-icon {
+  font-size: 14px;
+  color: #22c55e;
+}
+
+.bg-task-monitor-count {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bg-task-monitor-collapse {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 10px;
+  transition: color 0.2s ease;
+}
+
+.bg-task-monitor-collapse:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* =============================================================================
+   Task List
+   ============================================================================= */
+
+.bg-task-monitor-list {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Custom scrollbar */
+.bg-task-monitor-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bg-task-monitor-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.bg-task-monitor-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.bg-task-monitor-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =============================================================================
+   Task Item
+   ============================================================================= */
+
+.bg-task-item {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.bg-task-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Task Header */
+.bg-task-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.bg-task-status {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.bg-task-status-running {
+  color: #22c55e;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.bg-task-status-completed {
+  color: #3b82f6;
+}
+
+.bg-task-status-killed {
+  color: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.bg-task-command {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.bg-task-runtime {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* Task Output */
+.bg-task-output {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-top: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.bg-task-output-line {
+  color: rgba(255, 255, 255, 0.7);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 2px;
+}
+
+.bg-task-output-line:last-child {
+  margin-bottom: 0;
+}
+
+.bg-task-output-more {
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* Custom scrollbar for output */
+.bg-task-output::-webkit-scrollbar {
+  width: 4px;
+}
+
+.bg-task-output::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bg-task-output::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+/* Task Footer */
+.bg-task-footer {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bg-task-exit-code {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+/* =============================================================================
+   Light Theme Adjustments
+   ============================================================================= */
+
+[data-theme="light"] .bg-task-monitor {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .bg-task-monitor-header {
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .bg-task-monitor-title {
+  color: #16a34a;
+}
+
+[data-theme="light"] .bg-task-monitor-icon {
+  color: #16a34a;
+}
+
+[data-theme="light"] .bg-task-monitor-count {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .bg-task-monitor-collapse {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .bg-task-monitor-collapse:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="light"] .bg-task-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .bg-task-command {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="light"] .bg-task-runtime {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .bg-task-output {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .bg-task-output-line {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .bg-task-output-more {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .bg-task-exit-code {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .bg-task-footer {
+  border-top-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .bg-task-status-running {
+  color: #16a34a;
+}
+
+[data-theme="light"] .bg-task-status-completed {
+  color: #2563eb;
+}
+
+[data-theme="light"] .bg-task-status-killed {
+  color: #dc2626;
+}
+
+/* =============================================================================
+   Responsive Design
+   ============================================================================= */
+
+@media (max-width: 1200px) {
+  .bg-task-monitor {
+    width: 350px;
+  }
+}
+
+@media (max-width: 900px) {
+  .bg-task-monitor {
+    width: 300px;
+    right: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .bg-task-monitor {
+    width: calc(100vw - 20px);
+    right: 10px;
+    left: 10px;
+    top: auto;
+    bottom: 80px;
+  }
+}

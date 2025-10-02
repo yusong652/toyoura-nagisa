@@ -42,14 +42,14 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                     msg.content, preserve_thinking
                 )
                 formatted_messages.append({
-                    "role": msg.role,
+                    "role": msg.role, # type: ignore
                     "content": openai_content
                 })
             else:
                 # Simple text content
                 text_content = str(msg.content) if msg.content else ""
                 formatted_messages.append({
-                    "role": msg.role,
+                    "role": msg.role, # type: ignore
                     "content": text_content
                 })
         
@@ -79,14 +79,14 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 message.content, preserve_thinking
             )
             return {
-                "role": message.role,
+                "role": message.role, # type: ignore
                 "content": openai_content
             }
         else:
             # Simple text content
             text_content = str(message.content) if message.content else ""
             return {
-                "role": message.role,
+                "role": message.role, # type: ignore
                 "content": text_content
             }
     
@@ -195,53 +195,51 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
     @staticmethod
     def _format_tool_result(content: Any) -> Union[str, List[Dict[str, Any]]]:
         """
-        Format tool result content for OpenAI API with proper multimodal support.
-        
+        Format tool result content for OpenAI API.
+
         Transforms tool execution results into OpenAI API compatible format.
         Extracts llm_content from standardized ToolResult objects and formats
         according to OpenAI's content requirements.
-        
+
         Args:
-            content: Tool execution result, typically ToolResult.model_dump() containing:
-                - llm_content: Structured data for LLM consumption
+            content: Tool execution result with standardized parts format:
+                - llm_content.parts: List of content parts (text and/or inline_data)
                 - status: Operation outcome ("success" | "error")
                 - message: User-facing summary
-                - inline_data: Optional image data for multimodal content
-                Or raw content for legacy compatibility
-            
+
         Returns:
-            Union[str, List[Dict[str, Any]]]: Formatted content for OpenAI API:
-                - str: JSON serialized structured data or simple text
-                - List[Dict]: Multimodal content array with text and image blocks
-                
+            str: Formatted text content for OpenAI API
+                Note: OpenAI tool messages only support text, inline_data is omitted
+
         Example:
             # ToolResult with text content
-            result = {"status": "success", "llm_content": {"data": "result"}}
-            # Returns: '{"data": "result"}'
-            
-            # Result with image content
-            result = {"llm_content": {"text": "chart"}, "inline_data": {"data": "base64..."}}
-            # Returns: [{"type": "text", "text": '{"text": "chart"}'}, {"type": "image_url", ...}]
+            result = {"status": "success", "llm_content": {"parts": [{"type": "text", "text": "result"}]}}
+            # Returns: 'result'
+
+            # Result with image content (OpenAI limitation)
+            result = {"llm_content": {"parts": [{"type": "text", "text": "image"}, {"type": "inline_data", ...}]}}
+            # Returns: 'image' (inline_data omitted due to API constraints)
         """
-        # Handle multimodal content
-        # Check new format: inline_data inside llm_content
-        if isinstance(content, dict) and 'llm_content' in content and isinstance(content['llm_content'], dict) and 'inline_data' in content['llm_content']:
-            # New format: OpenAI tool messages only support text, so extract non-image content
-            llm_content = content['llm_content'].copy()
-            # Remove inline_data from the response
-            llm_content.pop('inline_data', None)
-            if llm_content:
-                return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
-            return '{"status": "image processed"}'
-        # Check legacy format: inline_data at root level
-        elif isinstance(content, dict) and 'llm_content' in content and 'inline_data' in content:
-            llm_content = content['llm_content']
-            if isinstance(llm_content, (dict, list)):
-                return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
-            return str(llm_content)
-        
-        # Handle standardized ToolResult - extract llm_content
-        if isinstance(content, dict) and 'llm_content' in content:
-            llm_content = content['llm_content']
-            if isinstance(llm_content, (dict, list)):
-                return OpenAIMessageFormatter.safe_json_serialize(llm_content, ensure_ascii=False, indent=2)
+        # All tools use standardized parts format
+        llm_content = content["llm_content"]
+        content_parts = llm_content["parts"]
+        text_parts = []
+
+        for part in content_parts:
+            part_type = part["type"]
+
+            if part_type == "text":
+                # Collect text content
+                text_content = part.get("text", "")
+                if text_content:
+                    text_parts.append(text_content)
+            elif part_type == "inline_data":
+                # OpenAI tool messages only support text, skip inline_data
+                # Note: This is an API limitation, not a choice
+                pass
+
+        # Return combined text or indicate content was processed
+        if text_parts:
+            return "\n".join(text_parts)
+
+        return '{"status": "content processed"}'

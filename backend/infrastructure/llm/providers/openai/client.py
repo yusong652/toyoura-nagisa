@@ -165,6 +165,18 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific response processor instance."""
         return OpenAIResponseProcessor()
 
+    def _get_title_generator(self):
+        """Get OpenAI-specific title generator class."""
+        return TitleGenerator
+
+    def _get_image_prompt_generator(self):
+        """Get OpenAI-specific image prompt generator class."""
+        return ImagePromptGenerator
+
+    def _get_web_search_generator(self):
+        """Get OpenAI-specific web search generator class."""
+        return WebSearchGenerator
+
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
@@ -193,8 +205,7 @@ class OpenAIClient(LLMClientBase):
         enable_memory = getattr(context_manager, 'enable_memory', True)
 
         # Get tool schemas for API
-        debug = getattr(self, 'debug', False)  # Fallback for debug flag
-        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile, debug)
+        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
         tool_schemas = tool_schemas or []  # Return empty list if None
 
         # Get tool schemas formatted for system prompt
@@ -210,11 +221,6 @@ class OpenAIClient(LLMClientBase):
             enable_memory=enable_memory,
             tool_schemas=prompt_tool_schemas
         )
-
-        debug = get_llm_settings().debug
-        if debug:
-            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
-
         # Get working contents from context manager (config obtained internally)
         working_contents = context_manager.get_working_contents()
 
@@ -240,65 +246,3 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific configuration object."""
         return self.openai_config
 
-    # ========== SPECIALIZED CONTENT GENERATION ==========
-
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate conversation title using OpenAI API.
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-            
-        Returns:
-            Generated title string, or None if failed
-        """
-        debug = self.openai_config.debug
-        return TitleGenerator.generate_title_from_messages(
-            self.client,
-            latest_messages,
-            debug
-        )
-
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate text-to-image prompt using OpenAI API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-            
-        Returns:
-            Dictionary containing text prompt and negative prompt, or None if failed
-        """
-        debug = self.openai_config.debug
-        return ImagePromptGenerator.generate_text_to_image_prompt(
-            self.client,
-            session_id,
-            debug
-        )
-
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform web search using OpenAI API with tools.
-        
-        Note: OpenAI doesn't have built-in web search like Gemini, so this
-        uses MCP tools for web search functionality.
-        
-        Args:
-            query: Search query to find information on the web
-            **kwargs: Additional search parameters
-            
-        Returns:
-            Dictionary containing search results with sources and metadata
-        """
-        debug = self.openai_config.debug
-        return WebSearchGenerator.perform_web_search(
-            self.client,
-            query,
-            debug,
-            **kwargs
-        )

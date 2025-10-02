@@ -153,10 +153,13 @@ class ChatService:
 
         # 2. Extract session ID
         session_id = parsed_data['session_id']
-
+        if not session_id:
+            raise ValueError("Session ID is required in the message data")
         # 3. Save user message and add to LLM client context (always process user messages)
         # Save to persistent storage first (for data safety)
+        print(f"[DEBUG] Processing user message for session {session_id}", flush=True)
         self.save_user_message_to_session(parsed_data)
+        print(f"[DEBUG] Saved user message {parsed_data.get('id')} to session {session_id}", flush=True)
 
         # Add message to LLM client's context manager
         from backend.shared.utils.app_context import get_llm_client

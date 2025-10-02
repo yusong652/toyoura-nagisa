@@ -5,7 +5,7 @@ Handles conversation title generation using LLM APIs.
 """
 
 from abc import abstractmethod
-from typing import Optional, List, Union, Awaitable
+from typing import Optional, List, Any
 from backend.domain.models.messages import BaseMessage, UserMessage
 from .base import BaseContentGenerator
 
@@ -13,31 +13,34 @@ from .base import BaseContentGenerator
 class BaseTitleGenerator(BaseContentGenerator):
     """
     Abstract base class for title generation.
-    
+
     Handles conversation title generation using LLM APIs.
     Generates concise, descriptive titles based on the first exchange
     in a conversation to help users identify and organize their chats.
     """
-    
+
     @staticmethod
     @abstractmethod
-    def generate_title_from_messages(
-        *args, **kwargs
-    ) -> Union[Optional[str], Awaitable[Optional[str]]]:
+    async def generate_title_from_messages(
+        client: Any,
+        latest_messages: List[BaseMessage]
+    ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
-        This method signature allows for provider-specific implementations
-        with different parameter requirements (client, debug flags, etc.)
-        and supports both sync and async implementations.
+        All provider implementations must follow this unified signature
+        for consistency across the codebase.
 
-        Common Args:
+        Args:
+            client: Provider-specific LLM client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            client (optional): LLM client instance for API calls
-            debug (optional): Enable debug output
+            debug: Enable debug output for troubleshooting
 
         Returns:
-            Generated title string, None if generation fails, or awaitable for async implementations
+            Generated title string, or None if generation fails
+
+        Note:
+            All implementations should be async for consistency with the base client architecture.
         """
         pass
     

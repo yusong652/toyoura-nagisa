@@ -97,8 +97,12 @@ def register_list_contacts_tool(mcp: FastMCP):
                 llm_content = "No contacts found"
             
             return success_response(
-                message, 
-                llm_content,
+                message,
+                llm_content={
+                    "parts": [
+                        {"type": "text", "text": llm_content}
+                    ]
+                },
                 contacts=contacts,
                 total_contacts=len(contacts),
                 contacts_with_email=contacts_with_email,

@@ -1,48 +1,48 @@
 """
-Anthropic Tool Manager - 专门用于Anthropic API的工具管理器
+Anthropic Tool Manager - Tool manager for Anthropic API
 
-继承自BaseToolManager，实现Anthropic特定的工具schema格式化和处理逻辑。
-专门针对Anthropic Claude API的要求进行优化，包括input_schema格式化。
+Inherits from BaseToolManager and implements Anthropic-specific tool schema formatting.
+Optimized for Anthropic Claude API requirements including input_schema formatting.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from backend.infrastructure.llm.base.tool_manager import BaseToolManager
 
 
 class AnthropicToolManager(BaseToolManager):
     """
-    Anthropic专用工具管理器
-    
-    继承BaseToolManager的通用功能，并实现Anthropic特定的：
-    - input_schema格式化
-    - Anthropic tool对象构建
-    - 参数描述和验证
+    Anthropic-specific tool manager
+
+    Inherits common functionality from BaseToolManager and implements Anthropic-specific:
+    - input_schema formatting
+    - Anthropic tool object construction
+    - Parameter description and validation
     """
     
     def _format_schema_for_anthropic(self, tool_schema: Dict[str, Any]) -> Dict[str, Any]:
         """
-        格式化工具schema为Anthropic格式
-        
+        Format tool schema for Anthropic format
+
         Args:
-            tool_schema: 原始工具schema
-            
+            tool_schema: Original tool schema
+
         Returns:
-            Dict: Anthropic格式的工具schema
+            Dict: Tool schema in Anthropic format
         """
         input_schema = tool_schema.get("parameters", {"type": "object", "properties": {}})
         
-        # 确保schema完整性
+        # Ensure schema completeness
         if "properties" in input_schema:
-            # 确保所有参数都有描述
+            # Ensure all parameters have descriptions
             for prop in input_schema["properties"].values():
                 if "description" not in prop:
                     prop["description"] = "Parameter value"
-            
-            # 保留原始的required字段，不要自动推断所有字段为必需
-            # 如果原始schema没有required字段，说明所有字段都是可选的
+
+            # Preserve original required field, don't auto-infer all fields as required
+            # If schema has no required field, all fields are optional
             if "required" not in input_schema:
-                input_schema["required"] = []  # 空数组表示所有字段都是可选的
+                input_schema["required"] = []  # Empty array means all fields are optional
         
         if "type" not in input_schema:
             input_schema["type"] = "object"
@@ -55,31 +55,30 @@ class AnthropicToolManager(BaseToolManager):
             "input_schema": input_schema
         }
     
-    async def get_function_call_schemas(self, session_id: str, agent_profile: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_function_call_schemas(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
         """
-        获取MCP工具的schema，返回Anthropic格式，支持agent profile过滤
-        
+        Get MCP tool schemas in Anthropic format with agent profile filtering
+
         Args:
-            session_id: 会话ID，用于工具缓存
-            agent_profile: Agent profile名称，用于工具过滤
-            debug: 是否启用调试输出
-            
+            session_id: Session ID for tool caching (required)
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+
         Returns:
-            List[Dict[str, Any]]: Anthropic格式的工具schema列表
+            List[Dict[str, Any]]: Tool schemas in Anthropic format
         """
         
-        # 使用基类的标准化工具获取方法
+        # Get standardized tools from base class
         tools_dict = await self.get_standardized_tools(session_id, agent_profile)
-        
+
         if not tools_dict:
             return []
-        
-        # 转换 ToolSchema 对象为 Anthropic 格式
+
+        # Convert ToolSchema objects to Anthropic format
         anthropic_tools = []
-        for tool_name, tool_schema in tools_dict.items():
-            # 将 JSONSchema 对象转换为字典
+        for _, tool_schema in tools_dict.items():
+            # Convert JSONSchema object to dictionary
             input_schema_dict = tool_schema.inputSchema.model_dump(exclude_none=True)
-            
+
             anthropic_tool = self._format_schema_for_anthropic({
                 "name": tool_schema.name,
                 "description": tool_schema.description,
@@ -93,18 +92,17 @@ class AnthropicToolManager(BaseToolManager):
         
         return anthropic_tools
 
-    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
         """
         Get tool schemas in standardized dictionary format for system prompt embedding.
-        
+
         This method returns a clean dictionary format specifically designed for embedding
         tool schemas into system prompts, separate from the API-specific formats.
-        
+
         Args:
             session_id: Session ID for tool caching (required)
-            agent_profile: Agent profile name for tool filtering
-            debug: Whether to enable debug output
-            
+            agent_profile: Agent profile name ("coding", "lifestyle", "general", "pfc", "disabled")
+
         Returns:
             List[Dict[str, Any]]: Tool schemas in standardized dictionary format for system prompt
         """

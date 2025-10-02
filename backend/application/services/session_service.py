@@ -93,7 +93,7 @@ class SessionService:
         return {
             "session": session,
             "history": [
-                msg.model_dump() | {"role": msg.role} 
+                msg.model_dump() | {"role": msg.role} # type: ignore
                 for msg in history_msgs
             ],
             "message_count": len(history_msgs)
@@ -156,7 +156,7 @@ class SessionService:
             "success": True,
             "message_count": len(history_msgs),
             "recent_messages": [
-                msg.model_dump() | {"role": msg.role} 
+                msg.model_dump() | {"role": msg.role} # type: ignore
                 for msg in recent_messages
             ]
         }
@@ -201,7 +201,6 @@ class SessionService:
         # Clear tool cache if LLM client provided
         if llm_client and hasattr(llm_client, '_clear_session_context'):
             await llm_client._clear_session_context(session_id)
-            print(f"[DEBUG] Cleared tool cache for deleted session: {session_id}")
         
         # TODO: Delete related memories from vector database
         # This will be implemented when memory service is refactored

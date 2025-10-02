@@ -20,4 +20,13 @@ _PROJECT_ROOT = _BACKEND_DIR.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
 if __name__ == "__main__":
-    uvicorn.run("backend.app:app", host="0.0.0.0", port=8000, reload=True) 
+    from backend.config import get_dev_config
+
+    dev_config = get_dev_config()
+
+    uvicorn.run(
+        "backend.app:app",
+        host=dev_config.host,
+        port=dev_config.port,
+        reload=dev_config.enable_reload
+    ) 
