@@ -115,7 +115,6 @@ class LLMClientBase(ABC):
             parsed_data: Parsed message data including agent_profile, enable_memory configuration
         """
         context_manager = self.get_or_create_context_manager(session_id)
-        print(f"[DEBUG] Adding user message to session {session_id}", flush=True)
 
         # Initialize context manager if needed
         if not context_manager._initialized_from_history:

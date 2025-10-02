@@ -208,6 +208,7 @@ class ConnectionManager:
                 # Send heartbeat
                 if not await self._send_heartbeat(session_id):
                     logger.info(f"Heartbeat send failed for {session_id}, stopping heartbeat")
+                    print(f"[HEARTBEAT] Stopping heartbeat for session {session_id} due to send failure", flush=True)
                     break
                 
                 # Wait for next heartbeat
@@ -226,15 +227,10 @@ class ConnectionManager:
             bool: Whether heartbeat send was successful
         """
         heartbeat_time = datetime.now().isoformat()
-        print(f"[HEARTBEAT] Sending heartbeat to session {session_id} at {heartbeat_time}", flush=True)
         result = await self.send_json(session_id, {
             "type": "HEARTBEAT",
             "timestamp": heartbeat_time
         })
-        if result:
-            print(f"[HEARTBEAT] Successfully sent heartbeat to session {session_id}", flush=True)
-        else:
-            print(f"[HEARTBEAT] Failed to send heartbeat to session {session_id}", flush=True)
         return result
 
     async def handle_heartbeat_response(self, session_id: str):
@@ -242,9 +238,6 @@ class ConnectionManager:
         response_time = datetime.now().isoformat()
         if session_id in self.connections:
             self.connections[session_id].update_heartbeat()
-            print(f"[HEARTBEAT] Backend received ACK from session {session_id} at {response_time}", flush=True)
-            last_heartbeat = self.connections[session_id].last_heartbeat.isoformat()
-            print(f"[HEARTBEAT] Last heartbeat updated to: {last_heartbeat}", flush=True)
         else:
             print(f"[HEARTBEAT] Backend received ACK from unknown session {session_id} at {response_time}", flush=True)
 

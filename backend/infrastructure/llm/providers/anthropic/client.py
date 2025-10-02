@@ -11,13 +11,12 @@ from .tool_manager import AnthropicToolManager
 
 class AnthropicClient(LLMClientBase):
     """
-    Anthropic Claude 客户端实现。
-    继承自 LLMClientBase，实现具体的 API 调用逻辑。
+    Anthropic Claude client class.
     """
     
     def __init__(self, api_key: str, **kwargs):
         """
-        初始化 Anthropic 客户端。
+        Initialize AnthropicClient instance.
         Args:
             api_key: Anthropic API key。
             **kwargs: Additional configuration parameters
@@ -28,7 +27,7 @@ class AnthropicClient(LLMClientBase):
         # Initialize Anthropic-specific configuration
         config_overrides = {}
         
-        # 从extra_config中提取相关配置进行覆盖
+        # Apply any extra configuration overrides
         if 'model' in self.extra_config:
             config_overrides['model_settings'] = {'model': self.extra_config['model']}
         if 'temperature' in self.extra_config:
@@ -50,16 +49,11 @@ class AnthropicClient(LLMClientBase):
         
         print(f"Enhanced Anthropic Client initialized with model: {self.anthropic_config.model_settings.model}")
         
-        # 初始化API客户端 - 使用统一的client属性名
+        # initialize Anthropic API client
         self.client = anthropic.Anthropic(api_key=self.api_key)
        
-        # 初始化统一工具管理器
+        # initialize tool manager
         self.tool_manager = AnthropicToolManager()
-
-    # get_response is now implemented in base class using provider-specific components
-
-
-    # ========== PROVIDER-SPECIFIC METHODS FOR BASE IMPLEMENTATION ==========
 
 
     def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
@@ -137,9 +131,6 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific configuration object."""
         return self.anthropic_config
 
-    # _streaming_tool_calling_loop is inherited from LLMClientBase
-
-
     async def call_api_with_context(
         self,
         context_contents: List[Dict[str, Any]],
@@ -182,25 +173,16 @@ class AnthropicClient(LLMClientBase):
         kwargs_api.update(kwargs)
 
         try:
-            # 调用Anthropic API
+            # call the Anthropic API
             response = self.client.messages.create(**kwargs_api)
-
-            # 打印raw response (如果启用调试)
-            if debug:
-                AnthropicDebugger.log_raw_response(response)
 
             return response
 
         except Exception as e:
-            # 确保在API调用失败时也能看到payload信息
+            # Log debug information if in debug mode
             if debug:
                 print(f"[DEBUG] API call failed with error: {str(e)}")
                 print(f"[DEBUG] Failed request payload:")
                 AnthropicDebugger.print_debug_request_payload(kwargs_api)
 
-            # 重新抛出异常
-            raise
-
-
-
-
+            raise e
