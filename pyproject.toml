@@ -87,6 +87,7 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot",
+    "pfc_workspace",  # PFC WebSocket server for ITASCA PFC integration
 ]
 
 [project.optional-dependencies]

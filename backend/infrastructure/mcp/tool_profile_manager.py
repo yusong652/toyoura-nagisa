@@ -79,7 +79,7 @@ class ToolProfileManager:
         "web_search"
     ]
 
-    # PFC simulation tools (coding tools + future PFC-specific tools)
+    # PFC simulation tools (coding tools + PFC-specific tool)
     PFC_TOOLS = [
         # File operation tools for PFC scripts and data files
         "write",
@@ -93,13 +93,8 @@ class ToolProfileManager:
         "grep",
         # Search tools for finding PFC documentation and examples
         "web_search",
-        # PFC-specific tools (to be added in the future)
-        # "pfc_execute",        # Execute PFC commands
-        # "pfc_model_create",   # Create models
-        # "pfc_model_query",    # Query model state
-        # "pfc_simulation_run", # Run simulations
-        # "pfc_data_extract",   # Extract data
-        # "pfc_visualization"   # Visualization
+        # PFC-specific tool (WebSocket-based ITASCA SDK control)
+        "pfc_execute_command",   # Execute any PFC SDK command (unified interface)
     ]
     
     # Tool profile definitions
@@ -124,9 +119,9 @@ class ToolProfileManager:
         
         AgentProfile.PFC: ToolProfile(
             name="PFC Expert",
-            description="ITASCA PFC simulation specialist with file operations and analysis tools",
+            description="ITASCA PFC simulation specialist with real-time SDK control and analysis tools",
             tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # Currently 10 basic tools, will expand in future
+            estimated_tokens=len(PFC_TOOLS) * 282,  # 11 tools: 10 basic + 1 unified PFC tool
             color="#9C27B0",  # Purple
             icon="⚛️"
         ),

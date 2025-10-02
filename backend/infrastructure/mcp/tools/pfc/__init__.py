@@ -1,10 +1,15 @@
-from .run_pfc import register_run_pfc_tool
+"""
+PFC Tools - ITASCA PFC simulation integration for aiNagisa.
+
+This package provides MCP tools for controlling ITASCA PFC simulations
+through a WebSocket connection to a PFC server running in the PFC GUI.
+"""
+
+from .pfc_commands import register_pfc_tools
+from .websocket_client import get_client, close_client
 
 __all__ = [
     "register_pfc_tools",
+    "get_client",
+    "close_client",
 ]
-
-def register_pfc_tools(mcp):
-    """Aggregate registration of all Itasca PFC tools."""
-    register_run_pfc_tool(mcp)
-    print(f"[DEBUG] All PFC tools registered.")

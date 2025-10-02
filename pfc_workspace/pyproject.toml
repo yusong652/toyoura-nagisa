@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pfc-server"
+version = "0.1.0"
+description = "WebSocket server for ITASCA PFC simulation control and communication"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "../LICENSE" }
+authors = [
+    { name = "yusong", email = "yusong.han.652@gmail.com" }
+]
+dependencies = [
+    "fastapi>=0.115.12",
+    "uvicorn[standard]>=0.34.2",
+    "websockets>=15.0.1",
+    "pydantic>=2.11.3",
+    "aiofiles>=23.1.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/yusong652/aiNagisa"
+"Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pfc_server"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+]

@@ -1,0 +1,9 @@
+; PFC Startup File - Launch WebSocket Server
+; This file can be used with: pfc3d700_console.exe startup.pfc
+
+model new
+
+; Enter Python mode and start server
+python-reset-state false
+
+program call 'C:\Dev\Han\aiNagisa\pfc_workspace\start_server.py'
