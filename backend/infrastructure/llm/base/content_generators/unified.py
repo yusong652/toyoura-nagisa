@@ -161,7 +161,7 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
         for msg in latest_messages:
             if msg is not None:
                 text_content = extract_text_content(msg.content)
-                conversation_text += f"{msg.role}: {text_content}\n"
+                conversation_text += f"{msg.role}: {text_content}\n" # type: ignore
         
         # Add motion style to conversation context for video prompts
         if prompt_type == PromptType.IMAGE_TO_VIDEO and motion_style:
@@ -231,7 +231,6 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
         response_text: str,
         context: Dict[str, Any],
         session_id: Optional[str] = None,
-        debug: bool = False
     ) -> Optional[Dict[str, str]]:
         """
         Process the raw generation response based on prompt type.
@@ -247,13 +246,11 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
         """
         if not response_text:
             return None
-        
         prompt_type = context['prompt_type']
         
         if prompt_type == PromptType.TEXT_TO_IMAGE:
             # Parse text-to-image response
-            parsed_result = parse_text_to_image_response(response_text, debug=debug)
-            
+            parsed_result = parse_text_to_image_response(response_text)
             if parsed_result is None:
                 return None
             
@@ -263,7 +260,6 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
             text_prompt, negative_prompt = enhance_prompts_with_defaults(
                 text_prompt=text_prompt,
                 negative_prompt=negative_prompt,
-                debug=debug
             )
             
             # Save to history for future few-shot learning
@@ -274,9 +270,9 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
                         context['conversation_text'], 
                         response_text
                     )
-                    if debug:
-                        print(f"[{prompt_type.value}] Saved generation to history for session {session_id}")
                 except Exception as e:
+                    from backend.config import get_llm_settings
+                    debug = get_llm_settings().debug
                     if debug:
                         print(f"[{prompt_type.value}] Warning: Failed to save generation to history: {e}")
             
@@ -304,15 +300,17 @@ class BaseUnifiedPromptGenerator(BaseContentGenerator):
                         user_request=context['conversation_text'],
                         assistant_response=response_text
                     )
-                    if debug:
-                        print(f"[{prompt_type.value}] Saved generation to history for session {session_id}")
                 except Exception as e:
+                    from backend.config import get_llm_settings
+                    debug = get_llm_settings().debug
                     if debug:
                         print(f"[{prompt_type.value}] Warning: Failed to save generation to history: {e}")
             
             return parsed_result
         
         else:
+            from backend.config import get_llm_settings
+            debug = get_llm_settings().debug
             if debug:
                 print(f"Unsupported prompt type: {prompt_type}")
             return None

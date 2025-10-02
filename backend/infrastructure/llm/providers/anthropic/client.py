@@ -70,6 +70,10 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific title generator class."""
         return TitleGenerator
 
+    def _get_image_prompt_generator(self):
+        """Get Anthropic-specific image prompt generator class."""
+        return ImagePromptGenerator
+
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
@@ -197,25 +201,6 @@ class AnthropicClient(LLMClientBase):
             raise
 
 
- 
-
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate a high-quality text-to-image prompt using the Anthropic API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-        
-        Returns:
-            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
-        """
-        return ImagePromptGenerator.generate_text_to_image_prompt(
-            self.client,
-            session_id,
-            self.anthropic_config.debug
-        )
 
     async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
         """

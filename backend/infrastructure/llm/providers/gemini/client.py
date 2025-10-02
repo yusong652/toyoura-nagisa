@@ -165,20 +165,6 @@ class GeminiClient(LLMClientBase):
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate high-quality text-to-image prompt using the Gemini API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-            
-        Returns:
-            Optional[Dict[str, str]]: A dictionary containing the text prompt and negative prompt, or None if generation fails
-        """
-        debug = self.gemini_config.debug
-        return await GeminiImagePromptGenerator.generate_text_to_image_prompt(self.client, session_id, debug)
 
     async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
         """
@@ -207,6 +193,10 @@ class GeminiClient(LLMClientBase):
     def _get_title_generator(self):
         """Get Gemini-specific title generator class."""
         return GeminiTitleGenerator
+
+    def _get_image_prompt_generator(self):
+        """Get Gemini-specific image prompt generator class."""
+        return GeminiImagePromptGenerator
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""

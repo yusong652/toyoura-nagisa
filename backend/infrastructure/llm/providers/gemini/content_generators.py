@@ -320,6 +320,7 @@ class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
             Dictionary with appropriate prompt keys based on type
         """
         try:
+            print(f"[{prompt_type.value}] Starting unified prompt generation...", flush=True)
             # Get Gemini configuration
             from backend.config import get_llm_settings
             llm_settings = get_llm_settings()
@@ -336,6 +337,7 @@ class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
                 llm_provider="gemini",
                 llm_model=llm_gemini_config.model
             )
+            print(f"[{prompt_type.value}] Context prepared: {context}", flush=True)
             
             # Create API call configuration
             config_kwargs = {
@@ -377,7 +379,7 @@ class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
                 contents=contents,
                 config=prompt_config
             )
-            
+            print(f"[{response}, API call completed.", flush=True)
             if debug:
                 print(f"[{prompt_type.value}] Response received:")
                 GeminiDebugger.print_debug_response(response)
@@ -388,7 +390,7 @@ class GeminiUnifiedPromptGenerator(BaseUnifiedPromptGenerator):
             if prompt_text:
                 # Process response using unified method
                 return GeminiUnifiedPromptGenerator.process_unified_response(
-                    prompt_text, context, session_id, debug
+                    prompt_text, context, session_id
                 )
             
             return None

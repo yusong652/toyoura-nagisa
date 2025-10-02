@@ -169,6 +169,10 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific title generator class."""
         return TitleGenerator
 
+    def _get_image_prompt_generator(self):
+        """Get OpenAI-specific image prompt generator class."""
+        return ImagePromptGenerator
+
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
@@ -245,24 +249,6 @@ class OpenAIClient(LLMClientBase):
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
-    async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
-        """
-        Generate text-to-image prompt using OpenAI API.
-        This method uses a specialized system prompt to create detailed and effective prompts for image generation
-        based on the recent conversation context.
-        
-        Args:
-            session_id: Optional session ID to get the latest conversation context
-            
-        Returns:
-            Dictionary containing text prompt and negative prompt, or None if failed
-        """
-        debug = self.openai_config.debug
-        return ImagePromptGenerator.generate_text_to_image_prompt(
-            self.client,
-            session_id,
-            debug
-        )
 
     async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
         """

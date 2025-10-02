@@ -5,7 +5,7 @@ Handles text-to-image prompt generation using conversation context and few-shot 
 """
 
 from abc import abstractmethod
-from typing import Optional, Dict, Any, List, Union, Awaitable
+from typing import Optional, Dict, Any, List
 from backend.domain.models.messages import BaseMessage, UserMessage, AssistantMessage
 from backend.infrastructure.storage.session_manager import get_latest_n_messages
 from backend.config import get_text_to_image_settings
@@ -19,33 +19,31 @@ from .base import BaseContentGenerator
 class BaseImagePromptGenerator(BaseContentGenerator):
     """
     Abstract base class for image prompt generation.
-    
+
     Handles text-to-image prompt generation using LLM APIs.
     Creates detailed and effective prompts for image generation based on
     recent conversation context, with support for positive and negative prompts.
     """
-    
+
     @staticmethod
     @abstractmethod
-    def generate_text_to_image_prompt(
-        client,  # LLM client instance
-        session_id: Optional[str] = None,
-        debug: bool = False
-    ) -> Union[Optional[Dict[str, str]], Awaitable[Optional[Dict[str, str]]]]:
+    async def generate_text_to_image_prompt(
+        client: Any,
+        session_id: Optional[str] = None
+    ) -> Optional[Dict[str, str]]:
         """
         Generate high-quality text-to-image prompts using recent conversation context.
 
-        Supports both synchronous and asynchronous implementations depending
-        on the specific provider requirements.
+        All provider implementations must follow this unified async signature
+        for consistency across the codebase.
 
         Args:
-            client: LLM client instance for API calls
+            client: Provider-specific LLM client instance for API calls
             session_id: Optional session ID for conversation context
-            debug: Enable debug output
+            debug: Enable debug output for troubleshooting
 
         Returns:
-            Dictionary with 'text_prompt' and 'negative_prompt' keys, None if failed,
-            or awaitable for async implementations
+            Dictionary with 'text_prompt' and 'negative_prompt' keys, or None if failed
         """
         pass
     
@@ -84,7 +82,7 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         for msg in latest_messages:
             if msg is not None:
                 text_content = extract_text_content(msg.content)
-                conversation_text += f"{msg.role}: {text_content}\n"
+                conversation_text += f"{msg.role}: {text_content}\n" # type: ignore
         
         # Get the appropriate model for prompt generation
         if llm_provider and llm_model:

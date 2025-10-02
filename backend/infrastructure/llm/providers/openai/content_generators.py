@@ -100,7 +100,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
     """
 
     @staticmethod
-    def generate_text_to_image_prompt(
+    async def generate_text_to_image_prompt(
         client,  # OpenAI client instance
         session_id: Optional[str] = None,
         debug: bool = False

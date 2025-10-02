@@ -59,7 +59,7 @@ CONVERSATION_VIDEO_PROMPT_PREFIX = "Based on the following conversation, please 
 # === REGEX PATTERNS ===
 
 # Pattern for extracting text prompts from responses
-TEXT_TO_IMAGE_PROMPT_PATTERN = r'<text_to_image_prompt>(.*?)</text_to_image_prompt>'
+TEXT_TO_IMAGE_PROMPT_PATTERN = r'<prompt>(.*?)</prompt>'
 
 # Pattern for extracting negative prompts from responses
 NEGATIVE_PROMPT_PATTERN = r'<negative_prompt>(.*?)</negative_prompt>'

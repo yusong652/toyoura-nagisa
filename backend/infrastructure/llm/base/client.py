@@ -15,7 +15,8 @@ from backend.infrastructure.llm.base.response_processor import BaseResponseProce
 from backend.shared.exceptions import UserRejectionInterruption
 
 if TYPE_CHECKING:
-    from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator    
+    from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
+    from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator    
 
 
 class LLMClientBase(ABC):
@@ -294,7 +295,6 @@ class LLMClientBase(ABC):
 
         # Get debug setting from provider config
         provider_config = self._get_provider_config()
-        debug = getattr(provider_config, 'debug', False)
 
         # Call provider-specific generator with unified signature
         return await generator.generate_title_from_messages(
@@ -303,23 +303,37 @@ class LLMClientBase(ABC):
         )
 
     async def generate_text_to_image_prompt(
-        self, 
+        self,
         session_id: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
         [Optional Interface] Generate text-to-image prompt.
-        
+
+        This method uses provider-specific image prompt generator for implementation.
+        Override _get_image_prompt_generator() to provide custom generator.
+
         Args:
-            session_id: Session ID for getting context
-            
+            session_id: Session ID for getting conversation context
+
         Returns:
             Dictionary containing text prompt and negative prompt, or None if failed
-            
+
         Raises:
             NotImplementedError: If client doesn't support this functionality
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support image prompt generation"
+        generator = self._get_image_prompt_generator()
+        if not generator:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} does not support image prompt generation"
+            )
+
+        # Get debug setting from provider config
+        provider_config = self._get_provider_config()
+
+        # Call provider-specific generator with unified signature
+        return await generator.generate_text_to_image_prompt(
+            self.client,
+            session_id=session_id
         )
 
     async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
@@ -359,6 +373,17 @@ class LLMClientBase(ABC):
         Returns:
             Optional[Type[BaseTitleGenerator]]: Title generator class for this provider,
                                                 or None if title generation is not supported
+        """
+        pass
+
+    @abstractmethod
+    def _get_image_prompt_generator(self) -> Optional[Type['BaseImagePromptGenerator']]:
+        """
+        Get provider-specific image prompt generator class.
+
+        Returns:
+            Optional[Type[BaseImagePromptGenerator]]: Image prompt generator class for this provider,
+                                                      or None if image prompt generation is not supported
         """
         pass
 

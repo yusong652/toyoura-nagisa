@@ -34,7 +34,6 @@ class TitleGenerator(BaseTitleGenerator):
     async def generate_title_from_messages(
         client: anthropic.Anthropic,
         latest_messages: List[BaseMessage],
-        debug: bool = False
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
@@ -78,7 +77,9 @@ class TitleGenerator(BaseTitleGenerator):
                 "max_tokens": 1024,
                 "temperature": 1.0
             })
-
+            from backend.config import get_llm_settings
+            llm_settings = get_llm_settings()
+            debug = llm_settings.debug
             if debug:
                 print("[DEBUG] Anthropic title generation API kwargs:")
                 import pprint
@@ -217,7 +218,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
     """
 
     @staticmethod
-    def generate_text_to_image_prompt(
+    async def generate_text_to_image_prompt(
         client: anthropic.Anthropic,
         session_id: Optional[str] = None,
         debug: bool = False

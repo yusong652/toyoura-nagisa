@@ -50,7 +50,6 @@ def extract_text_content(content: Union[str, List[dict]]) -> str:
 
 def parse_text_to_image_response(
     response_text: str,
-    debug: bool = False
 ) -> Optional[Tuple[str, str]]:
     """
     Parse text-to-image prompt response and extract text_prompt and negative_prompt.
@@ -64,36 +63,38 @@ def parse_text_to_image_response(
         negative_prompt will be empty string if none found in response.
     """
     try:
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
         # Clean up markdown code blocks if present
         cleaned_text = response_text
         if "```" in response_text:
             # Remove markdown code block markers
             cleaned_text = re.sub(r'```(?:text|xml|html)?\n?', '', response_text)
-            if debug:
-                print(f"[text_to_image] Cleaned markdown blocks from response")
-        
         # Extract text prompt
         text_prompt_match = re.search(TEXT_TO_IMAGE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         if not text_prompt_match:
             if debug:
-                print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {response_text}")
+                print(f"[text_to_image] Error: Failed to extract text prompt from response\nFull prompt text: {response_text}", flush=True)
             return None
         
         text_prompt = text_prompt_match.group(1).strip()
         if not text_prompt:
             if debug:
-                print(f"[text_to_image] Error: Extracted text prompt is empty")
+                print(f"[text_to_image] Error: Extracted text prompt is empty", flush=True)
             return None
         
         # Extract negative prompt
         negative_prompt_match = re.search(NEGATIVE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         negative_prompt = negative_prompt_match.group(1).strip() if negative_prompt_match else ""
-        
+        print(f"[text_to_image] Extracted text prompt: '{text_prompt}'", flush=True)
+        print(f"[text_to_image] Extracted negative prompt: '{negative_prompt}'", flush=True)
         return text_prompt, negative_prompt
         
     except Exception as e:
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
         if debug:
-            print(f"[text_to_image] Error parsing response text: {str(e)}")
+            print(f"[text_to_image] Error parsing response text: {str(e)}", flush=True)
         return None
 
 
