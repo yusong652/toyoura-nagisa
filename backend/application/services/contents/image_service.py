@@ -55,9 +55,6 @@ class ImageService:
                     "error": "Failed to generate image prompts from conversation"
                 }
 
-            print(f"[DEBUG] Text prompt: {prompt_result['text_prompt'][:100]}...")
-            print(f"[DEBUG] Negative prompt: {prompt_result['negative_prompt'][:100]}...")
-
             # Step 2: Generate image from prompts
             image_result = await generate_image_from_description(
                 prompt=prompt_result["text_prompt"],
