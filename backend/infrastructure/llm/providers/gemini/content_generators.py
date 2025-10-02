@@ -39,59 +39,73 @@ class GeminiTitleGenerator(BaseTitleGenerator):
     """
     Gemini-specific title generation using shared logic where possible.
     """
-    
+
     @staticmethod
     async def generate_title_from_messages(
         client,  # Gemini client instance
-        latest_messages: List[BaseMessage]
+        latest_messages: List[BaseMessage],
+        debug: bool = False
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
-        
-        Uses Gemini API with shared processing logic.
+
+        Args:
+            client: Gemini client instance for API calls
+            latest_messages: Recent conversation messages to generate title from
+            debug: Enable debug output for troubleshooting
+
+        Returns:
+            Generated title string, or None if generation fails
         """
         try:
             # Use base class validation
             if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
-            
+
             # Read Gemini configuration
             gemini_config = get_gemini_client_config()
-            
+
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
-            
+
             # Configure title generation parameters
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
                 max_output_tokens=gemini_config.model_settings.max_output_tokens
             )
-            
+
             # Build message sequence using base class method
             messages = BaseTitleGenerator.prepare_title_generation_messages(
                 latest_messages, TITLE_GENERATION_REQUEST_TEXT
             )
-            
+
             # Use MessageFormatter for unified message format conversion
             contents = GeminiMessageFormatter.format_messages(messages)
-            
+
             # Get model from configuration
             llm_settings = get_llm_settings()
             gemini_config = llm_settings.get_gemini_config()
             model = gemini_config.model
-            
+
+            if debug:
+                print("[DEBUG] Gemini title generation:")
+                GeminiDebugger.print_debug_request(contents, title_config)
+
             response = client.models.generate_content(
                 model=model,
                 contents=contents,
                 config=title_config
             )
-            
+
+            if debug:
+                GeminiDebugger.print_debug_response(response)
+
             # Extract response text using ResponseProcessor
             title_response_text = GeminiResponseProcessor.extract_text_content(response)
-            
+
             # Parse title using shared utility function
             return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
-            
+
         except Exception as e:
             print(f"Gemini title generation error: {str(e)}")
             return None

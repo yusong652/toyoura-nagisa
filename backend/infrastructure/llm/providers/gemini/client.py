@@ -165,21 +165,6 @@ class GeminiClient(LLMClientBase):
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
 
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate conversation title using Gemini API.
-        Customized implementation for Gemini API supporting multimodal content.
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-        """
-        return await GeminiTitleGenerator.generate_title_from_messages(
-            self.client, latest_messages
-        )
-
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
         Generate high-quality text-to-image prompt using the Gemini API.
@@ -218,6 +203,10 @@ class GeminiClient(LLMClientBase):
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""
         return GeminiResponseProcessor()
+
+    def _get_title_generator(self):
+        """Get Gemini-specific title generator class."""
+        return GeminiTitleGenerator
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""

@@ -24,47 +24,48 @@ from .constants import *
 class TitleGenerator(BaseTitleGenerator):
     """
     Handles conversation title generation using OpenAI API.
-    
+
     Generates concise, descriptive titles based on the first exchange
     in a conversation to help users identify and organize their chats.
     Inherits from BaseTitleGenerator for consistency with other providers.
     """
 
     @staticmethod
-    def generate_title_from_messages(
+    async def generate_title_from_messages(
         client,  # OpenAI client instance
-        latest_messages: List[BaseMessage],
-        debug: bool = False
+        latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
-        
+
         Args:
             client: OpenAI client instance for API calls
             latest_messages: Recent conversation messages to generate title from
             debug: Enable debug logging for API calls
-            
+
         Returns:
             Generated title string, or None if generation fails
         """
         try:
-            if not latest_messages or len(latest_messages) < 2:
+            # Use base class validation
+            if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
-            
+
             # Use shared system prompt for title generation
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
-            
-            # Build conversation messages
-            messages = list(latest_messages) + [
-                UserMessage(role="user", content=[{"type": "text", "text": "Please generate a title for the above conversation"}])
-            ]
-            
+
+            # Use base class method to prepare messages
+            messages = BaseTitleGenerator.prepare_title_generation_messages(
+                latest_messages,
+                "Please generate a title for the above conversation"
+            )
+
             # Format messages for OpenAI API
             formatted_messages = OpenAIMessageFormatter.format_messages(messages)
-            
+
             # Add system prompt
             api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
-            
+
             # Prepare API kwargs for debugging
             api_kwargs = {
                 "model": DEFAULT_TITLE_MODEL,
@@ -72,23 +73,17 @@ class TitleGenerator(BaseTitleGenerator):
                 "temperature": TITLE_GENERATION_TEMPERATURE,
                 "max_tokens": 100
             }
-            
             # Use smaller model for title generation
             response = client.chat.completions.create(**api_kwargs)
-            
-            # Debug response printing (similar to Gemini)
-            if debug:
-                print("[DEBUG] Title generation response:")
-                OpenAIDebugger.log_raw_response(response)
-            
+
             if not response.choices:
                 return None
-            
+
             title_response_text = response.choices[0].message.content or ""
-            
+
             # Parse title using shared utility function
-            return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH, debug=debug)
-            
+            return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH)
+
         except Exception as e:
             print(f"OpenAI title generation error: {str(e)}")
             return None

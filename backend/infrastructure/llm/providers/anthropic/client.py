@@ -66,6 +66,10 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific response processor instance."""
         return AnthropicResponseProcessor()
 
+    def _get_title_generator(self):
+        """Get Anthropic-specific title generator class."""
+        return TitleGenerator
+
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager
@@ -193,18 +197,7 @@ class AnthropicClient(LLMClientBase):
             raise
 
 
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate a concise conversation title using the Anthropic API.
-        支持多模态 content。
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-        """
-        return TitleGenerator.generate_title_from_messages(latest_messages) 
+ 
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """

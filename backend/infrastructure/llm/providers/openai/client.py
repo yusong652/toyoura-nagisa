@@ -165,6 +165,10 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific response processor instance."""
         return OpenAIResponseProcessor()
 
+    def _get_title_generator(self):
+        """Get OpenAI-specific title generator class."""
+        return TitleGenerator
+
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
@@ -240,26 +244,6 @@ class OpenAIClient(LLMClientBase):
         return self.openai_config
 
     # ========== SPECIALIZED CONTENT GENERATION ==========
-
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        Generate conversation title using OpenAI API.
-        
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-            
-        Returns:
-            Generated title string, or None if failed
-        """
-        debug = self.openai_config.debug
-        return TitleGenerator.generate_title_from_messages(
-            self.client,
-            latest_messages,
-            debug
-        )
 
     async def generate_text_to_image_prompt(self, session_id: Optional[str] = None) -> Optional[Dict[str, str]]:
         """

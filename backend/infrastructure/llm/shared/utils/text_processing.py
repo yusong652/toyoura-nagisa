@@ -8,7 +8,6 @@ import re
 from typing import Union, List, Dict, Any, Optional, Tuple
 from backend.config import get_text_to_image_settings
 try:
-    from ..constants.defaults import DEFAULT_NEGATIVE_PROMPT
     from ..constants.prompts import (
         TEXT_TO_IMAGE_PROMPT_PATTERN,
         NEGATIVE_PROMPT_PATTERN,
@@ -162,8 +161,7 @@ def enhance_prompts_with_defaults(
 
 def parse_title_response(
     response_text: str,
-    max_length: int = 50,
-    debug: bool = False
+    max_length: int = 50
 ) -> Optional[str]:
     """
     Parse title generation response and extract clean title.
@@ -182,9 +180,6 @@ def parse_title_response(
         if "```" in response_text:
             # Remove markdown code block markers
             cleaned_text = re.sub(r'```(?:text|xml|html)?\n?', '', response_text)
-            if debug:
-                print(f"[title_generation] Cleaned markdown blocks from response")
-        
         # Try to extract title using pattern matching
         title_match = re.search(TITLE_PROMPT_PATTERN, cleaned_text, re.DOTALL)
         if title_match:
@@ -200,12 +195,11 @@ def parse_title_response(
         if len(title) > max_length:
             title = title[:max_length].rsplit(' ', 1)[0] + "..."
         
-        if debug:
-            print(f"[title_generation] Parsed title: '{title}'")
-        
         return title if title else None
         
     except Exception as e:
+        from backend.config import get_llm_settings
+        debug = get_llm_settings().debug
         if debug:
             print(f"[title_generation] Error parsing title response: {str(e)}")
         return None
