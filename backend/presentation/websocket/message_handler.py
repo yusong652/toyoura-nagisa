@@ -144,38 +144,32 @@ class HeartbeatHandler(MessageHandler):
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
         if message.type == MessageType.HEARTBEAT_ACK:
-            handle_time = datetime.now().isoformat()
-            print(f"[HeartbeatHandler] Processing HEARTBEAT_ACK from session {session_id} at {handle_time}", flush=True)
             await self.connection_manager.handle_heartbeat_response(session_id)
-            print(f"[HeartbeatHandler] Completed HEARTBEAT_ACK processing for session {session_id} at {datetime.now().isoformat()}", flush=True)
 
 
 class LocationHandler(MessageHandler):
     """
     Handle geolocation responses from frontend.
 
-    Purpose: Process location responses from frontend and store them in cache
-    for MCP tools to access. Location requests are sent directly by tools.
+    Purpose: Process location responses from frontend and notify waiting
+    MCP tools via asyncio Event. Location requests are sent directly by tools.
     """
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
         if message.type == MessageType.LOCATION_RESPONSE:
-            print(f"[LocationHandler] Processing LOCATION_RESPONSE from session {session_id}", flush=True)
-
             # Extract location data from message
             location_data = getattr(message, 'location_data', None)
             error = getattr(message, 'error', None)
 
-            if location_data:
-                print(f"[LocationHandler] Received location data: lat={location_data.get('latitude')}, "
-                      f"lng={location_data.get('longitude')}, accuracy={location_data.get('accuracy')}", flush=True)
+            # Notify waiting code via event manager
+            from backend.infrastructure.websocket.location_response_manager import get_location_response_manager
+            manager = get_location_response_manager()
 
-                # Store in cache for MCP tools to access
-                from backend.infrastructure.websocket.message_cache import get_message_cache
-                cache = get_message_cache()
-                cache.store_message("location", session_id, location_data)
+            if location_data:
+                manager.set_response(session_id, location_data=location_data)
             else:
                 print(f"[LocationHandler] Received location error: {error}", flush=True)
+                manager.set_response(session_id, error=error)
     
 class ChatHandler(MessageHandler):
     """

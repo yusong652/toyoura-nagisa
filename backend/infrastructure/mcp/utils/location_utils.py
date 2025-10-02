@@ -56,7 +56,7 @@ async def _fetch_browser_location(
     timeout: float = 30.0
 ) -> Optional[Dict[str, Any]]:
     """
-    Fetch user location from browser via WebSocket.
+    Fetch user location from browser via WebSocket using asyncio Event.
 
     Args:
         context: FastMCP context containing session information
@@ -77,8 +77,14 @@ async def _fetch_browser_location(
             connection_manager = websocket_handler.get_connection_manager()
         except AttributeError:
             return None
-        
+
+        # Create location request and get event
+        from backend.infrastructure.websocket.location_response_manager import get_location_response_manager
+        manager = get_location_response_manager()
+        event = manager.create_request(session_id)
+
         try:
+            # Send location request to browser
             result = await connection_manager.send_json(session_id, {
                 "type": "LOCATION_REQUEST",
                 "session_id": session_id,
@@ -87,32 +93,41 @@ async def _fetch_browser_location(
             })
 
             if not result:
+                manager.cleanup_request(session_id)
                 return None
 
-            # Poll cache for response
-            from backend.infrastructure.websocket.message_cache import get_message_cache
-            cache = get_message_cache()
-            for _ in range(int(timeout * 10)):
-                location_data = cache.get_message("location", session_id)
-                if location_data:
-                    # Standardize browser location data structure
-                    return {
-                        "latitude": location_data.get("latitude"),
-                        "longitude": location_data.get("longitude"),
-                        "city": location_data.get("city"),
-                        "country": location_data.get("country"),
-                        "accuracy": location_data.get("accuracy")
-                    }
+            # Wait for response with timeout
+            try:
+                await asyncio.wait_for(event.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                print(f"[LOCATION] Browser location request timed out after {timeout}s")
+                manager.cleanup_request(session_id)
+                return None
 
-                await asyncio.sleep(0.1)
-            return None
+            # Get response from manager
+            response = manager.get_response(session_id)
+            manager.cleanup_request(session_id)
+
+            if response and not response.error:
+                # Return standardized location data structure
+                return {
+                    "latitude": response.latitude,
+                    "longitude": response.longitude,
+                    "city": response.city,
+                    "country": response.country,
+                    "accuracy": response.accuracy
+                }
+            else:
+                print(f"[LOCATION] Browser location error: {response.error if response else 'No response'}")
+                return None
 
         except Exception as e:
             print(f"Error getting browser location: {e}")
+            manager.cleanup_request(session_id)
             return None
 
     except Exception as e:
-        print(f"Error in get_browser_location: {e}")
+        print(f"Error in _fetch_browser_location: {e}")
         return None
 
 
