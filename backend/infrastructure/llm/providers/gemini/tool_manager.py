@@ -44,10 +44,6 @@ class GeminiToolManager(BaseToolManager):
                 function_declarations.append(func_decl)
         
         from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
-        if llm_settings.debug:
-            print(f"[DEBUG] Final Gemini tools count: {len(function_declarations)}")
-        
         # Return as Tool objects
         if function_declarations:
             return [types.Tool(function_declarations=function_declarations)]
@@ -92,9 +88,6 @@ class GeminiToolManager(BaseToolManager):
                 if llm_settings.debug:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
-
-        if llm_settings.debug:
-            print(f"[DEBUG] Gemini system prompt schemas count: {len(prompt_schemas)}")
         
         return prompt_schemas
     

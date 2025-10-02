@@ -73,7 +73,6 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         
         # Get latest conversation messages
         latest_messages = get_latest_n_messages(session_id, context_message_count) if session_id else tuple([None] * context_message_count)
-        print(f"[text_to_image] Loaded {len(latest_messages)} latest messages for session {session_id}")
         # Load few-shot history
         few_shot_history = load_text_to_image_history(session_id) if session_id else []
         
@@ -158,7 +157,6 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         # Parse the response
         parsed_result = parse_text_to_image_response(
             response_text,
-            debug=debug
         )
         
         if parsed_result is None:
@@ -170,7 +168,6 @@ class BaseImagePromptGenerator(BaseContentGenerator):
         text_prompt, negative_prompt = enhance_prompts_with_defaults(
             text_prompt=text_prompt,
             negative_prompt=negative_prompt,
-            debug=debug
         )
         
         # Save to history for future few-shot learning
@@ -181,8 +178,6 @@ class BaseImagePromptGenerator(BaseContentGenerator):
                     context['conversation_text'], 
                     response_text
                 )
-                if debug:
-                    print(f"[text_to_image] Saved generation to history for session {session_id}")
             except Exception as e:
                 if debug:
                     print(f"[text_to_image] Warning: Failed to save generation to history: {e}")

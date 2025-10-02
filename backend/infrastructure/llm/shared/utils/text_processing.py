@@ -101,7 +101,6 @@ def parse_text_to_image_response(
 def enhance_prompts_with_defaults(
     text_prompt: str,
     negative_prompt: str,
-    debug: bool = False
 ) -> Tuple[str, str]:
     """
     Enhance text and negative prompts by adding missing default keywords from config.
@@ -153,10 +152,6 @@ def enhance_prompts_with_defaults(
             # Join all keywords with comma, ensure no leading spaces
             enhanced_negative_prompt = ", ".join(missing_keywords) + (", " + enhanced_negative_prompt.lstrip() if enhanced_negative_prompt else "")
 
-    if debug:
-        print(f"[text_to_image] Enhanced text_prompt: {enhanced_text_prompt}")
-        print(f"[text_to_image] Enhanced negative_prompt: {enhanced_negative_prompt}")
-    
     return enhanced_text_prompt, enhanced_negative_prompt
 
 

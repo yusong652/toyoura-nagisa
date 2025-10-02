@@ -242,10 +242,6 @@ class GeminiClient(LLMClientBase):
             tool_schemas=prompt_tool_schemas
         )
 
-        debug = get_llm_settings().debug
-        if debug:
-            print(f"[DEBUG] System prompt for session {session_id}:\n{system_prompt}\n")
-
         # Get working contents from context manager (config obtained internally)
         working_contents = context_manager.get_working_contents()
 

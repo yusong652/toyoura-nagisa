@@ -252,16 +252,6 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             # Use MessageFormatter for message format conversion
             formatted_messages = MessageFormatter.format_messages(messages)
             
-            if debug:
-                print("\n[text_to_image] Messages for prompt generation:")
-                import pprint
-                pprint.pprint(messages)
-                print("[text_to_image] Formatted messages:")
-                pprint.pprint(formatted_messages)
-            
-            if debug:
-                print(f"\n[Anthropic][text_to_image] System prompt: {context['system_prompt']}")
-            
             # Use the model from context (which now correctly uses Anthropic's model)
             model_for_text_to_image = context.get('model', llm_anthropic_config.model)
             

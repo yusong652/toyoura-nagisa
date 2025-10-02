@@ -147,7 +147,6 @@ class ChatService:
         # 1. Parse request data using unified parsing logic
         try:
             parsed_data = parse_message_data(request_data)
-            print(f"[DEBUG] Parsed request data: {parsed_data}", flush=True)
 
         except Exception as e:
             raise ValueError(f"WebSocket message parsing failed: {str(e)}")
