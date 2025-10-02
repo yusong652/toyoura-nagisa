@@ -1,0 +1,15 @@
+# User-specific configuration
+config.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test files
+test_*.py
+
+# PFC data files
+*.sav
+*.dat
+*.txt

@@ -17,13 +17,14 @@ This UV workspace member provides a lightweight WebSocket server that enables ai
 
 ```
 pfc_workspace/
-├── pfc_server/
-│   ├── __init__.py          # Package initialization
-│   └── server.py            # Lightweight WebSocket server (single file!)
-├── pyproject.toml           # UV workspace member configuration
+├── pfc_server/              # WebSocket server package
+│   ├── __init__.py
+│   └── server.py            # Main server (~350 lines)
+├── config.example.py        # Configuration template
+├── start_simple.py          # Startup script for PFC Python console
+├── pyproject.toml           # UV workspace configuration
 ├── README.md                # This file
-├── QUICKSTART.md            # Quick start guide
-└── TOOL_REFERENCE.md        # Detailed tool documentation
+└── QUICKSTART.md            # Quick start guide
 ```
 
 ## 🚀 Quick Start
@@ -38,25 +39,20 @@ uv sync  # Installs all workspace members including pfc-server
 
 ### 2. Start PFC Server
 
-**Option A - GUI IPython Shell** (Interactive):
+**In PFC GUI Python Shell or Console**:
 
 ```python
-# In PFC GUI → Python Shell
->>> import sys
->>> sys.path.append(r'C:\Dev\Han\aiNagisa\pfc_workspace')
->>> from pfc_server import server
->>> server.start_background()
+# Add workspace to Python path and run startup script
+import sys
+sys.path.append(r'<AINAGISA_ROOT>\pfc_workspace')
+exec(open(r'<AINAGISA_ROOT>\pfc_workspace\start_server.py', encoding='utf-8').read())
 ```
 
-**Option B - Command-Line Console** (Headless):
-
-```
-$ pfc.exe
-PFC> python
->>> import sys
->>> sys.path.append(r'C:\Dev\Han\aiNagisa\pfc_workspace')
->>> from pfc_server import server
->>> server.start_background()
+**Example** (replace with your actual path):
+```python
+import sys
+sys.path.append(r'D:\Projects\aiNagisa\pfc_workspace')
+exec(open(r'D:\Projects\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
 ```
 
 ### 3. Use in aiNagisa
@@ -65,7 +61,7 @@ Start backend and select **PFC Expert** profile in frontend:
 
 ```
 User: Create a ball with radius 0.5 and run 1000 cycles
-AI: [Uses pfc_create_ball and pfc_run_cycles tools automatically]
+AI: [Uses pfc_execute_command tool automatically]
 ```
 
 ## 🏗️ Architecture
@@ -73,10 +69,10 @@ AI: [Uses pfc_create_ball and pfc_run_cycles tools automatically]
 ```
 ┌─────────────────────┐    WebSocket     ┌──────────────────────┐    Python API    ┌──────────────────┐
 │  aiNagisa Backend   │◄────────────────►│   PFC Server         │◄────────────────►│  ITASCA PFC SDK  │
-│  (MCP Tools)        │  ws://localhost  │   (in PFC process)   │   Direct import  │  (itasca module) │
-│  • pfc_create_ball  │     :9001        │   • Command executor │                  │  • ball.create   │
-│  • pfc_run_cycles   │                  │   • Message handler  │                  │  • cycle         │
-│  • pfc_query_balls  │                  │   • Error handling   │                  │  • ball.list     │
+│  (MCP Tool)         │  ws://localhost  │   (in PFC process)   │   Direct import  │  (itasca module) │
+│  pfc_execute_cmd    │     :9001        │   • Command executor │                  │  • ball.create   │
+│                     │                  │   • Message handler  │                  │  • cycle         │
+│                     │                  │   • Error handling   │                  │  • ball.list     │
 └─────────────────────┘                  └──────────────────────┘                  └──────────────────┘
 ```
 
@@ -87,20 +83,24 @@ AI: [Uses pfc_create_ball and pfc_run_cycles tools automatically]
 3. **Async WebSocket**: Using `websockets` library for efficient I/O
 4. **Command-based protocol**: Simple JSON messages for flexibility
 
-## 📚 Available Tools
+## 📚 MCP Tool
 
-The server exposes 6 MCP tools through aiNagisa:
+The server exposes a single unified MCP tool through aiNagisa:
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `pfc_execute_command` | Execute raw SDK commands | `command="ball.create", params={...}` |
-| `pfc_create_ball` | Create ball particles | `radius=0.5, x=0, y=0, z=0` |
-| `pfc_run_cycles` | Run simulation steps | `steps=1000` |
-| `pfc_query_balls` | Query ball information | `filter_expr="radius > 0.5"` |
-| `pfc_save_state` | Save model state | `filename="model.sav"` |
-| `pfc_load_state` | Load model state | `filename="model.sav"` |
+**`pfc_execute_command`** - Execute any ITASCA PFC SDK command
 
-See [TOOL_REFERENCE.md](TOOL_REFERENCE.md) for detailed documentation.
+Supports two command patterns:
+- **String commands**: `command="command"`, `params='{"cmd": "ball create radius 0.5"}'`
+- **Direct API calls**: `command="ball.count"`, `params='{}' (optional)`
+
+Example usage in chat:
+```
+User: Create a ball with radius 0.5
+AI: [Uses pfc_execute_command with command="command", params='{"cmd": "ball create radius 0.5"}']
+
+User: How many balls are there?
+AI: [Uses pfc_execute_command with command="ball.count"]
+```
 
 ## 🔧 Technical Details
 
@@ -202,17 +202,7 @@ See [QUICKSTART.md](QUICKSTART.md) for full workflow testing.
 ## 📖 Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)**: Step-by-step setup and usage guide
-- **[TOOL_REFERENCE.md](TOOL_REFERENCE.md)**: Detailed tool documentation with examples
-- **[../backend/infrastructure/mcp/tools/pfc/](../backend/infrastructure/mcp/tools/pfc/)**: aiNagisa backend integration code
-
-## 🤝 Contributing
-
-Contributions welcome! To add new PFC tools:
-
-1. Add tool function in `backend/infrastructure/mcp/tools/pfc/pfc_commands.py`
-2. Register tool in `register_pfc_tools()` function
-3. Update `backend/infrastructure/mcp/tool_profile_manager.py` PFC_TOOLS list
-4. Add documentation to [TOOL_REFERENCE.md](TOOL_REFERENCE.md)
+- **Backend Code**: `backend/infrastructure/mcp/tools/pfc/` - MCP integration
 
 ## 🐛 Troubleshooting
 
@@ -228,7 +218,7 @@ Contributions welcome! To add new PFC tools:
 - **Check**: Server logs in PFC console for error details
 - **Check**: Command syntax matches ITASCA SDK documentation
 
-See [QUICKSTART.md](QUICKSTART.md) for more troubleshooting tips.
+See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
 
 ## 📄 License
 

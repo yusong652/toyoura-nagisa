@@ -1,85 +1,105 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-PFC Server Startup Script
+PFC Server Startup - Uses threading for Python 3.6 compatibility.
 
-This script can be run in multiple ways:
-
-1. From PFC Console Python mode:
-   PFC> python
-   >>> exec(open('start_server.py').read())
-
-2. From PFC Console command:
-   PFC> python call start_server.py
-
-3. From PFC standalone Python:
-   C:\Program Files\Itasca\PFC700\exe64\python36\python.exe start_server.py
-
-4. With custom Python path:
-   python start_server.py
+RECOMMENDED: Set workspace path in config.py, then run:
+    >>> import sys
+    >>> sys.path.append(r'AINAGISA_ROOT\\pfc_workspace')
+    >>> exec(open(r'AINAGISA_ROOT\\pfc_workspace\\start_server.py', encoding='utf-8').read())
 """
 
 import sys
+import threading
 import os
 
-# Add pfc_workspace to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-
-print("=" * 60)
-print("PFC WebSocket Server Startup")
-print("=" * 60)
-print(f"Python version: {sys.version}")
-print(f"Python executable: {sys.executable}")
-print(f"Script directory: {script_dir}")
-print()
-
-# Try to import itasca
+# Determine workspace path
 try:
-    import itasca
-    print("✓ itasca module available - running in PFC environment")
-    itasca_available = True
+    # When run directly with python start_server.py
+    workspace = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    # When run via exec(), __file__ doesn't exist
+    # Assume the user already added the workspace to sys.path
+    # Try to find pfc_server module to determine workspace
+    workspace = None
+    for path in sys.path:
+        if os.path.exists(os.path.join(path, 'pfc_server')):
+            workspace = path
+            break
+
+    if workspace is None:
+        print("ERROR: Cannot find pfc_workspace in Python path!")
+        print("")
+        print("Please add workspace to sys.path first:")
+        print("    >>> import sys")
+        print("    >>> sys.path.append(r'C:\\\\Dev\\\\Han\\\\aiNagisa\\\\pfc_workspace')")
+        print("    >>> exec(open(r'...\\\\start_server.py', encoding='utf-8').read())")
+        print("")
+        print("Or use the simpler approach:")
+        print("    >>> import sys; sys.path.append(r'C:\\\\Dev\\\\Han\\\\aiNagisa\\\\pfc_workspace')")
+        print("    >>> from pfc_server import server; server.start_background()")
+        raise SystemExit("Workspace not in Python path")
+
+# Add workspace to path first
+if workspace not in sys.path:
+    sys.path.insert(0, workspace)
+
+# Try to load config to get correct workspace path
+try:
+    from config import PFC_WORKSPACE_PATH
+    # Use config path if different
+    if PFC_WORKSPACE_PATH != workspace:
+        workspace = PFC_WORKSPACE_PATH
+        if workspace not in sys.path:
+            sys.path.insert(0, workspace)
 except ImportError:
-    print("⚠ itasca module not available - running outside PFC")
-    print("  Server will work but commands will fail until run in PFC environment")
-    itasca_available = False
+    # config.py doesn't exist, but we can still work with hardcoded path
+    pass
 
-print()
+print("=" * 60)
+print("PFC WebSocket Server - Simple Startup")
+print("=" * 60)
 
-# Check for websockets
+# Check itasca
+try:
+    import itasca # type: ignore
+    print("Itasca module available")
+except ImportError:
+    print("Warning: itasca module not found (commands will fail)")
+
+# Check websockets
 try:
     import websockets
     print("✓ websockets module available")
 except ImportError:
-    print("✗ websockets module not found!")
-    print()
-    print("Please install websockets:")
-    print("  pip install websockets")
-    print()
-    print("Or with PFC Python:")
-    print('  "C:\\Program Files\\Itasca\\PFC700\\exe64\\python36\\python.exe" -m pip install websockets')
-    sys.exit(1)
+    print("✗ Error: websockets not installed")
+    print("  Install with: pip install websockets")
+    raise SystemExit("Missing required dependency: websockets")
 
 print()
 
-# Import and start server
-try:
-    from pfc_server import server
+# Import server
+from pfc_server import server
 
-    print("Starting PFC WebSocket Server...")
-    print("Server will listen on: ws://localhost:9001")
-    print()
-    print("To stop the server: Press Ctrl+C")
-    print("=" * 60)
-    print()
+def run_server():
+    """Run server in thread."""
+    try:
+        server.start()  # Blocking call
+    except KeyboardInterrupt:
+        print("\nServer stopped")
+    except Exception as e:
+        print(f"\nServer error: {e}")
+        import traceback
+        traceback.print_exc()
 
-    # Start in foreground mode (easier to stop)
-    server.start()
+# Start server in daemon thread
+print("Starting server in background thread...")
+server_thread = threading.Thread(target=run_server, daemon=True)
+server_thread.start()
 
-except KeyboardInterrupt:
-    print("\n✓ Server stopped by user")
-except Exception as e:
-    print(f"\n✗ Server failed to start: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+print("Server thread started")
+print()
+print("Server running on: ws://localhost:9001")
+print("You can now use PFC normally while server runs!")
+print()
+print("To stop: Close PFC or press Ctrl+C in this shell")
+print("=" * 60)

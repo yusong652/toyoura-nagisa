@@ -58,27 +58,38 @@ In either the PFC IPython shell or command-line Python mode:
 
 ### Step 4: Start PFC WebSocket Server
 
-**Same commands work for both GUI and command-line modes:**
+**RECOMMENDED: Use the startup script (works for both GUI and console):**
 
 ```python
 >>> import sys
->>> sys.path.append(r'C:\Dev\Han\aiNagisa\pfc_workspace')  # Adjust path as needed
->>> from pfc_server import server
->>> server.start_background()  # Non-blocking mode
+>>> sys.path.append(r'<AINAGISA_ROOT>\pfc_workspace')  # Replace with your actual path
+>>> exec(open(r'<AINAGISA_ROOT>\pfc_workspace\start_server.py', encoding='utf-8').read())
 ```
 
 You should see:
 
 ```
-✓ ITASCA SDK loaded successfully
-🚀 Starting PFC WebSocket Server on localhost:9001
-✓ Server running on ws://localhost:9001
-✓ Server started in background
+============================================================
+PFC WebSocket Server - Simple Startup
+============================================================
+✓ Itasca module available
+✓ websockets module available
+
+Starting server in background thread...
+Server thread started
+
+Server running on: ws://localhost:9001
+You can now use PFC normally while server runs!
+
+To stop: Close PFC or press Ctrl+C in this shell
+============================================================
 ```
 
-**Startup Mode Options**:
-- `server.start_background()`: Non-blocking, allows continued use of PFC console
-- `server.start()`: Blocking mode, dedicates console to server (use Ctrl+C to stop)
+**Why use start_server.py?**
+- Uses threading for Python 3.6 compatibility
+- Non-blocking: allows continued use of PFC console
+- Automatic path detection and validation
+- Better error messages
 
 **Command-Line Console Advantage**: Can run PFC headless without GUI overhead, perfect for server deployments!
 

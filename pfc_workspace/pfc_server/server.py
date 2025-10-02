@@ -13,17 +13,11 @@ import logging
 from datetime import datetime
 
 # Python 3.6 compatible typing
-try:
-    from typing import Any, Dict, Optional
-except ImportError:
-    # Fallback for older typing versions
-    Any = None
-    Dict = dict
-    Optional = None
+from typing import Any, Dict, Optional
 
 try:
     import websockets
-    from websockets.server import WebSocketServerProtocol
+    from websockets.server import WebSocketServerProtocol # type: ignore
 except ImportError:
     print("ERROR: websockets package not found!")
     print("Please install: pip install websockets")
@@ -47,7 +41,7 @@ class PFCCommandExecutor:
         """Initialize executor with itasca module reference."""
         global itasca
         try:
-            import itasca as _itasca
+            import itasca as _itasca # type: ignore
             itasca = _itasca
             self.itasca = itasca
             logger.info("✓ ITASCA SDK loaded successfully")
@@ -58,8 +52,8 @@ class PFCCommandExecutor:
     async def execute_command(
         self,
         command: str,
-        params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        params: Dict[str, Any] 
+    ) -> Dict[str, Any]: 
         """
         Execute a PFC command and return the result.
 
@@ -164,7 +158,7 @@ class PFCWebSocketServer:
         self.active_connections = set()
         self.server = None
 
-    async def handle_client(self, websocket: WebSocketServerProtocol, path: str = None):
+    async def handle_client(self, websocket: WebSocketServerProtocol, path: Optional[str] = None):
         """
         Handle WebSocket client connection.
 
@@ -308,6 +302,7 @@ def start(host: str = "localhost", port: int = 9001):
 
     _server_instance = PFCWebSocketServer(host, port)
 
+    loop = None
     try:
         # Python 3.6 compatible event loop execution
         loop = asyncio.new_event_loop()
@@ -319,7 +314,8 @@ def start(host: str = "localhost", port: int = 9001):
         logger.error(f"Server failed to start: {e}")
         raise
     finally:
-        loop.close()
+        if loop is not None:
+            loop.close()
 
 
 def start_background(host: str = "localhost", port: int = 9001):
@@ -344,19 +340,16 @@ def start_background(host: str = "localhost", port: int = 9001):
 
     # Get or create event loop (Python 3.6 compatible)
     try:
-        # Python 3.7+
+        # Python 3.7+ - try to get running loop
         loop = asyncio.get_running_loop()
-    except AttributeError:
-        # Python 3.6 fallback
+    except (AttributeError, RuntimeError):
+        # Python 3.6 fallback or no running loop
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
+            # Create new event loop if none exists
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-    except RuntimeError:
-        # No running loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
     # Start server as background task
     task = loop.create_task(_server_instance.start())
