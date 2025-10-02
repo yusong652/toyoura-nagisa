@@ -1,8 +1,8 @@
 """
 Location Response Manager
 
-Manages real-time location responses from browser using asyncio Events.
-Replaces polling-based message cache with efficient event-driven approach.
+Manages real-time location responses from browser using asyncio Futures.
+Unified with bash confirmation pattern for consistent async waiting behavior.
 """
 import asyncio
 from typing import Dict, Any, Optional
@@ -22,17 +22,17 @@ class LocationResponse:
 
 class LocationResponseManager:
     """
-    Manages location responses using asyncio Events for real-time updates.
+    Manages location responses using asyncio Futures for real-time updates.
 
-    Each session has an Event that gets set when location response arrives.
-    Waiting code can efficiently await the Event instead of polling cache.
+    Each session has a Future that gets resolved when location response arrives.
+    This pattern matches the bash confirmation service for consistency.
     """
 
     def __init__(self):
-        # Map session_id -> (Event, LocationResponse)
-        self._pending_requests: Dict[str, tuple[asyncio.Event, Optional[LocationResponse]]] = {}
+        # Map session_id -> Future[LocationResponse]
+        self._pending_requests: Dict[str, asyncio.Future[LocationResponse]] = {}
 
-    def create_request(self, session_id: str) -> asyncio.Event:
+    def create_request(self, session_id: str) -> asyncio.Future[LocationResponse]:
         """
         Create a new location request for session.
 
@@ -40,15 +40,15 @@ class LocationResponseManager:
             session_id: Session identifier
 
         Returns:
-            Event that will be set when response arrives
+            Future[LocationResponse]: Future that will be resolved when response arrives
         """
-        event = asyncio.Event()
-        self._pending_requests[session_id] = (event, None)
-        return event
+        future: asyncio.Future[LocationResponse] = asyncio.Future()
+        self._pending_requests[session_id] = future
+        return future
 
     def set_response(self, session_id: str, location_data: Optional[Dict[str, Any]] = None, error: Optional[str] = None):
         """
-        Set location response for session and notify waiting code.
+        Set location response for session and resolve the waiting Future.
 
         Args:
             session_id: Session identifier
@@ -59,7 +59,7 @@ class LocationResponseManager:
             # No pending request for this session, ignore
             return
 
-        event, _ = self._pending_requests[session_id]
+        future = self._pending_requests[session_id]
 
         # Create response object
         if location_data:
@@ -77,26 +77,9 @@ class LocationResponseManager:
                 error=error or "Unknown error"
             )
 
-        # Update pending request with response
-        self._pending_requests[session_id] = (event, response)
-
-        # Notify waiting code
-        event.set()
-
-    def get_response(self, session_id: str) -> Optional[LocationResponse]:
-        """
-        Get location response for session (non-blocking).
-
-        Args:
-            session_id: Session identifier
-
-        Returns:
-            LocationResponse if available, None otherwise
-        """
-        if session_id in self._pending_requests:
-            _, response = self._pending_requests[session_id]
-            return response
-        return None
+        # Resolve the Future with response
+        if not future.done():
+            future.set_result(response)
 
     def cleanup_request(self, session_id: str):
         """
