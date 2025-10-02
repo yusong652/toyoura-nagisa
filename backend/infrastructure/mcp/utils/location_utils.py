@@ -56,7 +56,9 @@ async def _fetch_browser_location(
     timeout: float = 30.0
 ) -> Optional[Dict[str, Any]]:
     """
-    Fetch user location from browser via WebSocket using asyncio Event.
+    Fetch user location from browser via WebSocket using asyncio Future.
+
+    Uses the same async waiting pattern as bash confirmation service for consistency.
 
     Args:
         context: FastMCP context containing session information
@@ -78,10 +80,10 @@ async def _fetch_browser_location(
         except AttributeError:
             return None
 
-        # Create location request and get event
+        # Create location request and get future
         from backend.infrastructure.websocket.location_response_manager import get_location_response_manager
         manager = get_location_response_manager()
-        event = manager.create_request(session_id)
+        location_future = manager.create_request(session_id)
 
         try:
             # Send location request to browser
@@ -98,14 +100,13 @@ async def _fetch_browser_location(
 
             # Wait for response with timeout
             try:
-                await asyncio.wait_for(event.wait(), timeout=timeout)
+                response = await asyncio.wait_for(location_future, timeout=timeout)
             except asyncio.TimeoutError:
                 print(f"[LOCATION] Browser location request timed out after {timeout}s")
                 manager.cleanup_request(session_id)
                 return None
 
-            # Get response from manager
-            response = manager.get_response(session_id)
+            # Clean up and return result
             manager.cleanup_request(session_id)
 
             if response and not response.error:
