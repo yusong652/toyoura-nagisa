@@ -11,9 +11,9 @@ from backend.config import get_llm_settings
 __all__ = ["web_search", "register_web_search_tool"]
 
 async def web_search(
+    context: Context,
     query: str = Field(..., description="Search query to find current information on the web (e.g., 'latest AI developments', 'Python 3.12 features', 'current news about climate change')"),
     max_uses: int = Field(5, description="Maximum number of search tool uses (ignored for Gemini due to API limitations)"),
-    context: Context = None
 ) -> Dict[str, Any]:
     """
     Search the web for current information using appropriate LLM provider.
@@ -87,8 +87,7 @@ async def web_search(
 
 def register_web_search_tool(mcp: FastMCP):
     """Register the Web Search tool with MCP server."""
-    common = dict(
+    mcp.tool(
         tags={"builtin", "web_search", "google", "search"},
         annotations={"category": "builtin", "tags": ["builtin", "web_search", "google", "search"]}
-    )
-    mcp.tool(**common)(web_search)
+        )(web_search)

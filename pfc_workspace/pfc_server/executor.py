@@ -30,76 +30,102 @@ class PFCCommandExecutor:
         params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Execute a PFC command and return the result.
+        Execute a native PFC command and return the result.
+
+        This method assembles a complete PFC command string from the command name
+        and optional keyword parameters, then executes via itasca.command().
 
         Args:
-            command: Command in dot notation (e.g., "ball.create", "cycle.run")
-            params: Command parameters dictionary
+            command: PFC command name (e.g., "ball create", "model domain extent", "cycle")
+            params: Dictionary with keyword-value pairs for command parameters
+                Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
+                Empty dict {} means use command defaults
 
         Returns:
-            Result dictionary with structure:
-                - status: "success" or "error"
-                - data: Command result data
-                - message: Human-readable message
-                - error: Error details if status="error"
+            Result dictionary following ToolResult pattern:
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-friendly message (success description or error details)
+                - data: Optional[Any] - Command result data (success only)
         """
         try:
             if not self.itasca:
                 return {
                     "status": "error",
-                    "message": "ITASCA SDK not available",
-                    "error": "Server not running in PFC GUI environment"
+                    "message": "ITASCA SDK not available: Server not running in PFC GUI environment",
+                    "data": None
                 }
 
-            logger.info(f"Executing command: {command} with params: {params}")
+            # Assemble complete PFC command string
+            cmd_str = self._assemble_command(command, params)
+            logger.info(f"Executing PFC command: {cmd_str}")
 
-            # Special case: "command" executes a PFC command string
-            if command == "command" and "cmd" in params:
-                cmd_str = params["cmd"]
-                logger.info(f"Executing PFC command string: {cmd_str}")
-                result = self.itasca.command(cmd_str)
-                return {
-                    "status": "success",
-                    "data": self._serialize_result(result),
-                    "message": f"PFC command executed: {cmd_str}"
-                }
+            # Execute native PFC command
+            result = self.itasca.command(cmd_str)
 
-            # Parse command path (e.g., "ball.create" -> itasca.ball.create)
-            parts = command.split('.')
-            obj = self.itasca
+            # Serialize result for response
+            serialized_result = self._serialize_result(result)
 
-            for part in parts[:-1]:
-                obj = getattr(obj, part)
-
-            # Execute the command
-            func = getattr(obj, parts[-1])
-
-            # Call function with parameters
-            if callable(func):
-                result = func(**params)
+            # Build message based on whether there's a return value
+            if serialized_result is not None:
+                message = f"PFC command executed: {cmd_str}\nResult: {serialized_result}"
             else:
-                result = func
+                message = f"PFC command executed: {cmd_str}"
 
             return {
                 "status": "success",
-                "data": self._serialize_result(result),
-                "message": f"Command '{command}' executed successfully"
+                "message": message,
+                "data": serialized_result
             }
 
-        except AttributeError as e:
-            logger.error(f"Command not found: {command} - {e}")
-            return {
-                "status": "error",
-                "message": f"Command '{command}' not found in ITASCA SDK",
-                "error": str(e)
-            }
         except Exception as e:
             logger.error(f"Command execution failed: {e}")
             return {
                 "status": "error",
-                "message": f"Command execution failed",
-                "error": str(e)
+                "message": f"Command execution failed: {str(e)}",
+                "data": None
             }
+
+    def _assemble_command(self, command: str, params: Dict[str, Any]) -> str:
+        """
+        Assemble complete PFC command string from command name and parameters.
+
+        Args:
+            command: PFC command name (e.g., "ball create", "model domain extent")
+            params: Keyword-value pairs for command parameters
+
+        Returns:
+            Complete PFC command string (e.g., "ball create radius 1.0 position (0, 0, 0)")
+
+        Example:
+            >>> _assemble_command("ball create", {"radius": 1.0, "position": "(0, 0, 0)"})
+            "ball create radius 1.0 position (0, 0, 0)"
+        """
+        # Start with base command
+        cmd_parts = [command]
+
+        # Add keyword-value pairs (type-based formatting)
+        for keyword, value in params.items():
+            if isinstance(value, str):
+                # String type: check if it's PFC native format or identifier
+                if (value.startswith('(') or                    # Tuple: "(0, 0, 0)"
+                    value.startswith('-') or                    # Negative number sequence: "-10 10"
+                    (value and value[0].isdigit()) or          # Positive number sequence: "10 20"
+                    ' ' in value):                             # Multi-token sequence: "id 1 2"
+                    # PFC native format → use as-is
+                    value_str = value
+                else:
+                    # Single identifier → add quotes (PFC requirement)
+                    value_str = f'"{value}"'
+            elif isinstance(value, (int, float)):
+                # Numeric type → direct conversion, no quotes
+                value_str = str(value)
+            else:
+                # Fallback: string representation
+                value_str = str(value)
+
+            cmd_parts.append(f"{keyword} {value_str}")
+
+        return " ".join(cmd_parts)
 
     def _serialize_result(self, result: Any) -> Any:
         """Convert PFC objects to JSON-serializable format."""

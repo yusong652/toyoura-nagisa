@@ -164,21 +164,27 @@ class PFCWebSocketClient:
         Send command to PFC server and wait for result.
 
         Args:
-            command: Command in dot notation (e.g., "ball.create")
-            params: Command parameters dictionary
+            command: PFC command name (e.g., "ball create", "model domain extent", "cycle")
+            params: Dictionary with keyword-value pairs for command parameters
+                Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
+                Empty dict {} means use command defaults
             timeout: Command timeout in seconds (default: 30.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
             Result dictionary from PFC server with structure:
-                - status: "success" or "error"
-                - data: Command result data
-                - message: Human-readable message
-                - error: Error details if status="error"
+                - type: "result" - Message type identifier
+                - command_id: str - Unique command identifier
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-friendly message (success description or error details)
+                - data: Optional[Any] - Command result data (success only)
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
             TimeoutError: If command execution times out
+
+        Note:
+            Server assembles complete command string: "command keyword1 value1 keyword2 value2 ..."
         """
         for attempt in range(max_retries):
             try:

@@ -27,29 +27,56 @@ __all__ = ["ToolResult", "success_response", "error_response", "user_rejected_re
 class ToolResult(BaseModel):
     """Unified success/error wrapper for all tool outputs.
 
-    **Core Fields**:
-    - `status`: Operation outcome ("success" | "error")
-    - `message`: User-facing summary for display
-    - `llm_content`: Structured data for LLM conversation history
-    - `data`: Tool-specific payload and metadata
-    - `error`: Detailed error information when status="error"
-    
+    **Core Fields** (all tools must return these four fields):
+    - `status`: Operation outcome ("success" | "error") - REQUIRED
+    - `message`: User-facing message (success description or error details) - REQUIRED
+    - `llm_content`: Structured data for LLM conversation history - REQUIRED
+    - `data`: Tool-specific payload and metadata - OPTIONAL
+
+    **llm_content Structure**:
+    Must follow the parts-based format for LLM consumption:
+    ```python
+    llm_content = {
+        "parts": [
+            {"type": "text", "text": "content for LLM"},
+            # Can include multiple parts
+        ]
+    }
+    ```
+
+    For simple text, can also be a string (auto-wrapped in parts by LLM layer).
+    For errors, use `<error>` tags: `{"parts": [{"type": "text", "text": "<error>...</error>"}]}`
+
+    **Field Usage Guidelines**:
+    - `status`: "success" or "error" - identifies operation outcome
+    - `message`: Brief user-friendly summary for UI display
+    - `llm_content`: Structured content for LLM (parts format preferred, string accepted)
+    - `data`: Additional metadata, debugging info, or tool-specific payloads
+
     **Usage Pattern**:
     ```python
-    # Success case
+    # Success case with parts-based llm_content
     return ToolResult(
         status="success",
         message="Found 5 matches in 3 files",
-        llm_content={"files": [...], "summary": {...}},
-        data={"files": [...], "summary": {...}}
+        llm_content={
+            "parts": [
+                {"type": "text", "text": "Search completed: 5 matches found"}
+            ]
+        },
+        data={"total_matches": 5, "file_count": 3}
     ).model_dump()
-    
-    # Error case  
-    return ToolResult(
-        status="error",
-        message="Invalid search pattern",
-        error="Regex compilation failed: invalid syntax"
-    ).model_dump()
+
+    # Error case (error_response auto-generates parts structure)
+    return error_response("Invalid pattern: Regex compilation failed")
+    # Returns: llm_content = {"parts": [{"type": "text", "text": "<error>...</error>"}]}
+
+    # Or use success_response with custom llm_content
+    return success_response(
+        "Operation completed",
+        llm_content={"parts": [{"type": "text", "text": "Details..."}]},
+        file_count=3
+    )
     ```
     """
 
@@ -80,23 +107,37 @@ class ToolResult(BaseModel):
 
 def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict[str, Any]:
     """Create a standardized success response for all MCP tools.
-    
+
     This function provides a unified way for all tools to return success responses,
     ensuring consistent structure across coding, lifestyle, communication, and other tool categories.
-    
+
     Args:
         message: Brief user-friendly success message for UI display
-        llm_content: Content for LLM conversation context (can be any type)
+        llm_content: Content for LLM conversation context in parts format:
+            - Recommended: {"parts": [{"type": "text", "text": "..."}]}
+            - Also accepts: string (will be used as-is, auto-wrapped by LLM layer)
         **data: Tool-specific data fields stored under the 'data' field
-    
+
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="success"
-        
+        Dict[str, Any]: ToolResult dictionary with four fields:
+            - status: "success"
+            - message: str (user-facing message)
+            - llm_content: Any (provided value or None)
+            - data: Dict[str, Any] or None
+
     Example:
+        # Standard parts-based llm_content (recommended)
         return success_response(
-            "Operation completed successfully",
-            llm_content="Process finished with 3 items processed",
-            results=["item1", "item2", "item3"],
+            "Read file: example.txt (10 lines)",
+            llm_content={"parts": [{"type": "text", "text": "file content..."}]},
+            file_path="example.txt",
+            lines=10
+        )
+
+        # Simple string llm_content (also valid)
+        return success_response(
+            "Operation completed",
+            llm_content="Process finished with 3 items",
             count=3
         )
     """
@@ -115,14 +156,29 @@ def error_response(message: str, **data) -> Dict[str, Any]:
     ensuring consistent error handling across coding, lifestyle, communication, and other tool categories.
 
     Args:
-        message: Brief user-friendly error message for UI display
-        **data: Additional error context data
+        message: Brief user-friendly error message with details (e.g., "File not found: example.txt")
+        **data: Additional error context data (optional)
 
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="error" and parts-based llm_content
+        Dict[str, Any]: ToolResult dictionary with four fields:
+            - status: "error"
+            - message: str (error description)
+            - llm_content: {"parts": [{"type": "text", "text": "<error>...</error>"}]}
+            - data: Dict[str, Any] or None
+
+    Note:
+        This function automatically wraps the error message in <error> tags within
+        a parts structure for consistent LLM error handling.
 
     Example:
-        return error_response("Operation failed", error_code=404)
+        return error_response("File not found: /path/to/file.txt")
+        # Returns:
+        # {
+        #   "status": "error",
+        #   "message": "File not found: /path/to/file.txt",
+        #   "llm_content": {"parts": [{"type": "text", "text": "<error>File not found...</error>"}]},
+        #   "data": None
+        # }
     """
     return ToolResult(
         status="error",
@@ -147,10 +203,26 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
         user_message: Optional message from the user explaining the rejection
 
     Returns:
-        Dict[str, Any]: ToolResult dictionary with status="success" and parts-based llm_content
+        Dict[str, Any]: ToolResult dictionary with four fields:
+            - status: "success" (successfully captured user's decision, not an error)
+            - message: str (rejection message for UI)
+            - llm_content: {"parts": [{"type": "text", "text": "..."}]}
+            - data: None
+
+    Note:
+        Status is "success" (not "error") because the tool successfully captured
+        the user's decision to reject. This prevents the LLM from treating valid
+        user choices as system failures.
 
     Example:
         return user_rejected_response(user_message="This command looks dangerous")
+        # Returns:
+        # {
+        #   "status": "success",
+        #   "message": "The user doesn't want to proceed...",
+        #   "llm_content": {"parts": [{"type": "text", "text": "The user doesn't..."}]},
+        #   "data": None
+        # }
     """
     # Follow Claude Code's rejection message pattern
     if user_message:
