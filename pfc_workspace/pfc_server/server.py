@@ -282,86 +282,21 @@ class PFCWebSocketServer:
             raise
 
 
-# Global server instance
-_server_instance: Optional[PFCWebSocketServer] = None
-
-
-def start(host: str = "localhost", port: int = 9001):
+# Module-level utility function for creating server instances
+def create_server(host: str = "localhost", port: int = 9001) -> PFCWebSocketServer:
     """
-    Start PFC WebSocket server (blocking call).
-
-    Usage in PFC GUI IPython shell:
-        >>> from pfc_server import server
-        >>> server.start()
-
-    Args:
-        host: Server host address (default: localhost)
-        port: Server port number (default: 9001)
-    """
-    global _server_instance
-
-    _server_instance = PFCWebSocketServer(host, port)
-
-    loop = None
-    try:
-        # Python 3.6 compatible event loop execution
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(_server_instance.start())
-    except KeyboardInterrupt:
-        logger.info("\n✓ Server stopped by user")
-    except Exception as e:
-        logger.error(f"Server failed to start: {e}")
-        raise
-    finally:
-        if loop is not None:
-            loop.close()
-
-
-def start_background(host: str = "localhost", port: int = 9001):
-    """
-    Start PFC WebSocket server in background (non-blocking).
-
-    Usage in PFC GUI IPython shell:
-        >>> from pfc_server import server
-        >>> server.start_background()
-        >>> # Continue using PFC GUI while server runs
+    Create a PFC WebSocket server instance.
 
     Args:
         host: Server host address (default: localhost)
         port: Server port number (default: 9001)
 
     Returns:
-        asyncio.Task: Server task (can be cancelled with task.cancel())
+        PFCWebSocketServer: Server instance ready to be started
+
+    Example:
+        >>> from pfc_server.server import PFCWebSocketServer, create_server
+        >>> server = create_server()
+        >>> # Use with startup script to run in background
     """
-    global _server_instance
-
-    _server_instance = PFCWebSocketServer(host, port)
-
-    # Get or create event loop (Python 3.6 compatible)
-    try:
-        # Python 3.7+ - try to get running loop
-        loop = asyncio.get_running_loop()
-    except (AttributeError, RuntimeError):
-        # Python 3.6 fallback or no running loop
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # Create new event loop if none exists
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-    # Start server as background task
-    task = loop.create_task(_server_instance.start())
-    logger.info("✓ Server started in background")
-    return task
-
-
-def get_server() -> Optional[PFCWebSocketServer]:
-    """Get the current server instance."""
-    return _server_instance
-
-
-if __name__ == "__main__":
-    # Direct execution (for testing)
-    start()
+    return PFCWebSocketServer(host, port)
