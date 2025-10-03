@@ -23,16 +23,37 @@ logging.basicConfig(
 # Import server
 from pfc_server.server import create_server
 
-# Server configuration
-HOST = "localhost"
-PORT = 9001
+# Load configuration
+try:
+    from config import (
+        WEBSOCKET_HOST,
+        WEBSOCKET_PORT,
+        PING_INTERVAL,
+        PING_TIMEOUT
+    )
+    HOST = WEBSOCKET_HOST
+    PORT = WEBSOCKET_PORT
+    PING_INT = PING_INTERVAL
+    PING_TO = PING_TIMEOUT
+except ImportError:
+    # Fallback to defaults if config not found
+    HOST = "localhost"
+    PORT = 9001
+    PING_INT = 30
+    PING_TO = 10
+    print("Warning: config.py not found, using default settings")
 
 print("=" * 60)
 print("PFC WebSocket Server")
 print("=" * 60)
 
 # Create server instance
-pfc_server = create_server(host=HOST, port=PORT)
+pfc_server = create_server(
+    host=HOST,
+    port=PORT,
+    ping_interval=PING_INT,
+    ping_timeout=PING_TO
+)
 
 def run_server():
     """Run async server in background thread."""

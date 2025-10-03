@@ -19,25 +19,38 @@ This UV workspace member provides a lightweight WebSocket server that enables ai
 pfc_workspace/
 ├── pfc_server/              # WebSocket server package
 │   ├── __init__.py
-│   └── server.py            # Main server (~350 lines)
-├── config.example.py        # Configuration template
-├── start_simple.py          # Startup script for PFC Python console
+│   └── server.py            # Main server implementation
+├── start_server.py          # Startup script for PFC Python console
+├── requirements.txt         # PFC Python environment dependencies
 ├── pyproject.toml           # UV workspace configuration
 ├── README.md                # This file
 └── QUICKSTART.md            # Quick start guide
 ```
 
-## 🚀 Quick Start
+## 📋 Prerequisites
 
-### 1. Install Dependencies
+### PFC Python Environment Setup
 
-From aiNagisa root:
+The server requires `websockets` package in PFC's Python environment.
+
+**Install dependencies in PFC Python:**
 
 ```bash
-uv sync  # Installs all workspace members including pfc-server
+# Using PFC's pip (replace path with your PFC installation)
+"C:\Program Files\Itasca\PFC700\exe64\python36\Scripts\pip.exe" install -r "C:\Dev\Han\aiNagisa\pfc_workspace\requirements.txt"
 ```
 
-### 2. Start PFC Server
+**Verify installation:**
+
+```bash
+"C:\Program Files\Itasca\PFC700\exe64\python36\Scripts\pip.exe" list | findstr websockets
+```
+
+Expected: `websockets (9.x or higher)`
+
+## 🚀 Quick Start
+
+### 1. Start PFC Server
 
 **In PFC GUI Python Shell or Console**:
 
@@ -55,7 +68,7 @@ sys.path.append(r'D:\Projects\aiNagisa\pfc_workspace')
 exec(open(r'D:\Projects\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
 ```
 
-### 3. Use in aiNagisa
+### 2. Use in aiNagisa
 
 Start backend and select **PFC Expert** profile in frontend:
 
@@ -207,8 +220,9 @@ See [QUICKSTART.md](QUICKSTART.md) for full workflow testing.
 ## 🐛 Troubleshooting
 
 ### Server won't start
-- **Check**: Is `websockets` installed? (`pip install websockets` in PFC Python)
+- **Check**: Is `websockets` installed in PFC Python? (See Prerequisites section)
 - **Check**: Port 9001 available? (no conflicts)
+- **Check**: Using PFC's Python, not system Python
 
 ### Connection failed
 - **Check**: Server running in PFC console? (look for "Server running" message)

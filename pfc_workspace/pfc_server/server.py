@@ -1,159 +1,48 @@
 """
 PFC WebSocket Server - Lightweight server to run in PFC GUI IPython shell.
 
-Usage in PFC GUI IPython shell:
-    >>> import itasca  # PFC SDK
-    >>> from pfc_server import server
-    >>> server.start()  # Starts WebSocket server on port 9001
+This module provides WebSocket server components for remote PFC control.
+Server startup should be done via start_server.py script.
 """
 
 import asyncio
 import json
 import logging
 from datetime import datetime
-
-# Python 3.6 compatible typing
 from typing import Any, Dict, Optional
 
-try:
-    import websockets
-    from websockets.server import WebSocketServerProtocol # type: ignore
-except ImportError:
-    print("ERROR: websockets package not found!")
-    print("Please install: pip install websockets")
-    raise
+import websockets
+from websockets.server import WebSocketServerProtocol #type: ignore
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+from .executor import PFCCommandExecutor
+
+# Module logger
 logger = logging.getLogger("PFC-Server")
-
-# Global reference to itasca module (imported in PFC GUI)
-itasca = None
-
-
-class PFCCommandExecutor:
-    """Execute PFC commands using itasca SDK."""
-
-    def __init__(self):
-        """Initialize executor with itasca module reference."""
-        global itasca
-        try:
-            import itasca as _itasca # type: ignore
-            itasca = _itasca
-            self.itasca = itasca
-            logger.info("✓ ITASCA SDK loaded successfully")
-        except ImportError:
-            logger.warning("⚠ ITASCA SDK not available (running outside PFC GUI)")
-            self.itasca = None
-
-    async def execute_command(
-        self,
-        command: str,
-        params: Dict[str, Any] 
-    ) -> Dict[str, Any]: 
-        """
-        Execute a PFC command and return the result.
-
-        Args:
-            command: Command in dot notation (e.g., "ball.create", "cycle.run")
-            params: Command parameters dictionary
-
-        Returns:
-            Result dictionary with structure:
-                - status: "success" or "error"
-                - data: Command result data
-                - message: Human-readable message
-                - error: Error details if status="error"
-        """
-        try:
-            if not self.itasca:
-                return {
-                    "status": "error",
-                    "message": "ITASCA SDK not available",
-                    "error": "Server not running in PFC GUI environment"
-                }
-
-            logger.info(f"Executing command: {command} with params: {params}")
-
-            # Special case: "command" executes a PFC command string
-            if command == "command" and "cmd" in params:
-                cmd_str = params["cmd"]
-                logger.info(f"Executing PFC command string: {cmd_str}")
-                result = self.itasca.command(cmd_str)
-                return {
-                    "status": "success",
-                    "data": self._serialize_result(result),
-                    "message": f"PFC command executed: {cmd_str}"
-                }
-
-            # Parse command path (e.g., "ball.create" -> itasca.ball.create)
-            parts = command.split('.')
-            obj = self.itasca
-
-            for part in parts[:-1]:
-                obj = getattr(obj, part)
-
-            # Execute the command
-            func = getattr(obj, parts[-1])
-
-            # Call function with parameters
-            if callable(func):
-                result = func(**params)
-            else:
-                result = func
-
-            return {
-                "status": "success",
-                "data": self._serialize_result(result),
-                "message": f"Command '{command}' executed successfully"
-            }
-
-        except AttributeError as e:
-            logger.error(f"Command not found: {command} - {e}")
-            return {
-                "status": "error",
-                "message": f"Command '{command}' not found in ITASCA SDK",
-                "error": str(e)
-            }
-        except Exception as e:
-            logger.error(f"Command execution failed: {e}")
-            return {
-                "status": "error",
-                "message": f"Command execution failed",
-                "error": str(e)
-            }
-
-    def _serialize_result(self, result: Any) -> Any:
-        """Convert PFC objects to JSON-serializable format."""
-        if result is None:
-            return None
-        elif isinstance(result, (str, int, float, bool)):
-            return result
-        elif isinstance(result, (list, tuple)):
-            return [self._serialize_result(item) for item in result]
-        elif isinstance(result, dict):
-            return {k: self._serialize_result(v) for k, v in result.items()}
-        else:
-            # For complex PFC objects, return string representation
-            return str(result)
 
 
 class PFCWebSocketServer:
     """WebSocket server for PFC command execution."""
 
-    def __init__(self, host: str = "localhost", port: int = 9001):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 9001,
+        ping_interval: int = 30,
+        ping_timeout: int = 10
+    ):
         """
         Initialize WebSocket server.
 
         Args:
             host: Server host address
             port: Server port number
+            ping_interval: Interval between ping frames in seconds
+            ping_timeout: Timeout for pong response in seconds
         """
         self.host = host
         self.port = port
+        self.ping_interval = ping_interval
+        self.ping_timeout = ping_timeout
         self.executor = PFCCommandExecutor()
         self.active_connections = set()
         self.server = None
@@ -261,21 +150,19 @@ class PFCWebSocketServer:
 
     async def start(self):
         """Start the WebSocket server."""
-        logger.info(f"🚀 Starting PFC WebSocket Server on {self.host}:{self.port}")
+        logger.info(f"Starting PFC WebSocket Server on {self.host}:{self.port}")
 
         try:
             async with websockets.serve(
                 self.handle_client,
                 self.host,
                 self.port,
-                ping_interval=30,
-                ping_timeout=10
+                ping_interval=self.ping_interval,
+                ping_timeout=self.ping_timeout
             ):
                 logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
-                logger.info("Press Ctrl+C to stop the server")
-
-                # Keep server running
-                await asyncio.Future()  # Run forever
+                # Keep server running forever
+                await asyncio.Future()
 
         except Exception as e:
             logger.error(f"Server error: {e}")
@@ -283,20 +170,27 @@ class PFCWebSocketServer:
 
 
 # Module-level utility function for creating server instances
-def create_server(host: str = "localhost", port: int = 9001) -> PFCWebSocketServer:
+def create_server(
+    host: str = "localhost",
+    port: int = 9001,
+    ping_interval: int = 30,
+    ping_timeout: int = 10
+) -> PFCWebSocketServer:
     """
     Create a PFC WebSocket server instance.
 
     Args:
         host: Server host address (default: localhost)
         port: Server port number (default: 9001)
+        ping_interval: Interval between ping frames in seconds (default: 30)
+        ping_timeout: Timeout for pong response in seconds (default: 10)
 
     Returns:
         PFCWebSocketServer: Server instance ready to be started
 
     Example:
-        >>> from pfc_server.server import PFCWebSocketServer, create_server
-        >>> server = create_server()
+        >>> from pfc_server.server import create_server
+        >>> server = create_server(host="localhost", port=9001)
         >>> # Use with startup script to run in background
     """
-    return PFCWebSocketServer(host, port)
+    return PFCWebSocketServer(host, port, ping_interval, ping_timeout)
