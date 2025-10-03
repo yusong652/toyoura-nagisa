@@ -9,7 +9,7 @@ from fastmcp.server.context import Context
 from typing import Optional, Dict, Any
 import json
 from pydantic import Field
-from .websocket_client import get_client
+from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 
