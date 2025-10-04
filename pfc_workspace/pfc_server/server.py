@@ -74,9 +74,10 @@ class PFCWebSocketServer:
                         # Execute command
                         command_id = data.get("command_id", "unknown")
                         command = data.get("command", "")
+                        arg = data.get("arg")  # Single positional argument (can be None)
                         params = data.get("params", {})
 
-                        result = await self.executor.execute_command(command, params)
+                        result = await self.executor.execute_command(command, arg, params)
 
                         # Send result back
                         response = {

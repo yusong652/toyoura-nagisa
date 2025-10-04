@@ -66,7 +66,7 @@ class PFCWebSocketClient:
                 self._websocket = await websockets.connect(
                     self.url,
                     ping_interval=30,
-                    ping_timeout=10
+                    ping_timeout=50
                 )
                 self.connected = True
                 logger.info(f"✓ Connected to PFC server: {self.url}")
@@ -156,6 +156,7 @@ class PFCWebSocketClient:
     async def send_command(
         self,
         command: str,
+        arg: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: float = 30.0,
         max_retries: int = 2
@@ -164,10 +165,13 @@ class PFCWebSocketClient:
         Send command to PFC server and wait for result.
 
         Args:
-            command: PFC command name (e.g., "ball create", "model domain extent", "cycle")
-            params: Dictionary with keyword-value pairs for command parameters
+            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
+            arg: Optional positional argument (single value without keyword)
+                Example: "9.81" for "model gravity 9.81"
+                Example: "(0,0,-9.81)" for "model gravity (0,0,-9.81)"
+            params: Optional dictionary with keyword parameters (values can be None for boolean flags)
                 Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
-                Empty dict {} means use command defaults
+                Example: {"model": "linear", "inheritance": None} for boolean flag
             timeout: Command timeout in seconds (default: 30.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
@@ -184,7 +188,8 @@ class PFCWebSocketClient:
             TimeoutError: If command execution times out
 
         Note:
-            Server assembles complete command string: "command keyword1 value1 keyword2 value2 ..."
+            Server assembles complete command string: "command arg keyword1 value1 keyword2 ..."
+            Params with None values are boolean flags (keyword without value).
         """
         for attempt in range(max_retries):
             try:
@@ -202,6 +207,7 @@ class PFCWebSocketClient:
                     "type": "command",
                     "command_id": command_id,
                     "command": command,
+                    "arg": arg,
                     "params": params
                 }
 

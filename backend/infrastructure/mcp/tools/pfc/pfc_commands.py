@@ -30,75 +30,115 @@ def register_pfc_tools(mcp: FastMCP):
         command: str = Field(
             ...,
             description=(
-                "PFC command name in space"
-                "Examples: 'ball create', 'model domain', 'model cycle'"
+                "PFC command name (e.g., 'model gravity', 'contact cmat default', 'ball create')"
+            )
+        ),
+        arg: Optional[str] = Field(
+            None,
+            description=(
+                "Optional positional argument (value without keyword).\n"
+                "Used for simple value-based commands.\n"
+                "Examples:\n"
+                "  • \"9.81\" → model gravity 9.81\n"
+                "  • \"(0,0,-9.81)\" → model gravity (0,0,-9.81)\n"
+                "  • \"stop\" → domain condition stop"
             )
         ),
         params: Optional[str] = Field(
             None,
             description=(
-                "Optional JSON string with command keyword parameters. "
-                "Use PFC native string formats:\n"
-                "  • Tuple format: {\"position\": \"(0, 0, 0)\"} → position (0, 0, 0)\n"
-                "  • Number sequence: {\"extent\": \"-10 10 -10 10 -10 10\"} → extent -10 10 -10 10 -10 10\n"
-                "  • Identifier: {\"group\": \"my_balls\"} → group \"my_balls\"\n"
-                "  • Numeric: {\"radius\": 1.5} → radius 1.5\n"
-                "Examples: {\"radius\": 1.0, \"position\": \"(0, 0, 0)\", \"group\": \"balls\"}"
+                "Optional JSON object with keyword parameters. "
+                "Value can be a string, number, or null:\n"
+                "  • String value: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
+                "  • String identifier: {\"model\": \"linear\"}\n"
+                "  • Numeric value: {\"proximity\": 0.5}\n"
+                "  • Boolean flag (null): {\"inheritance\": null}\n"
+                "  • Tuple string: {\"position\": \"(0, 0, 0)\"}\n"
+                "  • Identifier with quotes: {\"group\": \"my_balls\"}\n"
+                "Examples:\n"
+                "  • {\"model\": \"linear\", \"inheritance\": null}\n"
+                "  • {\"radius\": 1.0, \"position\": \"(0,0,0)\", \"group\": \"balls\"}"
             )
         )
     ) -> Dict[str, Any]:
         """
         Execute a native PFC command through the WebSocket connection to PFC server.
 
-        This tool executes native ITASCA PFC commands by combining the command name
-        with optional keyword parameters. Commands use default values if parameters
-        are not specified.
+        This tool executes native ITASCA PFC commands supporting both positional argument
+        and keyword parameters. PFC commands have flexible syntax allowing:
+        - Positional value without keyword
+        - Keyword-value pairs
+        - Boolean flags (keywords without values)
 
         Args:
-            command: PFC command name (e.g., "ball create", "model domain", "cycle")
-            params: Optional JSON with keyword-value pairs using PFC native formats
+            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
+            arg: Optional positional argument (single value without keyword)
+            params: Optional JSON object with keyword parameters (values can be string, number, or null)
 
         Examples:
-            # Create a ball with default parameters
-            pfc_execute_command(command="ball create")
+            # Positional argument - gravity with scalar
+            pfc_execute_command(command="model gravity", arg="9.81")
+            # Assembled: model gravity 9.81
 
-            # Create a ball with specific parameters (tuple string for position, identifier for group)
-            pfc_execute_command(
-                command="ball create",
-                params='{"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}'
-            )
-            # Assembled: ball create radius 1.0 position (0, 0, 0) group "my_balls"
+            # Positional argument - gravity with vector
+            pfc_execute_command(command="model gravity", arg="(0,0,-9.81)")
+            # Assembled: model gravity (0,0,-9.81)
 
-            # Set model domain (space-separated number sequence string)
+            # Keyword arguments - domain extent
             pfc_execute_command(
                 command="model domain",
                 params='{"extent": "-10 10 -10 10 -10 10"}'
             )
             # Assembled: model domain extent -10 10 -10 10 -10 10
 
-            # Run cycles (numeric parameter)
-            pfc_execute_command(command="model solve", params='{"cycles": 1000}')
+            # Boolean flags - contact material default with inheritance
+            pfc_execute_command(
+                command="contact cmat default",
+                params='{"model": "linear", "inheritance": null}'
+            )
+            # Assembled: contact cmat default model linear inheritance
+
+            # Ball creation with keyword parameters
+            pfc_execute_command(
+                command="ball create",
+                params='{"radius": 1.0, "position": "(0,0,0)", "group": "balls"}'
+            )
+            # Assembled: ball create radius 1.0 position (0,0,0) group "balls"
+
+            # Simple command - no parameters
+            pfc_execute_command(command="model cycle")
+            # Assembled: model cycle
 
         Note:
-            - Parameters are optional - commands use defaults if omitted
-            - Server assembles final command: "command keyword1 value1 keyword2 value2 ..."
+            - All parameters are optional - commands use defaults if omitted
+            - null values in params indicate boolean flags (keyword without value)
+            - Server assembles final command from command + arg + params
         """
         try:
             # Parse parameters
-            param_dict = json.loads(params) if params else {}
+            params_dict = json.loads(params) if params else {}
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
-            # Execute command (server will assemble command string from command + params)
-            result = await client.send_command(command, param_dict)
+            # Execute command (server will assemble command string from command + arg + params)
+            result = await client.send_command(command, arg, params_dict)
 
-            # Build display command string
-            if param_dict:
-                param_str = " ".join([f"{k} {v}" for k, v in param_dict.items()])
-                pfc_cmd = f"{command} {param_str}"
-            else:
-                pfc_cmd = command
+            # Build display command string for logging
+            parts = [command]
+
+            # Add positional argument
+            if arg:
+                parts.append(str(arg))
+
+            # Add keyword parameters
+            if params_dict:
+                for key, value in params_dict.items():
+                    parts.append(key)
+                    if value is not None:  # null values are boolean flags
+                        parts.append(str(value))
+
+            pfc_cmd = " ".join(parts)
 
             # PFC always returns a valid response - both success and error are "successful tool execution"
             # The LLM needs to see what PFC returned, whether it's success or error

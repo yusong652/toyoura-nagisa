@@ -27,19 +27,25 @@ class PFCCommandExecutor:
     async def execute_command(
         self,
         command: str,
-        params: Dict[str, Any]
+        arg: Any = None,
+        params: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
         Execute a native PFC command and return the result.
 
-        This method assembles a complete PFC command string from the command name
-        and optional keyword parameters, then executes via itasca.command().
+        This method assembles a complete PFC command string from the command name,
+        optional positional argument, and optional keyword parameters, then executes
+        via itasca.command().
 
         Args:
-            command: PFC command name (e.g., "ball create", "model domain extent", "cycle")
-            params: Dictionary with keyword-value pairs for command parameters
+            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
+            arg: Optional single positional argument (value without keyword)
+                Example: "9.81" for "model gravity 9.81"
+                Example: "(0,0,-9.81)" for "model gravity (0,0,-9.81)"
+            params: Optional dictionary with keyword parameters (values can be None for boolean flags)
                 Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
-                Empty dict {} means use command defaults
+                Example: {"model": "linear", "inheritance": None} for boolean flags
+                Empty dict {} or None means use command defaults
 
         Returns:
             Result dictionary following ToolResult pattern:
@@ -56,7 +62,8 @@ class PFCCommandExecutor:
                 }
 
             # Assemble complete PFC command string
-            cmd_str = self._assemble_command(command, params)
+            params = params or {}  # Handle None params
+            cmd_str = self._assemble_command(command, arg, params)
             logger.info(f"Executing PFC command: {cmd_str}")
 
             # Execute native PFC command
@@ -85,26 +92,44 @@ class PFCCommandExecutor:
                 "data": None
             }
 
-    def _assemble_command(self, command: str, params: Dict[str, Any]) -> str:
+    def _assemble_command(self, command: str, arg: Any, params: Dict[str, Any]) -> str:
         """
-        Assemble complete PFC command string from command name and parameters.
+        Assemble complete PFC command string from command name, positional arg, and parameters.
 
         Args:
-            command: PFC command name (e.g., "ball create", "model domain extent")
-            params: Keyword-value pairs for command parameters
+            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
+            arg: Optional positional argument (single value without keyword)
+            params: Keyword-value pairs for command parameters (None values are boolean flags)
 
         Returns:
-            Complete PFC command string (e.g., "ball create radius 1.0 position (0, 0, 0)")
+            Complete PFC command string
 
-        Example:
-            >>> _assemble_command("ball create", {"radius": 1.0, "position": "(0, 0, 0)"})
+        Examples:
+            >>> _assemble_command("model gravity", "9.81", {})
+            "model gravity 9.81"
+
+            >>> _assemble_command("ball create", None, {"radius": 1.0, "position": "(0, 0, 0)"})
             "ball create radius 1.0 position (0, 0, 0)"
+
+            >>> _assemble_command("contact cmat default", None, {"model": "linear", "inheritance": None})
+            "contact cmat default model linear inheritance"
         """
         # Start with base command
         cmd_parts = [command]
 
+        # Add positional argument (single value)
+        if arg is not None:
+            cmd_parts.append(str(arg))
+
         # Add keyword-value pairs (type-based formatting)
         for keyword, value in params.items():
+            cmd_parts.append(keyword)
+
+            # Handle None as boolean flag (keyword only, no value)
+            if value is None:
+                continue
+
+            # Format value based on type
             if isinstance(value, str):
                 # String type: check if it's PFC native format or identifier
                 if (value.startswith('(') or                    # Tuple: "(0, 0, 0)"
@@ -123,7 +148,7 @@ class PFCCommandExecutor:
                 # Fallback: string representation
                 value_str = str(value)
 
-            cmd_parts.append(f"{keyword} {value_str}")
+            cmd_parts.append(value_str)
 
         return " ".join(cmd_parts)
 
