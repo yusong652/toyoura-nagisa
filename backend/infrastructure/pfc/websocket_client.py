@@ -242,6 +242,92 @@ class PFCWebSocketClient:
         # Fallback: should never reach here due to retry logic
         raise RuntimeError("Unexpected code path in send_command")
 
+    async def send_script(
+        self,
+        script_path: str,
+        timeout: float = 30.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Send script file path to PFC server for execution.
+
+        Args:
+            script_path: Absolute path to Python script file
+                Example: "/path/to/pfc_project/scripts/analyze_balls.py"
+            timeout: Script execution timeout in seconds (default: 30.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary from PFC server with structure:
+                - type: "result" - Message type identifier
+                - command_id: str - Unique command identifier
+                - status: Literal["success", "error"] - Operation outcome
+                - message: str - User-friendly message with result
+                - data: Any - Script execution result
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If script execution times out
+
+        Note:
+            - Server reads and executes the script file locally
+            - LLM should read script content first using Read tool
+            - Scripts have access to itasca module
+        """
+        for attempt in range(max_retries):
+            try:
+                # Ensure connected (auto-reconnect if needed)
+                if not self.connected:
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                command_id = str(uuid4())
+
+                # Create script message with file path
+                message = {
+                    "type": "script",
+                    "command_id": command_id,
+                    "script_path": script_path
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_commands[command_id] = future
+
+                try:
+                    # Send script path
+                    await self.websocket.send(json.dumps(message))
+                    logger.debug(f"Script path sent: {command_id} - {script_path}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_commands.pop(command_id, None)
+                    raise TimeoutError(f"Script execution timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)  # Brief delay before retry
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to execute script after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"Script execution failed: {e}")
+                raise
+
+        # Fallback: should never reach here due to retry logic
+        raise RuntimeError("Unexpected code path in send_script")
+
     async def ping(self) -> bool:
         """
         Send ping to check server connectivity.

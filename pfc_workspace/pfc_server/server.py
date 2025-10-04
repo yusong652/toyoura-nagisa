@@ -15,6 +15,7 @@ import websockets
 from websockets.server import WebSocketServerProtocol #type: ignore
 
 from .executor import PFCCommandExecutor
+from .script_executor import PFCScriptExecutor
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -44,6 +45,7 @@ class PFCWebSocketServer:
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
         self.executor = PFCCommandExecutor()
+        self.script_executor = PFCScriptExecutor()
         self.active_connections = set()
         self.server = None
 
@@ -85,6 +87,23 @@ class PFCWebSocketServer:
 
                         await websocket.send(json.dumps(response))
                         logger.info(f"✓ Command result sent: {command_id}")
+
+                    elif msg_type == "script":
+                        # Execute Python script from file path
+                        command_id = data.get("command_id", "unknown")
+                        script_path = data.get("script_path", "")
+
+                        result = await self.script_executor.execute_script(script_path)
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "command_id": command_id,
+                            **result
+                        }
+
+                        await websocket.send(json.dumps(response))
+                        logger.info(f"✓ Script result sent: {command_id}")
 
                     elif msg_type == "ping":
                         # Respond to ping

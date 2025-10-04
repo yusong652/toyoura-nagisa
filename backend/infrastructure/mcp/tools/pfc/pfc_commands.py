@@ -140,4 +140,4 @@ def register_pfc_tools(mcp: FastMCP):
             # Backend error - unexpected system error
             return error_response(f"System error executing PFC command: {str(e)}")
 
-    print(f"[DEBUG] Registered PFC tool: pfc_execute_command")
+    print(f"[DEBUG] Registered PFC command tool: pfc_execute_command")
