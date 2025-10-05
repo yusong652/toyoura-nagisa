@@ -4,6 +4,7 @@ PFC Command Executor - Executes ITASCA PFC commands via SDK.
 This module provides command execution functionality for the PFC WebSocket server.
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -66,8 +67,9 @@ class PFCCommandExecutor:
             cmd_str = self._assemble_command(command, arg, params)
             logger.info(f"Executing PFC command: {cmd_str}")
 
-            # Execute native PFC command
-            result = self.itasca.command(cmd_str)
+            # Execute native PFC command in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, self.itasca.command, cmd_str)
 
             # Serialize result for response
             serialized_result = self._serialize_result(result)
