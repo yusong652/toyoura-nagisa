@@ -469,11 +469,236 @@ User: "Run the full simulation"
 | **Edit** | Codification | "How to preserve this?" | N/A (file operation) | Stateless | Script file |
 | **Script** | Execution | "Run validated workflow" | Requires validated state | **Stateful** | Simulation data |
 
-### The Stateless vs Stateful Design Principle
+### Critical Design Principle: Don't Sacrifice LLM Naturalness for Human Workflows
 
-**Key insight**: Command should be **stateless** to enable true validation sandbox behavior.
+**Core Insight**: Tool design must prioritize LLM's natural working mode over specific human workflows.
 
-#### Command Execution Flow (Stateless - Returns to Initial State)
+#### The Temptation: Stateless Command Tool
+
+Initial design consideration: Make `pfc_execute_command` stateless (auto-rollback after each execution) to mirror the human expert workflow of "test → rollback → write script → execute from clean state".
+
+**Why this seems attractive:**
+- Perfect orthogonality: Command = ephemeral testing, Script = persistent execution
+- Matches human mental model: "I test, then rollback, then run from scratch"
+- Clean separation: No state pollution between test and production
+
+**Why this is WRONG for LLM agents:**
+
+1. **Violates LLM's natural mental model**
+   - LLMs expect: Execute tool → State changes → Next action builds on new state
+   - Stateless breaks intuition: "I just created balls, why are they gone?"
+   - Adds cognitive overhead: "Remember this tool is special, it erases its own effects"
+
+2. **Breaks exploratory workflows**
+   ```python
+   # LLM natural exploration (impossible with stateless)
+   pfc_execute_command("ball create number 100")
+   pfc_execute_command("ball list")  # Expects to see 100 balls
+   # ❌ With stateless: balls gone, list returns 0
+
+   # LLM forced to batch (unnatural)
+   pfc_execute_command("ball create number 100; ball list")
+   # ⚠️ Can't iteratively explore, must plan entire sequence upfront
+   ```
+
+3. **Backend implementation complexity**
+   - Requires snapshot/rollback mechanism in PFC
+   - State management becomes tool-level concern (wrong layer)
+   - Error-prone: What if rollback fails?
+
+#### The Correct Approach: Stateful Tools + Explicit State Management
+
+**Best practice for industrial software agents:**
+
+1. **Keep tool behavior intuitive and predictable** (Stateful)
+   - `pfc_execute_command` → Modifies state, changes persist
+   - `pfc_execute_script` → Modifies state, changes persist
+   - LLM's expectation: "Actions have effects" ✓
+
+2. **Abstract high-level workflows into explicit tools** (New tool)
+   - `pfc_reset` → Explicit state management
+   - `pfc_save_state` → Named checkpoints (optional)
+   - `pfc_restore_state` → Return to checkpoint (optional)
+   - Workflow control becomes first-class operation
+
+3. **Teach LLM expert workflows via System Prompt** (Not tool docs)
+   - System prompt explains: "You're a PFC expert, here's how to work..."
+   - System prompt teaches: "Test with commands, reset state, run scripts"
+   - Tool docs explain: "What this tool does" (simple, factual)
+   - System prompt explains: "When and why to use tools" (strategic, contextual)
+
+```python
+# ✅ Correct: Stateful tools + Explicit state control
+
+# LLM explores naturally (state persists)
+pfc_execute_command("model gravity 9.81")
+pfc_execute_command("ball create number 100")
+pfc_execute_command("ball list")  # Sees 100 balls ✓
+
+# LLM explicitly manages state transition (taught via System Prompt)
+pfc_reset()  # Clear exploration state
+
+# LLM executes production workflow (clean state)
+pfc_execute_script("validated_simulation.py")
+```
+
+#### System Prompt vs Tool Docs: Where Knowledge Lives
+
+**Critical distinction:**
+
+| Aspect | Tool Documentation | System Prompt |
+|--------|-------------------|---------------|
+| **Purpose** | Describe tool capabilities | Teach expert workflows |
+| **Content** | "What this tool does" | "How experts use tools" |
+| **Scope** | Single tool behavior | Multi-tool orchestration |
+| **Audience** | LLM (operational) | LLM (strategic) |
+| **Example** | "pfc_reset clears simulation state" | "PFC experts test with commands, then reset before running scripts" |
+
+**Why System Prompt is more valuable:**
+
+1. **Tool docs can't teach strategy**
+   ```python
+   # ❌ Bad: Over-explain in tool docs
+   @tool(description="""
+       Execute PFC command. NOTE: This is stateful! State persists!
+       You should test commands, then call pfc_reset before scripts!
+       Production workflow: test → reset → script!
+       Remember to manage state properly!
+   """)
+   # Problems:
+   # - Too verbose, wastes tokens on every tool call
+   # - Strategic guidance in operational documentation
+   # - LLM sees this hundreds of times (token waste)
+   ```
+
+   ```python
+   # ✅ Good: Simple tool docs + Rich system prompt
+   @tool(description="Execute PFC command with persistent state changes")
+
+   # System prompt teaches strategy once:
+   SYSTEM_PROMPT = """
+   You are a PFC simulation expert. Your workflow:
+
+   1. EXPLORATION: Use pfc_execute_command for testing
+      - State accumulates across commands
+      - Iterate and refine parameters
+      - Build understanding of behavior
+
+   2. STATE RESET: Clear exploration artifacts
+      - Call pfc_reset() before production runs
+      - Returns to clean initial state
+      - Ensures reproducible execution
+
+   3. PRODUCTION: Execute validated scripts
+      - Use pfc_execute_script for actual work
+      - Scripts run in clean, known state
+      - Long-duration, high-confidence execution
+
+   Remember: Commands modify state permanently until you reset.
+   """
+   ```
+
+2. **System prompt teaches "the way"**
+   - Human expert's tacit knowledge
+   - When to use which tool
+   - How tools combine into workflows
+   - Best practices and patterns
+
+3. **Token efficiency**
+   - System prompt: Loaded once per session
+   - Tool docs: Included in every tool call context
+   - Strategic knowledge in system prompt = massive token savings
+
+#### Design Rules Summary
+
+1. **Tool design: Preserve LLM naturalness**
+   - Don't make tools "special" or counter-intuitive
+   - Don't encode workflow assumptions in tool behavior
+   - Keep tools simple, predictable, stateful
+
+2. **Workflow abstraction: Explicit tools**
+   - High-level workflows become dedicated tools
+   - State management = `pfc_reset` tool, not magic behavior
+   - Checkpoints = `pfc_save_state`, not implicit snapshots
+
+3. **Knowledge architecture: System Prompt > Tool Docs**
+   - Tool docs: Minimal, factual, capability-focused
+   - System prompt: Rich, strategic, workflow-focused
+   - Expert knowledge lives in system prompt
+   - Tool behavior stays simple and predictable
+
+#### Example: Teaching PFC Expertise via System Prompt
+
+```python
+PFC_EXPERT_SYSTEM_PROMPT = """
+You are an expert in ITASCA PFC (Particle Flow Code) simulations.
+
+## Your Mental Model: State Evolution
+
+PFC simulations are STATEFUL systems. Every command changes state:
+- model gravity 9.81 → gravity is now set (persists)
+- ball create → balls now exist (persist)
+- model cycle → simulation advances (state evolves)
+
+Unlike code files (static), PFC state is DYNAMIC and CUMULATIVE.
+
+## Your Workflow: Test → Reset → Execute
+
+### Phase 1: Exploration (Commands)
+Use pfc_execute_command to test ideas:
+- Try different parameters
+- Verify behavior in current state
+- Build intuition through iteration
+- State accumulates - this is expected and useful
+
+Example exploration:
+  pfc_execute_command("ball create radius 1.0")
+  pfc_execute_command("ball list")  # Verify creation
+  pfc_execute_command("ball delete")  # Try again
+  pfc_execute_command("ball create radius 2.0")  # Refine
+
+### Phase 2: State Reset (Explicit Management)
+Before production runs, clear exploration artifacts:
+  pfc_reset()  # Return to initial clean state
+
+This ensures:
+- Reproducible execution
+- No leftover test data
+- Clean starting conditions
+
+### Phase 3: Production (Scripts)
+Execute validated workflows from clean state:
+  pfc_execute_script("/workspace/validated_simulation.py")
+
+Scripts should contain tested, verified commands.
+They run in the clean state you just reset to.
+
+## State Awareness
+
+Always track:
+- What state am I in? (model initialized? balls created?)
+- What can I do now? (cycle requires balls to exist)
+- What do I need first? (create balls before cycling)
+
+Tool responses include current state - use this information!
+
+## Key Principles
+
+1. Commands are stateful - effects persist
+2. Reset explicitly when transitioning to production
+3. Scripts assume clean starting state
+4. Test thoroughly before scripting
+5. State history is your context
+
+You are not just executing commands - you're managing state evolution.
+"""
+```
+
+### The Revised Stateful Design Principle
+
+**Corrected insight**: Both Command and Script should be **stateful** - state management is a separate concern.
+
+#### Command Execution Flow (Stateful - State Persists)
 
 ```
 LLM
@@ -488,37 +713,37 @@ Execute PFC Command
  ↓
 Success or Error
  ↓
-Return to Initial State ← KEY: Command doesn't persist changes in session
+State Changes PERSIST ← KEY: Changes remain in simulation
  ↓
-Return Result
+Return Result (with current state info)
  ↓
 Backend → LLM
  ↓
-LLM decides next action
+LLM decides next action (aware of new state)
 ```
 
-**Critical behavior**: Command execution is **transactional and ephemeral**:
+**Critical behavior**: Command execution is **stateful and cumulative**:
 - Execute command in PFC
 - Observe result (success/error)
-- **Return PFC to initial state** (rollback changes)
-- Report result to LLM
-- LLM uses result to decide next step
+- **State changes persist** (no automatic rollback)
+- Report result with current state to LLM
+- LLM can continue building on this state
 
-**Why return to initial state?**
-1. **True validation sandbox**: Test without side effects
-2. **Repeatable experiments**: Can test same command multiple times
-3. **No state pollution**: Each command starts from clean slate
-4. **Safe exploration**: Mistakes don't accumulate
+**Why persist state?**
+1. **Natural LLM workflow**: Actions have effects, intuitive mental model
+2. **Exploratory iteration**: Test A, observe, test B, observe, refine...
+3. **No forced batching**: Can explore step-by-step naturally
+4. **Simple implementation**: No snapshot/rollback complexity
 
-#### Script Execution Flow (Stateful - Persists Changes)
+**State management**: Handled by explicit `pfc_reset` tool, not automatic rollback
+
+#### Script Execution Flow (Stateful - State Persists)
 
 ```
 LLM
  ↓
 pfc_execute_script (MCP Tool)
  ↓
-State Manager: Check preconditions
- ↓ (if valid)
 Backend (aiNagisa)
  ↓
 WebSocket → PFC Server
@@ -527,165 +752,101 @@ Execute PFC Script
  ↓
 Success or Error
  ↓
-Persist State Changes ← KEY: Script commits changes
+State Changes PERSIST ← KEY: Changes remain (same as Command)
  ↓
-Update State Snapshot
+Return Result (with current state info)
  ↓
-Return Result
+Backend → LLM
  ↓
-Backend → State Manager → LLM
+LLM decides next action (aware of new state)
 ```
 
-**Critical behavior**: Script execution is **persistent and stateful**:
-- Validate state preconditions first
+**Critical behavior**: Script execution is **stateful and persistent** (identical state behavior to Command):
 - Execute script in PFC
-- **Commit all changes** (persist state)
-- Update state tracking
-- Report result with new state
+- Observe result (success/error)
+- **State changes persist** (same as Command - no automatic rollback)
+- Report result with current state to LLM
+- LLM can continue building on this state
 
-#### Comparison: Command vs Script Execution
+**State management**: Handled by explicit `pfc_reset` tool when needed
 
-| Aspect | Command (Stateless) | Script (Stateful) |
-|--------|---------------------|-------------------|
-| **State changes** | Rollback (return to initial) | Commit (persist changes) |
-| **Purpose** | Validation testing | Production execution |
-| **Repeatability** | Always from same state | Builds on previous state |
-| **Failure impact** | No lasting effect | Changes may persist |
-| **LLM workflow** | Test → decide | Validate → execute |
+#### Comparison: Command vs Script - Purpose, Not State Behavior
+
+**Both tools are stateful** - state persists after execution. The difference is **purpose and usage taught via System Prompt**:
+
+| Aspect | Command | Script |
+|--------|---------|--------|
+| **State behavior** | ✅ Stateful (persists) | ✅ Stateful (persists) |
+| **Purpose** | Exploration & Testing | Production Execution |
+| **Typical use** | Interactive experimentation | Long-duration workflows |
+| **Failure tolerance** | Expected (part of learning) | Should be rare (validated) |
+| **Execution time** | Quick (seconds) | Long (minutes to hours) |
+| **Return value** | Command output text | Python expression result |
+| **LLM learns via** | System Prompt | System Prompt |
 
 ```python
-# Command: Stateless (ephemeral, disposable)
+# Command: For exploration (state persists!)
 pfc_execute_command(command="ball create", params='{"number": 100}')
-→ Executes in current PFC state
-→ Returns: "Created 100 balls"
-→ Does NOT track: "I created balls for this session"
-→ State changes in PFC, but command itself is stateless
+→ State changes: 0 balls → 100 balls (PERSISTS)
+→ Purpose: "Does this work? What happens?"
+→ Quick feedback for testing ideas
+→ State remains modified until pfc_reset()
 
-# Script: Stateful (persistent, tracked)
-pfc_execute_script(script_path="simulation.py")
-→ Checks preconditions against tracked state
-→ Records execution in state history
-→ Updates state snapshot
-→ State-aware execution with guarantees
+# Script: For production (state persists!)
+pfc_execute_script(script_path="create_10000_balls.py")
+→ State changes: 100 balls → 10100 balls (PERSISTS)
+→ Purpose: "Run validated workflow for real work"
+→ Long-duration execution with confidence
+→ State remains modified until pfc_reset()
 ```
 
-**Why this matters**:
+**Key insight**: The distinction is **workflow phase**, not **state behavior**:
 
-1. **Command = Pure Function with Rollback**
-   ```python
-   # Stateless: same inputs → same behavior (always from initial state)
-   command(cmd="model gravity", arg="9.81")
-   # Executes in PFC
-   # Returns result
-   # PFC state rolls back to initial
-   # No memory of previous commands
-   # No session tracking
-   # Just: "try this operation and report result, then rollback"
+1. **Both tools modify state persistently**
+   - No automatic rollback in either tool
+   - Changes accumulate across tool calls
+   - LLM manages state transitions via explicit `pfc_reset`
+   - Simple, predictable, intuitive behavior
 
-   # Example workflow:
-   initial_state = get_pfc_state()  # Empty simulation
+2. **Usage patterns taught via System Prompt** (not tool docs)
+   ```
+   Phase 1: Exploration (Command)
+   - Test ideas interactively
+   - Rapid parameter iteration
+   - Build understanding
+   - State accumulates naturally
 
-   command(cmd="ball create", params='{"number": 100}')
-   # → PFC creates 100 balls
-   # → Reports: "Created 100 balls"
-   # → PFC rolls back to initial_state (0 balls)
+   Phase 2: State Reset (pfc_reset)
+   - Explicit state management
+   - Clear exploration artifacts
+   - Return to clean baseline
 
-   command(cmd="ball create", params='{"number": 200}')
-   # → PFC creates 200 balls (starting from 0 again!)
-   # → Reports: "Created 200 balls"
-   # → PFC rolls back to initial_state (0 balls)
-
-   # Both commands start from same state - true sandbox
+   Phase 3: Production (Script)
+   - Execute validated workflow
+   - Long-duration runs
+   - High confidence execution
    ```
 
-2. **Script = Stateful Process with Commit**
-   ```python
-   # Stateful: maintains execution context and persists changes
-   script(path="sim.py")
-   # Executes in PFC
-   # Changes PERSIST (commit, not rollback)
-   # Remembers: what scripts ran before
-   # Tracks: state evolution
-   # Validates: preconditions based on history
-
-   # Example workflow:
-   initial_state = get_pfc_state()  # Empty simulation
-
-   script(path="create_100_balls.py")
-   # → PFC creates 100 balls
-   # → Changes COMMIT (persist)
-   # → new_state: {balls: 100}
-
-   script(path="create_200_more_balls.py")
-   # → Starts from new_state (100 balls already exist)
-   # → PFC creates 200 more balls
-   # → Changes COMMIT (persist)
-   # → new_state: {balls: 300}
-
-   # Scripts build on each other - stateful progression
+3. **Workflow analogy to coding**:
    ```
-
-3. **Separation of Concerns**
-   ```
-   Command Tool (stateless + rollback) → Sandbox testing, no side effects
-   State Manager (stateful)            → Context tracking, state injection
-   Script Tool (stateful + commit)     → Production execution, state evolution
-   ```
-
-4. **The Rollback vs Commit Pattern**
-   ```python
-   # Command: Transactional execution with rollback
-   def execute_command(cmd):
-       snapshot = pfc.save_state()        # Save current state
-       try:
-           result = pfc.execute(cmd)      # Execute command
-           return result                   # Return result
-       finally:
-           pfc.restore_state(snapshot)    # ALWAYS rollback
-
-   # Script: Persistent execution with commit
-   def execute_script(script):
-       if not validate_preconditions(script):
-           raise StateError("Preconditions not met")
-
-       result = pfc.execute(script)       # Execute script
-       state_manager.commit(result)       # COMMIT changes
-       return result
-   ```
-
-**Why this is true orthogonality:**
-
-1. **Non-overlapping concerns**:
-   - Command: State capability testing (ephemeral)
-   - Edit: Knowledge preservation (persistent)
-   - Script: Workflow execution (productive)
-
-2. **Sequential dependency**:
-   ```
-   Command → discovers what works
-   Edit    → codifies what works
-   Script  → executes what works
-   ```
-
-3. **Different failure modes**:
-   - Command fails → "This parameter/state doesn't work, try another"
-   - Edit fails → "File system issue"
-   - Script fails → "State preconditions not met" (should rarely happen if validated)
-
-4. **Like Coding Agent's workflow**:
-   ```
-   # Coding Agent
+   # Coding Agent workflow
    Read   → Understand current code
    Edit   → Modify code
    Test   → Validate changes
 
-   # Industrial Software Agent
-   Command → Validate state operations
-   Edit    → Codify validated operations
-   Script  → Execute codified workflow
+   # PFC Agent workflow (taught via System Prompt)
+   Command → Test operations interactively (stateful)
+   Reset   → Clear test state explicitly
+   Script  → Execute validated workflow (stateful)
    ```
 
-### State Manager Integration
+4. **Why both being stateful is correct**:
+   - Matches LLM's natural mental model (actions have effects)
+   - Enables iterative exploration (command A → observe → command B)
+   - Simple backend implementation (no snapshot/rollback complexity)
+   - Explicit state management via dedicated tool (pfc_reset)
+
+### State Manager Integration (Optional Future Enhancement)
 
 ```python
 class PFCStateManager:
@@ -1119,61 +1280,66 @@ Would you like me to set this up for you?
 
 ## Core Principles Summary
 
-1. **State injection is the most critical context engineering technique** - For industrial software agents, state IS the context
-2. **Command tools should be stateless** - Validation sandbox, not state tracker; complexity lives in State Manager
-3. **Script tools should be stateful** - Production execution requires state awareness and guarantees
-4. **Chaos is the norm** - Good abstraction layers beat expecting standard interfaces
-5. **Data flow is key** - SDK returns values, commands don't - this defines capability boundaries
-6. **LLM should generate code, not call commands directly** - Code is documentation, reusable and auditable
-7. **Tool design: quantity ≠ capability, consistency > flexibility**
-8. **Industrial software agent's superpower: state management, not architecture understanding**
+1. **Don't sacrifice LLM naturalness for human workflows** - Tool behavior must match LLM's intuitive mental model, not mimic specific human expert patterns
+2. **Stateful tools + Explicit state management** - All simulation tools should persist state; provide dedicated tools (pfc_reset) for state control
+3. **System Prompt > Tool Docs for workflow teaching** - Tool docs describe capabilities; System Prompt teaches expert workflows and tool orchestration
+4. **Purpose, not state behavior, distinguishes tools** - Command (exploration) vs Script (production) differ in usage intent, both are stateful
+5. **Gentle prompts > Complex concepts** - Guide LLM through natural language hints in tool responses ("Haven't saved state, need to?"), not abstract models
+6. **State injection is the most critical context engineering technique** - For industrial software agents, state IS the context
+7. **Abstraction layers hide chaos** - Industrial software has messy APIs; good adapter layers provide clean, consistent interfaces to LLM
+8. **Data flow defines capability boundaries** - SDK returns values, commands don't - this determines tool purpose
+9. **Industrial software agent's superpower: state management** - Understanding state evolution, not code architecture
 
-### Stateless vs Stateful Design Pattern
+### Tool Design Pattern: Simple Stateful Tools + Dedicated State Management
 
 ```python
-# ✅ Good: Separate concerns
+# ✅ Good: Both tools are stateful, state management is separate
 class CommandTool:
-    """Stateless - pure execution"""
+    """Stateful exploration tool - state persists"""
     async def execute(self, cmd: str) -> Result:
-        return await pfc_client.send(cmd)  # No state tracking
-
-class StateManager:
-    """Stateful - context management"""
-    def observe_result(self, result: Result):
-        self.history.append(result)  # Track state
-        self.current_state.update(result)  # Update snapshot
-
-    def inject_context(self, result: Result) -> ContextualResult:
-        return {
-            "result": result,
-            "state": self.current_state,
-            "history": self.history
-        }
+        result = await pfc_client.send(cmd)  # State persists in PFC
+        return result  # Simple: execute and return
 
 class ScriptTool:
-    """Stateful - validated execution"""
+    """Stateful production tool - state persists"""
     async def execute(self, script: str) -> Result:
-        # Uses StateManager for precondition checking
-        if not state_manager.validate_preconditions(script):
-            raise StateError("Preconditions not met")
-        return await pfc_client.send_script(script)
+        result = await pfc_client.send_script(script)  # State persists in PFC
+        return result  # Simple: execute and return
+
+class PFCResetTool:
+    """Explicit state management - separate concern"""
+    async def reset(self) -> Result:
+        await pfc_client.send(cmd)("model new")  # Explicit reset
+        return success_response("State reset to initial")
+
+# State injection happens at response level, not tool level
+def inject_state_context(result: Result) -> ContextualResult:
+    """Separate component adds state info to response"""
+    current_state = query_pfc_state()  # Query PFC for current state
+    return {
+        "result": result,
+        "current_state": current_state,  # Injected for LLM awareness
+        "suggested_actions": get_valid_next_actions(current_state)
+    }
 
 
-# ❌ Bad: Mixed concerns
+# ❌ Bad: Auto-rollback behavior (violates LLM naturalness)
 class CommandTool:
-    """Stateful command - confuses validation with tracking"""
-    def __init__(self):
-        self.history = []  # ❌ Why does validation need history?
-        self.state = {}    # ❌ Why does validation need state?
-
+    """Stateless with automatic rollback - CONFUSING"""
     async def execute(self, cmd: str) -> Result:
-        result = await pfc_client.send(cmd)
-        self.history.append(result)  # ❌ Validation shouldn't track
-        self.state.update(result)    # ❌ Validation shouldn't persist
-        return result
+        snapshot = await pfc_client.save_state()  # Save state
+        try:
+            result = await pfc_client.send(cmd)  # Execute
+            return result  # Return result
+        finally:
+            await pfc_client.restore_state(snapshot)  # ❌ Auto-rollback!
+        # Problem: LLM expects "create ball" to create ball
+        # But it's gone after function returns - counterintuitive!
 ```
 
 ### The State Injection Paradigm
+
+**Core principle: Guide through gentle prompts, not complex concepts**
 
 ```python
 # Traditional context engineering (for coding agents)
@@ -1181,9 +1347,98 @@ Context = Code Architecture + File Dependencies + Module Relationships
 → Large, static, spatial context
 
 # State injection (for industrial software agents)
-Context = Current State + State History + State Requirements + State Transitions
-→ Small, dynamic, temporal context
+Context = Current State + Gentle Workflow Prompts + Next Action Hints
+→ Small, dynamic, temporal context with natural guidance
 ```
+
+**LLM-friendly guidance through tool responses:**
+
+```python
+# ✅ Good: Natural prompts in tool responses
+# After command execution:
+{
+  "message": "Command executed: ball create number 100",
+  "llm_content": {
+    "text": """
+    ✓ Created 100 balls successfully
+
+    📊 Current state: 1100 balls, gravity 9.81
+
+    💡 Gentle reminder: This command modified the state.
+       If you want to make this permanent, consider:
+       • Reading current state file to understand baseline
+       • Writing updated script for production use
+       • Or use pfc_reset if this was just a test
+    """
+  }
+}
+
+# Before script execution (if state may be unclear):
+{
+  "message": "About to execute script",
+  "llm_content": {
+    "text": """
+    💡 Friendly heads-up: You're about to run a script.
+       Have you checked the current state?
+       • Read state file if you need to understand current baseline
+       • Use pfc_reset if you want a clean start
+       • Or proceed if you're confident about current state
+    """
+  }
+}
+
+# ❌ Bad: Complex dual-layer concepts
+{
+  "llm_content": {
+    "baseline_state": {...},  # Too complex
+    "test_overlay": {...},    # Too conceptual
+    "current_state": {...}    # Cognitive overhead
+  }
+  # Problem: LLM has to understand abstract state model
+  # Better: Just tell LLM what to do next in natural language
+}
+```
+
+**Design philosophy:**
+
+1. **Don't make LLM learn complex models** - Just guide naturally
+2. **Prompt at decision points** - "Haven't saved state yet, need to?"
+3. **Suggest concrete actions** - "Consider reading state file first"
+4. **Natural language > Abstract concepts** - "This was a test, want to keep it?" vs "test overlay layer"
+
+**Example workflow with gentle guidance:**
+
+```python
+# Step 1: LLM executes command
+→ pfc_execute_command("ball create number 100")
+
+Response: """
+✓ Created 100 balls
+
+💡 This was a test command. Want to:
+   • pfc_reset (discard this test)
+   • Write script (make it permanent)
+   • Keep testing (add more commands)
+"""
+
+# Step 2: LLM wants to run script
+→ pfc_execute_script("production_sim.py")
+
+Response: """
+💡 About to run production script.
+   Current state has test changes from commands.
+   Need to pfc_reset first for clean baseline?
+"""
+
+# Step 3: LLM makes informed choice naturally
+→ pfc_reset()  # Based on gentle prompt, not complex model understanding
+```
+
+**Why this is better:**
+- No complex "dual-layer" mental model needed
+- Natural conversational guidance
+- LLM learns through doing, not through theory
+- Prompts appear exactly when needed (contextual)
 
 **Why state injection is critical:**
 
