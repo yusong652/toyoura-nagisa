@@ -49,6 +49,22 @@ class PFCWebSocketServer:
         self.active_connections = set()
         self.server = None
 
+    @staticmethod
+    def _truncate_message(message: str, max_length: int = 5000) -> str:
+        """
+        Truncate message if too long to prevent WebSocket/JSON size issues.
+
+        Args:
+            message: Original message string
+            max_length: Maximum message length (default: 5000 characters)
+
+        Returns:
+            Truncated message with indicator if truncation occurred
+        """
+        if len(message) <= max_length:
+            return message
+        return message[:max_length] + f"\n... (truncated from {len(message)} chars)"
+
     async def handle_client(self, websocket: WebSocketServerProtocol, path: Optional[str] = None):
         """
         Handle WebSocket client connection.
@@ -79,6 +95,10 @@ class PFCWebSocketServer:
 
                         result = await self.executor.execute_command(command, arg, params)
 
+                        # Truncate message before sending (prevent oversized JSON)
+                        if "message" in result:
+                            result["message"] = self._truncate_message(result["message"])
+
                         # Send result back
                         response = {
                             "type": "result",
@@ -95,6 +115,10 @@ class PFCWebSocketServer:
                         script_path = data.get("script_path", "")
 
                         result = await self.script_executor.execute_script(script_path)
+
+                        # Truncate message before sending (prevent oversized JSON)
+                        if "message" in result:
+                            result["message"] = self._truncate_message(result["message"])
 
                         # Send result back
                         response = {

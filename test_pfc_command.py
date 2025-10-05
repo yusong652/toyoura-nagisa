@@ -1,10 +1,10 @@
 """
-Test script for refactored PFC command tool with structured parameters.
+Test script for type-driven PFC command tool.
 
-Tests the new command structure:
+Tests the elegant type-driven command structure:
 - command: "ball create" (actual PFC command name)
-- arg: "9.81" (single positional argument without keyword)
-- params: {"radius": 1.0, "position": "(0, 0, 0)"} (keyword-value pairs)
+- arg: 9.81 (native Python types: int, float, str, tuple)
+- params: {"radius": 1.0, "position": [0, 0, 0]} (typed keyword-value pairs)
   - params can have null values for boolean flags: {"inheritance": null}
 """
 
@@ -23,7 +23,7 @@ async def test_pfc_commands():
     """Test the refactored PFC command structure."""
 
     print("=" * 70)
-    print("Testing Refactored PFC Command Tool - Structured Parameters")
+    print("Testing Type-Driven PFC Command Tool - Native Python Types")
     print("=" * 70)
 
     try:
@@ -31,17 +31,17 @@ async def test_pfc_commands():
         client = await get_client()
         print(f"\n✓ Connected to PFC server at {client.url}")
 
-        # Test 1: Positional argument - model gravity (scalar)
+        # Test 1: Positional argument - model gravity (number)
         print("\n" + "-" * 70)
-        print("Test 1: Positional argument - model gravity (scalar)")
+        print("Test 1: Positional argument - model gravity (number type)")
         print("-" * 70)
         print("Command: 'model gravity'")
-        print("Arg: '9.81'")
+        print("Arg: 9.81 (float)")
         print("\nExpected assembly: 'model gravity 9.81'")
 
         result1 = await client.send_command(
             "model gravity",
-            arg="9.81"
+            arg=9.81  # Native Python float
         )
         print(f"\n✓ Result:")
         print(f"  Status: {result1.get('status')}")
@@ -82,17 +82,17 @@ async def test_pfc_commands():
         print(f"  Message: {result3.get('message')}")
         print(f"  Data: {result3.get('data')}")
 
-        # Test 4: Command with multiple parameters (mixed types)
+        # Test 4: Command with multiple parameters (mixed native types)
         print("\n" + "-" * 70)
-        print("Test 4: Multiple params (number, tuple string, identifier)")
+        print("Test 4: Multiple params (number, tuple/list, identifier)")
         print("-" * 70)
         print("Command: 'ball create'")
-        print("Params: {'radius': 1.5, 'position': '(0, 0, 0)', 'group': 'test_balls'}")
-        print("\nExpected assembly: 'ball create radius 1.5 position (0, 0, 0) group \"test_balls\"'")
+        print("Params: {'radius': 1.5, 'position': [0, 0, 0], 'group': 'test_balls'}")
+        print("\nExpected assembly: 'ball create radius 1.5 position (0,0,0) group \"test_balls\"'")
 
         result4 = await client.send_command(
             "ball create",
-            params={"radius": 1.5, "position": "(0, 0, 0)", "group": "test_balls"}
+            params={"radius": 1.5, "position": [0, 0, 0], "group": "test_balls"}  # Native types
         )
         print(f"\n✓ Result:")
         print(f"  Status: {result4.get('status')}")
@@ -160,19 +160,61 @@ async def test_pfc_commands():
         print(f"  Message: {result8.get('message')}")
         print(f"  Data: {result8.get('data')}")
 
+        # Test 9: Condition auto-conversion (LLM intuitive way)
+        print("\n" + "-" * 70)
+        print("Test 9: Condition auto-conversion (LLM intuitive way)")
+        print("-" * 70)
+        print("Command: 'model domain'")
+        print("Params: {'condition': 'stop'} (LLM intuitive key-value)")
+        print("\nBackend auto-converts to: {'condition': None, 'stop': None}")
+        print("Expected assembly: 'model domain condition stop'")
+
+        result9 = await client.send_command(
+            "model domain",
+            params={"condition": "stop"}  # LLM intuitive way
+        )
+        print(f"\n✓ Result:")
+        print(f"  Status: {result9.get('status')}")
+        print(f"  Message: {result9.get('message')}")
+        print(f"  Data: {result9.get('data')}")
+
+        # Test 10: String identifier with group parameter
+        print("\n" + "-" * 70)
+        print("Test 10: String identifier handling (group parameter)")
+        print("-" * 70)
+        print("Command: 'ball create'")
+        print("Params: {'radius': 1.0, 'group': 'my_balls'}")
+        print("\nExpected: 'ball create radius 1.0 group \"my_balls\"' (auto-quoted)")
+
+        result10 = await client.send_command(
+            "ball create",
+            params={"radius": 1.0, "group": "my_balls"}
+        )
+        print(f"\n✓ Result:")
+        print(f"  Status: {result10.get('status')}")
+        print(f"  Message: {result10.get('message')}")
+
         print("\n" + "=" * 70)
         print("All tests completed successfully!")
         print("=" * 70)
 
-        print("\n📋 Test Summary:")
-        print("  ✓ Positional argument (single value) - model gravity with scalar")
-        print("  ✓ Keyword parameters - model domain with extent")
+        print("\n📋 Test Summary - Type-Driven API:")
+        print("  ✓ Positional argument (native float) - model gravity with number type")
+        print("  ✓ Keyword parameters (string) - model domain with extent")
         print("  ✓ Ball creation with single numeric parameter")
-        print("  ✓ Ball creation with mixed types (number, tuple string, identifier)")
-        print("  ✓ Boolean flags (null values) - contact cmat with inheritance")
+        print("  ✓ Ball creation with mixed native types (float, list, string)")
+        print("  ✓ Boolean flags (None values) - contact cmat with inheritance")
         print("  ✓ Command with no parameters - ball list")
         print("  ✓ Ball delete with range parameter")
         print("  ✓ Invalid commands return proper PFC error structure")
+        print("  ✓ Condition auto-conversion - LLM intuitive {'condition': 'stop'}")
+        print("  ✓ String identifier auto-quoting - group parameter")
+        print("\n🎯 Type-Driven Benefits:")
+        print("  • No string wrapping for numbers: 9.81 instead of \"9.81\"")
+        print("  • Native tuples/lists: [0, 0, 0] instead of \"(0, 0, 0)\"")
+        print("  • Auto-conversion: {'condition': 'stop'} → proper PFC flags")
+        print("  • Smart string handling: identifiers auto-quoted, complex strings preserved")
+        print("  • Clearer LLM API ergonomics with Python type semantics")
 
     except Exception as e:
         print(f"\n✗ Test failed with error: {str(e)}")

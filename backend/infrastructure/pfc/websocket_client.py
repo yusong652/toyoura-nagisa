@@ -8,7 +8,7 @@ in the PFC GUI IPython shell, enabling real-time command execution.
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from uuid import uuid4
 from datetime import datetime
 
@@ -156,7 +156,7 @@ class PFCWebSocketClient:
     async def send_command(
         self,
         command: str,
-        arg: Optional[str] = None,
+        arg: Optional[Union[int, float, str, tuple]] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: float = 30.0,
         max_retries: int = 2
@@ -166,12 +166,18 @@ class PFCWebSocketClient:
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional positional argument (single value without keyword)
-                Example: "9.81" for "model gravity 9.81"
-                Example: "(0,0,-9.81)" for "model gravity (0,0,-9.81)"
+            arg: Optional positional argument (value without keyword) using native Python types
+                Supported types: int, float, str, tuple
+                Examples:
+                  • 9.81 (float) → "model gravity 9.81"
+                  • (0, 0, -9.81) (tuple) → "model gravity (0,0,-9.81)"
+                Note: Most PFC commands use keyword parameters (params dict).
+                      Positional args are typically numeric values or tuples.
             params: Optional dictionary with keyword parameters (values can be None for boolean flags)
-                Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
-                Example: {"model": "linear", "inheritance": None} for boolean flag
+                Examples:
+                  • {"radius": 1.0, "position": [0, 0, 0], "group": "my_balls"}
+                  • {"condition": "stop"} → "model domain condition stop"
+                  • {"model": "linear", "inheritance": None} → boolean flag
             timeout: Command timeout in seconds (default: 30.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
@@ -188,8 +194,10 @@ class PFCWebSocketClient:
             TimeoutError: If command execution times out
 
         Note:
-            Server assembles complete command string: "command arg keyword1 value1 keyword2 ..."
-            Params with None values are boolean flags (keyword without value).
+            - arg accepts native Python types (int, float, str, tuple) for type-driven formatting
+            - Server assembles complete command string: "command arg keyword1 value1 keyword2 ..."
+            - Params with None values are boolean flags (keyword without value)
+            - Type-driven formatting enables cleaner API: 9.81 instead of "9.81"
         """
         for attempt in range(max_retries):
             try:

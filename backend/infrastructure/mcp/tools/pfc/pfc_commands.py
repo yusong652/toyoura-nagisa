@@ -6,8 +6,7 @@ Provides a single unified tool for executing PFC commands through WebSocket.
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Optional, Dict, Any
-import json
+from typing import Optional, Dict, Any, Union
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -33,31 +32,32 @@ def register_pfc_tools(mcp: FastMCP):
                 "PFC command name (e.g., 'model gravity', 'contact cmat default', 'ball create')"
             )
         ),
-        arg: Optional[str] = Field(
+        arg: Optional[Union[int, float, str, tuple]] = Field(
             None,
             description=(
-                "Optional positional argument (value without keyword).\n"
-                "Used for simple value-based commands.\n"
-                "Examples:\n"
-                "  • \"9.81\" → model gravity 9.81\n"
-                "  • \"(0,0,-9.81)\" → model gravity (0,0,-9.81)\n"
-                "  • \"stop\" → domain condition stop"
+                "Optional positional argument (value without keyword) using native Python types.\n"
+                "Common use cases:\n"
+                "  • Number: 9.81 → model gravity 9.81\n"
+                "  • Tuple: (0, 0, -9.81) → model gravity (0,0,-9.81)\n"
+                "Note: Most PFC commands use keyword parameters. "
+                "Positional args are typically numeric values or tuples."
             )
         ),
-        params: Optional[str] = Field(
+        params: Optional[Dict[str, Any]] = Field(
             None,
             description=(
-                "Optional JSON object with keyword parameters. "
-                "Value can be a string, number, or null:\n"
-                "  • String value: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
-                "  • String identifier: {\"model\": \"linear\"}\n"
-                "  • Numeric value: {\"proximity\": 0.5}\n"
-                "  • Boolean flag (null): {\"inheritance\": null}\n"
-                "  • Tuple string: {\"position\": \"(0, 0, 0)\"}\n"
-                "  • Identifier with quotes: {\"group\": \"my_balls\"}\n"
+                "Optional dictionary with keyword parameters using typed values.\n"
+                "Value types:\n"
+                "  • Number: {\"radius\": 1.0}\n"
+                "  • Tuple/List: {\"position\": [0, 0, 0]}\n"
+                "  • String identifier: {\"model\": \"linear\"}, {\"group\": \"balls\"}\n"
+                "  • Complex string: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
+                "  • Boolean flag (None): {\"inheritance\": None}\n"
+                "  • Domain condition: {\"condition\": \"stop\"} (auto-converted to proper flags)\n"
                 "Examples:\n"
-                "  • {\"model\": \"linear\", \"inheritance\": null}\n"
-                "  • {\"radius\": 1.0, \"position\": \"(0,0,0)\", \"group\": \"balls\"}"
+                "  • {\"model\": \"linear\", \"inheritance\": None}\n"
+                "  • {\"radius\": 1.0, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
+                "  • {\"condition\": \"stop\"} → model domain condition stop (auto-converted)"
             )
         )
     ) -> Dict[str, Any]:
@@ -72,36 +72,36 @@ def register_pfc_tools(mcp: FastMCP):
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional positional argument (single value without keyword)
-            params: Optional JSON object with keyword parameters (values can be string, number, or null)
+            arg: Optional positional argument using native Python types (int, float, str, tuple)
+            params: Optional dictionary with keyword parameters (values: number, list, string, or None)
 
         Examples:
-            # Positional argument - gravity with scalar
-            pfc_execute_command(command="model gravity", arg="9.81")
+            # Positional argument - gravity with number
+            pfc_execute_command(command="model gravity", arg=9.81)
             # Assembled: model gravity 9.81
 
-            # Positional argument - gravity with vector
-            pfc_execute_command(command="model gravity", arg="(0,0,-9.81)")
+            # Positional argument - gravity with tuple
+            pfc_execute_command(command="model gravity", arg=(0, 0, -9.81))
             # Assembled: model gravity (0,0,-9.81)
 
             # Keyword arguments - domain extent
             pfc_execute_command(
                 command="model domain",
-                params='{"extent": "-10 10 -10 10 -10 10"}'
+                params={"extent": "-10 10 -10 10 -10 10"}
             )
             # Assembled: model domain extent -10 10 -10 10 -10 10
 
             # Boolean flags - contact material default with inheritance
             pfc_execute_command(
                 command="contact cmat default",
-                params='{"model": "linear", "inheritance": null}'
+                params={"model": "linear", "inheritance": None}
             )
             # Assembled: contact cmat default model linear inheritance
 
-            # Ball creation with keyword parameters
+            # Ball creation with keyword parameters (native types)
             pfc_execute_command(
                 command="ball create",
-                params='{"radius": 1.0, "position": "(0,0,0)", "group": "balls"}'
+                params={"radius": 1.0, "position": [0, 0, 0], "group": "balls"}
             )
             # Assembled: ball create radius 1.0 position (0,0,0) group "balls"
 
@@ -111,18 +111,16 @@ def register_pfc_tools(mcp: FastMCP):
 
         Note:
             - All parameters are optional - commands use defaults if omitted
-            - null values in params indicate boolean flags (keyword without value)
-            - Server assembles final command from command + arg + params
+            - arg accepts native Python types (int, float, str, tuple) for type-driven formatting
+            - params dict values support: number, list (for tuples), string, or None (boolean flags)
+            - Server performs type-driven command assembly from command + arg + params
         """
         try:
-            # Parse parameters
-            params_dict = json.loads(params) if params else {}
-
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
             # Execute command (server will assemble command string from command + arg + params)
-            result = await client.send_command(command, arg, params_dict)
+            result = await client.send_command(command, arg, params or {})
 
             # Build display command string for logging
             parts = [command]
@@ -132,10 +130,10 @@ def register_pfc_tools(mcp: FastMCP):
                 parts.append(str(arg))
 
             # Add keyword parameters
-            if params_dict:
-                for key, value in params_dict.items():
+            if params:
+                for key, value in params.items():
                     parts.append(key)
-                    if value is not None:  # null values are boolean flags
+                    if value is not None:  # None values are boolean flags
                         parts.append(str(value))
 
             pfc_cmd = " ".join(parts)
@@ -171,10 +169,6 @@ def register_pfc_tools(mcp: FastMCP):
         except ConnectionError as e:
             # Backend error - connection to PFC server failed
             return error_response(f"Cannot connect to PFC server: {str(e)}")
-
-        except json.JSONDecodeError as e:
-            # Backend error - invalid JSON in params
-            return error_response(f"Invalid JSON in params: {str(e)}")
 
         except Exception as e:
             # Backend error - unexpected system error
