@@ -21,14 +21,14 @@ def get_base_prompt(profile: str = "general") -> str:
     Load base system prompt based on agent profile.
 
     Args:
-        profile: Agent profile type (e.g., "general", "pfc_expert")
+        profile: Agent profile type (e.g., "general", "pfc", "coding", "lifestyle")
 
     Returns:
         Base system prompt string
 
     Priority:
         1. Environment variable NAGISA_BASE_PROMPT (overrides all)
-        2. Profile-specific prompt file (e.g., pfc_expert_prompt.md)
+        2. Profile-specific prompt file (e.g., pfc -> pfc_expert_prompt.md)
         3. Default base_prompt.md
     """
     base_prompt_from_env = os.getenv("NAGISA_BASE_PROMPT")
@@ -37,7 +37,7 @@ def get_base_prompt(profile: str = "general") -> str:
 
     # Profile-specific prompt mapping
     profile_prompts = {
-        "pfc_expert": "pfc_expert_prompt.md",
+        "pfc": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC = "pfc"
         "general": "base_prompt.md",
     }
 

@@ -29,7 +29,7 @@ async def build_system_prompt(
     - Expression/Live2D instructions
 
     Args:
-        agent_profile: Agent profile type ("general", "pfc_expert", "disabled", etc.)
+        agent_profile: Agent profile type ("general", "pfc", "coding", "lifestyle", "disabled")
         session_id: Session ID for memory retrieval
         user_id: User ID for memory operations
         enable_memory: Whether to enable memory injection (controlled by frontend)
