@@ -25,6 +25,42 @@ class PFCCommandExecutor:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
 
+    def _execute_pfc_command_sync(self, cmd_str: str) -> Any:
+        """
+        Synchronous wrapper for itasca.command() with comprehensive error handling.
+
+        This method wraps itasca.command() to catch ALL possible exceptions,
+        including ITASCA-specific errors that might bypass normal exception handling.
+
+        Args:
+            cmd_str: Complete PFC command string
+
+        Returns:
+            Command result or raises exception
+
+        Raises:
+            Exception: Any error during command execution
+        """
+        try:
+            # Execute command via ITASCA SDK
+            return self.itasca.command(cmd_str)
+
+        except Exception as e:
+            # Log the full exception for debugging
+            logger.error(f"PFC command failed: {cmd_str}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            # Re-raise to be handled by async wrapper
+            raise
+
+        except BaseException as e:
+            # Catch even system-level exceptions that bypass Exception
+            logger.error(f"Critical PFC error: {cmd_str}")
+            logger.error(f"BaseException type: {type(e).__name__}")
+            logger.error(f"BaseException message: {str(e)}")
+            # Convert to regular Exception to prevent event loop corruption
+            raise RuntimeError(f"Critical PFC error: {str(e)}") from e
+
     async def execute_command(
         self,
         command: str,
@@ -40,13 +76,19 @@ class PFCCommandExecutor:
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional single positional argument (value without keyword)
-                Example: "9.81" for "model gravity 9.81"
-                Example: "(0,0,-9.81)" for "model gravity (0,0,-9.81)"
+            arg: Optional single positional argument (value without keyword) using native Python types
+                Supported types: bool, int, float, str, tuple
+                Examples:
+                  • True (bool) → "model large-strain true"
+                  • 9.81 (float) → "model gravity 9.81"
+                  • (0, 0, -9.81) (tuple) → "model gravity (0,0,-9.81)"
             params: Optional dictionary with keyword parameters (values can be None for boolean flags)
-                Example: {"radius": 1.0, "position": "(0, 0, 0)", "group": "my_balls"}
-                Example: {"model": "linear", "inheritance": None} for boolean flags
-                Empty dict {} or None means use command defaults
+                Supported value types: bool, int, float, str, tuple, list
+                Examples:
+                  • {"radius": 1.0, "position": [0, 0, 0], "group": "my_balls"}
+                  • {"condition": "stop"} → "model domain condition stop"
+                  • {"model": "linear", "inheritance": None} → boolean flag
+                  • {"active": True} → keyword with boolean value
 
         Returns:
             Result dictionary following ToolResult pattern:
@@ -54,6 +96,8 @@ class PFCCommandExecutor:
                 - message: str - User-friendly message (success description or error details)
                 - data: Optional[Any] - Command result data (success only)
         """
+        cmd_str = None
+
         try:
             if not self.itasca:
                 return {
@@ -67,9 +111,14 @@ class PFCCommandExecutor:
             cmd_str = self._assemble_command(command, arg, params)
             logger.info(f"Executing PFC command: {cmd_str}")
 
-            # Execute native PFC command in thread pool to avoid blocking event loop
+            # Execute native PFC command in thread pool with safe wrapper
+            # Using synchronous wrapper to ensure all exceptions are caught
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, self.itasca.command, cmd_str)
+            result = await loop.run_in_executor(
+                None,
+                self._execute_pfc_command_sync,
+                cmd_str
+            )
 
             # Serialize result for response
             serialized_result = self._serialize_result(result)
@@ -80,17 +129,46 @@ class PFCCommandExecutor:
             else:
                 message = f"PFC command executed: {cmd_str}"
 
+            logger.info(f"✓ PFC command successful: {cmd_str}")
+
             return {
                 "status": "success",
                 "message": message,
                 "data": serialized_result
             }
 
+        except asyncio.CancelledError:
+            # Handle task cancellation separately
+            logger.warning(f"PFC command cancelled: {cmd_str}")
+            raise
+
         except Exception as e:
-            logger.error(f"Command execution failed: {e}")
+            # Log comprehensive error information
+            error_msg = str(e)
+            logger.error(f"Command execution failed: {error_msg}")
+
+            if cmd_str:
+                logger.error(f"  Failed command: {cmd_str}")
+
+            # Return error result (don't raise - keep server alive!)
             return {
                 "status": "error",
-                "message": f"Command execution failed: {str(e)}",
+                "message": f"Command execution failed: {error_msg}",
+                "data": None
+            }
+
+        except BaseException as e:
+            # Catch critical errors that might crash the server
+            error_msg = str(e)
+            logger.critical(f"CRITICAL: BaseException during command execution: {error_msg}")
+
+            if cmd_str:
+                logger.critical(f"  Failed command: {cmd_str}")
+
+            # Return error result and prevent server crash
+            return {
+                "status": "error",
+                "message": f"Critical error during command execution: {error_msg}",
                 "data": None
             }
 
@@ -188,17 +266,24 @@ class PFCCommandExecutor:
         Format value based on Python type for PFC command assembly.
 
         Type-driven formatting logic:
+        - Booleans (bool): Convert to PFC format (lowercase true/false)
         - Numbers (int/float): Direct string conversion
         - Tuples/Lists: Format as PFC tuple "(x,y,z)"
         - Strings: Smart handling for identifiers vs complex formats
 
         Args:
-            value: Value to format (int, float, str, tuple, list, or other)
+            value: Value to format (bool, int, float, str, tuple, list, or other)
 
         Returns:
             Formatted string for PFC command
 
         Examples:
+            >>> _format_value(True)
+            "true"
+
+            >>> _format_value(False)
+            "false"
+
             >>> _format_value(9.81)
             "9.81"
 
@@ -214,8 +299,13 @@ class PFCCommandExecutor:
             >>> _format_value("-10 10 -10 10")
             "-10 10 -10 10"
         """
+        # Booleans: convert to PFC format (lowercase true/false)
+        # MUST check before int because bool is a subclass of int in Python
+        if isinstance(value, bool):
+            return str(value).lower()
+
         # Numbers: direct conversion
-        if isinstance(value, (int, float)):
+        elif isinstance(value, (int, float)):
             return str(value)
 
         # Tuples/Lists: format as PFC tuple

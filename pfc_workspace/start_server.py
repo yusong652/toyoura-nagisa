@@ -60,7 +60,14 @@ def run_server():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
+        # Start the server (returns immediately after setup)
         loop.run_until_complete(pfc_server.start())
+
+        # Run event loop forever to handle connections
+        # This allows the event loop to process WebSocket connections
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print("\n✗ Server stopped by user")
     except Exception as e:
         print(f"\n✗ Server error: {e}")
         import traceback
