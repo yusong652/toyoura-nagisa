@@ -22,7 +22,7 @@ Note:
 import sys
 import asyncio
 import logging
-import nest_asyncio
+import nest_asyncio # type: ignore
 
 # Allow nested event loops (required for IPython environment)
 nest_asyncio.apply()
