@@ -67,9 +67,10 @@ class PFCCommandExecutor:
             cmd_str = self._assemble_command(command, arg, params)
             logger.info(f"Executing PFC command: {cmd_str}")
 
-            # Execute native PFC command in thread pool to avoid blocking event loop
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, self.itasca.command, cmd_str)
+            # Execute native PFC command directly in main thread
+            # Note: This blocks the event loop but is required for certain PFC commands
+            # (e.g., 'contact cmat default') that crash when executed in thread pool
+            result = self.itasca.command(cmd_str)
 
             # Serialize result for response
             serialized_result = self._serialize_result(result)
