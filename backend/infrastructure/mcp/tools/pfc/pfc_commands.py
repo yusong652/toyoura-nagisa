@@ -32,15 +32,16 @@ def register_pfc_tools(mcp: FastMCP):
                 "PFC command name (e.g., 'model gravity', 'contact cmat default', 'ball create')"
             )
         ),
-        arg: Optional[Union[int, float, str, tuple]] = Field(
+        arg: Optional[Union[bool, int, float, str, tuple]] = Field(
             None,
             description=(
                 "Optional positional argument (value without keyword) using native Python types.\n"
                 "Common use cases:\n"
+                "  • Boolean: True → model large-strain true\n"
                 "  • Number: 9.81 → model gravity 9.81\n"
                 "  • Tuple: (0, 0, -9.81) → model gravity (0,0,-9.81)\n"
                 "Note: Most PFC commands use keyword parameters. "
-                "Positional args are typically numeric values or tuples."
+                "Positional args are typically booleans, numeric values, or tuples."
             )
         ),
         params: Optional[Dict[str, Any]] = Field(
@@ -48,16 +49,18 @@ def register_pfc_tools(mcp: FastMCP):
             description=(
                 "Optional dictionary with keyword parameters using typed values.\n"
                 "Value types:\n"
+                "  • Boolean: {\"active\": True} → keyword active true\n"
                 "  • Number: {\"radius\": 1.0}\n"
                 "  • Tuple/List: {\"position\": [0, 0, 0]}\n"
                 "  • String identifier: {\"model\": \"linear\"}, {\"group\": \"balls\"}\n"
                 "  • Complex string: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
-                "  • Boolean flag (None): {\"inheritance\": None}\n"
+                "  • Boolean flag (None): {\"inheritance\": None} → keyword only, no value\n"
                 "  • Domain condition: {\"condition\": \"stop\"} (auto-converted to proper flags)\n"
                 "Examples:\n"
                 "  • {\"model\": \"linear\", \"inheritance\": None}\n"
                 "  • {\"radius\": 1.0, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
-                "  • {\"condition\": \"stop\"} → model domain condition stop (auto-converted)"
+                "  • {\"condition\": \"stop\"} → model domain condition stop (auto-converted)\n"
+                "  • {\"active\": True} → keyword active true"
             )
         )
     ) -> Dict[str, Any]:
@@ -72,10 +75,14 @@ def register_pfc_tools(mcp: FastMCP):
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional positional argument using native Python types (int, float, str, tuple)
-            params: Optional dictionary with keyword parameters (values: number, list, string, or None)
+            arg: Optional positional argument using native Python types (bool, int, float, str, tuple)
+            params: Optional dictionary with keyword parameters (values: bool, number, list, string, or None)
 
         Examples:
+            # Positional argument - boolean
+            pfc_execute_command(command="model large-strain", arg=True)
+            # Assembled: model large-strain true
+
             # Positional argument - gravity with number
             pfc_execute_command(command="model gravity", arg=9.81)
             # Assembled: model gravity 9.81
@@ -111,9 +118,10 @@ def register_pfc_tools(mcp: FastMCP):
 
         Note:
             - All parameters are optional - commands use defaults if omitted
-            - arg accepts native Python types (int, float, str, tuple) for type-driven formatting
-            - params dict values support: number, list (for tuples), string, or None (boolean flags)
+            - arg accepts native Python types (bool, int, float, str, tuple) for type-driven formatting
+            - params dict values support: bool, number, list (for tuples), string, or None (boolean flags)
             - Server performs type-driven command assembly from command + arg + params
+            - Python True/False automatically converts to PFC true/false (lowercase, unquoted)
         """
         try:
             # Get WebSocket client (auto-connects if needed)

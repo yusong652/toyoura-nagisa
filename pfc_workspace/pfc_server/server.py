@@ -29,7 +29,7 @@ class PFCWebSocketServer:
         host: str = "localhost",
         port: int = 9001,
         ping_interval: int = 30,
-        ping_timeout: int = 10
+        ping_timeout: int = 60
     ):
         """
         Initialize WebSocket server.
@@ -37,8 +37,9 @@ class PFCWebSocketServer:
         Args:
             host: Server host address
             port: Server port number
-            ping_interval: Interval between ping frames in seconds
-            ping_timeout: Timeout for pong response in seconds
+            ping_interval: Interval between ping frames in seconds (default: 30)
+            ping_timeout: Timeout for pong response in seconds (default: 60)
+                Note: Must be long enough to handle slow PFC commands like domain initialization
         """
         self.host = host
         self.port = port
@@ -106,8 +107,12 @@ class PFCWebSocketServer:
                             **result
                         }
 
-                        await websocket.send(json.dumps(response))
-                        logger.info(f"✓ Command result sent: {command_id}")
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Command result sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {command_id}")
+                            break  # Exit message loop
 
                     elif msg_type == "script":
                         # Execute Python script from file path
@@ -127,34 +132,50 @@ class PFCWebSocketServer:
                             **result
                         }
 
-                        await websocket.send(json.dumps(response))
-                        logger.info(f"✓ Script result sent: {command_id}")
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Script result sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send script result, connection closed: {command_id}")
+                            break  # Exit message loop
 
                     elif msg_type == "ping":
                         # Respond to ping
-                        await websocket.send(json.dumps({
-                            "type": "pong",
-                            "timestamp": datetime.now().isoformat()
-                        }))
+                        try:
+                            await websocket.send(json.dumps({
+                                "type": "pong",
+                                "timestamp": datetime.now().isoformat()
+                            }))
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning("Cannot send pong, connection closed")
+                            break  # Exit message loop
 
                     else:
                         logger.warning(f"Unknown message type: {msg_type}")
 
                 except json.JSONDecodeError as e:
                     logger.error(f"Invalid JSON: {e}")
-                    await websocket.send(json.dumps({
-                        "type": "error",
-                        "message": "Invalid JSON format",
-                        "error": str(e)
-                    }))
+                    try:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "Invalid JSON format",
+                            "error": str(e)
+                        }))
+                    except websockets.exceptions.ConnectionClosed:
+                        logger.warning("Cannot send error, connection closed")
+                        break  # Exit message loop
 
                 except Exception as e:
                     logger.error(f"Message handling error: {e}")
-                    await websocket.send(json.dumps({
-                        "type": "error",
-                        "message": "Internal server error",
-                        "error": str(e)
-                    }))
+                    try:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "Internal server error",
+                            "error": str(e)
+                        }))
+                    except websockets.exceptions.ConnectionClosed:
+                        logger.warning("Cannot send error, connection closed")
+                        break  # Exit message loop
 
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"✗ Client disconnected: {client_id}")
@@ -197,16 +218,18 @@ class PFCWebSocketServer:
         logger.info(f"Starting PFC WebSocket Server on {self.host}:{self.port}")
 
         try:
-            async with websockets.serve(
+            # Use websockets 9.1 compatible syntax (Python 3.6)
+            self.server = await websockets.serve(
                 self.handle_client,
                 self.host,
                 self.port,
                 ping_interval=self.ping_interval,
                 ping_timeout=self.ping_timeout
-            ):
-                logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
-                # Keep server running forever
-                await asyncio.Future()
+            )
+            logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
+
+            # Note: Event loop will be kept running by loop.run_forever() in start_server.py
+            # No need to block here with while True loop
 
         except Exception as e:
             logger.error(f"Server error: {e}")
@@ -218,7 +241,7 @@ def create_server(
     host: str = "localhost",
     port: int = 9001,
     ping_interval: int = 30,
-    ping_timeout: int = 10
+    ping_timeout: int = 60
 ) -> PFCWebSocketServer:
     """
     Create a PFC WebSocket server instance.
@@ -227,7 +250,8 @@ def create_server(
         host: Server host address (default: localhost)
         port: Server port number (default: 9001)
         ping_interval: Interval between ping frames in seconds (default: 30)
-        ping_timeout: Timeout for pong response in seconds (default: 10)
+        ping_timeout: Timeout for pong response in seconds (default: 60)
+            Note: Long timeout needed for slow PFC commands (domain initialization, etc.)
 
     Returns:
         PFCWebSocketServer: Server instance ready to be started

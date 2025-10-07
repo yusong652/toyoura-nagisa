@@ -21,19 +21,36 @@ logger = logging.getLogger("PFC-Client")
 class PFCWebSocketClient:
     """WebSocket client for communicating with PFC server."""
 
-    def __init__(self, url: str = "ws://localhost:9001"):
+    def __init__(
+        self,
+        url: str = "ws://localhost:9001",
+        auto_reconnect: bool = True,
+        reconnect_interval: float = 2.0,
+        max_reconnect_attempts: int = 0
+    ):
         """
         Initialize PFC WebSocket client.
 
         Args:
             url: WebSocket server URL (default: ws://localhost:9001)
+            auto_reconnect: Enable automatic reconnection on connection loss (default: True)
+            reconnect_interval: Seconds between reconnection attempts (default: 2.0)
+            max_reconnect_attempts: Maximum consecutive reconnect attempts (0 = unlimited, default: 0)
         """
         self.url = url
+        self.auto_reconnect = auto_reconnect
+        self.reconnect_interval = reconnect_interval
+        self.max_reconnect_attempts = max_reconnect_attempts
+
         self._websocket: Optional[Any] = None
         self.connected = False
         self.pending_commands: Dict[str, asyncio.Future] = {}
         self._message_task: Optional[asyncio.Task] = None
+        self._reconnect_task: Optional[asyncio.Task] = None
+        self._reconnecting = False
+        self._reconnect_count = 0
         self._lock = asyncio.Lock()
+        self._should_stop = False
 
     @property
     def websocket(self) -> Any:
@@ -58,22 +75,49 @@ class PFCWebSocketClient:
             bool: True if connection successful, False otherwise
         """
         async with self._lock:
-            # Already connected (idempotent)
+            # Clean up any stale pending commands from previous connection
+            # This ensures a fresh start and prevents "Future exception was never retrieved" errors
+            if self.pending_commands:
+                logger.debug(
+                    f"Cleaning up {len(self.pending_commands)} pending commands "
+                    "from previous connection"
+                )
+                for future in self.pending_commands.values():
+                    if not future.done():
+                        try:
+                            future.set_exception(ConnectionError("Connection reset"))
+                        except Exception:
+                            pass  # Future may already be in invalid state
+                self.pending_commands.clear()
+
+            # Already connected with valid websocket
             if self.connected and self._websocket:
-                return True
+                try:
+                    # Verify websocket is still open
+                    if not self._websocket.closed:
+                        return True
+                except Exception:
+                    pass  # Fall through to reconnect
 
             try:
                 self._websocket = await websockets.connect(
                     self.url,
                     ping_interval=30,
-                    ping_timeout=50
+                    ping_timeout=50,
+                    open_timeout=30,  # Increased from default 10s for slow servers
+                    compression=None  # Disable compression for Python 3.6 server compatibility
                 )
                 self.connected = True
+                self._reconnect_count = 0  # Reset reconnect counter on success
                 logger.info(f"✓ Connected to PFC server: {self.url}")
 
                 # Start message handler task
                 if self._message_task:
                     self._message_task.cancel()
+                    try:
+                        await self._message_task
+                    except asyncio.CancelledError:
+                        pass  # Expected cancellation
                 self._message_task = asyncio.create_task(self._handle_messages())
 
                 return True
@@ -84,11 +128,26 @@ class PFCWebSocketClient:
                 return False
 
     async def disconnect(self):
-        """Close WebSocket connection."""
+        """Close WebSocket connection and stop auto-reconnect."""
+        self._should_stop = True  # Signal to stop reconnection attempts
+
         async with self._lock:
+            # Cancel reconnect task
+            if self._reconnect_task:
+                self._reconnect_task.cancel()
+                try:
+                    await self._reconnect_task
+                except asyncio.CancelledError:
+                    pass  # Expected cancellation
+                self._reconnect_task = None
+
             # Cancel message handler
             if self._message_task:
                 self._message_task.cancel()
+                try:
+                    await self._message_task
+                except asyncio.CancelledError:
+                    pass  # Expected cancellation
                 self._message_task = None
 
             # Close websocket
@@ -100,6 +159,7 @@ class PFCWebSocketClient:
 
             self.connected = False
             self._websocket = None
+            self._reconnecting = False
 
             # Cancel all pending commands
             for future in self.pending_commands.values():
@@ -108,6 +168,51 @@ class PFCWebSocketClient:
             self.pending_commands.clear()
 
             logger.info("✓ Disconnected from PFC server")
+
+    async def _auto_reconnect(self):
+        """
+        Automatic reconnection task.
+
+        Attempts to reconnect to PFC server after connection loss.
+        Respects reconnect_interval and max_reconnect_attempts settings.
+        """
+        self._reconnecting = True
+        self._reconnect_count = 0
+
+        try:
+            while not self._should_stop:
+                # Check if we've exceeded max attempts (if limit is set)
+                if self.max_reconnect_attempts > 0 and self._reconnect_count >= self.max_reconnect_attempts:
+                    logger.error(
+                        f"Max reconnection attempts ({self.max_reconnect_attempts}) reached. "
+                        "Stopping auto-reconnect."
+                    )
+                    break
+
+                self._reconnect_count += 1
+                logger.info(
+                    f"Attempting to reconnect to PFC server "
+                    f"(attempt {self._reconnect_count}{'/' + str(self.max_reconnect_attempts) if self.max_reconnect_attempts > 0 else ''})"
+                )
+
+                # Attempt reconnection
+                success = await self.connect()
+
+                if success:
+                    logger.info("✓ Successfully reconnected to PFC server")
+                    self._reconnecting = False
+                    return
+
+                # Wait before next attempt
+                logger.debug(f"Waiting {self.reconnect_interval}s before next reconnect attempt")
+                await asyncio.sleep(self.reconnect_interval)
+
+        except asyncio.CancelledError:
+            logger.debug("Auto-reconnect task cancelled")
+        except Exception as e:
+            logger.error(f"Error in auto-reconnect task: {e}")
+        finally:
+            self._reconnecting = False
 
     async def _handle_messages(self):
         """Handle incoming messages from PFC server."""
@@ -142,21 +247,35 @@ class PFCWebSocketClient:
         except (ConnectionClosed, ConnectionClosedError) as e:
             logger.warning(f"Connection closed: {e}")
             self.connected = False
+
             # Cancel all pending commands
             for future in list(self.pending_commands.values()):
                 if not future.done():
                     future.set_exception(ConnectionError("Connection lost"))
             self.pending_commands.clear()
+
+            # Trigger auto-reconnect if enabled and not manually disconnected
+            if self.auto_reconnect and not self._should_stop:
+                logger.info("Connection lost, starting auto-reconnect...")
+                if not self._reconnecting and (not self._reconnect_task or self._reconnect_task.done()):
+                    self._reconnect_task = asyncio.create_task(self._auto_reconnect())
+
         except asyncio.CancelledError:
             logger.debug("Message handler cancelled")
         except Exception as e:
             logger.error(f"Unexpected error in message handler: {e}")
             self.connected = False
 
+            # Trigger auto-reconnect for unexpected errors too
+            if self.auto_reconnect and not self._should_stop:
+                logger.info("Unexpected error, starting auto-reconnect...")
+                if not self._reconnecting and (not self._reconnect_task or self._reconnect_task.done()):
+                    self._reconnect_task = asyncio.create_task(self._auto_reconnect())
+
     async def send_command(
         self,
         command: str,
-        arg: Optional[Union[int, float, str, tuple]] = None,
+        arg: Optional[Union[bool, int, float, str, tuple]] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: float = 30.0,
         max_retries: int = 2
@@ -167,12 +286,13 @@ class PFCWebSocketClient:
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
             arg: Optional positional argument (value without keyword) using native Python types
-                Supported types: int, float, str, tuple
+                Supported types: bool, int, float, str, tuple
                 Examples:
+                  • True (bool) → "model large-strain true"
                   • 9.81 (float) → "model gravity 9.81"
                   • (0, 0, -9.81) (tuple) → "model gravity (0,0,-9.81)"
                 Note: Most PFC commands use keyword parameters (params dict).
-                      Positional args are typically numeric values or tuples.
+                      Positional args are typically numeric values, booleans, or tuples.
             params: Optional dictionary with keyword parameters (values can be None for boolean flags)
                 Examples:
                   • {"radius": 1.0, "position": [0, 0, 0], "group": "my_balls"}
@@ -201,8 +321,21 @@ class PFCWebSocketClient:
         """
         for attempt in range(max_retries):
             try:
-                # Ensure connected (auto-reconnect if needed)
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    # Wait up to 30 seconds for reconnection
+                    for _ in range(60):  # 60 * 0.5s = 30s
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected (manual reconnect if needed)
                 if not self.connected:
+                    self._should_stop = False  # Allow reconnection
                     success = await self.connect()
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
@@ -290,8 +423,21 @@ class PFCWebSocketClient:
         """
         for attempt in range(max_retries):
             try:
-                # Ensure connected (auto-reconnect if needed)
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    # Wait up to 30 seconds for reconnection
+                    for _ in range(60):  # 60 * 0.5s = 30s
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected (manual reconnect if needed)
                 if not self.connected:
+                    self._should_stop = False  # Allow reconnection
                     success = await self.connect()
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
