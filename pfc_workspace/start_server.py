@@ -90,10 +90,33 @@ print(f"✓ Using event loop: {loop}")
 print(f"✓ Loop is running: {loop.is_running()}")
 print()
 
+async def keep_server_running():
+    """Keep server running with periodic yields for GUI updates."""
+    # Start server
+    await pfc_server.start()
+
+    print("✓ Server is running on ws://{}:{}".format(HOST, PORT))
+    print()
+    print("IMPORTANT:")
+    print("  • IPython shell is BLOCKED (this is necessary)")
+    print("  • PFC GUI should still be responsive")
+    print("  • Server logs will appear in console")
+    print("  • Press Ctrl+C to stop")
+    print()
+
+    # Keep running with frequent yields for GUI updates
+    try:
+        while True:
+            # Yield control frequently to allow PFC GUI updates
+            await asyncio.sleep(0.05)  # 50ms intervals
+    except asyncio.CancelledError:
+        print("\n✓ Server shutdown requested")
+
 try:
     print("✓ Server starting...")
-    # Thanks to nest_asyncio, this works even if loop is already running
-    loop.run_until_complete(pfc_server.start())
+    # Run server with event loop (will block IPython but allow GUI updates)
+    loop.run_until_complete(keep_server_running())
+
 except KeyboardInterrupt:
     print("\n✓ Server stopped by user (Ctrl+C)")
 except Exception as e:

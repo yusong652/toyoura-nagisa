@@ -110,6 +110,8 @@ class PFCWebSocketServer:
                         try:
                             await websocket.send(json.dumps(response))
                             logger.info(f"✓ Command result sent: {command_id}")
+                            # Yield control to allow GUI refresh in PFC IPython environment
+                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {command_id}")
                             break  # Exit message loop
@@ -135,6 +137,8 @@ class PFCWebSocketServer:
                         try:
                             await websocket.send(json.dumps(response))
                             logger.info(f"✓ Script result sent: {command_id}")
+                            # Yield control to allow GUI refresh in PFC IPython environment
+                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send script result, connection closed: {command_id}")
                             break  # Exit message loop
@@ -146,6 +150,8 @@ class PFCWebSocketServer:
                                 "type": "pong",
                                 "timestamp": datetime.now().isoformat()
                             }))
+                            # Yield control to allow GUI refresh
+                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning("Cannot send pong, connection closed")
                             break  # Exit message loop
@@ -214,7 +220,7 @@ class PFCWebSocketServer:
         self.active_connections -= disconnected
 
     async def start(self):
-        """Start the WebSocket server."""
+        """Start the WebSocket server (non-blocking)."""
         logger.info(f"Starting PFC WebSocket Server on {self.host}:{self.port}")
 
         try:
@@ -228,12 +234,19 @@ class PFCWebSocketServer:
             )
             logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
 
-            # Note: Event loop will be kept running by loop.run_forever() in start_server.py
-            # No need to block here with while True loop
+            # Note: Server is now running in the background
+            # websockets.serve() automatically handles connections via the event loop
+            # No need to block here - the server will continue running as long as
+            # the event loop is active
 
         except Exception as e:
             logger.error(f"Server error: {e}")
             raise
+
+    async def wait_closed(self):
+        """Wait for server to close (for graceful shutdown)."""
+        if self.server:
+            await self.server.wait_closed()
 
 
 # Module-level utility function for creating server instances

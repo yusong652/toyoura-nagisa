@@ -6,6 +6,7 @@ This module provides command execution functionality for the PFC WebSocket serve
 
 import asyncio
 import logging
+import sys
 from typing import Any, Dict, Optional
 
 # Module logger
@@ -13,7 +14,21 @@ logger = logging.getLogger("PFC-Server")
 
 
 class PFCCommandExecutor:
-    """Execute PFC commands using itasca SDK."""
+    """Execute PFC commands using itasca SDK with hybrid execution strategy.
+
+    Execution Modes:
+    - Main Thread: Thread-sensitive commands that crash in thread pool
+    - Background Thread: Long-running commands that should not block event loop
+    """
+
+    # Commands that MUST execute in main thread (thread-sensitive whitelist)
+    # These commands crash or behave incorrectly when executed in thread pool
+    MAIN_THREAD_COMMANDS = {
+        "contact cmat default",
+        "contact cmat",
+        # Add other known thread-sensitive commands here as discovered
+        # Example: "domain decompose", "clump template", etc.
+    }
 
     def __init__(self):
         """Initialize executor with itasca module reference."""
@@ -24,6 +39,37 @@ class PFCCommandExecutor:
         except ImportError:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
+
+    def _should_run_in_main_thread(self, command: str) -> bool:
+        """
+        Determine if command should execute in main thread based on whitelist.
+
+        Commands in MAIN_THREAD_COMMANDS whitelist are known to be thread-sensitive
+        and will crash if executed in background thread pool.
+
+        Args:
+            command: PFC command name (e.g., "contact cmat default")
+
+        Returns:
+            bool: True if command must run in main thread, False for background thread
+
+        Examples:
+            >>> _should_run_in_main_thread("contact cmat default")
+            True  # In whitelist, thread-sensitive
+
+            >>> _should_run_in_main_thread("model solve")
+            False  # Not in whitelist, safe for background
+
+            >>> _should_run_in_main_thread("ball create")
+            False  # Default: background thread (non-blocking)
+        """
+        # Check whitelist for known thread-sensitive commands
+        for sensitive_cmd in self.MAIN_THREAD_COMMANDS:
+            if command.startswith(sensitive_cmd):
+                return True
+
+        # Default: execute in background thread (safe, non-blocking)
+        return False
 
     def _execute_pfc_command_sync(self, cmd_str: str) -> Any:
         """
@@ -61,6 +107,61 @@ class PFCCommandExecutor:
             # Convert to regular Exception to prevent event loop corruption
             raise RuntimeError(f"Critical PFC error: {str(e)}") from e
 
+    def _execute_via_callback(self, callback_name: str, callback_func: callable, cmd_str: str):
+        """
+        Execute command in main thread via PFC callback mechanism.
+
+        This method registers a callback, triggers it with model cycle 1,
+        and then removes it. The callback executes in PFC's main thread.
+
+        Args:
+            callback_name: Unique name for the callback
+            callback_func: Callback function that will execute the command
+            cmd_str: Command string (for logging only)
+
+        Note:
+            model cycle 1 is safe and commonly used to "activate" new settings
+            in PFC. It doesn't affect simulation results.
+
+        Implementation:
+            PFC expects callback functions in IPython main thread's global namespace.
+            Since we run in background thread, we must access __main__ module's
+            namespace (where IPython and PFC share the same globals).
+        """
+        # Get __main__ module's namespace (IPython main thread globals)
+        main_globals = sys.modules['__main__'].__dict__
+
+        try:
+            # Register callback function to __main__ namespace
+            # PFC's set_callback looks for functions in main thread's globals()
+            main_globals[callback_name] = callback_func
+
+            # Register callback with PFC
+            self.itasca.set_callback(callback_name, -1)
+
+            # Trigger callback via model cycle 1 (executes in main thread)
+            self.itasca.command("model cycle 1")
+
+            # Remove callback registration
+            self.itasca.remove_callback(callback_name, -1)
+
+            # Clean up: remove function from __main__ namespace
+            if callback_name in main_globals:
+                del main_globals[callback_name]
+
+        except Exception as e:
+            # Ensure complete cleanup even if error occurs
+            try:
+                self.itasca.remove_callback(callback_name, -1)
+            except:
+                pass
+            try:
+                if callback_name in main_globals:
+                    del main_globals[callback_name]
+            except:
+                pass
+            raise
+
     async def execute_command(
         self,
         command: str,
@@ -68,11 +169,17 @@ class PFCCommandExecutor:
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Execute a native PFC command and return the result.
+        Execute a native PFC command with automatic hybrid execution strategy.
 
         This method assembles a complete PFC command string from the command name,
         optional positional argument, and optional keyword parameters, then executes
-        via itasca.command().
+        via itasca.command() using either main thread or background thread pool.
+
+        Execution mode is automatically determined by internal whitelist:
+        - Main Thread: Thread-sensitive commands that crash in thread pool
+          Examples: "contact cmat default" (requires main thread context)
+        - Background Thread: All other commands (long-running, compute-intensive)
+          Examples: "model solve cycle 10000" (non-blocking, keeps WebSocket alive)
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
@@ -95,6 +202,10 @@ class PFCCommandExecutor:
                 - status: Literal["success", "error"] - Operation outcome
                 - message: str - User-friendly message (success description or error details)
                 - data: Optional[Any] - Command result data (success only)
+
+        Note:
+            Execution mode is logged for debugging. Check logs for [MAIN THREAD] or
+            [BACKGROUND THREAD] markers to understand execution behavior.
         """
         cmd_str = None
 
@@ -109,12 +220,48 @@ class PFCCommandExecutor:
             # Assemble complete PFC command string
             params = params or {}  # Handle None params
             cmd_str = self._assemble_command(command, arg, params)
-            logger.info(f"Executing PFC command: {cmd_str}")
 
-            # Execute native PFC command directly in main thread
-            # Note: This blocks the event loop but is required for certain PFC commands
-            # (e.g., 'contact cmat default') that crash when executed in thread pool
-            result = self.itasca.command(cmd_str)
+            # Determine execution mode based on command whitelist
+            use_main_thread = self._should_run_in_main_thread(command)
+
+            if use_main_thread:
+                # Main thread execution via PFC callback mechanism
+                # This allows execution in main thread without blocking the event loop
+                logger.info(f"Executing PFC command [MAIN THREAD via callback]: {cmd_str}")
+
+                # Container to capture result from callback
+                callback_result = {'result': None, 'error': None}
+
+                def pfc_callback(*args):
+                    """Temporary callback executed in PFC main thread during model cycle"""
+                    try:
+                        callback_result['result'] = self.itasca.command(cmd_str)
+                    except Exception as e:
+                        callback_result['error'] = str(e)
+
+                # Generate unique callback name
+                callback_name = f"pfc_cmd_{id(pfc_callback)}"
+
+                # Execute in thread pool to avoid blocking event loop
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self._execute_via_callback,
+                                          callback_name, pfc_callback, cmd_str)
+
+                # Check for errors
+                if callback_result['error']:
+                    raise RuntimeError(callback_result['error'])
+
+                result = callback_result['result']
+            else:
+                # Background thread execution: Non-blocking, allows WebSocket to remain responsive
+                # Examples: "model solve cycle 10000" (long-running, thread-safe)
+                logger.info(f"Executing PFC command [BACKGROUND THREAD]: {cmd_str}")
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,  # Use default thread pool executor
+                    self._execute_pfc_command_sync,
+                    cmd_str
+                )
 
             # Serialize result for response
             serialized_result = self._serialize_result(result)
