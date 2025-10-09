@@ -9,7 +9,7 @@ mechanism to ensure thread safety.
 Architecture:
 - WebSocket Server: Background thread (non-blocking, accepts connections)
 - Command Execution: Main thread via queue (thread-safe for PFC)
-- Task Processing: IPython post_execute hook (automatic) OR manual loop
+- Task Processing: IPython post_execute hook (triggered by any IPython command)
 
 Usage in PFC GUI IPython shell:
     >>> import sys
@@ -17,10 +17,12 @@ Usage in PFC GUI IPython shell:
     >>> exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc_workspace\\start_server.py', encoding='utf-8').read())
 
 Features:
-    - IPython shell remains interactive (not blocked)
+    - IPython shell remains fully interactive (not blocked)
     - All PFC commands execute in main thread (thread-safe)
+    - Task processing via IPython hook (any command triggers processing)
     - Supports callback-based commands (contact cmat, etc.)
     - Long timeout configuration for long-running tasks
+    - Thread detection and logging for debugging
 
 Python 3.6 compatible implementation.
 """
@@ -127,10 +129,11 @@ try:
 
     ip = get_ipython()
     if ip:
-        # Register post_execute hook
+        # Register post_execute hook (MAIN THREAD execution)
         ip.events.register('post_execute', main_executor.process_tasks)
         print("✓ IPython post_execute hook registered")
-        print("  → Tasks will auto-process after each IPython command")
+        print("  → Tasks will process after each IPython command")
+        print("  → Or use: run_task_loop() for continuous processing")
         processing_mode = "hook"
     else:
         print("⚠ Not in IPython environment")
@@ -213,7 +216,11 @@ def server_status():
     print("Commands:")
     print("  • server_status()      - Show this status")
     print("  • get_queue_size()     - Get pending task count")
-    print("  • run_task_loop()      - Switch to continuous processing mode")
+    print("  • run_task_loop()      - Run continuous processing loop")
+    print()
+    print("Trigger Task Processing:")
+    print("  • Run any IPython command (e.g., pass, 1+1)")
+    print("  • Or use: run_task_loop() for continuous mode")
     print("=" * 70)
 
 # ===== Startup Complete =====
@@ -226,8 +233,8 @@ print("Server URL: ws://{}:{}".format(HOST, PORT))
 print()
 print("Task Processing:")
 if processing_mode == "hook":
-    print("  • Mode: IPython Hook (automatic)")
-    print("  • Trigger: Any IPython command")
+    print("  • Mode: IPython Hook (MAIN THREAD execution)")
+    print("  • Trigger: Any IPython command (e.g., pass, 1+1)")
     print("  • Shell: Interactive (not blocked)")
 else:
     print("  • Mode: Manual")
@@ -236,7 +243,7 @@ print()
 print("Available Commands:")
 print("  • server_status()      - Show server status")
 print("  • get_queue_size()     - Get pending task count")
-print("  • run_task_loop()      - Switch to continuous processing mode")
+print("  • run_task_loop()      - Run continuous processing loop")
 print()
 print("=" * 70)
 
