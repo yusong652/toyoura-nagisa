@@ -12,9 +12,17 @@ import logging
 from typing import Any, Dict, Optional
 
 from .main_thread_executor import MainThreadExecutor
+from .task_manager import TaskManager
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
+
+# Long-running commands that should return immediately with task ID
+LONG_RUNNING_COMMANDS = {
+    "model solve",
+    "model cycle",
+    # Add more long-running commands as needed
+}
 
 
 class PFCCommandExecutor:
@@ -25,15 +33,17 @@ class PFCCommandExecutor:
     to ensure thread safety and support for callback-based commands.
     """
 
-    def __init__(self, main_executor):
-        # type: (MainThreadExecutor) -> None
+    def __init__(self, main_executor, task_manager):
+        # type: (MainThreadExecutor, TaskManager) -> None
         """
-        Initialize executor with itasca module and main thread executor.
+        Initialize executor with itasca module, main thread executor, and task manager.
 
         Args:
             main_executor: Main thread executor for queue-based execution
+            task_manager: Task manager for long-running task tracking
         """
         self.main_executor = main_executor
+        self.task_manager = task_manager
 
         try:
             import itasca  # type: ignore
@@ -42,6 +52,19 @@ class PFCCommandExecutor:
         except ImportError:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
+
+    def _is_long_running_command(self, command):
+        # type: (str) -> bool
+        """
+        Check if a command is classified as long-running.
+
+        Args:
+            command: PFC command name (e.g., "model solve", "model cycle")
+
+        Returns:
+            bool: True if command is long-running, False otherwise
+        """
+        return any(command.startswith(cmd) for cmd in LONG_RUNNING_COMMANDS)
 
     def _execute_pfc_command_sync(self, cmd_str):
         # type: (str) -> Any
@@ -80,6 +103,11 @@ class PFCCommandExecutor:
         optional positional argument, and optional keyword parameters, then submits
         it to the main thread queue for execution.
 
+        Long-running commands (e.g., "model solve", "model cycle") return immediately
+        with a task ID. Use check_task_status() to query task progress.
+
+        Short-running commands wait for completion and return results immediately.
+
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
             arg: Optional single positional argument (value without keyword) using native Python types
@@ -98,9 +126,14 @@ class PFCCommandExecutor:
 
         Returns:
             Result dictionary following ToolResult pattern:
-                - status: Literal["success", "error"] - Operation outcome
-                - message: str - User-friendly message (success description or error details)
-                - data: Optional[Any] - Command result data (success only)
+                For short tasks:
+                    - status: "success" or "error"
+                    - message: User-friendly message
+                    - data: Command result data
+                For long tasks:
+                    - status: "pending"
+                    - message: Task submission confirmation
+                    - data: {"task_id": str, "command": str}
 
         Note:
             All commands execute in IPython main thread via queue mechanism.
@@ -120,7 +153,12 @@ class PFCCommandExecutor:
             params = params or {}  # Handle None params
             cmd_str = self._assemble_command(command, arg, params)
 
-            logger.info("Submitting PFC command to main thread: {}".format(cmd_str))
+            # Check if this is a long-running command
+            is_long_task = self._is_long_running_command(command)
+
+            logger.info("Submitting PFC command to main thread: {} [{}]".format(
+                cmd_str, "LONG TASK" if is_long_task else "SHORT TASK"
+            ))
 
             # Submit to main thread queue
             future = self.main_executor.submit(
@@ -128,32 +166,46 @@ class PFCCommandExecutor:
                 cmd_str
             )
 
-            # Wait for main thread to execute (async)
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,  # Use default thread pool
-                future.result,  # Block until main thread processes
-                300  # 5 minutes timeout
-            )
+            if is_long_task:
+                # Long task: register with task manager and return immediately
+                task_id = self.task_manager.create_task(future, cmd_str)
 
-            # Serialize result for response
-            serialized_result = self._serialize_result(result)
+                return {
+                    "status": "pending",
+                    "message": "Long-running task submitted: {}\nUse check_task_status tool to query progress.".format(cmd_str),
+                    "data": {
+                        "task_id": task_id,
+                        "command": cmd_str
+                    }
+                }
 
-            # Build message based on whether there's a return value
-            if serialized_result is not None:
-                message = "PFC command executed: {}\nResult: {}".format(
-                    cmd_str, serialized_result
-                )
             else:
-                message = "PFC command executed: {}".format(cmd_str)
+                # Short task: wait for completion
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,  # Use default thread pool
+                    future.result,  # Block until main thread processes
+                    60  # 1 minute timeout for short tasks
+                )
 
-            logger.info("✓ PFC command successful: {}".format(cmd_str))
+                # Serialize result for response
+                serialized_result = self._serialize_result(result)
 
-            return {
-                "status": "success",
-                "message": message,
-                "data": serialized_result
-            }
+                # Build message based on whether there's a return value
+                if serialized_result is not None:
+                    message = "PFC command executed: {}\nResult: {}".format(
+                        cmd_str, serialized_result
+                    )
+                else:
+                    message = "PFC command executed: {}".format(cmd_str)
+
+                logger.info("✓ PFC command successful: {}".format(cmd_str))
+
+                return {
+                    "status": "success",
+                    "message": message,
+                    "data": serialized_result
+                }
 
         except asyncio.CancelledError:
             # Handle task cancellation separately

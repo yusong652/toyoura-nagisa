@@ -488,6 +488,195 @@ class PFCWebSocketClient:
         # Fallback: should never reach here due to retry logic
         raise RuntimeError("Unexpected code path in send_script")
 
+    async def check_task_status(
+        self,
+        task_id: str,
+        timeout: float = 10.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Check status of a long-running task.
+
+        Args:
+            task_id: Task ID returned by long-running command submission
+            timeout: Query timeout in seconds (default: 10.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary with structure:
+                - type: "result" - Message type identifier
+                - command_id: str - Unique command identifier
+                - status: Literal["running", "success", "error", "not_found"] - Task status
+                - message: str - Status description with elapsed time
+                - data: Optional[Any] - Task result (when completed) or progress info (when running)
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If status query times out
+
+        Note:
+            This is NOT a PFC command - it queries the TaskManager directly.
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                command_id = str(uuid4())
+
+                # Create status query message
+                message = {
+                    "type": "check_task_status",
+                    "command_id": command_id,
+                    "task_id": task_id
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_commands[command_id] = future
+
+                try:
+                    # Send query
+                    await self.websocket.send(json.dumps(message))
+                    logger.debug(f"Task status query sent: {command_id} - Task ID: {task_id}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_commands.pop(command_id, None)
+                    raise TimeoutError(f"Task status query timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to query task status after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"Task status query failed: {e}")
+                raise
+
+        raise RuntimeError("Unexpected code path in check_task_status")
+
+    async def list_tasks(
+        self,
+        timeout: float = 10.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        List all tracked long-running tasks.
+
+        Args:
+            timeout: Query timeout in seconds (default: 10.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary with structure:
+                - type: "result" - Message type identifier
+                - command_id: str - Unique command identifier
+                - status: "success" - Always success (empty list if no tasks)
+                - message: str - Summary message
+                - data: List[Dict] - List of task info dictionaries:
+                    - task_id: str
+                    - command: str
+                    - status: Literal["running", "completed", "failed"]
+                    - elapsed_time: float
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If list query times out
+
+        Note:
+            This is NOT a PFC command - it queries the TaskManager directly.
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                command_id = str(uuid4())
+
+                # Create list tasks message
+                message = {
+                    "type": "list_tasks",
+                    "command_id": command_id
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_commands[command_id] = future
+
+                try:
+                    # Send query
+                    await self.websocket.send(json.dumps(message))
+                    logger.debug(f"List tasks query sent: {command_id}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_commands.pop(command_id, None)
+                    raise TimeoutError(f"List tasks query timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to list tasks after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"List tasks query failed: {e}")
+                raise
+
+        raise RuntimeError("Unexpected code path in list_tasks")
+
     async def ping(self) -> bool:
         """
         Send ping to check server connectivity.

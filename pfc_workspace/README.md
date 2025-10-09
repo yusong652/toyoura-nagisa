@@ -1,249 +1,364 @@
-# PFC Server - ITASCA PFC WebSocket Communication Bridge
+# PFC Server - Advanced WebSocket Integration for ITASCA PFC
 
-> **Real-time bidirectional communication between aiNagisa and ITASCA PFC software**
+> **Production-grade real-time communication between aiNagisa and ITASCA PFC with non-blocking task management**
 
-This UV workspace member provides a lightweight WebSocket server that enables aiNagisa to control ITASCA PFC simulations remotely. The server runs directly in PFC's Python environment (GUI IPython shell or command-line console) and exposes the ITASCA SDK through a WebSocket API.
+WebSocket server enabling remote PFC control through aiNagisa. Features hybrid execution architecture, automatic task classification, and PFC best practice integration for progress monitoring.
 
 ## 🎯 Key Features
 
-- ✅ **Zero External Dependencies**: Runs inside PFC's Python environment with direct `itasca` module access
-- ✅ **Dual Startup Modes**: Launch from GUI IPython shell OR command-line console
-- ✅ **Real-time Communication**: WebSocket for low-latency bidirectional communication
-- ✅ **Background Execution**: Non-blocking server mode allows continued PFC use
-- ✅ **Type-Safe Protocol**: Structured JSON messages with clear error handling
-- ✅ **MCP Integration**: Seamless integration with aiNagisa's Model Context Protocol
+- ✅ **Hybrid Execution Architecture**: Background server + main thread command execution
+- ✅ **Smart Task Classification**: Auto-detect short vs long-running operations
+- ✅ **Non-blocking Execution**: Long tasks return task_id immediately, query progress later
+- ✅ **Main Thread Safety**: All commands execute in IPython main thread (callback-safe)
+- ✅ **Script Support**: Run Python scripts with progress monitoring (PFC standard practice)
+- ✅ **Type-Driven API**: Native Python types → PFC command strings
+- ✅ **Zero Dependencies**: Runs in PFC's Python environment with direct `itasca` access
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          aiNagisa Backend                               │
+│  ┌─────────────────┐        ┌──────────────────┐                      │
+│  │  MCP Tools      │        │  WebSocket       │                      │
+│  │  - pfc_command  │───────►│  Client          │                      │
+│  │  - pfc_script   │        │  - Auto-reconnect│                      │
+│  │  - check_status │        │  - Retry logic   │                      │
+│  └─────────────────┘        └──────────────────┘                      │
+└──────────────────────────────────│──────────────────────────────────────┘
+                                   │ WebSocket (ws://localhost:9001)
+┌──────────────────────────────────▼──────────────────────────────────────┐
+│                     PFC WebSocket Server (in PFC process)               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  Background Thread (WebSocket Server)                           │   │
+│  │  - Accept connections, handle messages (non-blocking)           │   │
+│  └────────────┬────────────────────────────────┬───────────────────┘   │
+│               │                                │                        │
+│  ┌────────────▼──────────────┐   ┌────────────▼───────────────┐       │
+│  │  Executor                 │   │  ScriptExecutor            │       │
+│  │  - Task classification    │   │  - File execution          │       │
+│  │  - Type-driven assembly   │   │  - Output capture          │       │
+│  └────────────┬──────────────┘   └────────────┬───────────────┘       │
+│               │                                │                        │
+│  ┌────────────▼────────────────────────────────▼───────────────┐       │
+│  │  MainThreadExecutor (Queue + IPython Hook)                  │       │
+│  │  - Thread-safe queue → Future objects                       │       │
+│  │  - Executes in IPython main thread                         │       │
+│  └────────────┬────────────────────────────────────────────────┘       │
+│               │                                                         │
+│  ┌────────────▼─────────────────────────────────────────────────┐      │
+│  │  ITASCA PFC SDK (itasca module) - MAIN THREAD ONLY          │      │
+│  │  - Thread-sensitive callbacks (contact models, etc.)         │      │
+│  └──────────────────────────────────────────────────────────────┘      │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────┐       │
+│  │  TaskManager (Independent tracking)                         │       │
+│  │  - Non-blocking status queries (NOT PFC commands)           │       │
+│  │  - Long-running task lifecycle management                   │       │
+│  └─────────────────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Task Classification:**
+- **Short tasks** → Execute & wait → Return result immediately
+  - Examples: `model domain`, `ball generate`, `contact cmat`
+- **Long tasks** → Submit & return task_id → Query status later
+  - Examples: `model solve cycle 80000`, custom scripts
+
+## 🚀 Quick Start
+
+### 1. Install Dependencies
+
+```bash
+# In PFC Python environment (one time setup)
+pip install websockets
+
+# In aiNagisa environment
+cd aiNagisa
+uv sync
+```
+
+### 2. Start PFC Server
+
+In PFC GUI IPython shell or console Python mode:
+
+```python
+import sys
+sys.path.append(r'C:\Dev\Han\aiNagisa\pfc_workspace')  # Your path
+exec(open(r'C:\Dev\Han\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
+```
+
+You'll see:
+```
+======================================================================
+PFC WebSocket Server Status
+======================================================================
+Server:
+  • URL: ws://localhost:9001
+  • Running: True
+
+Task Processing Mode: hook (auto-process on any IPython command)
+
+Commands: server_status(), get_queue_size(), run_task_loop()
+======================================================================
+```
+
+### 3. Test Integration
+
+```bash
+# Run comprehensive demo (with PFC server running)
+uv run python DEMo.py
+```
+
+Validates: normal tasks, long tasks, status queries, WebSocket responsiveness, main thread execution.
+
+### 4. Use in aiNagisa
+
+Start backend, select "PFC Expert" profile, chat!
+
+```
+User: Create 500 balls with radius 0.5, then run 80000 cycles
+AI: [Creates balls → immediate result]
+    [Submits long task → task_id returned]
+    ⏳ Task submitted: 3614a7dd...
+    Use check_task_status to query progress
+```
+
+## 📖 Usage Examples
+
+### Normal Tasks (Immediate Results)
+
+```python
+# Via MCP tool or direct WebSocket
+command = "ball generate"
+params = {"number": 500, "radius": 0.5, "box": "-7 7"}
+
+# Returns immediately:
+{
+  "status": "success",
+  "message": "PFC command executed: ball generate number 500 radius 0.5 box -7 7",
+  "data": null
+}
+```
+
+### Long Tasks (Non-blocking)
+
+```python
+# Submit long task
+command = "model solve"
+params = {"cycle": 80000}
+
+# Returns immediately with task_id:
+{
+  "status": "pending",
+  "message": "Task submitted. Use check_task_status to query progress.",
+  "data": {
+    "task_id": "3614a7dd-30bd-47e6-afcd-10de810ff2bc",
+    "command": "model solve cycle 80000"
+  }
+}
+
+# Query status (non-blocking)
+check_task_status(task_id="3614a7dd...")
+# → "running" (elapsed 15s)
+# → "success" (elapsed 59s, completed)
+```
+
+### Script Execution (PFC Best Practice)
+
+For long tasks with progress, use segmented scripts:
+
+```python
+# progress_simulation.py
+import itasca
+
+total_cycles = 100000
+checkpoint = 10000
+
+for i in range(0, total_cycles, checkpoint):
+    itasca.command(f"model cycle {checkpoint}")
+    completed = i + checkpoint
+    print(f"Progress: {completed}/{total_cycles} ({completed/total_cycles*100:.1f}%)")
+    print(f"Unbalanced force: {itasca.mech.unbalanced_force()}")
+
+print("Simulation completed!")
+```
+
+Submit via `send_script()` → returns task_id → query to see accumulated output.
+
+**Why scripts?** PFC commands can't be stopped mid-execution. Segmented scripts enable:
+- Progress monitoring at checkpoints
+- State inspection (convergence, forces)
+- Early termination decisions
+- **This is PFC users' standard practice**
+
+## 🔧 Technical Details
+
+### Type-Driven Command Assembly
+
+Python types → PFC format automatically:
+
+```python
+arg=True               → "true"
+arg=9.81               → "9.81"
+arg=(0, 0, -9.81)      → "(0,0,-9.81)"
+arg="linear"           → '"linear"'
+params={"property": None}  → "property"  # Boolean flag
+```
+
+### Communication Protocol
+
+**Command → Result:**
+```json
+// Request
+{"type": "command", "command": "model gravity", "arg": [0, 0, -9.81], "params": {}}
+
+// Short task result (immediate)
+{"status": "success", "message": "PFC command executed: model gravity (0,0,-9.81)"}
+
+// Long task result (immediate)
+{"status": "pending", "data": {"task_id": "uuid", "command": "model solve cycle 80000"}}
+```
+
+**Status Query → Response:**
+```json
+// Request
+{"type": "check_task_status", "task_id": "uuid"}
+
+// Running
+{"status": "running", "message": "Task executing (15.23s)", "data": {"elapsed_time": 15.23}}
+
+// Completed
+{"status": "success", "message": "Task completed (59.17s)"}
+```
+
+### Architecture Highlights
+
+1. **Separation of Concerns**
+   - Executor: Execute commands only
+   - TaskManager: Track lifecycle only
+   - Server: Coordinate routing
+   - Status queries bypass Executor (not PFC commands!)
+
+2. **Non-blocking Design**
+   - Long tasks return immediately
+   - Client stays responsive
+   - No thread pool exhaustion
+
+3. **Main Thread Safety**
+   - All PFC commands → IPython main thread queue
+   - Thread-sensitive callbacks work correctly
+   - Processing triggered by IPython hook
+
+## 🐛 Troubleshooting
+
+**Server won't start**
+```python
+# Install websockets in PFC Python
+>>> import subprocess
+>>> subprocess.run(["pip", "install", "websockets"])
+```
+
+**Tasks not processing**
+```python
+# IPython Hook Mode: Run any command to trigger
+>>> pass  # or 1+1
+
+# Check queue
+>>> get_queue_size()
+
+# Continuous mode (blocks shell)
+>>> run_task_loop()
+```
+
+**Long task timeout**
+- Task should return task_id immediately
+- Add command to `LONG_RUNNING_COMMANDS` in `executor.py`:
+  ```python
+  LONG_RUNNING_COMMANDS = {
+      "model solve",
+      "model cycle",
+      "your_custom_long_command",  # Add here
+  }
+  ```
+
+**Connection failed**
+- Server running? Check `server_status()`
+- Port 9001 free? Check for conflicts
+- Firewall? Allow localhost:9001
 
 ## 📁 Project Structure
 
 ```
 pfc_workspace/
-├── pfc_server/              # WebSocket server package
-│   ├── __init__.py
-│   └── server.py            # Main server implementation
-├── start_server.py          # Startup script for PFC Python console
-├── requirements.txt         # PFC Python environment dependencies
-├── pyproject.toml           # UV workspace configuration
-├── README.md                # This file
-└── QUICKSTART.md            # Quick start guide
+├── pfc_server/
+│   ├── server.py                 # WebSocket server + routing
+│   ├── executor.py               # Command executor + task classification
+│   ├── script_executor.py        # Python script execution
+│   ├── main_thread_executor.py   # Queue-based main thread execution
+│   └── task_manager.py           # Long-running task tracking
+├── start_server.py               # Startup script (hybrid architecture)
+├── config_example.py             # Configuration template
+└── README.md                     # This file
 ```
 
-## 📋 Prerequisites
+## 🎓 Best Practices
 
-### PFC Python Environment Setup
+**DO:**
+- ✅ Use segmented scripts for long simulations (PFC standard practice)
+- ✅ Query task status instead of waiting for long tasks
+- ✅ Pass native Python types (auto-converted to PFC format)
+- ✅ Run any IPython command (`pass`) to trigger task processing
 
-The server requires `websockets` package in PFC's Python environment.
-
-**Install dependencies in PFC Python:**
-
-```bash
-# Using PFC's pip (replace path with your PFC installation)
-"C:\Program Files\Itasca\PFC700\exe64\python36\Scripts\pip.exe" install -r "C:\Dev\Han\aiNagisa\pfc_workspace\requirements.txt"
-```
-
-**Verify installation:**
-
-```bash
-"C:\Program Files\Itasca\PFC700\exe64\python36\Scripts\pip.exe" list | findstr websockets
-```
-
-Expected: `websockets (9.x or higher)`
-
-## 🚀 Quick Start
-
-### 1. Start PFC Server
-
-**In PFC GUI Python Shell or Console**:
-
-```python
-# Add workspace to Python path and run startup script
-import sys
-sys.path.append(r'<AINAGISA_ROOT>\pfc_workspace')
-exec(open(r'<AINAGISA_ROOT>\pfc_workspace\start_server.py', encoding='utf-8').read())
-```
-
-**Example** (replace with your actual path):
-```python
-import sys
-sys.path.append(r'D:\Projects\aiNagisa\pfc_workspace')
-exec(open(r'D:\Projects\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
-```
-
-### 2. Use in aiNagisa
-
-Start backend and select **PFC Expert** profile in frontend:
-
-```
-User: Create a ball with radius 0.5 and run 1000 cycles
-AI: [Uses pfc_execute_command tool automatically]
-```
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐    WebSocket     ┌──────────────────────┐    Python API    ┌──────────────────┐
-│  aiNagisa Backend   │◄────────────────►│   PFC Server         │◄────────────────►│  ITASCA PFC SDK  │
-│  (MCP Tool)         │  ws://localhost  │   (in PFC process)   │   Direct import  │  (itasca module) │
-│  pfc_execute_cmd    │     :9001        │   • Command executor │                  │  • ball.create   │
-│                     │                  │   • Message handler  │                  │  • cycle         │
-│                     │                  │   • Error handling   │                  │  • ball.list     │
-└─────────────────────┘                  └──────────────────────┘                  └──────────────────┘
-```
-
-**Key Design Decisions**:
-
-1. **Single-file server**: All server logic in `server.py` (~300 lines) for easy deployment
-2. **In-process execution**: Server runs in PFC's Python process for direct SDK access
-3. **Async WebSocket**: Using `websockets` library for efficient I/O
-4. **Command-based protocol**: Simple JSON messages for flexibility
-
-## 📚 MCP Tool
-
-The server exposes a single unified MCP tool through aiNagisa:
-
-**`pfc_execute_command`** - Execute any ITASCA PFC SDK command
-
-Supports two command patterns:
-- **String commands**: `command="command"`, `params='{"cmd": "ball create radius 0.5"}'`
-- **Direct API calls**: `command="ball.count"`, `params='{}' (optional)`
-
-Example usage in chat:
-```
-User: Create a ball with radius 0.5
-AI: [Uses pfc_execute_command with command="command", params='{"cmd": "ball create radius 0.5"}']
-
-User: How many balls are there?
-AI: [Uses pfc_execute_command with command="ball.count"]
-```
-
-## 🔧 Technical Details
-
-### Communication Protocol
-
-**Command Message** (aiNagisa → PFC):
-```json
-{
-  "type": "command",
-  "command_id": "uuid-v4",
-  "command": "ball.create",
-  "params": {
-    "radius": 0.5,
-    "position": [0, 0, 0]
-  }
-}
-```
-
-**Result Message** (PFC → aiNagisa):
-```json
-{
-  "type": "result",
-  "command_id": "uuid-v4",
-  "status": "success",
-  "data": {"ball_id": 12345},
-  "message": "Ball created successfully"
-}
-```
-
-**Event Message** (PFC → aiNagisa, async):
-```json
-{
-  "type": "event",
-  "event_type": "simulation_progress",
-  "data": {"step": 1000, "total": 10000}
-}
-```
-
-### Error Handling
-
-All errors return standardized responses:
-
-```json
-{
-  "type": "result",
-  "status": "error",
-  "message": "Command execution failed",
-  "error": "Detailed error message"
-}
-```
-
-### Server Implementation Highlights
-
-- **Async I/O**: `asyncio` and `websockets` for efficient concurrency
-- **Command Executor**: Parses dot-notation commands to SDK calls
-- **Result Serialization**: Converts PFC objects to JSON-safe types
-- **Connection Management**: Handles multiple simultaneous clients
-- **Graceful Shutdown**: Clean disconnect on Ctrl+C or PFC exit
+**DON'T:**
+- ❌ Submit large cycle counts as direct commands (use scripts)
+- ❌ Wait indefinitely for long tasks (use task_id + check_status)
+- ❌ Forget to trigger task processing in hook mode
 
 ## 🧪 Testing
 
-### Manual Test (without aiNagisa)
+```bash
+# Comprehensive integration test
+uv run python DEMo.py
 
-```python
-# In PFC Python environment
->>> from pfc_server import server
->>> server.start()  # Start in foreground for testing
+# Tests: normal tasks, long tasks, status queries, WebSocket
+#        responsiveness, task completion, main thread execution
 ```
 
-Then in another Python console:
+## 📚 Additional Resources
 
-```python
-import asyncio
-import websockets
-import json
+- **[DEMo.py](../DEMo.py)**: Complete integration example
+- **Backend Code**: `backend/infrastructure/pfc/` - WebSocket client & MCP tools
+- **[ITASCA PFC Docs](https://www.itascacg.com/software/pfc)**: Official PFC documentation
 
-async def test():
-    uri = "ws://localhost:9001"
-    async with websockets.connect(uri) as ws:
-        # Send command
-        await ws.send(json.dumps({
-            "type": "command",
-            "command_id": "test-123",
-            "command": "ball.create",
-            "params": {"radius": 0.5}
-        }))
+## 🔗 Configuration
 
-        # Receive result
-        result = await ws.recv()
-        print(json.loads(result))
+Optional: Create `config.py` from `config_example.py` to customize:
+- `WEBSOCKET_HOST`, `WEBSOCKET_PORT`
+- `PING_INTERVAL`, `PING_TIMEOUT` (for long tasks)
+- `AUTO_START_TASK_LOOP` (False = IPython hook mode)
 
-asyncio.run(test())
-```
+## 💡 Key Insights
 
-### Integration Test (with aiNagisa)
+**Why this architecture?**
+- PFC SDK callbacks are thread-sensitive → must use main thread
+- Long tasks block → need non-blocking submission
+- Progress monitoring required → scripts with checkpoints (PFC standard practice)
+- Can't stop PFC commands → segmented execution essential
 
-See [QUICKSTART.md](QUICKSTART.md) for full workflow testing.
+**Production-grade features:**
+- Task classification prevents timeouts
+- Non-blocking design maintains client responsiveness
+- Separation of concerns enables clean status queries
+- Type-driven API reduces string formatting errors
+- Main thread safety ensures callback compatibility
 
-## 📖 Documentation
+## 📄 License & Support
 
-- **[QUICKSTART.md](QUICKSTART.md)**: Step-by-step setup and usage guide
-- **Backend Code**: `backend/infrastructure/mcp/tools/pfc/` - MCP integration
-
-## 🐛 Troubleshooting
-
-### Server won't start
-- **Check**: Is `websockets` installed in PFC Python? (See Prerequisites section)
-- **Check**: Port 9001 available? (no conflicts)
-- **Check**: Using PFC's Python, not system Python
-
-### Connection failed
-- **Check**: Server running in PFC console? (look for "Server running" message)
-- **Check**: Firewall blocking localhost:9001?
-
-### Commands not executing
-- **Check**: Server logs in PFC console for error details
-- **Check**: Command syntax matches ITASCA SDK documentation
-
-See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
-
-## 📄 License
-
-Same as parent aiNagisa project.
-
-## 🔗 Links
-
-- [aiNagisa Repository](https://github.com/yusong652/aiNagisa)
-- [ITASCA PFC Documentation](https://www.itascacg.com/software/pfc)
-- [UV Workspace Documentation](https://docs.astral.sh/uv/concepts/workspaces/)
+- License: Same as parent aiNagisa project
+- Issues: https://github.com/yusong652/aiNagisa/issues
+- Repo: https://github.com/yusong652/aiNagisa
 
 ---
 
-**Built with ❤️ for seamless PFC-AI integration**
+**Built with ❤️ by Nagisa Toyoura (architecture) and Claude (implementation)**
