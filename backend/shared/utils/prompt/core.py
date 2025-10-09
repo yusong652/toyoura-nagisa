@@ -16,40 +16,43 @@ def _load_prompt_file(filename: str) -> str:
         return ""
 
 
-def get_base_prompt() -> str:
+def get_base_prompt(profile: str = "general") -> str:
     """
-    Load base system prompt.
-    Priority: environment variable NAGISA_BASE_PROMPT, then base_prompt.md file.
+    Load base system prompt based on agent profile.
+
+    Args:
+        profile: Agent profile type (e.g., "general", "pfc", "coding", "lifestyle")
+
+    Returns:
+        Base system prompt string
+
+    Priority:
+        1. Environment variable NAGISA_BASE_PROMPT (overrides all)
+        2. Profile-specific prompt file (e.g., pfc -> pfc_expert_prompt.md)
+        3. Default base_prompt.md
     """
     base_prompt_from_env = os.getenv("NAGISA_BASE_PROMPT")
     if base_prompt_from_env is not None:
         return base_prompt_from_env.strip()
-    
-    return _load_prompt_file("base_prompt.md")
+
+    # Profile-specific prompt mapping
+    profile_prompts = {
+        "pfc": "pfc_expert_prompt.md",  # Maps to AgentProfile.PFC = "pfc"
+        "general": "base_prompt.md",
+    }
+
+    # Get profile-specific prompt file, fallback to base_prompt.md
+    prompt_file = profile_prompts.get(profile, "base_prompt.md")
+    prompt = _load_prompt_file(prompt_file)
+
+    # If profile-specific file doesn't exist, fallback to base
+    if not prompt and profile != "general":
+        prompt = _load_prompt_file("base_prompt.md")
+
+    return prompt
 
 
 def get_expression_prompt() -> str:
     """Load expression/keyword instruction prompt"""
     return _load_prompt_file("expression_prompt.md")
-
-
-def get_tool_prompt() -> str:
-    """
-    DEPRECATED: Use build_system_prompt() for modern tool schema embedding with memory injection.
-    Load basic tool usage guide prompt with workspace root substitution.
-    
-    This function is kept for legacy compatibility only.
-    """
-    try:
-        from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
-        workspace_root = str(WORKSPACE_ROOT)
-    except ImportError:
-        # Fallback if import fails
-        workspace_root = str(BASE_DIR)
-    
-    prompt = _load_prompt_file("tool_prompt.md")
-    if prompt:
-        # Replace {workspace_root} placeholder with actual workspace path
-        prompt = prompt.replace("{workspace_root}", workspace_root)
-    return prompt
 

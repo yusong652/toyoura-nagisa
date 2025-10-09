@@ -76,10 +76,13 @@ class ToolProfileManager:
         "generate_image", "search_places", "get_location",
         "get_current_time",
         # Shared tool (only include once)
-        "web_search"
+        "web_search",
+        # PFC tools
+        "pfc_execute_command",
+        "pfc_execute_script"
     ]
 
-    # PFC simulation tools (coding tools + future PFC-specific tools)
+    # PFC simulation tools (coding tools + PFC-specific tools)
     PFC_TOOLS = [
         # File operation tools for PFC scripts and data files
         "write",
@@ -93,13 +96,9 @@ class ToolProfileManager:
         "grep",
         # Search tools for finding PFC documentation and examples
         "web_search",
-        # PFC-specific tools (to be added in the future)
-        # "pfc_execute",        # Execute PFC commands
-        # "pfc_model_create",   # Create models
-        # "pfc_model_query",    # Query model state
-        # "pfc_simulation_run", # Run simulations
-        # "pfc_data_extract",   # Extract data
-        # "pfc_visualization"   # Visualization
+        # PFC-specific tools (WebSocket-based ITASCA SDK control)
+        "pfc_execute_command",   # Execute native PFC commands (no return values)
+        "pfc_execute_script",    # Execute Python SDK scripts (with return values)
     ]
     
     # Tool profile definitions
@@ -124,9 +123,9 @@ class ToolProfileManager:
         
         AgentProfile.PFC: ToolProfile(
             name="PFC Expert",
-            description="ITASCA PFC simulation specialist with file operations and analysis tools",
+            description="ITASCA PFC simulation specialist with real-time SDK control and analysis tools",
             tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # Currently 10 basic tools, will expand in future
+            estimated_tokens=len(PFC_TOOLS) * 282,  # 12 tools: 10 basic + 2 PFC tools (command + script)
             color="#9C27B0",  # Purple
             icon="⚛️"
         ),
@@ -135,7 +134,7 @@ class ToolProfileManager:
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=GENERAL_TOOLS,
-            estimated_tokens=len(GENERAL_TOOLS) * 282,  # Using GENERAL_TOOLS length
+            estimated_tokens=len(GENERAL_TOOLS) * 282,  # Coding + Lifestyle + PFC tools
             color="#607D8B",  # Blue-grey
             icon="🤖"
         ),

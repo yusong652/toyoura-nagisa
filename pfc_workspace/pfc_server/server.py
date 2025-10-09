@@ -1,0 +1,330 @@
+"""
+PFC WebSocket Server - Lightweight server to run in PFC GUI IPython shell.
+
+This module provides WebSocket server components for remote PFC control.
+Server startup should be done via start_server.py script.
+"""
+
+import asyncio
+import json
+import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+import websockets
+from websockets.server import WebSocketServerProtocol #type: ignore
+
+from .executor import PFCCommandExecutor
+from .script_executor import PFCScriptExecutor
+from .main_thread_executor import MainThreadExecutor
+from .task_manager import TaskManager
+
+# Module logger
+logger = logging.getLogger("PFC-Server")
+
+
+class PFCWebSocketServer:
+    """WebSocket server for PFC command execution via main thread queue."""
+
+    def __init__(
+        self,
+        main_executor,  # type: MainThreadExecutor
+        host="localhost",  # type: str
+        port=9001,  # type: int
+        ping_interval=120,  # type: int
+        ping_timeout=300  # type: int
+    ):
+        # type: (...) -> None
+        """
+        Initialize WebSocket server.
+
+        Args:
+            main_executor: Main thread executor for queue-based command execution
+            host: Server host address (default: "localhost")
+            port: Server port number (default: 9001)
+            ping_interval: Interval between ping frames in seconds (default: 120)
+                Note: Longer interval (2 min) to accommodate long-running commands
+            ping_timeout: Timeout for pong response in seconds (default: 300)
+                Note: Longer timeout (5 min) to prevent disconnection during long tasks
+        """
+        self.main_executor = main_executor
+        self.host = host
+        self.port = port
+        self.ping_interval = ping_interval
+        self.ping_timeout = ping_timeout
+        self.task_manager = TaskManager()
+        self.executor = PFCCommandExecutor(main_executor, self.task_manager)
+        self.script_executor = PFCScriptExecutor(main_executor)
+        self.active_connections = set()
+        self.server = None
+
+    @staticmethod
+    def _truncate_message(message: str, max_length: int = 5000) -> str:
+        """
+        Truncate message if too long to prevent WebSocket/JSON size issues.
+
+        Args:
+            message: Original message string
+            max_length: Maximum message length (default: 5000 characters)
+
+        Returns:
+            Truncated message with indicator if truncation occurred
+        """
+        if len(message) <= max_length:
+            return message
+        return message[:max_length] + f"\n... (truncated from {len(message)} chars)"
+
+    async def handle_client(self, websocket: WebSocketServerProtocol, path: Optional[str] = None):
+        """
+        Handle WebSocket client connection.
+
+        Args:
+            websocket: WebSocket connection instance
+            path: Request path (for websockets 9.x compatibility)
+        """
+        client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        logger.info(f"✓ Client connected: {client_id}")
+        self.active_connections.add(websocket)
+
+        try:
+            async for message in websocket:
+                try:
+                    # Parse incoming message
+                    data = json.loads(message)
+                    logger.debug(f"Received message: {data}")
+
+                    msg_type = data.get("type", "command")
+
+                    if msg_type == "command":
+                        # Execute command
+                        command_id = data.get("command_id", "unknown")
+                        command = data.get("command", "")
+                        arg = data.get("arg")  # Single positional argument (can be None)
+                        params = data.get("params", {})
+
+                        result = await self.executor.execute_command(command, arg, params)
+
+                        # Truncate message before sending (prevent oversized JSON)
+                        if "message" in result:
+                            result["message"] = self._truncate_message(result["message"])
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "command_id": command_id,
+                            **result
+                        }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Command result sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {command_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "script":
+                        # Execute Python script from file path
+                        command_id = data.get("command_id", "unknown")
+                        script_path = data.get("script_path", "")
+
+                        result = await self.script_executor.execute_script(script_path)
+
+                        # Truncate message before sending (prevent oversized JSON)
+                        if "message" in result:
+                            result["message"] = self._truncate_message(result["message"])
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "command_id": command_id,
+                            **result
+                        }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Script result sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send script result, connection closed: {command_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "check_task_status":
+                        # Check long-running task status (not a PFC command, uses task manager directly)
+                        command_id = data.get("command_id", "unknown")
+                        task_id = data.get("task_id", "")
+
+                        result = self.task_manager.get_task_status(task_id)
+
+                        # Truncate message before sending
+                        if "message" in result:
+                            result["message"] = self._truncate_message(result["message"])
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "command_id": command_id,
+                            **result
+                        }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Task status sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send task status, connection closed: {command_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "list_tasks":
+                        # List all tracked long-running tasks (not a PFC command, uses task manager directly)
+                        command_id = data.get("command_id", "unknown")
+
+                        result = self.task_manager.list_all_tasks()
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "command_id": command_id,
+                            **result
+                        }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Task list sent: {command_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send task list, connection closed: {command_id}")
+                            break  # Exit message loop
+
+                    elif msg_type == "ping":
+                        # Respond to ping
+                        try:
+                            await websocket.send(json.dumps({
+                                "type": "pong",
+                                "timestamp": datetime.now().isoformat()
+                            }))
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning("Cannot send pong, connection closed")
+                            break  # Exit message loop
+
+                    else:
+                        logger.warning(f"Unknown message type: {msg_type}")
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON: {e}")
+                    try:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "Invalid JSON format",
+                            "error": str(e)
+                        }))
+                    except websockets.exceptions.ConnectionClosed:
+                        logger.warning("Cannot send error, connection closed")
+                        break  # Exit message loop
+
+                except Exception as e:
+                    logger.error(f"Message handling error: {e}")
+                    try:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "Internal server error",
+                            "error": str(e)
+                        }))
+                    except websockets.exceptions.ConnectionClosed:
+                        logger.warning("Cannot send error, connection closed")
+                        break  # Exit message loop
+
+        except websockets.exceptions.ConnectionClosed:
+            logger.info(f"✗ Client disconnected: {client_id}")
+
+        finally:
+            self.active_connections.discard(websocket)
+
+    async def broadcast_event(self, event_type: str, data: Dict[str, Any]):
+        """
+        Broadcast event to all connected clients.
+
+        Args:
+            event_type: Type of event (e.g., "simulation_progress")
+            data: Event data dictionary
+        """
+        if not self.active_connections:
+            return
+
+        message = json.dumps({
+            "type": "event",
+            "event_type": event_type,
+            "data": data,
+            "timestamp": datetime.now().isoformat()
+        })
+
+        # Send to all connected clients
+        disconnected = set()
+        for websocket in self.active_connections:
+            try:
+                await websocket.send(message)
+            except Exception as e:
+                logger.error(f"Failed to send event to client: {e}")
+                disconnected.add(websocket)
+
+        # Remove disconnected clients
+        self.active_connections -= disconnected
+
+    async def start(self):
+        """Start the WebSocket server (non-blocking)."""
+        logger.info(f"Starting PFC WebSocket Server on {self.host}:{self.port}")
+
+        try:
+            # Use websockets 9.1 compatible syntax (Python 3.6)
+            self.server = await websockets.serve(
+                self.handle_client,
+                self.host,
+                self.port,
+                ping_interval=self.ping_interval,
+                ping_timeout=self.ping_timeout
+            )
+            logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
+
+            # Note: Server is now running in the background
+            # websockets.serve() automatically handles connections via the event loop
+            # No need to block here - the server will continue running as long as
+            # the event loop is active
+
+        except Exception as e:
+            logger.error(f"Server error: {e}")
+            raise
+
+    async def wait_closed(self):
+        """Wait for server to close (for graceful shutdown)."""
+        if self.server:
+            await self.server.wait_closed()
+
+
+# Module-level utility function for creating server instances
+def create_server(
+    main_executor,  # type: MainThreadExecutor
+    host="localhost",  # type: str
+    port=9001,  # type: int
+    ping_interval=120,  # type: int
+    ping_timeout=300  # type: int
+):
+    # type: (...) -> PFCWebSocketServer
+    """
+    Create a PFC WebSocket server instance.
+
+    Args:
+        main_executor: Main thread executor for queue-based command execution
+        host: Server host address (default: "localhost")
+        port: Server port number (default: 9001)
+        ping_interval: Interval between ping frames in seconds (default: 120)
+            Note: Longer interval (2 min) to accommodate long-running commands
+        ping_timeout: Timeout for pong response in seconds (default: 300)
+            Note: Longer timeout (5 min) to prevent disconnection during long tasks
+
+    Returns:
+        PFCWebSocketServer: Server instance ready to be started
+
+    Example:
+        >>> from pfc_server.main_thread_executor import MainThreadExecutor
+        >>> from pfc_server.server import create_server
+        >>> executor = MainThreadExecutor()
+        >>> server = create_server(executor, host="localhost", port=9001)
+        >>> # Use with startup script
+    """
+    return PFCWebSocketServer(main_executor, host, port, ping_interval, ping_timeout)

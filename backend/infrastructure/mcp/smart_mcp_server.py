@@ -20,6 +20,7 @@ from backend.infrastructure.mcp.tools.lifestyle.tools.contacts import register_c
 from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_places_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_tools
+from backend.infrastructure.mcp.tools.pfc import register_pfc_tools, register_pfc_script_tool
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
@@ -42,6 +43,8 @@ register_contact_tools(mcp)
 register_places_tools(mcp)
 register_location_tools(mcp)
 register_time_tools(mcp)
+register_pfc_tools(mcp)
+register_pfc_script_tool(mcp)
 
 # 启动服务器
 if __name__ == "__main__":
