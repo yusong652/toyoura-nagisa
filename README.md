@@ -22,28 +22,19 @@
 
 ## 🚀 Core Philosophy
 
-aiNagisa is not just another chatbot. It's an exploration into creating a truly helpful and adaptive AI companion with blazing-fast performance. Our goal is to build a system that can learn, reason, and act in the world through a rich set of tools executed with intelligent parallel processing. We believe that the future of AI lies in its ability to seamlessly integrate with our digital lives while delivering exceptional speed and efficiency, and aiNagisa is our step in that direction.
+aiNagisa is not just another chatbot. It's an exploration into creating a truly helpful and adaptive AI companion. Our goal is to build a system that can learn, reason, and act in the world through a rich set of tools and intelligent orchestration. We believe that the future of AI lies in its ability to seamlessly integrate with our digital lives, and aiNagisa is our step in that direction.
 
 ## ✨ Key Innovations
 
-aiNagisa is built on a foundation of several key technical innovations that deliver exceptional performance and set it apart:
+aiNagisa is built on a foundation of several key technical innovations:
 
-### 🚀 **Parallel Tool Execution with Intelligent Batching**
+### 🧠 **Agent Profile-Based Tool System with `FastMCP`**
 
-aiNagisa features a revolutionary **parallel tool execution system** that delivers 60-70% faster performance for multi-tool scenarios. This intelligent batching system automatically determines the optimal execution strategy based on the number and nature of tool calls.
+At the heart of aiNagisa is the **Model Context Protocol (MCP)**, a powerful tool orchestration engine. Unlike traditional chatbots with hardcoded tool integrations, aiNagisa features a flexible agent profile system.
 
-- **Intelligent Execution Strategy**: Single tools run immediately, while multiple tools (3+) execute concurrently using `asyncio.gather()` for maximum throughput
-- **Error Isolation**: Failed tools don't prevent other tools from executing, ensuring robust operation even with partial failures
-- **Real-time Progress Tracking**: Live notifications for parallel execution progress with detailed batch status updates
-- **LLM-Driven Independence**: Trusts the LLM's judgment on tool independence and execution order, enabling sophisticated parallel workflows
-
-### 🧠 **Autonomous Tool Orchestration with `FastMCP`**
-
-At the heart of aiNagisa is the **Model Context Protocol (MCP)**, a powerful tool orchestration engine. Unlike traditional chatbots with hardcoded tool integrations, aiNagisa features a dynamic, semantic tool discovery and invocation system.
-
-- **Semantic Tool Search**: We use a `ToolVectorizer` to embed the descriptions and capabilities of all available tools into a vector space. When a user makes a request, the LLM can query this vector space to find the most relevant tools for the task at hand. This allows for a much more flexible and extensible tool system.
-- **Dynamic Tool Loading**: Tools are categorized and can be loaded on-demand, making the system lightweight and scalable. The LLM can request tool categories based on the task, and the MCP will provide the necessary tools.
-- **Chain of Thought (CoT) and Tool Use**: The system supports complex, multi-step tasks by allowing the LLM to chain together multiple tool calls. The LLM can reason about the results of one tool and use them as input for another, enabling sophisticated workflows.
+- **Agent Profile System**: Tools are organized into categories (coding, lifestyle, communication, etc.) and loaded based on agent profiles, ensuring the LLM has access to relevant capabilities for specific tasks
+- **Dynamic Tool Loading**: Different agent profiles (General, PFC Expert, etc.) activate appropriate tool categories, making the system lightweight and context-appropriate
+- **Multi-Step Reasoning**: The system supports complex workflows by allowing the LLM to chain together multiple tool calls, reasoning about results and using them as input for subsequent operations
 
 ### 📚 **Intelligent Long-Term Memory with Mem0**
 
@@ -61,7 +52,7 @@ aiNagisa features an advanced long-term memory system powered by Mem0 that autom
 aiNagisa features a sophisticated **unified LLM architecture** with a shared base class that ensures consistent behavior across all providers while enabling provider-specific optimizations.
 
 - **Unified Base Architecture**: All LLM providers (Gemini, OpenAI, Anthropic, Local) inherit from a common `LLMClientBase` with standardized streaming interfaces
-- **Provider-Specific Optimizations**: Each provider maintains its unique capabilities while benefiting from shared parallel execution and tool orchestration
+- **Provider-Specific Optimizations**: Each provider maintains its unique capabilities while benefiting from shared tool orchestration and conversation management
 - **Seamless Provider Switching**: Switch between models from OpenAI, Google, Anthropic, and local deployments (vLLM, Ollama) with zero configuration changes
 - **Pluggable TTS**: The Text-to-Speech system is also pluggable, with support for both local (GPT-SoVITS) and remote (Fish Audio) TTS engines.
 
@@ -71,6 +62,18 @@ The user experience is a top priority. We've built a modern, responsive frontend
 
 - **React and Material-UI**: A clean, modern, and responsive UI built with industry-standard technologies.
 - **Live2D Integration**: Nagisa is brought to life with a `Live2D` model that reacts to the conversation, creating a more engaging and personal interaction.
+
+### 🔬 **LLM-Driven Industrial Software Integration (PFC)**
+
+aiNagisa implements an experimental LLM agent system for ITASCA PFC discrete element simulations, demonstrating how AI assistants can interact with specialized industrial software.
+
+- **WebSocket-Based Communication**: Real-time bidirectional communication between aiNagisa and PFC through a dedicated WebSocket server
+- **State-Aware Agent Design**: The LLM maintains awareness of simulation state evolution, treating simulations as dynamic systems rather than static code
+- **Hybrid Task Execution**: Intelligent classification of short (immediate) vs. long-running tasks with non-blocking execution and progress monitoring
+- **Three-Phase Workflow**: Validation through interactive commands, codification into reusable scripts, and production execution with state management
+- **Thread-Safe Architecture**: All PFC SDK calls execute in the main thread using queue-based coordination to ensure callback compatibility
+
+This integration represents an initial exploration of LLM-driven control for complex industrial software, with room for further refinement and generalization.
 
 ## 🛠️ Technical Deep Dive
 
@@ -92,14 +95,24 @@ The user experience is a top priority. We've built a modern, responsive frontend
 | +--------------------v-----------------------+ |
 | |            Infrastructure Layer            | |
 | | +----------------+  +--------------------+ | |
-| | |  Unified LLM   |  |   Parallel Tool    | | |
-| | |  Base Client   |  |   Execution (MCP)  | | |
+| | |  Unified LLM   |  |   Tool Execution   | | |
+| | |  Base Client   |  |       (MCP)        | | |
 | | +----------------+  +--------------------+ | |
 | | +----------------+  +--------------------+ | |
-| | | Tool Vectorizer|  |  Mem0 Memory Mgmt  | | |
-| | |  (ChromaDB)    |  | (ChromaDB/Qdrant)  | | |
+| | | Agent Profile  |  |  Mem0 Memory Mgmt  | | |
+| | |    System      |  | (ChromaDB/Qdrant)  | | |
+| | +----------------+  +--------------------+ | |
+| | +----------------+  +--------------------+ | |
+| | |  PFC WebSocket |  |   PFC Tools (MCP)  | | |
+| | |     Client     |  | (Command/Script)   | | |
 | | +----------------+  +--------------------+ | |
 | +------------------------------------------+ |
++-------------+----------------------------------+
+              | (WebSocket: ws://localhost:9001)
++-------------v----------------------------------+
+|        PFC Workspace (External Process)        |
+|  WebSocket Server + Task Manager + Executor    |
+|         ITASCA PFC SDK (Main Thread)           |
 +------------------------------------------------+
 ```
 
@@ -124,10 +137,13 @@ aiNagisa/
 │   │   │   │   ├── openai/        # OpenAI integration
 │   │   │   │   └── local/         # Local LLM support (vLLM, Ollama)
 │   │   │   └── shared/            # Common utilities and constants
-│   │   ├── mcp/                   # Parallel Tool Execution (MCP)
+│   │   ├── mcp/                   # Tool Execution (MCP)
 │   │   │   ├── smart_mcp_server.py # Main MCP server
-│   │   │   ├── tool_vectorizer.py  # Semantic tool search
+│   │   │   ├── tool_profile_manager.py # Agent profile management
 │   │   │   └── tools/             # Tool implementations by category
+│   │   │       └── pfc/           # PFC simulation tools
+│   │   ├── pfc/                   # PFC WebSocket client integration
+│   │   │   └── websocket_client.py # Auto-reconnecting WebSocket client
 │   │   ├── memory/                # Mem0-powered long-term memory system
 │   │   ├── storage/               # File and session storage
 │   │   └── tts/                   # Text-to-speech engines
@@ -140,15 +156,25 @@ aiNagisa/
 │   │   └── contexts/             # React contexts for state management
 │   └── public/
 │       └── live2d_models/        # Live2D model files
+├── pfc_workspace/
+│   ├── pfc_server/               # PFC WebSocket server (runs in PFC process)
+│   │   ├── server.py             # WebSocket server + routing
+│   │   ├── executor.py           # Command executor + task classification
+│   │   ├── script_executor.py    # Python script execution
+│   │   ├── main_thread_executor.py # Queue-based main thread execution
+│   │   └── task_manager.py       # Long-running task tracking
+│   ├── scripts/                  # User simulation scripts
+│   ├── start_server.py           # Server startup script
+│   └── config_example.py         # Configuration template
 └── ...
 ```
 
-## 🚀 Performance Highlights
+## 🚀 Key Features
 
-- **60-70% Faster Multi-Tool Execution**: Parallel processing delivers significant performance improvements for complex multi-tool workflows
-- **Real-time Tool Orchestration**: Instant notifications and progress tracking for all tool execution phases
-- **Zero-Latency Provider Switching**: Seamless transitions between LLM providers with unified architecture
-- **Intelligent Resource Management**: Automatic batching optimization based on task complexity and tool independence
+- **Agent Profile System**: Different agent profiles activate relevant tool categories for specific tasks
+- **Flexible LLM Integration**: Seamless switching between multiple LLM providers with unified architecture
+- **Intelligent Memory System**: Automatic learning and context injection powered by Mem0
+- **Real-time Communication**: WebSocket-based streaming for responsive user experience
 
 ## 🚀 Getting Started
 
@@ -230,21 +256,42 @@ Configure memory system behavior in `backend/config/memory.py`:
 
 ### Key Features to Explore
 
-1. **Parallel Tool Execution**: Ask aiNagisa to perform multiple tasks simultaneously and watch the parallel processing in action
-2. **Semantic Tool Discovery**: The system automatically finds and uses the most relevant tools for your requests
+1. **Agent Profiles**: Switch between different agent profiles (General, PFC Expert) to activate specialized tool sets
+2. **Tool Categories**: The system loads appropriate tool categories based on the selected agent profile
 3. **Long-term Memory**: aiNagisa remembers your preferences and conversation history across sessions
 4. **Live2D Integration**: Enjoy an interactive character that responds to conversations
 5. **Voice Integration**: Use voice input for natural interaction (frontend feature)
+6. **PFC Integration** (optional): Interact with ITASCA PFC simulations through natural language with state-aware agent guidance
+
+### PFC Workspace Setup (Optional)
+
+For users working with ITASCA PFC discrete element simulations:
+
+```bash
+# 1. Install websockets in PFC's Python environment
+pip install websockets
+
+# 2. Start PFC WebSocket server in PFC IPython shell
+import sys
+sys.path.append(r'/path/to/aiNagisa/pfc_workspace')
+exec(open(r'/path/to/aiNagisa/pfc_workspace/start_server.py', encoding='utf-8').read())
+
+# 3. In aiNagisa, select "PFC Expert" agent profile
+# 4. Interact with PFC through natural language
+```
+
+See `pfc_workspace/README.md` for detailed setup and usage instructions.
 
 ## 🤝 Contributing
 
 We are actively looking for contributors to help us push the boundaries of what's possible with AI assistants. Whether you're a frontend developer, a backend engineer, or an AI researcher, there are many ways to get involved. 
 
 Key areas where we welcome contributions:
-- **Performance Optimizations**: Help improve our parallel execution algorithms
+- **Tool System Enhancements**: Improve tool orchestration and agent profile management
 - **New Tool Integrations**: Expand our tool ecosystem with new capabilities
 - **LLM Provider Support**: Add support for additional LLM providers
 - **Frontend Enhancements**: Improve the user experience and Live2D integration
+- **Industrial Software Integration**: Extend the PFC integration pattern to other specialized software (CAD, FEA, etc.)
 - **Documentation**: Help others understand and contribute to the project
 
 Please check out our contributing guidelines and the `CLAUDE.md` file for development setup instructions.
