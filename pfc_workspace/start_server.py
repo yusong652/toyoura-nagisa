@@ -50,40 +50,38 @@ try:
         WEBSOCKET_HOST,
         WEBSOCKET_PORT,
         PING_INTERVAL,
-        PING_TIMEOUT
+        PING_TIMEOUT,
+        AUTO_START_TASK_LOOP
     )
     HOST = WEBSOCKET_HOST
     PORT = WEBSOCKET_PORT
     PING_INT = PING_INTERVAL
     PING_TO = PING_TIMEOUT
+    AUTO_START = AUTO_START_TASK_LOOP
 except ImportError:
     # Fallback to defaults if config not found
     HOST = "localhost"
     PORT = 9001
     PING_INT = 120  # 2 minutes (long tasks friendly)
     PING_TO = 300   # 5 minutes (prevent disconnection)
+    AUTO_START = False
     print("Warning: config.py not found, using default settings")
 
-print("=" * 70)
-print("PFC WebSocket Server (Hybrid Queue Architecture)")
-print("=" * 70)
-print()
-print("Architecture:")
-print("  • WebSocket Server: Background thread (non-blocking)")
-print("  • Command Execution: Main thread via queue (thread-safe)")
-print("  • IPython Shell: Remains interactive")
-print()
-print("Server Configuration:")
-print("  • Host: {}".format(HOST))
-print("  • Port: {}".format(PORT))
-print("  • Ping Interval: {}s (long tasks friendly)".format(PING_INT))
-print("  • Ping Timeout: {}s (prevent disconnection)".format(PING_TO))
-print("=" * 70)
-print()
+print("Initializing PFC WebSocket Server...")
 
 # ===== Create Main Thread Executor =====
 main_executor = MainThreadExecutor()
-print("✓ Main thread executor created")
+
+# ===== Configure PFC Python State =====
+# Prevent PFC from resetting Python state/cache on initialization
+try:
+    import itasca as it
+    it.command("python-reset-state false")
+    print("✓ Python state preservation enabled (python-reset-state false)")
+except ImportError:
+    print("⚠ itasca module not available - skipping python-reset-state")
+except Exception as e:
+    print("⚠ Failed to set python-reset-state: {}".format(e))
 
 # ===== Create Server Instance =====
 pfc_server = create_server(
@@ -93,7 +91,6 @@ pfc_server = create_server(
     ping_interval=PING_INT,
     ping_timeout=PING_TO
 )
-print("✓ WebSocket server instance created")
 
 # ===== Start Server in Background Thread =====
 def run_server_background():
@@ -118,34 +115,26 @@ def run_server_background():
 # Start background thread
 server_thread = threading.Thread(target=run_server_background, daemon=True)
 server_thread.start()
-print("✓ WebSocket server started in background thread")
 
 # Wait a moment for server to start
 time.sleep(0.5)
 
 # ===== Register IPython Hook for Auto Task Processing =====
 try:
-    from IPython import get_ipython
+    from IPython import get_ipython # type: ignore
 
     ip = get_ipython()
     if ip:
         # Register post_execute hook (MAIN THREAD execution)
         ip.events.register('post_execute', main_executor.process_tasks)
-        print("✓ IPython post_execute hook registered")
-        print("  → Tasks will process after each IPython command")
-        print("  → Or use: run_task_loop() for continuous processing")
         processing_mode = "hook"
     else:
-        print("⚠ Not in IPython environment")
-        print("  → Use manual loop mode: run_task_loop()")
         processing_mode = "manual"
 except ImportError:
-    print("⚠ IPython not available")
-    print("  → Use manual loop mode: run_task_loop()")
     processing_mode = "manual"
 
 # ===== Utility Functions =====
-def run_task_loop(interval=0.01):
+def run_task_loop(interval=0.05):
     """
     Run continuous task processing loop (blocks IPython).
 
@@ -153,7 +142,7 @@ def run_task_loop(interval=0.01):
     IPython hooks are not sufficient or not available.
 
     Args:
-        interval: Check interval in seconds (default: 0.01 = 100Hz)
+        interval: Check interval in seconds (default: 0.05 = 20Hz)
 
     Note:
         This will BLOCK the IPython prompt while running.
@@ -225,28 +214,14 @@ def server_status():
 
 # ===== Startup Complete =====
 print()
-print("=" * 70)
-print("✓ PFC WebSocket Server Started Successfully")
-print("=" * 70)
-print()
-print("Server URL: ws://{}:{}".format(HOST, PORT))
-print()
-print("Task Processing:")
-if processing_mode == "hook":
-    print("  • Mode: IPython Hook (MAIN THREAD execution)")
-    print("  • Trigger: Any IPython command (e.g., pass, 1+1)")
-    print("  • Shell: Interactive (not blocked)")
-else:
-    print("  • Mode: Manual")
-    print("  • Use: run_task_loop() to start processing")
-print()
-print("Available Commands:")
-print("  • server_status()      - Show server status")
-print("  • get_queue_size()     - Get pending task count")
-print("  • run_task_loop()      - Run continuous processing loop")
-print()
-print("=" * 70)
-
-# Display initial status
-print()
 server_status()
+
+# ===== Auto-start Task Loop (if enabled) =====
+if AUTO_START and processing_mode == "hook":
+    print()
+    print("=" * 70)
+    print("Auto-starting continuous task processing loop...")
+    print("(Set AUTO_START_TASK_LOOP = False in config.py to disable)")
+    print("=" * 70)
+    time.sleep(1)  # Brief pause to allow reading the message
+    run_task_loop()

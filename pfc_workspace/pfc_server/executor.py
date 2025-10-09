@@ -61,7 +61,7 @@ class PFCCommandExecutor:
         """
         try:
             # Execute command via ITASCA SDK in main thread
-            return self.itasca.command(cmd_str)
+            return self.itasca.command(cmd_str) # type: ignore
 
         except Exception as e:
             # Log the full exception for debugging
