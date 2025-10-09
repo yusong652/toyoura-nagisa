@@ -1,185 +1,84 @@
 """
 PFC Command Executor - Executes ITASCA PFC commands via SDK.
 
-This module provides command execution functionality for the PFC WebSocket server.
+This module provides command execution functionality for the PFC WebSocket server
+using main thread queue execution strategy.
+
+Python 3.6 compatible implementation.
 """
 
 import asyncio
 import logging
-import sys
 from typing import Any, Dict, Optional
+
+from .main_thread_executor import MainThreadExecutor
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
 
 class PFCCommandExecutor:
-    """Execute PFC commands using itasca SDK with hybrid execution strategy.
+    """
+    Execute PFC commands using itasca SDK via main thread queue.
 
-    Execution Modes:
-    - Main Thread: Thread-sensitive commands that crash in thread pool
-    - Background Thread: Long-running commands that should not block event loop
+    All commands are executed in IPython main thread via queue mechanism
+    to ensure thread safety and support for callback-based commands.
     """
 
-    # Commands that MUST execute in main thread (thread-sensitive whitelist)
-    # These commands crash or behave incorrectly when executed in thread pool
-    MAIN_THREAD_COMMANDS = {
-        "contact cmat default",
-        "contact cmat",
-        # Add other known thread-sensitive commands here as discovered
-        # Example: "domain decompose", "clump template", etc.
-    }
+    def __init__(self, main_executor):
+        # type: (MainThreadExecutor) -> None
+        """
+        Initialize executor with itasca module and main thread executor.
 
-    def __init__(self):
-        """Initialize executor with itasca module reference."""
+        Args:
+            main_executor: Main thread executor for queue-based execution
+        """
+        self.main_executor = main_executor
+
         try:
             import itasca  # type: ignore
             self.itasca = itasca
-            logger.info("✓ ITASCA SDK loaded")
+            logger.info("✓ ITASCA SDK loaded for command execution")
         except ImportError:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
 
-    def _should_run_in_main_thread(self, command: str) -> bool:
+    def _execute_pfc_command_sync(self, cmd_str):
+        # type: (str) -> Any
         """
-        Determine if command should execute in main thread based on whitelist.
+        Synchronous wrapper for itasca.command() (executed in main thread).
 
-        Commands in MAIN_THREAD_COMMANDS whitelist are known to be thread-sensitive
-        and will crash if executed in background thread pool.
-
-        Args:
-            command: PFC command name (e.g., "contact cmat default")
-
-        Returns:
-            bool: True if command must run in main thread, False for background thread
-
-        Examples:
-            >>> _should_run_in_main_thread("contact cmat default")
-            True  # In whitelist, thread-sensitive
-
-            >>> _should_run_in_main_thread("model solve")
-            False  # Not in whitelist, safe for background
-
-            >>> _should_run_in_main_thread("ball create")
-            False  # Default: background thread (non-blocking)
-        """
-        # Check whitelist for known thread-sensitive commands
-        for sensitive_cmd in self.MAIN_THREAD_COMMANDS:
-            if command.startswith(sensitive_cmd):
-                return True
-
-        # Default: execute in background thread (safe, non-blocking)
-        return False
-
-    def _execute_pfc_command_sync(self, cmd_str: str) -> Any:
-        """
-        Synchronous wrapper for itasca.command() with comprehensive error handling.
-
-        This method wraps itasca.command() to catch ALL possible exceptions,
-        including ITASCA-specific errors that might bypass normal exception handling.
+        This method is submitted to main thread queue and executed there.
 
         Args:
             cmd_str: Complete PFC command string
 
         Returns:
-            Command result or raises exception
+            Command result
 
         Raises:
             Exception: Any error during command execution
         """
         try:
-            # Execute command via ITASCA SDK
+            # Execute command via ITASCA SDK in main thread
             return self.itasca.command(cmd_str)
 
         except Exception as e:
             # Log the full exception for debugging
-            logger.error(f"PFC command failed: {cmd_str}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(f"Exception message: {str(e)}")
+            logger.error("PFC command failed: {}".format(cmd_str))
+            logger.error("Exception type: {}".format(type(e).__name__))
+            logger.error("Exception message: {}".format(str(e)))
             # Re-raise to be handled by async wrapper
             raise
 
-        except BaseException as e:
-            # Catch even system-level exceptions that bypass Exception
-            logger.error(f"Critical PFC error: {cmd_str}")
-            logger.error(f"BaseException type: {type(e).__name__}")
-            logger.error(f"BaseException message: {str(e)}")
-            # Convert to regular Exception to prevent event loop corruption
-            raise RuntimeError(f"Critical PFC error: {str(e)}") from e
-
-    def _execute_via_callback(self, callback_name: str, callback_func: callable, cmd_str: str):
+    async def execute_command(self, command, arg=None, params=None):
+        # type: (str, Any, Optional[Dict[str, Any]]) -> Dict[str, Any]
         """
-        Execute command in main thread via PFC callback mechanism.
-
-        This method registers a callback, triggers it with model cycle 1,
-        and then removes it. The callback executes in PFC's main thread.
-
-        Args:
-            callback_name: Unique name for the callback
-            callback_func: Callback function that will execute the command
-            cmd_str: Command string (for logging only)
-
-        Note:
-            model cycle 1 is safe and commonly used to "activate" new settings
-            in PFC. It doesn't affect simulation results.
-
-        Implementation:
-            PFC expects callback functions in IPython main thread's global namespace.
-            Since we run in background thread, we must access __main__ module's
-            namespace (where IPython and PFC share the same globals).
-        """
-        # Get __main__ module's namespace (IPython main thread globals)
-        main_globals = sys.modules['__main__'].__dict__
-
-        try:
-            # Register callback function to __main__ namespace
-            # PFC's set_callback looks for functions in main thread's globals()
-            main_globals[callback_name] = callback_func
-
-            # Register callback with PFC
-            self.itasca.set_callback(callback_name, -1)
-
-            # Trigger callback via model cycle 1 (executes in main thread)
-            self.itasca.command("model cycle 1")
-
-            # Remove callback registration
-            self.itasca.remove_callback(callback_name, -1)
-
-            # Clean up: remove function from __main__ namespace
-            if callback_name in main_globals:
-                del main_globals[callback_name]
-
-        except Exception as e:
-            # Ensure complete cleanup even if error occurs
-            try:
-                self.itasca.remove_callback(callback_name, -1)
-            except:
-                pass
-            try:
-                if callback_name in main_globals:
-                    del main_globals[callback_name]
-            except:
-                pass
-            raise
-
-    async def execute_command(
-        self,
-        command: str,
-        arg: Any = None,
-        params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Execute a native PFC command with automatic hybrid execution strategy.
+        Execute a native PFC command via main thread queue.
 
         This method assembles a complete PFC command string from the command name,
-        optional positional argument, and optional keyword parameters, then executes
-        via itasca.command() using either main thread or background thread pool.
-
-        Execution mode is automatically determined by internal whitelist:
-        - Main Thread: Thread-sensitive commands that crash in thread pool
-          Examples: "contact cmat default" (requires main thread context)
-        - Background Thread: All other commands (long-running, compute-intensive)
-          Examples: "model solve cycle 10000" (non-blocking, keeps WebSocket alive)
+        optional positional argument, and optional keyword parameters, then submits
+        it to the main thread queue for execution.
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
@@ -204,8 +103,8 @@ class PFCCommandExecutor:
                 - data: Optional[Any] - Command result data (success only)
 
         Note:
-            Execution mode is logged for debugging. Check logs for [MAIN THREAD] or
-            [BACKGROUND THREAD] markers to understand execution behavior.
+            All commands execute in IPython main thread via queue mechanism.
+            This ensures thread safety and supports callback-based commands.
         """
         cmd_str = None
 
@@ -221,58 +120,34 @@ class PFCCommandExecutor:
             params = params or {}  # Handle None params
             cmd_str = self._assemble_command(command, arg, params)
 
-            # Determine execution mode based on command whitelist
-            use_main_thread = self._should_run_in_main_thread(command)
+            logger.info("Submitting PFC command to main thread: {}".format(cmd_str))
 
-            if use_main_thread:
-                # Main thread execution via PFC callback mechanism
-                # This allows execution in main thread without blocking the event loop
-                logger.info(f"Executing PFC command [MAIN THREAD via callback]: {cmd_str}")
+            # Submit to main thread queue
+            future = self.main_executor.submit(
+                self._execute_pfc_command_sync,
+                cmd_str
+            )
 
-                # Container to capture result from callback
-                callback_result = {'result': None, 'error': None}
-
-                def pfc_callback(*args):
-                    """Temporary callback executed in PFC main thread during model cycle"""
-                    try:
-                        callback_result['result'] = self.itasca.command(cmd_str)
-                    except Exception as e:
-                        callback_result['error'] = str(e)
-
-                # Generate unique callback name
-                callback_name = f"pfc_cmd_{id(pfc_callback)}"
-
-                # Execute in thread pool to avoid blocking event loop
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, self._execute_via_callback,
-                                          callback_name, pfc_callback, cmd_str)
-
-                # Check for errors
-                if callback_result['error']:
-                    raise RuntimeError(callback_result['error'])
-
-                result = callback_result['result']
-            else:
-                # Background thread execution: Non-blocking, allows WebSocket to remain responsive
-                # Examples: "model solve cycle 10000" (long-running, thread-safe)
-                logger.info(f"Executing PFC command [BACKGROUND THREAD]: {cmd_str}")
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None,  # Use default thread pool executor
-                    self._execute_pfc_command_sync,
-                    cmd_str
-                )
+            # Wait for main thread to execute (async)
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,  # Use default thread pool
+                future.result,  # Block until main thread processes
+                300  # 5 minutes timeout
+            )
 
             # Serialize result for response
             serialized_result = self._serialize_result(result)
 
             # Build message based on whether there's a return value
             if serialized_result is not None:
-                message = f"PFC command executed: {cmd_str}\nResult: {serialized_result}"
+                message = "PFC command executed: {}\nResult: {}".format(
+                    cmd_str, serialized_result
+                )
             else:
-                message = f"PFC command executed: {cmd_str}"
+                message = "PFC command executed: {}".format(cmd_str)
 
-            logger.info(f"✓ PFC command successful: {cmd_str}")
+            logger.info("✓ PFC command successful: {}".format(cmd_str))
 
             return {
                 "status": "success",
@@ -282,36 +157,21 @@ class PFCCommandExecutor:
 
         except asyncio.CancelledError:
             # Handle task cancellation separately
-            logger.warning(f"PFC command cancelled: {cmd_str}")
+            logger.warning("PFC command cancelled: {}".format(cmd_str))
             raise
 
         except Exception as e:
             # Log comprehensive error information
             error_msg = str(e)
-            logger.error(f"Command execution failed: {error_msg}")
+            logger.error("Command execution failed: {}".format(error_msg))
 
             if cmd_str:
-                logger.error(f"  Failed command: {cmd_str}")
+                logger.error("  Failed command: {}".format(cmd_str))
 
             # Return error result (don't raise - keep server alive!)
             return {
                 "status": "error",
-                "message": f"Command execution failed: {error_msg}",
-                "data": None
-            }
-
-        except BaseException as e:
-            # Catch critical errors that might crash the server
-            error_msg = str(e)
-            logger.critical(f"CRITICAL: BaseException during command execution: {error_msg}")
-
-            if cmd_str:
-                logger.critical(f"  Failed command: {cmd_str}")
-
-            # Return error result and prevent server crash
-            return {
-                "status": "error",
-                "message": f"Critical error during command execution: {error_msg}",
+                "message": "Command execution failed: {}".format(error_msg),
                 "data": None
             }
 

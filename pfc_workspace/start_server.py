@@ -1,31 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-PFC WebSocket Server Startup Script (Main Thread Version)
+PFC WebSocket Server Startup Script (Hybrid Queue Architecture)
 
-IMPORTANT: This version runs the server in the MAIN THREAD, which blocks
-the IPython shell but ensures all PFC commands execute in the correct thread context.
-This is required for commands like 'contact cmat default' that crash when executed
-in background threads.
+This version runs the WebSocket server in a BACKGROUND THREAD while keeping
+IPython shell interactive. Commands are executed in the MAIN THREAD via queue
+mechanism to ensure thread safety.
+
+Architecture:
+- WebSocket Server: Background thread (non-blocking, accepts connections)
+- Command Execution: Main thread via queue (thread-safe for PFC)
+- Task Processing: IPython post_execute hook (automatic) OR manual loop
 
 Usage in PFC GUI IPython shell:
     >>> import sys
     >>> sys.path.append(r'C:\\Dev\\Han\\aiNagisa\\pfc_workspace')
     >>> exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc_workspace\\start_server.py', encoding='utf-8').read())
 
-Note:
-    - IPython shell will be BLOCKED while server runs (this is intentional)
-    - Server output will be visible in PFC Console
-    - To stop server: Press Ctrl+C or close PFC GUI
-    - You can observe PFC state through GUI visualization while server runs
+Features:
+    - IPython shell remains interactive (not blocked)
+    - All PFC commands execute in main thread (thread-safe)
+    - Supports callback-based commands (contact cmat, etc.)
+    - Long timeout configuration for long-running tasks
+
+Python 3.6 compatible implementation.
 """
 
 import sys
 import asyncio
 import logging
-import nest_asyncio # type: ignore
-
-# Allow nested event loops (required for IPython environment)
-nest_asyncio.apply()
+import threading
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -34,7 +38,8 @@ logging.basicConfig(
     stream=sys.stdout
 )
 
-# Import server
+# Import server components
+from pfc_server.main_thread_executor import MainThreadExecutor
 from pfc_server.server import create_server
 
 # Load configuration
@@ -53,76 +58,188 @@ except ImportError:
     # Fallback to defaults if config not found
     HOST = "localhost"
     PORT = 9001
-    PING_INT = 30
-    PING_TO = 10
+    PING_INT = 120  # 2 minutes (long tasks friendly)
+    PING_TO = 300   # 5 minutes (prevent disconnection)
     print("Warning: config.py not found, using default settings")
 
-print("=" * 60)
-print("PFC WebSocket Server (Main Thread Mode)")
-print("=" * 60)
+print("=" * 70)
+print("PFC WebSocket Server (Hybrid Queue Architecture)")
+print("=" * 70)
 print()
-print("⚠ WARNING: This will BLOCK the IPython shell")
-print("⚠ Server runs in main thread for thread-safe PFC commands")
+print("Architecture:")
+print("  • WebSocket Server: Background thread (non-blocking)")
+print("  • Command Execution: Main thread via queue (thread-safe)")
+print("  • IPython Shell: Remains interactive")
 print()
-print(f"Starting server on: ws://{HOST}:{PORT}")
-print("To stop: Press Ctrl+C or close PFC GUI")
-print("=" * 60)
+print("Server Configuration:")
+print("  • Host: {}".format(HOST))
+print("  • Port: {}".format(PORT))
+print("  • Ping Interval: {}s (long tasks friendly)".format(PING_INT))
+print("  • Ping Timeout: {}s (prevent disconnection)".format(PING_TO))
+print("=" * 70)
 print()
 
-# Create server instance
+# ===== Create Main Thread Executor =====
+main_executor = MainThreadExecutor()
+print("✓ Main thread executor created")
+
+# ===== Create Server Instance =====
 pfc_server = create_server(
+    main_executor=main_executor,
     host=HOST,
     port=PORT,
     ping_interval=PING_INT,
     ping_timeout=PING_TO
 )
+print("✓ WebSocket server instance created")
 
-# Get the current event loop (IPython's existing loop)
-# nest_asyncio allows us to use run_until_complete even if loop is already running
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    # If no loop exists, create one
+# ===== Start Server in Background Thread =====
+def run_server_background():
+    """Run WebSocket server in background thread event loop."""
+    # Create new event loop for background thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-print(f"✓ Using event loop: {loop}")
-print(f"✓ Loop is running: {loop.is_running()}")
-print()
+    try:
+        # Start server
+        loop.run_until_complete(pfc_server.start())
 
-async def keep_server_running():
-    """Keep server running with periodic yields for GUI updates."""
-    # Start server
-    await pfc_server.start()
+        # Keep running
+        loop.run_forever()
+    except Exception as e:
+        logging.error("Server error: {}".format(e))
+        import traceback
+        traceback.print_exc()
+    finally:
+        loop.close()
 
-    print("✓ Server is running on ws://{}:{}".format(HOST, PORT))
+# Start background thread
+server_thread = threading.Thread(target=run_server_background, daemon=True)
+server_thread.start()
+print("✓ WebSocket server started in background thread")
+
+# Wait a moment for server to start
+time.sleep(0.5)
+
+# ===== Register IPython Hook for Auto Task Processing =====
+try:
+    from IPython import get_ipython
+
+    ip = get_ipython()
+    if ip:
+        # Register post_execute hook
+        ip.events.register('post_execute', main_executor.process_tasks)
+        print("✓ IPython post_execute hook registered")
+        print("  → Tasks will auto-process after each IPython command")
+        processing_mode = "hook"
+    else:
+        print("⚠ Not in IPython environment")
+        print("  → Use manual loop mode: run_task_loop()")
+        processing_mode = "manual"
+except ImportError:
+    print("⚠ IPython not available")
+    print("  → Use manual loop mode: run_task_loop()")
+    processing_mode = "manual"
+
+# ===== Utility Functions =====
+def run_task_loop(interval=0.01):
+    """
+    Run continuous task processing loop (blocks IPython).
+
+    This function provides an alternative task processing mode when
+    IPython hooks are not sufficient or not available.
+
+    Args:
+        interval: Check interval in seconds (default: 0.01 = 100Hz)
+
+    Note:
+        This will BLOCK the IPython prompt while running.
+        Press Ctrl+C to stop and return to hook mode.
+
+    Example:
+        >>> run_task_loop()  # Start continuous processing
+        >>> # Press Ctrl+C to stop
+    """
+    print("=" * 70)
+    print("Task Processing Loop Mode")
+    print("=" * 70)
+    print("  • Interval: {:.0f}ms".format(interval * 1000))
+    print("  • IPython shell BLOCKED (press Ctrl+C to stop)")
+    print("  • Server continues running in background")
+    print("=" * 70)
     print()
-    print("IMPORTANT:")
-    print("  • IPython shell is BLOCKED (this is necessary)")
-    print("  • PFC GUI should still be responsive")
-    print("  • Server logs will appear in console")
-    print("  • Press Ctrl+C to stop")
-    print()
 
-    # Keep running with frequent yields for GUI updates
     try:
         while True:
-            # Yield control frequently to allow PFC GUI updates
-            await asyncio.sleep(0.05)  # 50ms intervals
-    except asyncio.CancelledError:
-        print("\n✓ Server shutdown requested")
+            main_executor.process_tasks()
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print()
+        print("✓ Loop stopped")
+        print("  → Tasks will now process via IPython hooks")
 
-try:
-    print("✓ Server starting...")
-    # Run server with event loop (will block IPython but allow GUI updates)
-    loop.run_until_complete(keep_server_running())
+def get_queue_size():
+    """
+    Get current task queue size.
 
-except KeyboardInterrupt:
-    print("\n✓ Server stopped by user (Ctrl+C)")
-except Exception as e:
-    print(f"\n✗ Server error: {e}")
-    import traceback
-    traceback.print_exc()
-finally:
-    print("✓ Server shutdown complete")
-    print("=" * 60)
+    Returns:
+        int: Number of pending tasks
+
+    Example:
+        >>> get_queue_size()
+        5  # 5 tasks pending
+    """
+    return main_executor.queue_size()
+
+def server_status():
+    """
+    Display server status and usage information.
+
+    Example:
+        >>> server_status()
+    """
+    print("=" * 70)
+    print("PFC WebSocket Server Status")
+    print("=" * 70)
+    print("Server:")
+    print("  • URL: ws://{}:{}".format(HOST, PORT))
+    print("  • Running: {}".format(server_thread.is_alive()))
+    print("  • Active Connections: {}".format(len(pfc_server.active_connections)))
+    print()
+    print("Task Queue:")
+    print("  • Pending Tasks: {}".format(main_executor.queue_size()))
+    print("  • Processing Mode: {}".format(processing_mode))
+    print()
+    print("Commands:")
+    print("  • server_status()      - Show this status")
+    print("  • get_queue_size()     - Get pending task count")
+    print("  • run_task_loop()      - Switch to continuous processing mode")
+    print("=" * 70)
+
+# ===== Startup Complete =====
+print()
+print("=" * 70)
+print("✓ PFC WebSocket Server Started Successfully")
+print("=" * 70)
+print()
+print("Server URL: ws://{}:{}".format(HOST, PORT))
+print()
+print("Task Processing:")
+if processing_mode == "hook":
+    print("  • Mode: IPython Hook (automatic)")
+    print("  • Trigger: Any IPython command")
+    print("  • Shell: Interactive (not blocked)")
+else:
+    print("  • Mode: Manual")
+    print("  • Use: run_task_loop() to start processing")
+print()
+print("Available Commands:")
+print("  • server_status()      - Show server status")
+print("  • get_queue_size()     - Get pending task count")
+print("  • run_task_loop()      - Switch to continuous processing mode")
+print()
+print("=" * 70)
+
+# Display initial status
+print()
+server_status()

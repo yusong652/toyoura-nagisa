@@ -16,37 +16,43 @@ from websockets.server import WebSocketServerProtocol #type: ignore
 
 from .executor import PFCCommandExecutor
 from .script_executor import PFCScriptExecutor
+from .main_thread_executor import MainThreadExecutor
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
 
 class PFCWebSocketServer:
-    """WebSocket server for PFC command execution."""
+    """WebSocket server for PFC command execution via main thread queue."""
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 9001,
-        ping_interval: int = 30,
-        ping_timeout: int = 60
+        main_executor,  # type: MainThreadExecutor
+        host="localhost",  # type: str
+        port=9001,  # type: int
+        ping_interval=120,  # type: int
+        ping_timeout=300  # type: int
     ):
+        # type: (...) -> None
         """
         Initialize WebSocket server.
 
         Args:
-            host: Server host address
-            port: Server port number
-            ping_interval: Interval between ping frames in seconds (default: 30)
-            ping_timeout: Timeout for pong response in seconds (default: 60)
-                Note: Must be long enough to handle slow PFC commands like domain initialization
+            main_executor: Main thread executor for queue-based command execution
+            host: Server host address (default: "localhost")
+            port: Server port number (default: 9001)
+            ping_interval: Interval between ping frames in seconds (default: 120)
+                Note: Longer interval (2 min) to accommodate long-running commands
+            ping_timeout: Timeout for pong response in seconds (default: 300)
+                Note: Longer timeout (5 min) to prevent disconnection during long tasks
         """
+        self.main_executor = main_executor
         self.host = host
         self.port = port
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
-        self.executor = PFCCommandExecutor()
-        self.script_executor = PFCScriptExecutor()
+        self.executor = PFCCommandExecutor(main_executor)
+        self.script_executor = PFCScriptExecutor(main_executor)
         self.active_connections = set()
         self.server = None
 
@@ -110,8 +116,6 @@ class PFCWebSocketServer:
                         try:
                             await websocket.send(json.dumps(response))
                             logger.info(f"✓ Command result sent: {command_id}")
-                            # Yield control to allow GUI refresh in PFC IPython environment
-                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {command_id}")
                             break  # Exit message loop
@@ -137,8 +141,6 @@ class PFCWebSocketServer:
                         try:
                             await websocket.send(json.dumps(response))
                             logger.info(f"✓ Script result sent: {command_id}")
-                            # Yield control to allow GUI refresh in PFC IPython environment
-                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send script result, connection closed: {command_id}")
                             break  # Exit message loop
@@ -150,8 +152,6 @@ class PFCWebSocketServer:
                                 "type": "pong",
                                 "timestamp": datetime.now().isoformat()
                             }))
-                            # Yield control to allow GUI refresh
-                            await asyncio.sleep(0.01)
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning("Cannot send pong, connection closed")
                             break  # Exit message loop
@@ -251,27 +251,33 @@ class PFCWebSocketServer:
 
 # Module-level utility function for creating server instances
 def create_server(
-    host: str = "localhost",
-    port: int = 9001,
-    ping_interval: int = 30,
-    ping_timeout: int = 60
-) -> PFCWebSocketServer:
+    main_executor,  # type: MainThreadExecutor
+    host="localhost",  # type: str
+    port=9001,  # type: int
+    ping_interval=120,  # type: int
+    ping_timeout=300  # type: int
+):
+    # type: (...) -> PFCWebSocketServer
     """
     Create a PFC WebSocket server instance.
 
     Args:
-        host: Server host address (default: localhost)
+        main_executor: Main thread executor for queue-based command execution
+        host: Server host address (default: "localhost")
         port: Server port number (default: 9001)
-        ping_interval: Interval between ping frames in seconds (default: 30)
-        ping_timeout: Timeout for pong response in seconds (default: 60)
-            Note: Long timeout needed for slow PFC commands (domain initialization, etc.)
+        ping_interval: Interval between ping frames in seconds (default: 120)
+            Note: Longer interval (2 min) to accommodate long-running commands
+        ping_timeout: Timeout for pong response in seconds (default: 300)
+            Note: Longer timeout (5 min) to prevent disconnection during long tasks
 
     Returns:
         PFCWebSocketServer: Server instance ready to be started
 
     Example:
+        >>> from pfc_server.main_thread_executor import MainThreadExecutor
         >>> from pfc_server.server import create_server
-        >>> server = create_server(host="localhost", port=9001)
-        >>> # Use with startup script to run in background
+        >>> executor = MainThreadExecutor()
+        >>> server = create_server(executor, host="localhost", port=9001)
+        >>> # Use with startup script
     """
-    return PFCWebSocketServer(host, port, ping_interval, ping_timeout)
+    return PFCWebSocketServer(main_executor, host, port, ping_interval, ping_timeout)
