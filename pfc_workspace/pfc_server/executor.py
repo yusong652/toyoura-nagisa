@@ -168,11 +168,11 @@ class PFCCommandExecutor:
 
             if is_long_task:
                 # Long task: register with task manager and return immediately
-                task_id = self.task_manager.create_task(future, cmd_str)
+                task_id = self.task_manager.create_command_task(future, cmd_str)
 
                 return {
                     "status": "pending",
-                    "message": "Long-running task submitted: {}\nUse check_task_status tool to query progress.".format(cmd_str),
+                    "message": "Long-running command submitted: {}\nUse check_task_status tool to query progress.".format(cmd_str),
                     "data": {
                         "task_id": task_id,
                         "command": cmd_str

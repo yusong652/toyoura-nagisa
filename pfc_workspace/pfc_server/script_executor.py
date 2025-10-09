@@ -9,6 +9,8 @@ Python 3.6 compatible implementation.
 
 import asyncio
 import logging
+import sys
+from io import StringIO
 from typing import Any, Dict
 
 from .main_thread_executor import MainThreadExecutor
@@ -20,15 +22,17 @@ logger = logging.getLogger("PFC-Server")
 class PFCScriptExecutor:
     """Execute Python scripts using PFC Python SDK via main thread queue."""
 
-    def __init__(self, main_executor):
-        # type: (MainThreadExecutor) -> None
+    def __init__(self, main_executor, task_manager):
+        # type: (MainThreadExecutor, Any) -> None
         """
-        Initialize executor with itasca module and main thread executor.
+        Initialize executor with itasca module, main thread executor, and task manager.
 
         Args:
             main_executor: Main thread executor for queue-based execution
+            task_manager: Task manager for long-running task tracking
         """
         self.main_executor = main_executor
+        self.task_manager = task_manager
 
         try:
             import itasca  # type: ignore
@@ -38,19 +42,30 @@ class PFCScriptExecutor:
             logger.warning("⚠ ITASCA SDK not available for script execution")
             self.itasca = None
 
-    def _execute_script_sync(self, script_path, script_content):
-        # type: (str, str) -> Dict[str, Any]
+    def _execute_script_sync(self, script_path, script_content, output_buffer):
+        # type: (str, str, Any) -> Dict[str, Any]
         """
         Execute Python script synchronously (called in main thread).
+
+        Captures stdout during execution for progress tracking using shared buffer.
 
         Args:
             script_path: Path to script (for error messages)
             script_content: Script content to execute
+            output_buffer: StringIO buffer for capturing stdout (shared with TaskManager)
 
         Returns:
-            Result dictionary with status, message, and data
+            Result dictionary with status, message, data, and output:
+                - status: "success" or "error"
+                - message: User-friendly message
+                - data: Script result (from 'result' variable)
+                - output: Captured stdout content (print statements)
         """
         import os
+
+        # Use shared output buffer for stdout capture
+        old_stdout = sys.stdout
+        sys.stdout = output_buffer
 
         try:
             logger.info("Executing Python script in main thread: {}".format(script_path))
@@ -68,6 +83,9 @@ class PFCScriptExecutor:
                 # Look for 'result' variable in locals
                 result = exec_locals.get('result', None)
 
+            # Get captured output from shared buffer
+            output_text = output_buffer.getvalue()
+
             # Serialize result for response
             serialized_result = self._serialize_result(result)
 
@@ -83,40 +101,52 @@ class PFCScriptExecutor:
             return {
                 "status": "success",
                 "message": message,
-                "data": serialized_result
+                "data": serialized_result,
+                "output": output_text  # Include captured output
             }
 
         except Exception as e:
+            # Get captured output even on error
+            output_text = output_buffer.getvalue()
+
             logger.error("Script execution failed: {}".format(e))
             return {
                 "status": "error",
                 "message": "Script execution failed: {}".format(str(e)),
-                "data": None
+                "data": None,
+                "output": output_text  # Include output up to error point
             }
+
+        finally:
+            # Always restore stdout
+            sys.stdout = old_stdout
 
     async def execute_script(self, script_path):
         # type: (str) -> Dict[str, Any]
         """
-        Execute Python script from file path via main thread queue.
+        Submit Python script for execution as a long-running task.
 
-        This method reads and executes Python script files using the itasca module,
-        enabling direct access to PFC Python SDK methods that return values.
+        Scripts are always treated as long-running tasks and return immediately
+        with a task_id. Use check_task_status to query progress and retrieve output.
 
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
 
         Returns:
-            Result dictionary following ToolResult pattern:
-                - status: Literal["success", "error"] - Operation outcome
-                - message: str - User-friendly message with result
-                - data: Any - Script execution result (serialized)
+            Result dictionary for task submission:
+                - status: "pending" - Task submitted successfully
+                - message: str - Submission confirmation message
+                - data: Dict with task_id and script_path
 
         Note:
-            - Script must define 'result' variable or use single expression
+            - Scripts are executed in IPython main thread via queue
+            - Script must define 'result' variable for structured data
+            - Print statements are captured and available via task status query
             - Script has access to 'itasca' module in global scope
-            - All execution happens in IPython main thread via queue
         """
+        import os
+
         try:
             if not self.itasca:
                 return {
@@ -143,23 +173,37 @@ class PFCScriptExecutor:
                     "data": None
                 }
 
-            # Submit to main thread queue
-            logger.info("Submitting script to main thread: {}".format(script_path))
+            # Submit to main thread queue (non-blocking)
+            script_name = os.path.basename(script_path)
+            logger.info("Submitting script as long-running task: {}".format(script_name))
+
+            # Create shared output buffer for real-time output capture
+            output_buffer = StringIO()
+
             future = self.main_executor.submit(
                 self._execute_script_sync,
                 script_path,
-                script_content
+                script_content,
+                output_buffer  # Pass shared buffer to executor
             )
 
-            # Wait for main thread to execute (async)
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,  # Use default thread pool
-                future.result,  # Block until main thread processes
-                300  # 5 minutes timeout
+            # Register with task manager as script task and return immediately
+            task_id = self.task_manager.create_script_task(
+                future,
+                script_name,
+                script_path,
+                output_buffer  # Pass buffer reference for live status queries
             )
 
-            return result
+            return {
+                "status": "pending",
+                "message": "Script submitted as long-running task: {}\nUse check_task_status tool to query progress and retrieve output.".format(script_name),
+                "data": {
+                    "task_id": task_id,
+                    "script_path": script_path,
+                    "script_name": script_name
+                }
+            }
 
         except Exception as e:
             logger.error("Script submission failed: {}".format(e))

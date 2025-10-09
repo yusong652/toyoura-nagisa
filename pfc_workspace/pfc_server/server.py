@@ -54,7 +54,7 @@ class PFCWebSocketServer:
         self.ping_timeout = ping_timeout
         self.task_manager = TaskManager()
         self.executor = PFCCommandExecutor(main_executor, self.task_manager)
-        self.script_executor = PFCScriptExecutor(main_executor)
+        self.script_executor = PFCScriptExecutor(main_executor, self.task_manager)
         self.active_connections = set()
         self.server = None
 

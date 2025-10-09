@@ -32,10 +32,10 @@ class TaskManager:
         self.tasks = {}  # type: Dict[str, Dict[str, Any]]
         logger.info("✓ TaskManager initialized")
 
-    def create_task(self, future, command):
+    def create_command_task(self, future, command):
         # type: (Any, str) -> str
         """
-        Register a new long-running task.
+        Register a new long-running PFC command task.
 
         Args:
             future: asyncio Future object for the task
@@ -48,12 +48,44 @@ class TaskManager:
 
         self.tasks[task_id] = {
             "future": future,
-            "command": command,
+            "description": command,
+            "type": "command",
             "start_time": time.time(),
             "status": "running"
         }
 
-        logger.info("✓ Task registered: {} (ID: {})".format(command, task_id))
+        logger.info("✓ Command task registered: {} (ID: {})".format(command, task_id))
+
+        return task_id
+
+    def create_script_task(self, future, script_name, script_path=None, output_buffer=None):
+        # type: (Any, str, Optional[str], Any) -> str
+        """
+        Register a new long-running Python script task.
+
+        Args:
+            future: asyncio Future object for the task
+            script_name: Name of the script file (e.g., "simulation.py")
+            script_path: Optional full path to script for reference
+            output_buffer: Optional StringIO buffer for real-time output capture
+
+        Returns:
+            str: Unique task ID for tracking
+        """
+        task_id = str(uuid.uuid4())
+
+        self.tasks[task_id] = {
+            "future": future,
+            "description": "script: {}".format(script_name),
+            "type": "script",
+            "script_name": script_name,
+            "script_path": script_path,
+            "output_buffer": output_buffer,  # Store buffer reference for live access
+            "start_time": time.time(),
+            "status": "running"
+        }
+
+        logger.info("✓ Script task registered: {} (ID: {})".format(script_name, task_id))
 
         return task_id
 
@@ -62,6 +94,10 @@ class TaskManager:
         """
         Query task status (non-blocking).
 
+        Handles both command and script tasks appropriately:
+        - Command tasks: Return result data only
+        - Script tasks: Extract and return output + result data
+
         Args:
             task_id: Task ID to query
 
@@ -69,7 +105,7 @@ class TaskManager:
             Dict with status information:
                 - status: "running", "success", "error", or "not_found"
                 - message: Human-readable status message
-                - data: Task-specific data
+                - data: Task-specific data (includes output for scripts)
         """
         task_info = self.tasks.get(task_id)
 
@@ -81,7 +117,8 @@ class TaskManager:
             }
 
         future = task_info["future"]
-        command = task_info["command"]
+        description = task_info["description"]
+        task_type = task_info.get("type", "command")  # Default to command for backward compatibility
         start_time = task_info["start_time"]
         elapsed_time = time.time() - start_time
 
@@ -95,56 +132,135 @@ class TaskManager:
                 del self.tasks[task_id]
 
                 logger.info("✓ Task completed: {} (ID: {}, Time: {:.2f}s)".format(
-                    command, task_id, elapsed_time
+                    description, task_id, elapsed_time
                 ))
 
-                # Serialize result
-                serialized_result = self._serialize_result(result)
+                # Extract output and data based on task type
+                output_text = None
+                result_data = None
+                result_status = "success"
 
-                # Build message
-                if serialized_result is not None:
-                    message = "Task completed: {}\nElapsed time: {:.2f}s\nResult: {}".format(
-                        command, elapsed_time, serialized_result
+                if task_type == "script":
+                    # Script execution result - extract output and data
+                    if isinstance(result, dict):
+                        output_text = result.get("output")
+                        result_data = result.get("data")
+                        result_status = result.get("status", "success")
+                    else:
+                        result_data = result
+                else:
+                    # Command execution result - direct value
+                    result_data = result
+
+                # Serialize result data
+                serialized_result = self._serialize_result(result_data)
+
+                # Build message based on task type
+                if task_type == "script" and output_text:
+                    # Script with captured output
+                    message = "Script execution completed: {}\nElapsed time: {:.2f}s\n\n=== Script Output ===\n{}".format(
+                        task_info.get("script_name", description), elapsed_time, output_text
+                    )
+                elif serialized_result is not None:
+                    # Command with return value or script with data
+                    task_label = "Script" if task_type == "script" else "Command"
+                    message = "{} completed: {}\nElapsed time: {:.2f}s\nResult: {}".format(
+                        task_label, description, elapsed_time, serialized_result
                     )
                 else:
-                    message = "Task completed: {}\nElapsed time: {:.2f}s".format(
-                        command, elapsed_time
+                    # No output or result
+                    task_label = "Script" if task_type == "script" else "Command"
+                    message = "{} completed: {}\nElapsed time: {:.2f}s".format(
+                        task_label, description, elapsed_time
                     )
 
+                # Build response data
+                if task_type == "script":
+                    # For scripts, always include output field
+                    response_data = serialized_result if isinstance(serialized_result, dict) else {}
+                    if not isinstance(response_data, dict):
+                        response_data = {"result": serialized_result}
+                    response_data["output"] = output_text if output_text else ""
+                else:
+                    # For commands, return result data directly
+                    response_data = serialized_result
+
                 return {
-                    "status": "success",
+                    "status": result_status,
                     "message": message,
-                    "data": serialized_result
+                    "data": response_data
                 }
 
             except Exception as e:
-                # Task failed
+                # Task failed - but might have partial output (for scripts)
                 error_msg = str(e)
+
+                # Try to get partial result with output (for scripts)
+                output_text = None
+                if task_type == "script":
+                    try:
+                        partial_result = future.result(timeout=0)
+                        if isinstance(partial_result, dict):
+                            output_text = partial_result.get("output")
+                    except Exception:
+                        pass
+
                 del self.tasks[task_id]
 
-                logger.error("✗ Task failed: {} (ID: {})".format(command, task_id))
+                task_label = "Script" if task_type == "script" else "Command"
+                logger.error("✗ {} task failed: {} (ID: {})".format(task_label, description, task_id))
                 logger.error("  Error: {}".format(error_msg))
+
+                # Build error message with output if available (scripts only)
+                if task_type == "script" and output_text:
+                    message = "Script execution failed: {}\nElapsed time: {:.2f}s\nError: {}\n\n=== Partial Output ===\n{}".format(
+                        task_info.get("script_name", description), elapsed_time, error_msg, output_text
+                    )
+                    error_data = {"error": error_msg, "output": output_text}
+                else:
+                    message = "{} failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
+                        task_label, description, elapsed_time, error_msg
+                    )
+                    error_data = {"error": error_msg}
 
                 return {
                     "status": "error",
-                    "message": "Task failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
-                        command, elapsed_time, error_msg
-                    ),
-                    "data": None
+                    "message": message,
+                    "data": error_data
                 }
 
         else:
             # Task still running
+            task_label = "Script" if task_type == "script" else "Command"
+
+            # For script tasks, get current output from buffer if available
+            current_output = None
+            if task_type == "script":
+                output_buffer = task_info.get("output_buffer")
+                if output_buffer:
+                    try:
+                        # Read current buffer content (thread-safe operation)
+                        current_output = output_buffer.getvalue()
+                    except Exception as e:
+                        logger.warning("Failed to read output buffer: {}".format(e))
+
+            response_data = {
+                "task_id": task_id,
+                "task_type": task_type,
+                "description": description,
+                "elapsed_time": elapsed_time
+            }
+
+            # Include current output for scripts
+            if current_output:
+                response_data["output"] = current_output
+
             return {
                 "status": "running",
-                "message": "Task still executing: {}\nElapsed time: {:.2f}s".format(
-                    command, elapsed_time
+                "message": "{} still executing: {}\nElapsed time: {:.2f}s".format(
+                    task_label, description, elapsed_time
                 ),
-                "data": {
-                    "task_id": task_id,
-                    "command": command,
-                    "elapsed_time": elapsed_time
-                }
+                "data": response_data
             }
 
     def list_all_tasks(self):
@@ -162,7 +278,8 @@ class TaskManager:
 
         for task_id, task_info in self.tasks.items():
             future = task_info["future"]
-            command = task_info["command"]
+            description = task_info["description"]
+            task_type = task_info.get("type", "command")
             start_time = task_info["start_time"]
             elapsed_time = time.time() - start_time
 
@@ -176,12 +293,19 @@ class TaskManager:
             else:
                 task_status = "running"
 
-            tasks_info.append({
+            task_entry = {
                 "task_id": task_id,
-                "command": command,
+                "task_type": task_type,
+                "description": description,
                 "status": task_status,
                 "elapsed_time": elapsed_time
-            })
+            }
+
+            # Add script-specific info if applicable
+            if task_type == "script":
+                task_entry["script_name"] = task_info.get("script_name")
+
+            tasks_info.append(task_entry)
 
         message = "Found {} tracked task(s)".format(len(tasks_info))
 
