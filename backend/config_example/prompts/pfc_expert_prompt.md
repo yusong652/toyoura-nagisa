@@ -506,25 +506,37 @@ print("✓ Simulation complete, all data exported")
 # ❌ Wrong: Reading large CSV directly
 data = read("workspace/results/positions.csv")  # Not for data analysis!
 
-# ✅ Correct: Write analysis script
-write("workspace/analysis/plot_positions.py", """
-import pandas as pd
-import matplotlib.pyplot as plt
+# ✅ Correct: Progressive data analysis (bash + Python coding ability)
 
-df = pd.read_csv('workspace/results/positions.csv')
-fig, ax = plt.subplots()
-ax.scatter(df['x'], df['z'])
-ax.set_xlabel('X Position')
-ax.set_ylabel('Z Position')
-plt.savefig('workspace/plots/settlement_profile.png')
-print(f"Plotted {len(df)} points")
+# Stage 1: Quick structure inspection with bash
+bash("head -1 workspace/results/time_history.csv")
+# Output: cycle,strain,avg_velocity,max_contact_force
+
+bash("wc -l workspace/results/time_history.csv")
+# Output: 251 workspace/results/time_history.csv  (250 data rows + 1 header)
+
+# Stage 2: Data sampling with bash (quick pattern check)
+bash("awk 'NR==1 || NR%20==0' workspace/results/time_history.csv | head -15")
+# View header + every 20th row to identify obvious trends
+
+# Stage 3: Statistical analysis with Python (leverage coding ability)
+write("workspace/analysis/analyze_simulation.py", """
+import pandas as pd
+
+df = pd.read_csv('workspace/results/time_history.csv')
+
+# Summary statistics
+print(f"Records: {len(df)}, Cycles: {df['cycle'].min()}-{df['cycle'].max()}")
+print(f"Velocity: mean={df['avg_velocity'].mean():.4f}, std={df['avg_velocity'].std():.4f}")
+print(f"Peak force: {df['max_contact_force'].max():.2f} N at cycle {df.loc[df['max_contact_force'].idxmax(), 'cycle']}")
+
+# Liquefaction analysis (excess pore pressure ratio)
+stress_init, stress_curr = df['effective_stress'].iloc[[0, -1]]
+pressure_ratio = (stress_init - stress_curr) / stress_init if stress_init > 0 else 0.0
+print(f"Liquefaction: {'✓ Liquefied' if pressure_ratio > 0.95 else '✗ Not liquefied'} (ratio={pressure_ratio:.4f})")
 """)
 
-bash("python workspace/analysis/plot_positions.py")
-
-# ✅ Also correct: Quick data inspection with bash
-bash("head -20 workspace/results/positions.csv")  # Preview first 20 rows
-bash("wc -l workspace/results/positions.csv")     # Count rows
+bash("python workspace/analysis/analyze_simulation.py")
 ```
 
 ### When NOT to Use Tools
