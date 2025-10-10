@@ -31,40 +31,40 @@ def register_pfc_script_tool(mcp: FastMCP):
             ...,
             description=(
                 "Absolute path to Python script file for PFC SDK execution. "
-                "Example: '/path/to/pfc_project/scripts/analyze_balls.py'. "
-                "LLM should read the script first to understand its functionality."
+                "Example: '/workspace/scripts/settling_sim.py'. "
+                "Read the script first to understand its functionality."
             )
         )
     ) -> Dict[str, Any]:
         """
-        Execute Python SDK script from file path for queries and advanced operations.
+        Execute Python SDK script for long-running simulations and analysis.
 
-        This tool executes Python scripts that use PFC Python SDK (itasca module),
-        enabling queries and operations that return data (unlike commands which don't).
+        This tool executes Python scripts that use PFC Python SDK (itasca module).
+        Scripts run as long-running tasks and return immediately with a task_id.
 
-        Workflow:
-            1. LLM reads script file content using Read tool
-            2. LLM understands what the script does
-            3. LLM calls this tool with script path
-            4. PFC server reads and executes the script locally
-            5. Returns result data
+        Data flow pattern (three channels):
+            1. Real-time monitoring: Scripts print progress; check output via pfc_check_task_status
+            2. Checkpoint persistence: Scripts save complete state with "model save"
+            3. Analysis data: Scripts export CSV/JSON; write analysis scripts to process (don't read CSV directly)
 
-        Args:
-            script_path: Absolute path to Python script file
+        Usage workflow:
+            1. Read script file to understand what it does
+            2. Call this tool with script path → get task_id
+            3. Monitor progress with pfc_check_task_status (see print output)
+            4. After completion, process exported files
 
         Examples:
-            # First, LLM reads the script to understand it
-            # Then executes:
-            pfc_execute_script(script_path="/pfc_project/scripts/get_ball_count.py")
+            # Submit long-running simulation
+            result = pfc_execute_script(script_path="/workspace/scripts/settling_sim.py")
+            task_id = result["data"]["task_id"]
 
-            # Script content example (get_ball_count.py):
-            # result = itasca.ball.count()
+            # Monitor progress (check print output)
+            pfc_check_task_status(task_id=task_id)
+
+            # After completion: read metadata, analyze exported CSV with bash/Python if needed
 
         Note:
-            - Script must define 'result' variable or be single expression
-            - Script has access to 'itasca' module
-            - Use for queries (ball.count(), ball.list()) not commands
-            - For native PFC commands, use pfc_execute_command instead
+            For simple commands, use pfc_execute_command instead.
         """
         try:
             # Get WebSocket client (auto-connects if needed)
