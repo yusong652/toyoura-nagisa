@@ -168,6 +168,12 @@ class PFCCommandExecutor:
 
             if is_long_task:
                 # Long task: register with task manager and return immediately
+                # TODO: Improve error handling for long-running commands
+                #   Current: Returns task_id immediately, even if command has syntax errors
+                #   Desired: Wait briefly to catch immediate errors, then return task_id or error
+                #   Challenge: No way to validate PFC syntax without executing command
+                #   Possible solution: Add short timeout (e.g., 0.5s) to catch immediate failures
+                #   Note: This affects both testing and user experience
                 task_id = self.task_manager.create_command_task(future, cmd_str)
 
                 return {

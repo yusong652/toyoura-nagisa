@@ -23,7 +23,8 @@ from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_
 from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_tools,
     register_pfc_script_tool,
-    register_pfc_task_tools
+    register_pfc_task_status_tool,
+    register_pfc_list_tasks_tool
 )
 
 mcp = FastMCP(
@@ -49,7 +50,8 @@ register_location_tools(mcp)
 register_time_tools(mcp)
 register_pfc_tools(mcp)
 register_pfc_script_tool(mcp)
-register_pfc_task_tools(mcp)
+register_pfc_task_status_tool(mcp)
+register_pfc_list_tasks_tool(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

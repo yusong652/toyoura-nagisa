@@ -44,7 +44,7 @@ class TaskManager:
         Returns:
             str: Unique task ID for tracking
         """
-        task_id = str(uuid.uuid4())
+        task_id = uuid.uuid4().hex[:8]
 
         self.tasks[task_id] = {
             "future": future,
@@ -72,7 +72,7 @@ class TaskManager:
         Returns:
             str: Unique task ID for tracking
         """
-        task_id = str(uuid.uuid4())
+        task_id = uuid.uuid4().hex[:8]
 
         self.tasks[task_id] = {
             "future": future,
