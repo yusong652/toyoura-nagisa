@@ -79,7 +79,9 @@ class ToolProfileManager:
         "web_search",
         # PFC tools
         "pfc_execute_command",
-        "pfc_execute_script"
+        "pfc_execute_script",
+        "pfc_check_task_status",
+        "pfc_list_tasks"
     ]
 
     # PFC simulation tools (coding tools + PFC-specific tools)
@@ -97,8 +99,10 @@ class ToolProfileManager:
         # Search tools for finding PFC documentation and examples
         "web_search",
         # PFC-specific tools (WebSocket-based ITASCA SDK control)
-        "pfc_execute_command",   # Execute native PFC commands (no return values)
-        "pfc_execute_script",    # Execute Python SDK scripts (with return values)
+        "pfc_execute_command",      # Execute native PFC commands (no return values)
+        "pfc_execute_script",       # Execute Python SDK scripts (with return values)
+        "pfc_check_task_status",    # Query status of long-running tasks
+        "pfc_list_tasks",           # List all tracked long-running tasks
     ]
     
     # Tool profile definitions
@@ -125,7 +129,7 @@ class ToolProfileManager:
             name="PFC Expert",
             description="ITASCA PFC simulation specialist with real-time SDK control and analysis tools",
             tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # 12 tools: 10 basic + 2 PFC tools (command + script)
+            estimated_tokens=len(PFC_TOOLS) * 282,  # 14 tools: 10 basic + 4 PFC tools (command + script + task_status + list_tasks)
             color="#9C27B0",  # Purple
             icon="⚛️"
         ),
