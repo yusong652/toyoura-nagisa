@@ -49,18 +49,16 @@ def register_pfc_tools(mcp: FastMCP):
             description=(
                 "Optional dictionary with keyword parameters using typed values.\n"
                 "Value types:\n"
-                "  • Boolean: {\"active\": True} → keyword active true\n"
-                "  • Number: {\"radius\": 1.0}\n"
+                "  • Integer: {\"number\": 100} → keyword number 100\n"
+                "  • Float: {\"radius\": 1.5} → keyword radius 1.5\n"
                 "  • Tuple/List: {\"position\": [0, 0, 0]}\n"
                 "  • String identifier: {\"model\": \"linear\"}, {\"group\": \"balls\"}\n"
                 "  • Complex string: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
-                "  • Boolean flag (None): {\"inheritance\": None} → keyword only, no value\n"
-                "  • Domain condition: {\"condition\": \"stop\"} (auto-converted to proper flags)\n"
+                "  • Nested dict: {\"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5}} → keyword property kn 1.0e6 dp_nratio 0.5\n"
                 "Examples:\n"
-                "  • {\"model\": \"linear\", \"inheritance\": None}\n"
-                "  • {\"radius\": 1.0, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
-                "  • {\"condition\": \"stop\"} → model domain condition stop (auto-converted)\n"
-                "  • {\"active\": True} → keyword active true"
+                "  • {\"model\": \"linear\"}\n"
+                "  • {\"radius\": 1.5, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
+                "  • {\"model\": \"linear\", \"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5, \"fric\": 0.5}}"
             )
         )
     ) -> Dict[str, Any]:

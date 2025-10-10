@@ -254,6 +254,9 @@ class PFCCommandExecutor:
 
             >>> _assemble_command("model domain", None, {"condition": "stop"})
             "model domain condition stop"  # Auto-converted from key-value to flags
+
+            >>> _assemble_command("contact cmat default", None, {"model": "linear", "property": {"kn": 1.0e6, "dp_nratio": 0.5}})
+            "contact cmat default model linear property kn 1.0e6 dp_nratio 0.5"
         """
         # Pre-process params for PFC-specific special cases
         params = self._preprocess_params(params)
@@ -269,9 +272,36 @@ class PFCCommandExecutor:
         for keyword, value in params.items():
             cmd_parts.append(keyword)
             if value is not None:  # None = boolean flag (keyword only, no value)
-                cmd_parts.append(self._format_value(value))
+                # Special handling for nested dictionaries
+                if isinstance(value, dict):
+                    self._append_dict_params(cmd_parts, value)
+                else:
+                    cmd_parts.append(self._format_value(value))
 
         return " ".join(cmd_parts)
+
+    def _append_dict_params(self, cmd_parts, params_dict):
+        # type: (list, Dict[str, Any]) -> None
+        """
+        Recursively append dictionary parameters to command parts list.
+
+        Args:
+            cmd_parts: List to append command parts to (modified in-place)
+            params_dict: Dictionary of parameters to expand
+
+        Example:
+            >>> cmd_parts = ["contact", "cmat", "default", "property"]
+            >>> _append_dict_params(cmd_parts, {"kn": 1.0e6, "dp_nratio": 0.5})
+            >>> # cmd_parts becomes: ["contact", "cmat", "default", "property", "kn", "1000000.0", "dp_nratio", "0.5"]
+        """
+        for key, value in params_dict.items():
+            cmd_parts.append(key)
+            if value is not None:
+                if isinstance(value, dict):
+                    # Recursive handling for deeply nested dicts
+                    self._append_dict_params(cmd_parts, value)
+                else:
+                    cmd_parts.append(self._format_value(value))
 
     def _preprocess_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -324,10 +354,11 @@ class PFCCommandExecutor:
         - Booleans (bool): Convert to PFC format (lowercase true/false)
         - Numbers (int/float): Direct string conversion
         - Tuples/Lists: Format as PFC tuple "(x,y,z)"
+        - Dictionaries (dict): Expand to keyword-value pairs recursively
         - Strings: Smart handling for identifiers vs complex formats
 
         Args:
-            value: Value to format (bool, int, float, str, tuple, list, or other)
+            value: Value to format (bool, int, float, str, tuple, list, dict, or other)
 
         Returns:
             Formatted string for PFC command
@@ -348,6 +379,9 @@ class PFCCommandExecutor:
             >>> _format_value([0, 0, 0])
             "(0,0,0)"
 
+            >>> _format_value({"kn": 1.0e6, "dp_nratio": 0.5})
+            "kn 1000000.0 dp_nratio 0.5"
+
             >>> _format_value("linear")
             '"linear"'
 
@@ -366,6 +400,15 @@ class PFCCommandExecutor:
         # Tuples/Lists: format as PFC tuple
         elif isinstance(value, (tuple, list)):
             return f"({','.join(map(str, value))})"
+
+        # Dictionaries: expand to keyword-value pairs (e.g., property parameters)
+        elif isinstance(value, dict):
+            parts = []
+            for k, v in value.items():
+                parts.append(k)
+                if v is not None:  # None = boolean flag (keyword only, no value)
+                    parts.append(self._format_value(v))  # Recursive formatting
+            return " ".join(parts)
 
         # Strings: smart handling
         elif isinstance(value, str):

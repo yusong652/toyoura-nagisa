@@ -12,11 +12,12 @@ Features Demonstrated:
 2. Normal task execution (immediate results)
 3. Long-running task management (non-blocking submission)
 4. Task status querying and progress tracking
-5. Complete DEM simulation workflow:
+5. Nested dictionary parameters for complex PFC commands
+6. Complete DEM simulation workflow:
    - Domain initialization
    - Material property setup (large-strain, gravity)
    - Geometry generation (walls, particles)
-   - Contact model configuration (thread-sensitive)
+   - Contact model configuration with nested properties (thread-sensitive)
    - Long-running calculation with monitoring
 
 Architecture Highlights:
@@ -130,6 +131,29 @@ async def run_full_simulation():
             return
 
         print("✓ Connected successfully\n")
+
+        # Step 0: Initialize new model (clean slate)
+        print("=" * 70)
+        print("STEP 0: Initialize New Model")
+        print("Command: model new")
+        print("Purpose: Clear any previous simulation data")
+        print("Expected: [BACKGROUND THREAD]")
+        print("=" * 70)
+
+        result = await client.send_command(
+            command="model new",
+            timeout=10.0
+        )
+
+        success = display_result_details(result, "Step 0: Model Initialization")
+        test_results['total'] += 1
+        test_results['steps'].append(('Model Initialization', success))
+        if success:
+            test_results['passed'] += 1
+            print("✅ Model initialized successfully\n")
+        else:
+            test_results['failed'] += 1
+            print("⚠️  Model initialization failed, continuing anyway...\n")
 
         # Step 1: Setup domain extent
         print("=" * 70)
@@ -259,21 +283,24 @@ async def run_full_simulation():
                 test_results['failed'] += 1
 
         # Step 6: Setup contact model (CRITICAL - MAIN THREAD)
+        # This step demonstrates the new nested dictionary parameter support
         print("=" * 70)
-        print("STEP 6: Setup Contact Model (Thread-Sensitive)")
+        print("STEP 6: Setup Contact Model with Nested Dict Parameters")
         print("Command: contact cmat default model linear property kn 1.0e6 fric 0.5 dp_nratio 0.5 dp_sratio 0.3")
         print("Expected: [MAIN THREAD] ← This is the critical test!")
+        print("New Feature: Using nested dict for 'property' parameter")
         print("=" * 70)
 
         result = await client.send_command(
             command="contact cmat default",
             params={
                 "model": "linear",
-                "property": None,  # Boolean flag
-                "kn": 1.0e6,
-                "fric": 0.5,
-                "dp_nratio": 0.5,
-                "dp_sratio": 0.3
+                "property": {
+                    "kn": 1.0e6,
+                    "fric": 0.5,
+                    "dp_nratio": 0.5,
+                    "dp_sratio": 0.3
+                }
             },
             timeout=15.0
         )
@@ -495,8 +522,17 @@ async def run_full_simulation():
         print("   • Long tasks return immediately with task_id for non-blocking workflow")
         print("   • Use check_task_status() to query progress without blocking")
         print("   • TaskManager tracks task lifecycle independently from Executor")
+        print("   • Nested dict parameters for complex commands (e.g., contact properties)")
         print("   • For real progress tracking, use scripts with checkpoint outputs")
         print("   • PFC user standard practice: segment long tasks and output progress")
+
+        print("\n🆕 New Features Showcased:")
+        print("   • Nested Dictionary Parameters:")
+        print("     - Simplifies complex parameter structures")
+        print("     - Example: {'property': {'kn': 1.0e6, 'fric': 0.5, 'dp_nratio': 0.5}}")
+        print("     - Automatically expanded to: property kn 1.0e6 fric 0.5 dp_nratio 0.5")
+        print("     - Reduces LLM trial-and-error when calling PFC commands")
+        print("     - More intuitive parameter grouping for complex commands")
 
     except Exception as e:
         print(f"\n❌ Error during simulation: {e}")
