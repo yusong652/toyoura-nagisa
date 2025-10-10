@@ -47,79 +47,33 @@ def register_pfc_tools(mcp: FastMCP):
         params: Optional[Dict[str, Any]] = Field(
             None,
             description=(
-                "Optional dictionary with keyword parameters using typed values.\n"
+                "Optional dictionary with keyword parameters.\n"
                 "Value types:\n"
-                "  • Integer: {\"number\": 100} → keyword number 100\n"
-                "  • Float: {\"radius\": 1.5} → keyword radius 1.5\n"
-                "  • Tuple/List: {\"position\": [0, 0, 0]}\n"
-                "  • String identifier: {\"model\": \"linear\"}, {\"group\": \"balls\"}\n"
-                "  • Complex string: {\"extent\": \"-10 10 -10 10 -10 10\"}\n"
-                "  • Nested dict: {\"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5}} → keyword property kn 1.0e6 dp_nratio 0.5\n"
+                "  • Integer: {\"number\": 100}\n"
+                "  • Float: {\"radius\": 1.5}\n"
+                "  • List/Tuple: {\"position\": [0, 0, 0]}\n"
+                "  • String: {\"model\": \"linear\"}, {\"group\": \"balls\"}\n"
+                "  • Nested dict: {\"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5, \"fric\": 0.5}}\n"
                 "Examples:\n"
                 "  • {\"model\": \"linear\"}\n"
                 "  • {\"radius\": 1.5, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
-                "  • {\"model\": \"linear\", \"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5, \"fric\": 0.5}}"
+                "  • {\"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5, \"fric\": 0.5}}"
             )
         )
     ) -> Dict[str, Any]:
         """
-        Execute a native PFC command through the WebSocket connection to PFC server.
+        Execute PFC commands with success/failure validation only.
 
-        This tool executes native ITASCA PFC commands supporting both positional argument
-        and keyword parameters. PFC commands have flexible syntax allowing:
-        - Positional value without keyword
-        - Keyword-value pairs
-        - Boolean flags (keywords without values)
-
-        Args:
-            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional positional argument using native Python types (bool, int, float, str, tuple)
-            params: Optional dictionary with keyword parameters (values: bool, number, list, string, or None)
+        This tool returns only command execution status (success or syntax error).
+        Use for validation and state modification without data inspection.
 
         Examples:
-            # Positional argument - boolean
-            pfc_execute_command(command="model large-strain", arg=True)
-            # Assembled: model large-strain true
-
-            # Positional argument - gravity with number
             pfc_execute_command(command="model gravity", arg=9.81)
-            # Assembled: model gravity 9.81
-
-            # Positional argument - gravity with tuple
-            pfc_execute_command(command="model gravity", arg=(0, 0, -9.81))
-            # Assembled: model gravity (0,0,-9.81)
-
-            # Keyword arguments - domain extent
-            pfc_execute_command(
-                command="model domain",
-                params={"extent": "-10 10 -10 10 -10 10"}
-            )
-            # Assembled: model domain extent -10 10 -10 10 -10 10
-
-            # Boolean flags - contact material default with inheritance
-            pfc_execute_command(
-                command="contact cmat default",
-                params={"model": "linear", "inheritance": None}
-            )
-            # Assembled: contact cmat default model linear inheritance
-
-            # Ball creation with keyword parameters (native types)
-            pfc_execute_command(
-                command="ball create",
-                params={"radius": 1.0, "position": [0, 0, 0], "group": "balls"}
-            )
-            # Assembled: ball create radius 1.0 position (0,0,0) group "balls"
-
-            # Simple command - no parameters
-            pfc_execute_command(command="model cycle")
-            # Assembled: model cycle
+            pfc_execute_command(command="ball generate", params={"number": 1000, "radius": 0.1})
 
         Note:
-            - All parameters are optional - commands use defaults if omitted
-            - arg accepts native Python types (bool, int, float, str, tuple) for type-driven formatting
-            - params dict values support: bool, number, list (for tuples), string, or None (boolean flags)
-            - Server performs type-driven command assembly from command + arg + params
-            - Python True/False automatically converts to PFC true/false (lowercase, unquoted)
+            For operations requiring Python SDK access, custom logic, or print() output,
+            use pfc_execute_script instead.
         """
         try:
             # Get WebSocket client (auto-connects if needed)
