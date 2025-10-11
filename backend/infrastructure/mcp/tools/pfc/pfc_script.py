@@ -7,7 +7,7 @@ that return data (unlike native commands which don't return values).
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -33,6 +33,24 @@ def register_pfc_script_tool(mcp: FastMCP):
                 "Absolute path to Python script file for PFC SDK execution. "
                 "Example: '/workspace/scripts/settling_sim.py'. "
                 "Read the script first to understand its functionality."
+            )
+        ),
+        timeout: Optional[int] = Field(
+            None,
+            description=(
+                "Script execution timeout in milliseconds (default: None - no timeout limit).\n"
+                "Valid range: 1000-600000 (1 second to 10 minutes).\n"
+                "Only applies when run_in_background=False.\n"
+                "Use for testing: 60000-120000ms, Production simulations: None (no limit)"
+            )
+        ),
+        run_in_background: bool = Field(
+            True,
+            description=(
+                "Background execution control (default: True - asynchronous for production).\n"
+                "  • True: Return task_id immediately, query progress with pfc_check_task_status\n"
+                "  • False: Wait for completion, return result directly (for quick testing)\n"
+                "Use True for long simulations, False for quick test scripts"
             )
         )
     ) -> Dict[str, Any]:
@@ -71,7 +89,7 @@ def register_pfc_script_tool(mcp: FastMCP):
             client = await get_client()
 
             # Execute script
-            result = await client.send_script(script_path)
+            result = await client.send_script(script_path, timeout, run_in_background)
 
             # Handle result
             if result.get("status") == "success":

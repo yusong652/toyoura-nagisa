@@ -277,6 +277,8 @@ class PFCWebSocketClient:
         command: str,
         arg: Optional[Union[bool, int, float, str, tuple]] = None,
         params: Optional[Dict[str, Any]] = None,
+        timeout_ms: int = 30000,
+        run_in_background: bool = False,
         timeout: float = 30.0,
         max_retries: int = 2
     ) -> Dict[str, Any]:
@@ -298,7 +300,11 @@ class PFCWebSocketClient:
                   • {"radius": 1.0, "position": [0, 0, 0], "group": "my_balls"}
                   • {"condition": "stop"} → "model domain condition stop"
                   • {"model": "linear", "inheritance": None} → boolean flag
-            timeout: Command timeout in seconds (default: 30.0)
+            timeout_ms: Command execution timeout in milliseconds (default: 30000ms)
+                Passed to executor for command execution timeout control
+            run_in_background: Background execution control (default: False - synchronous)
+                Passed to executor to control execution mode
+            timeout: WebSocket communication timeout in seconds (default: 30.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -349,7 +355,9 @@ class PFCWebSocketClient:
                     "command_id": command_id,
                     "command": command,
                     "arg": arg,
-                    "params": params
+                    "params": params,
+                    "timeout_ms": timeout_ms,
+                    "run_in_background": run_in_background
                 }
 
                 # Create future for result
@@ -392,6 +400,8 @@ class PFCWebSocketClient:
     async def send_script(
         self,
         script_path: str,
+        timeout_ms: Optional[int] = None,
+        run_in_background: bool = True,
         timeout: float = 30.0,
         max_retries: int = 2
     ) -> Dict[str, Any]:
@@ -401,7 +411,11 @@ class PFCWebSocketClient:
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
-            timeout: Script execution timeout in seconds (default: 30.0)
+            timeout_ms: Script execution timeout in milliseconds (default: None - no timeout)
+                Passed to executor for script execution timeout control
+            run_in_background: Background execution control (default: True - asynchronous)
+                Passed to executor to control execution mode
+            timeout: WebSocket communication timeout in seconds (default: 30.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -448,7 +462,9 @@ class PFCWebSocketClient:
                 message = {
                     "type": "script",
                     "command_id": command_id,
-                    "script_path": script_path
+                    "script_path": script_path,
+                    "timeout_ms": timeout_ms,
+                    "run_in_background": run_in_background
                 }
 
                 # Create future for result

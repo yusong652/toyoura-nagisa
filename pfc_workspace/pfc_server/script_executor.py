@@ -18,6 +18,9 @@ from .main_thread_executor import MainThreadExecutor
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
+# Script execution timeout configuration
+MAX_SCRIPT_TIMEOUT_MS = 600000  # 10 minutes maximum for synchronous scripts
+
 
 class PFCScriptExecutor:
     """Execute Python scripts using PFC Python SDK via main thread queue."""
@@ -121,28 +124,41 @@ class PFCScriptExecutor:
             # Always restore stdout
             sys.stdout = old_stdout
 
-    async def execute_script(self, script_path):
-        # type: (str) -> Dict[str, Any]
+    async def execute_script(self, script_path, timeout_ms=None, run_in_background=True):
+        # type: (str, Optional[int], bool) -> Dict[str, Any]
         """
-        Submit Python script for execution as a long-running task.
+        Execute Python script with flexible execution control.
 
-        Scripts are always treated as long-running tasks and return immediately
-        with a task_id. Use check_task_status to query progress and retrieve output.
+        Execution modes:
+        - Asynchronous (run_in_background=True, default): Submit as background task, return task_id immediately
+        - Synchronous (run_in_background=False): Wait for completion, return result with timeout
 
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
+            timeout_ms: Script execution timeout in milliseconds (only for synchronous mode)
+                - None (default): No timeout limit for production simulations
+                - 1000-600000: Custom timeout (1 second to 10 minutes) for testing
+            run_in_background: Background execution control (default: True - production mode)
+                - True: Asynchronous - return task_id immediately, query via check_task_status
+                - False: Synchronous - wait for completion, return result directly
 
         Returns:
-            Result dictionary for task submission:
-                - status: "pending" - Task submitted successfully
-                - message: str - Submission confirmation message
-                - data: Dict with task_id and script_path
+            Result dictionary:
+                For asynchronous execution (run_in_background=True):
+                    - status: "pending" - Task submitted successfully
+                    - message: str - Submission confirmation message
+                    - data: Dict with task_id and script_path
+                For synchronous execution (run_in_background=False):
+                    - status: "success" or "error"
+                    - message: str - Execution result message
+                    - data: Script result data
+                    - output: Captured stdout from script
 
         Note:
             - Scripts are executed in IPython main thread via queue
             - Script must define 'result' variable for structured data
-            - Print statements are captured and available via task status query
+            - Print statements are captured and available in output
             - Script has access to 'itasca' module in global scope
         """
         import os
@@ -173,13 +189,29 @@ class PFCScriptExecutor:
                     "data": None
                 }
 
-            # Submit to main thread queue (non-blocking)
+            # Validate timeout if provided for synchronous mode
+            if not run_in_background and timeout_ms is not None:
+                if timeout_ms < 1000:
+                    return {
+                        "status": "error",
+                        "message": "Timeout must be at least 1000ms (1 second)",
+                        "data": None
+                    }
+                elif timeout_ms > MAX_SCRIPT_TIMEOUT_MS:
+                    return {
+                        "status": "error",
+                        "message": "Timeout cannot exceed {}ms ({} minutes)".format(
+                            MAX_SCRIPT_TIMEOUT_MS, MAX_SCRIPT_TIMEOUT_MS // 60000
+                        ),
+                        "data": None
+                    }
+
             script_name = os.path.basename(script_path)
-            logger.info("Submitting script as long-running task: {}".format(script_name))
 
             # Create shared output buffer for real-time output capture
             output_buffer = StringIO()
 
+            # Submit to main thread queue
             future = self.main_executor.submit(
                 self._execute_script_sync,
                 script_path,
@@ -187,23 +219,44 @@ class PFCScriptExecutor:
                 output_buffer  # Pass shared buffer to executor
             )
 
-            # Register with task manager as script task and return immediately
-            task_id = self.task_manager.create_script_task(
-                future,
-                script_name,
-                script_path,
-                output_buffer  # Pass buffer reference for live status queries
-            )
+            if run_in_background:
+                # Asynchronous execution: register with task manager and return immediately
+                logger.info("Submitting script as background task: {}".format(script_name))
 
-            return {
-                "status": "pending",
-                "message": "Script submitted as long-running task: {}\nUse check_task_status tool to query progress and retrieve output.".format(script_name),
-                "data": {
-                    "task_id": task_id,
-                    "script_path": script_path,
-                    "script_name": script_name
+                task_id = self.task_manager.create_script_task(
+                    future,
+                    script_name,
+                    script_path,
+                    output_buffer  # Pass buffer reference for live status queries
+                )
+
+                return {
+                    "status": "pending",
+                    "message": "Script submitted as background task: {}\nUse check_task_status tool to query progress and retrieve output.".format(script_name),
+                    "data": {
+                        "task_id": task_id,
+                        "script_path": script_path,
+                        "script_name": script_name
+                    }
                 }
-            }
+
+            else:
+                # Synchronous execution: wait for completion with optional timeout
+                timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
+                logger.info("Executing script synchronously: {} [timeout={}s]".format(
+                    script_name, timeout_seconds if timeout_seconds else "None"
+                ))
+
+                loop = asyncio.get_event_loop()
+                # Wait for script execution with timeout
+                result_dict = await loop.run_in_executor(
+                    None,  # Use default thread pool
+                    future.result,  # Block until main thread processes
+                    timeout_seconds  # Use specified timeout or None for no timeout
+                )
+
+                # Return the complete result from script execution
+                return result_dict
 
         except Exception as e:
             logger.error("Script submission failed: {}".format(e))

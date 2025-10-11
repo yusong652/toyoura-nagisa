@@ -59,6 +59,24 @@ def register_pfc_tools(mcp: FastMCP):
                 "  • {\"radius\": 1.5, \"position\": [0, 0, 0], \"group\": \"balls\"}\n"
                 "  • {\"property\": {\"kn\": 1.0e6, \"dp_nratio\": 0.5, \"fric\": 0.5}}"
             )
+        ),
+        timeout: int = Field(
+            30000,
+            description=(
+                "Command execution timeout in milliseconds (default: 30000ms / 30 seconds).\n"
+                "Valid range: 1000-600000 (1 second to 10 minutes).\n"
+                "Only applies when run_in_background=False.\n"
+                "Quick tests: 5000-10000ms, Complex validation: 30000-60000ms"
+            )
+        ),
+        run_in_background: bool = Field(
+            False,
+            description=(
+                "Background execution control (default: False - synchronous for testing).\n"
+                "  • False: Wait for completion, catch errors immediately (recommended for testing)\n"
+                "  • True: Return task_id immediately, query progress with pfc_check_task_status\n"
+                "Use False for quick syntax validation, True for long-running commands"
+            )
         )
     ) -> Dict[str, Any]:
         """
@@ -80,7 +98,7 @@ def register_pfc_tools(mcp: FastMCP):
             client = await get_client()
 
             # Execute command (server will assemble command string from command + arg + params)
-            result = await client.send_command(command, arg, params or {})
+            result = await client.send_command(command, arg, params or {}, timeout, run_in_background)
 
             # Build display command string for logging
             parts = [command]

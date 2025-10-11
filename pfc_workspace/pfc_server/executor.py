@@ -17,12 +17,9 @@ from .task_manager import TaskManager
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
-# Long-running commands that should return immediately with task ID
-LONG_RUNNING_COMMANDS = {
-    "model solve",
-    "model cycle",
-    # Add more long-running commands as needed
-}
+# Default timeout for command execution (milliseconds)
+DEFAULT_COMMAND_TIMEOUT_MS = 30000  # 30 seconds for testing
+MAX_COMMAND_TIMEOUT_MS = 600000     # 10 minutes maximum
 
 
 class PFCCommandExecutor:
@@ -53,18 +50,6 @@ class PFCCommandExecutor:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
 
-    def _is_long_running_command(self, command):
-        # type: (str) -> bool
-        """
-        Check if a command is classified as long-running.
-
-        Args:
-            command: PFC command name (e.g., "model solve", "model cycle")
-
-        Returns:
-            bool: True if command is long-running, False otherwise
-        """
-        return any(command.startswith(cmd) for cmd in LONG_RUNNING_COMMANDS)
 
     def _execute_pfc_command_sync(self, cmd_str):
         # type: (str) -> Any
@@ -94,19 +79,18 @@ class PFCCommandExecutor:
             # Re-raise to be handled by async wrapper
             raise
 
-    async def execute_command(self, command, arg=None, params=None):
-        # type: (str, Any, Optional[Dict[str, Any]]) -> Dict[str, Any]
+    async def execute_command(self, command, arg=None, params=None, timeout_ms=DEFAULT_COMMAND_TIMEOUT_MS, run_in_background=False):
+        # type: (str, Any, Optional[Dict[str, Any]], int, bool) -> Dict[str, Any]
         """
-        Execute a native PFC command via main thread queue.
+        Execute a native PFC command via main thread queue with flexible execution control.
 
         This method assembles a complete PFC command string from the command name,
         optional positional argument, and optional keyword parameters, then submits
         it to the main thread queue for execution.
 
-        Long-running commands (e.g., "model solve", "model cycle") return immediately
-        with a task ID. Use check_task_status() to query task progress.
-
-        Short-running commands wait for completion and return results immediately.
+        Execution modes:
+        - Synchronous (run_in_background=False): Wait for completion, return result/error immediately
+        - Asynchronous (run_in_background=True): Return task_id immediately, query via check_task_status()
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
@@ -123,14 +107,20 @@ class PFCCommandExecutor:
                   • {"condition": "stop"} → "model domain condition stop"
                   • {"model": "linear", "inheritance": None} → boolean flag
                   • {"active": True} → keyword with boolean value
+            timeout_ms: Command execution timeout in milliseconds (default: 30000ms / 30 seconds)
+                - Valid range: 1000-600000 (1 second to 10 minutes)
+                - Only applies to synchronous execution (run_in_background=False)
+            run_in_background: Background execution control (default: False - synchronous for testing)
+                - False: Synchronous - wait for completion, catch errors immediately
+                - True: Asynchronous - return task_id, query progress later
 
         Returns:
             Result dictionary following ToolResult pattern:
-                For short tasks:
+                For synchronous execution (run_in_background=False):
                     - status: "success" or "error"
                     - message: User-friendly message
                     - data: Command result data
-                For long tasks:
+                For asynchronous execution (run_in_background=True):
                     - status: "pending"
                     - message: Task submission confirmation
                     - data: {"task_id": str, "command": str}
@@ -153,11 +143,26 @@ class PFCCommandExecutor:
             params = params or {}  # Handle None params
             cmd_str = self._assemble_command(command, arg, params)
 
-            # Check if this is a long-running command
-            is_long_task = self._is_long_running_command(command)
+            # Validate timeout range
+            if timeout_ms < 1000:
+                return {
+                    "status": "error",
+                    "message": "Timeout must be at least 1000ms (1 second)",
+                    "data": None
+                }
+            elif timeout_ms > MAX_COMMAND_TIMEOUT_MS:
+                return {
+                    "status": "error",
+                    "message": "Timeout cannot exceed {}ms ({} minutes)".format(
+                        MAX_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS // 60000
+                    ),
+                    "data": None
+                }
+
+            timeout_seconds = timeout_ms / 1000.0
 
             logger.info("Submitting PFC command to main thread: {} [{}]".format(
-                cmd_str, "LONG TASK" if is_long_task else "SHORT TASK"
+                cmd_str, "ASYNC" if run_in_background else "SYNC, timeout={}s".format(timeout_seconds)
             ))
 
             # Submit to main thread queue
@@ -166,19 +171,13 @@ class PFCCommandExecutor:
                 cmd_str
             )
 
-            if is_long_task:
-                # Long task: register with task manager and return immediately
-                # TODO: Improve error handling for long-running commands
-                #   Current: Returns task_id immediately, even if command has syntax errors
-                #   Desired: Wait briefly to catch immediate errors, then return task_id or error
-                #   Challenge: No way to validate PFC syntax without executing command
-                #   Possible solution: Add short timeout (e.g., 0.5s) to catch immediate failures
-                #   Note: This affects both testing and user experience
+            if run_in_background:
+                # Asynchronous execution: register with task manager and return immediately
                 task_id = self.task_manager.create_command_task(future, cmd_str)
 
                 return {
                     "status": "pending",
-                    "message": "Long-running command submitted: {}\nUse check_task_status tool to query progress.".format(cmd_str),
+                    "message": "Command submitted as background task: {}\nUse check_task_status tool to query progress.".format(cmd_str),
                     "data": {
                         "task_id": task_id,
                         "command": cmd_str
@@ -186,12 +185,12 @@ class PFCCommandExecutor:
                 }
 
             else:
-                # Short task: wait for completion
+                # Synchronous execution: wait for completion with timeout
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     None,  # Use default thread pool
                     future.result,  # Block until main thread processes
-                    60  # 1 minute timeout for short tasks
+                    timeout_seconds  # Use specified timeout
                 )
 
                 # Serialize result for response
