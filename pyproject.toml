@@ -87,7 +87,9 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot",
-    "pfc-server",  # PFC WebSocket server (independent service)
+    # Note: pfc-server is NOT a workspace member
+    # It runs in PFC's embedded Python environment with its own dependencies
+    # Install in PFC environment: pip install websockets==9.1
 ]
 
 [project.optional-dependencies]

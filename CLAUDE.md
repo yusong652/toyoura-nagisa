@@ -203,13 +203,24 @@ npm run preview
 
 ### PFC Integration Development
 
+**Important**: pfc-server is NOT a UV workspace member. It runs in PFC's embedded Python environment with separate dependencies.
+
 ```bash
-# Start PFC WebSocket server (in PFC GUI Python console)
+# 1. Install pfc-server dependencies in PFC's Python environment
+#    (Run in PFC GUI IPython console)
+pip install websockets==9.1
+
+# 2. Start PFC WebSocket server (in PFC GUI Python console)
 exec(open(r'C:\Dev\Han\aiNagisa\pfc-server\start_server.py', encoding='utf-8').read())
 
-# Test integration (with PFC server running)
+# 3. Test integration from aiNagisa environment (with PFC server running)
 uv run python examples/pfc_integration/DEMo.py
 ```
+
+**Why separate?**
+- pfc-server requires `websockets==9.1` (PFC Python environment constraint)
+- aiNagisa requires `websockets>=15.0.1` (modern features)
+- Different runtime environments → separate dependency management
 
 ## File Structure
 
@@ -360,10 +371,12 @@ uv run python examples/pfc_integration/DEMo.py
 - Memory cleanup on session deletion
 
 ### PFC Integration
-- PFC server runs on port 9001 (WebSocket)
-- Server must be started in PFC GUI before using PFC tools
-- Long tasks return task_id immediately for non-blocking operation
-- Check `pfc-server/README.md` for troubleshooting
+- **Not a workspace member**: pfc-server runs in PFC's Python environment
+- **Dependency installation**: Run `pip install websockets==9.1` in PFC GUI
+- **Server port**: Runs on port 9001 (WebSocket)
+- **Startup**: Must be started in PFC GUI before using PFC tools
+- **Long tasks**: Return task_id immediately for non-blocking operation
+- **Troubleshooting**: Check `pfc-server/README.md`
 
 ## Key Development Notes
 
