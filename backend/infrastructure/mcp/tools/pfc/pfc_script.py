@@ -69,7 +69,13 @@ def register_pfc_script_tool(mcp: FastMCP):
         Note:
             For simple commands, use pfc_execute_command instead.
         """
+        from pathlib import Path
+
         try:
+            # Normalize path for consistency (convert to forward slashes)
+            # This ensures consistent path format across platforms
+            script_path = str(Path(script_path)).replace('\\', '/')
+
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
