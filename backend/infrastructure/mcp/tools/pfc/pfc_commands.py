@@ -65,7 +65,8 @@ def register_pfc_tools(mcp: FastMCP):
             description=(
                 "Command execution timeout in milliseconds. Valid range: 1000-600000 (1s to 10min). "
                 "Only applies when run_in_background=False. "
-                "Recommended: 5000-10000ms for quick tests, 30000-60000ms for complex validation."
+                "Recommended: 5000-10000ms for quick tests, 30000-60000ms for model solve/cycle. "
+                "For long cycles, use run_in_background=True instead of increasing timeout."
             )
         ),
         run_in_background: bool = Field(
@@ -83,10 +84,6 @@ def register_pfc_tools(mcp: FastMCP):
         This tool returns only command execution status (success or syntax error).
         Use for validation and state modification without data inspection.
 
-        Examples:
-            pfc_execute_command(command="model gravity", arg=9.81)
-            pfc_execute_command(command="ball generate", params={"number": 1000, "radius": 0.1})
-
         Note:
             For operations requiring Python SDK access, custom logic, or print() output,
             use pfc_execute_script instead.
@@ -96,7 +93,14 @@ def register_pfc_tools(mcp: FastMCP):
             client = await get_client()
 
             # Execute command (server will assemble command string from command + arg + params)
-            result = await client.send_command(command, arg, params or {}, timeout, run_in_background)
+            # WebSocket timeout is auto-calculated based on timeout + infrastructure buffer
+            result = await client.send_command(
+                command=command,
+                arg=arg,
+                params=params or {},
+                timeout_ms=timeout,
+                run_in_background=run_in_background
+            )
 
             # Build display command string for logging
             parts = [command]

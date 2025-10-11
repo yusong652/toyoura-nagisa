@@ -55,9 +55,6 @@ def register_pfc_script_tool(mcp: FastMCP):
         """
         Execute Python SDK script for long-running simulations and analysis.
 
-        This tool executes Python scripts that use PFC Python SDK (itasca module).
-        Scripts run as long-running tasks and return immediately with a task_id.
-
         Data flow pattern (three channels):
             1. Real-time monitoring: Scripts print progress; check output via pfc_check_task_status
             2. Checkpoint persistence: Scripts save complete state with "model save"
@@ -65,19 +62,9 @@ def register_pfc_script_tool(mcp: FastMCP):
 
         Usage workflow:
             1. Read script file to understand what it does
-            2. Call this tool with script path → get task_id
+            2. Call this tool with script path → returns task_id
             3. Monitor progress with pfc_check_task_status (see print output)
             4. After completion, process exported files
-
-        Examples:
-            # Submit long-running simulation
-            result = pfc_execute_script(script_path="/workspace/scripts/settling_sim.py")
-            task_id = result["data"]["task_id"]
-
-            # Monitor progress (check print output)
-            pfc_check_task_status(task_id=task_id)
-
-            # After completion: read metadata, analyze exported CSV with bash/Python if needed
 
         Note:
             For simple commands, use pfc_execute_command instead.
@@ -87,7 +74,12 @@ def register_pfc_script_tool(mcp: FastMCP):
             client = await get_client()
 
             # Execute script
-            result = await client.send_script(script_path, timeout, run_in_background)
+            # WebSocket timeout is auto-calculated based on timeout + infrastructure buffer
+            result = await client.send_script(
+                script_path=script_path,
+                timeout_ms=timeout,
+                run_in_background=run_in_background
+            )
 
             # Handle result
             if result.get("status") == "success":

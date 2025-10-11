@@ -51,7 +51,7 @@ from pathlib import Path
 backend_path = Path(__file__).parent / "backend"
 sys.path.insert(0, str(backend_path))
 
-from infrastructure.pfc.websocket_client import PFCWebSocketClient
+from infrastructure.pfc.websocket_client import PFCWebSocketClient # type: ignore
 
 
 def display_result_details(result: dict, step_name: str) -> bool:
@@ -319,7 +319,7 @@ async def run_full_simulation():
         # Step 7: Long calculation with task status query testing
         print("=" * 70)
         print("STEP 7: Long Calculation with Task Management (80000 cycles)")
-        print("Command: model solve cycle 80000")
+        print("Command: model cycle 80000")
         print("Expected: Immediate return with task_id, then query for status")
         print("=" * 70)
         print()
@@ -327,8 +327,8 @@ async def run_full_simulation():
         # Submit long-running task
         print("Submitting long-running task...")
         submit_result = await client.send_command(
-            command="model solve",
-            params={"cycle": 80000},
+            command="model cycle",
+            arg=80000,
             timeout=30.0  # Should return immediately
         )
 

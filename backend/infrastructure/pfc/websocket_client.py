@@ -67,6 +67,58 @@ class PFCWebSocketClient:
             raise RuntimeError("WebSocket not connected. Call connect() first.")
         return self._websocket
 
+    def _calculate_websocket_timeout_ms(self, timeout_ms: int, run_in_background: bool) -> int:
+        """
+        Calculate WebSocket communication timeout based on command execution timeout.
+
+        This is infrastructure overhead (network, serialization, system load),
+        not controlled by LLM. The timeout ensures:
+        1. Command has time to complete
+        2. Result can be transmitted back
+        3. System has buffer for GC pauses, network latency, etc.
+
+        Args:
+            timeout_ms: Command execution timeout in milliseconds
+            run_in_background: Whether command runs in background
+
+        Returns:
+            WebSocket communication timeout in milliseconds
+
+        Examples:
+            >>> _calculate_websocket_timeout_ms(3000, False)    # 3s command
+            13000  # 3s + 10s buffer
+
+            >>> _calculate_websocket_timeout_ms(60000, False)   # 60s command
+            72000  # 60s + 12s buffer (20% of 60s)
+
+            >>> _calculate_websocket_timeout_ms(60000, True)    # Background
+            10000  # Quick response with task_id
+        """
+        if run_in_background:
+            # Background mode: only waiting for task_id (quick response)
+            return 10000  # 10 seconds
+
+        else:
+            # Foreground mode: wait for command completion + result transmission buffer
+            # Dynamic buffer calculation:
+            # - Small commands (<10s): 10s fixed buffer (covers network + serialization)
+            # - Large commands (≥10s): 20% proportional buffer (scales with command time)
+            #
+            # Rationale:
+            # - Network latency: ~100ms (localhost)
+            # - JSON serialization: 1-2s (large results)
+            # - WebSocket overhead: ~100ms
+            # - Python GC pauses: ~500ms
+            # - System load margin: remaining buffer
+            if timeout_ms < 10000:
+                buffer_ms = 10000  # 10 seconds
+            else:
+                buffer_ms = max(10000, int(timeout_ms * 0.2))
+
+            # Infrastructure limit: max 10 minutes WebSocket timeout
+            MAX_WEBSOCKET_TIMEOUT_MS = 600000  # 10 minutes
+            return min(timeout_ms + buffer_ms, MAX_WEBSOCKET_TIMEOUT_MS)
+
     async def connect(self) -> bool:
         """
         Establish WebSocket connection to PFC server.
@@ -279,11 +331,14 @@ class PFCWebSocketClient:
         params: Optional[Dict[str, Any]] = None,
         timeout_ms: int = 30000,
         run_in_background: bool = False,
-        timeout: float = 30.0,
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
         Send command to PFC server and wait for result.
+
+        WebSocket communication timeout is automatically calculated based on timeout_ms
+        and run_in_background to ensure sufficient time for command execution and
+        result transmission (infrastructure overhead is handled transparently).
 
         Args:
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
@@ -301,10 +356,11 @@ class PFCWebSocketClient:
                   • {"condition": "stop"} → "model domain condition stop"
                   • {"model": "linear", "inheritance": None} → boolean flag
             timeout_ms: Command execution timeout in milliseconds (default: 30000ms)
-                Passed to executor for command execution timeout control
+                Passed to executor for command execution timeout control.
+                WebSocket timeout is auto-calculated: timeout_ms/1000 + buffer.
             run_in_background: Background execution control (default: False - synchronous)
-                Passed to executor to control execution mode
-            timeout: WebSocket communication timeout in seconds (default: 30.0)
+                Passed to executor to control execution mode.
+                Affects WebSocket timeout: background=10s, foreground=dynamic.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -317,13 +373,14 @@ class PFCWebSocketClient:
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
-            TimeoutError: If command execution times out
+            TimeoutError: If command execution or WebSocket communication times out
 
         Note:
             - arg accepts native Python types (int, float, str, tuple) for type-driven formatting
             - Server assembles complete command string: "command arg keyword1 value1 keyword2 ..."
             - Params with None values are boolean flags (keyword without value)
             - Type-driven formatting enables cleaner API: 9.81 instead of "9.81"
+            - WebSocket timeout is infrastructure detail, automatically managed
         """
         for attempt in range(max_retries):
             try:
@@ -349,6 +406,9 @@ class PFCWebSocketClient:
                 command_id = str(uuid4())
                 params = params or {}
 
+                # Auto-calculate WebSocket timeout (infrastructure detail)
+                websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
+
                 # Create command message
                 message = {
                     "type": "command",
@@ -369,13 +429,16 @@ class PFCWebSocketClient:
                     await self.websocket.send(json.dumps(message))
                     logger.debug(f"Command sent: {command_id} - {command}")
 
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
+                    # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
+                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
                     return result
 
                 except asyncio.TimeoutError:
                     self.pending_commands.pop(command_id, None)
-                    raise TimeoutError(f"Command '{command}' timed out after {timeout}s")
+                    raise TimeoutError(
+                        f"Command '{command}' timed out after {websocket_timeout_ms}ms "
+                        f"(command timeout: {timeout_ms}ms + infrastructure buffer)"
+                    )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
@@ -402,20 +465,24 @@ class PFCWebSocketClient:
         script_path: str,
         timeout_ms: Optional[int] = None,
         run_in_background: bool = True,
-        timeout: float = 30.0,
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
         Send script file path to PFC server for execution.
 
+        WebSocket communication timeout is automatically calculated based on timeout_ms
+        and run_in_background. For None timeout (no limit), uses 10s WebSocket timeout
+        in background mode for task_id response.
+
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
             timeout_ms: Script execution timeout in milliseconds (default: None - no timeout)
-                Passed to executor for script execution timeout control
+                Passed to executor for script execution timeout control.
+                WebSocket timeout auto-calculated when run_in_background=False.
             run_in_background: Background execution control (default: True - asynchronous)
-                Passed to executor to control execution mode
-            timeout: WebSocket communication timeout in seconds (default: 30.0)
+                Passed to executor to control execution mode.
+                Affects WebSocket timeout calculation.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -428,12 +495,13 @@ class PFCWebSocketClient:
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
-            TimeoutError: If script execution times out
+            TimeoutError: If script execution or WebSocket communication times out
 
         Note:
             - Server reads and executes the script file locally
             - LLM should read script content first using Read tool
             - Scripts have access to itasca module
+            - WebSocket timeout is infrastructure detail, automatically managed
         """
         for attempt in range(max_retries):
             try:
@@ -458,6 +526,14 @@ class PFCWebSocketClient:
 
                 command_id = str(uuid4())
 
+                # Auto-calculate WebSocket timeout (infrastructure detail)
+                # For scripts with timeout_ms=None (no script timeout), use background mode logic
+                if timeout_ms is None:
+                    # No script timeout limit, use quick WebSocket timeout for task_id
+                    websocket_timeout_ms = 10000 if run_in_background else 600000  # 10s or max 10 min
+                else:
+                    websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
+
                 # Create script message with file path
                 message = {
                     "type": "script",
@@ -476,13 +552,17 @@ class PFCWebSocketClient:
                     await self.websocket.send(json.dumps(message))
                     logger.debug(f"Script path sent: {command_id} - {script_path}")
 
-                    # Wait for result with timeout
-                    result = await asyncio.wait_for(future, timeout=timeout)
+                    # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
+                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
                     return result
 
                 except asyncio.TimeoutError:
                     self.pending_commands.pop(command_id, None)
-                    raise TimeoutError(f"Script execution timed out after {timeout}s")
+                    timeout_info = f"no limit" if timeout_ms is None else f"{timeout_ms}ms"
+                    raise TimeoutError(
+                        f"Script '{script_path}' timed out after {websocket_timeout_ms}ms "
+                        f"(script timeout: {timeout_info} + infrastructure buffer)"
+                    )
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
