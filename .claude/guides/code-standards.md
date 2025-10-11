@@ -92,30 +92,4 @@ def extract_tool_result_from_mcp(result: CallToolResult) -> Dict[str, Any]:
     """
 ```
 
----
-
-## Git Configuration
-
-### Commit Message Requirements
-
-When creating commits, follow these guidelines for attribution and project identification:
-
-1. **Project Attribution**: Always reference the aiNagisa project repository URL `https://github.com/yusong652/aiNagisa` in commit messages rather than external tools
-2. **Co-authorship**: Use "Co-authored-with: Nagisa Toyoura" to reflect collaborative development instead of external tool attribution
-3. **Project Context**: Ensure commit messages reflect the aiNagisa project context and goals
-
-### Example Commit Format
-```
-feat: improve tool extraction logic
-
-Enhance MCP tool result processing for better LLM integration
-in the aiNagisa voice-enabled AI assistant.
-
-https://github.com/yusong652/aiNagisa
-
-Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>
-```
-
----
-
 **These standards ensure consistent, maintainable, and well-documented code across the aiNagisa project.**
