@@ -218,9 +218,34 @@ class PFCCommandExecutor:
             raise
 
         except Exception as e:
-            # Log comprehensive error information
+            # Special handling for timeout errors (provide LLM-friendly guidance)
+            # Python 3.6 compatibility: Check both TimeoutError types
+            import concurrent.futures
+
+            # In Python 3.6+, concurrent.futures.TimeoutError is an alias of TimeoutError
+            # Check exception type name to handle both cases
+            exception_type_name = type(e).__name__
+            is_timeout = (
+                isinstance(e, concurrent.futures.TimeoutError) or
+                exception_type_name == 'TimeoutError'
+            )
+
+            if is_timeout:
+                logger.error("Command execution timed out: {} (timeout: {}ms)".format(cmd_str, timeout_ms))
+                logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))
+
+                return {
+                    "status": "error",
+                    "message": "Timeout after {}ms executing '{}'. Increase timeout or use run_in_background=True.".format(
+                        timeout_ms, cmd_str
+                    ),
+                    "data": None
+                }
+
+            # General error handling
             error_msg = str(e)
             logger.error("Command execution failed: {}".format(error_msg))
+            logger.error("Exception type: {}".format(type(e).__name__))
 
             if cmd_str:
                 logger.error("  Failed command: {}".format(cmd_str))
