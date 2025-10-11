@@ -11,7 +11,7 @@ import asyncio
 import logging
 import sys
 from io import StringIO
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .main_thread_executor import MainThreadExecutor
 
@@ -259,7 +259,38 @@ class PFCScriptExecutor:
                 return result_dict
 
         except Exception as e:
+            # Special handling for timeout errors (provide LLM-friendly guidance)
+            # Python 3.6 compatibility: Check both TimeoutError types
+            import concurrent.futures
+
+            # In Python 3.6+, concurrent.futures.TimeoutError is an alias of TimeoutError
+            # Check exception type name to handle both cases
+            exception_type_name = type(e).__name__
+            is_timeout = (
+                isinstance(e, concurrent.futures.TimeoutError) or
+                exception_type_name == 'TimeoutError'
+            )
+
+            if is_timeout:
+                # Script execution timed out
+                script_name_for_error = script_path.split('/')[-1].split('\\')[-1] if '/' in script_path or '\\' in script_path else script_path
+                timeout_display = timeout_ms if timeout_ms else "default"
+
+                logger.error("Script execution timed out: {} (timeout: {}ms)".format(script_path, timeout_ms))
+                logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))
+
+                return {
+                    "status": "error",
+                    "message": "Timeout after {}ms executing script '{}'. Increase timeout or use run_in_background=True.".format(
+                        timeout_ms, script_name_for_error
+                    ),
+                    "data": None
+                }
+
+            # General error handling
             logger.error("Script submission failed: {}".format(e))
+            logger.error("Exception type: {}".format(type(e).__name__))
+
             return {
                 "status": "error",
                 "message": "Script submission failed: {}".format(str(e)),
