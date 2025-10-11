@@ -36,21 +36,19 @@ def register_pfc_script_tool(mcp: FastMCP):
             )
         ),
         timeout: Optional[int] = Field(
-            None,
+            default=None,
             description=(
-                "Script execution timeout in milliseconds (default: None - no timeout limit).\n"
-                "Valid range: 1000-600000 (1 second to 10 minutes).\n"
-                "Only applies when run_in_background=False.\n"
-                "Use for testing: 60000-120000ms, Production simulations: None (no limit)"
+                "Script execution timeout in milliseconds (None = no limit). Valid range: 1000-600000 (1s to 10min). "
+                "Only applies when run_in_background=False. "
+                "Recommended: 60000-120000ms for testing, None for production simulations."
             )
         ),
         run_in_background: bool = Field(
-            True,
+            default=True,
             description=(
-                "Background execution control (default: True - asynchronous for production).\n"
-                "  • True: Return task_id immediately, query progress with pfc_check_task_status\n"
-                "  • False: Wait for completion, return result directly (for quick testing)\n"
-                "Use True for long simulations, False for quick test scripts"
+                "Set to false to wait for completion and return result directly (for quick test scripts). "
+                "When true, returns task_id immediately for long-running simulations. "
+                "Query progress with pfc_check_task_status when using background mode."
             )
         )
     ) -> Dict[str, Any]:

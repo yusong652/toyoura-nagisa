@@ -61,21 +61,19 @@ def register_pfc_tools(mcp: FastMCP):
             )
         ),
         timeout: int = Field(
-            30000,
+            default=30000,
             description=(
-                "Command execution timeout in milliseconds (default: 30000ms / 30 seconds).\n"
-                "Valid range: 1000-600000 (1 second to 10 minutes).\n"
-                "Only applies when run_in_background=False.\n"
-                "Quick tests: 5000-10000ms, Complex validation: 30000-60000ms"
+                "Command execution timeout in milliseconds. Valid range: 1000-600000 (1s to 10min). "
+                "Only applies when run_in_background=False. "
+                "Recommended: 5000-10000ms for quick tests, 30000-60000ms for complex validation."
             )
         ),
         run_in_background: bool = Field(
-            False,
+            default=False,
             description=(
-                "Background execution control (default: False - synchronous for testing).\n"
-                "  • False: Wait for completion, catch errors immediately (recommended for testing)\n"
-                "  • True: Return task_id immediately, query progress with pfc_check_task_status\n"
-                "Use False for quick syntax validation, True for long-running commands"
+                "Set to true to return task_id immediately and run in background. "
+                "When false, waits for completion and catches errors immediately (recommended for testing). "
+                "Query progress with pfc_check_task_status when using background mode."
             )
         )
     ) -> Dict[str, Any]:
