@@ -63,7 +63,7 @@ WebSocket server enabling remote PFC control through aiNagisa. Features hybrid e
 - **Short tasks** → Execute & wait → Return result immediately
   - Examples: `model domain`, `ball generate`, `contact cmat`
 - **Long tasks** → Submit & return task_id → Query status later
-  - Examples: `model solve cycle 80000`, custom scripts
+  - Examples: `model cycle 80000`, custom scripts
 
 ## 🚀 Quick Start
 
@@ -153,13 +153,13 @@ params = {"cycle": 80000}
   "status": "pending",
   "message": "Task submitted. Use check_task_status to query progress.",
   "data": {
-    "task_id": "3614a7dd-30bd-47e6-afcd-10de810ff2bc",
-    "command": "model solve cycle 80000"
+    "task_id": "3614a7dd",
+    "command": "model cycle 80000"
   }
 }
 
 # Query status (non-blocking)
-check_task_status(task_id="3614a7dd...")
+check_task_status(task_id="3614a7dd")
 # → "running" (elapsed 15s)
 # → "success" (elapsed 59s, completed)
 ```
@@ -217,7 +217,7 @@ params={"property": None}  → "property"  # Boolean flag
 {"status": "success", "message": "PFC command executed: model gravity (0,0,-9.81)"}
 
 // Long task result (immediate)
-{"status": "pending", "data": {"task_id": "uuid", "command": "model solve cycle 80000"}}
+{"status": "pending", "data": {"task_id": "uuid", "command": "model cycle 80000"}}
 ```
 
 **Status Query → Response:**

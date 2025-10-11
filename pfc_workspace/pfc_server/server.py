@@ -54,7 +54,7 @@ class PFCWebSocketServer:
         self.ping_timeout = ping_timeout
         self.task_manager = TaskManager()
         self.executor = PFCCommandExecutor(main_executor, self.task_manager)
-        self.script_executor = PFCScriptExecutor(main_executor)
+        self.script_executor = PFCScriptExecutor(main_executor, self.task_manager)
         self.active_connections = set()
         self.server = None
 
@@ -101,8 +101,10 @@ class PFCWebSocketServer:
                         command = data.get("command", "")
                         arg = data.get("arg")  # Single positional argument (can be None)
                         params = data.get("params", {})
+                        timeout_ms = data.get("timeout_ms", 30000)  # Default 30 seconds
+                        run_in_background = data.get("run_in_background", False)  # Default synchronous
 
-                        result = await self.executor.execute_command(command, arg, params)
+                        result = await self.executor.execute_command(command, arg, params, timeout_ms, run_in_background)
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:
@@ -126,8 +128,10 @@ class PFCWebSocketServer:
                         # Execute Python script from file path
                         command_id = data.get("command_id", "unknown")
                         script_path = data.get("script_path", "")
+                        timeout_ms = data.get("timeout_ms", None)  # Default None (no timeout)
+                        run_in_background = data.get("run_in_background", True)  # Default asynchronous
 
-                        result = await self.script_executor.execute_script(script_path)
+                        result = await self.script_executor.execute_script(script_path, timeout_ms, run_in_background)
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:
