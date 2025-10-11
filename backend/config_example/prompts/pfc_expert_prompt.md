@@ -39,12 +39,12 @@ PFC Simulation (Dynamic):
 
 **File operations**: Always use absolute paths starting with `{workspace_root}`.
 - ❌ NEVER use: `"."`, `"./"`, `"../"`, or relative paths
-- ✅ ALWAYS use: `"{workspace_root}/pfc_workspace/scripts/model.py"`
-- When users say "scripts/model.py", convert to: `"{workspace_root}/pfc_workspace/scripts/model.py"`
+- ✅ ALWAYS use: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
+- When users say "scripts/model.py", convert to: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 
 **Path format (cross-platform compatibility)**:
 - **Preferred**: Use forward slashes `/` in all path strings (works on both Windows and Linux)
-- **Example**: `"{workspace_root}/pfc_workspace/scripts/model.py"` ✅
+- **Example**: `"{workspace_root}/pfc-server/examples/scripts/model.py"` ✅
 - **Avoid mixing**: Don't alternate between `/` and `\` within the same path
 - **Why it works**: Python's `pathlib.Path` automatically handles platform-specific separators
 - **Tool behavior**: All file tools accept both `/` and `\`, but prefer `/` for consistency
@@ -99,13 +99,13 @@ Round 2: edit("config.py", ...)  # Need content first
 
 *Exploring existing scripts*:
 ```
-1. glob("**/*.py", path="{workspace_root}/pfc_workspace/scripts")
+1. glob("**/*.py", path="{workspace_root}/pfc-server/examples/scripts")
    → Find: setup.py, gravity_test.py, ball_settling.py
 
-2. read("{workspace_root}/pfc_workspace/scripts/gravity_test.py")
+2. read("{workspace_root}/pfc-server/examples/scripts/gravity_test.py")
    → Review existing gravity simulation setup
 
-3. grep("model gravity", path="{workspace_root}/pfc_workspace", type="py")
+3. grep("model gravity", path="{workspace_root}/pfc-server", type="py")
    → Search for gravity configurations across all scripts
 ```
 
@@ -114,7 +114,7 @@ Round 2: edit("config.py", ...)  # Need content first
 1. Validate commands with pfc_execute_command first
 
 2. write(
-     file_path="{workspace_root}/pfc_workspace/scripts/ball_compression.py",
+     file_path="{workspace_root}/pfc-server/examples/scripts/ball_compression.py",
      content='''
 import itasca
 
@@ -142,11 +142,11 @@ print(f"Maximum contact force: {max_force:.2f} N")
 
 *Updating existing script*:
 ```
-1. read("{workspace_root}/pfc_workspace/scripts/setup.py")
+1. read("{workspace_root}/pfc-server/examples/scripts/setup.py")
    → Check current parameters
 
 2. edit(
-     file_path="{workspace_root}/pfc_workspace/scripts/setup.py",
+     file_path="{workspace_root}/pfc-server/examples/scripts/setup.py",
      old_string='ball_radius = 0.1',
      new_string='ball_radius = 0.15'
    )
@@ -268,7 +268,7 @@ print("✓ Results exported to workspace/results/")  # Channel 1 notification
 
 # Step 2: Save to production script with scaling
 write(
-  file_path="{workspace_root}/pfc_workspace/scripts/gravity_test.py",
+  file_path="{workspace_root}/pfc-server/examples/scripts/gravity_test.py",
   content='''
 #!/usr/bin/env python3
 """
@@ -299,7 +299,7 @@ print(f"Average settling velocity: {avg_vel_z:.3f} m/s")
 )
 
 # Step 3: Verify file was created
-→ read("{workspace_root}/pfc_workspace/scripts/gravity_test.py")
+→ read("{workspace_root}/pfc-server/examples/scripts/gravity_test.py")
 ✓ Script saved successfully, ready for production execution
 ```
 
@@ -570,7 +570,7 @@ bash("python workspace/analysis/analyze_simulation.py")
 
 **Read files first** when user provides script paths:
 - Always use `read` tool with absolute paths to examine script content
-- Example: `read("{workspace_root}/pfc_workspace/scripts/model.py")`
+- Example: `read("{workspace_root}/pfc-server/examples/scripts/model.py")`
 - Understand what script does before executing
 - Verify script matches user intent
 - Explain script behavior to user
@@ -603,7 +603,7 @@ bash("python workspace/analysis/analyze_simulation.py")
 
 3. Codification Phase (Script):
    → write(
-       file_path="{workspace_root}/pfc_workspace/scripts/gravity_sim.py",
+       file_path="{workspace_root}/pfc-server/examples/scripts/gravity_sim.py",
        content='''
 import itasca
 
@@ -625,14 +625,14 @@ avg_velocity = np.mean(velocities)
 print(f"Simulation complete. Average velocity: {avg_velocity:.3f} m/s")
 '''
      )
-   ✓ Codified: production script saved at pfc_workspace/scripts/gravity_sim.py
+   ✓ Codified: production script saved at pfc-server/examples/scripts/gravity_sim.py
 
 4. State Reset (if needed):
    → pfc_reset()  # Clear test artifacts
    ✓ Clean baseline established (model empty, no gravity, no balls)
 
 5. Production Execution (Script):
-   → read("{workspace_root}/pfc_workspace/scripts/gravity_sim.py")
+   → read("{workspace_root}/pfc-server/examples/scripts/gravity_sim.py")
       ✓ Verified script content
 
    → pfc_execute_script("gravity_sim.py")

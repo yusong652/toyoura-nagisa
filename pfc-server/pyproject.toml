@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pfc-server"
+version = "0.1.0"
+description = "Independent WebSocket server for ITASCA PFC simulation integration"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { file = "../LICENSE" }
+authors = [
+    { name = "Nagisa Toyoura (Architecture)", email = "nagisa.toyoura@gmail.com" },
+    { name = "yusong", email = "yusong.han.652@gmail.com" }
+]
+
+# Minimal dependencies - runs in PFC's Python environment
+dependencies = [
+    "websockets==9.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/yusong652/aiNagisa"
+"Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
+Documentation = "https://github.com/yusong652/aiNagisa/blob/master/pfc-server/README.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"

@@ -156,16 +156,19 @@ aiNagisa/
 │   │   └── contexts/             # React contexts for state management
 │   └── public/
 │       └── live2d_models/        # Live2D model files
-├── pfc_workspace/
-│   ├── pfc_server/               # PFC WebSocket server (runs in PFC process)
+├── pfc-server/                   # PFC WebSocket server (independent service)
+│   ├── server/                   # Server implementation (runs in PFC process)
 │   │   ├── server.py             # WebSocket server + routing
 │   │   ├── executor.py           # Command executor + task classification
 │   │   ├── script_executor.py    # Python script execution
 │   │   ├── main_thread_executor.py # Queue-based main thread execution
 │   │   └── task_manager.py       # Long-running task tracking
-│   ├── scripts/                  # User simulation scripts
+│   ├── examples/                 # Example PFC projects
+│   │   ├── scripts/              # Example simulation scripts
+│   │   └── test_scripts/         # Test scripts
 │   ├── start_server.py           # Server startup script
-│   └── config_example.py         # Configuration template
+│   ├── pyproject.toml            # Server dependencies
+│   └── README.md                 # Independent server documentation
 └── ...
 ```
 
@@ -273,14 +276,14 @@ pip install websockets
 
 # 2. Start PFC WebSocket server in PFC IPython shell
 import sys
-sys.path.append(r'/path/to/aiNagisa/pfc_workspace')
-exec(open(r'/path/to/aiNagisa/pfc_workspace/start_server.py', encoding='utf-8').read())
+sys.path.append(r'/path/to/aiNagisa/pfc-server')
+exec(open(r'/path/to/aiNagisa/pfc-server/start_server.py', encoding='utf-8').read())
 
 # 3. In aiNagisa, select "PFC Expert" agent profile
 # 4. Interact with PFC through natural language
 ```
 
-See `pfc_workspace/README.md` for detailed setup and usage instructions.
+See `pfc-server/README.md` for detailed setup and usage instructions.
 
 ## 🤝 Contributing
 

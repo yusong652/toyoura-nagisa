@@ -29,7 +29,7 @@ Architecture Highlights:
 
 Usage:
     # 1. Start PFC server in PFC GUI IPython shell:
-    >>> exec(open(r'C:\Dev\Han\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
+    >>> exec(open(r'C:\Dev\Han\aiNagisa\pfc-server\start_server.py', encoding='utf-8').read())
 
     # 2. Run this demo from command line:
     python DEMo.py

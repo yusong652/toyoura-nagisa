@@ -13,8 +13,8 @@ Architecture:
 
 Usage in PFC GUI IPython shell:
     >>> import sys
-    >>> sys.path.append(r'C:\\Dev\\Han\\aiNagisa\\pfc_workspace')
-    >>> exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc_workspace\\start_server.py', encoding='utf-8').read())
+    >>> sys.path.append(r'C:\\Dev\\Han\\aiNagisa\\pfc-server')
+    >>> exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc-server\\start_server.py', encoding='utf-8').read())
 
 Features:
     - IPython shell remains fully interactive (not blocked)
@@ -41,8 +41,8 @@ logging.basicConfig(
 )
 
 # Import server components
-from pfc_server.main_thread_executor import MainThreadExecutor
-from pfc_server.server import create_server
+from server.main_thread_executor import MainThreadExecutor
+from server.server import create_server
 
 # Load configuration
 try:

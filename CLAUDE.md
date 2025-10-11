@@ -133,10 +133,10 @@ WebSocket Client → Queue → Main Thread Executor → PFC SDK
 ```
 
 **Key Components**:
-- **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc_workspace/pfc_server/main_thread_executor.py`)
-- **Task Manager**: Non-blocking lifecycle tracking (`pfc_workspace/pfc_server/task_manager.py:19`)
-- **Script Executor**: Real-time output capture for progress monitoring (`pfc_workspace/pfc_server/script_executor.py:28`)
-- **Command Executor**: Type-driven command assembly (`pfc_workspace/pfc_server/executor.py:152`)
+- **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-server/server/main_thread_executor.py`)
+- **Task Manager**: Non-blocking lifecycle tracking (`pfc-server/server/task_manager.py:19`)
+- **Script Executor**: Real-time output capture for progress monitoring (`pfc-server/server/script_executor.py:28`)
+- **Command Executor**: Type-driven command assembly (`pfc-server/server/executor.py:152`)
 
 **PFC Tools Workflow**:
 1. `pfc_execute_command`: Immediate commands (returns success/failure)
@@ -144,7 +144,7 @@ WebSocket Client → Queue → Main Thread Executor → PFC SDK
 3. `pfc_check_task_status`: Query progress with real-time output
 4. `pfc_list_tasks`: Overview of all tracked tasks
 
-**Detailed Documentation**: See `pfc_workspace/README.md` for implementation details, thread-safety architecture, and usage examples.
+**Detailed Documentation**: See `pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
 
 **Backend Integration**: `backend/infrastructure/mcp/tools/pfc/` + `backend/infrastructure/pfc/websocket_client.py`
 
@@ -205,10 +205,10 @@ npm run preview
 
 ```bash
 # Start PFC WebSocket server (in PFC GUI Python console)
-exec(open(r'C:\Dev\Han\aiNagisa\pfc_workspace\start_server.py', encoding='utf-8').read())
+exec(open(r'C:\Dev\Han\aiNagisa\pfc-server\start_server.py', encoding='utf-8').read())
 
 # Test integration (with PFC server running)
-uv run python DEMo.py
+uv run python examples/pfc_integration/DEMo.py
 ```
 
 ## File Structure
@@ -252,16 +252,19 @@ aiNagisa/
 │   ├── shared/                     # Common utilities and exceptions
 │   ├── memory_db/                  # ChromaDB persistence
 │   └── workspace/                  # Development workspace
-├── pfc_workspace/                  # PFC WebSocket server
-│   ├── pfc_server/
+├── pfc-server/                     # PFC WebSocket server (independent service)
+│   ├── server/                    # Server implementation
 │   │   ├── server.py              # WebSocket server + routing
 │   │   ├── executor.py            # Command executor + task classification
 │   │   ├── script_executor.py     # Script execution with output capture
 │   │   ├── main_thread_executor.py # Queue-based main thread execution
 │   │   └── task_manager.py        # Long-running task tracking
-│   ├── scripts/                   # Example PFC scripts
+│   ├── examples/                  # Example PFC projects
+│   │   ├── scripts/               # Example simulation scripts
+│   │   └── test_scripts/          # Test scripts
 │   ├── start_server.py            # Startup script
-│   └── README.md                  # PFC integration documentation
+│   ├── pyproject.toml             # Server dependencies
+│   └── README.md                  # Independent server documentation
 ├── frontend/
 │   ├── src/
 │   │   ├── components/            # React components
@@ -317,7 +320,7 @@ This pattern prevents:
 - Thread pool exhaustion
 - Blocking user interactions
 
-**Implementation**: `pfc_workspace/pfc_server/task_manager.py:19`
+**Implementation**: `pfc-server/server/task_manager.py:19`
 
 ## Testing
 
@@ -333,7 +336,7 @@ The frontend uses standard React testing practices with Vite.
 ### PFC Integration Testing
 ```bash
 # Comprehensive integration test (with PFC server running)
-uv run python DEMo.py
+uv run python examples/pfc_integration/DEMo.py
 
 # Tests: normal tasks, long tasks, status queries, WebSocket
 #        responsiveness, task completion, main thread execution
@@ -360,7 +363,7 @@ uv run python DEMo.py
 - PFC server runs on port 9001 (WebSocket)
 - Server must be started in PFC GUI before using PFC tools
 - Long tasks return task_id immediately for non-blocking operation
-- Check `pfc_workspace/README.md` for troubleshooting
+- Check `pfc-server/README.md` for troubleshooting
 
 ## Key Development Notes
 
@@ -406,7 +409,7 @@ Project-wide coding standards including:
 **When to use**: Writing new functions, creating commits, code reviews
 
 ### PFC Integration Deep Dive
-**File**: `pfc_workspace/README.md`
+**File**: `pfc-server/README.md`
 
 Detailed PFC integration documentation covering:
 - Thread-safety architecture and main thread execution
