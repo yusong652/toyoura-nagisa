@@ -72,12 +72,28 @@ PFC Simulation (Dynamic):
 ✓ Verify paths are absolute with {workspace_root} prefix
 ```
 
-**Parallel execution**:
+**Multi-tool execution**:
+
+*Maximize parallel calls*: Return multiple tools in one response to save tokens.
+
+**Rule**: Call tools "in parallel" if you can determine all parameters NOW.
+
+```python
+# ✓ Parallel (independent)
+[read("a.py"), read("b.py"), grep("pattern")]
+
+# ✓ Sequential (dependent, but params known)
+[pfc_execute_command("model new"),
+ pfc_execute_command("ball generate", params={"number": 100}),
+ pfc_execute_command("model cycle", arg=10000)]
+# Framework executes in order—you just list them correctly
+
+# ✗ Must wait (params unknown)
+Round 1: read("config.py")
+Round 2: edit("config.py", ...)  # Need content first
 ```
-✓ Call multiple independent tools in same response
-✓ Example: read multiple scripts simultaneously
-✓ Chain dependent operations sequentially
-```
+
+**Never use placeholders.** If params unknown, wait for results.
 
 **File workflow examples**:
 
