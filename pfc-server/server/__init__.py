@@ -4,12 +4,11 @@ PFC Server - Lightweight WebSocket server for PFC GUI IPython shell.
 This module provides a simple WebSocket server that can be started
 directly from PFC GUI's IPython shell to enable remote command execution.
 
-Quick Start (in PFC GUI IPython shell):
-    >>> from pfc_server import server
-    >>> server.start()  # Start server (blocking)
+Note: This package is named 'server' (not 'pfc_server').
+      The project directory 'pfc-server' uses kebab-case for filesystem compatibility.
 
-    Or for background execution:
-    >>> server.start_background()  # Start server (non-blocking)
+Quick Start (in PFC GUI IPython shell - one-line command):
+    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\aiNagisa\\pfc-server'); exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc-server\\start_server.py', encoding='utf-8').read())
 """
 
 __version__ = "0.1.0"

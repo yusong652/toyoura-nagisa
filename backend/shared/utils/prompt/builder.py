@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any
 
 from .core import get_base_prompt, get_expression_prompt
 from .memory import build_memory_section_from_session
+from backend.infrastructure.mcp.tools.coding.utils.path_normalization import normalize_path_separators
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ def _build_env_info() -> str:
         working_dir = str(WORKSPACE_ROOT)
     except ImportError:
         working_dir = str(Path.cwd())
+
+    # Normalize path to forward slashes for cross-platform consistency
+    # This ensures LLM always sees paths in the same format regardless of OS
+    working_dir = normalize_path_separators(working_dir, target_platform='linux')
 
     # Check if directory is a git repository
     is_git_repo = (Path(working_dir) / ".git").exists()
@@ -109,6 +114,10 @@ async def build_system_prompt(
     except ImportError:
         from .config import BASE_DIR
         workspace_root = str(BASE_DIR)
+
+    # Normalize workspace_root to forward slashes for LLM consistency
+    # This ensures LLM always sees paths in the same format (like Claude Code)
+    workspace_root = normalize_path_separators(workspace_root, target_platform='linux')
 
     # 4. Build environment information
     env_info = _build_env_info()
