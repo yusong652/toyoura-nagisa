@@ -15,6 +15,7 @@ from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
+from ..utils.path_normalization import normalize_windows_paths
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 __all__ = ["bash", "register_bash_tool"]
@@ -131,12 +132,15 @@ Usage notes:
             return error_response(f"Failed to start background process: {e}")
 
     try:
+        # Normalize Windows paths to prevent mixed separator errors
+        normalized_command = normalize_windows_paths(command)
+
         # Execute command
         start_time = time.time()
-        
+
         # Use shell=True for full shell command support
         process = subprocess.Popen(
-            command,
+            normalized_command,
             shell=True,
             cwd=str(work_dir),
             stdout=subprocess.PIPE,
@@ -191,7 +195,8 @@ Usage notes:
             execution_time=execution_time,
             stdout=stdout,
             stderr=stderr,
-            command=command,
+            command=normalized_command,  # Show the normalized command that was actually executed
+            original_command=command if normalized_command != command else None,  # Show original if different
             working_directory=str(work_dir)
         )
 
