@@ -232,7 +232,7 @@ class PFCScriptExecutor:
 
                 return {
                     "status": "pending",
-                    "message": "Script submitted as background task: {}\nUse check_task_status tool to query progress and retrieve output.".format(script_name),
+                    "message": "Script submitted: {}".format(script_name),
                     "data": {
                         "task_id": task_id,
                         "script_path": script_path,

@@ -87,18 +87,38 @@ def register_pfc_script_tool(mcp: FastMCP):
                 run_in_background=run_in_background
             )
 
-            # Handle result
-            if result.get("status") == "success":
+            # Handle result based on execution mode
+            status = result.get("status")
+            data = result.get("data")
+
+            if status == "pending":
+                # Background mode: provide task_id and monitoring guidance
+                task_id = data.get("task_id") if data else None
+                script_name = data.get("script_name") if data else "script"
+
+                return success_response(
+                    message=result.get("message", f"Script submitted: {script_path}"),
+                    llm_content={
+                        "parts": [{
+                            "type": "text",
+                            "text": f"Task submitted: {script_name}\nTask ID: {task_id}\n\nUse pfc_check_task_status to monitor progress."
+                        }]
+                    },
+                    script_path=script_path,
+                    result=data
+                )
+            elif status == "success":
+                # Synchronous mode: script completed successfully
                 return success_response(
                     message=result.get("message", f"Script executed: {script_path}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"✓ {result.get('message', 'Script executed successfully')}"
+                            "text": result.get("message", "Script completed successfully")
                         }]
                     },
                     script_path=script_path,
-                    result=result.get("data")
+                    result=data
                 )
             else:
                 # Script error - still successful tool call
@@ -107,7 +127,7 @@ def register_pfc_script_tool(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⚠ {result.get('message', 'Script execution failed')}"
+                            "text": result.get("message", "Script execution failed")
                         }]
                     },
                     script_path=script_path,
