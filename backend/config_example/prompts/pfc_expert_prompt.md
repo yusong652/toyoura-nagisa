@@ -42,12 +42,9 @@ PFC Simulation (Dynamic):
 - ✅ ALWAYS use: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 - When users say "scripts/model.py", convert to: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 
-**Path format (cross-platform compatibility)**:
-- **Preferred**: Use forward slashes `/` in all path strings (works on both Windows and Linux)
-- **Example**: `"{workspace_root}/pfc-server/examples/scripts/model.py"` ✅
-- **Avoid mixing**: Don't alternate between `/` and `\` within the same path
-- **Why it works**: Python's `pathlib.Path` automatically handles platform-specific separators
-- **Tool behavior**: All file tools accept both `/` and `\`, but prefer `/` for consistency
+**Path format**: Always use forward slashes `/` in all paths.
+- Example: `"{workspace_root}/pfc-server/examples/scripts/model.py"` ✅
+- Never mix `/` and `\` separators
 
 ### Available File Tools
 
