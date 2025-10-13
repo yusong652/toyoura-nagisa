@@ -82,4 +82,32 @@ def normalize_path_separators(path: str, target_platform: Optional[str] = None) 
         return path.replace('\\', '/')
 
 
-__all__ = ['normalize_windows_paths', 'normalize_path_separators']
+def path_to_llm_format(path: 'Path | str') -> str:
+    """
+    Convert a path to LLM-friendly format (forward slashes).
+
+    This ensures all paths shown to the LLM use consistent forward slash format,
+    regardless of the underlying platform.
+
+    Args:
+        path: Path object or string to format
+
+    Returns:
+        Path string with forward slashes
+
+    Example:
+        >>> from pathlib import Path
+        >>> path_to_llm_format(Path("C:\\Users\\test\\file.txt"))
+        'C:/Users/test/file.txt'
+    """
+    # Import Path here to avoid circular imports
+    from pathlib import Path
+
+    # Convert to string if it's a Path object
+    path_str = str(path)
+
+    # Normalize to forward slashes for LLM consistency
+    return normalize_path_separators(path_str, target_platform='linux')
+
+
+__all__ = ['normalize_windows_paths', 'normalize_path_separators', 'path_to_llm_format']
