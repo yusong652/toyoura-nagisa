@@ -13,12 +13,13 @@ from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import (
-    validate_path_in_workspace, 
-    WORKSPACE_ROOT, 
+    validate_path_in_workspace,
+    WORKSPACE_ROOT,
     is_safe_symlink,
     check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["glob", "register_glob_tool"]
 
@@ -86,12 +87,8 @@ def _expand_glob_pattern(
         
         for pat in patterns:
             # Use pathlib's glob for pattern matching
-            if '**' in pat:
-                # Recursive glob
-                matches = base_dir.rglob(pat.replace('**/', ''))
-            else:
-                # Non-recursive glob
-                matches = base_dir.glob(pat)
+            # pathlib.glob() natively supports ** for recursive matching
+            matches = base_dir.glob(pat)
             
             # Filter to files and directories and apply limit
             for match in matches:
@@ -135,7 +132,7 @@ def glob(
     ),
     path: Optional[str] = Field(
         None,
-        description="The directory to search in (defaults to current working directory if not specified)",
+        description="The directory to search in (defaults to workspace root if not specified)",
     ),
 ) -> Dict[str, Any]:
     """- Fast file and directory pattern matching tool that works with any codebase size
@@ -153,6 +150,10 @@ def glob(
 
     # Determine search directory
     if path:
+        # Normalize path separators for cross-platform compatibility
+        # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
+        path = normalize_path_separators(path.strip())
+
         # Validate provided path
         search_path = validate_path_in_workspace(path)
         if search_path is None:
@@ -186,9 +187,10 @@ def glob(
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
-        
+
         # Build Claude Code style response - simple file/directory path list
-        file_paths = [str(file_path) for file_path in sorted_files]
+        # Use forward slashes for LLM consistency (cross-platform)
+        file_paths = [path_to_llm_format(file_path) for file_path in sorted_files]
 
         # Build Claude Code aligned response
         total_found = len(file_paths)
