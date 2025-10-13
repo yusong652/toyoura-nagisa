@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 
 
 def register_pfc_script_tool(mcp: FastMCP):
@@ -69,12 +70,13 @@ def register_pfc_script_tool(mcp: FastMCP):
         Note:
             For simple commands, use pfc_execute_command instead.
         """
-        from pathlib import Path
-
         try:
-            # Normalize path for consistency (convert to forward slashes)
-            # This ensures consistent path format across platforms
-            script_path = str(Path(script_path)).replace('\\', '/')
+            # Normalize path separators for cross-platform compatibility
+            # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file.py)
+            # Note: PFC server expects forward slashes, so we normalize to Linux-style paths
+            if not script_path or not script_path.strip():
+                return error_response("script_path is required and cannot be empty")
+            script_path = normalize_path_separators(script_path.strip(), target_platform='linux')
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
