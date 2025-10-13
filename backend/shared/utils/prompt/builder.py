@@ -12,7 +12,7 @@ from typing import Optional, List, Dict, Any
 
 from .core import get_base_prompt, get_expression_prompt
 from .memory import build_memory_section_from_session
-from backend.infrastructure.mcp.tools.coding.utils.path_normalization import normalize_path_separators
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 
 logger = logging.getLogger(__name__)
 
