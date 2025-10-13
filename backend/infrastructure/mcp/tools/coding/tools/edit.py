@@ -15,12 +15,13 @@ from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import (
-    validate_path_in_workspace, 
-    WORKSPACE_ROOT, 
-    is_safe_symlink, 
+    validate_path_in_workspace,
+    WORKSPACE_ROOT,
+    is_safe_symlink,
     check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from ..utils.constants import (
     TEXT_CHARSET_DEFAULT,
 )
@@ -178,6 +179,10 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     if not file_path or not file_path.strip():
         return error_response("file_path is required and cannot be empty")
 
+    # Normalize path separators for cross-platform compatibility
+    # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    file_path = normalize_path_separators(file_path.strip())
+
     # Check if old_string and new_string are the same
     if old_string == new_string:
         return error_response("old_string and new_string must be different")
@@ -287,11 +292,13 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
 
         
         # ------------------------------------------------------------------
-        # Build Claude Code aligned response  
+        # Build Claude Code aligned response
         # ------------------------------------------------------------------
 
         # Build user-facing message aligned with Claude Code format
-        message = f"The file {target_file.relative_to(WORKSPACE_ROOT)} has been updated."
+        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        abs_path = path_to_llm_format(target_file)
+        message = f"The file {abs_path} has been updated."
 
         # Build Claude Code style llm_content with file preview
         try:

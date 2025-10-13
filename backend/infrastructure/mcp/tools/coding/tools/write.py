@@ -17,10 +17,11 @@ from fastmcp import FastMCP  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from ..utils.path_security import (
-    WORKSPACE_ROOT, 
-    validate_path_in_workspace, 
-    is_safe_symlink, 
+    WORKSPACE_ROOT,
+    validate_path_in_workspace,
+    is_safe_symlink,
     check_parent_symlinks
 )
 
@@ -59,9 +60,15 @@ def write(
     # ------------------------------------------------------------------
     # Parameter validation (manual to stay lightweight)
     # ------------------------------------------------------------------
-    
+
     # Fixed encoding for simplicity
     encoding = "utf-8"
+
+    # Normalize path separators for cross-platform compatibility
+    # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    if not file_path or not file_path.strip():
+        return error_response("file_path is required and cannot be empty")
+    file_path = normalize_path_separators(file_path.strip())
 
     # Validate path security
     abs_path = validate_path_in_workspace(file_path)
@@ -115,13 +122,14 @@ def write(
         lines_count = content.count('\n') + (1 if content and not content.endswith('\n') else 0)
         
         # Prepare response data
-        rel_display = abs_p.relative_to(WORKSPACE_ROOT)
-        
+        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        abs_display = path_to_llm_format(abs_p)
+
         # Create simple Claude Code-style message
         if not file_existed:
-            display_msg = f"File created successfully at: {str(rel_display)}"
+            display_msg = f"File created successfully at: {abs_display}"
         else:
-            display_msg = f"File updated successfully at: {str(rel_display)}"
+            display_msg = f"File updated successfully at: {abs_display}"
 
         return success_response(
             display_msg,
@@ -130,7 +138,7 @@ def write(
                     {"type": "text", "text": display_msg}
                 ]
             },
-            file_path=str(rel_display),
+            file_path=abs_display,
             size_bytes=size_bytes,
             lines_count=lines_count,
             file_created=not file_existed,

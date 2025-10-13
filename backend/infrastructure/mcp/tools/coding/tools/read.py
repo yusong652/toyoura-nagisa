@@ -19,12 +19,13 @@ from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import (
-    validate_path_in_workspace, 
+    validate_path_in_workspace,
     WORKSPACE_ROOT,
-    is_safe_symlink, 
+    is_safe_symlink,
     check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["read", "register_read_tool"]
 
@@ -350,6 +351,12 @@ Usage:
     # Path validation and security checks
     # ------------------------------------------------------------------
 
+    # Normalize path separators for cross-platform compatibility
+    # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    if not path or not path.strip():
+        return error_response("path is required and cannot be empty")
+    path = normalize_path_separators(path.strip())
+
     # Validate file path
     abs_file_path = validate_path_in_workspace(path)
     if abs_file_path is None:
@@ -400,7 +407,8 @@ Usage:
                 message = f"Read {file_type.value} file: {file_path.name} (0 lines)"
 
         # Build structured LLM content with unified parts format
-        rel_display = file_path.relative_to(WORKSPACE_ROOT) if str(file_path).startswith(str(WORKSPACE_ROOT)) else Path(path)
+        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        abs_display = path_to_llm_format(file_path)
 
         # Build parts array for unified content structure
         parts = []
@@ -425,7 +433,7 @@ Usage:
         return success_response(
             message,
             llm_content={"parts": parts},
-            file_path=str(rel_display),
+            file_path=abs_display,
             file_type=file_type.value,
             encoding=encoding,
             truncated=processing_result.truncated,
