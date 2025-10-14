@@ -13,6 +13,16 @@ from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
+# Use pathspec for GitWildMatch pattern matching (already a project dependency)
+try:
+    from pathspec import PathSpec  # type: ignore
+    from pathspec.patterns import GitWildMatchPattern  # type: ignore
+    HAS_PATHSPEC = True
+except ImportError:
+    PathSpec = None  # type: ignore
+    GitWildMatchPattern = None  # type: ignore
+    HAS_PATHSPEC = False
+
 from ..utils.path_security import (
     validate_path_in_workspace,
     WORKSPACE_ROOT,
@@ -34,76 +44,6 @@ MAX_FILES_DEFAULT = 100
 # Helper functions
 # -----------------------------------------------------------------------------
 
-def _expand_brace_pattern(pattern: str) -> List[str]:
-    """Expand brace patterns like {jpg,png,gif} into multiple patterns.
-    
-    Args:
-        pattern: Pattern potentially containing brace expansion
-        
-    Returns:
-        List of expanded patterns
-    """
-    import re
-    
-    # Find brace patterns like {jpg,png,gif}
-    brace_match = re.search(r'\{([^}]+)\}', pattern)
-    if not brace_match:
-        return [pattern]
-    
-    # Extract the options and create multiple patterns
-    options = brace_match.group(1).split(',')
-    prefix = pattern[:brace_match.start()]
-    suffix = pattern[brace_match.end():]
-    
-    expanded = []
-    for option in options:
-        expanded.append(prefix + option.strip() + suffix)
-    
-    return expanded
-
-def _expand_glob_pattern(
-    base_dir: Path,
-    pattern: str,
-    max_files: int = MAX_FILES_DEFAULT
-) -> List[Path]:
-    """Expand glob pattern and return matching files.
-    
-    Args:
-        base_dir: Base directory to search from
-        pattern: Glob pattern to match (supports brace expansion)
-        max_files: Maximum number of files to return
-        
-    Returns:
-        List of matching file paths
-    """
-    matched_files = []
-    
-    try:
-        # Handle absolute patterns
-        if pattern.startswith('/'):
-            pattern = pattern.lstrip('/')
-        
-        # Expand brace patterns
-        patterns = _expand_brace_pattern(pattern)
-        
-        for pat in patterns:
-            # Use pathlib's glob for pattern matching
-            # pathlib.glob() natively supports ** for recursive matching
-            matches = base_dir.glob(pat)
-            
-            # Filter to files and directories and apply limit
-            for match in matches:
-                if len(matched_files) >= max_files:
-                    break
-
-                if (match.is_file() or match.is_dir()) and match not in matched_files:
-                    matched_files.append(match)
-                    
-    except Exception:
-        # Invalid pattern or other error
-        pass
-    
-    return matched_files
 
 def _get_git_visible_files(search_dir: Path) -> Set[Path]:
     """Get set of files visible to git (not in .gitignore).
@@ -226,40 +166,66 @@ def glob(
             # Match pattern against git-visible files
             safe_files = []
 
-            for file_path in git_visible_files:
-                # Check if file matches the pattern using pathlib's match
-                try:
-                    # Use pathlib's match for glob patterns (supports **)
-                    if file_path.match(pattern):
-                        # Check symlink safety
-                        if file_path.is_symlink() and not is_safe_symlink(file_path):
+            # Use pathspec for GitWildMatch pattern matching (handles **, *, etc. correctly)
+            if PathSpec is not None and GitWildMatchPattern is not None:
+                # Create PathSpec with GitWildMatch pattern (like .gitignore)
+                spec = PathSpec.from_lines(GitWildMatchPattern, [pattern])
+
+                for file_path in git_visible_files:
+                    try:
+                        # Convert to relative path for matching
+                        try:
+                            rel_path = file_path.relative_to(search_dir)
+                            # Use forward slashes for GitWildMatch consistency
+                            rel_path_str = path_to_llm_format(rel_path)
+                        except ValueError:
+                            # If relative_to fails, skip this file
                             continue
 
-                        if not check_parent_symlinks(file_path):
-                            continue
+                        # Use pathspec GitWildMatch for correct ** and * handling
+                        if spec.match_file(rel_path_str):
+                            # Check symlink safety
+                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                                continue
 
-                        safe_files.append(file_path)
+                            if not check_parent_symlinks(file_path):
+                                continue
 
-                        # Apply limit
-                        if len(safe_files) >= MAX_FILES_DEFAULT:
-                            break
-                except Exception:
-                    # Match failed, skip
-                    continue
+                            safe_files.append(file_path)
+
+                            # Apply limit
+                            if len(safe_files) >= MAX_FILES_DEFAULT:
+                                break
+                    except Exception:
+                        # Match failed, skip
+                        continue
+            else:
+                # Fallback to Path.match if pathspec is not available
+                for file_path in git_visible_files:
+                    try:
+                        if file_path.match(pattern):
+                            # Check symlink safety
+                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                                continue
+
+                            if not check_parent_symlinks(file_path):
+                                continue
+
+                            safe_files.append(file_path)
+
+                            # Apply limit
+                            if len(safe_files) >= MAX_FILES_DEFAULT:
+                                break
+                    except Exception:
+                        continue
         else:
-            # Fallback to original pathlib glob if git is not available
-            matched_files = _expand_glob_pattern(search_dir, pattern, MAX_FILES_DEFAULT)
-
-            safe_files = []
-            for file_path in matched_files:
-                # Check symlink safety
-                if file_path.is_symlink() and not is_safe_symlink(file_path):
-                    continue
-
-                if not check_parent_symlinks(file_path):
-                    continue
-
-                safe_files.append(file_path)
+            # Git is required for glob tool
+            # This ensures consistent behavior and proper .gitignore filtering
+            return error_response(
+                "Git is required for file search. "
+                "Please ensure git is installed and the directory is a git repository. "
+                "Run 'git init' if this is a new project."
+            )
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
