@@ -6,10 +6,79 @@ Provides real-time status monitoring and output retrieval for long-running PFC t
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+
+
+def format_paginated_output(
+    output: str,
+    offset: int,
+    limit: int,
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Format task output with pagination for efficient context usage.
+
+    Args:
+        output: Complete output string from task
+        offset: Line offset from newest (0 = most recent)
+        limit: Number of lines to display
+
+    Returns:
+        Tuple of (formatted_output, pagination_metadata)
+    """
+    # Parse output into lines
+    lines = output.split('\n') if output else []
+    total_lines = len(lines)
+
+    if total_lines == 0:
+        return "(no output yet)", {
+            "total_lines": 0,
+            "displayed_count": 0,
+            "offset": offset,
+            "limit": limit,
+            "line_range": "0-0",
+            "has_earlier": False,
+            "has_later": False
+        }
+
+    # Calculate slice indices (offset from end, newest = highest index)
+    # offset=0, limit=10: show lines [-10:] (most recent 10 lines)
+    # offset=10, limit=10: show lines [-20:-10] (skip 10 newest, show next 10)
+    end_idx = total_lines - offset
+    start_idx = max(0, total_lines - offset - limit)
+
+    # Extract slice
+    displayed = lines[start_idx:end_idx] if end_idx > start_idx else []
+    displayed_count = len(displayed)
+
+    # Keep chronological order (oldest to newest within the slice)
+    # No reversal needed - natural time flow for better causality reasoning
+
+    # Calculate line numbers for display (0 = newest)
+    first_line_num = offset
+    last_line_num = offset + displayed_count - 1 if displayed_count > 0 else offset
+
+    # Format output
+    output_text = '\n'.join(displayed) if displayed else "(no lines in range)"
+
+    # Determine if there are more lines to explore
+    has_earlier = start_idx > 0  # More lines before the displayed range
+    has_later = offset > 0       # More lines after the displayed range (newer)
+
+    # Build metadata
+    metadata = {
+        "total_lines": total_lines,
+        "displayed_count": displayed_count,
+        "offset": offset,
+        "limit": limit,
+        "line_range": f"{first_line_num}-{last_line_num}",
+        "has_earlier": has_earlier,
+        "has_later": has_later
+    }
+
+    return output_text, metadata
 
 
 def register_pfc_task_status_tool(mcp: FastMCP):
@@ -32,6 +101,25 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 "Task ID returned by pfc_execute_script tool when script was submitted. "
                 "Example: 'a1b2c3d4'"
             )
+        ),
+        offset: int = Field(
+            0,
+            ge=0,
+            description=(
+                "Line offset from the most recent output. "
+                "0 = show most recent lines, 10 = skip 10 newest lines and show older ones. "
+                "Use this to paginate through task output efficiently."
+            )
+        ),
+        limit: int = Field(
+            10,
+            ge=1,
+            le=100,
+            description=(
+                "Number of output lines to display. "
+                "Default: 10 lines, Maximum: 100 lines. "
+                "Helps conserve context window for long-running tasks."
+            )
         )
     ) -> Dict[str, Any]:
         """
@@ -39,6 +127,12 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
         Use this tool to monitor scripts submitted via pfc_execute_script.
         Returns real-time progress updates and captured print() output.
+
+        Pagination:
+            - offset=0, limit=10: Show most recent 10 lines (default)
+            - offset=10, limit=10: Skip 10 newest lines, show next 10 older lines
+            - Navigate through output using offset parameter to conserve context
+            - Total line count provided to help you plan pagination
 
         Note:
             - Output shows print() statements from running script
@@ -76,21 +170,41 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 elapsed_time = data.get("elapsed_time", 0)
                 output = data.get("output", "")
 
+                # Format paginated output
+                output_text, pagination = format_paginated_output(output, offset, limit)
+
+                # Build navigation hints
+                nav_hints = []
+                if pagination["has_later"]:
+                    nav_hints.append(f"newer: offset={max(0, offset - limit)}")
+                if pagination["has_earlier"]:
+                    nav_hints.append(f"older: offset={offset + limit}")
+                nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
+
+                # Build LLM-friendly text
+                llm_text = (
+                    f"⏳ Task running: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Showing: lines {pagination['line_range']} "
+                    f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
+                    f"━━━ Output ━━━\n"
+                    f"{output_text}\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"💡 Navigate: {nav_hint}"
+                )
+
                 return success_response(
                     message=result.get("message", f"Task running: {task_id}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": (
-                                f"⏳ Task is running: {task_id}\n"
-                                f"Elapsed time: {elapsed_time:.2f}s\n"
-                                f"Output so far:\n{output if output else '(no output yet)'}"
-                            )
+                            "text": llm_text
                         }]
                     },
                     task_id=task_id,
                     task_status="running",
-                    task_data=data
+                    task_data=data,
+                    pagination=pagination
                 )
 
             elif status == "success":
@@ -100,22 +214,42 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 output = data.get("output", "")
                 task_result = data.get("result")
 
+                # Format paginated output
+                output_text, pagination = format_paginated_output(output, offset, limit)
+
+                # Build navigation hints
+                nav_hints = []
+                if pagination["has_later"]:
+                    nav_hints.append(f"newer: offset={max(0, offset - limit)}")
+                if pagination["has_earlier"]:
+                    nav_hints.append(f"older: offset={offset + limit}")
+                nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
+
+                # Build LLM-friendly text
+                llm_text = (
+                    f"✓ Task completed: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"Result: {task_result}\n"
+                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Showing: lines {pagination['line_range']} "
+                    f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
+                    f"━━━ Output ━━━\n"
+                    f"{output_text}\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"💡 Navigate: {nav_hint}"
+                )
+
                 return success_response(
                     message=result.get("message", f"Task completed: {task_id}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": (
-                                f"✓ Task completed successfully: {task_id}\n"
-                                f"Elapsed time: {elapsed_time:.2f}s\n"
-                                f"Result: {task_result}\n"
-                                f"Output:\n{output if output else '(no output)'}"
-                            )
+                            "text": llm_text
                         }]
                     },
                     task_id=task_id,
                     task_status="success",
-                    task_data=data
+                    task_data=data,
+                    pagination=pagination
                 )
 
             elif status == "error":
@@ -125,22 +259,42 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 output = data.get("output", "")
                 error_msg = data.get("error", "Unknown error")
 
+                # Format paginated output
+                output_text, pagination = format_paginated_output(output, offset, limit)
+
+                # Build navigation hints
+                nav_hints = []
+                if pagination["has_later"]:
+                    nav_hints.append(f"newer: offset={max(0, offset - limit)}")
+                if pagination["has_earlier"]:
+                    nav_hints.append(f"older: offset={offset + limit}")
+                nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
+
+                # Build LLM-friendly text
+                llm_text = (
+                    f"✗ Task failed: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"Error: {error_msg}\n"
+                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Showing: lines {pagination['line_range']} "
+                    f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
+                    f"━━━ Output before error ━━━\n"
+                    f"{output_text}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 Navigate: {nav_hint}"
+                )
+
                 return success_response(
                     message=result.get("message", f"Task failed: {task_id}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": (
-                                f"✗ Task failed: {task_id}\n"
-                                f"Elapsed time: {elapsed_time:.2f}s\n"
-                                f"Error: {error_msg}\n"
-                                f"Output before error:\n{output if output else '(no output)'}"
-                            )
+                            "text": llm_text
                         }]
                     },
                     task_id=task_id,
                     task_status="error",
-                    task_data=data
+                    task_data=data,
+                    pagination=pagination
                 )
 
             else:
