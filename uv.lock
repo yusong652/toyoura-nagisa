@@ -8,6 +8,12 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "ainagisa",
+    "ainagisa-uv-plot",
+]
+
 [[package]]
 name = "ainagisa"
 version = "0.1.0"
@@ -149,6 +155,11 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
+
+[[package]]
+name = "ainagisa-uv-plot"
+version = "0.1.0"
+source = { editable = "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot" }
 
 [[package]]
 name = "aiofiles"
