@@ -10,10 +10,12 @@ Python 3.6 compatible implementation.
 import asyncio
 import logging
 import sys
+import traceback
 from io import StringIO
 from typing import Any, Dict, Optional
 
 from .main_thread_executor import MainThreadExecutor
+from .utils import path_to_llm_format
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
@@ -79,10 +81,14 @@ class PFCScriptExecutor:
 
             # Try to execute as expression first (single line, returns value)
             try:
-                result = eval(script_content, exec_globals, exec_locals)
+                # Use compile() with script_path for better traceback
+                code_obj = compile(script_content, script_path, 'eval')
+                result = eval(code_obj, exec_globals, exec_locals)
             except SyntaxError:
                 # If eval fails, try exec (multi-line script)
-                exec(script_content, exec_globals, exec_locals)
+                # Use compile() with script_path to show actual file path in traceback
+                code_obj = compile(script_content, script_path, 'exec')
+                exec(code_obj, exec_globals, exec_locals)
                 # Look for 'result' variable in locals
                 result = exec_locals.get('result', None)
 
@@ -112,10 +118,52 @@ class PFCScriptExecutor:
             # Get captured output even on error
             output_text = output_buffer.getvalue()
 
-            logger.error("Script execution failed: {}".format(e))
+            # Capture complete stack trace for server logging (debugging)
+            full_traceback = traceback.format_exc()
+            logger.error("Script execution failed with traceback:\n{}".format(full_traceback))
+
+            # Extract only user script frames (filter out server implementation)
+            # This prevents exposing backend code to LLM
+            tb = sys.exc_info()[2]
+            user_frames = []
+
+            # Walk through traceback to find user script frames
+            while tb is not None:
+                frame = tb.tb_frame
+                filename = frame.f_code.co_filename
+                # Only include frames from user script (not server code)
+                if filename == script_path or filename == '<string>':
+                    user_frames.append((
+                        filename,
+                        tb.tb_lineno,
+                        frame.f_code.co_name,
+                        None  # No source line (not available for dynamic code)
+                    ))
+                tb = tb.tb_next
+
+            # Build user-facing error message with filtered traceback
+            # Normalize path to LLM-friendly format (forward slashes) using utility
+            display_path = path_to_llm_format(script_path)
+
+            if user_frames:
+                # Format user script traceback with absolute path in LLM-friendly format
+                error_parts = ["Script execution failed:\n"]
+                for filename, lineno, name, line in user_frames:
+                    # Use absolute path with forward slashes for cross-platform consistency
+                    error_parts.append('  File "{}", line {}, in {}\n'.format(
+                        display_path, lineno, name
+                    ))
+                error_parts.append("{}: {}".format(type(e).__name__, str(e)))
+                error_message = "".join(error_parts)
+            else:
+                # Fallback if no user frames found (shouldn't happen)
+                error_message = "Script execution failed: {}: {}".format(
+                    type(e).__name__, str(e)
+                )
+
             return {
                 "status": "error",
-                "message": "Script execution failed: {}".format(str(e)),
+                "message": error_message,
                 "data": None,
                 "output": output_text  # Include output up to error point
             }

@@ -90,11 +90,21 @@ def register_pfc_script_tool(mcp: FastMCP):
             )
 
             # Handle result based on execution mode
+            # Use run_in_background as primary branch logic (clearer intent)
             status = result.get("status")
             data = result.get("data")
 
-            if status == "pending":
-                # Background mode: provide task_id and monitoring guidance
+            if run_in_background:
+                # ===== Background Mode =====
+                # Expect: status == "pending" (task submitted)
+                # Return: task_id for progress monitoring
+                if status != "pending":
+                    # Protocol violation: background mode should return "pending"
+                    return error_response(
+                        f"Unexpected server response in background mode: status={status} "
+                        f"(expected 'pending'). Server may have changed behavior."
+                    )
+
                 task_id = data.get("task_id") if data else None
                 script_name = data.get("script_name") if data else "script"
 
@@ -109,32 +119,78 @@ def register_pfc_script_tool(mcp: FastMCP):
                     script_path=script_path,
                     result=data
                 )
-            elif status == "success":
-                # Synchronous mode: script completed successfully
-                return success_response(
-                    message=result.get("message", f"Script executed: {script_path}"),
-                    llm_content={
-                        "parts": [{
-                            "type": "text",
-                            "text": result.get("message", "Script completed successfully")
-                        }]
-                    },
-                    script_path=script_path,
-                    result=data
-                )
+
             else:
-                # Script error - still successful tool call
-                return success_response(
-                    message=result.get("message", f"Script error: {script_path}"),
-                    llm_content={
-                        "parts": [{
-                            "type": "text",
-                            "text": result.get("message", "Script execution failed")
-                        }]
-                    },
-                    script_path=script_path,
-                    script_error=result.get("message")
-                )
+                # ===== Foreground Mode (Synchronous) =====
+                # Expect: status == "success" | "error" (script completed/failed)
+                # Return: complete output and result
+
+                if status == "success":
+                    # Script completed successfully
+                    # Extract output and script result from server response
+                    output = result.get("output", "")  # Captured stdout (print statements)
+                    script_result = data  # Script's 'result' variable
+
+                    # Build comprehensive LLM content with output and result
+                    llm_text_parts = []
+
+                    # 1. Success message
+                    base_message = result.get("message", "Script completed successfully")
+                    llm_text_parts.append(base_message)
+
+                    # 2. Script output (print statements) - KEY ENHANCEMENT for LLM visibility
+                    if output and output.strip():
+                        llm_text_parts.append(f"\n\n=== Script Output ===\n{output.strip()}")
+
+                    # 3. Structured result (if script defined 'result' variable)
+                    if script_result is not None:
+                        llm_text_parts.append(f"\n\n=== Script Result ===\n{script_result}")
+
+                    llm_text = "".join(llm_text_parts)
+
+                    return success_response(
+                        message=result.get("message", f"Script executed: {script_path}"),
+                        llm_content={
+                            "parts": [{
+                                "type": "text",
+                                "text": llm_text
+                            }]
+                        },
+                        script_path=script_path,
+                        output=output,  # Preserve raw output for frontend/debugging
+                        script_result=script_result  # Preserve structured result
+                    )
+
+                else:
+                    # Script execution failed (status == "error" or other)
+                    # Extract output even on error (useful for debugging)
+                    output = result.get("output", "")  # Captured stdout before error
+                    error_message = result.get("message", "Script execution failed")
+
+                    # Build LLM content with error message and any output captured before error
+                    llm_text_parts = []
+
+                    # 1. Error message
+                    llm_text_parts.append(error_message)
+
+                    # 2. Script output before error (if any) - helps with debugging
+                    if output and output.strip():
+                        llm_text_parts.append(f"\n\n=== Script Output (before error) ===\n{output.strip()}")
+
+                    llm_text = "".join(llm_text_parts)
+
+                    return success_response(
+                        message=result.get("message", f"Script error: {script_path}"),
+                        llm_content={
+                            "parts": [{
+                                "type": "text",
+                                "text": llm_text
+                            }]
+                        },
+                        script_path=script_path,
+                        output=output,  # Preserve output for debugging
+                        script_error=error_message
+                    )
 
         except ConnectionError as e:
             return error_response(f"Cannot connect to PFC server: {str(e)}")
