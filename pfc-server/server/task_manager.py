@@ -168,7 +168,7 @@ class TaskManager:
 
         # Check if task is completed or failed (status updated by callback)
         if task_status in ["completed", "failed"]:
-            # Task done, retrieve result and remove from tracking
+            # Task done, retrieve result (keep in tracking for historical context)
             task_label = "Script" if task_type == "script" else "Command"
 
             # Get result (should not raise exception as status is already set)
@@ -183,8 +183,8 @@ class TaskManager:
                         task_id, str(e)
                     ))
 
-            # Remove task from tracking
-            del self.tasks[task_id]
+            # NOTE: Task is kept in registry for historical context
+            # Use cleanup_completed_tasks() to manually remove old tasks if needed
 
             # Handle based on task status
             if task_status == "completed":
@@ -361,7 +361,11 @@ class TaskManager:
     def cleanup_completed_tasks(self):
         # type: () -> int
         """
-        Remove completed/failed tasks from tracking.
+        Manually remove completed/failed tasks from tracking.
+
+        By default, completed and failed tasks are kept as historical context.
+        Use this method to explicitly clean up old tasks when memory management
+        is needed or when the task history becomes too large.
 
         Returns:
             int: Number of tasks cleaned up
