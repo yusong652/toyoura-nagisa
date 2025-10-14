@@ -61,8 +61,12 @@ class TaskManager:
                 self.tasks[task_id]["end_time"] = time.time()
                 # Update status based on task result
                 try:
-                    f.result(timeout=0)  # Check if task succeeded
-                    self.tasks[task_id]["status"] = "completed"
+                    result = f.result(timeout=0)  # Get task result
+                    # Check result dict status field (for commands that return error status)
+                    if isinstance(result, dict) and result.get("status") == "error":
+                        self.tasks[task_id]["status"] = "failed"
+                    else:
+                        self.tasks[task_id]["status"] = "completed"
                 except Exception:
                     self.tasks[task_id]["status"] = "failed"
 
@@ -106,8 +110,13 @@ class TaskManager:
                 self.tasks[task_id]["end_time"] = time.time()
                 # Update status based on task result
                 try:
-                    f.result(timeout=0)  # Check if task succeeded
-                    self.tasks[task_id]["status"] = "completed"
+                    result = f.result(timeout=0)  # Get task result
+                    # For script tasks, check result dict status field
+                    # Script executor returns {"status": "error"} on failure
+                    if isinstance(result, dict) and result.get("status") == "error":
+                        self.tasks[task_id]["status"] = "failed"
+                    else:
+                        self.tasks[task_id]["status"] = "completed"
                 except Exception:
                     self.tasks[task_id]["status"] = "failed"
 

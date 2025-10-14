@@ -76,21 +76,22 @@ class PFCScriptExecutor:
             logger.info("Executing Python script in main thread: {}".format(script_path))
 
             # Prepare execution context with itasca module
-            exec_globals = {"itasca": self.itasca}
-            exec_locals = {}
+            # Use single namespace for both globals and locals to ensure imported modules
+            # are accessible within function definitions (solves import scoping issue)
+            exec_context = {"itasca": self.itasca}
 
             # Try to execute as expression first (single line, returns value)
             try:
                 # Use compile() with script_path for better traceback
                 code_obj = compile(script_content, script_path, 'eval')
-                result = eval(code_obj, exec_globals, exec_locals)
+                result = eval(code_obj, exec_context, exec_context)
             except SyntaxError:
                 # If eval fails, try exec (multi-line script)
                 # Use compile() with script_path to show actual file path in traceback
                 code_obj = compile(script_content, script_path, 'exec')
-                exec(code_obj, exec_globals, exec_locals)
-                # Look for 'result' variable in locals
-                result = exec_locals.get('result', None)
+                exec(code_obj, exec_context, exec_context)
+                # Look for 'result' variable in context
+                result = exec_context.get('result', None)
 
             # Get captured output from shared buffer
             output_text = output_buffer.getvalue()
