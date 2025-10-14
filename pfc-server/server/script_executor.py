@@ -273,8 +273,8 @@ class PFCScriptExecutor:
 
             if is_timeout:
                 # Script execution timed out
-                script_name_for_error = script_path.split('/')[-1].split('\\')[-1] if '/' in script_path or '\\' in script_path else script_path
-                timeout_display = timeout_ms if timeout_ms else "default"
+                import os
+                script_name_for_error = os.path.basename(script_path)
 
                 logger.error("Script execution timed out: {} (timeout: {}ms)".format(script_path, timeout_ms))
                 logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))

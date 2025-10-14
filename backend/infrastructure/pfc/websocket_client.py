@@ -44,7 +44,7 @@ class PFCWebSocketClient:
 
         self._websocket: Optional[Any] = None
         self.connected = False
-        self.pending_commands: Dict[str, asyncio.Future] = {}
+        self.pending_requests: Dict[str, asyncio.Future] = {}
         self._message_task: Optional[asyncio.Task] = None
         self._reconnect_task: Optional[asyncio.Task] = None
         self._reconnecting = False
@@ -127,20 +127,20 @@ class PFCWebSocketClient:
             bool: True if connection successful, False otherwise
         """
         async with self._lock:
-            # Clean up any stale pending commands from previous connection
+            # Clean up any stale pending requests from previous connection
             # This ensures a fresh start and prevents "Future exception was never retrieved" errors
-            if self.pending_commands:
+            if self.pending_requests:
                 logger.debug(
-                    f"Cleaning up {len(self.pending_commands)} pending commands "
+                    f"Cleaning up {len(self.pending_requests)} pending requests "
                     "from previous connection"
                 )
-                for future in self.pending_commands.values():
+                for future in self.pending_requests.values():
                     if not future.done():
                         try:
                             future.set_exception(ConnectionError("Connection reset"))
                         except Exception:
                             pass  # Future may already be in invalid state
-                self.pending_commands.clear()
+                self.pending_requests.clear()
 
             # Already connected with valid websocket
             if self.connected and self._websocket:
@@ -213,11 +213,11 @@ class PFCWebSocketClient:
             self._websocket = None
             self._reconnecting = False
 
-            # Cancel all pending commands
-            for future in self.pending_commands.values():
+            # Cancel all pending requests
+            for future in self.pending_requests.values():
                 if not future.done():
                     future.set_exception(ConnectionError("Connection closed"))
-            self.pending_commands.clear()
+            self.pending_requests.clear()
 
             logger.info("✓ Disconnected from PFC server")
 
@@ -275,10 +275,10 @@ class PFCWebSocketClient:
                     msg_type = data.get("type")
 
                     if msg_type == "result":
-                        # Command result received
-                        command_id = data.get("command_id")
-                        if command_id in self.pending_commands:
-                            future = self.pending_commands.pop(command_id)
+                        # Request result received
+                        request_id = data.get("request_id")
+                        if request_id in self.pending_requests:
+                            future = self.pending_requests.pop(request_id)
                             if not future.done():
                                 future.set_result(data)
 
@@ -300,11 +300,11 @@ class PFCWebSocketClient:
             logger.warning(f"Connection closed: {e}")
             self.connected = False
 
-            # Cancel all pending commands
-            for future in list(self.pending_commands.values()):
+            # Cancel all pending requests
+            for future in list(self.pending_requests.values()):
                 if not future.done():
                     future.set_exception(ConnectionError("Connection lost"))
-            self.pending_commands.clear()
+            self.pending_requests.clear()
 
             # Trigger auto-reconnect if enabled and not manually disconnected
             if self.auto_reconnect and not self._should_stop:
@@ -366,7 +366,7 @@ class PFCWebSocketClient:
         Returns:
             Result dictionary from PFC server with structure:
                 - type: "result" - Message type identifier
-                - command_id: str - Unique command identifier
+                - request_id: str - Unique request identifier
                 - status: Literal["success", "error"] - Operation outcome
                 - message: str - User-friendly message (success description or error details)
                 - data: Optional[Any] - Command result data (success only)
@@ -403,7 +403,7 @@ class PFCWebSocketClient:
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
 
-                command_id = str(uuid4())
+                request_id = str(uuid4())
                 params = params or {}
 
                 # Auto-calculate WebSocket timeout (infrastructure detail)
@@ -412,7 +412,7 @@ class PFCWebSocketClient:
                 # Create command message
                 message = {
                     "type": "command",
-                    "command_id": command_id,
+                    "request_id": request_id,
                     "command": command,
                     "arg": arg,
                     "params": params,
@@ -422,19 +422,19 @@ class PFCWebSocketClient:
 
                 # Create future for result
                 future = asyncio.get_event_loop().create_future()
-                self.pending_commands[command_id] = future
+                self.pending_requests[request_id] = future
 
                 try:
                     # Send command
                     await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Command sent: {command_id} - {command}")
+                    logger.debug(f"Command sent: {request_id} - {command}")
 
                     # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
                     result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
                     return result
 
                 except asyncio.TimeoutError:
-                    self.pending_commands.pop(command_id, None)
+                    self.pending_requests.pop(request_id, None)
                     raise TimeoutError(
                         f"Command '{command}' timed out after {websocket_timeout_ms}ms "
                         f"(command timeout: {timeout_ms}ms + infrastructure buffer)"
@@ -488,7 +488,7 @@ class PFCWebSocketClient:
         Returns:
             Result dictionary from PFC server with structure:
                 - type: "result" - Message type identifier
-                - command_id: str - Unique command identifier
+                - request_id: str - Unique request identifier
                 - status: Literal["success", "error"] - Operation outcome
                 - message: str - User-friendly message with result
                 - data: Any - Script execution result
@@ -524,7 +524,7 @@ class PFCWebSocketClient:
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
 
-                command_id = str(uuid4())
+                request_id = str(uuid4())
 
                 # Auto-calculate WebSocket timeout (infrastructure detail)
                 # For scripts with timeout_ms=None (no script timeout), use background mode logic
@@ -537,7 +537,7 @@ class PFCWebSocketClient:
                 # Create script message with file path
                 message = {
                     "type": "script",
-                    "command_id": command_id,
+                    "request_id": request_id,
                     "script_path": script_path,
                     "timeout_ms": timeout_ms,
                     "run_in_background": run_in_background
@@ -545,19 +545,19 @@ class PFCWebSocketClient:
 
                 # Create future for result
                 future = asyncio.get_event_loop().create_future()
-                self.pending_commands[command_id] = future
+                self.pending_requests[request_id] = future
 
                 try:
                     # Send script path
                     await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Script path sent: {command_id} - {script_path}")
+                    logger.debug(f"Script path sent: {request_id} - {script_path}")
 
                     # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
                     result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
                     return result
 
                 except asyncio.TimeoutError:
-                    self.pending_commands.pop(command_id, None)
+                    self.pending_requests.pop(request_id, None)
                     timeout_info = f"no limit" if timeout_ms is None else f"{timeout_ms}ms"
                     raise TimeoutError(
                         f"Script '{script_path}' timed out after {websocket_timeout_ms}ms "
@@ -601,7 +601,7 @@ class PFCWebSocketClient:
         Returns:
             Result dictionary with structure:
                 - type: "result" - Message type identifier
-                - command_id: str - Unique command identifier
+                - request_id: str - Unique request identifier
                 - status: Literal["running", "success", "error", "not_found"] - Task status
                 - message: str - Status description with elapsed time
                 - data: Optional[Any] - Task result (when completed) or progress info (when running)
@@ -633,30 +633,30 @@ class PFCWebSocketClient:
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
 
-                command_id = str(uuid4())
+                request_id = str(uuid4())
 
                 # Create status query message
                 message = {
                     "type": "check_task_status",
-                    "command_id": command_id,
+                    "request_id": request_id,
                     "task_id": task_id
                 }
 
                 # Create future for result
                 future = asyncio.get_event_loop().create_future()
-                self.pending_commands[command_id] = future
+                self.pending_requests[request_id] = future
 
                 try:
                     # Send query
                     await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Task status query sent: {command_id} - Task ID: {task_id}")
+                    logger.debug(f"Task status query sent: {request_id} - Task ID: {task_id}")
 
                     # Wait for result with timeout
                     result = await asyncio.wait_for(future, timeout=timeout)
                     return result
 
                 except asyncio.TimeoutError:
-                    self.pending_commands.pop(command_id, None)
+                    self.pending_requests.pop(request_id, None)
                     raise TimeoutError(f"Task status query timed out after {timeout}s")
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
@@ -693,7 +693,7 @@ class PFCWebSocketClient:
         Returns:
             Result dictionary with structure:
                 - type: "result" - Message type identifier
-                - command_id: str - Unique command identifier
+                - request_id: str - Unique request identifier
                 - status: "success" - Always success (empty list if no tasks)
                 - message: str - Summary message
                 - data: List[Dict] - List of task info dictionaries:
@@ -729,29 +729,29 @@ class PFCWebSocketClient:
                     if not success:
                         raise ConnectionError("Failed to connect to PFC server")
 
-                command_id = str(uuid4())
+                request_id = str(uuid4())
 
                 # Create list tasks message
                 message = {
                     "type": "list_tasks",
-                    "command_id": command_id
+                    "request_id": request_id
                 }
 
                 # Create future for result
                 future = asyncio.get_event_loop().create_future()
-                self.pending_commands[command_id] = future
+                self.pending_requests[request_id] = future
 
                 try:
                     # Send query
                     await self.websocket.send(json.dumps(message))
-                    logger.debug(f"List tasks query sent: {command_id}")
+                    logger.debug(f"List tasks query sent: {request_id}")
 
                     # Wait for result with timeout
                     result = await asyncio.wait_for(future, timeout=timeout)
                     return result
 
                 except asyncio.TimeoutError:
-                    self.pending_commands.pop(command_id, None)
+                    self.pending_requests.pop(request_id, None)
                     raise TimeoutError(f"List tasks query timed out after {timeout}s")
 
             except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:

@@ -97,7 +97,7 @@ class PFCWebSocketServer:
 
                     if msg_type == "command":
                         # Execute command
-                        command_id = data.get("command_id", "unknown")
+                        request_id = data.get("request_id", "unknown")
                         command = data.get("command", "")
                         arg = data.get("arg")  # Single positional argument (can be None)
                         params = data.get("params", {})
@@ -113,20 +113,20 @@ class PFCWebSocketServer:
                         # Send result back
                         response = {
                             "type": "result",
-                            "command_id": command_id,
+                            "request_id": request_id,
                             **result
                         }
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Command result sent: {command_id}")
+                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
-                            logger.warning(f"Cannot send result, connection closed: {command_id}")
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
                     elif msg_type == "script":
                         # Execute Python script from file path
-                        command_id = data.get("command_id", "unknown")
+                        request_id = data.get("request_id", "unknown")
                         script_path = data.get("script_path", "")
                         timeout_ms = data.get("timeout_ms", None)  # Default None (no timeout)
                         run_in_background = data.get("run_in_background", True)  # Default asynchronous
@@ -140,20 +140,20 @@ class PFCWebSocketServer:
                         # Send result back
                         response = {
                             "type": "result",
-                            "command_id": command_id,
+                            "request_id": request_id,
                             **result
                         }
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Script result sent: {command_id}")
+                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
-                            logger.warning(f"Cannot send script result, connection closed: {command_id}")
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
                     elif msg_type == "check_task_status":
                         # Check long-running task status (not a PFC command, uses task manager directly)
-                        command_id = data.get("command_id", "unknown")
+                        request_id = data.get("request_id", "unknown")
                         task_id = data.get("task_id", "")
 
                         result = self.task_manager.get_task_status(task_id)
@@ -165,35 +165,35 @@ class PFCWebSocketServer:
                         # Send result back
                         response = {
                             "type": "result",
-                            "command_id": command_id,
+                            "request_id": request_id,
                             **result
                         }
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Task status sent: {command_id}")
+                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
-                            logger.warning(f"Cannot send task status, connection closed: {command_id}")
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
                     elif msg_type == "list_tasks":
                         # List all tracked long-running tasks (not a PFC command, uses task manager directly)
-                        command_id = data.get("command_id", "unknown")
+                        request_id = data.get("request_id", "unknown")
 
                         result = self.task_manager.list_all_tasks()
 
                         # Send result back
                         response = {
                             "type": "result",
-                            "command_id": command_id,
+                            "request_id": request_id,
                             **result
                         }
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Task list sent: {command_id}")
+                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
-                            logger.warning(f"Cannot send task list, connection closed: {command_id}")
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
                     elif msg_type == "ping":

@@ -51,8 +51,22 @@ class TaskManager:
             "description": command,
             "type": "command",
             "start_time": time.time(),
+            "end_time": None,  # Will be set when task completes
             "status": "running"
         }
+
+        # Register callback to capture completion time and status
+        def _on_complete(f):
+            if task_id in self.tasks:
+                self.tasks[task_id]["end_time"] = time.time()
+                # Update status based on task result
+                try:
+                    f.result(timeout=0)  # Check if task succeeded
+                    self.tasks[task_id]["status"] = "completed"
+                except Exception:
+                    self.tasks[task_id]["status"] = "failed"
+
+        future.add_done_callback(_on_complete)
 
         logger.info("✓ Command task registered: {} (ID: {})".format(command, task_id))
 
@@ -82,8 +96,22 @@ class TaskManager:
             "script_path": script_path,
             "output_buffer": output_buffer,  # Store buffer reference for live access
             "start_time": time.time(),
+            "end_time": None,  # Will be set when task completes
             "status": "running"
         }
+
+        # Register callback to capture completion time and status
+        def _on_complete(f):
+            if task_id in self.tasks:
+                self.tasks[task_id]["end_time"] = time.time()
+                # Update status based on task result
+                try:
+                    f.result(timeout=0)  # Check if task succeeded
+                    self.tasks[task_id]["status"] = "completed"
+                except Exception:
+                    self.tasks[task_id]["status"] = "failed"
+
+        future.add_done_callback(_on_complete)
 
         logger.info("✓ Script task registered: {} (ID: {})".format(script_name, task_id))
 
@@ -119,18 +147,39 @@ class TaskManager:
         future = task_info["future"]
         description = task_info["description"]
         task_type = task_info.get("type", "command")  # Default to command for backward compatibility
+        task_status = task_info["status"]  # Read status from task info (updated by callback)
         start_time = task_info["start_time"]
-        elapsed_time = time.time() - start_time
 
-        # Check if task is done (non-blocking)
-        if future.done():
-            # Task completed, get result
+        # Calculate elapsed time: use end_time if task completed, otherwise current time
+        end_time = task_info.get("end_time")
+        if end_time is not None:
+            elapsed_time = end_time - start_time
+        else:
+            elapsed_time = time.time() - start_time
+
+        # Check if task is completed or failed (status updated by callback)
+        if task_status in ["completed", "failed"]:
+            # Task done, retrieve result and remove from tracking
+            task_label = "Script" if task_type == "script" else "Command"
+
+            # Get result (should not raise exception as status is already set)
             try:
-                result = future.result(timeout=0)  # Non-blocking
+                result = future.result(timeout=0)
+            except Exception as e:
+                # Fallback: if future.result() raises, treat as failed
+                result = None
+                if task_status == "completed":
+                    # Unexpected: status says completed but future failed
+                    logger.warning("Status mismatch for task {}: status='completed' but future raised: {}".format(
+                        task_id, str(e)
+                    ))
 
-                # Mark as completed and remove from active tasks
-                del self.tasks[task_id]
+            # Remove task from tracking
+            del self.tasks[task_id]
 
+            # Handle based on task status
+            if task_status == "completed":
+                # Task completed successfully
                 logger.info("✓ Task completed: {} (ID: {}, Time: {:.2f}s)".format(
                     description, task_id, elapsed_time
                 ))
@@ -163,13 +212,11 @@ class TaskManager:
                     )
                 elif serialized_result is not None:
                     # Command with return value or script with data
-                    task_label = "Script" if task_type == "script" else "Command"
                     message = "{} completed: {}\nElapsed time: {:.2f}s\nResult: {}".format(
                         task_label, description, elapsed_time, serialized_result
                     )
                 else:
                     # No output or result
-                    task_label = "Script" if task_type == "script" else "Command"
                     message = "{} completed: {}\nElapsed time: {:.2f}s".format(
                         task_label, description, elapsed_time
                     )
@@ -181,9 +228,13 @@ class TaskManager:
                     if not isinstance(response_data, dict):
                         response_data = {"result": serialized_result}
                     response_data["output"] = output_text if output_text else ""
+                    response_data["elapsed_time"] = elapsed_time
                 else:
                     # For commands, return result data directly
-                    response_data = serialized_result
+                    response_data = serialized_result if isinstance(serialized_result, dict) else {}
+                    if not isinstance(response_data, dict):
+                        response_data = {"result": serialized_result}
+                    response_data["elapsed_time"] = elapsed_time
 
                 return {
                     "status": result_status,
@@ -191,37 +242,30 @@ class TaskManager:
                     "data": response_data
                 }
 
-            except Exception as e:
-                # Task failed - but might have partial output (for scripts)
-                error_msg = str(e)
-
-                # Try to get partial result with output (for scripts)
-                output_text = None
-                if task_type == "script":
-                    try:
-                        partial_result = future.result(timeout=0)
-                        if isinstance(partial_result, dict):
-                            output_text = partial_result.get("output")
-                    except Exception:
-                        pass
-
-                del self.tasks[task_id]
-
-                task_label = "Script" if task_type == "script" else "Command"
+            else:  # task_status == "failed"
+                # Task failed
                 logger.error("✗ {} task failed: {} (ID: {})".format(task_label, description, task_id))
-                logger.error("  Error: {}".format(error_msg))
 
-                # Build error message with output if available (scripts only)
+                # Try to extract error message and partial output (for scripts)
+                error_msg = "Task execution failed"
+                output_text = None
+
+                if task_type == "script" and isinstance(result, dict):
+                    # Script may return partial result with output
+                    output_text = result.get("output")
+                    error_msg = result.get("message", error_msg)
+
+                # Build error message
                 if task_type == "script" and output_text:
                     message = "Script execution failed: {}\nElapsed time: {:.2f}s\nError: {}\n\n=== Partial Output ===\n{}".format(
                         task_info.get("script_name", description), elapsed_time, error_msg, output_text
                     )
-                    error_data = {"error": error_msg, "output": output_text}
+                    error_data = {"error": error_msg, "output": output_text, "elapsed_time": elapsed_time}
                 else:
                     message = "{} failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
                         task_label, description, elapsed_time, error_msg
                     )
-                    error_data = {"error": error_msg}
+                    error_data = {"error": error_msg, "elapsed_time": elapsed_time}
 
                 return {
                     "status": "error",
@@ -277,21 +321,11 @@ class TaskManager:
         tasks_info = []
 
         for task_id, task_info in self.tasks.items():
-            future = task_info["future"]
             description = task_info["description"]
             task_type = task_info.get("type", "command")
+            task_status = task_info["status"]  # Read status directly (updated by callback)
             start_time = task_info["start_time"]
             elapsed_time = time.time() - start_time
-
-            # Check if done (non-blocking)
-            if future.done():
-                try:
-                    future.result(timeout=0)
-                    task_status = "completed"
-                except Exception:
-                    task_status = "failed"
-            else:
-                task_status = "running"
 
             task_entry = {
                 "task_id": task_id,
@@ -326,8 +360,8 @@ class TaskManager:
         tasks_to_remove = []
 
         for task_id, task_info in self.tasks.items():
-            future = task_info["future"]
-            if future.done():
+            task_status = task_info["status"]
+            if task_status in ["completed", "failed"]:
                 tasks_to_remove.append(task_id)
 
         for task_id in tasks_to_remove:
