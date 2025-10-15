@@ -12,6 +12,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.infrastructure.mcp.utils.pagination import format_paginated_output
 
 
 def register_pfc_script_tool(mcp: FastMCP):
@@ -123,7 +124,10 @@ def register_pfc_script_tool(mcp: FastMCP):
             else:
                 # ===== Foreground Mode (Synchronous) =====
                 # Expect: status == "success" | "error" (script completed/failed)
-                # Return: complete output and result
+                # Return: task_id + output summary (NOT full output)
+
+                # Extract task_id from server response (NEW: unified task management)
+                task_id = result.get("task_id")
 
                 if status == "success":
                     # Script completed successfully
@@ -131,16 +135,34 @@ def register_pfc_script_tool(mcp: FastMCP):
                     output = result.get("output", "")  # Captured stdout (print statements)
                     script_result = data  # Script's 'result' variable
 
-                    # Build comprehensive LLM content with output and result
+                    # Use pagination utility to extract output summary (last 10 lines)
+                    output_text, pagination = format_paginated_output(output, offset=0, limit=10)
+
+                    # Build navigation hints
+                    nav_hints = []
+                    if pagination["has_earlier"]:
+                        nav_hints.append(f"older: offset={10}")
+                    nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
+
+                    # Build LLM-friendly text with summary
                     llm_text_parts = []
 
-                    # 1. Success message
+                    # 1. Success message with task_id
                     base_message = result.get("message", "Script completed successfully")
-                    llm_text_parts.append(base_message)
+                    llm_text_parts.append(f"✓ {base_message}")
+                    if task_id:
+                        llm_text_parts.append(f"\nTask ID: {task_id}")
 
-                    # 2. Script output (print statements) - KEY ENHANCEMENT for LLM visibility
-                    if output and output.strip():
-                        llm_text_parts.append(f"\n\n=== Script Output ===\n{output.strip()}")
+                    # 2. Output summary (last 10 lines by default)
+                    if output:
+                        llm_text_parts.append(
+                            f"\n📊 Output: {pagination['total_lines']} lines total | "
+                            f"Showing: last {pagination['displayed_count']} lines\n\n"
+                            f"━━━ Output Summary ━━━\n"
+                            f"{output_text}\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"💡 Navigate: {nav_hint}"
+                        )
 
                     # 3. Structured result (if script defined 'result' variable)
                     if script_result is not None:
@@ -157,8 +179,9 @@ def register_pfc_script_tool(mcp: FastMCP):
                             }]
                         },
                         script_path=script_path,
-                        output=output,  # Preserve raw output for frontend/debugging
-                        script_result=script_result  # Preserve structured result
+                        task_id=task_id,  # NEW: Enable post-execution query
+                        script_result=script_result,
+                        pagination=pagination  # Include pagination metadata
                     )
 
                 else:
@@ -167,15 +190,33 @@ def register_pfc_script_tool(mcp: FastMCP):
                     output = result.get("output", "")  # Captured stdout before error
                     error_message = result.get("message", "Script execution failed")
 
-                    # Build LLM content with error message and any output captured before error
+                    # Use pagination utility to extract output summary (last 10 lines)
+                    output_text, pagination = format_paginated_output(output, offset=0, limit=10)
+
+                    # Build navigation hints
+                    nav_hints = []
+                    if pagination["has_earlier"]:
+                        nav_hints.append(f"older: offset={10}")
+                    nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
+
+                    # Build LLM content with error message and output summary
                     llm_text_parts = []
 
-                    # 1. Error message
-                    llm_text_parts.append(error_message)
+                    # 1. Error message with task_id
+                    llm_text_parts.append(f"✗ {error_message}")
+                    if task_id:
+                        llm_text_parts.append(f"\nTask ID: {task_id}")
 
-                    # 2. Script output before error (if any) - helps with debugging
-                    if output and output.strip():
-                        llm_text_parts.append(f"\n\n=== Script Output (before error) ===\n{output.strip()}")
+                    # 2. Script output before error (summary) - helps with debugging
+                    if output:
+                        llm_text_parts.append(
+                            f"\n📊 Output: {pagination['total_lines']} lines total | "
+                            f"Showing: last {pagination['displayed_count']} lines\n\n"
+                            f"━━━ Output before error ━━━\n"
+                            f"{output_text}\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"💡 Navigate: {nav_hint}"
+                        )
 
                     llm_text = "".join(llm_text_parts)
 
@@ -188,8 +229,9 @@ def register_pfc_script_tool(mcp: FastMCP):
                             }]
                         },
                         script_path=script_path,
-                        output=output,  # Preserve output for debugging
-                        script_error=error_message
+                        task_id=task_id,  # NEW: Enable post-execution query
+                        script_error=error_message,
+                        pagination=pagination  # Include pagination metadata
                     )
 
         except ConnectionError as e:

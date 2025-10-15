@@ -291,10 +291,19 @@ class PFCScriptExecutor:
 
             else:
                 # Synchronous execution: wait for completion with optional timeout
+                # BUT still register as task for unified output management
                 timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
                 logger.info("Executing script synchronously: {} [timeout={}s]".format(
                     script_name, timeout_seconds if timeout_seconds else "None"
                 ))
+
+                # Register task BEFORE waiting (enables output caching and post-query)
+                task_id = self.task_manager.create_script_task(
+                    future,
+                    script_name,
+                    script_path,
+                    output_buffer  # Pass buffer reference for output caching
+                )
 
                 loop = asyncio.get_event_loop()
                 # Wait for script execution with timeout
@@ -304,8 +313,18 @@ class PFCScriptExecutor:
                     timeout_seconds  # Use specified timeout or None for no timeout
                 )
 
-                # Return the complete result from script execution
-                return result_dict
+                # Extract cached output from task (single source of truth)
+                full_output = output_buffer.getvalue()
+
+                # Return task_id + status + data (output will be queried via pfc_check_task_status)
+                # This prevents context window exhaustion for long-running debug scripts
+                return {
+                    "status": result_dict.get("status", "success"),
+                    "message": result_dict.get("message", "Script executed"),
+                    "data": result_dict.get("data"),
+                    "task_id": task_id,  # NEW: Enable post-execution output query
+                    "output": full_output  # Keep full output in result for backward compatibility
+                }
 
         except Exception as e:
             # Special handling for timeout errors (provide LLM-friendly guidance)
