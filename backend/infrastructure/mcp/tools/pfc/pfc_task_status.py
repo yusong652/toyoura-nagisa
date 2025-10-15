@@ -29,48 +29,28 @@ def register_pfc_task_status_tool(mcp: FastMCP):
         context: Context,
         task_id: str = Field(
             ...,
-            description=(
-                "Task ID returned by pfc_execute_script tool when script was submitted. "
-                "Example: 'a1b2c3d4'"
-            )
+            description="Task ID from pfc_execute_script (e.g., 'a1b2c3d4')"
         ),
         offset: int = Field(
             0,
             ge=0,
-            description=(
-                "Line offset from the most recent output. "
-                "0 = show most recent lines, 10 = skip 10 newest lines and show older ones. "
-                "Use this to paginate through task output efficiently."
-            )
+            description="Skip N newest lines (0=most recent, 10=skip 10 newest)"
         ),
         limit: int = Field(
             10,
             ge=1,
             le=100,
-            description=(
-                "Number of output lines to display. "
-                "Default: 10 lines, Maximum: 100 lines. "
-                "Helps conserve context window for long-running tasks."
-            )
+            description="Lines to display (default: 10, max: 100)"
         )
     ) -> Dict[str, Any]:
         """
-        Check status and retrieve output of a long-running PFC script.
+        Check script status and retrieve output - works for both running and completed tasks.
 
-        Use this tool to monitor scripts submitted via pfc_execute_script.
-        Returns real-time progress updates and captured print() output.
+        Monitor live progress with real-time print() output, or retrieve full output
+        from scripts executed earlier (even after running other tasks).
 
-        Pagination:
-            - offset=0, limit=10: Show most recent 10 lines (default)
-            - offset=10, limit=10: Skip 10 newest lines, show next 10 older lines
-            - Navigate through output using offset parameter to conserve context
-            - Total line count provided to help you plan pagination
-
-        Note:
-            - Output shows print() statements from running script
-            - Scripts continuously export data - read CSV/JSON/checkpoints anytime for analysis
-            - Call multiple times to see progress updates
-            - Task status available until server restart or cleanup
+        Pagination helps manage long outputs efficiently. All scripts (foreground/background)
+        are tracked until server restart. Use pfc_list_tasks to find task IDs.
         """
         try:
             # Get WebSocket client (auto-connects if needed)
