@@ -117,14 +117,19 @@ class CommandTask(Task):
     def get_task_info(self):
         # type: () -> Dict[str, Any]
         """Get command task summary for listing."""
-        return {
+        info = {
             "task_id": self.task_id,
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
+            "start_time": self.start_time,
             "name": self.command  # Display name for list view (command text)
         }
+        # Add end_time for completed/failed tasks
+        if self.status in ["completed", "failed"] and self.end_time is not None:
+            info["end_time"] = self.end_time
+        return info
 
 
 class ScriptTask(Task):
@@ -284,12 +289,17 @@ class ScriptTask(Task):
     def get_task_info(self):
         # type: () -> Dict[str, Any]
         """Get script task summary for listing."""
-        return {
+        info = {
             "task_id": self.task_id,
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
+            "start_time": self.start_time,
             "script_name": self.script_name,
             "name": self.script_name  # Display name for list view
         }
+        # Add end_time for completed/failed tasks
+        if self.status in ["completed", "failed"] and self.end_time is not None:
+            info["end_time"] = self.end_time
+        return info

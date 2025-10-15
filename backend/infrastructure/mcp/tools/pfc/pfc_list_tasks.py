@@ -57,6 +57,8 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     name = task.get("name", "unknown")
                     status = task.get("status", "unknown")
                     elapsed = task.get("elapsed_time", 0)
+                    start_time = task.get("start_time")
+                    end_time = task.get("end_time")
 
                     status_icon = {
                         "running": "⏳",
@@ -64,9 +66,19 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                         "failed": "✗"
                     }.get(status, "?")
 
+                    # Format time info
+                    import datetime
+                    if start_time:
+                        start_str = datetime.datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
+                        time_info = f"started {start_str}"
+                        if end_time:
+                            end_str = datetime.datetime.fromtimestamp(end_time).strftime("%H:%M:%S")
+                            time_info = f"{start_str} → {end_str}"
+                    else:
+                        time_info = ""
+
                     task_lines.append(
-                        f"{status_icon} {name} ({task_id}) - "
-                        f"{status} - {elapsed:.2f}s"
+                        f"{status_icon} {name} ({task_id}) | {elapsed:.1f}s | {time_info}"
                     )
 
                 task_summary = (
