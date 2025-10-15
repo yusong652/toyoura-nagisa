@@ -122,7 +122,8 @@ class CommandTask(Task):
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
-            "elapsed_time": self.get_elapsed_time()
+            "elapsed_time": self.get_elapsed_time(),
+            "name": self.command  # Display name for list view (command text)
         }
 
 
@@ -289,5 +290,6 @@ class ScriptTask(Task):
             "description": self.description,
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
-            "script_name": self.script_name
+            "script_name": self.script_name,
+            "name": self.script_name  # Display name for list view
         }
