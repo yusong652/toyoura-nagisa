@@ -9,6 +9,7 @@ from fastmcp.server.context import Context
 from typing import Dict, Any
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.time_utils import format_time_range
 
 
 def register_pfc_list_tasks_tool(mcp: FastMCP):
@@ -51,8 +52,11 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
             if task_count == 0:
                 task_summary = "No tasks currently tracked."
             else:
+                # Sort tasks by start_time (newest first)
+                sorted_data = sorted(data, key=lambda t: t.get("start_time", 0), reverse=True)
+
                 task_lines = []
-                for task in data:
+                for task in sorted_data:
                     task_id = task.get("task_id", "unknown")
                     name = task.get("name", "unknown")
                     status = task.get("status", "unknown")
@@ -66,16 +70,8 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                         "failed": "✗"
                     }.get(status, "?")
 
-                    # Format time info
-                    import datetime
-                    if start_time:
-                        start_str = datetime.datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
-                        time_info = f"started {start_str}"
-                        if end_time:
-                            end_str = datetime.datetime.fromtimestamp(end_time).strftime("%H:%M:%S")
-                            time_info = f"{start_str} → {end_str}"
-                    else:
-                        time_info = ""
+                    # Format time info with date (important for long-running PFC workflows)
+                    time_info = format_time_range(start_time, end_time)
 
                     task_lines.append(
                         f"{status_icon} {name} ({task_id}) | {elapsed:.1f}s | {time_info}"

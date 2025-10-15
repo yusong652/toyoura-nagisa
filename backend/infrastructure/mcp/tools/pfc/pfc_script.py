@@ -13,6 +13,8 @@ from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from backend.infrastructure.mcp.utils.pagination import format_paginated_output
+from backend.infrastructure.mcp.utils.time_utils import format_timestamp, format_time_range
+import time
 
 
 def register_pfc_script_tool(mcp: FastMCP):
@@ -108,13 +110,15 @@ def register_pfc_script_tool(mcp: FastMCP):
 
                 task_id = data.get("task_id") if data else None
                 script_name = data.get("script_name") if data else "script"
+                submit_time = time.time()
+                time_info = format_time_range(submit_time)
 
                 return success_response(
                     message=result.get("message", f"Script submitted: {script_path}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"Task submitted: {script_name}\nTask ID: {task_id}\n\nUse pfc_check_task_status to monitor progress."
+                            "text": f"⏳ Task submitted: {script_name} | {time_info}\nTask ID: {task_id}\n\nUse pfc_check_task_status to monitor progress."
                         }]
                     },
                     script_path=script_path,
@@ -134,6 +138,8 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Extract output and script result from server response
                     output = result.get("output", "")  # Captured stdout (print statements)
                     script_result = data  # Script's 'result' variable
+                    start_time = result.get("start_time")
+                    end_time = result.get("end_time")
 
                     # Use pagination utility to extract output summary (last 10 lines)
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -147,9 +153,10 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Build LLM-friendly text with summary
                     llm_text_parts = []
 
-                    # 1. Success message with task_id
+                    # 1. Success message with task_id and time range (matching list tool format)
                     base_message = result.get("message", "Script completed successfully")
-                    llm_text_parts.append(f"✓ {base_message}")
+                    time_info = format_time_range(start_time, end_time)
+                    llm_text_parts.append(f"✓ {base_message} | {time_info}")
                     if task_id:
                         llm_text_parts.append(f"\nTask ID: {task_id}")
 
@@ -189,6 +196,8 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Extract output even on error (useful for debugging)
                     output = result.get("output", "")  # Captured stdout before error
                     error_message = result.get("message", "Script execution failed")
+                    start_time = result.get("start_time")
+                    end_time = result.get("end_time")
 
                     # Use pagination utility to extract output summary (last 10 lines)
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -202,8 +211,9 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Build LLM content with error message and output summary
                     llm_text_parts = []
 
-                    # 1. Error message with task_id
-                    llm_text_parts.append(f"✗ {error_message}")
+                    # 1. Error message with task_id and time range (matching list tool format)
+                    time_info = format_time_range(start_time, end_time)
+                    llm_text_parts.append(f"✗ {error_message} | {time_info}")
                     if task_id:
                         llm_text_parts.append(f"\nTask ID: {task_id}")
 

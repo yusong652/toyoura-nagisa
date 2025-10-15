@@ -316,14 +316,21 @@ class PFCScriptExecutor:
                 # Extract cached output from task (single source of truth)
                 full_output = output_buffer.getvalue()
 
-                # Return task_id + status + data (output will be queried via pfc_check_task_status)
+                # Get timing info from task for consistent time display
+                task = self.task_manager.tasks.get(task_id)
+                start_time = task.start_time if task else None
+                end_time = task.end_time if task else None
+
+                # Return task_id + status + data + timing (output will be queried via pfc_check_task_status)
                 # This prevents context window exhaustion for long-running debug scripts
                 return {
                     "status": result_dict.get("status", "success"),
                     "message": result_dict.get("message", "Script executed"),
                     "data": result_dict.get("data"),
                     "task_id": task_id,  # NEW: Enable post-execution output query
-                    "output": full_output  # Keep full output in result for backward compatibility
+                    "output": full_output,  # Keep full output in result for backward compatibility
+                    "start_time": start_time,  # NEW: Task start timestamp
+                    "end_time": end_time  # NEW: Task end timestamp (if completed)
                 }
 
         except Exception as e:
