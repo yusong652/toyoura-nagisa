@@ -58,7 +58,8 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                 task_lines = []
                 for task in sorted_data:
                     task_id = task.get("task_id", "unknown")
-                    name = task.get("name", "unknown")
+                    script_path = task.get("script_path", task.get("name", "unknown"))  # Use script_path, fallback to name
+                    description = task.get("description", "")  # Agent-provided description
                     status = task.get("status", "unknown")
                     elapsed = task.get("elapsed_time", 0)
                     start_time = task.get("start_time")
@@ -74,7 +75,9 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     time_info = format_time_range(start_time, end_time)
 
                     task_lines.append(
-                        f"{status_icon} {name} ({task_id}) | {elapsed:.1f}s | {time_info}"
+                        f"{status_icon} Task ID: {task_id} | {elapsed:.1f}s | {time_info}\n"
+                        f"  Script: {script_path}\n"
+                        f"  → {description}"
                     )
 
                 task_summary = (

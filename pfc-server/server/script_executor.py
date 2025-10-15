@@ -10,6 +10,7 @@ Python 3.6 compatible implementation.
 import asyncio
 import logging
 import sys
+import time
 import traceback
 from io import StringIO
 from typing import Any, Dict, Optional
@@ -173,8 +174,8 @@ class PFCScriptExecutor:
             # Always restore stdout
             sys.stdout = old_stdout
 
-    async def execute_script(self, script_path, timeout_ms=None, run_in_background=True):
-        # type: (str, Optional[int], bool) -> Dict[str, Any]
+    async def execute_script(self, script_path, description, timeout_ms=None, run_in_background=True):
+        # type: (str, str, Optional[int], bool) -> Dict[str, Any]
         """
         Execute Python script with flexible execution control.
 
@@ -185,6 +186,8 @@ class PFCScriptExecutor:
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
+            description: Task description from PFC agent (LLM-provided)
+                Example: "Phase 2: Settling simulation with 50k particles"
             timeout_ms: Script execution timeout in milliseconds (only for synchronous mode)
                 - None (default): No timeout limit for production simulations
                 - 1000-600000: Custom timeout (1 second to 10 minutes) for testing
@@ -272,11 +275,13 @@ class PFCScriptExecutor:
                 # Asynchronous execution: register with task manager and return immediately
                 logger.info("Submitting script as background task: {}".format(script_name))
 
+                submit_time = time.time()
                 task_id = self.task_manager.create_script_task(
                     future,
                     script_name,
                     script_path,
-                    output_buffer  # Pass buffer reference for live status queries
+                    output_buffer,  # Pass buffer reference for live status queries
+                    description  # Agent-provided task description
                 )
 
                 return {
@@ -284,8 +289,11 @@ class PFCScriptExecutor:
                     "message": "Script submitted: {}".format(script_name),
                     "data": {
                         "task_id": task_id,
+                        "task_type": "script",
+                        "script_name": script_name,
                         "script_path": script_path,
-                        "script_name": script_name
+                        "description": description,
+                        "start_time": submit_time
                     }
                 }
 
@@ -302,7 +310,8 @@ class PFCScriptExecutor:
                     future,
                     script_name,
                     script_path,
-                    output_buffer  # Pass buffer reference for output caching
+                    output_buffer,  # Pass buffer reference for output caching
+                    description  # Agent-provided task description
                 )
 
                 loop = asyncio.get_event_loop()
@@ -320,17 +329,24 @@ class PFCScriptExecutor:
                 task = self.task_manager.tasks.get(task_id)
                 start_time = task.start_time if task else None
                 end_time = task.end_time if task else None
+                elapsed_time = (end_time - start_time) if (start_time and end_time) else 0
 
-                # Return task_id + status + data + timing (output will be queried via pfc_check_task_status)
-                # This prevents context window exhaustion for long-running debug scripts
+                # Return unified structure with all metadata in data field
                 return {
                     "status": result_dict.get("status", "success"),
                     "message": result_dict.get("message", "Script executed"),
-                    "data": result_dict.get("data"),
-                    "task_id": task_id,  # NEW: Enable post-execution output query
-                    "output": full_output,  # Keep full output in result for backward compatibility
-                    "start_time": start_time,  # NEW: Task start timestamp
-                    "end_time": end_time  # NEW: Task end timestamp (if completed)
+                    "data": {
+                        "task_id": task_id,
+                        "task_type": "script",
+                        "script_name": script_name,
+                        "script_path": script_path,
+                        "description": description,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "elapsed_time": elapsed_time,
+                        "output": full_output,
+                        "result": result_dict.get("data")  # Script's 'result' variable
+                    }
                 }
 
         except Exception as e:
@@ -347,29 +363,52 @@ class PFCScriptExecutor:
             )
 
             if is_timeout:
-                # Script execution timed out
+                # Script execution timed out - retrieve task info if available
                 import os
                 script_name_for_error = os.path.basename(script_path)
 
                 logger.error("Script execution timed out: {} (timeout: {}ms)".format(script_path, timeout_ms))
                 logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))
 
+                # Try to get task info for timing and output
+                task_id_local = locals().get('task_id')
+                task = self.task_manager.tasks.get(task_id_local) if task_id_local else None
+
+                error_message = "Timeout after {}ms executing script '{}'. Increase timeout or use run_in_background=True.".format(
+                    timeout_ms, script_name_for_error
+                )
+
                 return {
                     "status": "error",
-                    "message": "Timeout after {}ms executing script '{}'. Increase timeout or use run_in_background=True.".format(
-                        timeout_ms, script_name_for_error
-                    ),
-                    "data": None
+                    "message": error_message,
+                    "data": {
+                        "task_id": task_id_local,
+                        "task_type": "script",
+                        "script_name": script_name_for_error,
+                        "script_path": script_path,
+                        "description": description,
+                        "start_time": task.start_time if task else None,
+                        "output": output_buffer.getvalue() if 'output_buffer' in locals() else "",
+                        "error": error_message
+                    }
                 }
 
-            # General error handling
+            # General error handling (pre-execution errors)
             logger.error("Script submission failed: {}".format(e))
             logger.error("Exception type: {}".format(type(e).__name__))
 
+            error_message = "Script submission failed: {}".format(str(e))
+
             return {
                 "status": "error",
-                "message": "Script submission failed: {}".format(str(e)),
-                "data": None
+                "message": error_message,
+                "data": {
+                    "task_type": "script",
+                    "script_name": os.path.basename(script_path) if script_path else "unknown",
+                    "script_path": script_path,
+                    "description": description,
+                    "error": error_message
+                }
             }
 
     def _serialize_result(self, result: Any) -> Any:

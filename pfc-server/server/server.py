@@ -128,10 +128,11 @@ class PFCWebSocketServer:
                         # Execute Python script from file path
                         request_id = data.get("request_id", "unknown")
                         script_path = data.get("script_path", "")
+                        description = data.get("description", "")  # Agent-provided task description
                         timeout_ms = data.get("timeout_ms", None)  # Default None (no timeout)
                         run_in_background = data.get("run_in_background", True)  # Default asynchronous
 
-                        result = await self.script_executor.execute_script(script_path, timeout_ms, run_in_background)
+                        result = await self.script_executor.execute_script(script_path, description, timeout_ms, run_in_background)
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:

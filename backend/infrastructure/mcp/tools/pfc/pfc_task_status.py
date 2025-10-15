@@ -11,6 +11,7 @@ from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.pagination import format_paginated_output
+from backend.infrastructure.mcp.utils.time_utils import format_time_range
 
 
 def register_pfc_task_status_tool(mcp: FastMCP):
@@ -81,6 +82,9 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 data = result.get("data", {})
                 elapsed_time = data.get("elapsed_time", 0)
                 output = data.get("output", "")
+                description = data.get("description", "")
+                script_path = data.get("script_path", "unknown")
+                start_time = data.get("start_time")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -93,9 +97,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     nav_hints.append(f"older: offset={offset + limit}")
                 nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
 
-                # Build LLM-friendly text
+                # Format time info (start time only for running tasks)
+                time_info = format_time_range(start_time)
+
+                # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"⏳ Task running: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"⏳ Running | Task ID: {task_id} | {time_info}\n"
+                    f"  Script: {script_path}\n"
+                    f"  → {description}\n\n"
                     f"📊 Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
@@ -125,6 +134,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 elapsed_time = data.get("elapsed_time", 0)
                 output = data.get("output", "")
                 task_result = data.get("result")
+                description = data.get("description", "")
+                script_path = data.get("script_path", "unknown")
+                start_time = data.get("start_time")
+                end_time = data.get("end_time")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -137,9 +150,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     nav_hints.append(f"older: offset={offset + limit}")
                 nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
 
-                # Build LLM-friendly text
+                # Format time info (start to end time range)
+                time_info = format_time_range(start_time, end_time)
+
+                # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✓ Task completed: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"✓ Completed | Task ID: {task_id} | {time_info}\n"
+                    f"  Script: {script_path}\n"
+                    f"  → {description}\n\n"
                     f"Result: {task_result}\n"
                     f"📊 Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "
@@ -170,6 +188,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 elapsed_time = data.get("elapsed_time", 0)
                 output = data.get("output", "")
                 error_msg = data.get("error", "Unknown error")
+                description = data.get("description", "")
+                script_path = data.get("script_path", "unknown")
+                start_time = data.get("start_time")
+                end_time = data.get("end_time")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -182,9 +204,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     nav_hints.append(f"older: offset={offset + limit}")
                 nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
 
-                # Build LLM-friendly text
+                # Format time info (start to end time range)
+                time_info = format_time_range(start_time, end_time)
+
+                # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✗ Task failed: {task_id} | Elapsed: {elapsed_time:.2f}s\n"
+                    f"✗ Failed | Task ID: {task_id} | {time_info}\n"
+                    f"  Script: {script_path}\n"
+                    f"  → {description}\n\n"
                     f"Error: {error_msg}\n"
                     f"📊 Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "

@@ -39,6 +39,14 @@ def register_pfc_script_tool(mcp: FastMCP):
                 "Read the script first to understand its functionality."
             )
         ),
+        description: str = Field(
+            ...,
+            description=(
+                "Task description explaining what this script does and its purpose in the workflow. "
+                "Recommended length: 30-80 characters. "
+                "This helps track task purpose across multi-stage simulations."
+            )
+        ),
         timeout: Optional[int] = Field(
             default=None,
             description=(
@@ -74,6 +82,21 @@ def register_pfc_script_tool(mcp: FastMCP):
             For simple commands, use pfc_execute_command instead.
         """
         try:
+            # Validate description length (LLM-friendly guidance)
+            if not description or not description.strip():
+                return error_response(
+                    "description is required. Please provide a brief explanation of what this script does. "
+                    "Example: 'Initial settling simulation with 10k particles'"
+                )
+
+            description = description.strip()
+            if len(description) > 200:
+                return error_response(
+                    f"description is too long ({len(description)} characters). "
+                    "Please keep it concise (recommended: 30-80 characters, max: 200). "
+                    "Focus on the task's purpose rather than implementation details."
+                )
+
             # Normalize path separators for cross-platform compatibility
             # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file.py)
             # Note: PFC server expects forward slashes, so we normalize to Linux-style paths
@@ -88,6 +111,7 @@ def register_pfc_script_tool(mcp: FastMCP):
             # WebSocket timeout is auto-calculated based on timeout + infrastructure buffer
             result = await client.send_script(
                 script_path=script_path,
+                description=description,
                 timeout_ms=timeout,
                 run_in_background=run_in_background
             )
@@ -108,9 +132,10 @@ def register_pfc_script_tool(mcp: FastMCP):
                         f"(expected 'pending'). Server may have changed behavior."
                     )
 
+                # Extract metadata from unified data structure
                 task_id = data.get("task_id") if data else None
-                script_name = data.get("script_name") if data else "script"
-                submit_time = time.time()
+                script_path_display = data.get("script_path", script_path) if data else script_path
+                submit_time = data.get("start_time", time.time()) if data else time.time()
                 time_info = format_time_range(submit_time)
 
                 return success_response(
@@ -118,7 +143,7 @@ def register_pfc_script_tool(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⏳ Task submitted: {script_name} | {time_info}\nTask ID: {task_id}\n\nUse pfc_check_task_status to monitor progress."
+                            "text": f"⏳ Task submitted | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}\n\nUse pfc_check_task_status to monitor progress."
                         }]
                     },
                     script_path=script_path,
@@ -130,16 +155,15 @@ def register_pfc_script_tool(mcp: FastMCP):
                 # Expect: status == "success" | "error" (script completed/failed)
                 # Return: task_id + output summary (NOT full output)
 
-                # Extract task_id from server response (NEW: unified task management)
-                task_id = result.get("task_id")
-
                 if status == "success":
                     # Script completed successfully
-                    # Extract output and script result from server response
-                    output = result.get("output", "")  # Captured stdout (print statements)
-                    script_result = data  # Script's 'result' variable
-                    start_time = result.get("start_time")
-                    end_time = result.get("end_time")
+                    # Extract all metadata from unified data structure
+                    task_id = data.get("task_id") if data else None
+                    script_path_display = data.get("script_path", script_path) if data else script_path
+                    output = data.get("output", "") if data else ""
+                    script_result = data.get("result") if data else None
+                    start_time = data.get("start_time") if data else None
+                    end_time = data.get("end_time") if data else None
 
                     # Use pagination utility to extract output summary (last 10 lines)
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -153,12 +177,9 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Build LLM-friendly text with summary
                     llm_text_parts = []
 
-                    # 1. Success message with task_id and time range (matching list tool format)
-                    base_message = result.get("message", "Script completed successfully")
+                    # 1. Success message with task_id and time range (three-line format)
                     time_info = format_time_range(start_time, end_time)
-                    llm_text_parts.append(f"✓ {base_message} | {time_info}")
-                    if task_id:
-                        llm_text_parts.append(f"\nTask ID: {task_id}")
+                    llm_text_parts.append(f"✓ Completed | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}")
 
                     # 2. Output summary (last 10 lines by default)
                     if output:
@@ -193,11 +214,13 @@ def register_pfc_script_tool(mcp: FastMCP):
 
                 else:
                     # Script execution failed (status == "error" or other)
-                    # Extract output even on error (useful for debugging)
-                    output = result.get("output", "")  # Captured stdout before error
-                    error_message = result.get("message", "Script execution failed")
-                    start_time = result.get("start_time")
-                    end_time = result.get("end_time")
+                    # Extract all metadata from unified data structure
+                    task_id = data.get("task_id") if data else None
+                    script_path_display = data.get("script_path", script_path) if data else script_path
+                    output = data.get("output", "") if data else ""
+                    error_message = data.get("error", result.get("message", "Script execution failed")) if data else result.get("message", "Script execution failed")
+                    start_time = data.get("start_time") if data else None
+                    end_time = data.get("end_time") if data else None
 
                     # Use pagination utility to extract output summary (last 10 lines)
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -211,11 +234,9 @@ def register_pfc_script_tool(mcp: FastMCP):
                     # Build LLM content with error message and output summary
                     llm_text_parts = []
 
-                    # 1. Error message with task_id and time range (matching list tool format)
+                    # 1. Error message with task_id and time range (three-line format)
                     time_info = format_time_range(start_time, end_time)
-                    llm_text_parts.append(f"✗ {error_message} | {time_info}")
-                    if task_id:
-                        llm_text_parts.append(f"\nTask ID: {task_id}")
+                    llm_text_parts.append(f"✗ Failed | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}\n\nError: {error_message}")
 
                     # 2. Script output before error (summary) - helps with debugging
                     if output:

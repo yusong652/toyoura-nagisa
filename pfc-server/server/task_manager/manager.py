@@ -54,8 +54,8 @@ class TaskManager:
         self.tasks[task_id] = task
         return task_id
 
-    def create_script_task(self, future, script_name, script_path=None, output_buffer=None):
-        # type: (Any, str, Optional[str], Any) -> str
+    def create_script_task(self, future, script_name, script_path=None, output_buffer=None, description=None):
+        # type: (Any, str, Optional[str], Any, Optional[str]) -> str
         """
         Register a new long-running Python script task.
 
@@ -64,12 +64,13 @@ class TaskManager:
             script_name: Name of the script file (e.g., "simulation.py")
             script_path: Optional full path to script for reference
             output_buffer: Optional StringIO buffer for real-time output capture
+            description: Task description from PFC agent (LLM-provided)
 
         Returns:
             str: Unique task ID for tracking
         """
         task_id = uuid.uuid4().hex[:8]
-        task = ScriptTask(task_id, future, script_name, script_path, output_buffer)
+        task = ScriptTask(task_id, future, script_name, script_path, output_buffer, description)
         self.tasks[task_id] = task
         return task_id
 

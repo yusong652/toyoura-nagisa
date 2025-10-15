@@ -140,8 +140,8 @@ class ScriptTask(Task):
     suitable for long-running simulations with progress monitoring.
     """
 
-    def __init__(self, task_id, future, script_name, script_path=None, output_buffer=None):
-        # type: (str, Any, str, Optional[str], Any) -> None
+    def __init__(self, task_id, future, script_name, script_path=None, output_buffer=None, description=None):
+        # type: (str, Any, str, Optional[str], Any, Optional[str]) -> None
         """
         Initialize script task.
 
@@ -151,8 +151,10 @@ class ScriptTask(Task):
             script_name: Name of the script file (e.g., "simulation.py")
             script_path: Optional full path to script for reference
             output_buffer: Optional StringIO buffer for real-time output capture
+            description: Task description from PFC agent (LLM-provided)
         """
-        super(ScriptTask, self).__init__(task_id, future, "script: {}".format(script_name), "script")
+        # Use agent-provided description directly
+        super(ScriptTask, self).__init__(task_id, future, description, "script")
         self.script_name = script_name
         self.script_path = script_path
         self.output_buffer = output_buffer
@@ -181,7 +183,10 @@ class ScriptTask(Task):
             response_data = {
                 "task_id": self.task_id,
                 "task_type": self.task_type,
+                "script_name": self.script_name,
+                "script_path": self.script_path,
                 "description": self.description,
+                "start_time": self.start_time,
                 "elapsed_time": elapsed_time
             }
 
@@ -243,12 +248,19 @@ class ScriptTask(Task):
                     self.description, elapsed_time
                 )
 
-            # Build response data (always include output field for scripts)
-            response_data = serialized_result if isinstance(serialized_result, dict) else {}
-            if not isinstance(response_data, dict):
-                response_data = {"result": serialized_result}
-            response_data["output"] = output_text if output_text else ""
-            response_data["elapsed_time"] = elapsed_time
+            # Build unified response data with all metadata
+            response_data = {
+                "task_id": self.task_id,
+                "task_type": self.task_type,
+                "script_name": self.script_name,
+                "script_path": self.script_path,
+                "description": self.description,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "elapsed_time": elapsed_time,
+                "output": output_text if output_text else "",
+                "result": serialized_result  # Script's 'result' variable
+            }
 
             return {
                 "status": result_status,
@@ -273,12 +285,24 @@ class ScriptTask(Task):
                 message = "Script execution failed: {}\nElapsed time: {:.2f}s\nError: {}\n\n=== Partial Output ===\n{}".format(
                     self.script_name, elapsed_time, error_msg, output_text
                 )
-                error_data = {"error": error_msg, "output": output_text, "elapsed_time": elapsed_time}
             else:
                 message = "Script failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
                     self.description, elapsed_time, error_msg
                 )
-                error_data = {"error": error_msg, "elapsed_time": elapsed_time}
+
+            # Build unified error data with all metadata
+            error_data = {
+                "task_id": self.task_id,
+                "task_type": self.task_type,
+                "script_name": self.script_name,
+                "script_path": self.script_path,
+                "description": self.description,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "elapsed_time": elapsed_time,
+                "output": output_text if output_text else "",
+                "error": error_msg
+            }
 
             return {
                 "status": "error",
@@ -292,12 +316,12 @@ class ScriptTask(Task):
         info = {
             "task_id": self.task_id,
             "task_type": self.task_type,
-            "description": self.description,
+            "description": self.description,  # Agent-provided task description
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
             "start_time": self.start_time,
-            "script_name": self.script_name,
-            "name": self.script_name  # Display name for list view
+            "name": self.script_name,  # Script file name (for backward compatibility)
+            "script_path": self.script_path  # Absolute path for LLM
         }
         # Add end_time for completed/failed tasks
         if self.status in ["completed", "failed"] and self.end_time is not None:

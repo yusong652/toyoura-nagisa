@@ -463,6 +463,7 @@ class PFCWebSocketClient:
     async def send_script(
         self,
         script_path: str,
+        description: str,
         timeout_ms: Optional[int] = None,
         run_in_background: bool = True,
         max_retries: int = 2
@@ -477,6 +478,8 @@ class PFCWebSocketClient:
         Args:
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
+            description: Human-readable task description explaining what this script does
+                Example: "Phase 2: Settling simulation with 50k particles"
             timeout_ms: Script execution timeout in milliseconds (default: None - no timeout)
                 Passed to executor for script execution timeout control.
                 WebSocket timeout auto-calculated when run_in_background=False.
@@ -534,11 +537,12 @@ class PFCWebSocketClient:
                 else:
                     websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
 
-                # Create script message with file path
+                # Create script message with file path and description
                 message = {
                     "type": "script",
                     "request_id": request_id,
                     "script_path": script_path,
+                    "description": description,
                     "timeout_ms": timeout_ms,
                     "run_in_background": run_in_background
                 }
