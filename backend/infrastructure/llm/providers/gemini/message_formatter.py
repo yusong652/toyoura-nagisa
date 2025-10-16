@@ -49,9 +49,43 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                         # Skip thinking content - don't include in API calls
                         if item.get("type") in ["thinking", "redacted_thinking"]:
                             continue
-                            
+
                         if item.get("type") == "text" and item.get("text"):
                             parts.append(types.Part(text=item["text"]))
+
+                        # Handle tool_use blocks (for assistant messages with tool calls)
+                        elif item.get("type") == "tool_use":
+                            function_call = types.FunctionCall(
+                                name=item.get("name"),
+                                args=item.get("input", {})
+                            )
+                            parts.append(types.Part(function_call=function_call))
+
+                        # Handle tool_result blocks (for user messages with tool results)
+                        elif item.get("type") == "tool_result":
+                            tool_result_content = item.get("content", {})
+
+                            # Extract text from tool result content (supports parts format)
+                            response_text = ""
+                            if isinstance(tool_result_content, dict) and "parts" in tool_result_content:
+                                for part in tool_result_content["parts"]:
+                                    if isinstance(part, dict) and part.get("type") == "text":
+                                        response_text = part.get("text", "")
+                                        break
+                            else:
+                                # Fallback to string representation
+                                response_text = str(tool_result_content)
+
+                            # Create FunctionResponse for Gemini API
+                            function_response = types.FunctionResponse(
+                                name=item.get("tool_name", "unknown"),
+                                response={
+                                    "status": "error" if item.get("is_error") else "success",
+                                    "content": response_text
+                                }
+                            )
+                            parts.append(types.Part(function_response=function_response))
+
                         elif item.get("type") == "image" and "inline_data" in item:
                             # Handle image content using unified processing
                             blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])
@@ -151,9 +185,43 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                     # Skip thinking content - don't include in API calls
                     if item.get("type") in ["thinking", "redacted_thinking"]:
                         continue
-                        
+
                     if item.get("type") == "text" and item.get("text"):
                         parts.append(types.Part(text=item["text"]))
+
+                    # Handle tool_use blocks (for assistant messages with tool calls)
+                    elif item.get("type") == "tool_use":
+                        function_call = types.FunctionCall(
+                            name=item.get("name"),
+                            args=item.get("input", {})
+                        )
+                        parts.append(types.Part(function_call=function_call))
+
+                    # Handle tool_result blocks (for user messages with tool results)
+                    elif item.get("type") == "tool_result":
+                        tool_result_content = item.get("content", {})
+
+                        # Extract text from tool result content (supports parts format)
+                        response_text = ""
+                        if isinstance(tool_result_content, dict) and "parts" in tool_result_content:
+                            for part in tool_result_content["parts"]:
+                                if isinstance(part, dict) and part.get("type") == "text":
+                                    response_text = part.get("text", "")
+                                    break
+                        else:
+                            # Fallback to string representation
+                            response_text = str(tool_result_content)
+
+                        # Create FunctionResponse for Gemini API
+                        function_response = types.FunctionResponse(
+                            name=item.get("tool_name", "unknown"),
+                            response={
+                                "status": "error" if item.get("is_error") else "success",
+                                "content": response_text
+                            }
+                        )
+                        parts.append(types.Part(function_response=function_response))
+
                     elif item.get("type") == "image" and "inline_data" in item:
                         # Handle image content using unified processing
                         blob = GeminiMessageFormatter._process_inline_data(item['inline_data'])

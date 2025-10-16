@@ -122,6 +122,72 @@ def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> st
     return message_id
 
 
+def save_tool_result_message(
+    tool_call_id: str,
+    tool_name: str,
+    tool_result: Dict[str, Any],
+    session_id: str
+) -> str:
+    """
+    Save tool execution result as a user message.
+
+    Tool results are stored as UserMessage with tool_result content type,
+    allowing LLM to understand tool execution context after server restart.
+
+    Args:
+        tool_call_id: ID of the tool call this result corresponds to
+        tool_name: Name of the executed tool
+        tool_result: Tool execution result (ToolResult format with llm_content)
+        session_id: Current session ID
+
+    Returns:
+        str: Generated message ID
+
+    Example:
+        >>> tool_result = {
+        ...     "status": "success",
+        ...     "message": "File read successfully",
+        ...     "llm_content": {"parts": [{"type": "text", "text": "content..."}]},
+        ...     "data": {"file_path": "example.py"}
+        ... }
+        >>> save_tool_result_message("call_1", "read_file", tool_result, session_id)
+        'msg_uuid_123'
+    """
+    from backend.infrastructure.storage.session_manager import load_all_message_history
+
+    # Extract content from tool result
+    llm_content = tool_result.get("llm_content", {})
+
+    # Build tool_result content block
+    tool_result_content = {
+        "type": "tool_result",
+        "tool_use_id": tool_call_id,
+        "tool_name": tool_name,
+        "content": llm_content,  # Use llm_content from ToolResult
+        "is_error": tool_result.get("status") == "error"
+    }
+
+    # Generate message ID
+    message_id = str(uuid.uuid4())
+
+    # Load history
+    history = load_all_message_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+    # Create user message with tool result
+    message = UserMessage(
+        content=[tool_result_content],
+        id=message_id,
+        timestamp=datetime.now()
+    )
+
+    # Add to history and save
+    history_msgs.append(message)
+    save_history(session_id, history_msgs)
+
+    return message_id
+
+
 async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> Optional[dict]:
     """Process TTS synthesis for single sentence"""
     if sentence is None or sentence == '':
