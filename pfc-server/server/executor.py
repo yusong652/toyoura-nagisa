@@ -17,12 +17,9 @@ from .task_manager import TaskManager
 # Module logger
 logger = logging.getLogger("PFC-Server")
 
-# Long-running commands that should return immediately with task ID
-LONG_RUNNING_COMMANDS = {
-    "model solve",
-    "model cycle",
-    # Add more long-running commands as needed
-}
+# Default timeout for command execution (milliseconds)
+DEFAULT_COMMAND_TIMEOUT_MS = 30000  # 30 seconds for testing
+MAX_COMMAND_TIMEOUT_MS = 600000     # 10 minutes maximum
 
 
 class PFCCommandExecutor:
@@ -53,18 +50,6 @@ class PFCCommandExecutor:
             logger.warning("⚠ ITASCA SDK not available")
             self.itasca = None
 
-    def _is_long_running_command(self, command):
-        # type: (str) -> bool
-        """
-        Check if a command is classified as long-running.
-
-        Args:
-            command: PFC command name (e.g., "model solve", "model cycle")
-
-        Returns:
-            bool: True if command is long-running, False otherwise
-        """
-        return any(command.startswith(cmd) for cmd in LONG_RUNNING_COMMANDS)
 
     def _execute_pfc_command_sync(self, cmd_str):
         # type: (str) -> Any
@@ -94,21 +79,21 @@ class PFCCommandExecutor:
             # Re-raise to be handled by async wrapper
             raise
 
-    async def execute_command(self, command, arg=None, params=None):
-        # type: (str, Any, Optional[Dict[str, Any]]) -> Dict[str, Any]
+    async def execute_command(self, session_id, command, arg=None, params=None, timeout_ms=DEFAULT_COMMAND_TIMEOUT_MS, run_in_background=False):
+        # type: (str, str, Any, Optional[Dict[str, Any]], int, bool) -> Dict[str, Any]
         """
-        Execute a native PFC command via main thread queue.
+        Execute a native PFC command via main thread queue with flexible execution control.
 
         This method assembles a complete PFC command string from the command name,
         optional positional argument, and optional keyword parameters, then submits
         it to the main thread queue for execution.
 
-        Long-running commands (e.g., "model solve", "model cycle") return immediately
-        with a task ID. Use check_task_status() to query task progress.
-
-        Short-running commands wait for completion and return results immediately.
+        Execution modes:
+        - Synchronous (run_in_background=False): Wait for completion, return result/error immediately
+        - Asynchronous (run_in_background=True): Return task_id immediately, query via check_task_status()
 
         Args:
+            session_id: Session identifier for task isolation and persistence
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
             arg: Optional single positional argument (value without keyword) using native Python types
                 Supported types: bool, int, float, str, tuple
@@ -123,14 +108,20 @@ class PFCCommandExecutor:
                   • {"condition": "stop"} → "model domain condition stop"
                   • {"model": "linear", "inheritance": None} → boolean flag
                   • {"active": True} → keyword with boolean value
+            timeout_ms: Command execution timeout in milliseconds (default: 30000ms / 30 seconds)
+                - Valid range: 1000-600000 (1 second to 10 minutes)
+                - Only applies to synchronous execution (run_in_background=False)
+            run_in_background: Background execution control (default: False - synchronous for testing)
+                - False: Synchronous - wait for completion, catch errors immediately
+                - True: Asynchronous - return task_id, query progress later
 
         Returns:
             Result dictionary following ToolResult pattern:
-                For short tasks:
+                For synchronous execution (run_in_background=False):
                     - status: "success" or "error"
                     - message: User-friendly message
                     - data: Command result data
-                For long tasks:
+                For asynchronous execution (run_in_background=True):
                     - status: "pending"
                     - message: Task submission confirmation
                     - data: {"task_id": str, "command": str}
@@ -153,11 +144,26 @@ class PFCCommandExecutor:
             params = params or {}  # Handle None params
             cmd_str = self._assemble_command(command, arg, params)
 
-            # Check if this is a long-running command
-            is_long_task = self._is_long_running_command(command)
+            # Validate timeout range
+            if timeout_ms < 1000:
+                return {
+                    "status": "error",
+                    "message": "Timeout must be at least 1000ms (1 second)",
+                    "data": None
+                }
+            elif timeout_ms > MAX_COMMAND_TIMEOUT_MS:
+                return {
+                    "status": "error",
+                    "message": "Timeout cannot exceed {}ms ({} minutes)".format(
+                        MAX_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS // 60000
+                    ),
+                    "data": None
+                }
+
+            timeout_seconds = timeout_ms / 1000.0
 
             logger.info("Submitting PFC command to main thread: {} [{}]".format(
-                cmd_str, "LONG TASK" if is_long_task else "SHORT TASK"
+                cmd_str, "ASYNC" if run_in_background else "SYNC, timeout={}s".format(timeout_seconds)
             ))
 
             # Submit to main thread queue
@@ -166,26 +172,27 @@ class PFCCommandExecutor:
                 cmd_str
             )
 
-            if is_long_task:
-                # Long task: register with task manager and return immediately
-                task_id = self.task_manager.create_task(future, cmd_str)
+            if run_in_background:
+                # Asynchronous execution: register with task manager and return immediately
+                task_id = self.task_manager.create_command_task(session_id, future, cmd_str)
 
                 return {
                     "status": "pending",
-                    "message": "Long-running task submitted: {}\nUse check_task_status tool to query progress.".format(cmd_str),
+                    "message": "Command submitted as background task: {}\nUse check_task_status tool to query progress.".format(cmd_str),
                     "data": {
                         "task_id": task_id,
-                        "command": cmd_str
+                        "command": cmd_str,
+                        "session_id": session_id
                     }
                 }
 
             else:
-                # Short task: wait for completion
+                # Synchronous execution: wait for completion with timeout
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     None,  # Use default thread pool
                     future.result,  # Block until main thread processes
-                    60  # 1 minute timeout for short tasks
+                    timeout_seconds  # Use specified timeout
                 )
 
                 # Serialize result for response
@@ -213,9 +220,34 @@ class PFCCommandExecutor:
             raise
 
         except Exception as e:
-            # Log comprehensive error information
+            # Special handling for timeout errors (provide LLM-friendly guidance)
+            # Python 3.6 compatibility: Check both TimeoutError types
+            import concurrent.futures
+
+            # In Python 3.6+, concurrent.futures.TimeoutError is an alias of TimeoutError
+            # Check exception type name to handle both cases
+            exception_type_name = type(e).__name__
+            is_timeout = (
+                isinstance(e, concurrent.futures.TimeoutError) or
+                exception_type_name == 'TimeoutError'
+            )
+
+            if is_timeout:
+                logger.error("Command execution timed out: {} (timeout: {}ms)".format(cmd_str, timeout_ms))
+                logger.error("Exception type: {} - {}".format(type(e).__name__, str(e)))
+
+                return {
+                    "status": "error",
+                    "message": "Timeout after {}ms executing '{}'. Increase timeout or use run_in_background=True.".format(
+                        timeout_ms, cmd_str
+                    ),
+                    "data": None
+                }
+
+            # General error handling
             error_msg = str(e)
             logger.error("Command execution failed: {}".format(error_msg))
+            logger.error("Exception type: {}".format(type(e).__name__))
 
             if cmd_str:
                 logger.error("  Failed command: {}".format(cmd_str))
@@ -254,6 +286,9 @@ class PFCCommandExecutor:
 
             >>> _assemble_command("model domain", None, {"condition": "stop"})
             "model domain condition stop"  # Auto-converted from key-value to flags
+
+            >>> _assemble_command("contact cmat default", None, {"model": "linear", "property": {"kn": 1.0e6, "dp_nratio": 0.5}})
+            "contact cmat default model linear property kn 1.0e6 dp_nratio 0.5"
         """
         # Pre-process params for PFC-specific special cases
         params = self._preprocess_params(params)
@@ -269,9 +304,36 @@ class PFCCommandExecutor:
         for keyword, value in params.items():
             cmd_parts.append(keyword)
             if value is not None:  # None = boolean flag (keyword only, no value)
-                cmd_parts.append(self._format_value(value))
+                # Special handling for nested dictionaries
+                if isinstance(value, dict):
+                    self._append_dict_params(cmd_parts, value)
+                else:
+                    cmd_parts.append(self._format_value(value))
 
         return " ".join(cmd_parts)
+
+    def _append_dict_params(self, cmd_parts, params_dict):
+        # type: (list, Dict[str, Any]) -> None
+        """
+        Recursively append dictionary parameters to command parts list.
+
+        Args:
+            cmd_parts: List to append command parts to (modified in-place)
+            params_dict: Dictionary of parameters to expand
+
+        Example:
+            >>> cmd_parts = ["contact", "cmat", "default", "property"]
+            >>> _append_dict_params(cmd_parts, {"kn": 1.0e6, "dp_nratio": 0.5})
+            >>> # cmd_parts becomes: ["contact", "cmat", "default", "property", "kn", "1000000.0", "dp_nratio", "0.5"]
+        """
+        for key, value in params_dict.items():
+            cmd_parts.append(key)
+            if value is not None:
+                if isinstance(value, dict):
+                    # Recursive handling for deeply nested dicts
+                    self._append_dict_params(cmd_parts, value)
+                else:
+                    cmd_parts.append(self._format_value(value))
 
     def _preprocess_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -324,10 +386,11 @@ class PFCCommandExecutor:
         - Booleans (bool): Convert to PFC format (lowercase true/false)
         - Numbers (int/float): Direct string conversion
         - Tuples/Lists: Format as PFC tuple "(x,y,z)"
+        - Dictionaries (dict): Expand to keyword-value pairs recursively
         - Strings: Smart handling for identifiers vs complex formats
 
         Args:
-            value: Value to format (bool, int, float, str, tuple, list, or other)
+            value: Value to format (bool, int, float, str, tuple, list, dict, or other)
 
         Returns:
             Formatted string for PFC command
@@ -348,6 +411,9 @@ class PFCCommandExecutor:
             >>> _format_value([0, 0, 0])
             "(0,0,0)"
 
+            >>> _format_value({"kn": 1.0e6, "dp_nratio": 0.5})
+            "kn 1000000.0 dp_nratio 0.5"
+
             >>> _format_value("linear")
             '"linear"'
 
@@ -366,6 +432,15 @@ class PFCCommandExecutor:
         # Tuples/Lists: format as PFC tuple
         elif isinstance(value, (tuple, list)):
             return f"({','.join(map(str, value))})"
+
+        # Dictionaries: expand to keyword-value pairs (e.g., property parameters)
+        elif isinstance(value, dict):
+            parts = []
+            for k, v in value.items():
+                parts.append(k)
+                if v is not None:  # None = boolean flag (keyword only, no value)
+                    parts.append(self._format_value(v))  # Recursive formatting
+            return " ".join(parts)
 
         # Strings: smart handling
         elif isinstance(value, str):

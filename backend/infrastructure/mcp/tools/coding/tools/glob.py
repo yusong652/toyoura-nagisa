@@ -5,20 +5,32 @@ file and directory paths sorted by modification time. Use this tool when you nee
 files or directories by name patterns.
 """
 
+import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
+# Use pathspec for GitWildMatch pattern matching (already a project dependency)
+try:
+    from pathspec import PathSpec  # type: ignore
+    from pathspec.patterns import GitWildMatchPattern  # type: ignore
+    HAS_PATHSPEC = True
+except ImportError:
+    PathSpec = None  # type: ignore
+    GitWildMatchPattern = None  # type: ignore
+    HAS_PATHSPEC = False
+
 from ..utils.path_security import (
-    validate_path_in_workspace, 
-    WORKSPACE_ROOT, 
+    validate_path_in_workspace,
+    WORKSPACE_ROOT,
     is_safe_symlink,
     check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["glob", "register_glob_tool"]
 
@@ -26,93 +38,66 @@ __all__ = ["glob", "register_glob_tool"]
 # Constants
 # -----------------------------------------------------------------------------
 
-MAX_FILES_DEFAULT = 1000
+MAX_FILES_DEFAULT = 100
 
 # -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 
-def _expand_brace_pattern(pattern: str) -> List[str]:
-    """Expand brace patterns like {jpg,png,gif} into multiple patterns.
-    
-    Args:
-        pattern: Pattern potentially containing brace expansion
-        
-    Returns:
-        List of expanded patterns
-    """
-    import re
-    
-    # Find brace patterns like {jpg,png,gif}
-    brace_match = re.search(r'\{([^}]+)\}', pattern)
-    if not brace_match:
-        return [pattern]
-    
-    # Extract the options and create multiple patterns
-    options = brace_match.group(1).split(',')
-    prefix = pattern[:brace_match.start()]
-    suffix = pattern[brace_match.end():]
-    
-    expanded = []
-    for option in options:
-        expanded.append(prefix + option.strip() + suffix)
-    
-    return expanded
 
-def _expand_glob_pattern(
-    base_dir: Path,
-    pattern: str,
-    max_files: int = MAX_FILES_DEFAULT
-) -> List[Path]:
-    """Expand glob pattern and return matching files.
-    
+def _get_git_visible_files(search_dir: Path) -> Set[Path]:
+    """Get set of files visible to git (not in .gitignore).
+
     Args:
-        base_dir: Base directory to search from
-        pattern: Glob pattern to match (supports brace expansion)
-        max_files: Maximum number of files to return
-        
+        search_dir: Directory to get files from
+
     Returns:
-        List of matching file paths
+        Set of absolute paths to files that are not gitignored
     """
-    matched_files = []
-    
     try:
-        # Handle absolute patterns
-        if pattern.startswith('/'):
-            pattern = pattern.lstrip('/')
-        
-        # Expand brace patterns
-        patterns = _expand_brace_pattern(pattern)
-        
-        for pat in patterns:
-            # Use pathlib's glob for pattern matching
-            if '**' in pat:
-                # Recursive glob
-                matches = base_dir.rglob(pat.replace('**/', ''))
-            else:
-                # Non-recursive glob
-                matches = base_dir.glob(pat)
-            
-            # Filter to files and directories and apply limit
-            for match in matches:
-                if len(matched_files) >= max_files:
-                    break
+        # Get tracked files
+        tracked_result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=search_dir,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
 
-                if (match.is_file() or match.is_dir()) and match not in matched_files:
-                    matched_files.append(match)
-                    
+        # Get untracked files (respecting .gitignore)
+        untracked_result = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=search_dir,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        visible_files = set()
+
+        # Process tracked files
+        if tracked_result.returncode == 0:
+            for line in tracked_result.stdout.strip().split('\n'):
+                if line:
+                    visible_files.add((search_dir / line).resolve())
+
+        # Process untracked files
+        if untracked_result.returncode == 0:
+            for line in untracked_result.stdout.strip().split('\n'):
+                if line:
+                    visible_files.add((search_dir / line).resolve())
+
+        return visible_files
     except Exception:
-        # Invalid pattern or other error
-        pass
-    
-    return matched_files
+        # If git fails, return empty set (will fall back to pathlib glob)
+        return set()
 
 def _sort_by_modification_time(files: List[Path]) -> List[Path]:
     """Sort files by modification time (newest first).
-    
+
     Args:
         files: List of file paths to sort
-        
+
     Returns:
         Sorted list with newest files first
     """
@@ -121,7 +106,7 @@ def _sort_by_modification_time(files: List[Path]) -> List[Path]:
             return path.stat().st_mtime
         except Exception:
             return 0.0
-    
+
     return sorted(files, key=get_mtime, reverse=True)
 
 # -----------------------------------------------------------------------------
@@ -135,7 +120,7 @@ def glob(
     ),
     path: Optional[str] = Field(
         None,
-        description="The directory to search in (defaults to current working directory if not specified)",
+        description="The directory to search in (defaults to workspace root if not specified)",
     ),
 ) -> Dict[str, Any]:
     """- Fast file and directory pattern matching tool that works with any codebase size
@@ -153,6 +138,10 @@ def glob(
 
     # Determine search directory
     if path:
+        # Normalize path separators for cross-platform compatibility
+        # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
+        path = normalize_path_separators(path.strip())
+
         # Validate provided path
         search_path = validate_path_in_workspace(path)
         if search_path is None:
@@ -168,38 +157,101 @@ def glob(
         search_dir = WORKSPACE_ROOT
 
     try:
-        # Find matching files
-        matched_files = _expand_glob_pattern(search_dir, pattern, MAX_FILES_DEFAULT)
-        
-        # Security filtering (even if no files matched)
-        safe_files = []
-        
-        for file_path in matched_files:
-            # Check symlink safety
-            if file_path.is_symlink() and not is_safe_symlink(file_path):
-                continue
-            
-            if not check_parent_symlinks(file_path):
-                continue
-            
-            safe_files.append(file_path)
+        # Get git-visible files (respecting .gitignore)
+        git_visible_files = _get_git_visible_files(search_dir)
+
+        # If git is available, filter files first before glob matching
+        # This is more efficient and ensures we don't hit the limit with gitignored files
+        if git_visible_files:
+            # Match pattern against git-visible files
+            safe_files = []
+
+            # Use pathspec for GitWildMatch pattern matching (handles **, *, etc. correctly)
+            if PathSpec is not None and GitWildMatchPattern is not None:
+                # Create PathSpec with GitWildMatch pattern (like .gitignore)
+                spec = PathSpec.from_lines(GitWildMatchPattern, [pattern])
+
+                for file_path in git_visible_files:
+                    try:
+                        # Convert to relative path for matching
+                        try:
+                            rel_path = file_path.relative_to(search_dir)
+                            # Use forward slashes for GitWildMatch consistency
+                            rel_path_str = path_to_llm_format(rel_path)
+                        except ValueError:
+                            # If relative_to fails, skip this file
+                            continue
+
+                        # Use pathspec GitWildMatch for correct ** and * handling
+                        if spec.match_file(rel_path_str):
+                            # Check symlink safety
+                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                                continue
+
+                            if not check_parent_symlinks(file_path):
+                                continue
+
+                            safe_files.append(file_path)
+
+                            # Apply limit
+                            if len(safe_files) >= MAX_FILES_DEFAULT:
+                                break
+                    except Exception:
+                        # Match failed, skip
+                        continue
+            else:
+                # Fallback to Path.match if pathspec is not available
+                for file_path in git_visible_files:
+                    try:
+                        if file_path.match(pattern):
+                            # Check symlink safety
+                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                                continue
+
+                            if not check_parent_symlinks(file_path):
+                                continue
+
+                            safe_files.append(file_path)
+
+                            # Apply limit
+                            if len(safe_files) >= MAX_FILES_DEFAULT:
+                                break
+                    except Exception:
+                        continue
+        else:
+            # Git is required for glob tool
+            # This ensures consistent behavior and proper .gitignore filtering
+            return error_response(
+                "Git is required for file search. "
+                "Please ensure git is installed and the directory is a git repository. "
+                "Run 'git init' if this is a new project."
+            )
         
         # Sort by modification time (newest first)
         sorted_files = _sort_by_modification_time(safe_files)
-        
+
         # Build Claude Code style response - simple file/directory path list
-        file_paths = [str(file_path) for file_path in sorted_files]
+        # Use forward slashes for LLM consistency (cross-platform)
+        file_paths = [path_to_llm_format(file_path) for file_path in sorted_files]
 
         # Build Claude Code aligned response
         total_found = len(file_paths)
 
+        # Check if results were truncated
+        truncated = len(safe_files) >= MAX_FILES_DEFAULT
+
         # Simple user-facing message - use generic "items" to include both files and directories
-        message = f"Found {total_found} matching items"
+        if truncated:
+            message = f"Found {total_found} matching items (showing first {MAX_FILES_DEFAULT}, results truncated)"
+        else:
+            message = f"Found {total_found} matching items"
 
         # Simple LLM content - just the paths, one per line
         # Provide meaningful message when no results found
         if file_paths:
             llm_content = "\n".join(file_paths)
+            if truncated:
+                llm_content += f"\n\n(Results limited to {MAX_FILES_DEFAULT} items. Use a more specific pattern or path to narrow the search.)"
         else:
             llm_content = f"No items found matching pattern '{pattern}'"
 
@@ -213,6 +265,7 @@ def glob(
             files=file_paths,
             pattern=pattern,
             total_found=total_found,
+            truncated=truncated,
         )
 
     except Exception as exc:

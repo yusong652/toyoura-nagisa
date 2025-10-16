@@ -15,12 +15,13 @@ from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import (
-    validate_path_in_workspace, 
-    WORKSPACE_ROOT, 
-    is_safe_symlink, 
+    validate_path_in_workspace,
+    WORKSPACE_ROOT,
+    is_safe_symlink,
     check_parent_symlinks
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from ..utils.constants import (
     TEXT_CHARSET_DEFAULT,
 )
@@ -153,7 +154,12 @@ Usage:
 - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
 - Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
 - The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`.
-- Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance."""
+- Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.
+
+PFC Script Guidelines (when editing .py files for PFC simulations):
+- Add print() statements for progress monitoring (visible via pfc_check_task_status)
+- Use itasca.command("model save 'name'") for checkpoint persistence
+- Export data to CSV/JSON files for post-analysis (write analysis scripts to process, don't read CSV directly)"""
 
     # ------------------------------------------------------------------
     # Parameter validation and normalization
@@ -172,6 +178,10 @@ Usage:
     # Validate inputs
     if not file_path or not file_path.strip():
         return error_response("file_path is required and cannot be empty")
+
+    # Normalize path separators for cross-platform compatibility
+    # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    file_path = normalize_path_separators(file_path.strip())
 
     # Check if old_string and new_string are the same
     if old_string == new_string:
@@ -282,11 +292,13 @@ Usage:
 
         
         # ------------------------------------------------------------------
-        # Build Claude Code aligned response  
+        # Build Claude Code aligned response
         # ------------------------------------------------------------------
 
         # Build user-facing message aligned with Claude Code format
-        message = f"The file {target_file.relative_to(WORKSPACE_ROOT)} has been updated."
+        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        abs_path = path_to_llm_format(target_file)
+        message = f"The file {abs_path} has been updated."
 
         # Build Claude Code style llm_content with file preview
         try:

@@ -142,11 +142,14 @@ class BaseToolManager(ABC):
         session_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Handle multiple function calls serially with intelligent rejection cascade.
+        Handle multiple function calls serially with intelligent cascade blocking.
 
-        Executes tools one by one, stopping subsequent tools if user rejects any tool.
-        This aligns with Claude Code's behavior where rejection of one tool cascades
-        to block remaining tools with contextual error messages.
+        Executes tools one by one, stopping subsequent tools if:
+        1. User rejects a tool → block all remaining tools
+        2. PFC tool fails → block remaining PFC tools only (stateful dependency chain)
+
+        This implements Claude Code's intelligent cascade pattern with contextual
+        error messages to help LLM understand why each tool was blocked.
 
         Args:
             function_calls: List of function call dictionaries, each containing:
@@ -162,22 +165,29 @@ class BaseToolManager(ABC):
                 - llm_content: Dict with parts structure
                 - data: Optional[Dict[str, Any]] - Tool-specific data
                 - user_rejected: Optional[bool] - True if directly rejected by user
-                - cascade_blocked: Optional[bool] - True if blocked due to earlier rejection
+                - cascade_blocked: Optional[bool] - True if blocked due to earlier failure
 
         Note:
-            Implements Claude Code's intelligent cascade pattern with different
-            messages for direct rejection vs cascade blocking, providing better
-            context to the LLM about why each tool failed.
+            PFC tools are stateful (model state persists across commands).
+            If one PFC tool fails, subsequent PFC tools will likely fail too
+            (e.g., "ball generate" requires successful "model new").
+
+            Other tools (read, write, bash) are stateless and independent,
+            so they continue executing even if PFC tools fail.
+
+            This aligns with Claude Code's behavior: tool errors don't block
+            subsequent tools, only user rejection does.
         """
         results = []
-        user_rejected_tool = None  # Track which tool was rejected
+        user_rejected_tool = None  # Track which tool was rejected by user
+        failed_pfc_tool = None  # Track which PFC tool failed
 
         for function_call in function_calls:
             tool_name = function_call.get("name", "unknown")
+            is_pfc_tool = tool_name.startswith("pfc_")
 
-            # If a previous tool was rejected, cascade block remaining tools
+            # Cascade blocking check 1: User rejection (blocks all remaining tools)
             if user_rejected_tool is not None:
-                # Use different message to indicate cascade blocking (like Claude Code)
                 from backend.infrastructure.mcp.utils.tool_result import success_response
 
                 cascade_message = f"The user doesn't want to take this action right now. Skipping {tool_name} due to previous rejection."
@@ -187,7 +197,7 @@ class BaseToolManager(ABC):
                         "parts": [{"type": "text", "text": cascade_message}]
                     }
                 )
-                cascade_result["cascade_blocked"] = True  # Different flag to distinguish from direct rejection
+                cascade_result["cascade_blocked"] = True
                 results.append(cascade_result)
 
                 llm_settings = get_llm_settings()
@@ -195,16 +205,47 @@ class BaseToolManager(ABC):
                     print(f"[BaseToolManager] Cascade blocking {tool_name} due to rejection of {user_rejected_tool}")
                 continue
 
+            # Cascade blocking check 2: PFC tool failure (blocks remaining PFC tools only)
+            if failed_pfc_tool is not None and is_pfc_tool:
+                from backend.infrastructure.mcp.utils.tool_result import error_response
+
+                cascade_message = (
+                    f"Cannot execute {tool_name}: Previous PFC tool failed ({failed_pfc_tool}). "
+                    f"PFC tools are stateful - fix the error before executing dependent PFC operations."
+                )
+                cascade_result = error_response(
+                    cascade_message,
+                    llm_content={
+                        "parts": [{"type": "text", "text": cascade_message}]
+                    }
+                )
+                cascade_result["cascade_blocked"] = True
+                results.append(cascade_result)
+
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Cascade blocking PFC tool {tool_name} due to failure of {failed_pfc_tool}")
+                continue
+
             # Execute tool normally
             result = await self.handle_function_call(function_call, session_id)
             results.append(result)
 
-            # Check if this tool was rejected by user
+            # Check cascade triggers after execution
+            # Trigger 1: User rejection (blocks all)
             if result.get('user_rejected', False):
                 user_rejected_tool = tool_name
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
                     print(f"[BaseToolManager] User rejected {tool_name}, will cascade block remaining tools")
+
+            # Trigger 2: PFC tool error (blocks PFC chain only)
+            # Note: status="pending" (background tasks) is not considered failure
+            if is_pfc_tool and result.get('status') == 'error':
+                failed_pfc_tool = tool_name
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] PFC tool {tool_name} failed, will cascade block remaining PFC tools")
 
         return results
 

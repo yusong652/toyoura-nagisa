@@ -10,10 +10,11 @@ from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 
 from ..utils.path_security import (
-    validate_path_in_workspace, 
+    validate_path_in_workspace,
     WORKSPACE_ROOT
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 
 __all__ = ["grep", "register_grep_tool"]
 
@@ -69,9 +70,10 @@ def _run_git_grep(
     context_after: Optional[int] = None,
     context_before: Optional[int] = None,
     context_both: Optional[int] = None,
+    include_untracked: bool = True,
 ) -> subprocess.CompletedProcess:
     """Run git grep with specified parameters.
-    
+
     Args:
         pattern: Search pattern
         search_path: Directory or file to search
@@ -83,11 +85,16 @@ def _run_git_grep(
         context_after: Lines to show after match
         context_before: Lines to show before match
         context_both: Lines to show before and after match
-        
+        include_untracked: Whether to search untracked files (default: True)
+
     Returns:
         CompletedProcess result from git grep
     """
     cmd = ["git", "grep"]
+
+    # Include untracked files (useful for workspace directories like pfc_workspace/)
+    if include_untracked:
+        cmd.append("--untracked")
     
     # Pattern matching flags
     if case_insensitive:
@@ -325,6 +332,10 @@ def grep(
 
     # Determine search path
     if path:
+        # Normalize path separators for cross-platform compatibility
+        # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
+        path = normalize_path_separators(path.strip())
+
         # Validate provided path
         search_path_abs = validate_path_in_workspace(path)
         if search_path_abs is None:
@@ -338,7 +349,7 @@ def grep(
         search_path = WORKSPACE_ROOT
 
     try:
-        # Run git grep
+        # Run git grep with untracked file support
         result = _run_git_grep(
             pattern=pattern,
             search_path=search_path,
@@ -350,6 +361,7 @@ def grep(
             context_after=context_after,
             context_before=context_before,
             context_both=context_both,
+            include_untracked=True,  # Search both tracked and untracked files
         )
         
         # Process git grep result

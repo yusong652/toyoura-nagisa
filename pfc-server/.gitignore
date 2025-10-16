@@ -13,3 +13,6 @@ test_*.py
 *.sav
 *.dat
 *.txt
+
+# Task persistence data (runtime)
+data/

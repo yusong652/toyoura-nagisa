@@ -13,7 +13,7 @@ WEBSOCKET_PORT = 9001        # Server port number
 
 # Ping Configuration (Long Timeout for Long-Running Tasks)
 # These values are configured to prevent disconnection during long-running
-# PFC commands like "model solve cycle 10000"
+# PFC commands like "model cycle 10000"
 
 PING_INTERVAL = 120  # Interval between ping frames (seconds)
                      # Default: 120s (2 minutes)

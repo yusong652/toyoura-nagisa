@@ -17,10 +17,11 @@ from fastmcp import FastMCP  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from ..utils.path_security import (
-    WORKSPACE_ROOT, 
-    validate_path_in_workspace, 
-    is_safe_symlink, 
+    WORKSPACE_ROOT,
+    validate_path_in_workspace,
+    is_safe_symlink,
     check_parent_symlinks
 )
 
@@ -42,21 +43,32 @@ def write(
     ),
 ) -> Dict[str, Any]:
     """Writes a file to the local filesystem.
-    
+
     Usage:
     - This tool will overwrite the existing file if there is one at the provided path.
     - If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
     - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
     - NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
     - Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.
+
+    PFC Script Guidelines (when writing .py files for PFC simulations):
+    - Add print() statements for progress monitoring (visible via pfc_check_task_status)
+    - Use itasca.command("model save 'name'") for checkpoint persistence
+    - Export data to CSV/JSON files for post-analysis (write analysis scripts to process, don't read CSV directly)
     """
 
     # ------------------------------------------------------------------
     # Parameter validation (manual to stay lightweight)
     # ------------------------------------------------------------------
-    
+
     # Fixed encoding for simplicity
     encoding = "utf-8"
+
+    # Normalize path separators for cross-platform compatibility
+    # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    if not file_path or not file_path.strip():
+        return error_response("file_path is required and cannot be empty")
+    file_path = normalize_path_separators(file_path.strip())
 
     # Validate path security
     abs_path = validate_path_in_workspace(file_path)
@@ -110,13 +122,14 @@ def write(
         lines_count = content.count('\n') + (1 if content and not content.endswith('\n') else 0)
         
         # Prepare response data
-        rel_display = abs_p.relative_to(WORKSPACE_ROOT)
-        
+        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        abs_display = path_to_llm_format(abs_p)
+
         # Create simple Claude Code-style message
         if not file_existed:
-            display_msg = f"File created successfully at: {str(rel_display)}"
+            display_msg = f"File created successfully at: {abs_display}"
         else:
-            display_msg = f"File updated successfully at: {str(rel_display)}"
+            display_msg = f"File updated successfully at: {abs_display}"
 
         return success_response(
             display_msg,
@@ -125,7 +138,7 @@ def write(
                     {"type": "text", "text": display_msg}
                 ]
             },
-            file_path=str(rel_display),
+            file_path=abs_display,
             size_bytes=size_bytes,
             lines_count=lines_count,
             file_created=not file_existed,

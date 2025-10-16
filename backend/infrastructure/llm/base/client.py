@@ -226,6 +226,17 @@ class LLMClientBase(ABC):
         # Process tool calls - add response to context manager
         context_manager.add_response(current_response)
 
+        # Save assistant message with tool_use to database
+        processor = self._get_response_processor()
+        if processor:
+            try:
+                tool_call_message = processor.format_response_for_storage(current_response)
+                from backend.shared.utils.helpers import save_assistant_message
+                save_assistant_message(tool_call_message.content, session_id)
+            except Exception as e:
+                # Log error but don't fail the execution
+                print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
+
         # Extract tool calls using response processor
         processor = self._get_response_processor()
         tool_calls = processor.extract_tool_calls(current_response) if processor else []
@@ -254,6 +265,19 @@ class LLMClientBase(ABC):
                     result,
                     inject_reminders=is_last_tool
                 )
+
+                # Save tool result to database
+                try:
+                    from backend.shared.utils.helpers import save_tool_result_message
+                    save_tool_result_message(
+                        tool_call_id=tool_call['id'],
+                        tool_name=tool_call['name'],
+                        tool_result=result,
+                        session_id=session_id
+                    )
+                except Exception as e:
+                    # Log error but don't fail the execution
+                    print(f"[WARNING] Failed to save tool result for {tool_call['name']}: {e}")
 
                 # Check if this tool was directly rejected by user (not cascade blocked)
                 # Only direct rejections trigger interruption, cascade blocks are informational

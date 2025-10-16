@@ -441,7 +441,7 @@ User: "✓ Good, ball falls correctly. State validated."
 
 # 2. CODIFICATION PHASE (Edit - write the script)
 User: "Now save this as a script"
-→ write_file(path="pfc_workspace/scripts/gravity_test.py", content='''
+→ write_file(path="pfc-server/examples/scripts/gravity_test.py", content='''
 # Validated workflow from interactive testing
 itasca.command('model new')
 itasca.command('model gravity 9.81')
@@ -456,7 +456,7 @@ result = {
 
 # 3. EXECUTION PHASE (Script - production run)
 User: "Run the full simulation"
-→ pfc_execute_script(script_path="pfc_workspace/scripts/gravity_test.py")
+→ pfc_execute_script(script_path="pfc-server/examples/scripts/gravity_test.py")
 # Runs for hours with 1000 balls and 50000 cycles
 # State was pre-validated in phase 1, script was codified in phase 2
 ```
