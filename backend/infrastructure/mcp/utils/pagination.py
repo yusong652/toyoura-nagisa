@@ -59,9 +59,15 @@ def format_paginated_output(
     # Keep chronological order (oldest to newest within the slice)
     # No reversal needed - natural time flow for better causality reasoning
 
-    # Calculate line numbers for display (0 = newest)
-    first_line_num = offset
-    last_line_num = offset + displayed_count - 1 if displayed_count > 0 else offset
+    # Calculate line numbers for display (using array indices)
+    # Line numbering: line 0 = oldest (lines[0]), line N = newest (lines[N])
+    # Example: total_lines=307, offset=290, limit=10
+    #   end_idx = 307 - 290 = 17
+    #   start_idx = 307 - 290 - 10 = 7
+    #   displayed = lines[7:17] (array indices 7-16)
+    #   Should display as "lines 7-16"
+    first_line_num = start_idx  # First array index in the slice
+    last_line_num = end_idx - 1  # Last array index in the slice
 
     # Format output
     output_text = '\n'.join(displayed) if displayed else "(no lines in range)"
