@@ -98,9 +98,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         if not hasattr(candidate, 'content') or not candidate.content:
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
         
-        # Extract thinking content and main text
+        # Extract thinking content and text parts
         thinking_parts = []
-        main_text = None
+        text_parts = []  # Collect ALL non-thinking text parts
 
         # Extract top-level thought
         if hasattr(candidate, 'thought') and candidate.thought:
@@ -113,8 +113,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     # Categorize text content
                     if getattr(part, 'thought', False):
                         thinking_parts.append(part.text)
-                    elif main_text is None:  # Capture first non-thinking text part
-                        main_text = part.text
+                    else:
+                        # Collect ALL non-thinking text parts (preserves order)
+                        text_parts.append(part.text)
                 elif hasattr(part, 'function_call') and part.function_call:
                     # Include function calls in storage format
                     func_call = part.function_call
@@ -134,12 +135,13 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     "thinking": full_thinking_content,
                 })
 
-        # Add main text content - preserve original format
-        if main_text:
-            content.append({
-                "type": "text",
-                "text": main_text  # Keep original format for proper markdown rendering
-            })
+        # Add all text parts as separate blocks (preserves multipart responses)
+        for text_part in text_parts:
+            if text_part.strip():  # Only add non-empty parts
+                content.append({
+                    "type": "text",
+                    "text": text_part  # Keep original format for proper markdown rendering
+                })
         
         # If no content was extracted, add empty text
         if not content:
@@ -235,13 +237,42 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         return sources
     
     @staticmethod
+    def extract_combined_text_from_content(content: List[Dict[str, Any]]) -> str:
+        """
+        Extract and combine all text parts from content array.
+
+        Used by frontend rendering and TTS processing to get complete text.
+        Skips thinking, tool_use, and tool_result blocks.
+
+        Args:
+            content: Message content array with multiple parts (from AssistantMessage.content)
+
+        Returns:
+            str: Combined text from all text parts
+
+        Example:
+            >>> content = [
+            ...     {"type": "text", "text": "Part 1"},
+            ...     {"type": "tool_use", "name": "read"},
+            ...     {"type": "text", "text": "Part 2"}
+            ... ]
+            >>> GeminiResponseProcessor.extract_combined_text_from_content(content)
+            'Part 1Part 2'
+        """
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get('type') == 'text':
+                text_parts.append(item.get('text', ''))
+        return ''.join(text_parts)
+
+    @staticmethod
     def has_tool_calls(response) -> bool:
         """
         Check if Gemini response contains tool calls.
-        
+
         Args:
             response: Raw Gemini API response object
-            
+
         Returns:
             bool: True if response contains tool calls
         """
