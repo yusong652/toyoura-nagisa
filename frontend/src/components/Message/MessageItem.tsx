@@ -39,13 +39,17 @@ interface MessageItemProps {
  * Returns:
  *     JSX element with complete message display including modals
  */
-const MessageItem: React.FC<MessageItemProps> = ({ 
-  message, 
-  onMessageSelect, 
-  selectedMessageId, 
-  allMessages 
+const MessageItem: React.FC<MessageItemProps> = ({
+  message,
+  onMessageSelect,
+  selectedMessageId,
+  allMessages
 }) => {
-  const { role } = message
+  const { role, content } = message
+
+  // Check if this is a tool_result message (user role with tool_result content)
+  const isToolResultMessage = role === 'user' &&
+    content?.some(block => block.type === 'tool_result')
   
   // Modal states
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -79,17 +83,23 @@ const MessageItem: React.FC<MessageItemProps> = ({
     hideAvatarTooltip()
   }
   
+  // Determine effective role for display (tool_result messages display like assistant)
+  const displayRole = isToolResultMessage ? 'tool-result' : role
+
   return (
     <>
       <div
-        className={`message ${role} ${isSelected ? 'selected' : ''}`}
+        className={`message ${displayRole} ${isSelected ? 'selected' : ''}`}
         onClick={eventHandlers.onMessageClick}
       >
-        <MessageAvatar
-          role={role}
-          onMouseEnter={handleAvatarMouseEnter}
-          onMouseLeave={handleAvatarMouseLeave}
-        />
+        {/* Hide avatar for tool_result messages */}
+        {!isToolResultMessage && (
+          <MessageAvatar
+            role={role}
+            onMouseEnter={handleAvatarMouseEnter}
+            onMouseLeave={handleAvatarMouseLeave}
+          />
+        )}
 
         {role === 'assistant' ? (
           <BotMessageRenderer

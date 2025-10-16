@@ -61,11 +61,12 @@ export const useChatMessage = ({
           if (historyData.history && Array.isArray(historyData.history)) {
             const convertedMessages: Message[] = historyData.history
               .filter((msg: any) => {
-                // Filter out tool-only messages (we'll render them as content blocks later)
-                return (msg.role === 'user' && !msg.tool_request) ||
-                       (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) ||
-                       (msg.role === 'image') ||
-                       (msg.role === 'video')
+                // Include all user, assistant, image, and video messages
+                // Tool results within user messages will be rendered as content blocks
+                return msg.role === 'user' ||
+                       msg.role === 'assistant' ||
+                       msg.role === 'image' ||
+                       msg.role === 'video'
               })
               .map((msg: any): Message | null => {
                 // ✨ Directly use backend role without mapping
@@ -115,6 +116,22 @@ export const useChatMessage = ({
                   }
                 } else if (Array.isArray(msg.content)) {
                   // 处理content数组，兼容直接text和type字段
+
+                  // Check if this is a structured message (tool_use, tool_result, thinking)
+                  const hasStructuredBlocks = msg.content.some((item: any) =>
+                    item.type === 'tool_use' ||
+                    item.type === 'tool_result' ||
+                    item.type === 'thinking'
+                  )
+
+                  // If it has structured blocks, preserve the content array
+                  if (hasStructuredBlocks) {
+                    // Don't clear content - it will be preserved below
+                  } else {
+                    // For simple text-only content arrays, extract text and clear content
+                    content = undefined
+                  }
+
                   const textContents = msg.content
                     .filter((item: any) => {
                       // 兼容两种格式：直接有text字段，或者type为text
@@ -130,7 +147,7 @@ export const useChatMessage = ({
                     if (keywordMatch) {
                       // 移除keyword标记
                       const textWithoutKeyword = rawText.replace(/\[\[\w+\]\]/g, '').trim();
-                      
+
                       if (!textWithoutKeyword) {
                         // 只有keyword，显示占位符
                         text = '...';
@@ -141,7 +158,7 @@ export const useChatMessage = ({
                     } else {
                       // 没有keyword标记
                       text = rawText;
-                      
+
                       // 兜底：如果assistant消息为空，添加占位符
                       if (!text.trim()) {
                         text = '...';
@@ -151,7 +168,7 @@ export const useChatMessage = ({
                     // 非assistant消息，直接使用原文本
                     text = rawText;
                   }
-                  
+
                   msg.content.forEach((item: any) => {
                     if (item.inline_data) {
                       files.push({
