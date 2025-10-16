@@ -657,6 +657,17 @@
   max-width: 100%;
 }
 
+/* Hide timestamp and status for tool messages */
+.message.tool-result .message-time,
+.message.tool-message .message-time {
+  display: none;
+}
+
+.message.tool-result .message-status,
+.message.tool-message .message-status {
+  display: none;
+}
+
 /* Tool Use Block Styles - Bash Terminal Style */
 .tool-use-block {
   background: #1e1e1e;
