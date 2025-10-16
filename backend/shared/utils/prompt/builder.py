@@ -17,9 +17,12 @@ from backend.infrastructure.mcp.utils.path_normalization import normalize_path_s
 logger = logging.getLogger(__name__)
 
 
-def _build_env_info() -> str:
+def _build_env_info(session_id: Optional[str] = None) -> str:
     """
     Build environment information string similar to Claude Code.
+
+    Args:
+        session_id: Optional session ID for task isolation context
 
     Returns:
         Formatted environment information block
@@ -44,6 +47,9 @@ def _build_env_info() -> str:
     # Get current date
     current_date = datetime.now().strftime("%Y-%m-%d")
 
+    # Truncate session_id to 8 characters for readability (consistent with task_id format)
+    session_id_display = session_id[:8] if session_id else 'unknown'
+
     # Format environment information (Claude Code style)
     env_info = f"""<env>
 Working directory: {working_dir}
@@ -51,6 +57,7 @@ Is directory a git repo: {'Yes' if is_git_repo else 'No'}
 Platform: {platform_name}
 OS Version: {os_version}
 Today's date: {current_date}
+session_id: {session_id_display}
 </env>"""
 
     return env_info
@@ -119,8 +126,8 @@ async def build_system_prompt(
     # This ensures LLM always sees paths in the same format (like Claude Code)
     workspace_root = normalize_path_separators(workspace_root, target_platform='linux')
 
-    # 4. Build environment information
-    env_info = _build_env_info()
+    # 4. Build environment information with session context
+    env_info = _build_env_info(session_id=session_id)
 
     # 5. Replace placeholders in base prompt
     base = base.replace("{tool_schemas}", tool_schemas_section)

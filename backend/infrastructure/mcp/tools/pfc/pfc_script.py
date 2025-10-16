@@ -82,6 +82,11 @@ def register_pfc_script_tool(mcp: FastMCP):
             For simple commands, use pfc_execute_command instead.
         """
         try:
+            # Get session ID from MCP context for task isolation
+            session_id = getattr(context, 'client_id', None) if context else None
+            if not session_id:
+                return error_response("Session ID not available")
+
             # Validate description length (LLM-friendly guidance)
             if not description or not description.strip():
                 return error_response(
@@ -113,7 +118,8 @@ def register_pfc_script_tool(mcp: FastMCP):
                 script_path=script_path,
                 description=description,
                 timeout_ms=timeout,
-                run_in_background=run_in_background
+                run_in_background=run_in_background,
+                session_id=session_id
             )
 
             # Handle result based on execution mode

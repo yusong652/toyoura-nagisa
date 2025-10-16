@@ -331,6 +331,7 @@ class PFCWebSocketClient:
         params: Optional[Dict[str, Any]] = None,
         timeout_ms: int = 30000,
         run_in_background: bool = False,
+        session_id: str = "default",
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
@@ -361,6 +362,8 @@ class PFCWebSocketClient:
             run_in_background: Background execution control (default: False - synchronous)
                 Passed to executor to control execution mode.
                 Affects WebSocket timeout: background=10s, foreground=dynamic.
+            session_id: Session identifier for task isolation (default: "default")
+                Used to separate tasks across different client sessions.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -413,6 +416,7 @@ class PFCWebSocketClient:
                 message = {
                     "type": "command",
                     "request_id": request_id,
+                    "session_id": session_id,
                     "command": command,
                     "arg": arg,
                     "params": params,
@@ -466,6 +470,7 @@ class PFCWebSocketClient:
         description: str,
         timeout_ms: Optional[int] = None,
         run_in_background: bool = True,
+        session_id: str = "default",
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
@@ -486,6 +491,8 @@ class PFCWebSocketClient:
             run_in_background: Background execution control (default: True - asynchronous)
                 Passed to executor to control execution mode.
                 Affects WebSocket timeout calculation.
+            session_id: Session identifier for task isolation (default: "default")
+                Used to separate tasks across different client sessions.
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
         Returns:
@@ -541,6 +548,7 @@ class PFCWebSocketClient:
                 message = {
                     "type": "script",
                     "request_id": request_id,
+                    "session_id": session_id,
                     "script_path": script_path,
                     "description": description,
                     "timeout_ms": timeout_ms,
@@ -684,13 +692,19 @@ class PFCWebSocketClient:
 
     async def list_tasks(
         self,
+        session_id: Optional[str] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
         timeout: float = 10.0,
         max_retries: int = 2
     ) -> Dict[str, Any]:
         """
-        List all tracked long-running tasks.
+        List all tracked long-running tasks with pagination support.
 
         Args:
+            session_id: Optional session ID to filter tasks (None = all sessions)
+            offset: Skip N most recent tasks (0 = most recent, default: 0)
+            limit: Maximum tasks to return (None = all tasks, default: None)
             timeout: Query timeout in seconds (default: 10.0)
             max_retries: Maximum retry attempts on connection failure (default: 2)
 
@@ -700,11 +714,17 @@ class PFCWebSocketClient:
                 - request_id: str - Unique request identifier
                 - status: "success" - Always success (empty list if no tasks)
                 - message: str - Summary message
-                - data: List[Dict] - List of task info dictionaries:
+                - data: List[Dict] - List of task info dictionaries (paginated):
                     - task_id: str
                     - command: str
                     - status: Literal["running", "completed", "failed"]
                     - elapsed_time: float
+                - pagination: Pagination metadata:
+                    - total_count: Total tasks available
+                    - displayed_count: Tasks in this response
+                    - offset: Current offset
+                    - limit: Current limit
+                    - has_more: Whether more tasks exist
 
         Raises:
             ConnectionError: If connection to PFC server fails after retries
@@ -735,10 +755,13 @@ class PFCWebSocketClient:
 
                 request_id = str(uuid4())
 
-                # Create list tasks message
+                # Create list tasks message with pagination
                 message = {
                     "type": "list_tasks",
-                    "request_id": request_id
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "offset": offset,
+                    "limit": limit
                 }
 
                 # Create future for result

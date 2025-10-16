@@ -182,8 +182,15 @@ class PFCWebSocketServer:
                     elif msg_type == "list_tasks":
                         # List all tracked long-running tasks (not a PFC command, uses task manager directly)
                         request_id = data.get("request_id", "unknown")
+                        session_id = data.get("session_id")  # Optional session filter
+                        offset = data.get("offset", 0)  # Skip N most recent tasks
+                        limit = data.get("limit")  # Max tasks to return (None = all)
 
-                        result = self.task_manager.list_all_tasks()
+                        result = self.task_manager.list_all_tasks(
+                            session_id=session_id,
+                            offset=offset,
+                            limit=limit
+                        )
 
                         # Send result back
                         response = {

@@ -89,6 +89,11 @@ def register_pfc_tools(mcp: FastMCP):
             use pfc_execute_script instead.
         """
         try:
+            # Get session ID from MCP context for task isolation
+            session_id = getattr(context, 'client_id', None) if context else None
+            if not session_id:
+                return error_response("Session ID not available")
+
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
@@ -99,7 +104,8 @@ def register_pfc_tools(mcp: FastMCP):
                 arg=arg,
                 params=params or {},
                 timeout_ms=timeout,
-                run_in_background=run_in_background
+                run_in_background=run_in_background,
+                session_id=session_id
             )
 
             # Build display command string for logging

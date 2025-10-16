@@ -54,6 +54,9 @@ def register_pfc_task_status_tool(mcp: FastMCP):
         are tracked until server restart. Use pfc_list_tasks to find task IDs.
         """
         try:
+            # Get current session ID from context (for ownership marking)
+            current_session_id = getattr(context, 'client_id', 'unknown')
+
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
@@ -85,6 +88,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 description = data.get("description", "")
                 script_path = data.get("script_path", "unknown")
                 start_time = data.get("start_time")
+                task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -100,9 +104,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 # Format time info (start time only for running tasks)
                 time_info = format_time_range(start_time)
 
+                # Build session marker (same pattern as pfc_list_tasks)
+                if task_session_id == current_session_id:
+                    session_marker = " [Your task]"
+                else:
+                    task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
+                    session_marker = f" [Session: {task_session_id_display}]"
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"⏳ Running | Task ID: {task_id} | {time_info}\n"
+                    f"⏳ Running | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"📊 Output: {pagination['total_lines']} lines total | "
@@ -138,6 +149,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 script_path = data.get("script_path", "unknown")
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
+                task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -153,9 +165,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 # Format time info (start to end time range)
                 time_info = format_time_range(start_time, end_time)
 
+                # Build session marker (same pattern as pfc_list_tasks)
+                if task_session_id == current_session_id:
+                    session_marker = " [Your task]"
+                else:
+                    task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
+                    session_marker = f" [Session: {task_session_id_display}]"
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✓ Completed | Task ID: {task_id} | {time_info}\n"
+                    f"✓ Completed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Result: {task_result}\n"
@@ -192,6 +211,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 script_path = data.get("script_path", "unknown")
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
+                task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
                 output_text, pagination = format_paginated_output(output, offset, limit)
@@ -207,9 +227,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 # Format time info (start to end time range)
                 time_info = format_time_range(start_time, end_time)
 
+                # Build session marker (same pattern as pfc_list_tasks)
+                if task_session_id == current_session_id:
+                    session_marker = " [Your task]"
+                else:
+                    task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
+                    session_marker = f" [Session: {task_session_id_display}]"
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✗ Failed | Task ID: {task_id} | {time_info}\n"
+                    f"✗ Failed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Error: {error_msg}\n"

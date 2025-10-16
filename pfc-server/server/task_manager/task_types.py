@@ -57,6 +57,7 @@ class CommandTask(Task):
                 ),
                 "data": {
                     "task_id": self.task_id,
+                    "session_id": self.session_id,
                     "task_type": self.task_type,
                     "description": self.description,
                     "elapsed_time": elapsed_time
@@ -95,6 +96,8 @@ class CommandTask(Task):
             response_data = serialized_result if isinstance(serialized_result, dict) else {}
             if not isinstance(response_data, dict):
                 response_data = {"result": serialized_result}
+            response_data["task_id"] = self.task_id
+            response_data["session_id"] = self.session_id
             response_data["elapsed_time"] = elapsed_time
 
             return {
@@ -115,7 +118,7 @@ class CommandTask(Task):
             return {
                 "status": "error",
                 "message": message,
-                "data": {"error": error_msg, "elapsed_time": elapsed_time}
+                "data": {"task_id": self.task_id, "session_id": self.session_id, "error": error_msg, "elapsed_time": elapsed_time}
             }
 
     def get_task_info(self):
@@ -123,6 +126,7 @@ class CommandTask(Task):
         """Get command task summary for listing."""
         info = {
             "task_id": self.task_id,
+            "session_id": self.session_id,
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
@@ -190,6 +194,7 @@ class ScriptTask(Task):
 
             response_data = {
                 "task_id": self.task_id,
+                "session_id": self.session_id,
                 "task_type": self.task_type,
                 "script_name": self.script_name,
                 "script_path": self.script_path,
@@ -259,6 +264,7 @@ class ScriptTask(Task):
             # Build unified response data with all metadata
             response_data = {
                 "task_id": self.task_id,
+                "session_id": self.session_id,
                 "task_type": self.task_type,
                 "script_name": self.script_name,
                 "script_path": self.script_path,
@@ -301,6 +307,7 @@ class ScriptTask(Task):
             # Build unified error data with all metadata
             error_data = {
                 "task_id": self.task_id,
+                "session_id": self.session_id,
                 "task_type": self.task_type,
                 "script_name": self.script_name,
                 "script_path": self.script_path,
@@ -323,6 +330,7 @@ class ScriptTask(Task):
         """Get script task summary for listing."""
         info = {
             "task_id": self.task_id,
+            "session_id": self.session_id,
             "task_type": self.task_type,
             "description": self.description,  # Agent-provided task description
             "status": self.status,

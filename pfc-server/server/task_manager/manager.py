@@ -148,38 +148,77 @@ class TaskManager:
 
         return task.get_status_response()
 
-    def list_all_tasks(self, session_id=None):
-        # type: (Optional[str]) -> Dict[str, Any]
+    def list_all_tasks(self, session_id=None, offset=0, limit=None):
+        # type: (Optional[str], int, Optional[int]) -> Dict[str, Any]
         """
-        List currently tracked tasks, optionally filtered by session.
+        List currently tracked tasks, optionally filtered by session with pagination.
 
         Args:
             session_id: Optional session ID to filter tasks
+            offset: Skip N most recent tasks (0 = most recent, default: 0)
+            limit: Maximum tasks to return (None = all tasks, default: None)
 
         Returns:
             Dict with task list:
                 - status: "success"
                 - message: Summary message
-                - data: List of task info dictionaries
+                - data: List of task info dictionaries (paginated)
+                - pagination: Pagination metadata
+                    - total_count: Total tasks available
+                    - displayed_count: Tasks in this response
+                    - offset: Current offset
+                    - limit: Current limit
+                    - has_more: Whether more tasks exist
         """
         # Filter tasks by session if specified
+        # Support both full UUID and 8-char prefix matching
         if session_id:
             filtered_tasks = [
                 task for task in self.tasks.values()
-                if task.session_id == session_id
+                if task.session_id == session_id or task.session_id.startswith(session_id)
             ]
-            tasks_info = [task.get_task_info() for task in filtered_tasks]
-            message = "Found {} tracked task(s) for session {}".format(
-                len(tasks_info), session_id
+        else:
+            filtered_tasks = list(self.tasks.values())
+
+        # Sort by start_time descending (most recent first)
+        sorted_tasks = sorted(
+            filtered_tasks,
+            key=lambda t: t.start_time,
+            reverse=True
+        )
+
+        # Apply pagination
+        total_count = len(sorted_tasks)
+        start_idx = offset
+        end_idx = start_idx + limit if limit else total_count
+
+        paginated_tasks = sorted_tasks[start_idx:end_idx]
+        tasks_info = [task.get_task_info() for task in paginated_tasks]
+
+        # Build message
+        if session_id:
+            message = "Found {} tracked task(s) for session {} (showing {} of {})".format(
+                len(tasks_info), session_id, len(tasks_info), total_count
             )
         else:
-            tasks_info = [task.get_task_info() for task in self.tasks.values()]
-            message = "Found {} tracked task(s) across all sessions".format(len(tasks_info))
+            message = "Found {} tracked task(s) across all sessions (showing {} of {})".format(
+                total_count, len(tasks_info), total_count
+            )
+
+        # Pagination metadata
+        pagination = {
+            "total_count": total_count,
+            "displayed_count": len(tasks_info),
+            "offset": offset,
+            "limit": limit,
+            "has_more": end_idx < total_count
+        }
 
         return {
             "status": "success",
             "message": message,
-            "data": tasks_info
+            "data": tasks_info,
+            "pagination": pagination
         }
 
     def cleanup_completed_tasks(self, session_id=None):
@@ -198,10 +237,11 @@ class TaskManager:
             int: Number of tasks cleaned up
         """
         if session_id:
-            # Clean up specific session
+            # Clean up specific session (support both full UUID and 8-char prefix)
             tasks_to_remove = [
                 task_id for task_id, task in self.tasks.items()
-                if task.session_id == session_id and task.status in ["completed", "failed"]
+                if (task.session_id == session_id or task.session_id.startswith(session_id))
+                and task.status in ["completed", "failed"]
             ]
         else:
             # Clean up all sessions
