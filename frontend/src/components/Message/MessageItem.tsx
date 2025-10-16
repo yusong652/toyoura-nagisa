@@ -47,6 +47,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const { role, content } = message
 
+  // Check if this message contains tool-related content blocks
+  const hasToolContent = content?.some(block =>
+    block.type === 'tool_use' ||
+    block.type === 'tool_result' ||
+    block.type === 'thinking'
+  )
+
   // Check if this is a tool_result message (user role with tool_result content)
   const isToolResultMessage = role === 'user' &&
     content?.some(block => block.type === 'tool_result')
@@ -83,8 +90,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
     hideAvatarTooltip()
   }
   
-  // Determine effective role for display (tool_result messages display like assistant)
-  const displayRole = isToolResultMessage ? 'tool-result' : role
+  // Determine effective role for display
+  let displayRole = role
+  if (isToolResultMessage) {
+    displayRole = 'tool-result'
+  } else if (hasToolContent) {
+    displayRole = 'tool-message'
+  }
 
   return (
     <>

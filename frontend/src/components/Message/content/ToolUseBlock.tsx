@@ -25,25 +25,21 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   return (
     <div className="tool-use-block">
       <div className="tool-use-header">
-        <div className="tool-use-icon">🔧</div>
-        <div className="tool-use-info">
-          <div className="tool-use-name">{block.name}</div>
-          {block.id && <div className="tool-use-id">ID: {block.id}</div>}
-        </div>
+        <span className="tool-use-prompt">$</span>
+        <span className="tool-use-name">{block.name}</span>
         {hasInput && (
           <button
             className="tool-use-toggle"
             onClick={() => setIsExpanded(!isExpanded)}
             aria-label={isExpanded ? 'Collapse parameters' : 'Expand parameters'}
           >
-            {isExpanded ? '▼' : '▶'}
+            {isExpanded ? '−' : '+'}
           </button>
         )}
       </div>
 
       {hasInput && isExpanded && (
         <div className="tool-use-input">
-          <div className="tool-use-input-label">Parameters:</div>
           <pre className="tool-use-input-content">
             {JSON.stringify(block.input, null, 2)}
           </pre>

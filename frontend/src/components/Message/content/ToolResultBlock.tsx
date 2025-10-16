@@ -36,22 +36,15 @@ const ToolResultBlock: React.FC<ToolResultBlockProps> = ({ block }) => {
   return (
     <div className={`tool-result-block ${block.is_error ? 'error' : 'success'}`}>
       <div className="tool-result-header">
-        <div className="tool-result-icon">
-          {block.is_error ? '❌' : '✅'}
-        </div>
-        <div className="tool-result-info">
-          <div className="tool-result-name">{block.tool_name}</div>
-          <div className="tool-result-status">
-            {block.is_error ? 'Error' : 'Success'}
-          </div>
-        </div>
+        <span className="tool-result-prompt">{block.is_error ? '✗' : '✓'}</span>
+        <span className="tool-result-name">{block.tool_name}</span>
         {isLongContent && (
           <button
             className="tool-result-toggle"
             onClick={() => setIsExpanded(!isExpanded)}
             aria-label={isExpanded ? 'Collapse result' : 'Expand result'}
           >
-            {isExpanded ? '▼' : '▶'}
+            {isExpanded ? '−' : '+'}
           </button>
         )}
       </div>

@@ -27,13 +27,13 @@ const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ block }) => {
         className="thinking-header"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="thinking-icon">💭</div>
-        <div className="thinking-title">Thinking...</div>
+        <span className="thinking-prompt">#</span>
+        <span className="thinking-title">thinking</span>
         <button
           className="thinking-toggle"
           aria-label={isExpanded ? 'Collapse thinking' : 'Expand thinking'}
         >
-          {isExpanded ? '▼' : '▶'}
+          {isExpanded ? '−' : '+'}
         </button>
       </div>
 
