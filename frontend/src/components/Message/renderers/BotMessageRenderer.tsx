@@ -50,12 +50,12 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
           )}
           
           {hasFiles && (
-            <MessageFiles 
+            <MessageFiles
               files={files}
               isLoading={isLoading || false}
               onImageClick={onImageClick}
               onVideoClick={onVideoClick}
-              sender="bot"
+              role="assistant"
             />
           )}
           

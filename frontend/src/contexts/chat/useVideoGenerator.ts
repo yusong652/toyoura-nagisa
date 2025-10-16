@@ -78,7 +78,7 @@ export const useVideoGenerator = ({
 
               const videoMessage: Message = {
                 id: lastVideoMessage.id || uuidv4(),
-                sender: 'bot',
+                role: 'assistant',  // ✨ Use role instead of sender: 'bot'
                 text: lastVideoMessage.content || '',
                 timestamp: new Date(lastVideoMessage.timestamp || Date.now()).getTime(),
                 files: [{

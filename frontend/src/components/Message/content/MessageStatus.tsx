@@ -4,20 +4,20 @@ import { MessageStatusProps } from '../types'
 
 /**
  * Message status indicator component.
- * 
+ *
  * Displays message delivery status for user messages with appropriate styling.
- * Only renders for user messages as bot messages don't need status indicators.
- * 
+ * Only renders for user messages as assistant messages don't need status indicators.
+ *
  * Args:
  *     status: Message status enum (SENDING, SENT, READ, ERROR)
- *     sender: Message sender type ('user' | 'bot')
- * 
+ *     role: Message role type (MessageRole)
+ *
  * Returns:
- *     JSX element with status indicator or null for bot messages
+ *     JSX element with status indicator or null for assistant messages
  */
-const MessageStatusComponent: React.FC<MessageStatusProps> = ({ status, sender }) => {
+const MessageStatusComponent: React.FC<MessageStatusProps> = ({ status, role }) => {
   // Only show status for user messages
-  if (sender !== 'user') return null
+  if (role !== 'user') return null
   
   let statusText = ''
   let statusClass = ''

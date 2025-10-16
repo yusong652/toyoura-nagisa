@@ -4,17 +4,17 @@ import { MessageFilesProps } from '../types'
 
 /**
  * Message files container component.
- * 
+ *
  * Manages the display of file attachments in messages including images,
  * videos, and documents with appropriate preview components.
- * 
+ *
  * Args:
  *     files: Array of file objects to display
  *     isLoading: Whether message is currently loading
  *     onImageClick: Image click handler for viewer
  *     onVideoClick: Optional video click handler for player
- *     sender: Message sender type for context
- * 
+ *     role: Message role type for context
+ *
  * Returns:
  *     JSX element with file previews or null if no files/loading
  */
@@ -23,7 +23,7 @@ const MessageFiles: React.FC<MessageFilesProps> = ({
   isLoading,
   onImageClick,
   onVideoClick,
-  sender
+  role
 }) => {
   if (!files || files.length === 0 || isLoading) return null
   
@@ -35,7 +35,7 @@ const MessageFiles: React.FC<MessageFilesProps> = ({
           file={file}
           onImageClick={onImageClick}
           onVideoClick={onVideoClick}
-          sender={sender}
+          role={role}
         />
       ))}
     </div>

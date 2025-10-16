@@ -1,45 +1,176 @@
+/**
+ * Chat message types and interfaces.
+ *
+ * This module defines the core message structure used throughout the application,
+ * now unified with backend role naming conventions.
+ */
+
+// =====================
+// Message Role Types
+// =====================
+
+/**
+ * Message role type - unified with backend standards.
+ *
+ * Aligned with LLM API conventions (OpenAI, Anthropic, Google):
+ * - 'user': User-generated messages
+ * - 'assistant': AI assistant responses
+ * - 'image': System-generated image messages
+ * - 'video': System-generated video messages
+ */
+export type MessageRole = 'user' | 'assistant' | 'image' | 'video';
+
+// =====================
+// Content Block Types
+// =====================
+
+/**
+ * Union type for all content block variants.
+ *
+ * Messages can contain structured content blocks for multimodal support,
+ * including text, tool calls, tool results, and thinking processes.
+ */
+export type ContentBlock =
+  | TextBlock
+  | ToolUseBlock
+  | ToolResultBlock
+  | ThinkingBlock;
+
+/**
+ * Plain text content block.
+ */
+export interface TextBlock {
+  type: 'text';
+  text: string;
+}
+
+/**
+ * Tool invocation block (function call).
+ *
+ * Represents an AI assistant's decision to call a tool/function.
+ */
+export interface ToolUseBlock {
+  type: 'tool_use';
+  id: string | null;
+  name: string;
+  input: Record<string, any>;
+}
+
+/**
+ * Tool execution result block.
+ *
+ * Contains the output from a tool execution, returned as a user message.
+ */
+export interface ToolResultBlock {
+  type: 'tool_result';
+  tool_use_id: string | null;
+  tool_name: string;
+  content: {
+    parts: Array<{ type: string; text: string }>;
+  };
+  is_error: boolean;
+}
+
+/**
+ * AI thinking/reasoning block.
+ *
+ * Contains internal reasoning process from models with extended thinking.
+ */
+export interface ThinkingBlock {
+  type: 'thinking';
+  thinking: string;
+}
+
+// =====================
+// Message Interface
+// =====================
+
+/**
+ * Core message interface.
+ *
+ * Represents a single message in the chat, supporting both simple text
+ * and structured multimodal content.
+ *
+ * Key changes from previous version:
+ * - `sender` replaced with `role` to match backend naming
+ * - Added `content` field for structured content blocks
+ * - Maintained backward compatibility for simple text messages
+ */
 export interface Message {
   id: string;
-  sender: 'user' | 'bot';
-  text: string;
+  role: MessageRole;              // ✨ Unified field name (was: sender)
+  text: string;                    // Simple text content (compatibility)
+  content?: ContentBlock[];        // Structured content blocks (multimodal)
   files?: FileData[];
   timestamp: number;
-  streaming?: boolean; // 标记是否正在流式显示文本
-  status?: MessageStatus; // 用户消息状态
-  isLoading?: boolean; // 标记是否为加载中的消息
-  isRead?: boolean; // 标记用户消息是否已读
-  newText?: string; // 新增的文本部分，用于流式显示
-  onRenderComplete?: () => void; // 渲染完成的回调函数
-  toolState?: MessageToolState;
+  streaming?: boolean;             // Marks if text is streaming
+  status?: MessageStatus;          // User message status
+  isLoading?: boolean;             // Marks loading state
+  isRead?: boolean;                // Marks if user message was read
+  newText?: string;                // New text portion for streaming
+  onRenderComplete?: () => void;   // Render completion callback
+  toolState?: MessageToolState;    // Real-time tool execution state
 }
 
-// 消息状态枚举
+// =====================
+// Supporting Types
+// =====================
+
+/**
+ * Message status enumeration.
+ *
+ * Tracks the lifecycle of a user message from creation to API processing.
+ */
 export enum MessageStatus {
-  SENDING = 'sending', // 正在发送
-  SENT = 'sent',       // 已发送到后端
-  READ = 'read',       // 后端已传给LLM API
-  ERROR = 'error'      // 发送出错
+  SENDING = 'sending', // Being sent to backend
+  SENT = 'sent',       // Successfully sent to backend
+  READ = 'read',       // Passed to LLM API by backend
+  ERROR = 'error'      // Sending failed
 }
 
-// 消息中的工具状态
+/**
+ * Real-time tool execution state.
+ *
+ * Used to display live tool usage indicators during message streaming.
+ * This is separate from tool blocks in content (which are for persistence).
+ */
 export interface MessageToolState {
   isUsingTool: boolean;
-  toolNames?: string[]; // 工具名称数组，支持单个和多个工具
+  toolNames?: string[];            // Tool name array for single/multiple tools
   action?: string;
-  thinking?: string; // AI thinking content
+  thinking?: string;               // AI thinking content
 }
 
+/**
+ * File attachment data.
+ *
+ * Represents files uploaded with user messages.
+ */
 export interface FileData {
   name: string;
   type: string;
-  data: string; // Base64编码的文件数据
+  data: string;                    // Base64-encoded file data
 }
 
+// =====================
+// Chat Context Types
+// =====================
+
+/**
+ * Chat state interface.
+ *
+ * Represents the current state of the chat session.
+ */
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
 }
 
+/**
+ * Chat context type.
+ *
+ * Defines the complete chat context API available to components.
+ */
 export interface ChatContextType extends ChatState {
   sendMessage: (text: string, files?: FileData[]) => Promise<void>;
   clearChat: () => void;
@@ -47,4 +178,4 @@ export interface ChatContextType extends ChatState {
   generateImage: (sessionId: string) => Promise<{ success: boolean; image_path?: string; error?: string }>;
   generateVideo: (sessionId: string, motionStyle?: string) => Promise<{ success: boolean; video_path?: string; error?: string }>;
   addVideoMessage: (videoPath: string, content?: string) => string;
-} 
+}

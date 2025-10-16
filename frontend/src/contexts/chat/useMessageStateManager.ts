@@ -113,7 +113,7 @@ export const useMessageStateManager = ({
   const addImageMessage = useCallback((imageData: any) => {
     const imageMessage: Message = {
       id: imageData.id || imageData.message_id,
-      sender: 'bot',
+      role: 'assistant',  // ✨ Use role instead of sender: 'bot'
       text: imageData.content || '',
       timestamp: new Date(imageData.timestamp || Date.now()).getTime(),
       files: [{

@@ -45,7 +45,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   selectedMessageId, 
   allMessages 
 }) => {
-  const { sender } = message
+  const { role } = message
   
   // Modal states
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -72,7 +72,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   
   // Avatar event handlers
   const handleAvatarMouseEnter = (e: React.MouseEvent<HTMLImageElement>) => {
-    showAvatarTooltip(e, sender)
+    showAvatarTooltip(e, role)
   }
   
   const handleAvatarMouseLeave = () => {
@@ -81,17 +81,17 @@ const MessageItem: React.FC<MessageItemProps> = ({
   
   return (
     <>
-      <div 
-        className={`message ${sender} ${isSelected ? 'selected' : ''}`}
+      <div
+        className={`message ${role} ${isSelected ? 'selected' : ''}`}
         onClick={eventHandlers.onMessageClick}
       >
         <MessageAvatar
-          sender={sender}
+          role={role}
           onMouseEnter={handleAvatarMouseEnter}
           onMouseLeave={handleAvatarMouseLeave}
         />
-        
-        {sender === 'bot' ? (
+
+        {role === 'assistant' ? (
           <BotMessageRenderer
             message={message}
             isSelected={isSelected}
@@ -108,9 +108,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
           />
         )}
         
-        <MessageStatusComponent 
+        <MessageStatusComponent
           status={message.status}
-          sender={sender}
+          role={role}
         />
         
         <MessageActions

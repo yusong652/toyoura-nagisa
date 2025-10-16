@@ -1,35 +1,36 @@
 import React from 'react'
+import { MessageRole } from '../../../types/chat'
 
 /**
  * Avatar tooltip utility functions.
- * 
+ *
  * Provides helper functions for showing and hiding avatar tooltips with
- * sender-specific information and positioning logic.
+ * role-specific information and positioning logic.
  */
 
 /**
  * Show avatar tooltip on hover.
- * 
- * Creates and positions a tooltip element with sender information.
- * 
+ *
+ * Creates and positions a tooltip element with role information.
+ *
  * Args:
  *     e: Mouse event from avatar hover
- *     sender: Message sender type for content determination
+ *     role: Message role type for content determination
  */
-export const showAvatarTooltip = (e: React.MouseEvent<HTMLImageElement>, sender: 'user' | 'bot') => {
+export const showAvatarTooltip = (e: React.MouseEvent<HTMLImageElement>, role: MessageRole) => {
   const tooltip = document.createElement('div')
   tooltip.className = 'avatar-tooltip'
-  
-  if (sender === 'user') {
+
+  if (role === 'user') {
     tooltip.textContent = 'User\nName：yusong\nIntroduction： developer of aiNagisa.'
   } else {
     tooltip.textContent = 'Toyoura Nagisa\nPersonality: Energetic, cute, clingy\nHobbies: Chatting with you, being adorable\nBio: Nagisa is your AI virtual companion who loves to keep you company and interact with you!'
   }
-  
+
   document.body.appendChild(tooltip)
   const rect = e.currentTarget.getBoundingClientRect()
-  
-  if (sender === 'user') {
+
+  if (role === 'user') {
     tooltip.style.left = `${rect.left - tooltip.offsetWidth - 10}px`
     tooltip.style.top = `${rect.top - 10}px`
   } else {

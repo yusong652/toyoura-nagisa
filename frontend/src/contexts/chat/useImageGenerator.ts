@@ -38,7 +38,7 @@ export const useImageGenerator = ({
             if (lastImageMessage) {
               const imageMessage: Message = {
                 id: lastImageMessage.id || uuidv4(),
-                sender: 'bot',
+                role: 'assistant',  // ✨ Use role instead of sender: 'bot'
                 text: lastImageMessage.content || '',
                 timestamp: new Date(lastImageMessage.timestamp || Date.now()).getTime(),
                 files: [{

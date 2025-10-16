@@ -30,11 +30,11 @@ const UserMessageRenderer: React.FC<UserMessageRendererProps> = ({
       <MessageText content={text || ''} />
       
       {files && files.length > 0 && !isLoading && (
-        <MessageFiles 
+        <MessageFiles
           files={files}
           isLoading={isLoading}
           onImageClick={onImageClick}
-          sender="user"
+          role="user"
         />
       )}
       
