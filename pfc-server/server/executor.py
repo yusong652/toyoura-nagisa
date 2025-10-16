@@ -79,8 +79,8 @@ class PFCCommandExecutor:
             # Re-raise to be handled by async wrapper
             raise
 
-    async def execute_command(self, command, arg=None, params=None, timeout_ms=DEFAULT_COMMAND_TIMEOUT_MS, run_in_background=False):
-        # type: (str, Any, Optional[Dict[str, Any]], int, bool) -> Dict[str, Any]
+    async def execute_command(self, session_id, command, arg=None, params=None, timeout_ms=DEFAULT_COMMAND_TIMEOUT_MS, run_in_background=False):
+        # type: (str, str, Any, Optional[Dict[str, Any]], int, bool) -> Dict[str, Any]
         """
         Execute a native PFC command via main thread queue with flexible execution control.
 
@@ -93,6 +93,7 @@ class PFCCommandExecutor:
         - Asynchronous (run_in_background=True): Return task_id immediately, query via check_task_status()
 
         Args:
+            session_id: Session identifier for task isolation and persistence
             command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
             arg: Optional single positional argument (value without keyword) using native Python types
                 Supported types: bool, int, float, str, tuple
@@ -173,14 +174,15 @@ class PFCCommandExecutor:
 
             if run_in_background:
                 # Asynchronous execution: register with task manager and return immediately
-                task_id = self.task_manager.create_command_task(future, cmd_str)
+                task_id = self.task_manager.create_command_task(session_id, future, cmd_str)
 
                 return {
                     "status": "pending",
                     "message": "Command submitted as background task: {}\nUse check_task_status tool to query progress.".format(cmd_str),
                     "data": {
                         "task_id": task_id,
-                        "command": cmd_str
+                        "command": cmd_str,
+                        "session_id": session_id
                     }
                 }
 

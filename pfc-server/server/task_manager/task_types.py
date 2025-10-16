@@ -24,20 +24,24 @@ class CommandTask(Task):
     commands that return results directly.
     """
 
-    def __init__(self, task_id, future, command):
-        # type: (str, Any, str) -> None
+    def __init__(self, task_id, session_id, future, command, on_status_change=None):
+        # type: (str, str, Any, str, Any) -> None
         """
         Initialize command task.
 
         Args:
             task_id: Unique task identifier
+            session_id: Session identifier for task isolation
             future: asyncio Future object for the task
             command: PFC command string being executed
+            on_status_change: Optional callback function(task) called when task status changes
         """
-        super(CommandTask, self).__init__(task_id, future, command, "command")
+        super(CommandTask, self).__init__(task_id, session_id, future, command, "command", on_status_change)
         self.command = command
 
-        logger.info("✓ Command task registered: {} (ID: {})".format(command, task_id))
+        logger.info("✓ Command task registered: {} (ID: {}, Session: {})".format(
+            command, task_id, session_id
+        ))
 
     def get_status_response(self):
         # type: () -> Dict[str, Any]
@@ -140,26 +144,30 @@ class ScriptTask(Task):
     suitable for long-running simulations with progress monitoring.
     """
 
-    def __init__(self, task_id, future, script_name, script_path=None, output_buffer=None, description=None):
-        # type: (str, Any, str, Optional[str], Any, Optional[str]) -> None
+    def __init__(self, task_id, session_id, future, script_name, script_path=None, output_buffer=None, description=None, on_status_change=None):
+        # type: (str, str, Any, str, Optional[str], Any, Optional[str], Any) -> None
         """
         Initialize script task.
 
         Args:
             task_id: Unique task identifier
+            session_id: Session identifier for task isolation
             future: asyncio Future object for the task
             script_name: Name of the script file (e.g., "simulation.py")
             script_path: Optional full path to script for reference
             output_buffer: Optional StringIO buffer for real-time output capture
             description: Task description from PFC agent (LLM-provided)
+            on_status_change: Optional callback function(task) called when task status changes
         """
         # Use agent-provided description directly
-        super(ScriptTask, self).__init__(task_id, future, description, "script")
+        super(ScriptTask, self).__init__(task_id, session_id, future, description, "script", on_status_change)
         self.script_name = script_name
         self.script_path = script_path
         self.output_buffer = output_buffer
 
-        logger.info("✓ Script task registered: {} (ID: {})".format(script_name, task_id))
+        logger.info("✓ Script task registered: {} (ID: {}, Session: {})".format(
+            script_name, task_id, session_id
+        ))
 
     def get_current_output(self):
         # type: () -> Optional[str]

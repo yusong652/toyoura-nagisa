@@ -174,8 +174,8 @@ class PFCScriptExecutor:
             # Always restore stdout
             sys.stdout = old_stdout
 
-    async def execute_script(self, script_path, description, timeout_ms=None, run_in_background=True):
-        # type: (str, str, Optional[int], bool) -> Dict[str, Any]
+    async def execute_script(self, session_id, script_path, description, timeout_ms=None, run_in_background=True):
+        # type: (str, str, str, Optional[int], bool) -> Dict[str, Any]
         """
         Execute Python script with flexible execution control.
 
@@ -184,6 +184,7 @@ class PFCScriptExecutor:
         - Synchronous (run_in_background=False): Wait for completion, return result with timeout
 
         Args:
+            session_id: Session identifier for task isolation and persistence
             script_path: Absolute path to Python script file
                 Example: "/path/to/pfc_project/scripts/analyze_balls.py"
             description: Task description from PFC agent (LLM-provided)
@@ -277,6 +278,7 @@ class PFCScriptExecutor:
 
                 submit_time = time.time()
                 task_id = self.task_manager.create_script_task(
+                    session_id,
                     future,
                     script_name,
                     script_path,
@@ -307,6 +309,7 @@ class PFCScriptExecutor:
 
                 # Register task BEFORE waiting (enables output caching and post-query)
                 task_id = self.task_manager.create_script_task(
+                    session_id,
                     future,
                     script_name,
                     script_path,

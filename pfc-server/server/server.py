@@ -98,13 +98,14 @@ class PFCWebSocketServer:
                     if msg_type == "command":
                         # Execute command
                         request_id = data.get("request_id", "unknown")
+                        session_id = data.get("session_id", "default")  # Session ID for task isolation
                         command = data.get("command", "")
                         arg = data.get("arg")  # Single positional argument (can be None)
                         params = data.get("params", {})
                         timeout_ms = data.get("timeout_ms", 30000)  # Default 30 seconds
                         run_in_background = data.get("run_in_background", False)  # Default synchronous
 
-                        result = await self.executor.execute_command(command, arg, params, timeout_ms, run_in_background)
+                        result = await self.executor.execute_command(session_id, command, arg, params, timeout_ms, run_in_background)
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:
@@ -127,12 +128,13 @@ class PFCWebSocketServer:
                     elif msg_type == "script":
                         # Execute Python script from file path
                         request_id = data.get("request_id", "unknown")
+                        session_id = data.get("session_id", "default")  # Session ID for task isolation
                         script_path = data.get("script_path", "")
                         description = data.get("description", "")  # Agent-provided task description
                         timeout_ms = data.get("timeout_ms", None)  # Default None (no timeout)
                         run_in_background = data.get("run_in_background", True)  # Default asynchronous
 
-                        result = await self.script_executor.execute_script(script_path, description, timeout_ms, run_in_background)
+                        result = await self.script_executor.execute_script(session_id, script_path, description, timeout_ms, run_in_background)
 
                         # Truncate message before sending (prevent oversized JSON)
                         if "message" in result:

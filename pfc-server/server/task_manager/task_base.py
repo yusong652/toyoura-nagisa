@@ -24,24 +24,28 @@ class Task(ABC):
     implementing type-specific behavior (e.g., output capture for scripts).
     """
 
-    def __init__(self, task_id, future, description, task_type):
-        # type: (str, Any, str, str) -> None
+    def __init__(self, task_id, session_id, future, description, task_type, on_status_change=None):
+        # type: (str, str, Any, str, str, Any) -> None
         """
         Initialize common task properties.
 
         Args:
             task_id: Unique task identifier
+            session_id: Session identifier for task isolation
             future: asyncio Future object for the task
             description: Human-readable task description
             task_type: Task type identifier ("command" or "script")
+            on_status_change: Optional callback function(task) called when task status changes
         """
         self.task_id = task_id
+        self.session_id = session_id
         self.future = future
         self.description = description
         self.task_type = task_type
         self.start_time = time.time()
         self.end_time = None  # type: Optional[float]
         self.status = "running"  # type: str
+        self.on_status_change = on_status_change  # Callback for persistence
 
         # Register completion callback
         future.add_done_callback(self._on_complete)
@@ -60,6 +64,13 @@ class Task(ABC):
                 self.status = "completed"
         except Exception:
             self.status = "failed"
+
+        # Notify status change for persistence
+        if self.on_status_change:
+            try:
+                self.on_status_change(self)
+            except Exception as e:
+                logger.warning("Status change callback failed: {}".format(e))
 
     def get_elapsed_time(self):
         # type: () -> float
