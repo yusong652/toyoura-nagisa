@@ -42,7 +42,6 @@ def register_websocket_routes(app: FastAPI):
             - Stream-capable chat responses
             - Tool integration support
         """
-        print(f"[WebSocket] Connection attempt for session: {session_id}")
         try:
             # Directly use the WebSocket handler from app state
             # No need for wrapper function - simpler and clearer

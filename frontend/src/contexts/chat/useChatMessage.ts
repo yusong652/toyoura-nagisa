@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { Message, MessageStatus, FileData } from '../../types/chat'
 import { sessionService, chatService } from '../../services/api'
 import { useWebSocketMessageStatus } from '../../hooks/useWebSocketMessageStatus'
+import { messageConverterManager, BackendMessage } from './messageConverters'
 
 export interface UseChatMessageOptions {
   currentSessionId: string | null
@@ -54,151 +55,24 @@ export const useChatMessage = ({
   // Reload messages when session changes
   useEffect(() => {
     if (currentSessionId) {
-      // Directly call internal message loading logic instead of using switchSession wrapper
+      // Load session history and convert messages using strategy pattern
       const loadMessages = async () => {
         try {
           const historyData = await sessionService.getSessionHistory(currentSessionId)
+
           if (historyData.history && Array.isArray(historyData.history)) {
-            const convertedMessages: Message[] = historyData.history
-              .filter((msg: any) => {
-                // Include all user, assistant, image, and video messages
-                // Tool results within user messages will be rendered as content blocks
-                return msg.role === 'user' ||
-                       msg.role === 'assistant' ||
-                       msg.role === 'image' ||
-                       msg.role === 'video'
-              })
-              .map((msg: any): Message | null => {
-                // ✨ Directly use backend role without mapping
-                const role = msg.role
-                if (!['user', 'assistant', 'image', 'video'].includes(role)) {
-                  return null
-                }
+            // Filter valid message roles and convert using MessageConverterManager
+            const backendMessages = historyData.history.filter((msg: any) => {
+              // Include all user, assistant, image, and video messages
+              // Tool results within user messages will be rendered as content blocks
+              return msg.role === 'user' ||
+                     msg.role === 'assistant' ||
+                     msg.role === 'image' ||
+                     msg.role === 'video'
+            }) as BackendMessage[]
 
-                let text = ''
-                let files: any[] = []
-                let content = msg.content  // ✨ Preserve structured content
-
-                if (role === 'image') {
-                  text = msg.content || ''
-                  files.push({
-                    name: 'generated_image',
-                    type: 'image/png',
-                    data: `/api/images/${msg.image_path}`
-                  })
-                } else if (role === 'video') {
-                  text = msg.content || ''
-                  // Determine video type based on file extension
-                  const videoPath = msg.video_path
-                  // Extract filename from path (format: session_id/filename.ext)
-                  const filename = videoPath?.split('/').pop() || 'video.mp4'
-                  const extension = filename.toLowerCase().split('.').pop()
-                  let mediaType = 'video/mp4' // default
-                  
-                  if (extension === 'gif') {
-                    mediaType = 'image/gif'
-                  } else if (extension === 'webm') {
-                    mediaType = 'video/webm'
-                  } else if (extension === 'mp4') {
-                    mediaType = 'video/mp4'
-                  }
-                  
-                  files.push({
-                    name: filename,
-                    type: mediaType,
-                    data: `/api/videos/${msg.video_path}`
-                  })
-                } else if (typeof msg.content === 'string') {
-                  text = msg.content
-                  // Add placeholder if assistant message is empty (may only have emotion)
-                  if (role === 'assistant' && !text) {
-                    text = '...'  // Use ellipsis as placeholder to indicate emotion-only action
-                  }
-                } else if (Array.isArray(msg.content)) {
-                  // Process content array, compatible with both direct text and type fields
-
-                  // Check if this is a structured message (tool_use, tool_result, thinking)
-                  const hasStructuredBlocks = msg.content.some((item: any) =>
-                    item.type === 'tool_use' ||
-                    item.type === 'tool_result' ||
-                    item.type === 'thinking'
-                  )
-
-                  // If it has structured blocks, preserve the content array
-                  if (hasStructuredBlocks) {
-                    // Don't clear content - it will be preserved below
-                  } else {
-                    // For simple text-only content arrays, extract text and clear content
-                    content = undefined
-                  }
-
-                  const textContents = msg.content
-                    .filter((item: any) => {
-                      // Compatible with two formats: direct text field, or type is text
-                      return item.text || (item.type === 'text' && item.text)
-                    })
-                    .map((item: any) => item.text)
-
-                  let rawText = textContents.join('\n')
-
-                  // Parse and process [[keyword]] markers
-                  if (role === 'assistant') {
-                    const keywordMatch = rawText.match(/\[\[(\w+)\]\]/);
-                    if (keywordMatch) {
-                      // Remove keyword marker
-                      const textWithoutKeyword = rawText.replace(/\[\[\w+\]\]/g, '').trim();
-
-                      if (!textWithoutKeyword) {
-                        // Only keyword, show placeholder
-                        text = '...';
-                      } else {
-                        // Has keyword and text, only show text
-                        text = textWithoutKeyword;
-                      }
-                    } else {
-                      // No keyword marker
-                      text = rawText;
-
-                      // Fallback: if assistant message is empty, add placeholder
-                      if (!text.trim()) {
-                        text = '...';
-                      }
-                    }
-                  } else {
-                    // For non-assistant messages, use original text directly
-                    text = rawText;
-                  }
-
-                  msg.content.forEach((item: any) => {
-                    if (item.inline_data) {
-                      files.push({
-                        name: `image_${files.length + 1}`,
-                        type: item.inline_data.mime_type,
-                        data: `data:${item.inline_data.mime_type};base64,${item.inline_data.data}`
-                      })
-                    }
-                  })
-                }
-
-                return {
-                  id: msg.id || uuidv4(),
-                  role,  // ✨ Use role directly (was: sender)
-                  text,
-                  content: Array.isArray(content) ? content : undefined,  // ✨ Preserve structured content
-                  files: files.length > 0 ? files : undefined,
-                  timestamp: new Date(msg.timestamp || Date.now()).getTime(),
-                  status: role === 'user' ? MessageStatus.READ : undefined,  // ✨ Check role instead of sender
-                  streaming: false,
-                  isLoading: false,
-                  isRead: true,
-                  toolState: msg.tool_state ? {
-                    isUsingTool: msg.tool_state.is_using_tool || false,
-                    toolNames: msg.tool_state.tool_name ? [msg.tool_state.tool_name] : undefined,
-                    action: msg.tool_state.action
-                  } : undefined
-                }
-              })
-              .filter((msg: Message | null): msg is Message => msg !== null)
+            // Convert all messages using the converter manager
+            const convertedMessages = messageConverterManager.convertMany(backendMessages)
             setMessages(convertedMessages)
           } else {
             setMessages([])

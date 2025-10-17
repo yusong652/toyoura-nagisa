@@ -88,7 +88,6 @@ class HeartbeatMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.HEARTBEAT
 
 
-
 class LocationRequestMessage(BaseWebSocketMessage):
     """Location request message schema"""
     type: MessageType = MessageType.LOCATION_REQUEST
@@ -122,7 +121,6 @@ class ChatStreamChunk(BaseWebSocketMessage):
     content: str
     chunk_type: str = "text"  # text, tool_call, status, etc.
     is_final: bool = False
-
 
 
 class ToolUseNotification(BaseWebSocketMessage):
@@ -322,7 +320,6 @@ def parse_incoming_websocket_message(data: str) -> BaseWebSocketMessage:
         return schema_class(**parsed_data)
     except Exception as e:
         raise ValueError(f"Invalid message format for '{message_type}': {e}")
-
 
 
 def create_error_message(

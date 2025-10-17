@@ -81,7 +81,6 @@ class ConnectionManager:
                 self._heartbeat_tasks[session_id] = asyncio.create_task(
                     self._heartbeat_loop(session_id)
                 )
-                print(f"[WebSocket] Connection established with heartbeat (20s interval) for session {session_id}")
                 
                 # Send connection success message
                 await self._send_system_message(session_id, {
