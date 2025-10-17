@@ -432,6 +432,7 @@ class HistoricalTask:
         """Get task summary for listing (historical)."""
         info = {
             "task_id": self.task_id,
+            "session_id": self.session_id,  # Include session_id for filtering
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
