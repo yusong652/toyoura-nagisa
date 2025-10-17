@@ -58,14 +58,12 @@ export const useBashConfirmation = () => {
 
     // If not immediately available, try to wait
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.log('[BashConfirmation] WebSocket not ready, waiting for connection...')
 
       const waitForConnection = (window as any).__waitForConnection
       if (waitForConnection) {
         const connected = await waitForConnection(3000) // Wait up to 3 seconds
         if (connected) {
           ws = (window as any).__wsConnection
-          console.log('[BashConfirmation] Got connection after waiting')
         } else {
           console.error('[BashConfirmation] Failed to get WebSocket connection after waiting')
           return
@@ -75,9 +73,6 @@ export const useBashConfirmation = () => {
         return
       }
     }
-
-    console.log('[BashConfirmation] Using WebSocket:', ws)
-    console.log('[BashConfirmation] WebSocket readyState:', ws?.readyState)
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       const response = {
@@ -89,11 +84,9 @@ export const useBashConfirmation = () => {
       }
 
       const jsonMessage = JSON.stringify(response)
-      console.log('[BashConfirmation] Sending response:', response)
 
       try {
         ws.send(jsonMessage)
-        console.log('[BashConfirmation] Successfully sent response')
       } catch (error) {
         console.error('[BashConfirmation] Error sending message:', error)
         console.error('[BashConfirmation] WebSocket state at error:', ws.readyState)
@@ -113,14 +106,10 @@ export const useBashConfirmation = () => {
 
   // Approve command execution - 无状态设计，使用refs获取最新值
   const approve = useCallback(async (userMessage?: string) => {
-    console.log('[BashConfirmation] Approve called:', {
-      currentState: stateRef.current,
-      userMessage
-    })
+
 
     if (stateRef.current.currentRequest) {
       const request = stateRef.current.currentRequest
-      console.log('[BashConfirmation] Sending approval for request:', request.id)
 
       await sendResponseRef.current(request.confirmationId, true, userMessage)
 
@@ -133,7 +122,6 @@ export const useBashConfirmation = () => {
       // Clear current request
       clearCurrentRequestRef.current()
 
-      console.log('[BashConfirmation] Processed approval and cleared request')
     } else {
       console.warn('[BashConfirmation] Approve called but no current request found')
     }
@@ -141,14 +129,9 @@ export const useBashConfirmation = () => {
 
   // Reject command execution - 无状态设计，使用refs获取最新值
   const reject = useCallback(async (userMessage?: string) => {
-    console.log('[BashConfirmation] Reject called:', {
-      currentState: stateRef.current,
-      userMessage
-    })
 
     if (stateRef.current.currentRequest) {
       const request = stateRef.current.currentRequest
-      console.log('[BashConfirmation] Sending rejection for request:', request.id)
 
       await sendResponseRef.current(request.confirmationId, false, userMessage)
 
@@ -166,12 +149,10 @@ export const useBashConfirmation = () => {
           timestamp: new Date().toISOString()
         }
       }))
-      console.log('[BashConfirmation] Dispatched toolUseConcluded event after rejection')
 
       // Clear current request
       clearCurrentRequestRef.current()
 
-      console.log('[BashConfirmation] Processed rejection and cleared request')
     } else {
       console.warn('[BashConfirmation] Reject called but no current request found')
     }
@@ -188,12 +169,9 @@ export const useBashConfirmation = () => {
   clearCurrentRequestRef.current = clearCurrentRequest
 
   useEffect(() => {
-    console.log('[BashConfirmation] Setting up event listener for bashConfirmationRequest (mount only)')
 
     const handleBashConfirmationRequest = (event: CustomEvent) => {
-      console.log('[BashConfirmation] Event received:', event)
       const data = event.detail
-      console.log('[BashConfirmation] Event detail data:', data)
 
       // Generate unique ID for this request
       const requestId = `bash_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
@@ -208,22 +186,18 @@ export const useBashConfirmation = () => {
         timestamp: data.timestamp || new Date().toISOString()
       }
 
-      console.log('[BashConfirmation] Parsed request:', request)
-
       setState(prevState => {
         // Since backend executes serially, we should never have overlapping requests
         // But if we do, log a warning and replace the current request
         if (prevState.currentRequest) {
           console.warn('[BashConfirmation] Received new request while another is active (unexpected with serial execution)')
         }
-        console.log('[BashConfirmation] Setting as current request')
         return {
           currentRequest: request,
           isOpen: true
         }
       })
 
-      console.log('[BashConfirmation] State updated with request')
     }
 
     // Listen to custom event from ConnectionContext
@@ -243,7 +217,6 @@ export const useBashConfirmation = () => {
   // Set up timeout for current request
   useEffect(() => {
     if (state.currentRequest && state.isOpen) {
-      console.log('[BashConfirmation] Setting timeout for current request:', state.currentRequest.id)
 
       // Clear any existing timeout
       if (timeoutRef.current) {
@@ -251,7 +224,6 @@ export const useBashConfirmation = () => {
       }
 
       timeoutRef.current = setTimeout(() => {
-        console.log('[BashConfirmation] Auto-rejecting due to timeout:', state.currentRequest?.id)
         const currentRequest = stateRef.current.currentRequest
         if (currentRequest) {
           // Use the current sendResponse function from ref
@@ -264,7 +236,6 @@ export const useBashConfirmation = () => {
                 timestamp: new Date().toISOString()
               }
             }))
-            console.log('[BashConfirmation] Dispatched toolUseConcluded event after timeout rejection')
 
             // Clear current request
             clearCurrentRequestRef.current()

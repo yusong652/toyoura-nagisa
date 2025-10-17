@@ -20,18 +20,8 @@ const BashConfirmation: React.FC = () => {
 
   // Debug logging for component state
   useEffect(() => {
-    console.log('[BashConfirmation] Component render state:', {
-      bashConfirmationOpen,
-      bashRequest,
-      shouldShow: !!(bashConfirmationOpen && bashRequest)
-    })
-  }, [bashConfirmationOpen, bashRequest])
 
-  console.log('[BashConfirmation] Render check:', {
-    isOpen: bashConfirmationOpen,
-    hasRequest: !!bashRequest,
-    command: bashRequest?.command
-  })
+  }, [bashConfirmationOpen, bashRequest])
 
   // Conditional return MUST come after all hooks
 
