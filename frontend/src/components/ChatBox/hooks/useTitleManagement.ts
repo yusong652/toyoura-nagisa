@@ -53,12 +53,12 @@ export const useTitleManagement = (
   const canRefreshTitle = useMemo(() => {
     // Need at least 2 messages
     const hasEnoughMessages = messages.length >= 2
-    
-    // Need both user and bot messages
-    const hasUserMessage = messages.some(msg => msg.sender === 'user')
-    const hasBotMessage = messages.some(msg => msg.sender === 'bot')
-    
-    return hasEnoughMessages && hasUserMessage && hasBotMessage
+
+    // Need both user and assistant messages
+    const hasUserMessage = messages.some(msg => msg.role === 'user')
+    const hasAssistantMessage = messages.some(msg => msg.role === 'assistant')
+
+    return hasEnoughMessages && hasUserMessage && hasAssistantMessage
   }, [messages])
   
   // Async handler for title refresh

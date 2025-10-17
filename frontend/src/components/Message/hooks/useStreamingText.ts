@@ -19,13 +19,13 @@ import { StreamingTextHookReturn } from '../types'
  *         - setChunks: Function to manually update chunks
  */
 export const useStreamingText = (message: Message): StreamingTextHookReturn => {
-  const { text, newText, streaming, sender, onRenderComplete } = message
+  const { text, newText, streaming, role, onRenderComplete } = message
   
   const [displayText, setDisplayText] = useState('')
   const [chunks, setChunks] = useState<string[]>([])
   
   useEffect(() => {
-    if (streaming && sender === 'bot') {
+    if (streaming && role === 'assistant') {
       if (newText) {
         // Incremental update with new text chunk
         setChunks(prev => [...prev, newText])
@@ -48,7 +48,7 @@ export const useStreamingText = (message: Message): StreamingTextHookReturn => {
       setDisplayText(text || '')
       setChunks([])
     }
-  }, [text, newText, streaming, sender, onRenderComplete])
+  }, [text, newText, streaming, role, onRenderComplete])
   
   return {
     displayText,

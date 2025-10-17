@@ -16,7 +16,7 @@
   margin-top: 12px;
 }
 
-.message:not(.user) {
+.message:not(.user):not(.tool-result) {
   margin-right: auto;
 }
 
@@ -70,11 +70,11 @@
   box-shadow: 0 0 12px var(--user-message-hover-glow, rgba(74, 144, 226, 0.3));
 }
 
-.message:not(.user) .message-content {
+.message:not(.user):not(.tool-result) .message-content {
   border-top-left-radius: 4px;
 }
 
-.message:not(.user) .message-content:hover {
+.message:not(.user):not(.tool-result) .message-content:hover {
   box-shadow: 0 0 12px var(--bot-message-hover-glow, rgba(130, 130, 130, 0.25));
 }
 
@@ -87,8 +87,8 @@
   .message.user .message-content:hover {
     box-shadow: 0 0 12px var(--user-message-hover-glow-dark, rgba(100, 180, 255, 0.3));
   }
-  
-  .message:not(.user) .message-content:hover {
+
+  .message:not(.user):not(.tool-result) .message-content:hover {
     box-shadow: 0 0 12px var(--bot-message-hover-glow-dark, rgba(180, 180, 180, 0.25));
   }
 }
@@ -437,7 +437,11 @@
   text-align: right;
 }
 
-.message:not(.user) .message-time {
+.message:not(.user):not(.tool-result) .message-time {
+  text-align: left;
+}
+
+.message.tool-result .message-time {
   text-align: left;
 }
 
@@ -606,5 +610,364 @@
   .video-format-badge {
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* ==================== Tool Message Styles ==================== */
+
+/* Tool-result messages (user role with tool_result content) */
+.message.tool-result {
+  margin-right: auto;
+  margin-left: 0;
+  max-width: 100%;
+}
+
+.message.tool-result .message-content {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.message.tool-result .message-content:hover {
+  box-shadow: none;
+}
+
+/* Tool messages (assistant with tool_use/thinking content) */
+.message.tool-message {
+  margin-right: auto;
+  max-width: 100%;
+}
+
+.message.tool-message .message-content {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.message.tool-message .message-content:hover {
+  box-shadow: none;
+}
+
+.message.tool-message .message-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Hide timestamp and status for tool messages */
+.message.tool-result .message-time,
+.message.tool-message .message-time {
+  display: none;
+}
+
+.message.tool-result .message-status,
+.message.tool-message .message-status {
+  display: none;
+}
+
+/* Tool Use Block Styles - Bash Terminal Style */
+.tool-use-block {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 6px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tool-use-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.tool-use-prompt {
+  color: #4ec9b0;
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.tool-use-name {
+  color: #dcdcaa;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.tool-use-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  color: #808080;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.tool-use-toggle:hover {
+  color: #d4d4d4;
+}
+
+.tool-use-input {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.tool-use-input-content {
+  background-color: #2d2d2d;
+  border-radius: 2px;
+  padding: 8px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ce9178;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  text-align: left;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+
+/* Tool Result Block Styles - Bash Terminal Style */
+.tool-result-block {
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 6px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tool-result-block.success {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-left: 3px solid #4ec9b0;
+}
+
+.tool-result-block.error {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-left: 3px solid #f48771;
+}
+
+.tool-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.tool-result-prompt {
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+  font-size: 14px;
+}
+
+.tool-result-block.success .tool-result-prompt {
+  color: #4ec9b0;
+}
+
+.tool-result-block.error .tool-result-prompt {
+  color: #f48771;
+}
+
+.tool-result-name {
+  color: #dcdcaa;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.tool-result-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  color: #808080;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.tool-result-toggle:hover {
+  color: #d4d4d4;
+}
+
+.tool-result-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  text-align: left;
+  word-wrap: break-word;
+}
+
+.tool-result-content .code-block {
+  background-color: #2d2d2d;
+  border-radius: 2px;
+  padding: 8px;
+  margin: 6px 0;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.tool-result-content code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  background-color: #2d2d2d;
+  padding: 2px 4px;
+  border-radius: 2px;
+  color: #ce9178;
+}
+
+.tool-result-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #d4d4d4;
+}
+
+.tool-result-content p {
+  margin: 4px 0;
+  text-align: left;
+}
+
+.tool-result-content ul,
+.tool-result-content ol {
+  margin: 4px 0;
+  padding-left: 20px;
+  text-align: left;
+}
+
+/* Thinking Block Styles - Bash Terminal Style */
+.thinking-block {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-left: 3px solid #c586c0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 6px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.thinking-header:hover {
+  opacity: 0.9;
+}
+
+.thinking-prompt {
+  color: #c586c0;
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.thinking-title {
+  flex: 1;
+  color: #dcdcaa;
+  text-align: left;
+}
+
+.thinking-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  color: #808080;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.thinking-toggle:hover {
+  color: #d4d4d4;
+}
+
+.thinking-content {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #3a3a3a;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  text-align: left;
+}
+
+.thinking-content p {
+  margin: 4px 0;
+  text-align: left;
+}
+
+/* Slide-in animation for tool blocks */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark mode support for tool messages - Keep bash terminal style consistent */
+@media (prefers-color-scheme: dark) {
+  .message.tool-result .message-content {
+    background-color: #2a2a2a;
+    border-color: #404040;
+    border-left-color: #808080;
+  }
+
+  /* Tool blocks already use dark terminal colors, no changes needed in dark mode */
+
+  .thinking-block {
+    background: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-left: 3px solid #c586c0;
+  }
+
+  .thinking-title {
+    color: #dcdcaa;
+  }
+
+  .thinking-toggle {
+    color: #808080;
+  }
+
+  .thinking-toggle:hover {
+    color: #d4d4d4;
+  }
+
+  .thinking-content {
+    color: #d4d4d4;
   }
 }

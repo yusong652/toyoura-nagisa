@@ -61,36 +61,32 @@ export const useChatMessage = ({
           if (historyData.history && Array.isArray(historyData.history)) {
             const convertedMessages: Message[] = historyData.history
               .filter((msg: any) => {
-                return (msg.role === 'user' && !msg.tool_request) ||
-                       (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) ||
-                       (msg.role === 'image') ||
-                       (msg.role === 'video')
+                // Include all user, assistant, image, and video messages
+                // Tool results within user messages will be rendered as content blocks
+                return msg.role === 'user' ||
+                       msg.role === 'assistant' ||
+                       msg.role === 'image' ||
+                       msg.role === 'video'
               })
               .map((msg: any): Message | null => {
-                let sender: 'user' | 'bot'
-                if (msg.role === 'user' && !msg.tool_request) {
-                  sender = 'user'
-                } else if (msg.role === 'assistant' && (!Array.isArray(msg.tool_calls) || msg.tool_calls.length === 0)) {
-                  sender = 'bot'
-                } else if (msg.role === 'image') {
-                  sender = 'bot'
-                } else if (msg.role === 'video') {
-                  sender = 'bot'
-                } else {
+                // ✨ Directly use backend role without mapping
+                const role = msg.role
+                if (!['user', 'assistant', 'image', 'video'].includes(role)) {
                   return null
                 }
 
                 let text = ''
                 let files: any[] = []
+                let content = msg.content  // ✨ Preserve structured content
 
-                if (msg.role === 'image') {
+                if (role === 'image') {
                   text = msg.content || ''
                   files.push({
                     name: 'generated_image',
                     type: 'image/png',
                     data: `/api/images/${msg.image_path}`
                   })
-                } else if (msg.role === 'video') {
+                } else if (role === 'video') {
                   text = msg.content || ''
                   // 根据文件扩展名确定视频类型
                   const videoPath = msg.video_path
@@ -115,27 +111,43 @@ export const useChatMessage = ({
                 } else if (typeof msg.content === 'string') {
                   text = msg.content
                   // 如果assistant消息为空（可能只有表情），添加占位符
-                  if (msg.role === 'assistant' && !text) {
+                  if (role === 'assistant' && !text) {
                     text = '...'  // 使用省略号作为占位符，表示只有表情动作
                   }
                 } else if (Array.isArray(msg.content)) {
                   // 处理content数组，兼容直接text和type字段
+
+                  // Check if this is a structured message (tool_use, tool_result, thinking)
+                  const hasStructuredBlocks = msg.content.some((item: any) =>
+                    item.type === 'tool_use' ||
+                    item.type === 'tool_result' ||
+                    item.type === 'thinking'
+                  )
+
+                  // If it has structured blocks, preserve the content array
+                  if (hasStructuredBlocks) {
+                    // Don't clear content - it will be preserved below
+                  } else {
+                    // For simple text-only content arrays, extract text and clear content
+                    content = undefined
+                  }
+
                   const textContents = msg.content
                     .filter((item: any) => {
                       // 兼容两种格式：直接有text字段，或者type为text
                       return item.text || (item.type === 'text' && item.text)
                     })
                     .map((item: any) => item.text)
-                  
+
                   let rawText = textContents.join('\n')
-                  
+
                   // 解析并处理[[keyword]]标记
-                  if (msg.role === 'assistant') {
+                  if (role === 'assistant') {
                     const keywordMatch = rawText.match(/\[\[(\w+)\]\]/);
                     if (keywordMatch) {
                       // 移除keyword标记
                       const textWithoutKeyword = rawText.replace(/\[\[\w+\]\]/g, '').trim();
-                      
+
                       if (!textWithoutKeyword) {
                         // 只有keyword，显示占位符
                         text = '...';
@@ -146,7 +158,7 @@ export const useChatMessage = ({
                     } else {
                       // 没有keyword标记
                       text = rawText;
-                      
+
                       // 兜底：如果assistant消息为空，添加占位符
                       if (!text.trim()) {
                         text = '...';
@@ -156,7 +168,7 @@ export const useChatMessage = ({
                     // 非assistant消息，直接使用原文本
                     text = rawText;
                   }
-                  
+
                   msg.content.forEach((item: any) => {
                     if (item.inline_data) {
                       files.push({
@@ -170,11 +182,12 @@ export const useChatMessage = ({
 
                 return {
                   id: msg.id || uuidv4(),
-                  sender,
+                  role,  // ✨ Use role directly (was: sender)
                   text,
+                  content: Array.isArray(content) ? content : undefined,  // ✨ Preserve structured content
                   files: files.length > 0 ? files : undefined,
                   timestamp: new Date(msg.timestamp || Date.now()).getTime(),
-                  status: sender === 'user' ? MessageStatus.READ : undefined,
+                  status: role === 'user' ? MessageStatus.READ : undefined,  // ✨ Check role instead of sender
                   streaming: false,
                   isLoading: false,
                   isRead: true,
@@ -247,13 +260,13 @@ export const useChatMessage = ({
   const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
     const userMessage: Message = {
       id: uuidv4(),
-      sender: 'user',
+      role: 'user',  // ✨ Use role instead of sender
       text,
       files: files.length > 0 ? files : undefined,
       timestamp: Date.now(),
       status: MessageStatus.SENDING
     }
-    
+
     setMessages(prev => [...prev, userMessage])
     return userMessage.id
   }, [])
@@ -266,7 +279,7 @@ export const useChatMessage = ({
     const filename = videoPath.split('/').pop() || 'video.mp4'
     const extension = filename.toLowerCase().split('.').pop()
     let mediaType = 'video/mp4' // 默认
-    
+
     if (extension === 'gif') {
       mediaType = 'image/gif'
     } else if (extension === 'webm') {
@@ -274,10 +287,10 @@ export const useChatMessage = ({
     } else if (extension === 'mp4') {
       mediaType = 'video/mp4'
     }
-    
+
     const videoMessage: Message = {
       id: videoMessageId,
-      sender: 'bot',
+      role: 'assistant',  // ✨ Use role instead of sender: 'bot'
       text: content, // 空内容，只显示视频
       files: [{
         name: filename,
@@ -286,7 +299,7 @@ export const useChatMessage = ({
       }],
       timestamp: Date.now()
     }
-    
+
     setMessages(prev => [...prev, videoMessage])
     return videoMessageId
   }, [])
@@ -313,11 +326,12 @@ export const useChatMessage = ({
       const customEvent = event as CustomEvent
       const { messageId, sender, initialText, streaming } = customEvent.detail
 
-      if (sender === 'bot') {
-        // Create new bot message with specified ID
+      // ✨ Convert legacy 'bot' sender to 'assistant' role
+      if (sender === 'bot' || sender === 'assistant') {
+        // Create new assistant message with specified ID
         const newBotMessage: Message = {
           id: messageId,
-          sender: 'bot',
+          role: 'assistant',  // ✨ Use role instead of sender
           text: initialText,
           timestamp: Date.now(),
           streaming: streaming,

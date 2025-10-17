@@ -1,4 +1,5 @@
 import React from 'react'
+import { MessageRole } from '../../../types/chat'
 
 interface ImageFileProps {
   file: {
@@ -7,20 +8,20 @@ interface ImageFileProps {
     data: string
   }
   onClick?: (imageUrl: string) => void
-  sender: 'user' | 'bot'
+  role: MessageRole
 }
 
 /**
  * Image file display component.
- * 
+ *
  * Renders image files with click handling for viewer. Video generation
  * is now available via the /video slash command for better user experience.
- * 
+ *
  * Args:
  *     file: Image file object with data URL
  *     onClick: Optional click handler for image viewer
- *     sender: Message sender type (kept for future extensibility)
- * 
+ *     role: Message role type (kept for future extensibility)
+ *
  * Returns:
  *     JSX element with clickable image
  */

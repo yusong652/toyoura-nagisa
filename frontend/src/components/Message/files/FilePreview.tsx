@@ -6,16 +6,16 @@ import { FilePreviewProps } from '../types'
 
 /**
  * File preview dispatcher component.
- * 
+ *
  * Routes file display to appropriate specialized components based on file type.
  * Handles images, videos, and generic documents with proper event handling.
- * 
+ *
  * Args:
  *     file: File object with name, type, and data
  *     onImageClick: Optional image click handler
  *     onVideoClick: Optional video click handler
- *     sender: Message sender type for context
- * 
+ *     role: Message role type for context
+ *
  * Returns:
  *     JSX element with appropriate file preview component
  */
@@ -23,17 +23,17 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   file,
   onImageClick,
   onVideoClick,
-  sender
+  role
 }) => {
   const { type, name } = file
   
   // Image files
   if (type.startsWith('image/')) {
     return (
-      <ImageFile 
+      <ImageFile
         file={file}
         onClick={onImageClick}
-        sender={sender}
+        role={role}
       />
     )
   }

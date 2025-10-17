@@ -39,13 +39,24 @@ interface MessageItemProps {
  * Returns:
  *     JSX element with complete message display including modals
  */
-const MessageItem: React.FC<MessageItemProps> = ({ 
-  message, 
-  onMessageSelect, 
-  selectedMessageId, 
-  allMessages 
+const MessageItem: React.FC<MessageItemProps> = ({
+  message,
+  onMessageSelect,
+  selectedMessageId,
+  allMessages
 }) => {
-  const { sender } = message
+  const { role, content } = message
+
+  // Check if this message contains tool-related content blocks
+  const hasToolContent = content?.some(block =>
+    block.type === 'tool_use' ||
+    block.type === 'tool_result' ||
+    block.type === 'thinking'
+  )
+
+  // Check if this is a tool_result message (user role with tool_result content)
+  const isToolResultMessage = role === 'user' &&
+    content?.some(block => block.type === 'tool_result')
   
   // Modal states
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -72,26 +83,37 @@ const MessageItem: React.FC<MessageItemProps> = ({
   
   // Avatar event handlers
   const handleAvatarMouseEnter = (e: React.MouseEvent<HTMLImageElement>) => {
-    showAvatarTooltip(e, sender)
+    showAvatarTooltip(e, role)
   }
   
   const handleAvatarMouseLeave = () => {
     hideAvatarTooltip()
   }
   
+  // Determine effective role for display
+  let displayRole = role
+  if (isToolResultMessage) {
+    displayRole = 'tool-result'
+  } else if (hasToolContent) {
+    displayRole = 'tool-message'
+  }
+
   return (
     <>
-      <div 
-        className={`message ${sender} ${isSelected ? 'selected' : ''}`}
+      <div
+        className={`message ${displayRole} ${isSelected ? 'selected' : ''}`}
         onClick={eventHandlers.onMessageClick}
       >
-        <MessageAvatar
-          sender={sender}
-          onMouseEnter={handleAvatarMouseEnter}
-          onMouseLeave={handleAvatarMouseLeave}
-        />
-        
-        {sender === 'bot' ? (
+        {/* Hide avatar for tool_result messages */}
+        {!isToolResultMessage && (
+          <MessageAvatar
+            role={role}
+            onMouseEnter={handleAvatarMouseEnter}
+            onMouseLeave={handleAvatarMouseLeave}
+          />
+        )}
+
+        {role === 'assistant' ? (
           <BotMessageRenderer
             message={message}
             isSelected={isSelected}
@@ -108,9 +130,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
           />
         )}
         
-        <MessageStatusComponent 
+        <MessageStatusComponent
           status={message.status}
-          sender={sender}
+          role={role}
         />
         
         <MessageActions

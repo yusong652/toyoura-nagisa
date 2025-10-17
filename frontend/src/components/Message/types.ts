@@ -1,4 +1,4 @@
-import { Message, MessageStatus } from '../../types/chat'
+import { Message, MessageStatus, MessageRole } from '../../types/chat'
 
 // 基础消息属性
 export interface BaseMessageProps {
@@ -39,7 +39,7 @@ export interface MessageFilesProps {
   isLoading: boolean
   onImageClick: (imageUrl: string) => void
   onVideoClick?: (videoUrl: string, format: string) => void
-  sender: 'user' | 'bot'
+  role: MessageRole
 }
 
 // 文件预览组件属性
@@ -51,13 +51,13 @@ export interface FilePreviewProps {
   }
   onImageClick?: (imageUrl: string) => void
   onVideoClick?: (videoUrl: string, format: string) => void
-  sender: 'user' | 'bot'
+  role: MessageRole
 }
 
 // 消息状态组件属性
 export interface MessageStatusProps {
   status?: MessageStatus
-  sender: 'user' | 'bot'
+  role: MessageRole
 }
 
 // 消息时间戳组件属性
@@ -68,7 +68,7 @@ export interface MessageTimestampProps {
 
 // 消息头像组件属性
 export interface MessageAvatarProps {
-  sender: 'user' | 'bot'
+  role: MessageRole
   onMouseEnter?: (e: React.MouseEvent<HTMLImageElement>) => void
   onMouseLeave?: () => void
 }

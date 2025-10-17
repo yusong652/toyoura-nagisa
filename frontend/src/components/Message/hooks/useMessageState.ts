@@ -23,7 +23,7 @@ export const useMessageState = (
   message: Message,
   selectedMessageId: string | null
 ): MessageStateHookReturn => {
-  const { text, streaming, sender, id, newText, onRenderComplete } = message
+  const { text, streaming, role, id, newText, onRenderComplete } = message
   
   const [displayText, setDisplayText] = useState('')
   const [chunks, setChunks] = useState<string[]>([])
@@ -33,7 +33,7 @@ export const useMessageState = (
   
   // Handle text updates for streaming messages
   useEffect(() => {
-    if (streaming && sender === 'bot') {
+    if (streaming && role === 'assistant') {
       if (newText) {
         // Incremental update with newText
         setChunks(prev => [...prev, newText])
@@ -55,12 +55,12 @@ export const useMessageState = (
       setDisplayText(text || '')
       setChunks([])
     }
-  }, [text, newText, streaming, sender, onRenderComplete])
+  }, [text, newText, streaming, role, onRenderComplete])
   
   // Handle loading animation
   useEffect(() => {
     let timer: number
-    if (message.isLoading || (streaming && sender === 'bot' && chunks.length === 0)) {
+    if (message.isLoading || (streaming && role === 'assistant' && chunks.length === 0)) {
       timer = window.setInterval(() => {
         setDotCount(prev => (prev % 3) + 1)
       }, 500)
@@ -70,7 +70,7 @@ export const useMessageState = (
         window.clearInterval(timer)
       }
     }
-  }, [message.isLoading, streaming, sender, chunks.length])
+  }, [message.isLoading, streaming, role, chunks.length])
   
   return {
     displayText,
