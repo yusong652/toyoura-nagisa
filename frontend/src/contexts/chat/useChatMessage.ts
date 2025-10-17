@@ -277,7 +277,7 @@ export const useChatMessage = ({
 
       return {
         userMessageId,
-        botMessageId: '', // No longer need placeholder ID
+        botMessageId: '', 
         response
       }
     } catch (error) {

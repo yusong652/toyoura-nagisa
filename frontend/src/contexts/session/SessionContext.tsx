@@ -82,7 +82,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
-  // 切换会话
+
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
       const canConnect = await checkConnection()
@@ -96,22 +96,19 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       localStorage.setItem('session_id', sessionId)
       setCurrentSessionId(sessionId)
 
-      // 同步 TTS 状态到后端
       try {
         await updateTTSEnabled(ttsEnabled)
       } catch (error) {
         console.error('同步 TTS 状态失败:', error)
       }
       
-      // SessionContext 不再负责加载消息，这个责任完全交给 ChatContext
-      // 这样避免重复加载，职责更清晰
     } catch (error) {
       console.error('切换会话失败:', error)
       throw error
     }
   }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
-  // 删除会话
+
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
     if (connectionStatus !== ConnectionStatus.CONNECTED && connectionStatus !== ConnectionStatus.CONNECTING) {
       const canConnect = await checkConnection()
@@ -139,7 +136,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   }, [currentSessionId, createNewSession, refreshSessions, switchSession, connectionStatus, checkConnection, connectionError])
 
-  // 刷新标题方法
+
   const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
     try {
       if (!sessionId) {
@@ -148,9 +145,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
 
       const data = await sessionService.generateTitle(sessionId)
 
-      // 如果成功生成了新标题，更新会话列表
       if (data.success && data.title) {
-        // 更新本地状态中的会话标题
         setSessions(prevSessions => 
           prevSessions.map(session => 
             session.id === sessionId 
@@ -165,7 +160,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   }, [])
 
-  // 初始化 Effect: ComponentDidMount
   useEffect(() => {
     const initLoad = async () => {
       // Attempt to establish connection and load initial data
@@ -226,11 +220,9 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   }, [currentSessionId]) // Remove connectToSession from dependencies to prevent unnecessary reconnects
 
-  // 尝试在重新连接后加载会话
   useEffect(() => {
     const loadSessionOnReconnect = async () => {
       if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId) {
-        console.log("检测到重新连接，尝试加载/刷新会话...")
         setSessionLoadAttempted(false) // We are attempting to load now
 
         try {

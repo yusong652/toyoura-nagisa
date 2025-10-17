@@ -23,7 +23,6 @@ import { ConnectionStatus } from './types/connection'
 function AppContent(): React.ReactElement {
   const { connectionStatus, connectionError, checkConnection } = useConnection()
   
-  // Slash command execution hook - shared between InputArea and StatusPanel
   const { executeSlashCommand, executionQueue } = useSlashCommandExecution()
 
   return (
@@ -55,7 +54,6 @@ function AppContent(): React.ReactElement {
 }
 
 function App(): React.ReactElement {
-  // 初始化主题
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light'
     document.body.setAttribute('data-theme', savedTheme)
