@@ -232,7 +232,9 @@ class LLMClientBase(ABC):
             try:
                 tool_call_message = processor.format_response_for_storage(current_response)
                 from backend.shared.utils.helpers import save_assistant_message
-                save_assistant_message(tool_call_message.content, session_id)
+                # Ensure content is in list format (format_response_for_storage always returns list)
+                content = tool_call_message.content if isinstance(tool_call_message.content, list) else [{"type": "text", "text": str(tool_call_message.content)}]
+                save_assistant_message(content, session_id)
             except Exception as e:
                 # Log error but don't fail the execution
                 print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
