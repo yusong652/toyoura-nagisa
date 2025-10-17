@@ -1,13 +1,13 @@
 /**
  * useChatMessage Hook
- * 
- * 负责聊天消息的完整管理
- * - 消息状态管理 (messages, setMessages)
- * - 发送消息 (包括创建用户消息和机器人消息)
- * - 会话历史加载和转换
- * - 删除消息
- * - 清空聊天
- * - 消息状态更新
+ *
+ * Manages complete chat message functionality
+ * - Message state management (messages, setMessages)
+ * - Send messages (including creating user and bot messages)
+ * - Session history loading and conversion
+ * - Delete messages
+ * - Clear chat
+ * - Message status updates
  */
 
 import { useState, useCallback, useEffect } from 'react'
@@ -51,10 +51,10 @@ export const useChatMessage = ({
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
-  // 当会话变化时，重新加载消息
+  // Reload messages when session changes
   useEffect(() => {
     if (currentSessionId) {
-      // 直接调用内部消息加载逻辑，而不是通过 switchSession 包装器
+      // Directly call internal message loading logic instead of using switchSession wrapper
       const loadMessages = async () => {
         try {
           const historyData = await sessionService.getSessionHistory(currentSessionId)
@@ -88,12 +88,12 @@ export const useChatMessage = ({
                   })
                 } else if (role === 'video') {
                   text = msg.content || ''
-                  // 根据文件扩展名确定视频类型
+                  // Determine video type based on file extension
                   const videoPath = msg.video_path
-                  // 从路径中提取文件名 (格式: session_id/filename.ext)
+                  // Extract filename from path (format: session_id/filename.ext)
                   const filename = videoPath?.split('/').pop() || 'video.mp4'
                   const extension = filename.toLowerCase().split('.').pop()
-                  let mediaType = 'video/mp4' // 默认
+                  let mediaType = 'video/mp4' // default
                   
                   if (extension === 'gif') {
                     mediaType = 'image/gif'
@@ -110,12 +110,12 @@ export const useChatMessage = ({
                   })
                 } else if (typeof msg.content === 'string') {
                   text = msg.content
-                  // 如果assistant消息为空（可能只有表情），添加占位符
+                  // Add placeholder if assistant message is empty (may only have emotion)
                   if (role === 'assistant' && !text) {
-                    text = '...'  // 使用省略号作为占位符，表示只有表情动作
+                    text = '...'  // Use ellipsis as placeholder to indicate emotion-only action
                   }
                 } else if (Array.isArray(msg.content)) {
-                  // 处理content数组，兼容直接text和type字段
+                  // Process content array, compatible with both direct text and type fields
 
                   // Check if this is a structured message (tool_use, tool_result, thinking)
                   const hasStructuredBlocks = msg.content.some((item: any) =>
@@ -134,38 +134,38 @@ export const useChatMessage = ({
 
                   const textContents = msg.content
                     .filter((item: any) => {
-                      // 兼容两种格式：直接有text字段，或者type为text
+                      // Compatible with two formats: direct text field, or type is text
                       return item.text || (item.type === 'text' && item.text)
                     })
                     .map((item: any) => item.text)
 
                   let rawText = textContents.join('\n')
 
-                  // 解析并处理[[keyword]]标记
+                  // Parse and process [[keyword]] markers
                   if (role === 'assistant') {
                     const keywordMatch = rawText.match(/\[\[(\w+)\]\]/);
                     if (keywordMatch) {
-                      // 移除keyword标记
+                      // Remove keyword marker
                       const textWithoutKeyword = rawText.replace(/\[\[\w+\]\]/g, '').trim();
 
                       if (!textWithoutKeyword) {
-                        // 只有keyword，显示占位符
+                        // Only keyword, show placeholder
                         text = '...';
                       } else {
-                        // 有keyword和文本，只显示文本
+                        // Has keyword and text, only show text
                         text = textWithoutKeyword;
                       }
                     } else {
-                      // 没有keyword标记
+                      // No keyword marker
                       text = rawText;
 
-                      // 兜底：如果assistant消息为空，添加占位符
+                      // Fallback: if assistant message is empty, add placeholder
                       if (!text.trim()) {
                         text = '...';
                       }
                     }
                   } else {
-                    // 非assistant消息，直接使用原文本
+                    // For non-assistant messages, use original text directly
                     text = rawText;
                   }
 
@@ -204,7 +204,7 @@ export const useChatMessage = ({
             setMessages([])
           }
         } catch (error) {
-          console.error('加载会话消息失败:', error)
+          console.error('Failed to load session messages:', error)
           setMessages([])
         }
       }
@@ -214,49 +214,49 @@ export const useChatMessage = ({
     }
   }, [currentSessionId])
 
-  // 删除消息
+  // Delete message
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
-    // 确保有当前会话ID
+    // Ensure there is a current session ID
     if (!currentSessionId) {
-      throw new Error("没有活动的会话");
+      throw new Error("No active session");
     }
-    
+
     try {
-      // 先检查消息是否存在于当前消息列表中
+      // First check if message exists in current message list
       const messageExists = messages.some(msg => msg.id === messageId);
       if (!messageExists) {
-        console.error(`消息 ${messageId} 不存在于当前会话中`);
-        throw new Error("消息不存在于当前会话中");
+        console.error(`Message ${messageId} does not exist in current session`);
+        throw new Error("Message does not exist in current session");
       }
-      
-      // 首先在前端更新消息列表，删除指定消息
+
+      // First update message list in frontend, removing specified message
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-      
-      // 调用后端API删除消息
+
+      // Call backend API to delete message
       const responseData = await chatService.deleteMessage(currentSessionId, messageId);
-      
+
       if (!responseData.success) {
-        console.error('删除消息失败:', responseData);
-        
-        // 如果后端删除失败但前端已移除，恢复被删除的消息
+        console.error('Failed to delete message:', responseData);
+
+        // If backend deletion failed but frontend removed it, restore the deleted message
         await sessionSwitchSession(currentSessionId);
-        throw new Error(`删除消息失败: ${responseData.detail}`);
+        throw new Error(`Failed to delete message: ${responseData.detail}`);
       }
-      
-      // 删除成功后刷新会话列表
+
+      // Refresh session list after successful deletion
       await sessionRefreshSessions();
     } catch (error) {
-      console.error('删除消息失败:', error);
+      console.error('Failed to delete message:', error);
       throw error;
     }
   }, [currentSessionId, sessionRefreshSessions, messages, sessionSwitchSession]);
 
-  // 清空聊天
+  // Clear chat
   const clearChat = useCallback(() => {
     setMessages([])
   }, [])
 
-  // 添加用户消息
+  // Add user message
   const addUserMessage = useCallback((text: string, files: FileData[] = []): string => {
     const userMessage: Message = {
       id: uuidv4(),
@@ -272,13 +272,13 @@ export const useChatMessage = ({
   }, [])
 
 
-  // 添加视频消息
+  // Add video message
   const addVideoMessage = useCallback((videoPath: string, content: string = "") => {
     const videoMessageId = uuidv4()
-    // 从路径中提取文件名 (格式: session_id/filename.ext)
+    // Extract filename from path (format: session_id/filename.ext)
     const filename = videoPath.split('/').pop() || 'video.mp4'
     const extension = filename.toLowerCase().split('.').pop()
-    let mediaType = 'video/mp4' // 默认
+    let mediaType = 'video/mp4' // default
 
     if (extension === 'gif') {
       mediaType = 'image/gif'
@@ -291,7 +291,7 @@ export const useChatMessage = ({
     const videoMessage: Message = {
       id: videoMessageId,
       role: 'assistant',  // ✨ Use role instead of sender: 'bot'
-      text: content, // 空内容，只显示视频
+      text: content, // Empty content, only show video
       files: [{
         name: filename,
         type: mediaType,
@@ -304,7 +304,7 @@ export const useChatMessage = ({
     return videoMessageId
   }, [])
 
-  // 更新消息状态
+  // Update message status
   const updateMessageStatus = useCallback((messageId: string, status: MessageStatus, errorMessage?: string) => {
     setMessages(prev => 
       prev.map(msg => 
@@ -324,14 +324,14 @@ export const useChatMessage = ({
   useEffect(() => {
     const handleMessageCreate = (event: Event) => {
       const customEvent = event as CustomEvent
-      const { messageId, sender, initialText, streaming } = customEvent.detail
+      const { messageId, role, initialText, streaming } = customEvent.detail
 
-      // ✨ Convert legacy 'bot' sender to 'assistant' role
-      if (sender === 'bot' || sender === 'assistant') {
+      // Only create assistant messages
+      if (role === 'assistant') {
         // Create new assistant message with specified ID
         const newBotMessage: Message = {
           id: messageId,
-          role: 'assistant',  // ✨ Use role instead of sender
+          role: 'assistant',
           text: initialText,
           timestamp: Date.now(),
           streaming: streaming,
@@ -350,39 +350,39 @@ export const useChatMessage = ({
     }
   }, [])
 
-  // 更新机器人消息
+  // Update bot message
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
     setMessages(prev => {
       const updatedMessages = prev.map(msg => {
         if (msg.id === messageId) {
           const updatedMsg = { ...msg, ...updates }
-          // 如果更新包含新的ID，确保保持消息的完整性
+          // If update includes new ID, ensure message integrity is maintained
           if (updates.id && updates.id !== messageId) {
-            console.log(`[updateBotMessage] 更新消息ID: ${messageId} -> ${updates.id}`)
+            console.log(`[updateBotMessage] Updating message ID: ${messageId} -> ${updates.id}`)
           }
           return updatedMsg
         }
         return msg
       })
-      
-      // 验证消息是否存在
-      const messageFound = updatedMessages.some(msg => 
+
+      // Verify message exists
+      const messageFound = updatedMessages.some(msg =>
         msg.id === messageId || (updates.id && msg.id === updates.id)
       )
       if (!messageFound) {
-        console.warn(`[updateBotMessage] 警告: 未找到ID为 ${messageId} 的消息`)
+        console.warn(`[updateBotMessage] Warning: Message with ID ${messageId} not found`)
       }
-      
+
       return updatedMessages
     })
   }, [])
 
 
-  // 创建并发送消息的基础函数
-  // 职责：创建用户消息 -> 调用后端API -> 创建机器人消息占位符
-  // 不包含：音频处理、流式响应处理、Live2D动作等高级功能
+  // Base function for creating and sending messages
+  // Responsibilities: Create user message -> Call backend API -> Create bot message placeholder
+  // Does not include: Audio processing, streaming response handling, Live2D actions, etc.
   const sendMessage = useCallback(async (
-    text: string, 
+    text: string,
     files: FileData[] = []
   ): Promise<{
     userMessageId: string
@@ -390,24 +390,24 @@ export const useChatMessage = ({
     response: Response
   }> => {
     if (text.trim() === '' && files.length === 0) {
-      throw new Error('消息内容不能为空')
+      throw new Error('Message content cannot be empty')
     }
-    
-    // 创建用户消息
+
+    // Create user message
     const userMessageId = addUserMessage(text, files)
-    
+
     try {
-      // 创建API请求
+      // Create API request
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
       const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled)
 
       return {
         userMessageId,
-        botMessageId: '', // 不再需要占位符ID
+        botMessageId: '', // No longer need placeholder ID
         response
       }
     } catch (error) {
-      // 更新消息为错误状态
+      // Update message to error status
       updateMessageStatus(userMessageId, MessageStatus.ERROR)
       throw error
     }

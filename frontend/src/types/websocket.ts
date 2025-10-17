@@ -108,7 +108,7 @@ export interface LocationResponseMessage extends BaseWebSocketMessage {
 export interface MessageCreateMessage extends BaseWebSocketMessage {
   type: MessageType.MESSAGE_CREATE;
   message_id: string;
-  sender: string;
+  role: "user" | "assistant" | "system";
   initial_text?: string;
   streaming?: boolean;
 }

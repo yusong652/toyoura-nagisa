@@ -164,7 +164,7 @@ class TTSChunk(BaseWebSocketMessage):
 class MessageCreateMessage(BaseWebSocketMessage):
     """Message creation message schema for dynamic bot message creation"""
     type: MessageType = MessageType.MESSAGE_CREATE
-    sender: str = "bot"
+    role: str = "assistant"  # "user" | "assistant" | "system"
     initial_text: Optional[str] = None
     streaming: bool = True
 

@@ -112,7 +112,7 @@ async def send_message_create_via_websocket(session_id: str, message_id: str):
             MessageType.MESSAGE_CREATE,
             session_id=session_id,
             message_id=message_id,
-            sender="bot",
+            role="assistant",
             initial_text="",
             streaming=True
         )

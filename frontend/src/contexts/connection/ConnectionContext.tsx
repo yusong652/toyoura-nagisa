@@ -350,7 +350,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           window.dispatchEvent(new CustomEvent('messageCreate', {
             detail: {
               messageId: data.message_id,
-              sender: data.sender,
+              role: data.role,
               initialText: data.initial_text || '',
               streaming: data.streaming || true
             }
