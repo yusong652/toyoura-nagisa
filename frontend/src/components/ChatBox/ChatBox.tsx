@@ -17,7 +17,7 @@ import ChatBoxTitleBar from './components/ChatBoxTitleBar'
 import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
-import { LiveToolStateDisplay } from '../Tools'
+import { LiveToolStateDisplay } from '../tools'
 import './ChatBox.css'
 
 /**

@@ -50,9 +50,10 @@ class TitleService:
 
     def _is_pure_text_assistant(self, msg) -> bool:
         """
-        Determine if assistant message is pure text (non-tool/function_call).
+        Determine if assistant message is pure text (non-tool message).
 
-        A pure text assistant message has no tool_calls field or an empty tool_calls list.
+        A pure text assistant message does not contain tool_use blocks in its content.
+        Tool use blocks indicate the assistant is calling tools rather than conversing.
 
         Args:
             msg: Message object to check
@@ -60,10 +61,42 @@ class TitleService:
         Returns:
             bool: True if message is pure text assistant message, False otherwise
         """
-        return (
-            getattr(msg, "role", None) == "assistant"
-            and not (getattr(msg, "tool_calls", None) or [])
-        )
+        if getattr(msg, "role", None) != "assistant":
+            return False
+
+        # Check content for tool_use blocks
+        content = getattr(msg, "content", None)
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get('type') == 'tool_use':
+                    return False
+
+        return True
+
+    def _is_pure_text_user(self, msg) -> bool:
+        """
+        Determine if user message is pure text (non-tool result message).
+
+        A pure text user message does not contain tool_result blocks in its content.
+        Tool result blocks are system-generated responses from tool execution.
+
+        Args:
+            msg: Message object to check
+
+        Returns:
+            bool: True if message is pure text user message, False otherwise
+        """
+        if getattr(msg, "role", None) != "user":
+            return False
+
+        # Check content for tool_result blocks
+        content = getattr(msg, "content", None)
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get('type') == 'tool_result':
+                    return False
+
+        return True
 
     async def _generate_title_from_history(self, session_id: str, llm_client) -> Optional[str]:
         """
@@ -71,6 +104,10 @@ class TitleService:
 
         Searches backward from end of history to find most recent pair of non-tool messages,
         then uses LLM to generate an appropriate session title.
+
+        Filters out both:
+        - Assistant messages with tool_use blocks (tool calls)
+        - User messages with tool_result blocks (tool execution results)
 
         Args:
             session_id: Session UUID to generate title for
@@ -82,13 +119,15 @@ class TitleService:
         history = load_history(session_id)
         history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
 
-        # Traverse backward to find most recent pair of non-tool messages
+        # Traverse backward to find most recent pair of pure conversation messages
         latest_user_msg = None
         latest_assistant_msg = None
 
         for msg in reversed(history_msgs):
-            if not latest_user_msg and getattr(msg, 'role', None) == 'user':
+            # Find latest pure text user message (not tool result)
+            if not latest_user_msg and self._is_pure_text_user(msg):
                 latest_user_msg = msg
+            # Find latest pure text assistant message (not tool use)
             elif not latest_assistant_msg and self._is_pure_text_assistant(msg):
                 latest_assistant_msg = msg
 

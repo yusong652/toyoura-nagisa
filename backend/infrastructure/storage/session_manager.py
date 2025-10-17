@@ -346,29 +346,42 @@ def _cleanup_message_files(session_id: str, message: dict) -> None:
 def get_latest_n_messages(session_id: str, n: int = 2) -> Tuple[BaseMessage, ...]:
     """
     Get latest n messages from specified session (returns message objects instead of dict)
-    Only returns user/assistant messages, filters out image/tool and other types
-    
+    Only returns pure conversational user/assistant messages, filters out:
+    - Image/video messages
+    - Tool use messages (assistant messages with tool_use blocks)
+    - Tool result messages (user messages with tool_result blocks)
+
+    This ensures only actual conversation content is returned for:
+    - Title generation
+    - Memory saving
+    - Image/video prompt generation context
+
     Args:
         session_id: Session ID
         n: Number of messages to get, defaults to 2
-        
+
     Returns:
         Tuple: Tuple containing BaseMessage objects, returns all actual messages if less than n messages exist
     """
-    
+
     history = load_history(session_id)  # Only returns non-image and non-video messages
     # Ensure all messages are BaseMessage objects
     history_msgs: List[BaseMessage] = [message_factory(msg) for msg in history]
     if not history_msgs:
         return tuple()
+
     latest_messages: List[BaseMessage] = []
     for msg in reversed(history_msgs):
+        # Check if message is pure conversation (not tool-related)
         if msg.role in ['user', 'assistant']:
-            latest_messages.append(msg)
-            if len(latest_messages) == n:
-                break
-    latest_messages.reverse()
+            # Filter out tool messages by checking content structure
+            is_tool_message = _is_tool_message(msg)
+            if not is_tool_message:
+                latest_messages.append(msg)
+                if len(latest_messages) == n:
+                    break
 
+    latest_messages.reverse()
     return tuple(latest_messages)
 
 
@@ -438,6 +451,34 @@ def get_latest_user_message(session_id: str) -> Optional[BaseMessage]:
 
 
 # ========== Internal Helper Functions ==========
+
+def _is_tool_message(msg: BaseMessage) -> bool:
+    """
+    Check if a message contains tool-related content (tool_use or tool_result).
+
+    Tool messages are identified by their content structure:
+    - Assistant messages with 'tool_use' blocks
+    - User messages with 'tool_result' blocks
+
+    Args:
+        msg: Message object to check
+
+    Returns:
+        bool: True if message contains tool content, False otherwise
+    """
+    content = msg.content
+
+    # Handle structured content (list of content blocks)
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                block_type = block.get('type')
+                # Check for tool_use (in assistant messages) or tool_result (in user messages)
+                if block_type in ['tool_use', 'tool_result']:
+                    return True
+
+    return False
+
 
 def _update_session_metadata_timestamp(session_id: str) -> None:
     """Update timestamp in session metadata"""
