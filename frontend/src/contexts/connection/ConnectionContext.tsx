@@ -395,6 +395,15 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             detail: data
           }))
         }
+
+        // Handle message saved notifications (for tool messages auto-refresh)
+        if (data.type === 'MESSAGE_SAVED') {
+          console.log('[ConnectionContext] Dispatching messageSaved event:', data)
+          // Dispatch custom event to trigger message list refresh
+          window.dispatchEvent(new CustomEvent('messageSaved', {
+            detail: data
+          }))
+        }
       } catch (error) {
         console.error("[WebSocket] failed to parse message:", error)
       }

@@ -46,10 +46,10 @@ def parse_message_data(data: dict) -> MessageParseResult:
         except:
             timestamp = None
 
-    # Build content array
+    # Build content array - use standard ContentBlock format
     content = []
     if text:
-        content.append({"text": text})
+        content.append({"type": "text", "text": text})
 
     for file in files:
         if file['type'].startswith('image/'):

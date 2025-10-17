@@ -61,9 +61,18 @@ type BackendContentBlock = ContentBlock | InlineImageBlock
 
 /**
  * Checks if content block is a text block with text content
+ * Supports both new format {"type": "text", "text": "..."} and legacy format {"text": "..."}
  */
 function isTextBlock(block: BackendContentBlock): block is ContentBlock & { type: 'text'; text: string } {
-  return 'type' in block && block.type === 'text' && 'text' in block && typeof block.text === 'string'
+  // New format with explicit type field
+  if ('type' in block && block.type === 'text' && 'text' in block && typeof block.text === 'string') {
+    return true
+  }
+  // Legacy format without type field (backward compatibility)
+  if (!('type' in block) && 'text' in block && typeof block.text === 'string') {
+    return true
+  }
+  return false
 }
 
 /**

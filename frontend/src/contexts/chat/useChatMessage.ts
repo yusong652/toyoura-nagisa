@@ -224,6 +224,45 @@ export const useChatMessage = ({
     }
   }, [])
 
+  // Subscribe to message saved events to refresh messages immediately
+  useEffect(() => {
+    const handleMessageSaved = async (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { message_id, role } = customEvent.detail
+      console.log(`[useChatMessage] Message saved (${role}), refreshing to show new message: ${message_id}`)
+
+      // Reload messages after each tool message is saved
+      if (currentSessionId) {
+        try {
+          const historyData = await sessionService.getSessionHistory(currentSessionId)
+
+          if (historyData.history && Array.isArray(historyData.history)) {
+            // Filter valid message roles
+            const backendMessages = historyData.history.filter((msg: any) => {
+              return msg.role === 'user' ||
+                     msg.role === 'assistant' ||
+                     msg.role === 'image' ||
+                     msg.role === 'video'
+            }) as BackendMessage[]
+
+            // Convert all messages using the converter manager
+            const convertedMessages = messageConverterManager.convertMany(backendMessages)
+            setMessages(convertedMessages)
+            console.log('[useChatMessage] Messages refreshed successfully after message save')
+          }
+        } catch (error) {
+          console.error('[useChatMessage] Failed to refresh messages after message saved:', error)
+        }
+      }
+    }
+
+    window.addEventListener('messageSaved', handleMessageSaved)
+
+    return () => {
+      window.removeEventListener('messageSaved', handleMessageSaved)
+    }
+  }, [currentSessionId])
+
   // Update bot message
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
     setMessages(prev => {

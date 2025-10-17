@@ -234,7 +234,10 @@ class LLMClientBase(ABC):
                 from backend.shared.utils.helpers import save_assistant_message
                 # Ensure content is in list format (format_response_for_storage always returns list)
                 content = tool_call_message.content if isinstance(tool_call_message.content, list) else [{"type": "text", "text": str(tool_call_message.content)}]
-                save_assistant_message(content, session_id)
+                message_id = save_assistant_message(content, session_id)
+
+                # Send WebSocket notification to refresh messages
+                await self._send_message_saved_notification(session_id, message_id, 'assistant')
             except Exception as e:
                 # Log error but don't fail the execution
                 print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
@@ -271,12 +274,15 @@ class LLMClientBase(ABC):
                 # Save tool result to database
                 try:
                     from backend.shared.utils.helpers import save_tool_result_message
-                    save_tool_result_message(
+                    message_id = save_tool_result_message(
                         tool_call_id=tool_call['id'],
                         tool_name=tool_call['name'],
                         tool_result=result,
                         session_id=session_id
                     )
+
+                    # Send WebSocket notification to refresh messages after each tool result
+                    await self._send_message_saved_notification(session_id, message_id, 'user')
                 except Exception as e:
                     # Log error but don't fail the execution
                     print(f"[WARNING] Failed to save tool result for {tool_call['name']}: {e}")
@@ -565,23 +571,23 @@ class LLMClientBase(ABC):
         self.cleanup_session_context(session_id)
     
     async def _send_websocket_tool_notification(
-        self, 
-        session_id: Optional[str], 
+        self,
+        session_id: Optional[str],
         notification: Dict[str, Any]
     ):
         """
         Send tool calling notification via WebSocket.
-        
+
         This method provides dual-channel notification - both SSE (for backwards compatibility)
         and WebSocket (for unified real-time architecture) are supported.
-        
+
         Args:
             session_id: Target session ID
             notification: Notification dictionary with tool calling information
         """
         if not session_id:
             return
-        
+
         try:
             # Import here to avoid circular dependencies
             from backend.application.services.notifications import get_tool_notification_service
@@ -606,11 +612,57 @@ class LLMClientBase(ABC):
                     tool_names=notification.get('tool_names'),
                     results=notification.get('results')
                 )
-            
+
         except Exception as e:
             # Don't fail the main execution if WebSocket notification fails
             provider_name = self.__class__.__name__.replace('Client', '')
             print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
+
+    async def _send_message_saved_notification(
+        self,
+        session_id: str,
+        message_id: str,
+        role: str
+    ):
+        """
+        Send notification that a message was saved to database.
+
+        This triggers frontend to refresh and display the new message immediately.
+
+        Args:
+            session_id: Target session ID
+            message_id: ID of the saved message
+            role: Message role ('user' for tool_result, 'assistant' for tool_use)
+        """
+        if not session_id:
+            return
+
+        try:
+            from backend.application.services.notifications import get_tool_notification_service
+
+            service = get_tool_notification_service()
+            if not service:
+                print("[DEBUG] Tool notification service not available for MESSAGE_SAVED")
+                return
+
+            # Send custom event to trigger message refresh
+            notification = {
+                'type': 'MESSAGE_SAVED',
+                'message_id': message_id,
+                'role': role,
+                'session_id': session_id
+            }
+
+            # Use connection_manager.send_json instead of _send_to_session
+            success = await service.connection_manager.send_json(session_id, notification)
+
+            if success:
+                print(f"[DEBUG] Sent MESSAGE_SAVED notification for {role} message {message_id}")
+            else:
+                print(f"[DEBUG] Failed to send MESSAGE_SAVED notification (no connection for session {session_id})")
+
+        except Exception as e:
+            print(f"[DEBUG] Failed to send message saved notification: {e}")
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:
