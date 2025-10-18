@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from fastmcp import Client as MCPClient
 from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
+from pydantic import ValidationError
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
@@ -294,6 +295,55 @@ class BaseToolManager(ABC):
 
             # Step 3: Return tool result directly (already in standardized ToolResult format)
             return tool_result
+
+        except ValidationError as e:
+            # Pydantic validation error - format for LLM understanding
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Validation error for tool {tool_name}: {e}")
+
+            # Format validation errors for LLM
+            error_details = []
+            for error in e.errors():
+                field = ".".join(str(loc) for loc in error["loc"])
+                error_type = error["type"]
+                message = error["msg"]
+
+                # Format based on error type
+                if error_type == "unexpected_keyword_argument":
+                    error_details.append(
+                        f"  • Parameter '{field}': Not defined in tool schema (unexpected argument)"
+                    )
+                elif error_type == "missing":
+                    error_details.append(
+                        f"  • Parameter '{field}': Required but not provided"
+                    )
+                elif error_type in ["type_error", "value_error"]:
+                    error_details.append(
+                        f"  • Parameter '{field}': {message}"
+                    )
+                else:
+                    error_details.append(
+                        f"  • Parameter '{field}': {message} (type: {error_type})"
+                    )
+
+            formatted_errors = "\n".join(error_details)
+            error_message = (
+                f"Tool '{tool_name}' parameter validation failed.\n\n"
+                f"Validation errors:\n{formatted_errors}\n\n"
+                f"Please check the tool schema and correct the parameters."
+            )
+
+            from backend.infrastructure.mcp.utils.tool_result import error_response
+            return error_response(
+                error_message,
+                llm_content={
+                    "parts": [{
+                        "type": "text",
+                        "text": error_message
+                    }]
+                }
+            )
 
         except Exception as e:
             # System/infrastructure errors - re-raise for upper layer handling
