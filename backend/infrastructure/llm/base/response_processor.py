@@ -48,13 +48,15 @@ class BaseResponseProcessor(ABC):
     
     @staticmethod
     @abstractmethod
-    def format_response_for_storage(response) -> BaseMessage:
+    def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> BaseMessage:
         """
         Format LLM API response for storage in conversation history.
-        
+
         Args:
             response: Raw LLM API response object
-            
+            tool_calls: Pre-extracted tool calls (optional). If provided, reuses these instead of re-extracting.
+                       This ensures consistent IDs between extract_tool_calls() and format_response_for_storage().
+
         Returns:
             BaseMessage: Formatted message for storage
         """

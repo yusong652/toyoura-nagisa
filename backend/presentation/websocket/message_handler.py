@@ -48,14 +48,14 @@ class WebSocketMessageProcessor:
         location_handler = LocationHandler(connection_manager)
         chat_handler = ChatHandler(connection_manager)
 
-        # Initialize bash confirmation handler
-        bash_confirmation_handler = BashConfirmationHandler(connection_manager)
+        # Initialize tool confirmation handler
+        tool_confirmation_handler = ToolConfirmationHandler(connection_manager)
 
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
             MessageType.CHAT_MESSAGE: chat_handler,
-            MessageType.BASH_CONFIRMATION_RESPONSE: bash_confirmation_handler,
+            MessageType.TOOL_CONFIRMATION_RESPONSE: tool_confirmation_handler,
         }
         
         # Store location handler for external tool access
@@ -218,36 +218,36 @@ class ChatHandler(MessageHandler):
                 )
 
 
-class BashConfirmationHandler(MessageHandler):
+class ToolConfirmationHandler(MessageHandler):
     """
-    Handle bash command confirmation responses from frontend.
+    Handle tool confirmation responses from frontend.
 
-    Purpose: Process user responses to bash command confirmation requests.
-    When user approves/rejects a bash command in the frontend, this handler
-    routes the response to the BashConfirmationService to unblock waiting tools.
+    Purpose: Process user responses to tool confirmation requests (bash, edit, write, etc.).
+    When user approves/rejects a tool operation in the frontend, this handler
+    routes the response to the ToolConfirmationService to unblock waiting tools.
     """
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
-        if message.type == MessageType.BASH_CONFIRMATION_RESPONSE:
+        if message.type == MessageType.TOOL_CONFIRMATION_RESPONSE:
             try:
-                print(f"[BashConfirmationHandler] Processing BASH_CONFIRMATION_RESPONSE from session {session_id}", flush=True)
+                print(f"[ToolConfirmationHandler] Processing TOOL_CONFIRMATION_RESPONSE from session {session_id}", flush=True)
 
                 # Extract confirmation data from message
                 confirmation_id = getattr(message, 'confirmation_id', None)
                 approved = getattr(message, 'approved', False)
                 user_message = getattr(message, 'user_message', None)
 
-                print(f"[BashConfirmationHandler] confirmation_id={confirmation_id}, session_id={session_id}, approved={approved}", flush=True)
+                print(f"[ToolConfirmationHandler] confirmation_id={confirmation_id}, session_id={session_id}, approved={approved}", flush=True)
                 if user_message:
-                    print(f"[BashConfirmationHandler] user_message={user_message}", flush=True)
+                    print(f"[ToolConfirmationHandler] user_message={user_message}", flush=True)
 
                 if not confirmation_id:
-                    logger.warning(f"Missing confirmation_id in BASH_CONFIRMATION_RESPONSE from session {session_id}")
+                    logger.warning(f"Missing confirmation_id in TOOL_CONFIRMATION_RESPONSE from session {session_id}")
                     return
 
                 # Get confirmation service and handle response
-                from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
-                confirmation_service = get_bash_confirmation_service()
+                from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
+                confirmation_service = get_tool_confirmation_service()
 
                 if confirmation_service:
                     # Handle the confirmation response

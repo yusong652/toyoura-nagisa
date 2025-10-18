@@ -60,9 +60,9 @@ class MessageType(str, Enum):
     # Session management
     TITLE_UPDATE = "TITLE_UPDATE"
 
-    # Bash command confirmation
-    BASH_CONFIRMATION_REQUEST = "BASH_CONFIRMATION_REQUEST"
-    BASH_CONFIRMATION_RESPONSE = "BASH_CONFIRMATION_RESPONSE"
+    # Tool confirmation (bash, edit, write, etc.)
+    TOOL_CONFIRMATION_REQUEST = "TOOL_CONFIRMATION_REQUEST"
+    TOOL_CONFIRMATION_RESPONSE = "TOOL_CONFIRMATION_RESPONSE"
 
     # Background process notifications
     BACKGROUND_PROCESS_STARTED = "BACKGROUND_PROCESS_STARTED"
@@ -174,17 +174,19 @@ class EmotionKeywordMessage(BaseWebSocketMessage):
     message_id: Optional[str] = None
 
 
-class BashConfirmationRequestMessage(BaseWebSocketMessage):
-    """Bash command confirmation request message schema"""
-    type: MessageType = MessageType.BASH_CONFIRMATION_REQUEST
+class ToolConfirmationRequestMessage(BaseWebSocketMessage):
+    """Tool confirmation request message schema (for bash, edit, write, etc.)"""
+    type: MessageType = MessageType.TOOL_CONFIRMATION_REQUEST
     confirmation_id: str
+    tool_call_id: str  # ID of the tool call to match with frontend ToolUseBlock
+    tool_name: str
     command: str
     description: Optional[str] = None
 
 
-class BashConfirmationResponseMessage(BaseWebSocketMessage):
-    """Bash command confirmation response message schema"""
-    type: MessageType = MessageType.BASH_CONFIRMATION_RESPONSE
+class ToolConfirmationResponseMessage(BaseWebSocketMessage):
+    """Tool confirmation response message schema"""
+    type: MessageType = MessageType.TOOL_CONFIRMATION_RESPONSE
     confirmation_id: str
     approved: bool
     user_message: Optional[str] = None
@@ -224,7 +226,7 @@ INCOMING_MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT_ACK: HeartbeatMessage,
     MessageType.LOCATION_RESPONSE: LocationResponseMessage,
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
-    MessageType.BASH_CONFIRMATION_RESPONSE: BashConfirmationResponseMessage,
+    MessageType.TOOL_CONFIRMATION_RESPONSE: ToolConfirmationResponseMessage,
 }
 
 # Outgoing message schemas (backend creates these messages to send to frontend)
@@ -241,7 +243,7 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
     MessageType.TTS_CHUNK: TTSChunk,
     # Used via specialized creation functions
-    MessageType.BASH_CONFIRMATION_REQUEST: BashConfirmationRequestMessage,
+    MessageType.TOOL_CONFIRMATION_REQUEST: ToolConfirmationRequestMessage,
     # Background process notifications
     MessageType.BACKGROUND_PROCESS_STARTED: BackgroundProcessNotification,
     MessageType.BACKGROUND_PROCESS_OUTPUT_UPDATE: BackgroundProcessNotification,
@@ -378,26 +380,32 @@ def create_tool_use_message(
     return msg.model_dump(mode="json", exclude_none=True)
 
 
-def create_bash_confirmation_request(
+def create_tool_confirmation_request(
     confirmation_id: str,
+    tool_call_id: str,
+    tool_name: str,
     command: str,
     description: Optional[str] = None,
     session_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Create Bash command confirmation request message
+    """Create tool confirmation request message (for bash, edit, write, etc.)
 
     Args:
         confirmation_id: Unique ID for confirmation request
-        command: Bash command to execute
+        tool_call_id: ID of the tool call (matches frontend ToolUseBlock.id)
+        tool_name: Name of the tool requiring confirmation (bash, edit, write)
+        command: Command/operation to execute
         description: Command description (optional)
         session_id: Session ID
 
     Returns:
-        Bash confirmation request message dictionary
+        Tool confirmation request message dictionary
     """
-    msg = BashConfirmationRequestMessage(
-        type=MessageType.BASH_CONFIRMATION_REQUEST,
+    msg = ToolConfirmationRequestMessage(
+        type=MessageType.TOOL_CONFIRMATION_REQUEST,
         confirmation_id=confirmation_id,
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
         command=command,
         description=description,
         session_id=session_id

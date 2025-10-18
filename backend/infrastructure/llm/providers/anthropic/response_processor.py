@@ -74,8 +74,12 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
             
         for item in response.content:
             if item.type == "tool_use":
+                # Anthropic always provides item.id, but fallback to UUID just in case
+                import uuid
+                tool_call_id = item.id if hasattr(item, 'id') and item.id else str(uuid.uuid4())
+
                 tool_calls.append({
-                    "id": item.id,
+                    "id": tool_call_id,
                     "name": item.name,
                     "arguments": item.input  # 统一使用 arguments 字段
                 })
@@ -188,7 +192,7 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         return "\n".join(thinking_parts).strip() if thinking_parts else None
 
     @staticmethod
-    def format_response_for_storage(response: Any):
+    def format_response_for_storage(response: Any, tool_calls: Optional[List[Dict[str, Any]]] = None):
         """
         Format Anthropic API response for storage as BaseMessage.
 
@@ -199,6 +203,8 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
 
         Args:
             response: Raw Anthropic API response object
+            tool_calls: Pre-extracted tool calls (optional). If provided, reuses these instead of re-extracting.
+                       This ensures consistent IDs between extract_tool_calls() and format_response_for_storage().
 
         Returns:
             BaseMessage object ready for storage
@@ -214,12 +220,38 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         content_list = []
         text_content = ""
 
+        # Create mapping from name to tool_call for reuse
+        tool_calls_map = {}
+        if tool_calls:
+            for tc in tool_calls:
+                tool_calls_map[tc['name']] = tc
+
         for item in response.content:
             if item.type == "text":
                 content_list.append({"type": "text", "text": item.text})
                 text_content += item.text
             elif item.type == "thinking":
                 content_list.append({"type": "thinking", "thinking": item.thinking})
+            elif item.type == "tool_use":
+                # Reuse pre-extracted tool call if available (to preserve IDs)
+                if item.name in tool_calls_map:
+                    tool_call = tool_calls_map[item.name]
+                    content_list.append({
+                        "type": "tool_use",
+                        "id": tool_call['id'],
+                        "name": tool_call['name'],
+                        "input": item.input
+                    })
+                else:
+                    # Fallback: generate new ID if not in pre-extracted tool_calls
+                    import uuid
+                    tool_call_id = item.id if hasattr(item, 'id') and item.id else str(uuid.uuid4())
+                    content_list.append({
+                        "type": "tool_use",
+                        "id": tool_call_id,
+                        "name": item.name,
+                        "input": item.input
+                    })
 
         # Note: keyword parsing is handled at display layer, preserve original text
 

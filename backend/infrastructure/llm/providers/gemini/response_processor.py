@@ -66,11 +66,18 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             return tool_calls
         
         if hasattr(candidate.content, 'parts'):
+            import uuid
             for part in candidate.content.parts:
                 if hasattr(part, 'function_call') and part.function_call:
                     func_call = part.function_call
+                    # Generate unique ID for tool call if not provided by LLM
+                    # This ID is used for user confirmation matching in frontend
+                    tool_call_id = getattr(func_call, 'id', None)
+                    if not tool_call_id:
+                        tool_call_id = str(uuid.uuid4())
+
                     tool_call = {
-                        'id': getattr(func_call, 'id', f"call_{len(tool_calls)}"),
+                        'id': tool_call_id,
                         'name': func_call.name,
                         'arguments': dict(func_call.args) if hasattr(func_call, 'args') else {}
                     }
@@ -78,13 +85,15 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         
         return tool_calls
     @staticmethod
-    def format_response_for_storage(response) -> BaseMessage:
+    def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> BaseMessage:
         """
         Format Gemini API response for storage in conversation history.
-        
+
         Args:
             response: Raw Gemini API response object
-            
+            tool_calls: Pre-extracted tool calls (optional). If provided, reuses these instead of re-extracting.
+                       This ensures consistent IDs between extract_tool_calls() and format_response_for_storage().
+
         Returns:
             BaseMessage: Formatted message for storage
         """
@@ -97,10 +106,17 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         candidate = response.candidates[0]
         if not hasattr(candidate, 'content') or not candidate.content:
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
-        
+
+        # Reuse pre-extracted tool calls if provided, otherwise extract now
+        if tool_calls is None:
+            tool_calls = GeminiResponseProcessor.extract_tool_calls(response)
+
         # Extract thinking content and text parts
         thinking_parts = []
         text_parts = []  # Collect ALL non-thinking text parts
+
+        # Track tool call index to match with pre-extracted tool_calls
+        tool_call_index = 0
 
         # Process all parts from the response
         if hasattr(candidate.content, 'parts'):
@@ -113,14 +129,16 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         # Collect ALL non-thinking text parts (preserves order)
                         text_parts.append(part.text)
                 elif hasattr(part, 'function_call') and part.function_call:
-                    # Include function calls in storage format
-                    func_call = part.function_call
-                    content.append({
-                        "type": "tool_use",
-                        "id": getattr(func_call, 'id', f"call_{len(content)}"),
-                        "name": func_call.name,
-                        "input": dict(func_call.args) if hasattr(func_call, 'args') else {}
-                    })
+                    # Use pre-extracted tool call with consistent ID
+                    if tool_call_index < len(tool_calls):
+                        tool_call = tool_calls[tool_call_index]
+                        content.append({
+                            "type": "tool_use",
+                            "id": tool_call['id'],  # Reuse ID from extract_tool_calls()
+                            "name": tool_call['name'],
+                            "input": tool_call['arguments']
+                        })
+                        tool_call_index += 1
 
         # Build content list for storage
         if thinking_parts:

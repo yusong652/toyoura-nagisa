@@ -226,11 +226,15 @@ class LLMClientBase(ABC):
         # Process tool calls - add response to context manager
         context_manager.add_response(current_response)
 
-        # Save assistant message with tool_use to database
+        # Extract tool calls first (to ensure consistent IDs across save and execution)
         processor = self._get_response_processor()
+        tool_calls = processor.extract_tool_calls(current_response) if processor else []
+
+        # Save assistant message with tool_use to database
+        # Pass extracted tool_calls to reuse the same IDs (avoid regenerating UUIDs)
         if processor:
             try:
-                tool_call_message = processor.format_response_for_storage(current_response)
+                tool_call_message = processor.format_response_for_storage(current_response, tool_calls)
                 from backend.shared.utils.helpers import save_assistant_message
                 # Ensure content is in list format (format_response_for_storage always returns list)
                 content = tool_call_message.content if isinstance(tool_call_message.content, list) else [{"type": "text", "text": str(tool_call_message.content)}]
@@ -241,10 +245,6 @@ class LLMClientBase(ABC):
             except Exception as e:
                 # Log error but don't fail the execution
                 print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
-
-        # Extract tool calls using response processor
-        processor = self._get_response_processor()
-        tool_calls = processor.extract_tool_calls(current_response) if processor else []
 
         if tool_calls:
             # Send tool use notification

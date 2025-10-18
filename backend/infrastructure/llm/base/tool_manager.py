@@ -276,14 +276,14 @@ class BaseToolManager(ABC):
         tool_args = function_call.get("arguments", {})
         tool_id = function_call.get("id", "")
 
-        # tool_id is not used by MCP but preserved for LLM context managers
-        # which need it to properly format tool results in conversation history
-        _ = tool_id
+        # tool_id is used for:
+        # 1. LLM context managers to properly format tool results in conversation history
+        # 2. User confirmation matching (frontend uses it to match confirmation requests to tool blocks)
 
         try:
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
-                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, session_id)
+                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, tool_id, session_id)
                 if rejection_result is not None:
                     # User rejected - return rejection result (already in ToolResult format)
                     return rejection_result
@@ -306,6 +306,7 @@ class BaseToolManager(ABC):
         self,
         tool_name: str,
         tool_args: Dict[str, Any],
+        tool_id: str,
         session_id: str
     ) -> Optional[Dict[str, Any]]:
         """
@@ -314,6 +315,7 @@ class BaseToolManager(ABC):
         Args:
             tool_name: Name of the tool requiring confirmation
             tool_args: Tool arguments
+            tool_id: Tool call ID for matching with frontend
             session_id: Session ID for confirmation (required)
 
         Returns:
@@ -321,7 +323,7 @@ class BaseToolManager(ABC):
         """
 
         approved, user_message = await self._request_user_confirmation(
-            tool_name, tool_args, session_id
+            tool_name, tool_args, tool_id, session_id
         )
 
         if not approved:
@@ -356,9 +358,10 @@ class BaseToolManager(ABC):
         _ = tool_args  # Reserved for future command filtering
         # Define tools that require user confirmation
         CONFIRMATION_REQUIRED_TOOLS = {
-            "bash": True,  # All bash commands require confirmation
+            "bash": True,   # All bash commands require confirmation
+            "edit": True,   # All file edits require confirmation
+            "write": True,  # All file writes require confirmation
             # Add other tools here as needed
-            # "file_write": True,  # Example: file writing might need confirmation
             # "system_command": True,  # Example: other system commands
         }
 
@@ -374,13 +377,14 @@ class BaseToolManager(ABC):
 
         return False
 
-    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], session_id: str) -> tuple[bool, Optional[str]]:
+    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, session_id: str) -> tuple[bool, Optional[str]]:
         """
         Request user confirmation for tool execution.
 
         Args:
             tool_name: Name of the tool to execute
             tool_args: Arguments for the tool
+            tool_id: Tool call ID for matching with frontend
             session_id: Session ID for the confirmation request
 
         Returns:
@@ -389,29 +393,41 @@ class BaseToolManager(ABC):
                                       optional feedback from user when rejecting
         """
         try:
-            from backend.application.services.notifications.bash_confirmation_service import get_bash_confirmation_service
+            from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
 
             llm_settings = get_llm_settings()
-            confirmation_service = get_bash_confirmation_service()
+            confirmation_service = get_tool_confirmation_service()
             if not confirmation_service:
                 if llm_settings.debug:
-                    print(f"[BaseToolManager] Bash confirmation service not available, auto-rejecting {tool_name}")
+                    print(f"[BaseToolManager] Tool confirmation service not available, auto-rejecting {tool_name}")
                 return (False, "Confirmation service not available")
 
-            # Extract command from tool arguments
-            command = tool_args.get("command", "")
-            description = tool_args.get("description", None)
-
-            # Generate a more descriptive message for the user
-            if not description and tool_name == "bash":
-                description = f"Execute bash command: {command}"
+            # Extract command from tool arguments based on tool type
+            if tool_name == "bash":
+                command = tool_args.get("command", "")
+                description = tool_args.get("description", None)
+                if not description:
+                    description = f"Execute bash command: {command}"
+            elif tool_name == "edit":
+                file_path = tool_args.get("file_path", "unknown")
+                command = f"Edit file: {file_path}"
+                description = tool_args.get("description", None)
+            elif tool_name == "write":
+                file_path = tool_args.get("file_path", "unknown")
+                command = f"Write file: {file_path}"
+                description = tool_args.get("description", None)
+            else:
+                command = f"{tool_name} operation"
+                description = tool_args.get("description", None)
 
             if llm_settings.debug:
-                print(f"[BaseToolManager] Requesting user confirmation for {tool_name}: {command}")
+                print(f"[BaseToolManager] Requesting user confirmation for {tool_name} (tool_id={tool_id}): {command}")
 
             # Request confirmation with 60 second timeout
             approved, user_message = await confirmation_service.request_confirmation(
                 session_id=session_id,
+                tool_call_id=tool_id,
+                tool_name=tool_name,
                 command=command,
                 description=description,
                 timeout_seconds=60

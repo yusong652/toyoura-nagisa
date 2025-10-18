@@ -93,10 +93,14 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                 else:
                     parsed_args = arguments
                 
+                # OpenAI always provides tool_call.id, but fallback to UUID just in case
+                import uuid
+                tool_call_id = tool_call.id if hasattr(tool_call, 'id') and tool_call.id else str(uuid.uuid4())
+
                 tool_calls.append({
                     'name': tool_call.function.name,
                     'arguments': parsed_args,
-                    'id': tool_call.id
+                    'id': tool_call_id
                 })
             except Exception as e:
                 print(f"[WARNING] Failed to parse tool call: {e}")
@@ -107,13 +111,15 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
     
     
     @staticmethod
-    def format_response_for_storage(response) -> AssistantMessage:
+    def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> AssistantMessage:
         """
         Format OpenAI response for storage in message history
-        
+
         Args:
             response: OpenAI API response object
-            
+            tool_calls: Pre-extracted tool calls (optional). If provided, reuses these instead of re-extracting.
+                       This ensures consistent IDs between extract_tool_calls() and format_response_for_storage().
+
         Returns:
             AssistantMessage object ready for storage
         """
@@ -122,10 +128,10 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                 role="assistant",
                 content=[{"type": "text", "text": ""}]
             )
-        
+
         choice = response.choices[0].message
         content_blocks = []
-        
+
         # Handle text content - preserve original format
         text_content = OpenAIResponseProcessor.extract_text_content(response)
         if text_content:
@@ -133,22 +139,21 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                 "type": "text",
                 "text": text_content
             })
-        
-        # Handle tool calls
-        tool_calls = None
-        if hasattr(choice, 'tool_calls') and choice.tool_calls:
+
+        # Reuse pre-extracted tool calls if provided, otherwise extract now
+        if tool_calls is None and hasattr(choice, 'tool_calls') and choice.tool_calls:
             tool_calls = OpenAIResponseProcessor.extract_tool_calls(response)
-        
+
         # Create AssistantMessage
         message = AssistantMessage(
             role="assistant",
             content=content_blocks if content_blocks else [{"type": "text", "text": ""}]
         )
-        
+
         # Add tool calls if present
         if tool_calls:
             message.tool_calls = tool_calls
-        
+
         return message
     
     @staticmethod

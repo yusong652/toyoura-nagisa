@@ -8,10 +8,12 @@ export enum ConnectionStatus {
 }
 
 /**
- * Bash confirmation request data structure
+ * Tool confirmation request data structure (bash, edit, write, etc.)
  */
-export interface BashConfirmationData {
+export interface ToolConfirmationData {
   confirmation_id: string
+  tool_call_id: string  // ID to match with ToolUseBlock.id
+  tool_name: string
   command: string
   description?: string
   timestamp?: string
@@ -28,7 +30,7 @@ export interface ConnectionContextType {
   checkConnection: () => Promise<boolean>
   waitForConnection: (timeout?: number) => Promise<boolean>
 
-  // Bash confirmation management
-  pendingBashConfirmation: BashConfirmationData | null
-  clearPendingBashConfirmation: () => void
+  // Tool confirmation management (bash, edit, write, etc.)
+  pendingToolConfirmation: ToolConfirmationData | null
+  clearPendingToolConfirmation: () => void
 }

@@ -12,7 +12,7 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  * Tool use block component for displaying tool calls.
  *
  * Shows the tool name, input parameters in a collapsible format.
- * For bash tool, displays interactive command confirmation UI inline.
+ * For tools requiring confirmation (configured in backend), displays interactive confirmation UI inline.
  * Supports multiple tool calls in a single message.
  *
  * Args:
@@ -22,8 +22,8 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  *     JSX element with tool call display
  */
 const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
-  // Use Connection Context for bash confirmation management
-  const { pendingBashConfirmation, clearPendingBashConfirmation } = useConnection()
+  // Use Connection Context for tool confirmation management
+  const { pendingToolConfirmation, clearPendingToolConfirmation } = useConnection()
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus | null>(null) // null = no confirmation UI, will be set to pending when request arrives
@@ -33,10 +33,6 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   const blockIdRef = useRef(block.id)
 
   const hasInput = block.input && Object.keys(block.input).length > 0
-
-  // Check if this is a bash tool call with command parameter
-  const isBashTool = block.name === 'bash'
-  const bashCommand = isBashTool && block.input?.command ? block.input.command : null
 
   // Send confirmation response via WebSocket
   const sendConfirmationResponse = useCallback(async (confirmationId: string, approved: boolean, userMessage?: string) => {
@@ -57,7 +53,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       const response = {
-        type: 'BASH_CONFIRMATION_RESPONSE',
+        type: 'TOOL_CONFIRMATION_RESPONSE',
         confirmation_id: confirmationId,
         approved,
         user_message: userMessage,
@@ -66,9 +62,8 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
 
       try {
         ws.send(JSON.stringify(response))
-        console.log(`[ToolUseBlock] Sent confirmation response: ${approved ? 'approved' : 'rejected'}`)
       } catch (error) {
-        console.error('[ToolUseBlock] Error sending confirmation response:', error)
+        console.error('[ToolUseBlock] Error sending tool confirmation response:', error)
       }
     }
   }, [])
@@ -95,36 +90,35 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   useEffect(() => {
     // Check if there's a pending confirmation that matches this tool block
     // Using React Context instead of window global variables
-    if (pendingBashConfirmation && isBashTool && bashCommand) {
-      if (pendingBashConfirmation.command === bashCommand) {
-        setCurrentConfirmationId(pendingBashConfirmation.confirmation_id)
+    if (pendingToolConfirmation) {
+      // Match by tool_call_id (precise matching for multiple same-type tools)
+      if (pendingToolConfirmation.tool_call_id === block.id) {
+        setCurrentConfirmationId(pendingToolConfirmation.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
-        clearPendingBashConfirmation()
+        clearPendingToolConfirmation()
       }
     }
 
     // Also listen for new confirmation requests via event
-    const handleBashConfirmationRequest = (event: CustomEvent) => {
+    const handleToolConfirmationRequest = (event: CustomEvent) => {
       const data = event.detail
 
-      // Match this confirmation request to this tool block by checking if:
-      // 1. It's a bash command
-      // 2. The command matches (if available)
-      if (isBashTool && bashCommand && data.command === bashCommand) {
+      // Match this confirmation request to this tool block by tool_call_id
+      if (data.tool_call_id === block.id) {
         setCurrentConfirmationId(data.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
-        clearPendingBashConfirmation()
+        clearPendingToolConfirmation()
       }
     }
 
-    window.addEventListener('bashConfirmationRequest', handleBashConfirmationRequest as EventListener)
+    window.addEventListener('toolConfirmationRequest', handleToolConfirmationRequest as EventListener)
 
     return () => {
-      window.removeEventListener('bashConfirmationRequest', handleBashConfirmationRequest as EventListener)
+      window.removeEventListener('toolConfirmationRequest', handleToolConfirmationRequest as EventListener)
     }
-  }, [isBashTool, bashCommand, block.id, pendingBashConfirmation, clearPendingBashConfirmation])
+  }, [block.id, pendingToolConfirmation, clearPendingToolConfirmation])
 
   // Keyboard navigation for pending confirmation
   useEffect(() => {
@@ -187,11 +181,20 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
         )}
       </div>
 
-      {/* Display bash command with interactive confirmation */}
-      {isBashTool && bashCommand && (
+      {/* Display tool operation with interactive confirmation (for tools requiring confirmation) */}
+      {confirmationStatus && (
         <div className="tool-use-bash-command">
-          <div className="bash-command-label">Command:</div>
-          <code className="bash-command-text">{bashCommand}</code>
+          <div className="bash-command-label">
+            {block.name === 'bash' ? 'Command:' :
+             block.name === 'edit' ? 'Edit:' :
+             block.name === 'write' ? 'Write:' : 'Operation:'}
+          </div>
+          <code className="bash-command-text">
+            {block.name === 'bash' && block.input?.command ? block.input.command as string :
+             block.name === 'edit' && block.input?.file_path ? `${block.input.file_path}` :
+             block.name === 'write' && block.input?.file_path ? `${block.input.file_path}` :
+             'Unknown operation'}
+          </code>
 
           {/* Show interactive buttons when pending confirmation */}
           {confirmationStatus === 'pending' && (

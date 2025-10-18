@@ -59,12 +59,12 @@ class WebSocketHandler:
 
         # Initialize application services
         from backend.application.services.notifications.message_status_service import MessageStatusService
-        from backend.application.services.notifications.bash_confirmation_service import BashConfirmationService
+        from backend.application.services.notifications.tool_confirmation_service import ToolConfirmationService
         from backend.application.services.notifications.emotion_notification_service import EmotionNotificationService
         from backend.application.services.notifications.tool_notification_service import ToolNotificationService
         from backend.application.services.notifications.background_process_notification_service import BackgroundProcessNotificationService
         self.status_service = MessageStatusService(self.connection_manager)
-        self.bash_confirmation_service = BashConfirmationService(self.connection_manager)
+        self.tool_confirmation_service = ToolConfirmationService(self.connection_manager)
         self.emotion_service = EmotionNotificationService(self.connection_manager)
         self.tool_notification_service = ToolNotificationService(self.connection_manager)
         self.background_process_notification_service = BackgroundProcessNotificationService(self.connection_manager)

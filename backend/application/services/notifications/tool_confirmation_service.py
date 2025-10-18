@@ -1,7 +1,7 @@
 """
-Bash Command Confirmation Service - DDD Application Layer
+Tool Confirmation Service - DDD Application Layer
 
-This service handles bash command confirmation requests, coordinating between
+This service handles tool confirmation requests (bash, edit, write, etc.), coordinating between
 MCP tools that need user approval and the WebSocket frontend for user interaction.
 
 DDD Role: Application Service
@@ -14,16 +14,16 @@ import logging
 import uuid
 from typing import Optional, Dict
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
-from backend.presentation.websocket.message_types import create_bash_confirmation_request
+from backend.presentation.websocket.message_types import create_tool_confirmation_request
 
 logger = logging.getLogger(__name__)
 
 
-class BashConfirmationService:
+class ToolConfirmationService:
     """
-    Application Service for Bash Command Confirmations.
+    Application Service for Tool Confirmations.
 
-    Manages the lifecycle of bash command confirmation requests:
+    Manages the lifecycle of tool confirmation requests (bash, edit, write, etc.):
     - Sends confirmation requests to frontend via WebSocket
     - Tracks pending confirmations with timeout handling
     - Provides async interface for MCP tools to await user approval
@@ -32,7 +32,7 @@ class BashConfirmationService:
 
     def __init__(self, connection_manager: ConnectionManager):
         """
-        Initialize bash confirmation service.
+        Initialize tool confirmation service.
 
         Args:
             connection_manager: WebSocket connection manager instance
@@ -43,18 +43,22 @@ class BashConfirmationService:
     async def request_confirmation(
         self,
         session_id: str,
+        tool_call_id: str,
+        tool_name: str,
         command: str,
         description: Optional[str] = None,
         timeout_seconds: int = 60
     ) -> tuple[bool, Optional[str]]:
         """
-        Request user confirmation for a bash command.
+        Request user confirmation for a tool execution.
 
         Sends confirmation request to frontend and waits for response.
 
         Args:
             session_id: WebSocket session ID for the user
-            command: The bash command to execute
+            tool_call_id: ID of the tool call (for matching with frontend)
+            tool_name: Name of the tool requiring confirmation (bash, edit, write)
+            command: The command/operation to execute
             description: Optional description of what the command does
             timeout_seconds: Timeout for waiting for confirmation (default 60s)
 
@@ -73,8 +77,10 @@ class BashConfirmationService:
 
         try:
             # Send confirmation request to frontend
-            request_msg = create_bash_confirmation_request(
+            request_msg = create_tool_confirmation_request(
                 confirmation_id=confirmation_id,  # Use unique confirmation ID
+                tool_call_id=tool_call_id,
+                tool_name=tool_name,
                 command=command,
                 description=description,
                 session_id=session_id
@@ -83,9 +89,9 @@ class BashConfirmationService:
             # Check if session is connected
             if await self.connection_manager.is_connected(session_id):
                 await self.connection_manager.send_json(session_id, request_msg)
-                logger.info(f"Sent bash confirmation request {confirmation_id} for session {session_id}, command: {command}")
+                logger.info(f"Sent tool confirmation request {confirmation_id} for session {session_id}, tool: {tool_name}, command: {command}")
             else:
-                logger.warning(f"Session {session_id} not connected, auto-rejecting bash command")
+                logger.warning(f"Session {session_id} not connected, auto-rejecting tool: {tool_name}")
                 return (False, None)
 
             # Wait for response with timeout
@@ -111,7 +117,7 @@ class BashConfirmationService:
         """
         Handle confirmation response from frontend.
 
-        Called by the WebSocket message handler when a BASH_CONFIRMATION_RESPONSE is received.
+        Called by the WebSocket message handler when a TOOL_CONFIRMATION_RESPONSE is received.
 
         Args:
             confirmation_id: The unique confirmation ID from the response
@@ -139,12 +145,12 @@ class BashConfirmationService:
             logger.info(f"With user message: {user_message}")
         return True
 
-def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
+def get_tool_confirmation_service() -> Optional[ToolConfirmationService]:
     """
-    Get bash confirmation service from WebSocketHandler.
+    Get tool confirmation service from WebSocketHandler.
 
     Returns:
-        BashConfirmationService instance or None if not initialized
+        ToolConfirmationService instance or None if not initialized
 
     Note:
         The service is initialized and managed by WebSocketHandler,
@@ -163,13 +169,12 @@ def get_bash_confirmation_service() -> Optional[BashConfirmationService]:
             return None
 
         handler = app.state.websocket_handler
-        if not hasattr(handler, 'bash_confirmation_service'):
-            logger.warning("Bash confirmation service not found in WebSocket handler")
+        if not hasattr(handler, 'tool_confirmation_service'):
+            logger.warning("Tool confirmation service not found in WebSocket handler")
             return None
 
-        return handler.bash_confirmation_service
+        return handler.tool_confirmation_service
 
     except Exception as e:
-        logger.warning(f"Could not get bash confirmation service: {e}")
+        logger.warning(f"Could not get tool confirmation service: {e}")
         return None
-    

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
-import { ConnectionStatus, ConnectionContextType, BashConfirmationData } from '../../types/connection'
+import { ConnectionStatus, ConnectionContextType, ToolConfirmationData } from '../../types/connection'
 import GeolocationService from '../../utils/geolocation'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
@@ -20,7 +20,7 @@ interface ConnectionProviderProps {
 export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CONNECTING)
   const [connectionError, setConnectionError] = useState<string | null>(null)
-  const [pendingBashConfirmation, setPendingBashConfirmation] = useState<BashConfirmationData | null>(null)
+  const [pendingToolConfirmation, setPendingToolConfirmation] = useState<ToolConfirmationData | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const locationRequestHandler = useRef<((data: any) => void) | null>(null)
 
@@ -357,18 +357,27 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           }))
         }
 
-        // Handle bash confirmation requests
-        if (data.type === 'BASH_CONFIRMATION_REQUEST') {
-          // Store in state for late-mounting components (React-idiomatic approach)
-          setPendingBashConfirmation({
+        // Handle tool confirmation requests (bash, edit, write, etc.)
+        if (data.type === 'TOOL_CONFIRMATION_REQUEST') {
+          console.log('[ConnectionContext] Received TOOL_CONFIRMATION_REQUEST', {
             confirmation_id: data.confirmation_id,
+            tool_call_id: data.tool_call_id,
+            tool_name: data.tool_name,
+            command: data.command
+          })
+
+          // Store in state for late-mounting components (React-idiomatic approach)
+          setPendingToolConfirmation({
+            confirmation_id: data.confirmation_id,
+            tool_call_id: data.tool_call_id,
+            tool_name: data.tool_name,
             command: data.command,
             description: data.description,
             timestamp: data.timestamp
           })
 
           // Also dispatch custom event for immediate notification
-          window.dispatchEvent(new CustomEvent('bashConfirmationRequest', {
+          window.dispatchEvent(new CustomEvent('toolConfirmationRequest', {
             detail: data
           }))
         }
@@ -456,9 +465,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     locationRequestHandler.current = handler
   }, [])
 
-  // Clear pending bash confirmation
-  const clearPendingBashConfirmation = useCallback(() => {
-    setPendingBashConfirmation(null)
+  // Clear pending tool confirmation
+  const clearPendingToolConfirmation = useCallback(() => {
+    setPendingToolConfirmation(null)
   }, [])
 
   // No longer need to expose pending confirmation via window global
@@ -520,8 +529,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       onLocationRequest,
       checkConnection,
       waitForConnection,
-      pendingBashConfirmation,
-      clearPendingBashConfirmation
+      pendingToolConfirmation,
+      clearPendingToolConfirmation
     }}>
       {children}
     </ConnectionContext.Provider>
