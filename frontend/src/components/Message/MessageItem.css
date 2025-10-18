@@ -678,6 +678,7 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   max-width: 100%;
+  min-width: 400px;
   overflow: hidden;
 }
 
@@ -849,6 +850,7 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   max-width: 100%;
+  min-width: 400px;
   overflow: hidden;
 }
 
@@ -1014,6 +1016,7 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   max-width: 100%;
+  min-width: 400px;
   overflow: hidden;
 }
 
