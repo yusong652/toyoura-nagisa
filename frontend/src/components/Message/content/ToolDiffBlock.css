@@ -1,0 +1,14 @@
+/**
+ * ToolDiffBlock styles - File operation tool display.
+ *
+ * Minimal styles for tool-diff-block container.
+ * Confirmation UI styles inherited from MessageItem.css (.tool-use-bash-command, etc.)
+ */
+
+/* Main container */
+.tool-diff-block {
+  margin: 8px 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
