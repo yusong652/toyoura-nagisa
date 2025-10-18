@@ -1,22 +1,25 @@
 import React, { useEffect, useRef } from 'react'
 import ToolStateDisplay from './ToolStateDisplay'
-import BashConfirmation from './BashConfirmation'
 import { useWebSocketToolStateSimple } from '../../hooks/useWebSocketToolState'
 
 /**
  * Live Tool State Display Component
- * 
+ *
  * A WebSocket-powered real-time tool state display that shows active tool usage
  * information as it happens. This component combines the base ToolStateDisplay
  * with WebSocket event handling for live updates.
- * 
+ *
  * Features:
  * - Real-time WebSocket tool state updates
  * - Automatic show/hide based on tool activity
  * - Consistent UI with existing tool state displays
  * - Automatic scrolling to keep tool state visible
  * - Zero configuration required
- * 
+ *
+ * Note:
+ * Bash confirmation logic has been migrated to ToolUseBlock component
+ * for better context integration and message history visibility.
+ *
  * Usage:
  * Place this component at the chat interface level to show real-time
  * tool usage feedback to users.
@@ -32,7 +35,7 @@ const LiveToolStateDisplay: React.FC = () => {
       let scrollableParent = displayRef.current.parentElement
       while (scrollableParent) {
         const style = window.getComputedStyle(scrollableParent)
-        if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
             scrollableParent.classList.contains('chatbox')) {
           break
         }
@@ -60,8 +63,6 @@ const LiveToolStateDisplay: React.FC = () => {
           <ToolStateDisplay toolState={toolState} />
         </div>
       )}
-      {/* BashConfirmation always rendered to maintain persistent event listener */}
-      <BashConfirmation />
     </>
   )
 }

@@ -22,7 +22,7 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  */
 const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus>('approved') // Default to approved for historical messages
+  const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus | null>(null) // null = no confirmation UI, will be set to pending when request arrives
   const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve')
   const [currentConfirmationId, setCurrentConfirmationId] = useState<string | null>(null)
 
@@ -95,19 +95,36 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     }
   }, [currentConfirmationId, sendConfirmationResponse])
 
-  // Listen for bash confirmation requests
+  // Check for pending confirmation on mount and listen for new requests
   useEffect(() => {
+    // Check if there's a pending confirmation that matches this tool block
+    const getPendingConfirmation = (window as any).__getPendingConfirmation
+
+    if (getPendingConfirmation && isBashTool && bashCommand) {
+      const pendingData = getPendingConfirmation()
+
+      if (pendingData && pendingData.command === bashCommand) {
+        setCurrentConfirmationId(pendingData.confirmation_id)
+        setConfirmationStatus('pending')
+        // Clear the pending confirmation since we've consumed it
+        const clearPending = (window as any).__clearPendingConfirmation
+        if (clearPending) clearPending()
+      }
+    }
+
+    // Also listen for new confirmation requests
     const handleBashConfirmationRequest = (event: CustomEvent) => {
       const data = event.detail
 
       // Match this confirmation request to this tool block by checking if:
       // 1. It's a bash command
       // 2. The command matches (if available)
-      // 3. The timing is recent (within last few seconds)
       if (isBashTool && bashCommand && data.command === bashCommand) {
-        console.log(`[ToolUseBlock] Received confirmation request for block ${block.id}`)
         setCurrentConfirmationId(data.confirmation_id)
         setConfirmationStatus('pending')
+        // Clear the pending confirmation since we've consumed it
+        const clearPending = (window as any).__clearPendingConfirmation
+        if (clearPending) clearPending()
       }
     }
 
@@ -185,6 +202,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
           <div className="bash-command-label">Command:</div>
           <code className="bash-command-text">{bashCommand}</code>
 
+          {/* Show interactive buttons when pending confirmation */}
           {confirmationStatus === 'pending' && (
             <div className="bash-confirmation-interactive">
               <button
@@ -214,7 +232,8 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
             </div>
           )}
 
-          {confirmationStatus !== 'pending' && (
+          {/* Show status badge after confirmation (approved/rejected) */}
+          {confirmationStatus !== null && confirmationStatus !== 'pending' && (
             <div className="bash-confirmation-status">
               <span className={`status-badge ${confirmationStatus}`}>
                 {confirmationStatus === 'approved' ? '✓ Approved' : '✗ Rejected'}

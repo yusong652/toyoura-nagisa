@@ -22,7 +22,10 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const locationRequestHandler = useRef<((data: any) => void) | null>(null)
-  
+
+  // Store pending bash confirmation requests for late-mounting components
+  const pendingConfirmationRef = useRef<any | null>(null)
+
   // Reconnection management
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef<number>(0)
@@ -267,7 +270,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       try {
         const data = JSON.parse(event.data)
         console.log("[WebSocket] received message:", data)
-        
+
         // Handle heartbeat messages
         if (data.type === 'HEARTBEAT') {
           console.log('WebSocket received heartbeat, sending ACK')
@@ -375,13 +378,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
         // Handle bash confirmation requests
         if (data.type === 'BASH_CONFIRMATION_REQUEST') {
-          console.log('[ConnectionContext] Dispatching bashConfirmationRequest event with data:', data)
+          // Store in ref for late-mounting components
+          pendingConfirmationRef.current = data
+
           // Dispatch custom event for bash confirmation dialog
-          const event = new CustomEvent('bashConfirmationRequest', {
+          window.dispatchEvent(new CustomEvent('bashConfirmationRequest', {
             detail: data
-          })
-          window.dispatchEvent(event)
-          console.log('[ConnectionContext] bashConfirmationRequest event dispatched')
+          }))
         }
 
         // Handle background process notifications
@@ -465,6 +468,14 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   // Register location request handler
   const onLocationRequest = useCallback((handler: (data: any) => void) => {
     locationRequestHandler.current = handler
+  }, [])
+
+  // Expose pending confirmation ref for late-mounting components
+  useEffect(() => {
+    // Expose getter and setter functions for pending confirmation
+    (window as any).__getPendingConfirmation = () => pendingConfirmationRef.current
+    (window as any).__clearPendingConfirmation = () => { pendingConfirmationRef.current = null }
+    // Note: No cleanup - these functions should persist for the app lifetime
   }, [])
 
   // Expose WebSocket connection globally for services
