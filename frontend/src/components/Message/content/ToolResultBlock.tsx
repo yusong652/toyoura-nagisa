@@ -10,8 +10,9 @@ interface ToolResultBlockProps {
 /**
  * Tool result block component for displaying tool execution results.
  *
- * Shows tool results with proper formatting, supports both success and error states.
- * Handles text content with markdown rendering and collapsible display for long results.
+ * Shows tool results with scrollable viewport and height limit.
+ * Supports both success and error states with markdown rendering.
+ * Default expanded with limited height for better UX.
  *
  * Args:
  *     block: ToolResultBlock object with tool name, content, and error status
@@ -20,6 +21,7 @@ interface ToolResultBlockProps {
  *     JSX element with tool result display
  */
 const ToolResultBlock: React.FC<ToolResultBlockProps> = ({ block }) => {
+  // Default to expanded state for better visibility
   const [isExpanded, setIsExpanded] = useState(true)
 
   // Extract text content from parts
@@ -28,49 +30,48 @@ const ToolResultBlock: React.FC<ToolResultBlockProps> = ({ block }) => {
     .map(part => part.text)
     .join('\n')
 
-  const isLongContent = textContent.length > 500
-  const displayContent = isExpanded || !isLongContent
-    ? textContent
-    : textContent.substring(0, 500) + '...'
-
   return (
     <div className={`tool-result-block ${block.is_error ? 'error' : 'success'}`}>
       <div className="tool-result-header">
         <span className="tool-result-prompt">{block.is_error ? '✗' : '✓'}</span>
         <span className="tool-result-name">{block.tool_name}</span>
-        {isLongContent && (
-          <button
-            className="tool-result-toggle"
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-label={isExpanded ? 'Collapse result' : 'Expand result'}
-          >
-            {isExpanded ? '−' : '+'}
-          </button>
-        )}
+        <button
+          className="tool-result-toggle"
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-label={isExpanded ? 'Collapse result' : 'Expand result'}
+        >
+          {isExpanded ? '−' : '+'}
+        </button>
       </div>
 
-      <div className="tool-result-content">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            code({ node, inline, className, children, ...props }: any) {
-              return inline ? (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              ) : (
-                <pre className="code-block">
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                </pre>
-              )
-            }
-          }}
-        >
-          {displayContent}
-        </ReactMarkdown>
-      </div>
+      {isExpanded && (
+        <div className="tool-result-content">
+          <div className="tool-result-viewport">
+            <div className="tool-result-scrollable">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ node, inline, className, children, ...props }: any) {
+                    return inline ? (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <pre className="code-block">
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      </pre>
+                    )
+                  }
+                }}
+              >
+                {textContent}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

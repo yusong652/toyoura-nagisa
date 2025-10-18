@@ -741,7 +741,107 @@
   word-break: break-all;
 }
 
-/* Tool Result Block Styles - Bash Terminal Style */
+/* Bash command display in tool-use block */
+.tool-use-bash-command {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.bash-command-label {
+  color: #808080;
+  font-size: 11px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.bash-command-text {
+  display: block;
+  background-color: #2d2d2d;
+  border-radius: 2px;
+  padding: 6px 8px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d4d4d4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 6px;
+}
+
+.bash-confirmation-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.status-badge.approved {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-badge.rejected {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-badge.pending {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+/* Interactive confirmation buttons */
+.bash-confirmation-interactive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.bash-confirm-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  padding: 2px 4px;
+  transition: all 0.2s ease;
+}
+
+.bash-confirm-btn:hover {
+  opacity: 1;
+}
+
+.bash-confirm-btn.reject {
+  color: #71717a;
+}
+
+.bash-confirm-btn.approve {
+  color: #71717a;
+}
+
+/* Tool Result Block Styles - Enhanced with Scrollable Viewport */
 .tool-result-block {
   border-radius: 4px;
   padding: 8px 12px;
@@ -768,7 +868,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
   font-size: 13px;
   line-height: 1.4;
 }
@@ -812,15 +911,55 @@
 }
 
 .tool-result-content {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #3a3a3a;
   font-size: 13px;
   line-height: 1.6;
   color: #d4d4d4;
   text-align: left;
-  word-wrap: break-word;
 }
 
-.tool-result-content .code-block {
+/* Scrollable viewport for tool result - minimalist bash style */
+.tool-result-viewport {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 60px;
+  max-height: 300px;
   background-color: #2d2d2d;
+  border-radius: 2px;
+  padding: 8px;
+  margin-top: 4px;
+  /* Custom scrollbar styling - minimalist */
+  scrollbar-width: thin;
+  scrollbar-color: #505050 #2d2d2d;
+}
+
+.tool-result-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tool-result-viewport::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.tool-result-viewport::-webkit-scrollbar-thumb {
+  background: #505050;
+  border-radius: 2px;
+}
+
+.tool-result-viewport::-webkit-scrollbar-thumb:hover {
+  background: #606060;
+}
+
+.tool-result-scrollable {
+  position: relative;
+  z-index: 0;
+}
+
+.tool-result-scrollable .code-block {
+  background-color: #252525;
   border-radius: 2px;
   padding: 8px;
   margin: 6px 0;
@@ -828,34 +967,43 @@
   max-width: 100%;
 }
 
-.tool-result-content code {
+.tool-result-scrollable code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 12px;
-  background-color: #2d2d2d;
+  background-color: #252525;
   padding: 2px 4px;
   border-radius: 2px;
   color: #ce9178;
 }
 
-.tool-result-content pre code {
+.tool-result-scrollable pre code {
   background-color: transparent;
   padding: 0;
   color: #d4d4d4;
 }
 
-.tool-result-content p {
-  margin: 4px 0;
+.tool-result-scrollable p {
+  margin: 6px 0;
   text-align: left;
+  word-wrap: break-word;
 }
 
-.tool-result-content ul,
-.tool-result-content ol {
+.tool-result-scrollable p:first-child {
+  margin-top: 0;
+}
+
+.tool-result-scrollable p:last-child {
+  margin-bottom: 0;
+}
+
+.tool-result-scrollable ul,
+.tool-result-scrollable ol {
   margin: 4px 0;
   padding-left: 20px;
   text-align: left;
 }
 
-/* Thinking Block Styles - Bash Terminal Style */
+/* Thinking Block Styles - Enhanced with Scrollable Viewport */
 .thinking-block {
   background: #1e1e1e;
   border: 1px solid #3a3a3a;
@@ -922,9 +1070,60 @@
   text-align: left;
 }
 
+/* Scrollable viewport for thinking content - minimalist bash style */
+.thinking-viewport {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 80px;
+  max-height: 200px;
+  background-color: #2d2d2d;
+  border-radius: 2px;
+  padding: 8px;
+  margin-top: 4px;
+  /* Custom scrollbar styling - minimalist */
+  scrollbar-width: thin;
+  scrollbar-color: #505050 #2d2d2d;
+}
+
+.thinking-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.thinking-viewport::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.thinking-viewport::-webkit-scrollbar-thumb {
+  background: #505050;
+  border-radius: 2px;
+}
+
+.thinking-viewport::-webkit-scrollbar-thumb:hover {
+  background: #606060;
+}
+
+.thinking-scrollable {
+  position: relative;
+  z-index: 0;
+}
+
 .thinking-content p {
   margin: 4px 0;
   text-align: left;
+}
+
+.thinking-scrollable p {
+  margin: 6px 0;
+  text-align: left;
+}
+
+.thinking-scrollable p:first-child {
+  margin-top: 0;
+}
+
+.thinking-scrollable p:last-child {
+  margin-bottom: 0;
 }
 
 /* Slide-in animation for tool blocks */

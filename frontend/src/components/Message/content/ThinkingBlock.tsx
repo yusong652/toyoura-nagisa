@@ -9,7 +9,8 @@ interface ThinkingBlockProps {
 /**
  * Thinking block component for displaying AI reasoning process.
  *
- * Shows the AI's internal thought process in a collapsible format.
+ * Shows the AI's internal thought process with scrollable viewport.
+ * Default expanded with limited height for better UX.
  * Useful for debugging and understanding AI decision-making.
  *
  * Args:
@@ -19,7 +20,8 @@ interface ThinkingBlockProps {
  *     JSX element with thinking content display
  */
 const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ block }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
+  // Default to expanded state for better visibility
+  const [isExpanded, setIsExpanded] = useState(true)
 
   return (
     <div className="thinking-block">
@@ -39,7 +41,11 @@ const ThinkingBlock: React.FC<ThinkingBlockProps> = ({ block }) => {
 
       {isExpanded && (
         <div className="thinking-content">
-          <ReactMarkdown>{block.thinking}</ReactMarkdown>
+          <div className="thinking-viewport">
+            <div className="thinking-scrollable">
+              <ReactMarkdown>{block.thinking}</ReactMarkdown>
+            </div>
+          </div>
         </div>
       )}
     </div>
