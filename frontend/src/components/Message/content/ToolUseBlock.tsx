@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolUseBlock as ToolUseBlockType } from '../../../types/chat'
 import { useConnection } from '../../../contexts/connection/ConnectionContext'
+import ToolDiffViewer from './ToolDiffViewer'
 
 interface ToolUseBlockProps {
   block: ToolUseBlockType
@@ -32,6 +33,10 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   const blockIdRef = useRef(block.id)
 
   const hasInput = block.input && Object.keys(block.input).length > 0
+
+  // Check if this tool should display diff viewer (edit/write tools)
+  const shouldShowDiff = (block.name === 'edit' || block.name === 'write') &&
+                         block.input?.file_path
 
   // Send confirmation response via WebSocket
   const sendConfirmationResponse = useCallback(async (approved: boolean, userMessage?: string) => {
@@ -165,7 +170,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
       <div className="tool-use-header">
         <span className="tool-use-prompt">$</span>
         <span className="tool-use-name">{block.name}</span>
-        {hasInput && (
+        {hasInput && !shouldShowDiff && (
           <button
             className="tool-use-toggle"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -175,6 +180,17 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
           </button>
         )}
       </div>
+
+      {/* Display diff viewer for edit/write tools */}
+      {shouldShowDiff && (
+        <ToolDiffViewer
+          toolName={block.name as 'edit' | 'write'}
+          filePath={block.input.file_path as string}
+          oldString={block.input.old_string as string | undefined}
+          newString={block.input.new_string as string | undefined}
+          content={block.input.content as string | undefined}
+        />
+      )}
 
       {/* Display tool operation with interactive confirmation (for tools requiring confirmation) */}
       {confirmationStatus && (
@@ -232,7 +248,8 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
         </div>
       )}
 
-      {hasInput && isExpanded && (
+      {/* Show raw JSON parameters only for non-diff tools */}
+      {!shouldShowDiff && hasInput && isExpanded && (
         <div className="tool-use-input">
           <pre className="tool-use-input-content">
             {JSON.stringify(block.input, null, 2)}
