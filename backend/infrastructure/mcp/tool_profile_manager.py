@@ -78,6 +78,7 @@ class ToolProfileManager:
         # Shared tool (only include once)
         "web_search",
         # PFC tools
+        "pfc_query_python_api",
         "pfc_execute_command",
         "pfc_execute_script",
         "pfc_check_task_status",
@@ -99,6 +100,7 @@ class ToolProfileManager:
         # Search tools for finding PFC documentation and examples
         "web_search",
         # PFC-specific tools (WebSocket-based ITASCA SDK control)
+        "pfc_query_python_api",     # Query PFC Python SDK documentation (ALWAYS try first)
         "pfc_execute_command",      # Execute native PFC commands (no return values)
         "pfc_execute_script",       # Execute Python SDK scripts (with return values)
         "pfc_check_task_status",    # Query status of long-running tasks

@@ -1,0 +1,317 @@
+{
+  "module": "itasca.ball",
+  "description": "Ball object management in PFC - primary objects for discrete element simulations",
+  "import_statement": "import itasca as it",
+  "functions": [
+    {
+      "name": "create",
+      "signature": "itasca.ball.create(rad: float, pos: tuple, **kwargs) -> Ball",
+      "description": "Create a single ball at specified position with given radius",
+      "parameters": [
+        {
+          "name": "rad",
+          "type": "float",
+          "required": true,
+          "description": "Ball radius (must be positive)"
+        },
+        {
+          "name": "pos",
+          "type": "tuple",
+          "required": true,
+          "description": "Position as (x, y, z) tuple"
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": false,
+          "description": "Optional ball ID for explicit assignment. If not provided, auto-assigned."
+        }
+      ],
+      "returns": {
+        "type": "Ball",
+        "description": "Ball object instance representing the created ball"
+      },
+      "examples": [
+        {
+          "code": "import itasca as it\n\nball = it.ball.create(rad=0.1, pos=(0, 0, 0))",
+          "description": "Create ball at origin with radius 0.1"
+        },
+        {
+          "code": "ball = it.ball.create(rad=0.15, pos=(1.0, 2.0, 3.0), id=100)",
+          "description": "Create ball with explicit ID 100"
+        },
+        {
+          "code": "# Create multiple balls in a loop\nfor i in range(10):\n    ball = it.ball.create(rad=0.1, pos=(i * 0.5, 0, 0))",
+          "description": "Create 10 balls in a line"
+        }
+      ],
+      "limitations": "For batch creation with packing patterns (cubic, hexagonal) or large numbers of balls, use itasca.command('ball generate ...')  for better performance and advanced features.",
+      "fallback_commands": ["ball.generate"],
+      "see_also": ["ball.list", "ball.find", "ball.delete", "ball.count"],
+      "notes": [
+        "Ball creation modifies the model state immediately",
+        "Created balls are assigned default properties from contact model",
+        "Use this for precise placement of individual balls"
+      ]
+    },
+    {
+      "name": "list",
+      "signature": "itasca.ball.list() -> Iterator[Ball]",
+      "description": "Return an iterator over all balls in the model",
+      "parameters": [],
+      "returns": {
+        "type": "Iterator[Ball]",
+        "description": "Iterator yielding Ball objects. Can be used in for loops or list comprehensions."
+      },
+      "examples": [
+        {
+          "code": "import itasca as it\n\n# Print position of all balls\nfor ball in it.ball.list():\n    print(ball.pos())",
+          "description": "Iterate over all balls and print positions"
+        },
+        {
+          "code": "# Extract Z-velocities using list comprehension\nvelocities = [b.vel_z() for b in it.ball.list()]",
+          "description": "Get list of all ball Z-velocities"
+        },
+        {
+          "code": "# Count balls with velocity below threshold\nimport numpy as np\nslow_balls = sum(1 for b in it.ball.list() if b.vel_z() < 0.01)",
+          "description": "Count settled balls"
+        },
+        {
+          "code": "# Calculate average position\npositions = [b.pos() for b in it.ball.list()]\navg_pos = np.mean(positions, axis=0)",
+          "description": "Calculate centroid of all balls"
+        }
+      ],
+      "best_practices": [
+        "Use list comprehension for data extraction - it's Pythonic and efficient",
+        "Avoid modifying balls during iteration; use list(it.ball.list()) to create snapshot first",
+        "For large models, consider filtering during iteration rather than creating full list",
+        "Combine with NumPy for vectorized operations on extracted data"
+      ],
+      "see_also": ["ball.find", "ball.count"],
+      "notes": [
+        "Returns an iterator, not a list - efficient for large models",
+        "Order is not guaranteed - don't rely on iteration order",
+        "Ball objects remain valid until deleted or model.new"
+      ]
+    },
+    {
+      "name": "find",
+      "signature": "itasca.ball.find(id: int) -> Ball | None",
+      "description": "Find ball by ID number",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "int",
+          "required": true,
+          "description": "Ball ID to search for"
+        }
+      ],
+      "returns": {
+        "type": "Ball | None",
+        "description": "Ball object if found, None if ID doesn't exist"
+      },
+      "examples": [
+        {
+          "code": "import itasca as it\n\nball = it.ball.find(1)\nif ball:\n    print(ball.pos())\nelse:\n    print('Ball not found')",
+          "description": "Find ball with ID 1 and safely check if it exists"
+        },
+        {
+          "code": "# Modify specific ball\nball = it.ball.find(100)\nif ball:\n    ball.set_pos(0, 0, 5.0)",
+          "description": "Find and modify ball position"
+        }
+      ],
+      "best_practices": [
+        "Always check if result is None before using",
+        "Ball IDs are assigned automatically unless specified in create()",
+        "Use ball.list() if you need to find balls by properties rather than ID"
+      ],
+      "see_also": ["ball.list", "ball.create"],
+      "notes": [
+        "Returns None (not exception) if ball doesn't exist",
+        "Ball IDs may not be sequential if balls were deleted",
+        "Finding by ID is O(1) - very fast even for large models"
+      ]
+    },
+    {
+      "name": "count",
+      "signature": "itasca.ball.count() -> int",
+      "description": "Get total number of balls in the model",
+      "parameters": [],
+      "returns": {
+        "type": "int",
+        "description": "Number of balls currently in the model"
+      },
+      "examples": [
+        {
+          "code": "import itasca as it\n\nprint(f'Total balls: {it.ball.count()}')",
+          "description": "Print total ball count"
+        },
+        {
+          "code": "# Verify ball generation\ninitial_count = it.ball.count()\nit.command('ball generate number 1000')\nassert it.ball.count() == initial_count + 1000",
+          "description": "Verify ball generation succeeded"
+        }
+      ],
+      "best_practices": [
+        "More efficient than len(list(it.ball.list())) for just getting count",
+        "Use to verify operations that should create/delete balls"
+      ],
+      "see_also": ["ball.list"],
+      "notes": [
+        "Very fast - O(1) operation"
+      ]
+    }
+  ],
+  "object_methods": [
+    {
+      "class": "Ball",
+      "name": "pos",
+      "signature": "ball.pos() -> tuple",
+      "description": "Get ball position as (x, y, z) tuple",
+      "parameters": [],
+      "returns": {
+        "type": "tuple",
+        "description": "(x, y, z) position coordinates in model space"
+      },
+      "examples": [
+        {
+          "code": "ball = it.ball.find(1)\npos = ball.pos()\nx, y, z = pos",
+          "description": "Get and unpack position"
+        },
+        {
+          "code": "# Calculate distance from origin\nimport numpy as np\ndist = np.linalg.norm(ball.pos())",
+          "description": "Calculate distance using NumPy"
+        }
+      ],
+      "see_also": ["Ball.set_pos", "Ball.vel", "Ball.disp"]
+    },
+    {
+      "class": "Ball",
+      "name": "vel_z",
+      "signature": "ball.vel_z() -> float",
+      "description": "Get Z-component of ball velocity",
+      "parameters": [],
+      "returns": {
+        "type": "float",
+        "description": "Velocity in Z direction"
+      },
+      "examples": [
+        {
+          "code": "if ball.vel_z() < 0.01:\n    print('Ball has settled')",
+          "description": "Check if ball has settled (low velocity)"
+        },
+        {
+          "code": "# Extract all Z-velocities\nvels_z = [b.vel_z() for b in it.ball.list()]",
+          "description": "Get Z-velocities of all balls"
+        }
+      ],
+      "see_also": ["Ball.vel", "Ball.vel_x", "Ball.vel_y"],
+      "notes": [
+        "Returns scalar, not vector",
+        "Positive Z is typically upward in PFC conventions"
+      ]
+    },
+    {
+      "class": "Ball",
+      "name": "vel",
+      "signature": "ball.vel() -> tuple",
+      "description": "Get ball velocity vector as (vx, vy, vz) tuple",
+      "parameters": [],
+      "returns": {
+        "type": "tuple",
+        "description": "(vx, vy, vz) velocity components"
+      },
+      "examples": [
+        {
+          "code": "vel = ball.vel()\nvx, vy, vz = vel",
+          "description": "Get and unpack velocity"
+        },
+        {
+          "code": "# Calculate velocity magnitude\nimport numpy as np\nspeed = np.linalg.norm(ball.vel())",
+          "description": "Calculate speed (velocity magnitude)"
+        }
+      ],
+      "see_also": ["Ball.vel_x", "Ball.vel_y", "Ball.vel_z", "Ball.set_vel"],
+      "notes": [
+        "Returns tuple of 3 floats",
+        "Use vel_x(), vel_y(), vel_z() for individual components"
+      ]
+    },
+    {
+      "class": "Ball",
+      "name": "set_pos",
+      "signature": "ball.set_pos(x: float, y: float, z: float) -> None",
+      "description": "Set ball position to new coordinates",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "float",
+          "required": true,
+          "description": "X coordinate"
+        },
+        {
+          "name": "y",
+          "type": "float",
+          "required": true,
+          "description": "Y coordinate"
+        },
+        {
+          "name": "z",
+          "type": "float",
+          "required": true,
+          "description": "Z coordinate"
+        }
+      ],
+      "returns": {
+        "type": "None",
+        "description": "No return value (modifies ball in place)"
+      },
+      "examples": [
+        {
+          "code": "ball.set_pos(0, 0, 5.0)",
+          "description": "Move ball to position (0, 0, 5)"
+        },
+        {
+          "code": "# Move all balls up by 1.0\nfor ball in it.ball.list():\n    x, y, z = ball.pos()\n    ball.set_pos(x, y, z + 1.0)",
+          "description": "Translate all balls vertically"
+        }
+      ],
+      "see_also": ["Ball.pos", "Ball.set_vel"],
+      "notes": [
+        "Modifies ball state immediately",
+        "May cause overlap with other balls - contacts will update on next cycle",
+        "Use with caution during simulation (can introduce unphysical states)"
+      ]
+    },
+    {
+      "class": "Ball",
+      "name": "delete",
+      "signature": "ball.delete() -> None",
+      "description": "Delete this ball from the model",
+      "parameters": [],
+      "returns": {
+        "type": "None",
+        "description": "No return value (ball is deleted)"
+      },
+      "examples": [
+        {
+          "code": "ball = it.ball.find(1)\nif ball:\n    ball.delete()",
+          "description": "Delete ball with ID 1"
+        },
+        {
+          "code": "# Delete balls below Z threshold\nfor ball in list(it.ball.list()):\n    if ball.pos()[2] < -10:\n        ball.delete()",
+          "description": "Delete balls that fell below threshold"
+        }
+      ],
+      "best_practices": [
+        "Use list(it.ball.list()) to create snapshot before deleting during iteration",
+        "Ball object becomes invalid after deletion - don't use it again"
+      ],
+      "see_also": ["ball.create"],
+      "notes": [
+        "Associated contacts are automatically deleted",
+        "Ball ID is freed and may be reused",
+        "Cannot undo deletion"
+      ]
+    }
+  ]
+}

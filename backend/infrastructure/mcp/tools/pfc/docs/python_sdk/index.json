@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "description": "PFC Python SDK documentation index for quick lookup",
+  "keywords": {
+    "create ball": ["itasca.ball.create"],
+    "create balls": ["itasca.ball.create"],
+    "new ball": ["itasca.ball.create"],
+    "make ball": ["itasca.ball.create"],
+    "add ball": ["itasca.ball.create"],
+    "generate ball": ["itasca.ball.create"],
+    "list balls": ["itasca.ball.list"],
+    "iterate balls": ["itasca.ball.list"],
+    "all balls": ["itasca.ball.list"],
+    "get balls": ["itasca.ball.list"],
+    "loop balls": ["itasca.ball.list"],
+    "find ball": ["itasca.ball.find"],
+    "get ball": ["itasca.ball.find"],
+    "search ball": ["itasca.ball.find"],
+    "ball by id": ["itasca.ball.find"],
+    "count balls": ["itasca.ball.count"],
+    "number of balls": ["itasca.ball.count"],
+    "how many balls": ["itasca.ball.count"],
+    "total balls": ["itasca.ball.count"],
+    "ball position": ["Ball.pos"],
+    "get position": ["Ball.pos"],
+    "ball location": ["Ball.pos"],
+    "where is ball": ["Ball.pos"],
+    "ball coordinates": ["Ball.pos"],
+    "ball velocity": ["Ball.vel", "Ball.vel_z"],
+    "get velocity": ["Ball.vel"],
+    "ball speed": ["Ball.vel"],
+    "velocity z": ["Ball.vel_z"],
+    "vertical velocity": ["Ball.vel_z"],
+    "set position": ["Ball.set_pos"],
+    "move ball": ["Ball.set_pos"],
+    "change position": ["Ball.set_pos"],
+    "relocate ball": ["Ball.set_pos"],
+    "delete ball": ["Ball.delete"],
+    "remove ball": ["Ball.delete"],
+    "destroy ball": ["Ball.delete"]
+  },
+  "modules": {
+    "ball": {
+      "description": "Ball object management",
+      "file": "ball.json",
+      "functions": ["create", "list", "find", "count"],
+      "object_methods": ["pos", "vel", "vel_z", "set_pos", "delete"]
+    }
+  },
+  "quick_ref": {
+    "itasca.ball.create": "ball.json#create",
+    "itasca.ball.list": "ball.json#list",
+    "itasca.ball.find": "ball.json#find",
+    "itasca.ball.count": "ball.json#count",
+    "Ball.pos": "ball.json#Ball.pos",
+    "Ball.vel": "ball.json#Ball.vel",
+    "Ball.vel_z": "ball.json#Ball.vel_z",
+    "Ball.set_pos": "ball.json#Ball.set_pos",
+    "Ball.delete": "ball.json#Ball.delete"
+  },
+  "fallback_hints": {
+    "batch creation": "For creating many balls with packing patterns, use itasca.command('ball generate ...')",
+    "cubic packing": "Python SDK doesn't support cubic packing. Use itasca.command('ball generate cubic ...')",
+    "hexagonal packing": "Python SDK doesn't support hexagonal packing. Use itasca.command('ball generate hexagonal ...')",
+    "model control": "Model operations like cycle, solve use commands. No Python SDK equivalent."
+  }
+}
