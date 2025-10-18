@@ -106,9 +106,11 @@ class LLMClientBase(ABC):
         """
         pass
 
-    def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
+    async def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
         """
-        Add user message to specified session.
+        Add user message to specified session (async).
+
+        Now supports async reminder injection for bash processes and PFC tasks.
 
         Args:
             session_id: Session ID
@@ -127,8 +129,8 @@ class LLMClientBase(ABC):
                 recent_history = recent_history[:-1]
             recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
             context_manager.initialize_session_from_history(recent_msgs)
-        # Add user message and set configuration
-        context_manager.add_user_message_from_data(parsed_data)
+        # Add user message and set configuration (now async)
+        await context_manager.add_user_message_from_data(parsed_data)
 
     async def get_response_from_session(
         self,
@@ -264,7 +266,7 @@ class LLMClientBase(ABC):
                 # Check if this is the last tool result
                 is_last_tool = (i == len(tool_calls) - 1)
 
-                context_manager.add_tool_result(
+                await context_manager.add_tool_result(
                     tool_call['id'],
                     tool_call['name'],
                     result,

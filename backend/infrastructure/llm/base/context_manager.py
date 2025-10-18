@@ -100,16 +100,17 @@ class BaseContextManager(ABC):
         # Mark as initialized
         self._initialized_from_history = True
     
-    def add_user_message(self, user_message: BaseMessage) -> None:
+    async def add_user_message(self, user_message: BaseMessage) -> None:
         """
-        Add a new user message to the context incrementally.
+        Add a new user message to the context incrementally (async).
 
         This method is called for each new user input, adding it to the
         existing context without re-processing historical messages.
 
+        Now supports async reminder injection for both bash processes and PFC tasks.
+
         Args:
             user_message: New user message to add
-            inject_reminders: Whether to inject system reminders into this message
         """
         if not self._initialized_from_history:
             # Fallback to old behavior if not properly initialized
@@ -117,7 +118,8 @@ class BaseContextManager(ABC):
             return
 
         # Inject system reminders to user message content BEFORE formatting and storing
-        reminders = self._get_background_task_reminders()
+        # Now async to support both local bash processes and remote PFC task queries
+        reminders = await self._get_background_task_reminders()
         print(f"[DEBUG] add_user_message: Got {len(reminders)} reminders for session {self.session_id}")
 
         if reminders:
@@ -144,9 +146,9 @@ class BaseContextManager(ABC):
 
         self.working_contents.append(formatted_message)
 
-    def add_user_message_from_data(self, parsed_data: dict) -> None:
+    async def add_user_message_from_data(self, parsed_data: dict) -> None:
         """
-        Create user message from parsed data and update configuration.
+        Create user message from parsed data and update configuration (async).
 
         Args:
             parsed_data: Parsed message data including agent_profile, enable_memory configuration
@@ -166,8 +168,8 @@ class BaseContextManager(ABC):
             id=parsed_data.get('id')
         )
 
-        # Add to context with reminder injection
-        self.add_user_message(user_message)
+        # Add to context with async reminder injection
+        await self.add_user_message(user_message)
 
     @abstractmethod
     def add_response(self, response: Any) -> None:
@@ -184,14 +186,15 @@ class BaseContextManager(ABC):
         pass
     
     @abstractmethod
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
+    async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
-        Add tool execution result to context.
+        Add tool execution result to context (async).
 
         Since we manage messages sequentially, tool results are simply
         appended after their corresponding tool calls.
 
         Provider implementations should inject system reminders to result content if inject_reminders=True.
+        Now async to support querying remote PFC task status.
 
         Args:
             tool_call_id: Unique identifier for tool call
@@ -310,21 +313,77 @@ class BaseContextManager(ABC):
         self.working_contents.clear()
         self._initialized_from_history = False
 
-    def _get_background_task_reminders(self) -> List[str]:
+    async def _get_background_task_reminders(self) -> List[str]:
         """
-        Get background task status reminders.
+        Get background task status reminders (async).
+
+        Queries both local bash processes and remote PFC tasks concurrently.
 
         Returns:
             List[str]: List of reminder strings for active background tasks
         """
+        import asyncio
+
+        reminders = []
+
+        # Query bash processes (local, fast)
         try:
             from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
 
             process_manager = get_process_manager()
-            return process_manager.get_system_reminders(self.session_id)
+            bash_reminders = process_manager.get_system_reminders(self.session_id)
+            reminders.extend(bash_reminders)
+            print(f"[DEBUG] Got {len(bash_reminders)} bash process reminders")
 
         except Exception as e:
-            print(f"[DEBUG] Failed to get background task reminders: {e}")
-            return []
+            print(f"[DEBUG] Failed to get bash process reminders: {e}")
+
+        # Query PFC tasks (remote, may be slow)
+        try:
+            from backend.infrastructure.pfc.websocket_client import get_client
+
+            # Get WebSocket client and query running tasks
+            client = await get_client()
+            result = await client.list_tasks(
+                session_id=self.session_id,
+                offset=0,
+                limit=5  # Only get recent tasks for reminders
+            )
+
+            if result.get("status") == "success":
+                tasks = result.get("data", [])
+                running_tasks = [task for task in tasks if task.get("status") == "running"]
+
+                # Limit to 3 tasks to avoid overwhelming LLM
+                for task in running_tasks[:3]:
+                    task_id = task.get("task_id", "unknown")
+                    description = task.get("description", "")
+                    script_path = task.get("script_path", task.get("name", "unknown"))
+                    elapsed_time = task.get("elapsed_time", 0)
+
+                    reminder = (
+                        f"PFC Task {task_id} "
+                        f"(script: {script_path}) "
+                        f"(status: running) "
+                        f"(elapsed: {elapsed_time:.1f}s) "
+                        f"- {description}. "
+                        "You can check its status and output using the pfc_check_task_status tool."
+                    )
+                    reminders.append(reminder)
+
+                if len(running_tasks) > 3:
+                    additional_count = len(running_tasks) - 3
+                    reminders.append(
+                        f"Note: {additional_count} more PFC task(s) are running. "
+                        "Use pfc_list_tasks to see all tasks."
+                    )
+
+                print(f"[DEBUG] Got {len(running_tasks)} PFC task reminders")
+
+        except Exception as e:
+            # PFC server may not be running - this is normal, don't break the flow
+            print(f"[DEBUG] Failed to get PFC task reminders: {e}")
+
+        return reminders
 
 

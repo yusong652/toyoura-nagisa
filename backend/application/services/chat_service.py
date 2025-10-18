@@ -161,10 +161,10 @@ class ChatService:
         self.save_user_message_to_session(parsed_data)
         print(f"[DEBUG] Saved user message {parsed_data.get('id')} to session {session_id}", flush=True)
 
-        # Add message to LLM client's context manager
+        # Add message to LLM client's context manager (now async for reminder injection)
         from backend.shared.utils.app_context import get_llm_client
         llm_client = get_llm_client()
-        llm_client.add_user_message_to_session(session_id, parsed_data)
+        await llm_client.add_user_message_to_session(session_id, parsed_data)
 
         return {
             'session_id': session_id,

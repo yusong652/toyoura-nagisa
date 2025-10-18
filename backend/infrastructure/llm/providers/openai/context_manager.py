@@ -72,9 +72,9 @@ class OpenAIContextManager(BaseContextManager):
             
             self.working_contents.append(assistant_message)
     
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
+    async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
-        Add tool execution result to context
+        Add tool execution result to context (async)
 
         Args:
             tool_call_id: Tool call identifier
@@ -82,9 +82,9 @@ class OpenAIContextManager(BaseContextManager):
             result: Tool execution result (can contain inline_data for images)
             inject_reminders: Whether to inject system reminders into this result
         """
-        # Inject system reminders to result content if needed
+        # Inject system reminders to result content if needed (async)
         if inject_reminders:
-            reminders = self._get_background_task_reminders()
+            reminders = await self._get_background_task_reminders()
             print(f"[DEBUG] OpenAIContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if reminders:

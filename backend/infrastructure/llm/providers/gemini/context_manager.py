@@ -65,9 +65,9 @@ class GeminiContextManager(BaseContextManager):
             # Add to working context
             self.working_contents.append(raw_content)
     
-    def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
+    async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
-        Add tool execution result to context - unified implementation
+        Add tool execution result to context - unified implementation (async)
 
         Use message formatter to handle format, maintaining consistent architecture pattern with Anthropic
 
@@ -77,10 +77,10 @@ class GeminiContextManager(BaseContextManager):
             result: Tool execution result
             inject_reminders: Whether to inject system reminders into this result
         """
-        # Inject system reminders to result content if needed
+        # Inject system reminders to result content if needed (async)
         if inject_reminders:
             print(f"[DEBUG] GeminiContextManager.add_tool_result: inject_reminders=True for session {self.session_id}")
-            reminders = self._get_background_task_reminders()
+            reminders = await self._get_background_task_reminders()
             print(f"[DEBUG] GeminiContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if len(reminders) == 0:
