@@ -61,6 +61,10 @@ class BaseContextManager(ABC):
 
         # Cached system reminders (captured before tool execution)
         self._cached_system_reminders: List[str] = []
+
+        # PFC task status transition tracking (session-scoped, memory-only)
+        self._notified_completions: set = set()  # Task IDs that have been notified as completed/failed
+        self._last_task_states: Dict[str, str] = {}  # Last known status for each task_id
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -352,7 +356,48 @@ class BaseContextManager(ABC):
 
             if result.get("status") == "success":
                 tasks = result.get("data", [])
-                running_tasks = [task for task in tasks if task.get("status") == "running"]
+                current_states = {}  # Snapshot of current task states
+
+                # Step 1: Detect status transitions (running → completed/failed)
+                completion_notifications = []
+                for task in tasks:
+                    task_id = task.get("task_id", "unknown")
+                    current_status = task.get("status", "unknown")
+                    current_states[task_id] = current_status
+
+                    # Check for transition: was running, now completed/failed
+                    last_status = self._last_task_states.get(task_id)
+                    if (last_status == "running" and
+                        current_status in ["completed", "failed"] and
+                        task_id not in self._notified_completions):
+
+                        # Generate completion notification
+                        description = task.get("description", "")
+                        script_path = task.get("script_path", task.get("name", "unknown"))
+                        elapsed_time = task.get("elapsed_time", 0)
+
+                        # Status icon
+                        status_icon = "✓" if current_status == "completed" else "✗"
+
+                        completion_notifications.append(
+                            f"{status_icon} PFC Task {task_id} {current_status}: "
+                            f"{script_path} (elapsed: {elapsed_time:.1f}s) - {description}. "
+                            f"Use pfc_check_task_status('{task_id}') to see results."
+                        )
+
+                        # Mark as notified
+                        self._notified_completions.add(task_id)
+                        print(f"[DEBUG] Task {task_id} transition detected: running → {current_status}")
+
+                # Step 2: Add completion notifications first (higher priority)
+                reminders.extend(completion_notifications)
+
+                # Step 3: Add running tasks reminders (only tasks not notified as completed)
+                running_tasks = [
+                    task for task in tasks
+                    if task.get("status") == "running"
+                    and task.get("task_id") not in self._notified_completions
+                ]
 
                 # Limit to 3 tasks to avoid overwhelming LLM
                 for task in running_tasks[:3]:
@@ -379,7 +424,10 @@ class BaseContextManager(ABC):
                         "Use pfc_list_tasks to see all tasks."
                     )
 
-                print(f"[DEBUG] Got {len(running_tasks)} PFC task reminders")
+                # Step 4: Update state snapshot for next comparison
+                self._last_task_states = current_states
+
+                print(f"[DEBUG] Got {len(completion_notifications)} completion notifications, {len(running_tasks)} running task reminders")
 
         except Exception as e:
             # PFC server may not be running - this is normal, don't break the flow
