@@ -359,12 +359,13 @@ class BaseContextManager(ABC):
                     task_id = task.get("task_id", "unknown")
                     description = task.get("description", "")
                     script_path = task.get("script_path", task.get("name", "unknown"))
+                    status = task.get("status", "unknown")
                     elapsed_time = task.get("elapsed_time", 0)
 
                     reminder = (
                         f"PFC Task {task_id} "
                         f"(script: {script_path}) "
-                        f"(status: running) "
+                        f"(status: {status}) "
                         f"(elapsed: {elapsed_time:.1f}s) "
                         f"- {description}. "
                         "You can check its status and output using the pfc_check_task_status tool."
