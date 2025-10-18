@@ -102,10 +102,6 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         thinking_parts = []
         text_parts = []  # Collect ALL non-thinking text parts
 
-        # Extract top-level thought
-        if hasattr(candidate, 'thought') and candidate.thought:
-            thinking_parts.append(str(candidate.thought))
-
         # Process all parts from the response
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
@@ -165,14 +161,10 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         try:
             if not hasattr(response, 'candidates') or not response.candidates:
                 return None
-                
+
             candidate = response.candidates[0]
-            
-            # Extract top-level thought
-            if hasattr(candidate, 'thought') and candidate.thought and str(candidate.thought).strip():
-                thinking_parts.append(str(candidate.thought))
-                
-            # Extract part-level thinking
+
+            # Extract part-level thinking (only location where thinking content exists)
             if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
                 for part in candidate.content.parts:
                     if hasattr(part, 'text') and part.text and getattr(part, 'thought', False):
