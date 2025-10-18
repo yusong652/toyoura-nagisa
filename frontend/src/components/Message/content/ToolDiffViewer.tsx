@@ -72,27 +72,25 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
       }
     } else if (toolName === 'edit') {
       // For edit tool, show deletions and additions
-      let lineNum = 1
-
-      // Add old lines as deletions
+      // Deletions start from line 1
       if (oldString) {
         const oldLines = oldString.split('\n')
-        oldLines.forEach(line => {
+        oldLines.forEach((line, idx) => {
           lines.push({
             type: 'deletion',
-            lineNumber: lineNum++,
+            lineNumber: idx + 1,
             content: line
           })
         })
       }
 
-      // Add new lines as additions
+      // Additions also start from line 1 (new content)
       if (newString) {
         const newLines = newString.split('\n')
-        newLines.forEach(line => {
+        newLines.forEach((line, idx) => {
           lines.push({
             type: 'addition',
-            lineNumber: lineNum++,
+            lineNumber: idx + 1,
             content: line
           })
         })
@@ -116,7 +114,6 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
     <div className="tool-diff-viewer">
       <div className="diff-header">
         <div className="diff-file-info">
-          <span className="diff-file-icon">📄</span>
           <span className="diff-file-name">{fileName}</span>
           <span className="diff-file-path">{filePath}</span>
         </div>

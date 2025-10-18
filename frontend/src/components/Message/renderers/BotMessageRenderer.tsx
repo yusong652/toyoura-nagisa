@@ -3,6 +3,7 @@ import StreamingTextRenderer from './StreamingTextRenderer'
 import MessageFiles from '../content/MessageFiles'
 import MessageTimestamp from '../content/MessageTimestamp'
 import ToolUseBlock from '../content/ToolUseBlock'
+import ToolDiffBlock from '../content/ToolDiffBlock'
 import ThinkingBlock from '../content/ThinkingBlock'
 import { BotMessageRendererProps } from '../types'
 import { ContentBlock } from '../../../types/chat'
@@ -64,6 +65,10 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
             />
           )
         case 'tool_use':
+          // Route to specialized component based on tool type
+          if (block.name === 'edit' || block.name === 'write') {
+            return <ToolDiffBlock key={index} block={block} />
+          }
           return <ToolUseBlock key={index} block={block} />
         case 'thinking':
           return <ThinkingBlock key={index} block={block} />
