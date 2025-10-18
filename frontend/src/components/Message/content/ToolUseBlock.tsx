@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolUseBlock as ToolUseBlockType } from '../../../types/chat'
+import { useConnection } from '../../../contexts/connection/ConnectionContext'
 
 interface ToolUseBlockProps {
   block: ToolUseBlockType
@@ -21,6 +22,9 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  *     JSX element with tool call display
  */
 const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
+  // Use Connection Context for bash confirmation management
+  const { pendingBashConfirmation, clearPendingBashConfirmation } = useConnection()
+
   const [isExpanded, setIsExpanded] = useState(false)
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus | null>(null) // null = no confirmation UI, will be set to pending when request arrives
   const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve')
@@ -84,35 +88,23 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
       sendConfirmationResponse(currentConfirmationId, false, 'Command rejected by user')
       setConfirmationStatus('rejected')
       setCurrentConfirmationId(null)
-
-      // Dispatch event to clear tool state
-      window.dispatchEvent(new CustomEvent('toolUseConcluded', {
-        detail: {
-          reason: 'user_rejection',
-          timestamp: new Date().toISOString()
-        }
-      }))
     }
   }, [currentConfirmationId, sendConfirmationResponse])
 
   // Check for pending confirmation on mount and listen for new requests
   useEffect(() => {
     // Check if there's a pending confirmation that matches this tool block
-    const getPendingConfirmation = (window as any).__getPendingConfirmation
-
-    if (getPendingConfirmation && isBashTool && bashCommand) {
-      const pendingData = getPendingConfirmation()
-
-      if (pendingData && pendingData.command === bashCommand) {
-        setCurrentConfirmationId(pendingData.confirmation_id)
+    // Using React Context instead of window global variables
+    if (pendingBashConfirmation && isBashTool && bashCommand) {
+      if (pendingBashConfirmation.command === bashCommand) {
+        setCurrentConfirmationId(pendingBashConfirmation.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
-        const clearPending = (window as any).__clearPendingConfirmation
-        if (clearPending) clearPending()
+        clearPendingBashConfirmation()
       }
     }
 
-    // Also listen for new confirmation requests
+    // Also listen for new confirmation requests via event
     const handleBashConfirmationRequest = (event: CustomEvent) => {
       const data = event.detail
 
@@ -123,8 +115,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
         setCurrentConfirmationId(data.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
-        const clearPending = (window as any).__clearPendingConfirmation
-        if (clearPending) clearPending()
+        clearPendingBashConfirmation()
       }
     }
 
@@ -133,7 +124,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     return () => {
       window.removeEventListener('bashConfirmationRequest', handleBashConfirmationRequest as EventListener)
     }
-  }, [isBashTool, bashCommand, block.id])
+  }, [isBashTool, bashCommand, block.id, pendingBashConfirmation, clearPendingBashConfirmation])
 
   // Keyboard navigation for pending confirmation
   useEffect(() => {

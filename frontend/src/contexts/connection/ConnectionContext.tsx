@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
-import { ConnectionStatus, ConnectionContextType } from '../../types/connection'
+import { ConnectionStatus, ConnectionContextType, BashConfirmationData } from '../../types/connection'
 import GeolocationService from '../../utils/geolocation'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
@@ -20,11 +20,9 @@ interface ConnectionProviderProps {
 export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CONNECTING)
   const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [pendingBashConfirmation, setPendingBashConfirmation] = useState<BashConfirmationData | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const locationRequestHandler = useRef<((data: any) => void) | null>(null)
-
-  // Store pending bash confirmation requests for late-mounting components
-  const pendingConfirmationRef = useRef<any | null>(null)
 
   // Reconnection management
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -329,23 +327,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             }
           }))
         }
-        
-        // Handle tool use notifications
-        if (data.type === 'NAGISA_IS_USING_TOOL') {
-          
-          // Dispatch custom event for other components to listen to
-          window.dispatchEvent(new CustomEvent('toolUseStarted', { 
-            detail: data 
-          }))
-        }
-        
-        if (data.type === 'NAGISA_TOOL_USE_CONCLUDED') {
-
-          // Dispatch custom event for other components to listen to
-          window.dispatchEvent(new CustomEvent('toolUseConcluded', {
-            detail: data
-          }))
-        }
 
         // Handle message creation requests
         if (data.type === 'MESSAGE_CREATE') {
@@ -378,10 +359,15 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
         // Handle bash confirmation requests
         if (data.type === 'BASH_CONFIRMATION_REQUEST') {
-          // Store in ref for late-mounting components
-          pendingConfirmationRef.current = data
+          // Store in state for late-mounting components (React-idiomatic approach)
+          setPendingBashConfirmation({
+            confirmation_id: data.confirmation_id,
+            command: data.command,
+            description: data.description,
+            timestamp: data.timestamp
+          })
 
-          // Dispatch custom event for bash confirmation dialog
+          // Also dispatch custom event for immediate notification
           window.dispatchEvent(new CustomEvent('bashConfirmationRequest', {
             detail: data
           }))
@@ -470,13 +456,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     locationRequestHandler.current = handler
   }, [])
 
-  // Expose pending confirmation ref for late-mounting components
-  useEffect(() => {
-    // Expose getter and setter functions for pending confirmation
-    (window as any).__getPendingConfirmation = () => pendingConfirmationRef.current
-    (window as any).__clearPendingConfirmation = () => { pendingConfirmationRef.current = null }
-    // Note: No cleanup - these functions should persist for the app lifetime
+  // Clear pending bash confirmation
+  const clearPendingBashConfirmation = useCallback(() => {
+    setPendingBashConfirmation(null)
   }, [])
+
+  // No longer need to expose pending confirmation via window global
+  // Using React Context pattern instead for better type safety and maintainability
 
   // Expose WebSocket connection globally for services
   useEffect(() => {
@@ -533,7 +519,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       sendWebSocketMessage,
       onLocationRequest,
       checkConnection,
-      waitForConnection
+      waitForConnection,
+      pendingBashConfirmation,
+      clearPendingBashConfirmation
     }}>
       {children}
     </ConnectionContext.Provider>
