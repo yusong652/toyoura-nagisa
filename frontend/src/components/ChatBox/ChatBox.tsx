@@ -17,7 +17,6 @@ import ChatBoxTitleBar from './components/ChatBoxTitleBar'
 import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
-import { LiveToolStateDisplay } from '../tools'
 import './ChatBox.css'
 
 /**
@@ -87,9 +86,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
             selectedMessageId={selectedMessageId}
             onMessageSelect={setSelectedMessageId}
           />
-          
-          {/* Live Tool State Display - shows real-time tool usage */}
-          <LiveToolStateDisplay />
 
           {/* Scroll anchor for maintaining position */}
           <div className="scroll-anchor" />

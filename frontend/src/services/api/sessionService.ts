@@ -29,11 +29,6 @@ export interface SessionHistoryResponse {
     timestamp?: string
     tool_request?: boolean
     tool_calls?: any[]
-    tool_state?: {
-      is_using_tool?: boolean
-      tool_name?: string
-      action?: string
-    }
     image_path?: string
     video_path?: string
   }>

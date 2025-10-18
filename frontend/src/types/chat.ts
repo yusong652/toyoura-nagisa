@@ -109,7 +109,6 @@ export interface Message {
   isRead?: boolean;                // Marks if user message was read
   newText?: string;                // New text portion for streaming
   onRenderComplete?: () => void;   // Render completion callback
-  toolState?: MessageToolState;    // Real-time tool execution state
 }
 
 // =====================
@@ -126,19 +125,6 @@ export enum MessageStatus {
   SENT = 'sent',       // Successfully sent to backend
   READ = 'read',       // Passed to LLM API by backend
   ERROR = 'error'      // Sending failed
-}
-
-/**
- * Real-time tool execution state.
- *
- * Used to display live tool usage indicators during message streaming.
- * This is separate from tool blocks in content (which are for persistence).
- */
-export interface MessageToolState {
-  isUsingTool: boolean;
-  toolNames?: string[];            // Tool name array for single/multiple tools
-  action?: string;
-  thinking?: string;               // AI thinking content
 }
 
 /**

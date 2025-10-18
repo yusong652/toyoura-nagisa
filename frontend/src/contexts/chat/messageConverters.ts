@@ -22,11 +22,6 @@ export interface BackendMessage {
   image_path?: string
   video_path?: string
   timestamp?: string
-  tool_state?: {
-    is_using_tool?: boolean
-    tool_name?: string
-    action?: string
-  }
 }
 
 // =====================
@@ -276,7 +271,6 @@ export class AssistantMessageConverter implements MessageConverter {
 
   convert(msg: BackendMessage): Message {
     const { text, content, files } = this.extractContent(msg.content)
-    const toolState = this.extractToolState(msg.tool_state)
 
     return {
       id: msg.id || uuidv4(),
@@ -288,8 +282,7 @@ export class AssistantMessageConverter implements MessageConverter {
       status: undefined,
       streaming: false,
       isLoading: false,
-      isRead: true,
-      toolState
+      isRead: true
     }
   }
 
@@ -370,18 +363,6 @@ export class AssistantMessageConverter implements MessageConverter {
     }
 
     return trimmedText
-  }
-
-  private extractToolState(toolState?: BackendMessage['tool_state']): Message['toolState'] {
-    if (!toolState) {
-      return undefined
-    }
-
-    return {
-      isUsingTool: toolState.is_using_tool || false,
-      toolNames: toolState.tool_name ? [toolState.tool_name] : undefined,
-      action: toolState.action
-    }
   }
 }
 

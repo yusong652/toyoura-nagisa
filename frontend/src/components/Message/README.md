@@ -30,13 +30,10 @@ Message/
 ├── avatar/                      # 头像组件
 │   ├── MessageAvatar.tsx        # 消息头像
 │   └── AvatarTooltip.tsx        # 头像提示信息
-├── actions/                     # 操作组件
-│   ├── MessageActions.tsx       # 消息操作容器
-│   ├── DeleteButton.tsx         # 删除按钮
-│   └── SelectButton.tsx         # 选择按钮
-└── tools/                       # 工具相关组件
-    ├── ToolStateDisplay.tsx     # 工具状态显示
-    └── ToolActionText.tsx       # 工具动作文本
+└── actions/                     # 操作组件
+    ├── MessageActions.tsx       # 消息操作容器
+    ├── DeleteButton.tsx         # 删除按钮
+    └── SelectButton.tsx         # 选择按钮
 ```
 
 ## 设计原则
