@@ -38,7 +38,7 @@ class ToolConfirmationService:
             connection_manager: WebSocket connection manager instance
         """
         self.connection_manager = connection_manager
-        self.active_confirmations: Dict[str, asyncio.Future[tuple[bool, Optional[str]]]] = {}  # confirmation_id -> Future
+        self.active_confirmations: Dict[str, asyncio.Future[tuple[bool, Optional[str]]]] = {}  # tool_call_id -> Future
 
     async def request_confirmation(
         self,
@@ -56,7 +56,7 @@ class ToolConfirmationService:
 
         Args:
             session_id: WebSocket session ID for the user
-            tool_call_id: ID of the tool call (for matching with frontend)
+            tool_call_id: ID of the tool call (used for both matching and tracking)
             tool_name: Name of the tool requiring confirmation (bash, edit, write)
             command: The command/operation to execute
             description: Optional description of what the command does
@@ -68,17 +68,13 @@ class ToolConfirmationService:
                                         optional message from user when rejecting
         """
 
-        # Generate unique confirmation ID for this request
-        confirmation_id = str(uuid.uuid4())
-
-        # Create Future for this confirmation request
+        # Create Future for this confirmation request (keyed by tool_call_id)
         confirmation_future: asyncio.Future[tuple[bool, Optional[str]]] = asyncio.Future()
-        self.active_confirmations[confirmation_id] = confirmation_future
+        self.active_confirmations[tool_call_id] = confirmation_future
 
         try:
             # Send confirmation request to frontend
             request_msg = create_tool_confirmation_request(
-                confirmation_id=confirmation_id,  # Use unique confirmation ID
                 tool_call_id=tool_call_id,
                 tool_name=tool_name,
                 command=command,
@@ -89,7 +85,7 @@ class ToolConfirmationService:
             # Check if session is connected
             if await self.connection_manager.is_connected(session_id):
                 await self.connection_manager.send_json(session_id, request_msg)
-                logger.info(f"Sent tool confirmation request {confirmation_id} for session {session_id}, tool: {tool_name}, command: {command}")
+                logger.info(f"Sent tool confirmation request {tool_call_id} for session {session_id}, tool: {tool_name}, command: {command}")
             else:
                 logger.warning(f"Session {session_id} not connected, auto-rejecting tool: {tool_name}")
                 return (False, None)
@@ -100,27 +96,27 @@ class ToolConfirmationService:
                     confirmation_future,
                     timeout=timeout_seconds
                 )
-                logger.info(f"Confirmation {confirmation_id} result: {'approved' if approved else 'rejected'}")
+                logger.info(f"Tool call {tool_call_id} confirmation result: {'approved' if approved else 'rejected'}")
                 if user_message:
                     logger.info(f"User message: {user_message}")
                 return (approved, user_message)
             except asyncio.TimeoutError:
-                logger.warning(f"Confirmation {confirmation_id} timed out after {timeout_seconds}s")
+                logger.warning(f"Tool call {tool_call_id} confirmation timed out after {timeout_seconds}s")
                 return (False, None)
 
         finally:
             # Clean up the Future
-            if confirmation_id in self.active_confirmations:
-                del self.active_confirmations[confirmation_id]
+            if tool_call_id in self.active_confirmations:
+                del self.active_confirmations[tool_call_id]
 
-    def handle_confirmation_response(self, confirmation_id: str, approved: bool, user_message: Optional[str] = None) -> bool:
+    def handle_confirmation_response(self, tool_call_id: str, approved: bool, user_message: Optional[str] = None) -> bool:
         """
         Handle confirmation response from frontend.
 
         Called by the WebSocket message handler when a TOOL_CONFIRMATION_RESPONSE is received.
 
         Args:
-            confirmation_id: The unique confirmation ID from the response
+            tool_call_id: The tool call ID from the response
             approved: Whether the command was approved
             user_message: Optional message from user when rejecting
 
@@ -128,19 +124,19 @@ class ToolConfirmationService:
             bool: True if confirmation was found and processed, False otherwise
         """
 
-        confirmation_future = self.active_confirmations.get(confirmation_id)
+        confirmation_future = self.active_confirmations.get(tool_call_id)
 
         if confirmation_future is None:
-            logger.warning(f"Received response for unknown confirmation: {confirmation_id}")
+            logger.warning(f"Received response for unknown tool call: {tool_call_id}")
             return False
 
         if confirmation_future.done():
-            logger.warning(f"Received duplicate response for confirmation: {confirmation_id}")
+            logger.warning(f"Received duplicate response for tool call: {tool_call_id}")
             return False
 
         # Set the result to wake up the waiting coroutine
         confirmation_future.set_result((approved, user_message))
-        logger.info(f"Processed confirmation {confirmation_id}: {'approved' if approved else 'rejected'}")
+        logger.info(f"Processed tool call {tool_call_id} confirmation: {'approved' if approved else 'rejected'}")
         if user_message:
             logger.info(f"With user message: {user_message}")
         return True

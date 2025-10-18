@@ -28,14 +28,13 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus | null>(null) // null = no confirmation UI, will be set to pending when request arrives
   const [selectedButton, setSelectedButton] = useState<'reject' | 'approve'>('approve')
-  const [currentConfirmationId, setCurrentConfirmationId] = useState<string | null>(null)
 
   const blockIdRef = useRef(block.id)
 
   const hasInput = block.input && Object.keys(block.input).length > 0
 
   // Send confirmation response via WebSocket
-  const sendConfirmationResponse = useCallback(async (confirmationId: string, approved: boolean, userMessage?: string) => {
+  const sendConfirmationResponse = useCallback(async (approved: boolean, userMessage?: string) => {
     let ws = (window as any).__wsConnection
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -54,7 +53,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       const response = {
         type: 'TOOL_CONFIRMATION_RESPONSE',
-        confirmation_id: confirmationId,
+        tool_call_id: block.id,  // Use block.id as tool_call_id
         approved,
         user_message: userMessage,
         timestamp: new Date().toISOString()
@@ -66,25 +65,23 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
         console.error('[ToolUseBlock] Error sending tool confirmation response:', error)
       }
     }
-  }, [])
+  }, [block.id])
 
   // Handle approval
   const handleApprove = useCallback(() => {
-    if (currentConfirmationId) {
-      sendConfirmationResponse(currentConfirmationId, true)
+    if (confirmationStatus === 'pending') {
+      sendConfirmationResponse(true)
       setConfirmationStatus('approved')
-      setCurrentConfirmationId(null)
     }
-  }, [currentConfirmationId, sendConfirmationResponse])
+  }, [confirmationStatus, sendConfirmationResponse])
 
   // Handle rejection
   const handleReject = useCallback(() => {
-    if (currentConfirmationId) {
-      sendConfirmationResponse(currentConfirmationId, false, 'Command rejected by user')
+    if (confirmationStatus === 'pending') {
+      sendConfirmationResponse(false, 'Command rejected by user')
       setConfirmationStatus('rejected')
-      setCurrentConfirmationId(null)
     }
-  }, [currentConfirmationId, sendConfirmationResponse])
+  }, [confirmationStatus, sendConfirmationResponse])
 
   // Check for pending confirmation on mount and listen for new requests
   useEffect(() => {
@@ -93,7 +90,6 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     if (pendingToolConfirmation) {
       // Match by tool_call_id (precise matching for multiple same-type tools)
       if (pendingToolConfirmation.tool_call_id === block.id) {
-        setCurrentConfirmationId(pendingToolConfirmation.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
         clearPendingToolConfirmation()
@@ -106,7 +102,6 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
 
       // Match this confirmation request to this tool block by tool_call_id
       if (data.tool_call_id === block.id) {
-        setCurrentConfirmationId(data.confirmation_id)
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
         clearPendingToolConfirmation()

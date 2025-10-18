@@ -177,7 +177,6 @@ class EmotionKeywordMessage(BaseWebSocketMessage):
 class ToolConfirmationRequestMessage(BaseWebSocketMessage):
     """Tool confirmation request message schema (for bash, edit, write, etc.)"""
     type: MessageType = MessageType.TOOL_CONFIRMATION_REQUEST
-    confirmation_id: str
     tool_call_id: str  # ID of the tool call to match with frontend ToolUseBlock
     tool_name: str
     command: str
@@ -187,7 +186,7 @@ class ToolConfirmationRequestMessage(BaseWebSocketMessage):
 class ToolConfirmationResponseMessage(BaseWebSocketMessage):
     """Tool confirmation response message schema"""
     type: MessageType = MessageType.TOOL_CONFIRMATION_RESPONSE
-    confirmation_id: str
+    tool_call_id: str  # ID of the tool call to match the request
     approved: bool
     user_message: Optional[str] = None
 
@@ -381,7 +380,6 @@ def create_tool_use_message(
 
 
 def create_tool_confirmation_request(
-    confirmation_id: str,
     tool_call_id: str,
     tool_name: str,
     command: str,
@@ -391,8 +389,7 @@ def create_tool_confirmation_request(
     """Create tool confirmation request message (for bash, edit, write, etc.)
 
     Args:
-        confirmation_id: Unique ID for confirmation request
-        tool_call_id: ID of the tool call (matches frontend ToolUseBlock.id)
+        tool_call_id: ID of the tool call (used for both matching and tracking)
         tool_name: Name of the tool requiring confirmation (bash, edit, write)
         command: Command/operation to execute
         description: Command description (optional)
@@ -403,7 +400,6 @@ def create_tool_confirmation_request(
     """
     msg = ToolConfirmationRequestMessage(
         type=MessageType.TOOL_CONFIRMATION_REQUEST,
-        confirmation_id=confirmation_id,
         tool_call_id=tool_call_id,
         tool_name=tool_name,
         command=command,
