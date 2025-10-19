@@ -12,8 +12,9 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE
 
-DOCS_DIR = Path(__file__).parent / "docs" / "python_sdk"
+DOCS_DIR = PFC_DOCS_SOURCE
 
 
 def load_index() -> Dict[str, Any]:
