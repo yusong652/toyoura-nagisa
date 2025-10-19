@@ -1,191 +1,20 @@
-"""
-PFC Python API Query Tool - documentation lookup for PFC Python SDK.
+"""PFC Python API Query Tool - MCP wrapper for SDK documentation queries.
 
-This tool enables LLM to query PFC Python API documentation and should
+This MCP tool enables LLM to query PFC Python API documentation and should
 be used FIRST before falling back to itasca.command() strings.
+
+This is a thin wrapper around the core SDK documentation utilities in
+backend.infrastructure.pfc.sdk_docs, handling only MCP protocol integration
+and error response formatting.
 """
 
-import json
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
+
+from backend.infrastructure.pfc.sdk_docs import search_api, load_api_doc, format_api_doc, load_index
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE
-
-DOCS_DIR = PFC_DOCS_SOURCE
-
-
-def load_index() -> Dict[str, Any]:
-    """Load the index file for fast lookups."""
-    index_path = DOCS_DIR / "index.json"
-    if not index_path.exists():
-        raise FileNotFoundError(f"Index file not found: {index_path}")
-
-    with open(index_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-
-def search_api(query: str) -> Optional[str]:
-    """
-    Search for API based on query keywords.
-
-    Args:
-        query: Natural language query like "create a ball"
-
-    Returns:
-        API name like "itasca.ball.create" or None if not found
-    """
-    index = load_index()
-    query_lower = query.lower()
-
-    # Try direct API name match first
-    if query in index["quick_ref"]:
-        return query
-
-    # Try keyword match with flexible word matching
-    # Split both keyword and query into words and check if all keyword words are in query
-    query_words = set(query_lower.split())
-
-    best_match = None
-    best_score = 0
-
-    for keyword, apis in index["keywords"].items():
-        keyword_words = set(keyword.split())
-        # Calculate how many keyword words match
-        matching_words = keyword_words & query_words
-        score = len(matching_words)
-
-        # If all keyword words are in query, it's a valid match
-        if matching_words == keyword_words and score > best_score:
-            best_match = apis[0]
-            best_score = score
-
-    return best_match
-
-
-def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
-    """
-    Load documentation for a specific API.
-
-    Args:
-        api_name: Full API name like "itasca.ball.create"
-
-    Returns:
-        API documentation dict or None if not found
-    """
-    index = load_index()
-
-    # Get file reference from index
-    ref = index["quick_ref"].get(api_name)
-    if not ref:
-        return None
-
-    # Parse file path and anchor
-    file_name, anchor = ref.split('#')
-    doc_path = DOCS_DIR / file_name
-
-    if not doc_path.exists():
-        return None
-
-    with open(doc_path, 'r', encoding='utf-8') as f:
-        doc = json.load(f)
-
-    # Find the specific function or method
-    if anchor.startswith("Ball."):
-        # Object method
-        method_name = anchor.replace("Ball.", "")
-        for method in doc.get("object_methods", []):
-            if method["name"] == method_name:
-                return method
-    else:
-        # Module function
-        for func in doc.get("functions", []):
-            if func["name"] == anchor:
-                return func
-
-    return None
-
-
-def format_api_doc(api_doc: Dict[str, Any], api_name: str) -> str:
-    """
-    Format API documentation as LLM-friendly markdown.
-
-    Args:
-        api_doc: API documentation dictionary
-        api_name: Full API name for reference
-
-    Returns:
-        Formatted markdown string
-    """
-    lines = []
-
-    # Header
-    lines.append(f"# {api_name}")
-    lines.append("")
-    lines.append(f"**Signature**: `{api_doc['signature']}`")
-    lines.append("")
-
-    # Description
-    lines.append(api_doc['description'])
-    lines.append("")
-
-    # Parameters
-    if api_doc.get('parameters'):
-        lines.append("## Parameters")
-        for param in api_doc['parameters']:
-            required = "**required**" if param['required'] else "*optional*"
-            lines.append(f"- **`{param['name']}`** ({param['type']}, {required}): {param['description']}")
-        lines.append("")
-
-    # Returns
-    if api_doc.get('returns'):
-        ret = api_doc['returns']
-        lines.append(f"## Returns")
-        lines.append(f"**`{ret['type']}`**: {ret['description']}")
-        lines.append("")
-
-    # Examples
-    if api_doc.get('examples'):
-        lines.append("## Examples")
-        for i, ex in enumerate(api_doc['examples'], 1):
-            lines.append(f"### Example {i}: {ex['description']}")
-            lines.append("```python")
-            lines.append(ex['code'])
-            lines.append("```")
-            lines.append("")
-
-    # Limitations (IMPORTANT - guides to command fallback)
-    if api_doc.get('limitations'):
-        lines.append("## ⚠️ Limitations")
-        lines.append(api_doc['limitations'])
-        lines.append("")
-
-        if api_doc.get('fallback_commands'):
-            lines.append(f"**When to use commands instead**: {', '.join(api_doc['fallback_commands'])}")
-            lines.append("")
-
-    # Best Practices
-    if api_doc.get('best_practices'):
-        lines.append("## 💡 Best Practices")
-        for bp in api_doc['best_practices']:
-            lines.append(f"- {bp}")
-        lines.append("")
-
-    # Notes
-    if api_doc.get('notes'):
-        lines.append("## 📝 Notes")
-        for note in api_doc['notes']:
-            lines.append(f"- {note}")
-        lines.append("")
-
-    # See Also
-    if api_doc.get('see_also'):
-        lines.append(f"**See Also**: {', '.join(api_doc['see_also'])}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
