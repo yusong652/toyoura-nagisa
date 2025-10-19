@@ -12,7 +12,6 @@ Core capabilities:
 """
 
 import json
-from pathlib import Path
 from typing import Optional, Dict, Any
 
 from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE
