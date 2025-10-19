@@ -12,8 +12,8 @@ Tools:
 - pfc_query_python_api: Query PFC Python SDK documentation (NEW)
 """
 
-from .pfc_commands import register_pfc_tools
-from .pfc_script import register_pfc_script_tool
+from .pfc_execute_command import register_pfc_tools
+from .pfc_execute_script import register_pfc_script_tool
 from .pfc_task_status import register_pfc_task_status_tool
 from .pfc_list_tasks import register_pfc_list_tasks_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
