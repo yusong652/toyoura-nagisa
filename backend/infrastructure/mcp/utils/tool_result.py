@@ -149,7 +149,7 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
     ).model_dump()
 
 
-def error_response(message: str, **data) -> Dict[str, Any]:
+def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, Any]:
     """Create a standardized error response for all MCP tools.
 
     This function provides a unified way for all tools to return error responses,
@@ -157,20 +157,23 @@ def error_response(message: str, **data) -> Dict[str, Any]:
 
     Args:
         message: Brief user-friendly error message with details (e.g., "File not found: example.txt")
+        llm_content: Optional custom content for LLM in parts format. If not provided,
+            automatically wraps message in <error> tags: {"parts": [{"type": "text", "text": "<error>...</error>"}]}
         **data: Additional error context data (optional)
 
     Returns:
         Dict[str, Any]: ToolResult dictionary with four fields:
             - status: "error"
             - message: str (error description)
-            - llm_content: {"parts": [{"type": "text", "text": "<error>...</error>"}]}
+            - llm_content: Any (custom or auto-generated with <error> tags)
             - data: Dict[str, Any] or None
 
     Note:
-        This function automatically wraps the error message in <error> tags within
-        a parts structure for consistent LLM error handling.
+        If llm_content is not provided, this function automatically wraps the error message
+        in <error> tags within a parts structure for consistent LLM error handling.
 
     Example:
+        # Simple error (auto-wrapped in <error> tags)
         return error_response("File not found: /path/to/file.txt")
         # Returns:
         # {
@@ -179,15 +182,26 @@ def error_response(message: str, **data) -> Dict[str, Any]:
         #   "llm_content": {"parts": [{"type": "text", "text": "<error>File not found...</error>"}]},
         #   "data": None
         # }
+
+        # Custom llm_content for richer error context
+        return error_response(
+            "API not found",
+            llm_content={"parts": [{"type": "text", "text": "⚠️ Try alternative approach..."}]},
+            suggestion="Use fallback tool"
+        )
     """
-    return ToolResult(
-        status="error",
-        message=message,
-        llm_content={
+    # If no custom llm_content provided, use default <error> wrapped format
+    if llm_content is None:
+        llm_content = {
             "parts": [
                 {"type": "text", "text": f"<error>{message}</error>"}
             ]
-        },
+        }
+
+    return ToolResult(
+        status="error",
+        message=message,
+        llm_content=llm_content,
         data=data if data else None,
     ).model_dump()
 
