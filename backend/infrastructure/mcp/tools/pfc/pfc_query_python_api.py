@@ -238,26 +238,13 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 if hints:
                     return error_response(
                         f"No Python SDK API found for '{operation}'.\n\n"
-                        f"Suggestion: {hints[0]}\n\n"
-                        f"Use pfc_query_command tool to search for PFC commands instead.",
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": f"⚠️ Python SDK cannot do this operation.\n\n{hints[0]}"
-                            }]
-                        }
+                        f"⚠️ {hints[0]}\n\n"
+                        f"Use pfc_query_command tool to search for PFC commands instead."
                     )
 
                 return error_response(
-                    f"No Python SDK API found for '{operation}'. "
-                    f"Try pfc_query_command tool to search for commands instead.",
-                    llm_content={
-                        "parts": [{
-                            "type": "text",
-                            "text": f"⚠️ No Python SDK API found for: {operation}\n\n"
-                                   f"**Next step**: Use pfc_query_command tool to search for PFC commands."
-                        }]
-                    }
+                    f"No Python SDK API found for '{operation}'.\n\n"
+                    f"**Next step**: Use pfc_query_command tool to search for PFC commands."
                 )
 
             # Load API documentation
