@@ -1,0 +1,32 @@
+{
+  "module": "template",
+  "description": "Natural language keywords for template module API search",
+  "keywords": {
+    "count templates": ["itasca.clump.template.count"],
+    "number of templates": ["itasca.clump.template.count"],
+    "how many templates": ["itasca.clump.template.count"],
+    "total templates": ["itasca.clump.template.count"],
+    "find template": ["itasca.clump.template.find"],
+    "get template": ["itasca.clump.template.find"],
+    "search template": ["itasca.clump.template.find"],
+    "template by name": ["itasca.clump.template.find"],
+    "find template pebble": ["itasca.clump.template.findpebble"],
+    "search template pebble": ["itasca.clump.template.findpebble"],
+    "template pebble by id": ["itasca.clump.template.findpebble"],
+    "list templates": ["itasca.clump.template.list"],
+    "iterate templates": ["itasca.clump.template.list"],
+    "all templates": ["itasca.clump.template.list"],
+    "get templates": ["itasca.clump.template.list"],
+    "loop templates": ["itasca.clump.template.list"],
+    "make template": ["itasca.clump.template.make"],
+    "create template": ["itasca.clump.template.make"],
+    "template from clump": ["itasca.clump.template.make"],
+    "save clump as template": ["itasca.clump.template.make"],
+    "maximum template id": ["itasca.clump.template.maxid"],
+    "max template id": ["itasca.clump.template.maxid"],
+    "highest id": ["itasca.clump.template.maxid"],
+    "clump definition": ["itasca.clump.template"],
+    "reusable clump": ["itasca.clump.template"],
+    "clump geometry": ["itasca.clump.template"]
+  }
+}

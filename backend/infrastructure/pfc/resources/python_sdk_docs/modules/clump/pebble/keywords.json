@@ -1,0 +1,32 @@
+{
+  "module": "pebble",
+  "description": "Natural language keywords for pebble module API search",
+  "keywords": {
+    "count pebbles": ["itasca.clump.pebble.count"],
+    "number of pebbles": ["itasca.clump.pebble.count"],
+    "how many pebbles": ["itasca.clump.pebble.count"],
+    "total pebbles": ["itasca.clump.pebble.count"],
+    "find pebble": ["itasca.clump.pebble.find"],
+    "get pebble": ["itasca.clump.pebble.find"],
+    "search pebble": ["itasca.clump.pebble.find"],
+    "pebble by id": ["itasca.clump.pebble.find"],
+    "pebbles in box": ["itasca.clump.pebble.inbox"],
+    "pebbles in region": ["itasca.clump.pebble.inbox"],
+    "spatial query": ["itasca.clump.pebble.inbox"],
+    "list pebbles": ["itasca.clump.pebble.list"],
+    "iterate pebbles": ["itasca.clump.pebble.list"],
+    "all pebbles": ["itasca.clump.pebble.list"],
+    "get pebbles": ["itasca.clump.pebble.list"],
+    "loop pebbles": ["itasca.clump.pebble.list"],
+    "maximum pebble id": ["itasca.clump.pebble.maxid"],
+    "max pebble id": ["itasca.clump.pebble.maxid"],
+    "highest id": ["itasca.clump.pebble.maxid"],
+    "nearest pebble": ["itasca.clump.pebble.near"],
+    "closest pebble": ["itasca.clump.pebble.near"],
+    "pebble near point": ["itasca.clump.pebble.near"],
+    "find nearest": ["itasca.clump.pebble.near"],
+    "sphere in clump": ["itasca.clump.pebble"],
+    "clump component": ["itasca.clump.pebble"],
+    "overlapping sphere": ["itasca.clump.pebble"]
+  }
+}
