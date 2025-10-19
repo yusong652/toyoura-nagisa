@@ -1,0 +1,134 @@
+{
+  "class": "Ball",
+  "description": "Ball object representing a single ball in PFC discrete element simulation. Obtained via itasca.ball.create(), itasca.ball.find(), or itasca.ball.list().",
+  "methods": [
+    {
+      "name": "pos",
+      "signature": "ball.pos() -> tuple",
+      "description": "Get ball position as (x, y, z) tuple in model space",
+      "parameters": [],
+      "returns": {
+        "type": "tuple",
+        "description": "(x, y, z) position coordinates"
+      }
+    },
+    {
+      "name": "vel",
+      "signature": "ball.vel() -> tuple",
+      "description": "Get ball velocity vector as (vx, vy, vz) tuple. Use vel_x(), vel_y(), vel_z() for individual components.",
+      "parameters": [],
+      "returns": {
+        "type": "tuple",
+        "description": "(vx, vy, vz) velocity components"
+      }
+    },
+    {
+      "name": "vel_x",
+      "signature": "ball.vel_x() -> float",
+      "description": "Get X-component of ball velocity. Returns scalar.",
+      "parameters": [],
+      "returns": {
+        "type": "float",
+        "description": "Velocity in X direction"
+      }
+    },
+    {
+      "name": "vel_y",
+      "signature": "ball.vel_y() -> float",
+      "description": "Get Y-component of ball velocity. Returns scalar.",
+      "parameters": [],
+      "returns": {
+        "type": "float",
+        "description": "Velocity in Y direction"
+      }
+    },
+    {
+      "name": "vel_z",
+      "signature": "ball.vel_z() -> float",
+      "description": "Get Z-component of ball velocity. Returns scalar. Positive Z is typically upward in PFC conventions.",
+      "parameters": [],
+      "returns": {
+        "type": "float",
+        "description": "Velocity in Z direction"
+      }
+    },
+    {
+      "name": "set_pos",
+      "signature": "ball.set_pos(x: float, y: float, z: float) -> None",
+      "description": "Set ball position to new coordinates. Modifies ball state immediately. May cause overlap with other balls - contacts will update on next cycle. Use with caution during simulation.",
+      "parameters": [
+        {
+          "name": "x",
+          "type": "float",
+          "required": true,
+          "description": "X coordinate"
+        },
+        {
+          "name": "y",
+          "type": "float",
+          "required": true,
+          "description": "Y coordinate"
+        },
+        {
+          "name": "z",
+          "type": "float",
+          "required": true,
+          "description": "Z coordinate"
+        }
+      ],
+      "returns": {
+        "type": "None",
+        "description": "No return value"
+      }
+    },
+    {
+      "name": "set_vel",
+      "signature": "ball.set_vel(vx: float, vy: float, vz: float) -> None",
+      "description": "Set ball velocity to new values. Modifies ball state immediately.",
+      "parameters": [
+        {
+          "name": "vx",
+          "type": "float",
+          "required": true,
+          "description": "X velocity component"
+        },
+        {
+          "name": "vy",
+          "type": "float",
+          "required": true,
+          "description": "Y velocity component"
+        },
+        {
+          "name": "vz",
+          "type": "float",
+          "required": true,
+          "description": "Z velocity component"
+        }
+      ],
+      "returns": {
+        "type": "None",
+        "description": "No return value"
+      }
+    },
+    {
+      "name": "delete",
+      "signature": "ball.delete() -> None",
+      "description": "Delete this ball from the model. Associated contacts are automatically deleted. Ball ID is freed and may be reused. Cannot undo. Use list(it.ball.list()) to create snapshot before deleting during iteration.",
+      "parameters": [],
+      "returns": {
+        "type": "None",
+        "description": "No return value"
+      }
+    },
+    {
+      "name": "id",
+      "signature": "ball.id() -> int",
+      "description": "Get ball ID number. IDs are unique within the model.",
+      "parameters": [],
+      "returns": {
+        "type": "int",
+        "description": "Ball ID"
+      }
+    }
+  ]
+}

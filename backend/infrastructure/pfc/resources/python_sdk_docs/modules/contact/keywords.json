@@ -1,0 +1,21 @@
+{
+  "module": "contact",
+  "description": "Natural language keywords for contact module API search",
+  "keywords": {
+    "count contacts": ["itasca.contact.count"],
+    "number of contacts": ["itasca.contact.count"],
+    "how many contacts": ["itasca.contact.count"],
+    "contact count": ["itasca.contact.count"],
+    "contact energy": ["itasca.contact.energy"],
+    "energy from contacts": ["itasca.contact.energy"],
+    "find contact": ["itasca.contact.find"],
+    "get contact": ["itasca.contact.find"],
+    "search contact": ["itasca.contact.find"],
+    "list contacts": ["itasca.contact.list"],
+    "iterate contacts": ["itasca.contact.list"],
+    "all contacts": ["itasca.contact.list"],
+    "contact iterator": ["itasca.contact.list"],
+    "contact model property": ["itasca.contact.model_prop_index"],
+    "contact property index": ["itasca.contact.model_prop_index"]
+  }
+}

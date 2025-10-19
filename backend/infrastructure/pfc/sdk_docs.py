@@ -37,6 +37,39 @@ def load_index() -> Dict[str, Any]:
         return json.load(f)
 
 
+def load_all_keywords() -> Dict[str, list]:
+    """Load keywords from all modules.
+
+    Loads keywords from:
+    - itasca_keywords.json (top-level module)
+    - modules/*/keywords.json (sub-modules like ball, contact, etc.)
+
+    Returns:
+        Dict mapping keywords to API names
+    """
+    all_keywords = {}
+
+    # Load itasca keywords
+    itasca_keywords_path = PFC_DOCS_SOURCE / "itasca_keywords.json"
+    if itasca_keywords_path.exists():
+        with open(itasca_keywords_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            all_keywords.update(data.get("keywords", {}))
+
+    # Load keywords from all modules
+    modules_dir = PFC_DOCS_SOURCE / "modules"
+    if modules_dir.exists():
+        for module_dir in modules_dir.iterdir():
+            if module_dir.is_dir():
+                keywords_file = module_dir / "keywords.json"
+                if keywords_file.exists():
+                    with open(keywords_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        all_keywords.update(data.get("keywords", {}))
+
+    return all_keywords
+
+
 def search_api(query: str) -> Optional[str]:
     """Search for API based on query keywords.
 
@@ -58,19 +91,15 @@ def search_api(query: str) -> Optional[str]:
         >>> search_api("cubic packing")
         None
     """
-    index = load_index()
+    keywords = load_all_keywords()
     query_lower = query.lower()
-
-    # Try direct API name match first
-    if query in index["quick_ref"]:
-        return query
 
     # Try keyword match with flexible word matching
     query_words = set(query_lower.split())
     best_match = None
     best_score = 0
 
-    for keyword, apis in index["keywords"].items():
+    for keyword, apis in keywords.items():
         keyword_words = set(keyword.split())
         # Calculate how many keyword words match
         matching_words = keyword_words & query_words
@@ -123,15 +152,15 @@ def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
         doc = json.load(f)
 
     # Find the specific function or method
-    if anchor.startswith("Ball."):
-        # Object method
-        method_name = anchor.replace("Ball.", "")
-        for method in doc.get("object_methods", []):
-            if method["name"] == method_name:
+    # Check if it's an object file (contains "methods") or module file (contains "functions")
+    if "methods" in doc:
+        # Object method file (e.g., ball_object.json)
+        for method in doc["methods"]:
+            if method["name"] == anchor:
                 return method
-    else:
-        # Module function
-        for func in doc.get("functions", []):
+    elif "functions" in doc:
+        # Module function file (e.g., ball.json)
+        for func in doc["functions"]:
             if func["name"] == anchor:
                 return func
 
