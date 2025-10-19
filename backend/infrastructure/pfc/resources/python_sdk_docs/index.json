@@ -60,6 +60,11 @@
       "description": "Clump template management - reusable clump definitions",
       "file": "modules/clump/template/module.json",
       "functions": ["count", "find", "findpebble", "list", "make", "maxid"]
+    },
+    "measure": {
+      "description": "Measurement sphere management for monitoring local physical quantities",
+      "file": "modules/measure/module.json",
+      "functions": ["count", "find", "list", "maxid"]
     }
   },
   "objects": {
@@ -215,6 +220,17 @@
         "set_extra", "set_group", "set_prop",
         "valid", "vertices", "wall"
       ]
+    },
+    "Measure": {
+      "description": "Measurement sphere object for monitoring local physical quantities",
+      "file": "modules/measure/Measure.json",
+      "note": "18 methods - measurement spheres monitor stress, strain rate, porosity, and coordination in specified regions",
+      "method_groups": {
+        "identification": "id, valid, delete",
+        "position": "pos, pos_x/y/z, set_pos, set_pos_x/y/z",
+        "geometry": "radius, set_radius",
+        "measurements": "coordination, porosity, size, strainrate, strainrate_full, stress, stress_full"
+      }
     }
   },
   "quick_ref": {
@@ -840,6 +856,30 @@
     "itasca.clump.template.list": "modules/clump/template/module.json#list",
     "itasca.clump.template.make": "modules/clump/template/module.json#make",
     "itasca.clump.template.maxid": "modules/clump/template/module.json#maxid",
+    "itasca.measure.count": "modules/measure/module.json#count",
+    "itasca.measure.find": "modules/measure/module.json#find",
+    "itasca.measure.list": "modules/measure/module.json#list",
+    "itasca.measure.maxid": "modules/measure/module.json#maxid",
+    "Measure.id": "modules/measure/Measure.json#id",
+    "Measure.valid": "modules/measure/Measure.json#valid",
+    "Measure.delete": "modules/measure/Measure.json#delete",
+    "Measure.pos": "modules/measure/Measure.json#pos",
+    "Measure.pos_x": "modules/measure/Measure.json#pos_x",
+    "Measure.pos_y": "modules/measure/Measure.json#pos_y",
+    "Measure.pos_z": "modules/measure/Measure.json#pos_z",
+    "Measure.set_pos": "modules/measure/Measure.json#set_pos",
+    "Measure.set_pos_x": "modules/measure/Measure.json#set_pos_x",
+    "Measure.set_pos_y": "modules/measure/Measure.json#set_pos_y",
+    "Measure.set_pos_z": "modules/measure/Measure.json#set_pos_z",
+    "Measure.radius": "modules/measure/Measure.json#radius",
+    "Measure.set_radius": "modules/measure/Measure.json#set_radius",
+    "Measure.coordination": "modules/measure/Measure.json#coordination",
+    "Measure.porosity": "modules/measure/Measure.json#porosity",
+    "Measure.size": "modules/measure/Measure.json#size",
+    "Measure.strainrate": "modules/measure/Measure.json#strainrate",
+    "Measure.strainrate_full": "modules/measure/Measure.json#strainrate_full",
+    "Measure.stress": "modules/measure/Measure.json#stress",
+    "Measure.stress_full": "modules/measure/Measure.json#stress_full",
     "Template.id": "modules/clump/template/Template.json#id",
     "Template.valid": "modules/clump/template/Template.json#valid",
     "Template.delete": "modules/clump/template/Template.json#delete",

@@ -1,0 +1,47 @@
+{
+  "keywords": {
+    "measurement": ["itasca.measure", "Measure"],
+    "monitoring": ["itasca.measure", "Measure"],
+    "stress": ["Measure.stress", "Measure.stress_full"],
+    "strain": ["Measure.strainrate", "Measure.strainrate_full"],
+    "porosity": ["Measure.porosity"],
+    "coordination": ["Measure.coordination"],
+    "sphere": ["Measure.radius", "Measure.set_radius"],
+    "location": ["Measure.pos", "Measure.set_pos"],
+    "position": ["Measure.pos", "Measure.pos_x", "Measure.pos_y", "Measure.pos_z"],
+    "size distribution": ["Measure.size"],
+    "tensor": ["Measure.stress", "Measure.strainrate"],
+    "void ratio": ["Measure.porosity"],
+    "contact number": ["Measure.coordination"]
+  },
+  "common_tasks": {
+    "monitor stress in region": {
+      "functions": ["itasca.measure.find", "Measure.stress"],
+      "example": "measure = itasca.measure.find(1); stress = measure.stress()"
+    },
+    "track porosity": {
+      "functions": ["itasca.measure.find", "Measure.porosity"],
+      "example": "measure = itasca.measure.find(1); por = measure.porosity()"
+    },
+    "measure coordination number": {
+      "functions": ["itasca.measure.find", "Measure.coordination"],
+      "example": "measure = itasca.measure.find(1); coord = measure.coordination()"
+    },
+    "get particle size distribution": {
+      "functions": ["itasca.measure.find", "Measure.size"],
+      "example": "measure = itasca.measure.find(1); dist = measure.size()"
+    },
+    "iterate all measurements": {
+      "functions": ["itasca.measure.list"],
+      "example": "for m in itasca.measure.list(): print(m.stress())"
+    },
+    "move measurement sphere": {
+      "functions": ["Measure.set_pos"],
+      "example": "measure.set_pos(vec(10, 10, 10))"
+    },
+    "resize measurement sphere": {
+      "functions": ["Measure.set_radius"],
+      "example": "measure.set_radius(3.0)"
+    }
+  }
+}

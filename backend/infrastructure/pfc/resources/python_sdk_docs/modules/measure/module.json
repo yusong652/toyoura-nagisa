@@ -1,0 +1,45 @@
+{
+  "module": "itasca.measure",
+  "description": "Functions and classes for working with Itasca measurement spheres",
+  "functions": {
+    "count": {
+      "signature": "itasca.measure.count() → int",
+      "description": "Get the number of measures",
+      "returns": "int - The number of measurement objects in the model",
+      "example": "num_measures = itasca.measure.count()"
+    },
+    "find": {
+      "signature": "itasca.measure.find(id: int) → Measure",
+      "description": "Get the measure object with the given ID number",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "int",
+          "description": "The ID number of the measurement object to find"
+        }
+      ],
+      "returns": "Measure object or None if not found",
+      "example": "measure = itasca.measure.find(1)"
+    },
+    "list": {
+      "signature": "itasca.measure.list() → iterator",
+      "description": "Get a measure iterator object",
+      "returns": "Iterator object that yields Measure instances",
+      "example": "for m in itasca.measure.list():\n    print(m.id(), m.pos())",
+      "notes": "Use this to iterate over all measurement objects in the model"
+    },
+    "maxid": {
+      "signature": "itasca.measure.maxid() → int",
+      "description": "Get the maximum measure ID",
+      "returns": "int - The highest ID number among all measurement objects",
+      "example": "max_id = itasca.measure.maxid()"
+    }
+  },
+  "classes": ["Measure"],
+  "usage_notes": [
+    "Measurement spheres are used to monitor local values of stress, strain rate, porosity, and coordination number",
+    "Create measurement objects using PFC commands (e.g., 'measure create')",
+    "Access measurement data through the Measure object methods",
+    "Measurements are calculated based on particles within the sphere radius"
+  ]
+}
