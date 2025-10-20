@@ -20,8 +20,6 @@ export enum MessageType {
   STATUS_UPDATE = "STATUS_UPDATE",
   
   // Tool related
-  NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL",
-  NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED",
   TOOL_CALL_REQUEST = "TOOL_CALL_REQUEST",
   TOOL_CALL_RESULT = "TOOL_CALL_RESULT",
   
@@ -73,16 +71,6 @@ export interface StatusMessage extends BaseWebSocketMessage {
   error_message?: string;  // Optional error details when status is "error"
 }
 
-export interface ToolUseMessage extends BaseWebSocketMessage {
-  type: MessageType.NAGISA_IS_USING_TOOL | MessageType.NAGISA_TOOL_USE_CONCLUDED;
-  tool_names?: string[];  // Array of tool names (new format)
-  tool_name?: string;     // Legacy single tool name (backwards compatibility)
-  action?: string;
-  thinking?: string;      // LLM thinking content
-  parameters?: Record<string, any>;
-  results?: Record<string, any>;  // Results for concluded notifications
-  result?: Record<string, any>;   // Legacy result field (backwards compatibility)
-}
 
 export interface TitleUpdateMessage extends BaseWebSocketMessage {
   type: MessageType.TITLE_UPDATE;
@@ -155,7 +143,6 @@ export type WebSocketMessage =
   | HeartbeatMessage
   | ErrorMessage
   | StatusMessage
-  | ToolUseMessage
   | TitleUpdateMessage
   | LocationRequestMessage
   | LocationResponseMessage
@@ -212,25 +199,6 @@ export function createStatusMessage(
     session_id,
     message_id,
     error_message,
-    timestamp: new Date().toISOString()
-  };
-}
-
-export function createToolUseMessage(
-  isUsing: boolean,
-  tool_name?: string,
-  parameters?: Record<string, any>,
-  action?: string,
-  result?: Record<string, any>,
-  session_id?: string
-): ToolUseMessage {
-  return {
-    type: isUsing ? MessageType.NAGISA_IS_USING_TOOL : MessageType.NAGISA_TOOL_USE_CONCLUDED,
-    tool_name,
-    parameters,
-    action,
-    result,
-    session_id,
     timestamp: new Date().toISOString()
   };
 }

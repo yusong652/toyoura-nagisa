@@ -32,7 +32,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const { ttsEnabled } = useTtsEnable()
   const { memoryEnabled } = useMemory()
   const {
-    toolState,
     toolsEnabled,
     currentProfile
   } = useAgent()

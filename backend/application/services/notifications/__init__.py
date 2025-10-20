@@ -13,11 +13,6 @@ from .message_status_service import (
     get_message_status_service
 )
 
-from .tool_notification_service import (
-    ToolNotificationService,
-    get_tool_notification_service
-)
-
 from .emotion_notification_service import (
     EmotionNotificationService,
     get_emotion_notification_service
@@ -27,9 +22,6 @@ __all__ = [
     # Message Status Services
     'MessageStatusService',
     'get_message_status_service',
-    # Tool Notification Services
-    'ToolNotificationService',
-    'get_tool_notification_service',
     # Emotion Notification Services
     'EmotionNotificationService',
     'get_emotion_notification_service'

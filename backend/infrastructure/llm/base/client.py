@@ -179,8 +179,7 @@ class LLMClientBase(ABC):
     async def _recursive_tool_calling(
         self,
         session_id: str,
-        iterations: int = 0,
-        had_tools_in_previous_round: bool = False
+        iterations: int = 0
     ) -> Any:
         """
         Recursive tool calling implementation with user rejection interruption.
@@ -188,7 +187,6 @@ class LLMClientBase(ABC):
         Args:
             session_id: Session ID
             iterations: Current iteration count
-            had_tools_in_previous_round: Whether tools were executed in the previous iteration
 
         Returns:
             Any: Final LLM response
@@ -216,11 +214,6 @@ class LLMClientBase(ABC):
         # Check if response contains tool calls
         processor = self._get_response_processor()
         if not (processor and processor.has_tool_calls(current_response)):
-            # If previous round had tools and now we're done, send concluded notification
-            if had_tools_in_previous_round:
-                concluded_notification = {'type': 'NAGISA_TOOL_USE_CONCLUDED'}
-                await self._send_websocket_tool_notification(session_id, concluded_notification)
-
             # Add final response to context manager before returning
             context_manager.add_response(current_response)
             return current_response  # Normal completion
@@ -249,10 +242,6 @@ class LLMClientBase(ABC):
                 print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
 
         if tool_calls:
-            # Send tool use notification
-            notification = self._create_tool_notification(tool_calls, current_response)
-            await self._send_websocket_tool_notification(session_id, notification)
-
             # Execute tools serially with rejection cascade
             # This aligns with Claude Code's behavior: serial execution with intelligent cascade
             results = await self.tool_manager.handle_multiple_function_calls(
@@ -299,8 +288,8 @@ class LLMClientBase(ABC):
             if rejected_tools:
                 raise UserRejectionInterruption(session_id, rejected_tools)
 
-        # Continue recursively - pass True if we executed tools this round
-        return await self._recursive_tool_calling(session_id, iterations + 1, bool(tool_calls))
+        # Continue recursively
+        return await self._recursive_tool_calling(session_id, iterations + 1)
 
     async def generate_title_from_messages(
         self,
@@ -509,116 +498,10 @@ class LLMClientBase(ABC):
         """
         return tool_result.get('user_rejected', False)
 
-    def _create_tool_notification(
-        self,
-        tool_calls: List[Dict[str, Any]],
-        current_response: Any
-    ) -> Dict[str, Any]:
-        """
-        Create tool use notification data structure.
-
-        Args:
-            tool_calls: List of tool call dictionaries
-            current_response: Current LLM response containing text and thinking content
-
-        Returns:
-            Dict[str, Any]: Notification dictionary ready for WebSocket transmission
-        """
-        num_tools = len(tool_calls)
-        # Extract text and thinking content from response processor
-        processor = self._get_response_processor()
-
-        # Extract text content
-        try:
-            extracted_text = processor.extract_text_content(current_response) if processor else ""
-        except Exception:
-            extracted_text = ""
-
-        # Extract thinking content
-        thinking_content = None
-        try:
-            if processor and hasattr(processor, 'extract_thinking_content'):
-                thinking_content = processor.extract_thinking_content(current_response)
-        except Exception:
-            pass
-        tool_names = [tc.get('name', 'unknown') for tc in tool_calls]
-
-        # Generate action description based on extracted text or tool names
-        if extracted_text and len(extracted_text.strip()) > 0:
-            action = extracted_text.strip()
-            if len(action) > 150:
-                action = action[:147] + "..."
-        else:
-            if num_tools == 1:
-                action = f"Using {tool_names[0]}..."
-            else:
-                action = f"Executing {num_tools} tools in parallel: {', '.join(tool_names)}..."
-
-        # Build notification structure
-        notification = {
-            'type': 'NAGISA_IS_USING_TOOL',
-            'tool_names': tool_names,
-            'action': action
-        }
-
-        # Add thinking content if available
-        if thinking_content:
-            notification['thinking'] = thinking_content
-
-        return notification
-
     async def _clear_session_context(self, session_id: str):
         """Clear session context - shared implementation."""
         # Clear session-specific context manager
         self.cleanup_session_context(session_id)
-    
-    async def _send_websocket_tool_notification(
-        self,
-        session_id: Optional[str],
-        notification: Dict[str, Any]
-    ):
-        """
-        Send tool calling notification via WebSocket.
-
-        This method provides dual-channel notification - both SSE (for backwards compatibility)
-        and WebSocket (for unified real-time architecture) are supported.
-
-        Args:
-            session_id: Target session ID
-            notification: Notification dictionary with tool calling information
-        """
-        if not session_id:
-            return
-
-        try:
-            # Import here to avoid circular dependencies
-            from backend.application.services.notifications import get_tool_notification_service
-
-            service = get_tool_notification_service()
-            if not service:
-                print("[DEBUG] Tool notification service not available")
-                return
-
-            notification_type = notification.get('type')
-
-            if notification_type == 'NAGISA_IS_USING_TOOL':
-                await service.notify_tool_use_started(
-                    session_id=session_id,
-                    tool_names=notification.get('tool_names', []),
-                    action=notification.get('action', ''),
-                    thinking=notification.get('thinking')
-                )
-            elif notification_type == 'NAGISA_TOOL_USE_CONCLUDED':
-                await service.notify_tool_use_concluded(
-                    session_id=session_id,
-                    tool_names=notification.get('tool_names'),
-                    results=notification.get('results')
-                )
-
-        except Exception as e:
-            # Don't fail the main execution if WebSocket notification fails
-            provider_name = self.__class__.__name__.replace('Client', '')
-            print(f"[DEBUG] {provider_name} WebSocket tool notification failed: {e}")
 
     async def _send_message_saved_notification(
         self,
@@ -640,11 +523,11 @@ class LLMClientBase(ABC):
             return
 
         try:
-            from backend.application.services.notifications import get_tool_notification_service
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
 
-            service = get_tool_notification_service()
-            if not service:
-                print("[DEBUG] Tool notification service not available for MESSAGE_SAVED")
+            connection_manager = get_connection_manager()
+            if not connection_manager:
+                print("[DEBUG] Connection manager not available for MESSAGE_SAVED")
                 return
 
             # Send custom event to trigger message refresh
@@ -655,8 +538,8 @@ class LLMClientBase(ABC):
                 'session_id': session_id
             }
 
-            # Use connection_manager.send_json instead of _send_to_session
-            success = await service.connection_manager.send_json(session_id, notification)
+            # Send via WebSocket to trigger frontend message refresh
+            success = await connection_manager.send_json(session_id, notification)
 
             if success:
                 print(f"[DEBUG] Sent MESSAGE_SAVED notification for {role} message {message_id}")
