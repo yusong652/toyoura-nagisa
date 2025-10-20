@@ -4,7 +4,7 @@ This MCP tool enables LLM to query PFC Python API documentation and should
 be used FIRST before falling back to itasca.command() strings.
 
 This is a thin wrapper around the core SDK documentation utilities in
-backend.infrastructure.pfc.sdk_docs, handling only MCP protocol integration
+backend.infrastructure.pfc.sdk, handling only MCP protocol integration
 and error response formatting.
 """
 
@@ -13,13 +13,14 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 
-from backend.infrastructure.pfc.sdk_docs import (
+from backend.infrastructure.pfc.sdk import (
     search_api,
     load_api_doc,
     format_api_doc,
-    format_api_signature,
-    load_index
+    format_api_signature
 )
+from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
+from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
 from backend.infrastructure.pfc.config import SDK_SEARCH_TOP_N
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
@@ -61,7 +62,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
             if not matches:
                 # Check fallback hints
-                index = load_index()
+                index = DocumentationLoader.load_index()
                 hints = []
                 for hint_key, hint_msg in index.get("fallback_hints", {}).items():
                     if hint_key in operation.lower():
@@ -98,8 +99,10 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     }
                 )
 
-            # Get the best match (first result) - now includes metadata
-            best_api_name, best_score, best_metadata = matches[0]
+            # Get the best match (first result) - SearchResult object
+            best_result = matches[0]
+            best_api_name = best_result.api_name
+            best_metadata = best_result.metadata
 
             # Load full documentation for best match
             api_doc = load_api_doc(best_api_name)
@@ -107,16 +110,14 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if not api_doc:
                 return error_response(f"API documentation not found for {best_api_name}")
 
-            # Format full documentation for best match (pass metadata for Contact types)
-            formatted_doc = format_api_doc(api_doc, best_api_name, metadata=best_metadata)
+            # Format full documentation for best match (pass SearchResult for Contact types)
+            formatted_doc = format_api_doc(api_doc, best_result)
 
             # Determine display name (use official full path)
             # Three cases:
             # 1. Contact types: itasca.{ContactType}.{method}
             # 2. Object methods: itasca.{module}.{Class}.{method}
             # 3. Module functions: itasca.{module}.{function} (already full path)
-
-            from backend.infrastructure.pfc.sdk_docs import CLASS_TO_MODULE
 
             display_name = best_api_name  # Default
 
@@ -137,8 +138,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             related_section = ""
             if len(matches) > 1:
                 related_apis = []
-                for api_name, score, metadata in matches[1:]:
-                    sig = format_api_signature(api_name)
+                for result in matches[1:]:
+                    sig = format_api_signature(result.api_name)
                     if sig:
                         related_apis.append(f"- {sig}")
 
@@ -168,8 +169,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     "is_contact_type": bool(best_metadata and 'contact_type' in best_metadata),
                     "contact_type": best_metadata.get('contact_type') if best_metadata else None,
                     "related_apis": [
-                        {"name": name, "score": score}
-                        for name, score, _ in matches[1:]
+                        {"name": result.api_name, "score": result.score}
+                        for result in matches[1:]
                     ] if len(matches) > 1 else []
                 }
             )

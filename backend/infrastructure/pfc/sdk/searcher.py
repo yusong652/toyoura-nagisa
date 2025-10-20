@@ -1,0 +1,98 @@
+"""High-level search orchestrator for PFC SDK APIs.
+
+This module coordinates multiple search strategies and provides
+a unified search interface. It implements the Strategy pattern
+to dynamically select the appropriate search approach.
+
+Architecture:
+    APISearcher orchestrates strategies in priority order:
+    1. PathSearchStrategy (exact path matching)
+    2. KeywordSearchStrategy (natural language)
+    3. Future: SemanticSearchStrategy (embedding-based)
+"""
+
+from typing import List
+from backend.infrastructure.pfc.sdk.models import SearchResult
+from backend.infrastructure.pfc.sdk.search.path_search import PathSearchStrategy
+from backend.infrastructure.pfc.sdk.search.keyword_search import KeywordSearchStrategy
+
+
+class APISearcher:
+    """Orchestrates multiple search strategies.
+
+    This class implements the Strategy pattern, trying different search
+    approaches in priority order until results are found.
+
+    The orchestrator is designed for extensibility - new strategies can
+    be added without modifying existing code.
+    """
+
+    def __init__(self):
+        """Initialize with available search strategies.
+
+        Strategies are tried in the order they appear in the list:
+        1. PathSearchStrategy: For dot-separated paths
+        2. KeywordSearchStrategy: For natural language
+        """
+        self.strategies = [
+            PathSearchStrategy(),      # Try exact path first
+            KeywordSearchStrategy(),   # Fall back to keywords
+            # Future: SemanticSearchStrategy() for embedding-based search
+        ]
+
+    def search(self, query: str, top_n: int = 3) -> List[SearchResult]:
+        """Smart API search with automatic strategy selection.
+
+        Tries strategies in order until results are found:
+        1. Path matching (if query contains '.')
+        2. Keyword matching (always available)
+
+        Args:
+            query: Either an API path or natural language query
+                   Examples:
+                   - "itasca.ball.create" (path)
+                   - "BallBallContact.gap" (path with Contact type)
+                   - "create ball" (natural language)
+                   - "measure count" (natural language)
+            top_n: Maximum number of results to return (default: 3)
+
+        Returns:
+            List of SearchResult objects sorted by score (highest first)
+            Empty list if no matches found
+
+        Example:
+            >>> searcher = APISearcher()
+            >>> results = searcher.search("itasca.ball.create")
+            >>> results[0].api_name
+            "itasca.ball.create"
+            >>> results[0].score
+            999
+            >>> results[0].strategy
+            SearchStrategy.PATH
+        """
+        for strategy in self.strategies:
+            # Check if this strategy can handle the query
+            if strategy.can_handle(query):
+                results = strategy.search(query, top_n)
+                # If we found results, return immediately
+                if results:
+                    return results
+
+        # No strategy found any results
+        return []
+
+    def add_strategy(self, strategy):
+        """Add a new search strategy to the orchestrator.
+
+        This method allows dynamic extension of search capabilities
+        without modifying the core class.
+
+        Args:
+            strategy: Instance of SearchStrategy subclass
+
+        Example:
+            >>> searcher = APISearcher()
+            >>> semantic_strategy = SemanticSearchStrategy()
+            >>> searcher.add_strategy(semantic_strategy)
+        """
+        self.strategies.append(strategy)
