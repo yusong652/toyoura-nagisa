@@ -29,9 +29,59 @@ def _parse_mcp_text_content(text: str) -> Tuple[bool, Dict[str, Any]]:
         return (False, {})
 
 
+def _parse_validation_error_details(error_text: str) -> Optional[Dict[str, str]]:
+    """
+    Parse FastMCP validation error text to extract structured error details.
+
+    Parses error text like:
+    "1 validation error for call[pfc_execute_command]
+     description
+     Unexpected keyword argument [type=unexpected_keyword_argument, ...]"
+
+    Args:
+        error_text: Raw error text from FastMCP
+
+    Returns:
+        Optional[Dict[str, str]]: Parsed error details containing:
+            - param_name: Name of the problematic parameter
+            - error_type: Type of validation error (e.g., 'unexpected_keyword_argument')
+            - error_desc: Human-readable error description
+            Returns None if parsing fails
+    """
+    import re
+
+    # Pattern to extract parameter name and error type from FastMCP error format
+    # Example: "description\n  Unexpected keyword argument [type=unexpected_keyword_argument"
+    param_pattern = r'call\[[\w_]+\]\s+(\w+)\s+'
+    type_pattern = r'\[type=([\w_]+)'
+
+    param_match = re.search(param_pattern, error_text)
+    type_match = re.search(type_pattern, error_text)
+
+    if not param_match:
+        return None
+
+    param_name = param_match.group(1)
+    error_type = type_match.group(1) if type_match else 'unknown'
+
+    # Extract error description (text between param name and [type=...])
+    try:
+        desc_start = error_text.index(param_name) + len(param_name)
+        desc_end = error_text.index('[type=') if '[type=' in error_text else len(error_text)
+        error_desc = error_text[desc_start:desc_end].strip()
+    except (ValueError, IndexError):
+        error_desc = 'Validation error'
+
+    return {
+        'param_name': param_name,
+        'error_type': error_type,
+        'error_desc': error_desc
+    }
+
+
 def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
     """
-    Format MCP validation error as friendly ToolResult for LLM.
+    Format MCP validation error as concise ToolResult for LLM.
 
     When FastMCP parameter validation fails, it returns plain text errors instead
     of JSON. This function converts those errors into standardized ToolResult format
@@ -43,7 +93,7 @@ def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: ToolResult dictionary with:
             - status: "error"
-            - message: User-facing error summary
+            - message: Concise error summary
             - llm_content: Structured content for LLM with helpful guidance
 
     Example:
@@ -53,7 +103,7 @@ def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
     from backend.infrastructure.mcp.utils.tool_result import error_response
 
     # Extract tool name if present in error text
-    tool_name = "unknown tool"
+    tool_name = "unknown"
     if "call[" in error_text and "]" in error_text:
         try:
             start = error_text.index("call[") + 5
@@ -62,21 +112,42 @@ def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
         except (ValueError, IndexError):
             pass
 
-    # Format friendly error message for LLM
-    error_message = (
-        f"Tool parameter validation failed: {tool_name}\n\n"
-        f"MCP Validation Error:\n{error_text}\n\n"
-        f"Common causes:\n"
-        f"  • Provided a parameter that doesn't exist in the tool schema\n"
-        f"  • Missing a required parameter\n"
-        f"  • Parameter value has incorrect type (e.g., string instead of number)\n"
-        f"  • Parameter value doesn't match constraints\n\n"
-        f"Action required:\n"
-        f"  1. Check the tool schema to see accepted parameters\n"
-        f"  2. Verify all required parameters are provided\n"
-        f"  3. Ensure parameter types match the schema\n"
-        f"  4. Retry with corrected parameters"
-    )
+    # Try to parse detailed error information
+    error_details = _parse_validation_error_details(error_text)
+
+    # Build concise error message based on error type
+    if error_details:
+        param_name = error_details['param_name']
+        error_type = error_details['error_type']
+
+        if error_type == 'unexpected_keyword_argument':
+            error_message = (
+                f"Tool '{tool_name}' validation failed: Parameter '{param_name}' does not exist in schema.\n"
+                f"Remove this parameter and check the tool schema for valid parameters."
+            )
+        elif error_type == 'missing':
+            error_message = (
+                f"Tool '{tool_name}' validation failed: Required parameter '{param_name}' is missing.\n"
+                f"Add this parameter with the correct type as specified in the tool schema."
+            )
+        elif error_type in ['type_error', 'value_error']:
+            error_message = (
+                f"Tool '{tool_name}' validation failed: Parameter '{param_name}' has invalid type or value.\n"
+                f"Details: {error_details['error_desc']}\n"
+                f"Check the tool schema for the expected parameter type and constraints."
+            )
+        else:
+            error_message = (
+                f"Tool '{tool_name}' validation failed: Parameter '{param_name}' - {error_details['error_desc']}\n"
+                f"Check the tool schema and correct the parameter."
+            )
+    else:
+        # Fallback to generic message if parsing fails
+        error_message = (
+            f"Tool '{tool_name}' parameter validation failed.\n"
+            f"Raw error: {error_text}\n"
+            f"Check the tool schema and correct your parameters."
+        )
 
     return error_response(
         error_message,
