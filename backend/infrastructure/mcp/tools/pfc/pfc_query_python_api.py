@@ -29,29 +29,24 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         operation: str = Field(
             ...,
             description=(
-                "Describe what you want to do with PFC Python SDK. "
-                "Examples: 'create a ball', 'list all balls', 'get ball velocity', 'find ball by id'"
+                "Keyword query for PFC Python SDK. Use short phrases like "
+                "'create ball', 'list balls', 'ball velocity', 'delete contact'."
             )
         )
     ) -> Dict[str, Any]:
         """
-        Query PFC Python SDK documentation - ALWAYS TRY THIS FIRST!
+        Search PFC Python SDK documentation by keywords - ALWAYS TRY THIS FIRST!
 
-        This tool searches for Python API methods to accomplish your goal.
-        Python SDK is preferred over itasca.command() for type safety and better code quality.
-
-        If Python SDK cannot do what you need, this tool will suggest command fallback.
-
-        Usage strategy:
-        1. Query this tool FIRST for any PFC operation
-        2. If SDK exists, use the returned Python API (preferred)
-        3. If SDK insufficient, see the fallback command suggestion
-        4. Only use pfc_query_command tool if explicitly needed
+        Uses keyword matching to find Python API methods. Python SDK is preferred
+        over itasca.command() for type safety and maintainability.
 
         Examples:
-        - "create a ball" → returns itasca.ball.create()
-        - "list all balls" → returns itasca.ball.list()
-        - "create 1000 balls in cubic packing" → returns ball.create() with limitation note
+        - "create ball" → itasca.ball.create()
+        - "list balls" → itasca.ball.list()
+        - "ball velocity" → Ball.vel()
+
+        If no Python SDK exists for your operation, this tool will suggest
+        using pfc_query_command instead.
         """
         try:
             # Search for matching API

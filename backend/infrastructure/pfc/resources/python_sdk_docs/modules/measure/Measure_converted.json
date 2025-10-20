@@ -69,7 +69,7 @@
       "description": "Delete this measurement object",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "examples": [
         {
@@ -147,14 +147,14 @@
       "description": "Set the measure location (vector)",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "parameters": [
         {
           "name": "value",
           "type": "vec",
           "required": true,
-          "description": "(x, y, z) coordinates"
+          "description": ""
         }
       ],
       "examples": [
@@ -170,14 +170,14 @@
       "description": "Set the x-component of the measure location",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "parameters": [
         {
           "name": "value",
           "type": "float",
           "required": true,
-          "description": "X coordinate"
+          "description": ""
         }
       ],
       "examples": [
@@ -193,14 +193,14 @@
       "description": "Set the y-component of the measure location",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "parameters": [
         {
           "name": "value",
           "type": "float",
           "required": true,
-          "description": "Y coordinate"
+          "description": ""
         }
       ],
       "examples": [
@@ -216,14 +216,14 @@
       "description": "Set the z-component of the measure location",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "parameters": [
         {
           "name": "value",
           "type": "float",
           "required": true,
-          "description": "Z coordinate"
+          "description": ""
         }
       ],
       "examples": [
@@ -254,14 +254,14 @@
       "description": "Set the measure radius",
       "returns": {
         "type": "None",
-        "description": "No return value"
+        "description": ""
       },
       "parameters": [
         {
           "name": "value",
           "type": "float",
           "required": true,
-          "description": "Measurement sphere radius"
+          "description": ""
         }
       ],
       "examples": [
