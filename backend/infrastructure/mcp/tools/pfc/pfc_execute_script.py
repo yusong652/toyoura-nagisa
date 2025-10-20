@@ -149,7 +149,12 @@ def register_pfc_script_tool(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⏳ Task submitted | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}\n\nUse pfc_check_task_status to monitor progress."
+                            "text": (
+                                f"**STATUS**: Task submitted | Task ID: {task_id} | {time_info}\n"
+                                f"  Script: {script_path_display}\n"
+                                f"  → {description}\n\n"
+                                f"Use pfc_check_task_status to monitor progress."
+                            )
                         }]
                     },
                     script_path=script_path,
@@ -185,17 +190,21 @@ def register_pfc_script_tool(mcp: FastMCP):
 
                     # 1. Success message with task_id and time range (three-line format)
                     time_info = format_time_range(start_time, end_time)
-                    llm_text_parts.append(f"✓ Completed | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}")
+                    llm_text_parts.append(
+                        f"**STATUS**: Completed | Task ID: {task_id} | {time_info}\n"
+                        f"  Script: {script_path_display}\n"
+                        f"  → {description}"
+                    )
 
                     # 2. Output summary (last 10 lines by default)
                     if output:
                         llm_text_parts.append(
-                            f"\n📊 Output: {pagination['total_lines']} lines total | "
+                            f"\nOutput: {pagination['total_lines']} lines total | "
                             f"Showing: last {pagination['displayed_count']} lines\n\n"
                             f"━━━ Output Summary ━━━\n"
                             f"{output_text}\n"
                             f"━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"💡 Navigate: {nav_hint}"
+                            f"**NEXT**: {nav_hint}"
                         )
 
                     # 3. Structured result (if script defined 'result' variable)
@@ -242,17 +251,22 @@ def register_pfc_script_tool(mcp: FastMCP):
 
                     # 1. Error message with task_id and time range (three-line format)
                     time_info = format_time_range(start_time, end_time)
-                    llm_text_parts.append(f"✗ Failed | Task ID: {task_id} | {time_info}\n  Script: {script_path_display}\n  → {description}\n\nError: {error_message}")
+                    llm_text_parts.append(
+                        f"**STATUS**: Failed | Task ID: {task_id} | {time_info}\n"
+                        f"  Script: {script_path_display}\n"
+                        f"  → {description}\n\n"
+                        f"Error: {error_message}"
+                    )
 
                     # 2. Script output before error (summary) - helps with debugging
                     if output:
                         llm_text_parts.append(
-                            f"\n📊 Output: {pagination['total_lines']} lines total | "
+                            f"\nOutput: {pagination['total_lines']} lines total | "
                             f"Showing: last {pagination['displayed_count']} lines\n\n"
                             f"━━━ Output before error ━━━\n"
                             f"{output_text}\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"💡 Navigate: {nav_hint}"
+                            f"**NEXT**: {nav_hint}"
                         )
 
                     llm_text = "".join(llm_text_parts)

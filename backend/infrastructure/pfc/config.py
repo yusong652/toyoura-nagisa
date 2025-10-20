@@ -25,6 +25,15 @@ PFC_DOCS_SOURCE = _CURRENT_DIR / "resources" / "python_sdk_docs"
 PFC_DOCS_INDEX = _PROJECT_ROOT / "data" / "pfc" / "python_sdk_index"
 
 # ============================================================================
+# SDK Query Configuration
+# ============================================================================
+
+# Maximum number of API matches to return from keyword search
+# - Top 1 result gets full documentation
+# - Remaining results show brief signatures only
+SDK_SEARCH_TOP_N = 3
+
+# ============================================================================
 # Future: Semantic Search Configuration
 # ============================================================================
 

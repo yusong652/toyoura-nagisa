@@ -132,7 +132,7 @@ def register_pfc_tools(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"✓ PFC command executed: {pfc_cmd}\nResult: {result.get('data')}"
+                            "text": f"**STATUS**: PFC command executed: {pfc_cmd}\n\nResult: {result.get('data')}"
                         }]
                     },
                     command=pfc_cmd,
@@ -145,7 +145,7 @@ def register_pfc_tools(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⚠ PFC command returned error: {pfc_cmd}\nError: {result.get('message')}"
+                            "text": f"**WARNING**: PFC command returned error: {pfc_cmd}\n\nError: {result.get('message')}"
                         }]
                     },
                     command=pfc_cmd,

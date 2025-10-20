@@ -13,7 +13,14 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 
-from backend.infrastructure.pfc.sdk_docs import search_api, load_api_doc, format_api_doc, load_index
+from backend.infrastructure.pfc.sdk_docs import (
+    search_api,
+    load_api_doc,
+    format_api_doc,
+    format_api_signature,
+    load_index
+)
+from backend.infrastructure.pfc.config import SDK_SEARCH_TOP_N
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 
@@ -49,10 +56,10 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         using pfc_query_command instead.
         """
         try:
-            # Search for matching API
-            api_name = search_api(operation)
+            # Search for matching APIs (configurable top-N)
+            matches = search_api(operation, top_n=SDK_SEARCH_TOP_N)
 
-            if not api_name:
+            if not matches:
                 # Check fallback hints
                 index = load_index()
                 hints = []
@@ -63,37 +70,62 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 if hints:
                     return error_response(
                         f"No Python SDK API found for '{operation}'.\n\n"
-                        f"⚠️ {hints[0]}\n\n"
-                        f"Use pfc_query_command tool to search for PFC commands instead."
+                        f"**NOTE**: {hints[0]}\n\n"
+                        f"**NEXT**: Use pfc_query_command tool to search for PFC commands instead."
                     )
 
                 return error_response(
                     f"No Python SDK API found for '{operation}'.\n\n"
-                    f"**Next step**: Use pfc_query_command tool to search for PFC commands."
+                    f"**NEXT**: Use pfc_query_command tool to search for PFC commands."
                 )
 
-            # Load API documentation
-            api_doc = load_api_doc(api_name)
+            # Get the best match (first result)
+            best_api_name, best_score = matches[0]
+
+            # Load full documentation for best match
+            api_doc = load_api_doc(best_api_name)
 
             if not api_doc:
-                return error_response(f"API documentation not found for {api_name}")
+                return error_response(f"API documentation not found for {best_api_name}")
 
-            # Format documentation
-            formatted_doc = format_api_doc(api_doc, api_name)
+            # Format full documentation for best match
+            formatted_doc = format_api_doc(api_doc, best_api_name)
+
+            # Format related APIs (if multiple matches)
+            related_section = ""
+            if len(matches) > 1:
+                related_apis = []
+                for api_name, score in matches[1:]:
+                    sig = format_api_signature(api_name)
+                    if sig:
+                        related_apis.append(f"- {sig}")
+
+                if related_apis:
+                    related_section = (
+                        f"\n\n---\n\n"
+                        f"## Related APIs\n\n"
+                        f"Query again with exact name if needed:\n\n"
+                        + "\n".join(related_apis)
+                    )
 
             return success_response(
-                message=f"Found Python SDK API: {api_name}",
+                message=f"✅ Found {len(matches)} Python SDK API(s): {best_api_name}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": f"✅ **Python SDK Available** (preferred approach)\n\n{formatted_doc}"
+                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}"
                     }]
                 },
                 data={
-                    "api_name": api_name,
+                    "api_name": best_api_name,
                     "signature": api_doc['signature'],
                     "has_limitations": bool(api_doc.get('limitations')),
-                    "fallback_commands": api_doc.get('fallback_commands', [])
+                    "fallback_commands": api_doc.get('fallback_commands', []),
+                    "match_count": len(matches),
+                    "related_apis": [
+                        {"name": name, "score": score}
+                        for name, score in matches[1:]
+                    ] if len(matches) > 1 else []
                 }
             )
 

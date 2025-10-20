@@ -72,8 +72,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⚠ Task not found: {task_id}\n"
-                                   "The task may have expired or the task ID is invalid."
+                            "text": (
+                                f"**WARNING**: Task not found: {task_id}\n\n"
+                                "The task may have expired or the task ID is invalid."
+                            )
                         }]
                     },
                     task_id=task_id,
@@ -113,16 +115,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"⏳ Running | Task ID: {task_id} | {time_info}{session_marker}\n"
+                    f"**STATUS**: Running | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
-                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output ━━━\n"
                     f"{output_text}\n"
                     f"━━━━━━━━━━━━━━\n"
-                    f"💡 Navigate: {nav_hint}"
+                    f"**NEXT**: {nav_hint}"
                 )
 
                 return success_response(
@@ -174,17 +176,17 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✓ Completed | Task ID: {task_id} | {time_info}{session_marker}\n"
+                    f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Result: {task_result}\n"
-                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output ━━━\n"
                     f"{output_text}\n"
                     f"━━━━━━━━━━━━━━\n"
-                    f"💡 Navigate: {nav_hint}"
+                    f"**NEXT**: {nav_hint}"
                 )
 
                 return success_response(
@@ -236,17 +238,17 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"✗ Failed | Task ID: {task_id} | {time_info}{session_marker}\n"
+                    f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Error: {error_msg}\n"
-                    f"📊 Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines total | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output before error ━━━\n"
                     f"{output_text}\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"💡 Navigate: {nav_hint}"
+                    f"**NEXT**: {nav_hint}"
                 )
 
                 return success_response(
@@ -270,7 +272,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     llm_content={
                         "parts": [{
                             "type": "text",
-                            "text": f"⚠ Unknown task status: {status}"
+                            "text": f"**WARNING**: Unknown task status: {status}"
                         }]
                     },
                     task_id=task_id,

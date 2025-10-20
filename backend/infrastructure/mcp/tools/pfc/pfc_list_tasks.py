@@ -98,11 +98,11 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     end_time = task.get("end_time")
                     is_historical = task.get("historical", False)
 
-                    status_icon = {
-                        "running": "⏳",
-                        "completed": "✓",
-                        "failed": "✗"
-                    }.get(status, "?")
+                    status_text = {
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed"
+                    }.get(status, "Unknown")
 
                     # Mark task ownership: only show session_id for non-current sessions
                     if task_session_id == current_session_id:
@@ -118,7 +118,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                     time_info = format_time_range(start_time, end_time)
 
                     task_lines.append(
-                        f"{status_icon} Task ID: {task_id} | {elapsed:.1f}s | {time_info}{session_marker}{historical_marker}\n"
+                        f"[{status_text}] Task ID: {task_id} | {elapsed:.1f}s | {time_info}{session_marker}{historical_marker}\n"
                         f"  Script: {script_path}\n"
                         f"  → {description}"
                     )
@@ -134,16 +134,16 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                 # Build session filter info (truncate session_id to 8 chars)
                 if session_id:
                     session_id_display = session_id[:8] if len(session_id) >= 8 else session_id
-                    filter_info = f"🔍 Filter: session {session_id_display}"
+                    filter_info = f"**FILTER**: session {session_id_display}"
                 else:
-                    filter_info = "🔍 Filter: None (all sessions)"
+                    filter_info = "**FILTER**: None (all sessions)"
 
                 task_summary = (
-                    f"📋 Tasks: {total_count} total | Showing: {displayed_count} ({'most recent' if offset == 0 else f'offset {offset}'})\n"
+                    f"Tasks: {total_count} total | Showing: {displayed_count} ({'most recent' if offset == 0 else f'offset {offset}'})\n"
                     f"{filter_info}\n"
-                    f"👤 Your session: {current_session_id_display}\n\n" +
+                    f"Your session: {current_session_id_display}\n\n" +
                     "\n\n".join(task_lines) +
-                    f"\n\n💡 Navigate: {nav_hint}"
+                    f"\n\n**NEXT**: {nav_hint}"
                 )
 
             return success_response(

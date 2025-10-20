@@ -14,7 +14,7 @@ Core capabilities:
 import json
 from typing import Optional, Dict, Any
 
-from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE
+from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE, SDK_SEARCH_TOP_N
 
 
 def load_index() -> Dict[str, Any]:
@@ -70,34 +70,35 @@ def load_all_keywords() -> Dict[str, list]:
     return all_keywords
 
 
-def search_api(query: str) -> Optional[str]:
+def search_api(query: str, top_n: int = SDK_SEARCH_TOP_N) -> list[tuple[str, int]]:
     """Search for API based on query keywords.
 
     Uses flexible word matching: if all words in a keyword are present
-    in the query, it's considered a match. Returns the best match with
-    highest word overlap.
+    in the query, it's considered a match. Returns top-N matches sorted
+    by word overlap score (descending).
 
     Args:
         query: Natural language query like "create a ball" or "list all balls"
+        top_n: Maximum number of results to return (default: 3)
 
     Returns:
-        API name like "itasca.ball.create" or None if not found
+        List of (api_name, score) tuples sorted by score (highest first).
+        Empty list if no matches found.
 
     Examples:
         >>> search_api("create a ball")
-        "itasca.ball.create"
-        >>> search_api("list all balls")
-        "itasca.ball.list"
+        [("itasca.ball.create", 2)]
+        >>> search_api("ball velocity")
+        [("Ball.vel", 2), ("Ball.vel_set", 2), ("Ball.vel_spin", 2)]
         >>> search_api("cubic packing")
-        None
+        []
     """
     keywords = load_all_keywords()
     query_lower = query.lower()
 
     # Try keyword match with flexible word matching
     query_words = set(query_lower.split())
-    best_match = None
-    best_score = 0
+    matches = []  # List of (api_name, score) tuples
 
     for keyword, apis in keywords.items():
         keyword_words = set(keyword.split())
@@ -106,11 +107,25 @@ def search_api(query: str) -> Optional[str]:
         score = len(matching_words)
 
         # If all keyword words are in query, it's a valid match
-        if matching_words == keyword_words and score > best_score:
-            best_match = apis[0]
-            best_score = score
+        if matching_words == keyword_words and score > 0:
+            # Add all APIs associated with this keyword
+            for api_name in apis:
+                matches.append((api_name, score))
 
-    return best_match
+    # Sort by score (descending), then by API name (for stability)
+    matches.sort(key=lambda x: (-x[1], x[0]))
+
+    # Return top-N unique matches
+    seen = set()
+    unique_matches = []
+    for api_name, score in matches:
+        if api_name not in seen:
+            seen.add(api_name)
+            unique_matches.append((api_name, score))
+            if len(unique_matches) >= top_n:
+                break
+
+    return unique_matches
 
 
 def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
@@ -165,6 +180,37 @@ def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
                 return func
 
     return None
+
+
+def format_api_signature(api_name: str) -> Optional[str]:
+    """Format API signature as brief one-liner for quick reference.
+
+    Args:
+        api_name: Full API name like "itasca.ball.create"
+
+    Returns:
+        Brief signature string like "itasca.ball.create(radius, pos=None) - Create a new ball"
+        Returns None if API not found.
+
+    Examples:
+        >>> format_api_signature("Ball.vel")
+        "Ball.vel() -> tuple[float, float, float] - Get ball velocity vector"
+    """
+    api_doc = load_api_doc(api_name)
+    if not api_doc:
+        return None
+
+    # Extract first line of description (usually the summary)
+    description_lines = api_doc['description'].strip().split('\n')
+    brief_desc = description_lines[0].strip()
+
+    # Get return type if available
+    return_info = ""
+    if api_doc.get('returns'):
+        return_type = api_doc['returns']['type']
+        return_info = f" -> {return_type}"
+
+    return f"`{api_doc['signature']}`{return_info} - {brief_desc}"
 
 
 def format_api_doc(api_doc: Dict[str, Any], api_name: str) -> str:
@@ -235,7 +281,7 @@ def format_api_doc(api_doc: Dict[str, Any], api_name: str) -> str:
 
     # Limitations (IMPORTANT - guides to command fallback)
     if api_doc.get('limitations'):
-        lines.append("## ⚠️ Limitations")
+        lines.append("## Limitations")
         lines.append(api_doc['limitations'])
         lines.append("")
 
@@ -245,14 +291,14 @@ def format_api_doc(api_doc: Dict[str, Any], api_name: str) -> str:
 
     # Best Practices
     if api_doc.get('best_practices'):
-        lines.append("## 💡 Best Practices")
+        lines.append("## Best Practices")
         for bp in api_doc['best_practices']:
             lines.append(f"- {bp}")
         lines.append("")
 
     # Notes
     if api_doc.get('notes'):
-        lines.append("## 📝 Notes")
+        lines.append("## Notes")
         for note in api_doc['notes']:
             lines.append(f"- {note}")
         lines.append("")
