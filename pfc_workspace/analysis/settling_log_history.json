@@ -1,0 +1,410 @@
+[
+    {
+        "timestamp": 1760810058.3229609,
+        "message": "\u25b6\ufe0f Step 5: Starting 50000 cycles for particle settling (reporting every 500 steps)..."
+    },
+    {
+        "timestamp": 1760810059.1288934,
+        "message": "  ... Cycle completed: 500/50000 (1.0%)"
+    },
+    {
+        "timestamp": 1760810059.718149,
+        "message": "  ... Cycle completed: 1000/50000 (2.0%)"
+    },
+    {
+        "timestamp": 1760810060.2523584,
+        "message": "  ... Cycle completed: 1500/50000 (3.0%)"
+    },
+    {
+        "timestamp": 1760810061.0574913,
+        "message": "  ... Cycle completed: 2000/50000 (4.0%)"
+    },
+    {
+        "timestamp": 1760810061.5884116,
+        "message": "  ... Cycle completed: 2500/50000 (5.0%)"
+    },
+    {
+        "timestamp": 1760810062.5035942,
+        "message": "  ... Cycle completed: 3000/50000 (6.0%)"
+    },
+    {
+        "timestamp": 1760810063.0797422,
+        "message": "  ... Cycle completed: 3500/50000 (7.0%)"
+    },
+    {
+        "timestamp": 1760810063.798414,
+        "message": "  ... Cycle completed: 4000/50000 (8.0%)"
+    },
+    {
+        "timestamp": 1760810064.546499,
+        "message": "  ... Cycle completed: 4500/50000 (9.0%)"
+    },
+    {
+        "timestamp": 1760810065.321404,
+        "message": "  ... Cycle completed: 5000/50000 (10.0%)"
+    },
+    {
+        "timestamp": 1760810065.890565,
+        "message": "  ... Cycle completed: 5500/50000 (11.0%)"
+    },
+    {
+        "timestamp": 1760810066.4237218,
+        "message": "  ... Cycle completed: 6000/50000 (12.0%)"
+    },
+    {
+        "timestamp": 1760810066.8951104,
+        "message": "  ... Cycle completed: 6500/50000 (13.0%)"
+    },
+    {
+        "timestamp": 1760810067.3606546,
+        "message": "  ... Cycle completed: 7000/50000 (14.0%)"
+    },
+    {
+        "timestamp": 1760810067.7877016,
+        "message": "  ... Cycle completed: 7500/50000 (15.0%)"
+    },
+    {
+        "timestamp": 1760810068.2155914,
+        "message": "  ... Cycle completed: 8000/50000 (16.0%)"
+    },
+    {
+        "timestamp": 1760810068.6430523,
+        "message": "  ... Cycle completed: 8500/50000 (17.0%)"
+    },
+    {
+        "timestamp": 1760810069.4536223,
+        "message": "  ... Cycle completed: 9000/50000 (18.0%)"
+    },
+    {
+        "timestamp": 1760810070.0654435,
+        "message": "  ... Cycle completed: 9500/50000 (19.0%)"
+    },
+    {
+        "timestamp": 1760810070.6471817,
+        "message": "  ... Cycle completed: 10000/50000 (20.0%)"
+    },
+    {
+        "timestamp": 1760810071.23087,
+        "message": "  ... Cycle completed: 10500/50000 (21.0%)"
+    },
+    {
+        "timestamp": 1760810071.7162292,
+        "message": "  ... Cycle completed: 11000/50000 (22.0%)"
+    },
+    {
+        "timestamp": 1760810072.3515425,
+        "message": "  ... Cycle completed: 11500/50000 (23.0%)"
+    },
+    {
+        "timestamp": 1760810073.1522124,
+        "message": "  ... Cycle completed: 12000/50000 (24.0%)"
+    },
+    {
+        "timestamp": 1760810073.7552488,
+        "message": "  ... Cycle completed: 12500/50000 (25.0%)"
+    },
+    {
+        "timestamp": 1760810074.3190436,
+        "message": "  ... Cycle completed: 13000/50000 (26.0%)"
+    },
+    {
+        "timestamp": 1760810074.9377363,
+        "message": "  ... Cycle completed: 13500/50000 (27.0%)"
+    },
+    {
+        "timestamp": 1760810075.6111097,
+        "message": "  ... Cycle completed: 14000/50000 (28.0%)"
+    },
+    {
+        "timestamp": 1760810076.1887867,
+        "message": "  ... Cycle completed: 14500/50000 (29.0%)"
+    },
+    {
+        "timestamp": 1760810076.696368,
+        "message": "  ... Cycle completed: 15000/50000 (30.0%)"
+    },
+    {
+        "timestamp": 1760810077.4241138,
+        "message": "  ... Cycle completed: 15500/50000 (31.0%)"
+    },
+    {
+        "timestamp": 1760810078.1572242,
+        "message": "  ... Cycle completed: 16000/50000 (32.0%)"
+    },
+    {
+        "timestamp": 1760810078.9704714,
+        "message": "  ... Cycle completed: 16500/50000 (33.0%)"
+    },
+    {
+        "timestamp": 1760810079.6404598,
+        "message": "  ... Cycle completed: 17000/50000 (34.0%)"
+    },
+    {
+        "timestamp": 1760810080.219352,
+        "message": "  ... Cycle completed: 17500/50000 (35.0%)"
+    },
+    {
+        "timestamp": 1760810080.7280378,
+        "message": "  ... Cycle completed: 18000/50000 (36.0%)"
+    },
+    {
+        "timestamp": 1760810081.2951813,
+        "message": "  ... Cycle completed: 18500/50000 (37.0%)"
+    },
+    {
+        "timestamp": 1760810081.8725424,
+        "message": "  ... Cycle completed: 19000/50000 (38.0%)"
+    },
+    {
+        "timestamp": 1760810082.3908021,
+        "message": "  ... Cycle completed: 19500/50000 (39.0%)"
+    },
+    {
+        "timestamp": 1760810082.8650455,
+        "message": "  ... Cycle completed: 20000/50000 (40.0%)"
+    },
+    {
+        "timestamp": 1760810083.305851,
+        "message": "  ... Cycle completed: 20500/50000 (41.0%)"
+    },
+    {
+        "timestamp": 1760810083.7407024,
+        "message": "  ... Cycle completed: 21000/50000 (42.0%)"
+    },
+    {
+        "timestamp": 1760810084.176945,
+        "message": "  ... Cycle completed: 21500/50000 (43.0%)"
+    },
+    {
+        "timestamp": 1760810084.6154056,
+        "message": "  ... Cycle completed: 22000/50000 (44.0%)"
+    },
+    {
+        "timestamp": 1760810085.0526118,
+        "message": "  ... Cycle completed: 22500/50000 (45.0%)"
+    },
+    {
+        "timestamp": 1760810085.4925823,
+        "message": "  ... Cycle completed: 23000/50000 (46.0%)"
+    },
+    {
+        "timestamp": 1760810085.9178245,
+        "message": "  ... Cycle completed: 23500/50000 (47.0%)"
+    },
+    {
+        "timestamp": 1760810086.4656484,
+        "message": "  ... Cycle completed: 24000/50000 (48.0%)"
+    },
+    {
+        "timestamp": 1760810087.2900467,
+        "message": "  ... Cycle completed: 24500/50000 (49.0%)"
+    },
+    {
+        "timestamp": 1760810087.8706768,
+        "message": "  ... Cycle completed: 25000/50000 (50.0%)"
+    },
+    {
+        "timestamp": 1760810088.4167097,
+        "message": "  ... Cycle completed: 25500/50000 (51.0%)"
+    },
+    {
+        "timestamp": 1760810088.909077,
+        "message": "  ... Cycle completed: 26000/50000 (52.0%)"
+    },
+    {
+        "timestamp": 1760810089.5051668,
+        "message": "  ... Cycle completed: 26500/50000 (53.0%)"
+    },
+    {
+        "timestamp": 1760810090.0825622,
+        "message": "  ... Cycle completed: 27000/50000 (54.0%)"
+    },
+    {
+        "timestamp": 1760810090.7321522,
+        "message": "  ... Cycle completed: 27500/50000 (55.0%)"
+    },
+    {
+        "timestamp": 1760810091.270883,
+        "message": "  ... Cycle completed: 28000/50000 (56.0%)"
+    },
+    {
+        "timestamp": 1760810091.9600685,
+        "message": "  ... Cycle completed: 28500/50000 (57.0%)"
+    },
+    {
+        "timestamp": 1760810092.5349863,
+        "message": "  ... Cycle completed: 29000/50000 (58.0%)"
+    },
+    {
+        "timestamp": 1760810093.1374831,
+        "message": "  ... Cycle completed: 29500/50000 (59.0%)"
+    },
+    {
+        "timestamp": 1760810093.7063882,
+        "message": "  ... Cycle completed: 30000/50000 (60.0%)"
+    },
+    {
+        "timestamp": 1760810094.2680204,
+        "message": "  ... Cycle completed: 30500/50000 (61.0%)"
+    },
+    {
+        "timestamp": 1760810094.7992566,
+        "message": "  ... Cycle completed: 31000/50000 (62.0%)"
+    },
+    {
+        "timestamp": 1760810095.488959,
+        "message": "  ... Cycle completed: 31500/50000 (63.0%)"
+    },
+    {
+        "timestamp": 1760810096.0587904,
+        "message": "  ... Cycle completed: 32000/50000 (64.0%)"
+    },
+    {
+        "timestamp": 1760810096.5881793,
+        "message": "  ... Cycle completed: 32500/50000 (65.0%)"
+    },
+    {
+        "timestamp": 1760810097.1026645,
+        "message": "  ... Cycle completed: 33000/50000 (66.0%)"
+    },
+    {
+        "timestamp": 1760810097.7495248,
+        "message": "  ... Cycle completed: 33500/50000 (67.0%)"
+    },
+    {
+        "timestamp": 1760810098.3665864,
+        "message": "  ... Cycle completed: 34000/50000 (68.0%)"
+    },
+    {
+        "timestamp": 1760810098.8921409,
+        "message": "  ... Cycle completed: 34500/50000 (69.0%)"
+    },
+    {
+        "timestamp": 1760810099.4680674,
+        "message": "  ... Cycle completed: 35000/50000 (70.0%)"
+    },
+    {
+        "timestamp": 1760810100.214071,
+        "message": "  ... Cycle completed: 35500/50000 (71.0%)"
+    },
+    {
+        "timestamp": 1760810100.7984757,
+        "message": "  ... Cycle completed: 36000/50000 (72.0%)"
+    },
+    {
+        "timestamp": 1760810101.6178925,
+        "message": "  ... Cycle completed: 36500/50000 (73.0%)"
+    },
+    {
+        "timestamp": 1760810102.2336495,
+        "message": "  ... Cycle completed: 37000/50000 (74.0%)"
+    },
+    {
+        "timestamp": 1760810102.66276,
+        "message": "  ... Cycle completed: 37500/50000 (75.0%)"
+    },
+    {
+        "timestamp": 1760810103.0874994,
+        "message": "  ... Cycle completed: 38000/50000 (76.0%)"
+    },
+    {
+        "timestamp": 1760810103.5154593,
+        "message": "  ... Cycle completed: 38500/50000 (77.0%)"
+    },
+    {
+        "timestamp": 1760810103.990133,
+        "message": "  ... Cycle completed: 39000/50000 (78.0%)"
+    },
+    {
+        "timestamp": 1760810104.8026693,
+        "message": "  ... Cycle completed: 39500/50000 (79.0%)"
+    },
+    {
+        "timestamp": 1760810105.4359162,
+        "message": "  ... Cycle completed: 40000/50000 (80.0%)"
+    },
+    {
+        "timestamp": 1760810105.927662,
+        "message": "  ... Cycle completed: 40500/50000 (81.0%)"
+    },
+    {
+        "timestamp": 1760810106.599135,
+        "message": "  ... Cycle completed: 41000/50000 (82.0%)"
+    },
+    {
+        "timestamp": 1760810107.2527742,
+        "message": "  ... Cycle completed: 41500/50000 (83.0%)"
+    },
+    {
+        "timestamp": 1760810107.7305782,
+        "message": "  ... Cycle completed: 42000/50000 (84.0%)"
+    },
+    {
+        "timestamp": 1760810108.1507764,
+        "message": "  ... Cycle completed: 42500/50000 (85.0%)"
+    },
+    {
+        "timestamp": 1760810108.9675984,
+        "message": "  ... Cycle completed: 43000/50000 (86.0%)"
+    },
+    {
+        "timestamp": 1760810109.6217754,
+        "message": "  ... Cycle completed: 43500/50000 (87.0%)"
+    },
+    {
+        "timestamp": 1760810110.1957002,
+        "message": "  ... Cycle completed: 44000/50000 (88.0%)"
+    },
+    {
+        "timestamp": 1760810110.7234137,
+        "message": "  ... Cycle completed: 44500/50000 (89.0%)"
+    },
+    {
+        "timestamp": 1760810111.2326252,
+        "message": "  ... Cycle completed: 45000/50000 (90.0%)"
+    },
+    {
+        "timestamp": 1760810111.8975246,
+        "message": "  ... Cycle completed: 45500/50000 (91.0%)"
+    },
+    {
+        "timestamp": 1760810112.4569552,
+        "message": "  ... Cycle completed: 46000/50000 (92.0%)"
+    },
+    {
+        "timestamp": 1760810113.0555222,
+        "message": "  ... Cycle completed: 46500/50000 (93.0%)"
+    },
+    {
+        "timestamp": 1760810113.6453254,
+        "message": "  ... Cycle completed: 47000/50000 (94.0%)"
+    },
+    {
+        "timestamp": 1760810114.28384,
+        "message": "  ... Cycle completed: 47500/50000 (95.0%)"
+    },
+    {
+        "timestamp": 1760810114.8343837,
+        "message": "  ... Cycle completed: 48000/50000 (96.0%)"
+    },
+    {
+        "timestamp": 1760810115.4391398,
+        "message": "  ... Cycle completed: 48500/50000 (97.0%)"
+    },
+    {
+        "timestamp": 1760810116.072433,
+        "message": "  ... Cycle completed: 49000/50000 (98.0%)"
+    },
+    {
+        "timestamp": 1760810116.6541874,
+        "message": "  ... Cycle completed: 49500/50000 (99.0%)"
+    },
+    {
+        "timestamp": 1760810117.2356164,
+        "message": "  ... Cycle completed: 50000/50000 (100.0%)"
+    },
+    {
+        "timestamp": 1760810117.2356164,
+        "message": "Simulation cycles complete. State is persistent and settled."
+    }
+]
