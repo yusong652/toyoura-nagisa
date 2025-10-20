@@ -67,20 +67,39 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     if hint_key in operation.lower():
                         hints.append(hint_msg)
 
+                # No match is not an error - it's a normal query result
+                # Return success to guide LLM to the next step (query commands)
                 if hints:
-                    return error_response(
-                        f"No Python SDK API found for '{operation}'.\n\n"
-                        f"**NOTE**: {hints[0]}\n\n"
-                        f"**NEXT**: Use pfc_query_command tool to search for PFC commands instead."
+                    message = f"No Python SDK API found for '{operation}'."
+                    llm_text = (
+                        f"**Python SDK**: Not available for this operation.\n\n"
+                        f"**Note**: {hints[0]}\n\n"
+                        f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands instead."
+                    )
+                else:
+                    message = f"No Python SDK API found for '{operation}'."
+                    llm_text = (
+                        f"**Python SDK**: Not available for this operation.\n\n"
+                        f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands."
                     )
 
-                return error_response(
-                    f"No Python SDK API found for '{operation}'.\n\n"
-                    f"**NEXT**: Use pfc_query_command tool to search for PFC commands."
+                return success_response(
+                    message=message,
+                    llm_content={
+                        "parts": [{
+                            "type": "text",
+                            "text": llm_text
+                        }]
+                    },
+                    data={
+                        "query": operation,
+                        "matches_found": 0,
+                        "suggestion": "Use pfc_query_command tool"
+                    }
                 )
 
-            # Get the best match (first result)
-            best_api_name, best_score = matches[0]
+            # Get the best match (first result) - now includes metadata
+            best_api_name, best_score, best_metadata = matches[0]
 
             # Load full documentation for best match
             api_doc = load_api_doc(best_api_name)
@@ -88,14 +107,37 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if not api_doc:
                 return error_response(f"API documentation not found for {best_api_name}")
 
-            # Format full documentation for best match
-            formatted_doc = format_api_doc(api_doc, best_api_name)
+            # Format full documentation for best match (pass metadata for Contact types)
+            formatted_doc = format_api_doc(api_doc, best_api_name, metadata=best_metadata)
+
+            # Determine display name (use official full path)
+            # Three cases:
+            # 1. Contact types: itasca.{ContactType}.{method}
+            # 2. Object methods: itasca.{module}.{Class}.{method}
+            # 3. Module functions: itasca.{module}.{function} (already full path)
+
+            from backend.infrastructure.pfc.sdk_docs import CLASS_TO_MODULE
+
+            display_name = best_api_name  # Default
+
+            if best_metadata and 'contact_type' in best_metadata:
+                # Case 1: Contact type
+                contact_type = best_metadata['contact_type']
+                method_name = best_api_name.split('.')[-1]
+                display_name = f"itasca.{contact_type}.{method_name}"
+
+            elif '.' in best_api_name and not best_api_name.startswith('itasca.'):
+                # Case 2: Object method (e.g., "Ball.vel", "Wall.vel")
+                class_name = best_api_name.split('.')[0]
+                if class_name in CLASS_TO_MODULE:
+                    module_name = CLASS_TO_MODULE[class_name]
+                    display_name = f"itasca.{module_name}.{best_api_name}"
 
             # Format related APIs (if multiple matches)
             related_section = ""
             if len(matches) > 1:
                 related_apis = []
-                for api_name, score in matches[1:]:
+                for api_name, score, metadata in matches[1:]:
                     sig = format_api_signature(api_name)
                     if sig:
                         related_apis.append(f"- {sig}")
@@ -109,7 +151,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     )
 
             return success_response(
-                message=f"✅ Found {len(matches)} Python SDK API(s): {best_api_name}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
+                message=f"✅ Found {len(matches)} Python SDK API(s): {display_name}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
                 llm_content={
                     "parts": [{
                         "type": "text",
@@ -117,14 +159,17 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     }]
                 },
                 data={
-                    "api_name": best_api_name,
+                    "api_name": display_name,
+                    "internal_path": best_api_name,
                     "signature": api_doc['signature'],
                     "has_limitations": bool(api_doc.get('limitations')),
                     "fallback_commands": api_doc.get('fallback_commands', []),
                     "match_count": len(matches),
+                    "is_contact_type": bool(best_metadata and 'contact_type' in best_metadata),
+                    "contact_type": best_metadata.get('contact_type') if best_metadata else None,
                     "related_apis": [
                         {"name": name, "score": score}
-                        for name, score in matches[1:]
+                        for name, score, _ in matches[1:]
                     ] if len(matches) > 1 else []
                 }
             )
