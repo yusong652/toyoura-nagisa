@@ -36,24 +36,24 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         operation: str = Field(
             ...,
             description=(
-                "Keyword query for PFC Python SDK. Use short phrases like "
-                "'create ball', 'list balls', 'ball velocity', 'delete contact'."
+                "PFC Python SDK query. Supports exact paths ('itasca.ball.create', "
+                "'BallBallContact.gap') or natural language ('create ball', 'wall velocity'). "
+                "Case-insensitive."
             )
         )
     ) -> Dict[str, Any]:
         """
-        Search PFC Python SDK documentation by keywords - ALWAYS TRY THIS FIRST!
+        Query PFC Python SDK documentation - ALWAYS TRY THIS FIRST!
 
-        Uses keyword matching to find Python API methods. Python SDK is preferred
-        over itasca.command() for type safety and maintainability.
+        Supports both exact API paths and natural language queries with intelligent
+        routing. Returns complete official paths for direct code usage.
 
-        Examples:
-        - "create ball" → itasca.ball.create()
-        - "list balls" → itasca.ball.list()
-        - "ball velocity" → Ball.vel()
+        Query styles:
+        - Exact path: "itasca.measure.count", "Ball.vel", "BallBallContact.gap"
+        - Natural language: "create ball", "wall velocity", "measure count"
+        - Case-insensitive: "ballballcontact.gap" → itasca.BallBallContact.gap
 
-        If no Python SDK exists for your operation, this tool will suggest
-        using pfc_query_command instead.
+        If no Python SDK exists, guides to pfc_query_command tool.
         """
         try:
             # Search for matching APIs (configurable top-N)
