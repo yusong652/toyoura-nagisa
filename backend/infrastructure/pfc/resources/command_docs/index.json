@@ -1,0 +1,179 @@
+{
+  "version": "1.0",
+  "description": "PFC command documentation index for quick lookup and LLM-assisted command discovery",
+  "categories": {
+    "ball": {
+      "description": "Ball object creation, modification, and management commands",
+      "file": "commands/ball/category.json",
+      "commands": ["generate", "delete", "attribute", "property", "group", "result", "history"],
+      "priority": "high"
+    },
+    "wall": {
+      "description": "Wall object creation, modification, and management commands",
+      "file": "commands/wall/category.json",
+      "commands": ["create", "generate", "delete", "attribute", "property", "group", "result"],
+      "priority": "high"
+    },
+    "clump": {
+      "description": "Clump object creation, modification, and template management commands",
+      "file": "commands/clump/category.json",
+      "commands": ["create", "generate", "template", "replicate", "delete", "attribute", "property"],
+      "priority": "medium"
+    },
+    "contact": {
+      "description": "Contact and contact model configuration commands",
+      "file": "commands/contact/category.json",
+      "subcategories": ["model"],
+      "commands": ["property", "group", "method", "result"],
+      "priority": "high"
+    },
+    "model": {
+      "description": "Model system control and configuration commands",
+      "file": "commands/model/category.json",
+      "commands": ["solve", "cycle", "configure", "domain", "save", "restore", "new", "largestrain"],
+      "priority": "high"
+    },
+    "measure": {
+      "description": "Measurement sphere creation and configuration commands",
+      "file": "commands/measure/category.json",
+      "commands": ["create", "delete", "history", "result"],
+      "priority": "medium"
+    },
+    "set": {
+      "description": "Global system settings and parameters",
+      "file": "commands/set/category.json",
+      "commands": ["gravity", "timestep", "random", "fish"],
+      "priority": "medium"
+    }
+  },
+  "quick_ref": {
+    "ball generate": "commands/ball/generate.json",
+    "ball generate cubic": "commands/ball/generate.json#cubic",
+    "ball generate hexagonal": "commands/ball/generate.json#hexagonal",
+    "ball delete": "commands/ball/delete.json",
+    "ball attribute": "commands/ball/attribute.json",
+    "ball property": "commands/ball/property.json",
+    "ball group": "commands/ball/group.json",
+    "wall create": "commands/wall/create.json",
+    "wall generate": "commands/wall/generate.json",
+    "wall delete": "commands/wall/delete.json",
+    "wall attribute": "commands/wall/attribute.json",
+    "clump create": "commands/clump/create.json",
+    "clump template": "commands/clump/template.json",
+    "clump generate": "commands/clump/generate.json",
+    "contact model": "commands/contact/model/category.json",
+    "contact model assign": "commands/contact/model/assign.json",
+    "contact model linear": "commands/contact/model/linear.json",
+    "contact model linearpbond": "commands/contact/model/linearpbond.json",
+    "contact property": "commands/contact/property.json",
+    "model solve": "commands/model/solve.json",
+    "model cycle": "commands/model/cycle.json",
+    "model configure": "commands/model/configure.json",
+    "model domain": "commands/model/domain.json",
+    "model save": "commands/model/save.json",
+    "measure create": "commands/measure/create.json",
+    "set gravity": "commands/set/gravity.json",
+    "set timestep": "commands/set/timestep.json"
+  },
+  "python_sdk_alternatives": {
+    "ball generate": {
+      "command": "ball generate",
+      "reason": "Python SDK doesn't support packing patterns for batch ball creation",
+      "python_alternative": "itasca.ball.create() - can create individual balls only",
+      "python_workaround": "Use itasca.ball.create() in a loop with manual positioning logic",
+      "recommendation": "use_command",
+      "use_cases": [
+        "Generating large numbers of balls with packing patterns (cubic, hexagonal)",
+        "Creating initial assemblies with controlled porosity",
+        "Batch ball creation with size distributions"
+      ]
+    },
+    "wall generate": {
+      "command": "wall generate",
+      "reason": "Python SDK doesn't support geometric wall generation (box, cylinder, etc.)",
+      "python_alternative": "Manual wall creation using Python SDK requires vertex-by-vertex construction",
+      "python_workaround": "Calculate vertices manually and use itasca.wall module",
+      "recommendation": "use_command",
+      "use_cases": [
+        "Creating box/cylinder/cone boundaries",
+        "Generating complex wall geometries",
+        "Building simulation containers"
+      ]
+    },
+    "model solve": {
+      "command": "model solve",
+      "reason": "Python SDK doesn't have automatic equilibrium detection",
+      "python_alternative": "itasca.cycle() - requires manual termination logic",
+      "python_workaround": "Use itasca.cycle() with manual ratio checking in a loop",
+      "recommendation": "use_command",
+      "use_cases": [
+        "Solving to mechanical equilibrium automatically",
+        "Using force/moment ratio convergence criteria",
+        "Automatic timestep adjustment during solution"
+      ]
+    },
+    "contact model assign": {
+      "command": "contact model assign",
+      "reason": "Bulk contact model assignment is more efficient via command",
+      "python_alternative": "Contact.set_model() - requires iterating through contacts",
+      "python_workaround": "Use itasca.contact.list() with Contact.set_model() in loop",
+      "recommendation": "prefer_command_for_bulk",
+      "use_cases": [
+        "Assigning contact models to all contacts or groups",
+        "Batch contact model configuration",
+        "Setting default contact behavior"
+      ]
+    },
+    "ball attribute density": {
+      "command": "ball attribute density",
+      "reason": "Bulk attribute setting is more efficient via command",
+      "python_alternative": "Ball.set_density() - available but less efficient for bulk operations",
+      "python_workaround": "Use itasca.ball.list() with Ball.set_density() in loop",
+      "recommendation": "prefer_command_for_bulk",
+      "use_cases": [
+        "Setting density for all balls or ball groups",
+        "Batch property updates",
+        "Initial model setup"
+      ]
+    }
+  },
+  "fallback_hints": {
+    "cubic packing": "For cubic packing patterns, use 'ball generate cubic' command. Python SDK doesn't support this - manual positioning would be required.",
+    "hexagonal packing": "For hexagonal close packing, use 'ball generate hexagonal' command. Python SDK requires manual calculation of positions.",
+    "wall box": "To create box-shaped walls, use 'wall generate box' command. Python SDK requires manual vertex creation.",
+    "wall cylinder": "To create cylindrical walls, use 'wall generate cylinder' command. Python SDK requires manual vertex calculation.",
+    "solve equilibrium": "To solve to mechanical equilibrium, use 'model solve' command with ratio criteria. Python SDK itasca.cycle() requires manual convergence checking.",
+    "contact model all": "To assign contact models to all contacts, use 'contact model assign' command. More efficient than Python SDK iteration.",
+    "automatic timestep": "For automatic timestep calculation, use 'model auto dt' command. Python SDK itasca.set_timestep() sets manual values only."
+  },
+  "command_patterns": {
+    "object_commands": [
+      "ball",
+      "wall",
+      "clump",
+      "measure"
+    ],
+    "system_commands": [
+      "model",
+      "set",
+      "contact"
+    ],
+    "common_subcommands": [
+      "generate",
+      "create",
+      "delete",
+      "attribute",
+      "property",
+      "group",
+      "result",
+      "history"
+    ]
+  },
+  "notes": [
+    "Commands are preferred over Python SDK for batch operations and specialized geometries",
+    "Python SDK is preferred for fine-grained control and programmatic logic",
+    "Use 'itasca.command()' to execute any PFC command from Python",
+    "Commands return no value; use 'result' subcommands to query results",
+    "Most commands operate on ranges (groups, spatial regions, all objects)"
+  ]
+}

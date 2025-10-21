@@ -1,0 +1,105 @@
+{
+  "category": "model",
+  "full_name": "Model Commands",
+  "description": "System-level commands for controlling simulation execution, configuration, and state management",
+  "command_prefix": "model",
+  "python_module": "itasca",
+  "python_functions": ["itasca.cycle(), itasca.timestep(), itasca.set_timestep()"],
+  "doc_url": "https://docs.itascacg.com/pfc700/pfc/docproject/source/manual/model/model.html",
+  "commands": [
+    {
+      "name": "solve",
+      "file": "solve.json",
+      "short_description": "Solve to mechanical equilibrium using convergence criteria",
+      "syntax": "model solve [ratio <value>] [ratio-average <value>] ...",
+      "python_available": false,
+      "python_alternative": "itasca.cycle() with manual ratio checking in loop",
+      "use_cases": ["Reach equilibrium automatically", "Solve to force/moment balance", "Automatic timestep adjustment"],
+      "priority": "high"
+    },
+    {
+      "name": "cycle",
+      "file": "cycle.json",
+      "short_description": "Execute a specified number of calculation cycles",
+      "syntax": "model cycle <n>",
+      "python_available": true,
+      "python_alternative": "itasca.cycle(n)",
+      "use_cases": ["Fixed number of timesteps", "Manual simulation control"],
+      "priority": "high"
+    },
+    {
+      "name": "configure",
+      "file": "configure.json",
+      "short_description": "Configure model settings and options",
+      "syntax": "model configure <keyword>",
+      "python_available": "partial",
+      "python_alternative": "Various itasca.set_* functions",
+      "use_cases": ["Set thread count", "Enable features", "Configure solver"],
+      "priority": "medium"
+    },
+    {
+      "name": "domain",
+      "file": "domain.json",
+      "short_description": "Define computational domain and boundary conditions",
+      "syntax": "model domain <keyword> <parameters>",
+      "python_available": true,
+      "python_alternative": "itasca.set_domain_min(), itasca.set_domain_max(), itasca.set_domain_condition()",
+      "use_cases": ["Set periodic boundaries", "Define domain extent", "Boundary conditions"],
+      "priority": "high"
+    },
+    {
+      "name": "save",
+      "file": "save.json",
+      "short_description": "Save model state to file",
+      "syntax": "model save <filename>",
+      "python_available": false,
+      "python_alternative": "Use itasca.command('model save <filename>')",
+      "use_cases": ["Checkpoint simulations", "Save results", "Create restart points"],
+      "priority": "medium"
+    },
+    {
+      "name": "restore",
+      "file": "restore.json",
+      "short_description": "Restore model state from file",
+      "syntax": "model restore <filename>",
+      "python_available": false,
+      "python_alternative": "Use itasca.command('model restore <filename>')",
+      "use_cases": ["Load checkpoints", "Continue simulations", "Load initial states"],
+      "priority": "medium"
+    },
+    {
+      "name": "new",
+      "file": "new.json",
+      "short_description": "Clear model and start fresh",
+      "syntax": "model new",
+      "python_available": false,
+      "python_alternative": "Use itasca.command('model new')",
+      "use_cases": ["Reset simulation", "Clear all objects"],
+      "priority": "low"
+    },
+    {
+      "name": "largestrain",
+      "file": "largestrain.json",
+      "short_description": "Enable/configure large strain mode",
+      "syntax": "model largestrain <on|off>",
+      "python_available": false,
+      "python_alternative": "Use itasca.command('model largestrain ...')",
+      "use_cases": ["Enable large deformations", "Strain tracking"],
+      "priority": "low"
+    }
+  ],
+  "common_keywords": {
+    "solve": ["ratio", "ratio-average", "force-max", "moment-max", "cycles"],
+    "cycle": ["number of cycles"],
+    "domain": ["extent", "condition", "periodic", "destroy"],
+    "configure": ["threads", "dynamic"]
+  },
+  "related_categories": ["ball", "wall", "contact", "set"],
+  "notes": [
+    "'model solve' is preferred for reaching equilibrium (not available in Python SDK)",
+    "'model cycle' is equivalent to itasca.cycle() in Python",
+    "Model state can be saved/restored for checkpointing",
+    "Domain settings must be configured before generating objects",
+    "Use 'model solve' with ratio criteria for automatic convergence"
+  ]
+}

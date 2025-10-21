@@ -1450,7 +1450,7 @@
           "name": "property_name",
           "type": "str",
           "required": true,
-          "description": "Surface property name"
+          "description": "Surface property name (depends on contact model, e.g., 'kn', 'ks', 'fric' for linear model, 'pb_kn', 'pb_ks', 'pb_coh' for parallel bond, 'hz_kn' for Hertz)"
         }
       ],
       "returns": {
@@ -1467,7 +1467,7 @@
           "name": "property_name",
           "type": "str",
           "required": true,
-          "description": "Surface property name"
+          "description": "Surface property name (depends on contact model, e.g., 'kn', 'ks', 'fric' for linear model, 'pb_kn', 'pb_ks', 'pb_coh' for parallel bond, 'hz_kn' for Hertz)"
         }
       ],
       "returns": {
@@ -1493,7 +1493,7 @@
           "name": "property_name",
           "type": "str",
           "required": true,
-          "description": "Surface property name"
+          "description": "Surface property name (depends on contact model, e.g., 'kn', 'ks', 'fric' for linear model, 'pb_kn', 'pb_ks', 'pb_coh' for parallel bond, 'hz_kn' for Hertz)"
         },
         {
           "name": "value",

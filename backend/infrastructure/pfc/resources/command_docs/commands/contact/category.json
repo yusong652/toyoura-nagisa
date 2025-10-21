@@ -1,0 +1,73 @@
+{
+  "category": "contact",
+  "full_name": "Contact Commands",
+  "description": "Commands for configuring contact models and managing contact properties between objects",
+  "command_prefix": "contact",
+  "python_module": "itasca.contact",
+  "python_object_class": "Contact (BallBallContact, BallFacetContact, etc.)",
+  "doc_url": "https://docs.itascacg.com/pfc700/pfc/docproject/source/manual/contact/contact.html",
+  "subcategories": [
+    {
+      "name": "model",
+      "file": "model/category.json",
+      "description": "Contact model assignment and configuration",
+      "priority": "high"
+    }
+  ],
+  "commands": [
+    {
+      "name": "property",
+      "file": "property.json",
+      "short_description": "Set contact model properties",
+      "syntax": "contact property <name> <value> <range>",
+      "python_available": true,
+      "python_alternative": "Contact.set_prop()",
+      "use_cases": ["Set stiffness", "Set friction", "Configure contact behavior"],
+      "priority": "high"
+    },
+    {
+      "name": "group",
+      "file": "group.json",
+      "short_description": "Assign contacts to groups",
+      "syntax": "contact group <slot> <name> <range>",
+      "python_available": true,
+      "python_alternative": "Contact.set_group()",
+      "use_cases": ["Organize contacts", "Range selection"],
+      "priority": "low"
+    },
+    {
+      "name": "method",
+      "file": "method.json",
+      "short_description": "Execute contact model methods",
+      "syntax": "contact method <method_name> <args> <range>",
+      "python_available": true,
+      "python_alternative": "Contact.method()",
+      "use_cases": ["Bond contacts", "Activate special behaviors"],
+      "priority": "medium"
+    },
+    {
+      "name": "result",
+      "file": "result.json",
+      "short_description": "Query contact results and calculate aggregate values",
+      "syntax": "contact result <keyword> <range>",
+      "python_available": "partial",
+      "python_alternative": "Contact getter methods - requires manual aggregation",
+      "use_cases": ["Sum contact forces", "Get maximum gap", "Count contacts"],
+      "priority": "low"
+    }
+  ],
+  "common_ranges": {
+    "all": "All contacts in the model",
+    "group <name>": "Contacts in the specified group",
+    "model <model_name>": "Contacts with specific contact model",
+    "type <contact_type>": "Contacts of specific type (e.g., ball-ball)",
+    "contact <id1> <id2>": "Contact between two specific objects"
+  },
+  "related_categories": ["ball", "wall", "clump", "model"],
+  "notes": [
+    "Contact models define mechanical behavior at contact points",
+    "Common contact models: linear, linearpbond, linearcbond, hertz",
+    "Contact properties are model-specific (e.g., 'kn' for normal stiffness)",
+    "Use 'contact model' commands to assign and configure models"
+  ]
+}
