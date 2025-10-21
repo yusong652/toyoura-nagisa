@@ -119,8 +119,8 @@ class APIDocFormatter:
         lines.append("")
 
         # Add Contact type availability info
-        if result.metadata and 'contact_type' in result.metadata:
-            all_types = result.metadata.get('all_contact_types', [])
+        if result.metadata and 'all_contact_types' in result.metadata:
+            all_types = result.metadata['all_contact_types']
             lines.append(f"**Available for**: {', '.join(all_types)}")
             lines.append("")
 
