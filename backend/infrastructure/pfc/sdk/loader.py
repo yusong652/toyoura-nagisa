@@ -10,8 +10,10 @@ Responsibilities:
 - Cache loaded data for performance
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from functools import lru_cache
+from collections import defaultdict
+from pathlib import Path
 import json
 
 from backend.infrastructure.pfc.config import PFC_DOCS_SOURCE
@@ -69,12 +71,15 @@ class DocumentationLoader:
 
     @staticmethod
     @lru_cache(maxsize=1)
-    def load_all_keywords() -> Dict[str, list]:
-        """Load keywords from all modules with caching.
+    def load_all_keywords() -> Dict[str, List[str]]:
+        """Load keywords from all modules with caching and merging.
 
         Aggregates keywords from:
         - itasca_keywords.json (top-level module)
-        - modules/*/keywords.json (sub-modules like ball, contact, etc.)
+        - modules/**/keywords.json (all modules and submodules recursively)
+
+        Uses merge strategy: when multiple modules define the same keyword,
+        all associated APIs are collected (not overwritten).
 
         Returns:
             Dict mapping keywords to list of API names
@@ -83,30 +88,26 @@ class DocumentationLoader:
             >>> keywords = DocumentationLoader.load_all_keywords()
             >>> keywords["create ball"]
             ["itasca.ball.create"]
-            >>> keywords["ball velocity"]
-            ["Ball.vel", "Ball.vel_set", "Ball.vel_spin"]
+            >>> keywords["normal vector"]  # Merged from multiple modules
+            ["Facet.normal", "Contact.normal"]
         """
-        all_keywords = {}
+        # Use defaultdict to automatically handle merging
+        all_keywords = defaultdict(list)
 
         # Load itasca top-level keywords
         itasca_keywords_path = PFC_DOCS_SOURCE / "itasca_keywords.json"
         if itasca_keywords_path.exists():
             with open(itasca_keywords_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                all_keywords.update(data.get("keywords", {}))
+                DocumentationLoader._merge_keywords(all_keywords, data.get("keywords", {}))
 
-        # Load keywords from all sub-modules
+        # Load keywords from all sub-modules (recursive)
         modules_dir = PFC_DOCS_SOURCE / "modules"
         if modules_dir.exists():
-            for module_dir in modules_dir.iterdir():
-                if module_dir.is_dir():
-                    keywords_file = module_dir / "keywords.json"
-                    if keywords_file.exists():
-                        with open(keywords_file, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            all_keywords.update(data.get("keywords", {}))
+            DocumentationLoader._load_keywords_recursive(modules_dir, all_keywords)
 
-        return all_keywords
+        # Convert defaultdict back to regular dict for return
+        return dict(all_keywords)
 
     @staticmethod
     def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
@@ -281,6 +282,54 @@ class DocumentationLoader:
             del quick_ref[api_name]
 
         return index
+
+    @staticmethod
+    def _merge_keywords(target: defaultdict, source: Dict[str, list]) -> None:
+        """Merge keywords from source into target without overwriting.
+
+        When a keyword exists in both target and source, their API lists
+        are merged (deduplicated).
+
+        Args:
+            target: Target defaultdict to merge into
+            source: Source dict to merge from
+        """
+        for keyword, apis in source.items():
+            # Skip comment entries
+            if keyword.startswith("_comment"):
+                continue
+
+            # Extend the list (merge, don't replace)
+            target[keyword].extend(apis)
+
+            # Deduplicate while preserving order
+            target[keyword] = list(dict.fromkeys(target[keyword]))
+
+    @staticmethod
+    def _load_keywords_recursive(directory: Path, all_keywords: defaultdict) -> None:
+        """Recursively load keywords from a directory tree.
+
+        Scans the given directory and all subdirectories for keywords.json files
+        and merges them into all_keywords.
+
+        Args:
+            directory: Directory to scan
+            all_keywords: Target defaultdict to accumulate keywords
+        """
+        for item in directory.iterdir():
+            if item.is_dir():
+                # Load keywords.json in this directory if it exists
+                keywords_file = item / "keywords.json"
+                if keywords_file.exists():
+                    with open(keywords_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        DocumentationLoader._merge_keywords(
+                            all_keywords,
+                            data.get("keywords", {})
+                        )
+
+                # Recursively process subdirectories
+                DocumentationLoader._load_keywords_recursive(item, all_keywords)
 
     @staticmethod
     def clear_cache():
