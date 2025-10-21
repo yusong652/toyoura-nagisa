@@ -34,51 +34,42 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
     )
     async def pfc_query_python_api(
         context: Context,
-        operation: str = Field(
+        query: str = Field(
             ...,
             description=(
-                "PFC Python SDK query. Supports exact paths ('itasca.ball.create', "
-                "'BallBallContact.gap') or natural language ('create ball', 'wall velocity'). "
-                "Case-insensitive."
+                "Search for PFC Python API. Examples: 'Ball.pos', 'ball velocity', "
+                "'create a ball', 'pos'. Case-insensitive, supports partial matching."
             )
         )
     ) -> Dict[str, Any]:
-        """
-        Query PFC Python SDK documentation - ALWAYS TRY THIS FIRST!
+        """Query PFC Python API documentation - preferred for PFC operations.
 
-        Supports both exact API paths and natural language queries with intelligent
-        routing. Returns complete official paths for direct code usage.
-
-        Query styles:
-        - Exact path: "itasca.measure.count", "Ball.vel", "BallBallContact.gap"
-        - Natural language: "create ball", "wall velocity", "measure count"
-        - Case-insensitive: "ballballcontact.gap" → itasca.BallBallContact.gap
-
-        If no Python SDK exists, guides to pfc_query_command tool.
+        Searches complete API catalog using exact paths, keywords, or natural language.
+        Returns best matches with full documentation and related alternatives.
         """
         try:
             # Search for matching APIs (configurable top-N)
-            matches = searcher.search(operation, top_n=SDK_SEARCH_TOP_N)
+            matches = searcher.search(query, top_n=SDK_SEARCH_TOP_N)
 
             if not matches:
                 # Check fallback hints
                 index = DocumentationLoader.load_index()
                 hints = []
                 for hint_key, hint_msg in index.get("fallback_hints", {}).items():
-                    if hint_key in operation.lower():
+                    if hint_key in query.lower():
                         hints.append(hint_msg)
 
                 # No match is not an error - it's a normal query result
                 # Return success to guide LLM to the next step (query commands)
                 if hints:
-                    message = f"No Python SDK API found for '{operation}'."
+                    message = f"No Python SDK API found for '{query}'."
                     llm_text = (
                         f"**Python SDK**: Not available for this operation.\n\n"
                         f"**Note**: {hints[0]}\n\n"
                         f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands instead."
                     )
                 else:
-                    message = f"No Python SDK API found for '{operation}'."
+                    message = f"No Python SDK API found for '{query}'."
                     llm_text = (
                         f"**Python SDK**: Not available for this operation.\n\n"
                         f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands."
@@ -93,7 +84,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                         }]
                     },
                     data={
-                        "query": operation,
+                        "query": query,
                         "matches_found": 0,
                         "suggestion": "Use pfc_query_command tool"
                     }
