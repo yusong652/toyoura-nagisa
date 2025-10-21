@@ -1,0 +1,93 @@
+{
+  "command": "wall group",
+  "category": "wall",
+  "description": "Specify wall or facet group names. Use of the group logic is described in Groups documentation. By default, s is assigned to the group slot 'Default'. Use the 'add' keyword to assign the group name to the next available slot and the 'remove' keyword to remove s from all slots. The optional 'facet' keyword can be given before the optional range to specify that the group name will be applied to facets. In this case, the range is applied to facets and not to walls.",
+
+  "syntax": "wall group <s> <keyword> ... <facet> <range>",
+
+  "parameters": [
+    {
+      "name": "s",
+      "type": "string",
+      "required": true,
+      "description": "Group name to assign or remove"
+    },
+    {
+      "name": "keyword",
+      "type": "keyword",
+      "required": false,
+      "description": "Operation: 'add', 'remove', or 'slot'. Default: assign to 'Default' slot"
+    },
+    {
+      "name": "facet",
+      "type": "keyword",
+      "required": false,
+      "description": "If specified, apply group name to facets instead of walls (range applies to facets)"
+    },
+    {
+      "name": "range",
+      "type": "range",
+      "required": false,
+      "description": "Range of walls or facets to apply the group to. Default: all"
+    }
+  ],
+
+  "keywords": [
+    {
+      "name": "add",
+      "syntax": "add",
+      "description": "Assign group name s to the next available slot"
+    },
+    {
+      "name": "remove",
+      "syntax": "remove",
+      "description": "Remove group name s from all slots"
+    },
+    {
+      "name": "slot",
+      "syntax": "slot <slot>",
+      "description": "Set group slot to s. Default slot: 'Default'"
+    },
+    {
+      "name": "facet",
+      "syntax": "facet",
+      "description": "Apply group name to facets instead of walls. When specified, range applies to facets"
+    }
+  ],
+
+  "examples": [
+    {
+      "command": "wall group 'boundary'",
+      "description": "Assign all walls to group 'boundary' in default slot"
+    },
+    {
+      "command": "wall group 'facetassembly' facet",
+      "description": "Assign all facets to group 'facetassembly' in default slot"
+    },
+    {
+      "command": "wall group 'container' slot 'A'",
+      "description": "Assign all walls to group 'container' in slot 'A'"
+    },
+    {
+      "command": "wall group 'walls' add range id 1 10",
+      "description": "Add walls with IDs 1-10 to group 'walls' in next available slot"
+    },
+    {
+      "command": "wall group 'oldgroup' remove",
+      "description": "Remove group 'oldgroup' from all slots for all walls"
+    },
+    {
+      "command": "wall group 'top' facet range position-z 9 10",
+      "description": "Assign facets at z-position 9-10 to group 'top'"
+    },
+    {
+      "command": "wall group 'layer1' slot 'layer' range name 'foundation'",
+      "description": "Assign walls named 'foundation' to group 'layer1' in slot 'layer'"
+    }
+  ],
+
+  "python_sdk_alternative": {
+    "available": true,
+    "workaround": "Wall.set_group(group_name, slot) or Facet.set_group(group_name, slot) for setting; Wall.group_remove(group_name, slot) or Facet.group_remove(group_name, slot) for removing - requires iteration over wall/facet range"
+  }
+}
