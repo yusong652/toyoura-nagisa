@@ -18,8 +18,11 @@ from backend.infrastructure.pfc.sdk import (
     DocumentationLoader,
     APIDocFormatter
 )
-from backend.infrastructure.pfc.config import SDK_SEARCH_TOP_N
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+
+# Default and maximum limits for search results
+DEFAULT_SEARCH_LIMIT = 10
+MAX_SEARCH_LIMIT = 20
 
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
@@ -40,16 +43,28 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 "Search for PFC Python API. Examples: 'Ball.pos', 'ball velocity', "
                 "'create a ball', 'pos'. Case-insensitive, supports partial matching."
             )
+        ),
+        limit: int = Field(
+            DEFAULT_SEARCH_LIMIT,
+            description=(
+                "Number of results to return. Use higher values for exploring "
+                "related APIs, lower values for focused searches."
+            ),
+            ge=1,
+            le=MAX_SEARCH_LIMIT
         )
     ) -> Dict[str, Any]:
         """Query PFC Python API documentation - preferred for PFC operations.
 
         Searches complete API catalog using exact paths, keywords, or natural language.
         Returns best matches with full documentation and related alternatives.
+
+        The limit parameter controls how many results to return. Use higher values
+        when exploring related APIs, lower values when you know what you're looking for.
         """
         try:
-            # Search for matching APIs (configurable top-N)
-            matches = searcher.search(query, top_n=SDK_SEARCH_TOP_N)
+            # Search for matching APIs with user-specified limit
+            matches = searcher.search(query, top_n=limit)
 
             if not matches:
                 # Check fallback hints
@@ -110,7 +125,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if len(matches) > 1:
                 related_apis = []
                 for result in matches[1:]:
-                    sig = APIDocFormatter.format_signature(result.api_name)
+                    # Pass metadata to formatter for Contact type handling
+                    sig = APIDocFormatter.format_signature(result.api_name, result.metadata)
                     if sig:
                         related_apis.append(f"- {sig}")
 

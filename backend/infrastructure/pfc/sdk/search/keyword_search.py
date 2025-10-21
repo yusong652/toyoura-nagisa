@@ -9,10 +9,11 @@ Matching Algorithm:
 - Returns top-N results sorted by score
 """
 
-from typing import List
+from typing import List, Dict, Set, Optional
 from backend.infrastructure.pfc.sdk.models import SearchResult, SearchStrategy as StrategyEnum
 from backend.infrastructure.pfc.sdk.search.base import SearchStrategy
 from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
+from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
 
 
 class KeywordSearchStrategy(SearchStrategy):
@@ -109,20 +110,8 @@ class KeywordSearchStrategy(SearchStrategy):
         # Sort by score (descending), then by API name (for stability)
         matches.sort(key=lambda x: (-x[1], x[0]))
 
-        # Return top-N unique matches
-        seen = set()
-        results = []
-        for api_name, score in matches:
-            if api_name not in seen:
-                seen.add(api_name)
-                results.append(SearchResult(
-                    api_name=api_name,
-                    score=score,
-                    strategy=StrategyEnum.KEYWORD,
-                    metadata=None
-                ))
-                if len(results) >= top_n:
-                    break
+        # Deduplicate with Contact type grouping
+        results = self._deduplicate_with_contact_grouping(matches, top_n)
 
         return results
 
@@ -292,3 +281,125 @@ class KeywordSearchStrategy(SearchStrategy):
             return 0.6
 
         return 0.0
+
+    def _deduplicate_with_contact_grouping(
+        self,
+        matches: List[tuple],
+        top_n: int
+    ) -> List[SearchResult]:
+        """Deduplicate results with intelligent Contact type grouping.
+
+        For Contact APIs (BallBallContact, BallFacetContact, etc.), group all
+        Contact types that share the same method into a single SearchResult.
+
+        Args:
+            matches: List of (api_name, score) tuples
+            top_n: Maximum number of results to return
+
+        Returns:
+            List of SearchResult objects with Contact types properly grouped
+
+        Example:
+            Input matches:
+                [("itasca.BallBallContact.force_global", 1070),
+                 ("itasca.BallFacetContact.force_global", 1070),
+                 ("itasca.ball.create", 1000)]
+
+            Output results:
+                [SearchResult(
+                    api_name="itasca.BallBallContact.force_global",
+                    score=1070,
+                    metadata={
+                        "all_contact_types": ["BallBallContact", "BallFacetContact", ...],
+                        "contact_method": "force_global"
+                    }
+                ),
+                SearchResult(
+                    api_name="itasca.ball.create",
+                    score=1000,
+                    metadata=None
+                )]
+        """
+        seen_apis = set()  # Track non-Contact APIs
+        contact_methods: Dict[str, Dict] = {}  # Track Contact methods: {method_name: {...}}
+        results = []
+
+        for api_name, score in matches:
+            # Check if this is a Contact API
+            contact_info = self._extract_contact_info(api_name)
+
+            if contact_info:
+                # This is a Contact API
+                method_name = contact_info["method"]
+
+                if method_name not in contact_methods:
+                    # First time seeing this Contact method
+                    contact_methods[method_name] = {
+                        "api_name": api_name,  # Use first Contact type's path
+                        "score": score,
+                        "contact_types": set([contact_info["contact_type"]])  # Use set to avoid duplicates
+                    }
+                else:
+                    # Add this Contact type to the existing group (set handles deduplication)
+                    contact_methods[method_name]["contact_types"].add(
+                        contact_info["contact_type"]
+                    )
+            else:
+                # Regular API (non-Contact)
+                if api_name not in seen_apis:
+                    seen_apis.add(api_name)
+                    results.append(SearchResult(
+                        api_name=api_name,
+                        score=score,
+                        strategy=StrategyEnum.KEYWORD,
+                        metadata=None
+                    ))
+
+        # Add Contact methods to results
+        for method_name, info in contact_methods.items():
+            results.append(SearchResult(
+                api_name=info["api_name"],
+                score=info["score"],
+                strategy=StrategyEnum.KEYWORD,
+                metadata={
+                    "all_contact_types": sorted(list(info["contact_types"])),  # Convert set to sorted list
+                    "contact_method": method_name
+                }
+            ))
+
+        # Sort by score (descending) to maintain score-based ordering
+        results.sort(key=lambda r: -r.score)
+
+        # Return top-N
+        return results[:top_n]
+
+    def _extract_contact_info(self, api_name: str) -> Optional[Dict[str, str]]:
+        """Extract Contact type and method name from API path.
+
+        Args:
+            api_name: Full API path (e.g., "itasca.BallBallContact.force_global")
+
+        Returns:
+            Dict with "contact_type" and "method" if this is a Contact API,
+            None otherwise
+
+        Example:
+            >>> self._extract_contact_info("itasca.BallBallContact.force_global")
+            {"contact_type": "BallBallContact", "method": "force_global"}
+            >>> self._extract_contact_info("itasca.ball.create")
+            None
+        """
+        parts = api_name.split('.')
+
+        # Check each part for Contact type match
+        for i, part in enumerate(parts):
+            if part in CONTACT_TYPES:
+                # Found a Contact type
+                # Method name should be the next part
+                if i + 1 < len(parts):
+                    return {
+                        "contact_type": part,
+                        "method": parts[i + 1]
+                    }
+
+        return None

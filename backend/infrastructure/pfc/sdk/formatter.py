@@ -22,20 +22,28 @@ class APIDocFormatter:
     """
 
     @staticmethod
-    def format_signature(api_name: str) -> Optional[str]:
+    def format_signature(api_name: str, metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Format brief one-liner signature for quick reference.
 
         Args:
             api_name: Full API name (e.g., "itasca.ball.create")
+            metadata: Optional metadata from SearchResult (for Contact type info)
 
         Returns:
             Brief signature string with return type and description
             Format: "`signature` -> return_type - brief description"
+            For Contact APIs: includes supported contact types
             Returns None if API not found
 
         Example:
             >>> APIDocFormatter.format_signature("Ball.vel")
-            "`Ball.vel() -> tuple[float, float, float]` - Get ball velocity vector"
+            "`ball.vel() -> vec` - Get ball velocity vector"
+
+            >>> APIDocFormatter.format_signature(
+            ...     "itasca.BallBallContact.force_global",
+            ...     {"all_contact_types": ["BallBallContact", "BallFacetContact", ...]}
+            ... )
+            "`contact.force_global() -> vec` - Get contact force (supports: BallBallContact, BallFacetContact, ...)"
         """
         api_doc = DocumentationLoader.load_api_doc(api_name)
         if not api_doc:
@@ -51,7 +59,13 @@ class APIDocFormatter:
             return_type = api_doc['returns']['type']
             return_info = f" -> {return_type}"
 
-        return f"`{api_doc['signature']}`{return_info} - {brief_desc}"
+        # Add Contact type support information if available
+        contact_suffix = ""
+        if metadata and "all_contact_types" in metadata:
+            contact_types = metadata["all_contact_types"]
+            contact_suffix = f" (supports: {', '.join(contact_types)})"
+
+        return f"`{api_doc['signature']}`{return_info} - {brief_desc}{contact_suffix}"
 
     @staticmethod
     def format_full_doc(
