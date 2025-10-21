@@ -24,6 +24,16 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 DEFAULT_SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 20
 
+# Confidence threshold for query results
+# Score ranges (designed for future semantic search integration):
+#   950-999: Exact path match (PathSearchStrategy)
+#   800-949: High-quality semantic match (SemanticSearchStrategy - future)
+#   700-799: Good keyword match (KeywordSearchStrategy)
+#   400-699: Low-quality partial match (triggers fallback suggestion)
+#   0-399:   Noise-level match (treated as no results)
+HIGH_CONFIDENCE_THRESHOLD = 700  # Filters out low-quality matches
+MAX_LOW_CONFIDENCE_DISPLAY = 2   # Show only top 2 results for low confidence
+
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
     """Register PFC Python API query tool with the MCP server."""
@@ -66,6 +76,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             # Search for matching APIs with user-specified limit
             matches = searcher.search(query, top_n=limit)
 
+            # ===== Condition 1: No results found =====
             if not matches:
                 # Check fallback hints
                 index = DocumentationLoader.load_index()
@@ -76,19 +87,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
                 # No match is not an error - it's a normal query result
                 # Return success to guide LLM to the next step (query commands)
-                if hints:
-                    message = f"No Python SDK API found for '{query}'."
-                    llm_text = (
-                        f"**Python SDK**: Not available for this operation.\n\n"
-                        f"**Note**: {hints[0]}\n\n"
-                        f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands instead."
-                    )
-                else:
-                    message = f"No Python SDK API found for '{query}'."
-                    llm_text = (
-                        f"**Python SDK**: Not available for this operation.\n\n"
-                        f"**Next Step**: Use `pfc_query_command` tool to search for PFC commands."
-                    )
+                message = f"No Python SDK API found for '{query}'"
+                llm_text = APIDocFormatter.format_no_results_response(query, hints)
 
                 return success_response(
                     message=message,
@@ -101,14 +101,51 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     data={
                         "query": query,
                         "matches_found": 0,
+                        "reason": "no_results",
                         "suggestion": "Use pfc_query_command tool"
                     }
                 )
 
-            # Get the best match (first result) - SearchResult object
-            best_result = matches[0]
+            # ===== Condition 2: Low confidence results =====
+            best_score = matches[0].score
 
-            # Get API path (already in official format from expanded index)
+            if best_score < HIGH_CONFIDENCE_THRESHOLD:
+                # Low-quality match - show simplified results and recommend fallback
+                low_conf_matches = matches[:MAX_LOW_CONFIDENCE_DISPLAY]
+
+                message = f"Found {len(low_conf_matches)} low-confidence matches (best score: {best_score}/{HIGH_CONFIDENCE_THRESHOLD})"
+                llm_text = APIDocFormatter.format_low_confidence_response(
+                    query,
+                    low_conf_matches,
+                    best_score,
+                    HIGH_CONFIDENCE_THRESHOLD
+                )
+
+                return success_response(
+                    message=message,
+                    llm_content={
+                        "parts": [{
+                            "type": "text",
+                            "text": llm_text
+                        }]
+                    },
+                    data={
+                        "query": query,
+                        "matches_found": len(matches),
+                        "displayed_count": len(low_conf_matches),
+                        "best_score": best_score,
+                        "confidence": "low",
+                        "reason": "low_confidence",
+                        "suggestion": "Strongly recommended to use pfc_query_command",
+                        "partial_results": [
+                            {"name": result.api_name, "score": result.score}
+                            for result in low_conf_matches
+                        ]
+                    }
+                )
+
+            # ===== Condition 3: High confidence results (score >= 700) =====
+            best_result = matches[0]
             api_path = best_result.api_name
 
             # Load full documentation for best match
@@ -138,12 +175,21 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                         + "\n".join(related_apis)
                     )
 
+            # Optional gentle hint for medium-confidence results with few matches
+            # (score 700-899, less than 3 results)
+            optional_hint = ""
+            if best_score < 900 and len(matches) < 3:
+                optional_hint = (
+                    f"\n\n---\n\n"
+                    f"**Note**: If these don't match your needs, you may also try pfc_query_command."
+                )
+
             return success_response(
-                message=f"✅ Found {len(matches)} Python SDK API(s): {api_path}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
+                message=f"Found {len(matches)} Python SDK API(s): {api_path}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}"
+                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}{optional_hint}"
                     }]
                 },
                 data={

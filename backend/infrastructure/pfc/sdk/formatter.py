@@ -6,9 +6,10 @@ LLM-friendly markdown format. It handles:
 - Full documentation with examples and best practices
 - Special formatting for Contact types
 - Official API path generation
+- Search result responses (no results, low confidence)
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from backend.infrastructure.pfc.sdk.models import SearchResult
 from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
 from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
@@ -233,3 +234,81 @@ class APIDocFormatter:
 
         # Case 3: Module functions (already has full path)
         return api_name
+
+    @staticmethod
+    def format_no_results_response(query: str, hints: List[str] = None) -> str:
+        """Format LLM content when no Python SDK API found.
+
+        Args:
+            query: Original search query
+            hints: Optional list of hint messages from fallback_hints
+
+        Returns:
+            Formatted markdown string for LLM consumption
+
+        Example output:
+            **Python SDK**: Not available for this operation
+
+            **Next Step**: Use pfc_query_command tool to search for PFC commands instead
+        """
+        hint_text = f"Note: {hints[0]}\n\n" if hints else ""
+
+        return (
+            f"**Python SDK**: Not available for this operation\n\n"
+            f"{hint_text}"
+            f"**Next Step**: Use pfc_query_command tool to search for PFC commands instead"
+        )
+
+    @staticmethod
+    def format_low_confidence_response(
+        query: str,
+        low_confidence_matches: List[SearchResult],
+        best_score: int,
+        confidence_threshold: int
+    ) -> str:
+        """Format LLM content for low-confidence search results.
+
+        Shows simplified results with clear warning and fallback recommendation.
+        Uses consistent formatting with other PFC tool responses.
+
+        Args:
+            query: Original search query
+            low_confidence_matches: List of SearchResult objects (typically top 2)
+            best_score: Score of the best match
+            confidence_threshold: Threshold value for comparison
+
+        Returns:
+            Formatted markdown string for LLM consumption
+
+        Example output:
+            **Python SDK Search Results** | Confidence: LOW | Best Score: 450/700
+
+            Found 2 partial matches:
+
+              `ball.pos() -> vec` - Get ball position (score: 450)
+              `ball.vel() -> vec` - Get ball velocity (score: 420)
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            **Low confidence match** - These may not be what you need.
+
+            **Recommended Next Step**: Use pfc_query_command to search for PFC command-based alternatives, which may have more options.
+        """
+        # Format simplified results (only show signatures)
+        simplified_results = []
+        for result in low_confidence_matches:
+            sig = APIDocFormatter.format_signature(result.api_name, result.metadata)
+            if sig:
+                simplified_results.append(f"  {sig} (score: {result.score})")
+
+        results_text = "\n".join(simplified_results) if simplified_results else "  None"
+
+        return (
+            f"**Python SDK Search Results** | Confidence: LOW | Best Score: {best_score}/{confidence_threshold}\n\n"
+            f"Found {len(low_confidence_matches)} partial matches:\n\n"
+            f"{results_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"**Low confidence match** - These may not be what you need.\n\n"
+            f"**Recommended Next Step**: Use pfc_query_command to search "
+            f"for PFC command-based alternatives, which may have more options."
+        )
