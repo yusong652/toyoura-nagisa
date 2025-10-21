@@ -81,6 +81,10 @@ class DocumentationLoader:
         Uses merge strategy: when multiple modules define the same keyword,
         all associated APIs are collected (not overwritten).
 
+        Post-processing:
+        - Expands itasca.contact.Contact.* entries to all Contact type variants
+          (same expansion as index loading for consistency)
+
         Returns:
             Dict mapping keywords to list of API names
 
@@ -90,6 +94,8 @@ class DocumentationLoader:
             ["itasca.ball.create"]
             >>> keywords["normal vector"]  # Merged from multiple modules
             ["Facet.normal", "Contact.normal"]
+            >>> keywords["contact gap"]  # Expanded to all Contact types
+            ["itasca.BallBallContact.gap", "itasca.BallFacetContact.gap", ...]
         """
         # Use defaultdict to automatically handle merging
         all_keywords = defaultdict(list)
@@ -105,6 +111,9 @@ class DocumentationLoader:
         modules_dir = PFC_DOCS_SOURCE / "modules"
         if modules_dir.exists():
             DocumentationLoader._load_keywords_recursive(modules_dir, all_keywords)
+
+        # Expand Contact.* entries to all Contact type variants
+        all_keywords = DocumentationLoader._expand_contact_keywords(all_keywords)
 
         # Convert defaultdict back to regular dict for return
         return dict(all_keywords)
@@ -205,9 +214,16 @@ class DocumentationLoader:
         entries_to_remove = []
 
         for api_name, file_ref in quick_ref.items():
+            # Format 1: Short format "Contact.gap" (legacy)
             if api_name.startswith("Contact."):
                 # Extract method name
                 method_name = api_name.split(".", 1)[1]
+                contact_entries[method_name] = file_ref
+                entries_to_remove.append(api_name)
+            # Format 2: Unified format "itasca.contact.Contact.gap" (preferred)
+            elif api_name.startswith("itasca.contact.Contact."):
+                # Extract method name after "itasca.contact.Contact."
+                method_name = api_name.split(".", 3)[3]
                 contact_entries[method_name] = file_ref
                 entries_to_remove.append(api_name)
 
@@ -282,6 +298,57 @@ class DocumentationLoader:
             del quick_ref[api_name]
 
         return index
+
+    @staticmethod
+    def _expand_contact_keywords(all_keywords: defaultdict) -> defaultdict:
+        """Expand itasca.contact.Contact.* entries in keywords to all Contact type variants.
+
+        This ensures keywords.json entries like "itasca.contact.Contact.gap" are
+        expanded to all specific Contact types, matching the behavior of index expansion.
+
+        Args:
+            all_keywords: Dictionary mapping keywords to API lists
+
+        Returns:
+            Modified dictionary with expanded Contact entries
+
+        Example:
+            Input:
+                {"contact gap": ["itasca.contact.Contact.gap"]}
+
+            Output:
+                {"contact gap": [
+                    "itasca.BallBallContact.gap",
+                    "itasca.BallFacetContact.gap",
+                    "itasca.BallPebbleContact.gap",
+                    "itasca.PebblePebbleContact.gap",
+                    "itasca.PebbleFacetContact.gap"
+                ]}
+        """
+        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+
+        # Create a new dict to store expanded results
+        expanded_keywords = defaultdict(list)
+
+        for keyword, api_list in all_keywords.items():
+            expanded_apis = []
+
+            for api_name in api_list:
+                # Check if this is a Contact abstract path
+                if api_name.startswith("itasca.contact.Contact."):
+                    # Extract method name after "itasca.contact.Contact."
+                    method_name = api_name.split(".", 3)[3]
+
+                    # Expand to all Contact types
+                    for contact_type in CONTACT_TYPES:
+                        expanded_apis.append(f"itasca.{contact_type}.{method_name}")
+                else:
+                    # Keep non-Contact APIs as-is
+                    expanded_apis.append(api_name)
+
+            expanded_keywords[keyword] = expanded_apis
+
+        return expanded_keywords
 
     @staticmethod
     def _merge_keywords(target: defaultdict, source: Dict[str, list]) -> None:

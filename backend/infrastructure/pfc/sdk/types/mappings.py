@@ -15,10 +15,9 @@ parent modules, used for generating official API paths.
 #   Vertex -> wall.vertex module -> itasca.wall.vertex.Vertex.pos()
 #   Pebble -> clump module -> itasca.clump.Pebble.vel()
 #
-# Note: Contact is NOT included here because it's an internal documentation
-# interface, not a user-facing class. Users should use specific Contact types:
-# BallBallContact, BallFacetContact, BallPebbleContact, PebblePebbleContact,
-# PebbleFacetContact
+# Note: Contact is NOT included here because it uses abstract path representation:
+# keywords.json: itasca.contact.Contact.* (abstract)
+# loader expands to: itasca.BallBallContact.*, itasca.BallFacetContact.*, etc. (concrete)
 CLASS_TO_MODULE = {
     "Ball": "ball",
     "Clump": "clump",

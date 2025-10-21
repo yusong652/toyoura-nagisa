@@ -76,9 +76,6 @@ class KeywordSearchStrategy(SearchStrategy):
             True
         """
         keywords = DocumentationLoader.load_all_keywords()
-        index = DocumentationLoader.load_index()
-        quick_ref = index.get("quick_ref", {})
-
         query_lower = query.lower()
         query_words = set(query_lower.split())
 
@@ -105,10 +102,9 @@ class KeywordSearchStrategy(SearchStrategy):
                 )
 
                 # Add all APIs associated with this keyword
-                # Resolve short paths (Ball.pos) to full paths (itasca.ball.Ball.pos)
+                # (keywords now use complete paths from keywords.json)
                 for api_name in apis:
-                    resolved_path = self._resolve_api_path(api_name, quick_ref)
-                    matches.append((resolved_path, score))
+                    matches.append((api_name, score))
 
         # Sort by score (descending), then by API name (for stability)
         matches.sort(key=lambda x: (-x[1], x[0]))
@@ -296,77 +292,3 @@ class KeywordSearchStrategy(SearchStrategy):
             return 0.6
 
         return 0.0
-
-    def _resolve_api_path(self, api_name: str, quick_ref: dict) -> str:
-        """Resolve short API paths to full paths using the index.
-
-        Keywords may contain short paths (e.g., "Ball.pos", "Contact.gap")
-        that need to be resolved to full official paths found in the index.
-
-        Resolution strategy:
-        1. If api_name exists in quick_ref, return as-is (already full path)
-        2. If not, search quick_ref for matching full path:
-           - For object methods: "Ball.pos" → "itasca.ball.Ball.pos"
-           - For Contact types: "Contact.gap" → "itasca.BallBallContact.gap" (any variant)
-           - For module functions: usually already full, return as-is
-
-        Args:
-            api_name: API name from keywords (may be short or full path)
-            quick_ref: Index of available API paths
-
-        Returns:
-            Full API path if found in index, otherwise original api_name
-
-        Example:
-            >>> self._resolve_api_path("Ball.pos", quick_ref)
-            "itasca.ball.Ball.pos"
-            >>> self._resolve_api_path("Contact.gap", quick_ref)
-            "itasca.BallBallContact.gap"
-            >>> self._resolve_api_path("itasca.ball.create", quick_ref)
-            "itasca.ball.create"  # Already full path
-        """
-        # Case 1: Already a full path in index
-        if api_name in quick_ref:
-            return api_name
-
-        # Case 2: Short path - need to find full path in index
-        # Parse into parts for matching
-        if '.' not in api_name:
-            # Single word, not a path - return as-is
-            return api_name
-
-        parts = api_name.split('.')
-        if len(parts) < 2:
-            return api_name
-
-        # Try to find matching full path in quick_ref
-        # Match pattern: index key ends with the short path
-        # Example: "Ball.pos" matches "itasca.ball.Ball.pos"
-        #          "Contact.gap" matches "itasca.BallBallContact.gap"
-
-        # Strategy 1: Exact suffix match (case-insensitive)
-        api_name_lower = api_name.lower()
-        for full_path in quick_ref.keys():
-            full_path_lower = full_path.lower()
-
-            # Check if full_path ends with api_name pattern
-            # "itasca.ball.Ball.pos" should match "Ball.pos"
-            full_parts = full_path_lower.split('.')
-
-            # Match last N parts where N = len(parts)
-            if len(full_parts) >= len(parts):
-                # Compare last N parts
-                if '.'.join(full_parts[-len(parts):]) == api_name_lower:
-                    return full_path
-
-        # Strategy 2: Contact type special handling
-        # "Contact.gap" should match any "itasca.*Contact.gap"
-        if parts[0].lower() == 'contact':
-            method_name = parts[-1]
-            for full_path in quick_ref.keys():
-                if full_path.lower().endswith(f"contact.{method_name.lower()}"):
-                    # Return first matching Contact type variant
-                    return full_path
-
-        # Not found - return original (may cause downstream error, but preserves debugging info)
-        return api_name
