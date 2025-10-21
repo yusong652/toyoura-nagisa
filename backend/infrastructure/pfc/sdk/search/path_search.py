@@ -10,7 +10,7 @@ Supports:
 - Case-insensitive matching
 """
 
-from typing import List
+from typing import List, Dict, Any, Optional
 from backend.infrastructure.pfc.sdk.models import SearchResult, SearchStrategy as StrategyEnum
 from backend.infrastructure.pfc.sdk.search.base import SearchStrategy
 from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
@@ -93,11 +93,12 @@ class PathSearchStrategy(SearchStrategy):
 
         # Strategy 2: Regular path lookup (exact match)
         if query_stripped in quick_ref:
+            metadata = self._build_contact_metadata(query_stripped)
             return [SearchResult(
                 api_name=query_stripped,
                 score=999,
                 strategy=StrategyEnum.PATH,
-                metadata=None
+                metadata=metadata
             )]
 
         # Strategy 3: Case-insensitive fallback
@@ -105,11 +106,12 @@ class PathSearchStrategy(SearchStrategy):
         query_lower = query_stripped.lower()
         for api_name in quick_ref.keys():
             if api_name.lower() == query_lower:
+                metadata = self._build_contact_metadata(api_name)
                 return [SearchResult(
                     api_name=api_name,  # Return correctly-cased version
                     score=999,
                     strategy=StrategyEnum.PATH,
-                    metadata=None
+                    metadata=metadata
                 )]
 
         # Strategy 4: Partial path matching
@@ -161,16 +163,16 @@ class PathSearchStrategy(SearchStrategy):
         class_part = parts[-2].lower()  # Second-to-last part (Class name)
         attr_query = parts[-1].lower()  # Last part (attribute/method name)
 
-        # Special handling for Contact type aliases
-        # Map all Contact type names to "Contact" for unified matching
+        # Track if this is a Contact type query (for metadata)
         contact_type_match = None
         if ContactTypeResolver.is_contact_query(query):
             from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
             for ct in CONTACT_TYPES:
                 if ct.lower() == class_part:
-                    class_part = "contact"
                     contact_type_match = ct  # Remember original contact type
                     break
+            # NOTE: We no longer map class_part to "contact" because the index
+            # has been expanded with actual Contact type names (BallBallContact, etc.)
 
         # Collect candidates with match quality scores
         candidates = []
@@ -220,6 +222,45 @@ class PathSearchStrategy(SearchStrategy):
             )]
 
         return []
+
+    def _build_contact_metadata(self, api_name: str) -> Optional[Dict[str, Any]]:
+        """Build metadata for Contact type APIs.
+
+        If the API name is a Contact type (BallBallContact, BallFacetContact, etc.),
+        returns metadata with contact_type and all_contact_types information.
+        Otherwise returns None.
+
+        Args:
+            api_name: API path like "BallBallContact.gap" or "Ball.vel"
+
+        Returns:
+            Metadata dict for Contact types, None for other types
+
+        Example:
+            >>> self._build_contact_metadata("BallBallContact.gap")
+            {'contact_type': 'BallBallContact', 'all_contact_types': [...]}
+            >>> self._build_contact_metadata("Ball.vel")
+            None
+        """
+        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+
+        # Extract class name from API path
+        # Handle both "BallBallContact.gap" and "itasca.BallBallContact.gap"
+        parts = api_name.split('.')
+        if len(parts) < 2:
+            return None
+
+        # Check second-to-last part (class name position)
+        class_name = parts[-2]
+
+        # If it's a Contact type, build metadata
+        if class_name in CONTACT_TYPES:
+            return {
+                'contact_type': class_name,
+                'all_contact_types': CONTACT_TYPES
+            }
+
+        return None
 
     def _calculate_attr_match_score(self, query_attr: str, api_attr: str) -> int:
         """Calculate match quality between query attribute and API attribute.

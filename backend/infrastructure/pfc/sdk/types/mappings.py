@@ -6,19 +6,26 @@ parent modules, used for generating official API paths.
 
 # Object class to module mapping
 # Maps class names to their parent module names in PFC Python SDK
-# Format: "ClassName" -> "module_name"
+# Format: "ClassName" -> "module_name" or "module.submodule"
 # Official API path structure: itasca.{module}.{Class}.{method}
 #
 # Examples:
 #   Ball -> ball module -> itasca.ball.Ball.vel()
 #   Facet -> wall module -> itasca.wall.Facet.vel()
+#   Vertex -> wall.vertex module -> itasca.wall.vertex.Vertex.pos()
 #   Pebble -> clump module -> itasca.clump.Pebble.vel()
+#
+# Note: Contact is NOT included here because it's an internal documentation
+# interface, not a user-facing class. Users should use specific Contact types:
+# BallBallContact, BallFacetContact, BallPebbleContact, PebblePebbleContact,
+# PebbleFacetContact
 CLASS_TO_MODULE = {
     "Ball": "ball",
     "Clump": "clump",
-    "Contact": "contact",  # Generic contact interface
     "Measure": "measure",
     "Wall": "wall",
-    "Facet": "wall",       # Facet is under wall module
-    "Pebble": "clump",     # Pebble is under clump module
+    "Facet": "wall",           # Facet is under wall module
+    "Vertex": "wall.vertex",   # Vertex is under wall.vertex submodule
+    "Pebble": "clump",         # Pebble is under clump module
+    "Template": "clump.template",  # Template is under clump.template submodule
 }

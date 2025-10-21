@@ -14,19 +14,19 @@ from fastmcp.server.context import Context
 from pydantic import Field
 
 from backend.infrastructure.pfc.sdk import (
-    search_api,
-    load_api_doc,
-    format_api_doc,
-    format_api_signature
+    APISearcher,
+    DocumentationLoader,
+    APIDocFormatter
 )
-from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
-from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
 from backend.infrastructure.pfc.config import SDK_SEARCH_TOP_N
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
     """Register PFC Python API query tool with the MCP server."""
+
+    # Create searcher instance once
+    searcher = APISearcher()
 
     @mcp.tool(
         tags={"pfc", "python", "api", "documentation"},
@@ -58,7 +58,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         """
         try:
             # Search for matching APIs (configurable top-N)
-            matches = search_api(operation, top_n=SDK_SEARCH_TOP_N)
+            matches = searcher.search(operation, top_n=SDK_SEARCH_TOP_N)
 
             if not matches:
                 # Check fallback hints
@@ -101,45 +101,25 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
             # Get the best match (first result) - SearchResult object
             best_result = matches[0]
-            best_api_name = best_result.api_name
-            best_metadata = best_result.metadata
+
+            # Get API path (already in official format from expanded index)
+            api_path = best_result.api_name
 
             # Load full documentation for best match
-            api_doc = load_api_doc(best_api_name)
+            api_doc = DocumentationLoader.load_api_doc(api_path)
 
             if not api_doc:
-                return error_response(f"API documentation not found for {best_api_name}")
+                return error_response(f"API documentation not found for {api_path}")
 
             # Format full documentation for best match (pass SearchResult for Contact types)
-            formatted_doc = format_api_doc(api_doc, best_result)
-
-            # Determine display name (use official full path)
-            # Three cases:
-            # 1. Contact types: itasca.{ContactType}.{method}
-            # 2. Object methods: itasca.{module}.{Class}.{method}
-            # 3. Module functions: itasca.{module}.{function} (already full path)
-
-            display_name = best_api_name  # Default
-
-            if best_metadata and 'contact_type' in best_metadata:
-                # Case 1: Contact type
-                contact_type = best_metadata['contact_type']
-                method_name = best_api_name.split('.')[-1]
-                display_name = f"itasca.{contact_type}.{method_name}"
-
-            elif '.' in best_api_name and not best_api_name.startswith('itasca.'):
-                # Case 2: Object method (e.g., "Ball.vel", "Wall.vel")
-                class_name = best_api_name.split('.')[0]
-                if class_name in CLASS_TO_MODULE:
-                    module_name = CLASS_TO_MODULE[class_name]
-                    display_name = f"itasca.{module_name}.{best_api_name}"
+            formatted_doc = APIDocFormatter.format_full_doc(api_doc, best_result)
 
             # Format related APIs (if multiple matches)
             related_section = ""
             if len(matches) > 1:
                 related_apis = []
                 for result in matches[1:]:
-                    sig = format_api_signature(result.api_name)
+                    sig = APIDocFormatter.format_signature(result.api_name)
                     if sig:
                         related_apis.append(f"- {sig}")
 
@@ -152,7 +132,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     )
 
             return success_response(
-                message=f"✅ Found {len(matches)} Python SDK API(s): {display_name}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
+                message=f"✅ Found {len(matches)} Python SDK API(s): {api_path}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
                 llm_content={
                     "parts": [{
                         "type": "text",
@@ -160,14 +140,13 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     }]
                 },
                 data={
-                    "api_name": display_name,
-                    "internal_path": best_api_name,
+                    "api_name": api_path,
                     "signature": api_doc['signature'],
                     "has_limitations": bool(api_doc.get('limitations')),
                     "fallback_commands": api_doc.get('fallback_commands', []),
                     "match_count": len(matches),
-                    "is_contact_type": bool(best_metadata and 'contact_type' in best_metadata),
-                    "contact_type": best_metadata.get('contact_type') if best_metadata else None,
+                    "is_contact_type": bool(best_result.metadata and 'contact_type' in best_result.metadata),
+                    "contact_type": best_result.metadata.get('contact_type') if best_result.metadata else None,
                     "related_apis": [
                         {"name": result.api_name, "score": result.score}
                         for result in matches[1:]

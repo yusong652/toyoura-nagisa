@@ -34,6 +34,10 @@ class DocumentationLoader:
         - keywords: Keyword to API list mapping (if present)
         - fallback_hints: Suggestions when SDK doesn't support operation
 
+        Post-processing:
+        - Expands Contact.* entries to all Contact type variants
+          (BallBallContact, BallFacetContact, etc.)
+
         Returns:
             Dict containing index data structure
 
@@ -45,13 +49,23 @@ class DocumentationLoader:
             >>> quick_ref = index["quick_ref"]
             >>> "itasca.ball.create" in quick_ref
             True
+            >>> "BallBallContact.gap" in quick_ref  # Expanded from Contact.gap
+            True
         """
         index_path = PFC_DOCS_SOURCE / "index.json"
         if not index_path.exists():
             raise FileNotFoundError(f"Index file not found: {index_path}")
 
         with open(index_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            index = json.load(f)
+
+        # Expand Contact.* entries to all Contact type variants
+        index = DocumentationLoader._expand_contact_types(index)
+
+        # Expand object methods to full official paths
+        index = DocumentationLoader._expand_object_methods(index)
+
+        return index
 
     @staticmethod
     @lru_cache(maxsize=1)
@@ -154,6 +168,119 @@ class DocumentationLoader:
                     return func
 
         return None
+
+    @staticmethod
+    def _expand_contact_types(index: Dict[str, Any]) -> Dict[str, Any]:
+        """Expand Contact.* entries to all Contact type variants.
+
+        PFC has multiple Contact types (BallBallContact, BallFacetContact, etc.)
+        that share the same interface documented as "Contact". This method
+        expands each Contact.* entry to all Contact type variants so that
+        LLM can search using official API paths.
+
+        Args:
+            index: Loaded index dictionary
+
+        Returns:
+            Modified index with expanded Contact entries
+
+        Example:
+            Input quick_ref:
+                "Contact.gap": "modules/contact/Contact.json#gap"
+
+            Output quick_ref:
+                "BallBallContact.gap": "modules/contact/Contact.json#gap"
+                "BallFacetContact.gap": "modules/contact/Contact.json#gap"
+                "BallPebbleContact.gap": "modules/contact/Contact.json#gap"
+                "PebblePebbleContact.gap": "modules/contact/Contact.json#gap"
+                "PebbleFacetContact.gap": "modules/contact/Contact.json#gap"
+        """
+        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+
+        quick_ref = index.get("quick_ref", {})
+
+        # Find all Contact.* entries
+        contact_entries = {}
+        entries_to_remove = []
+
+        for api_name, file_ref in quick_ref.items():
+            if api_name.startswith("Contact."):
+                # Extract method name
+                method_name = api_name.split(".", 1)[1]
+                contact_entries[method_name] = file_ref
+                entries_to_remove.append(api_name)
+
+        # Expand each Contact.* entry to all Contact types
+        for method_name, file_ref in contact_entries.items():
+            for contact_type in CONTACT_TYPES:
+                # Create only full official paths: itasca.BallBallContact.gap
+                # This eliminates the need for PathResolver to add "itasca." prefix
+                full_path = f"itasca.{contact_type}.{method_name}"
+                quick_ref[full_path] = file_ref
+
+        # Remove original Contact.* entries (they're now replaced by specific types)
+        for api_name in entries_to_remove:
+            del quick_ref[api_name]
+
+        return index
+
+    @staticmethod
+    def _expand_object_methods(index: Dict[str, Any]) -> Dict[str, Any]:
+        """Expand object method entries to full official paths.
+
+        Object methods like "Ball.vel", "Wall.pos" are stored in index as short paths.
+        This method expands them to full official paths like "itasca.ball.Ball.vel",
+        "itasca.wall.Wall.pos", eliminating the need for runtime path resolution.
+
+        Args:
+            index: Loaded index dictionary
+
+        Returns:
+            Modified index with expanded object method entries
+
+        Example:
+            Input quick_ref:
+                "Ball.vel": "modules/ball/Ball.json#vel"
+                "Wall.pos": "modules/wall/Wall.json#pos"
+
+            Output quick_ref:
+                "itasca.ball.Ball.vel": "modules/ball/Ball.json#vel"
+                "itasca.wall.Wall.pos": "modules/wall/Wall.json#pos"
+        """
+        from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
+
+        quick_ref = index.get("quick_ref", {})
+
+        # Find all object method entries (Class.method format, not starting with itasca.)
+        object_methods = {}
+        entries_to_remove = []
+
+        for api_name, file_ref in quick_ref.items():
+            # Skip if already full path or module function
+            if api_name.startswith("itasca."):
+                continue
+
+            # Check if it's an object method (Class.method format)
+            if '.' in api_name:
+                class_name = api_name.split('.')[0]
+                # Check if it's a known class with module mapping
+                if class_name in CLASS_TO_MODULE:
+                    object_methods[api_name] = file_ref
+                    entries_to_remove.append(api_name)
+
+        # Expand each object method to full path
+        for short_path, file_ref in object_methods.items():
+            class_name = short_path.split('.')[0]
+            module_name = CLASS_TO_MODULE[class_name]
+            # Create full official path: Ball.vel → itasca.ball.Ball.vel
+            full_path = f"itasca.{module_name}.{short_path}"
+            quick_ref[full_path] = file_ref
+
+        # Remove original short path entries
+        for api_name in entries_to_remove:
+            del quick_ref[api_name]
+
+        return index
 
     @staticmethod
     def clear_cache():
