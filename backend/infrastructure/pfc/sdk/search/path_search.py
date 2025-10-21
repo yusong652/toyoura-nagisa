@@ -54,6 +54,7 @@ class PathSearchStrategy(SearchStrategy):
         1. Check if query is a Contact type (special handling)
         2. Try exact path match (case-sensitive)
         3. Try case-insensitive match (user convenience)
+        4. Try partial path match (e.g., "Ball.velocity" → "Ball.vel")
 
         Args:
             query: API path string (e.g., "itasca.ball.create")
@@ -111,4 +112,150 @@ class PathSearchStrategy(SearchStrategy):
                     metadata=None
                 )]
 
+        # Strategy 4: Partial path matching
+        # Handles cases like "Ball.velocity" → "Ball.vel" or "Wall.position" → "Wall.pos"
+        partial_match = self._partial_path_match(query_stripped, quick_ref)
+        if partial_match:
+            return partial_match
+
         return []
+
+    def _partial_path_match(self, query: str, quick_ref: dict) -> List[SearchResult]:
+        """Attempt partial path matching for attribute/method names.
+
+        Handles common scenarios where users query with:
+        - Full attribute names instead of abbreviations ("Ball.velocity" → "Ball.vel")
+        - Alternative names for the same concept ("Wall.position" → "Wall.pos")
+        - Contact type aliases ("BallBallContact.force" → "Contact.force_global")
+
+        Matching rules:
+        1. Class/module name must match (case-insensitive)
+           - Special case: Contact type names are aliased to "Contact"
+        2. Attribute name partial matching:
+           - Prefix match (first 3+ chars): "vel" matches "velocity"
+           - Substring match: one is contained in the other
+        3. Returns best match with score 850 (lower than exact match)
+
+        Args:
+            query: Path query string (must contain '.')
+            quick_ref: Index of available API paths
+
+        Returns:
+            List with single SearchResult if partial match found, empty list otherwise
+
+        Example:
+            >>> self._partial_path_match("Ball.velocity", quick_ref)
+            [SearchResult(api_name="Ball.vel", score=850, ...)]
+            >>> self._partial_path_match("ballballcontact.force", quick_ref)
+            [SearchResult(api_name="Contact.force_global", score=850, ...)]
+        """
+        if '.' not in query:
+            return []
+
+        # Parse query into class/module part and attribute/method part
+        parts = query.split('.')
+        if len(parts) < 2:
+            return []
+
+        # Handle both "Class.attr" and "module.Class.attr" patterns
+        class_part = parts[-2].lower()  # Second-to-last part (Class name)
+        attr_query = parts[-1].lower()  # Last part (attribute/method name)
+
+        # Special handling for Contact type aliases
+        # Map all Contact type names to "Contact" for unified matching
+        contact_type_match = None
+        if ContactTypeResolver.is_contact_query(query):
+            from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+            for ct in CONTACT_TYPES:
+                if ct.lower() == class_part:
+                    class_part = "contact"
+                    contact_type_match = ct  # Remember original contact type
+                    break
+
+        # Collect candidates with match quality scores
+        candidates = []
+
+        for api_name in quick_ref.keys():
+            api_parts = api_name.split('.')
+            if len(api_parts) < 2:
+                continue
+
+            api_class = api_parts[-2].lower()  # Class/module in API
+            api_attr = api_parts[-1].lower()  # Attribute/method in API
+
+            # Class name must match (exact or case-insensitive)
+            if api_class != class_part:
+                continue
+
+            # Calculate attribute match quality
+            match_score = self._calculate_attr_match_score(attr_query, api_attr)
+
+            if match_score > 0:
+                candidates.append((api_name, match_score))
+
+        # Return best match if any candidates found
+        if candidates:
+            # Sort by match score (descending)
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            best_match = candidates[0]
+
+            # Build metadata
+            metadata = {
+                "match_type": "partial",
+                "original_query": query,
+                "match_quality": best_match[1]
+            }
+
+            # Add Contact type information if applicable
+            if contact_type_match:
+                from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+                metadata["contact_type"] = contact_type_match
+                metadata["all_contact_types"] = CONTACT_TYPES
+
+            return [SearchResult(
+                api_name=best_match[0],
+                score=850,  # Lower than exact match (999) but indicates good match
+                strategy=StrategyEnum.PATH,
+                metadata=metadata
+            )]
+
+        return []
+
+    def _calculate_attr_match_score(self, query_attr: str, api_attr: str) -> int:
+        """Calculate match quality between query attribute and API attribute.
+
+        Scoring rules:
+        - Exact match: 100 (shouldn't happen, handled by earlier strategies)
+        - One is prefix of the other (3+ chars): 80
+        - One is substring of the other: 60
+        - No match: 0
+
+        Args:
+            query_attr: Attribute name from query (lowercase)
+            api_attr: Attribute name from API (lowercase)
+
+        Returns:
+            Match score (0-100)
+
+        Example:
+            >>> self._calculate_attr_match_score("velocity", "vel")
+            80  # "vel" is prefix of "velocity"
+            >>> self._calculate_attr_match_score("pos", "position")
+            80  # "pos" is prefix of "position"
+        """
+        if query_attr == api_attr:
+            return 100  # Exact match (shouldn't happen due to earlier strategies)
+
+        # Prefix matching (minimum 3 chars to avoid false positives)
+        min_prefix_len = 3
+        if len(query_attr) >= min_prefix_len and len(api_attr) >= min_prefix_len:
+            # Check if one is prefix of the other
+            if query_attr.startswith(api_attr[:min_prefix_len]) or \
+               api_attr.startswith(query_attr[:min_prefix_len]):
+                return 80
+
+        # Substring matching (one is contained in the other)
+        if query_attr in api_attr or api_attr in query_attr:
+            return 60
+
+        return 0

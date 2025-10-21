@@ -85,16 +85,21 @@ class ContactTypeResolver:
         - Partial path: "BallBallContact.gap"
         - Case-insensitive: "ballballcontact.gap"
 
+        Note: Partial method name matching (e.g., "BallBallContact.force" → "Contact.force_global")
+        is handled by PathSearchStrategy._partial_path_match for consistency.
+
         Args:
             api_path: API path string to resolve
             quick_ref: Quick reference dict from index (for validation)
 
         Returns:
-            ContactQueryResult if valid contact query, None otherwise
+            ContactQueryResult if valid contact query with exact method match, None otherwise
 
         Examples:
             >>> resolve("BallBallContact.gap", {"Contact.gap": "..."})
             ContactQueryResult(internal_path="Contact.gap", ...)
+            >>> resolve("ballballcontact.force", {...})
+            None  # Partial match handled by PathSearchStrategy
             >>> resolve("itasca.ball.create", {...})
             None
         """
@@ -112,7 +117,8 @@ class ContactTypeResolver:
                     method_name = parts[contact_idx + 1]
                     internal_path = f"Contact.{method_name}"
 
-                    # Verify method exists in Contact interface
+                    # Only return exact matches
+                    # Partial matching is delegated to PathSearchStrategy
                     if ContactTypeResolver._verify_method(internal_path, quick_ref):
                         return ContactQueryResult(
                             internal_path=internal_path,
