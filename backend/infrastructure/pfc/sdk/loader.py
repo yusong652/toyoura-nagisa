@@ -120,13 +120,16 @@ class DocumentationLoader:
 
     @staticmethod
     def load_api_doc(api_name: str) -> Optional[Dict[str, Any]]:
-        """Load documentation for a specific API.
+        """Load documentation for a specific API or module.
 
         Args:
             api_name: Full API name like "itasca.ball.create" or "Ball.vel"
+                     or module name like "itasca.ball"
 
         Returns:
             API documentation dict with fields:
+
+            For functions/methods:
                 - signature: Function signature
                 - description: Detailed description
                 - parameters: List of parameter definitions
@@ -138,20 +141,36 @@ class DocumentationLoader:
                 - notes: Additional notes (optional)
                 - see_also: Related APIs (optional)
 
+            For modules:
+                - type: "module"
+                - signature: Module signature with function count
+                - description: Module description
+                - available_functions: List of all function names in the module
+                - usage_note: Guidance on querying specific functions
+
             Returns None if API not found.
 
         Example:
             >>> doc = DocumentationLoader.load_api_doc("itasca.ball.create")
             >>> doc["signature"]
             "itasca.ball.create(radius, pos=None)"
-            >>> doc["description"]
-            "Create a new ball in the simulation..."
+
+            >>> doc = DocumentationLoader.load_api_doc("itasca.ball")
+            >>> doc["type"]
+            "module"
+            >>> len(doc["available_functions"])
+            9
         """
         index = DocumentationLoader.load_index()
 
-        # Get file reference from index
+        # Try 1: Get file reference from quick_ref (functions/methods)
         ref = index["quick_ref"].get(api_name)
         if not ref:
+            # Try 2: Check if it's a module name
+            module_doc = DocumentationLoader._load_module_doc(api_name, index)
+            if module_doc:
+                return module_doc
+            # Not found in either quick_ref or modules
             return None
 
         # Parse file path and anchor
@@ -298,6 +317,59 @@ class DocumentationLoader:
             del quick_ref[api_name]
 
         return index
+
+    @staticmethod
+    def _load_module_doc(api_name: str, index: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Load module-level documentation.
+
+        Args:
+            api_name: API name that might be a module (e.g., "itasca.ball", "itasca.clump")
+            index: Loaded index dictionary
+
+        Returns:
+            Module documentation dict or None if not a module
+
+        Example:
+            Input: "itasca.ball"
+            Output: {
+                "type": "module",
+                "signature": "itasca.ball (module - 9 functions available)",
+                "description": "Ball object management...",
+                "available_functions": ["itasca.ball.create", ...]
+            }
+        """
+        modules = index.get("modules", {})
+
+        # Extract module name from API name
+        # "itasca.ball" -> "ball"
+        # "itasca.clump.template" -> "clump.template"
+        if not api_name.startswith("itasca."):
+            return None
+
+        module_name = api_name.replace("itasca.", "", 1)
+
+        # Check if this module exists
+        if module_name not in modules:
+            return None
+
+        module_info = modules[module_name]
+
+        # Build list of available functions with full paths
+        functions = module_info.get("functions", [])
+        available_functions = [f"itasca.{module_name}.{func}" for func in functions]
+
+        func_count = len(functions)
+
+        return {
+            "type": "module",
+            "signature": f"{api_name} (module - {func_count} function{'s' if func_count != 1 else ''} available)",
+            "description": module_info.get("description", f"{module_name} module"),
+            "available_functions": available_functions,
+            "usage_note": (
+                f"Query specific functions (e.g., '{available_functions[0] if available_functions else 'function_name'}') "
+                "for detailed documentation including parameters, return types, and examples."
+            )
+        }
 
     @staticmethod
     def _expand_contact_keywords(all_keywords: defaultdict) -> defaultdict:
