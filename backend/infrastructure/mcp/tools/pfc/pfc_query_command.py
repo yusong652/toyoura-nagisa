@@ -126,16 +126,12 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     formatted_doc = f"# {best_result.name}\n\n*Documentation not available*"
 
             elif best_result.doc_type == DocumentType.MODEL_PROPERTY:
-                # Load model property documentation
+                # Load full model documentation (model-level, not individual property)
                 model_name = best_result.category
-                property_keyword = best_result.metadata.get("property_keyword", "")
                 model_doc = CommandLoader.load_model_property_doc(model_name)
 
-                if model_doc and property_keyword:
-                    formatted_doc = CommandFormatter.format_model_property(
-                        model_doc,
-                        property_keyword
-                    )
+                if model_doc:
+                    formatted_doc = CommandFormatter.format_full_model(model_doc)
                 else:
                     formatted_doc = f"# {best_result.name}\n\n*Documentation not available*"
 
@@ -164,8 +160,7 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     "score": best_result.score,
                     "total_results": len(results),
                     "include_model_properties": include_model_properties,
-                    "python_alternative": best_result.metadata.get("python_available")
-                                         if best_result.doc_type == DocumentType.COMMAND else None,
+                    "python_alternative": best_result.metadata.get("python_available") if best_result.metadata and best_result.doc_type == DocumentType.COMMAND else None,
                     "related_results": [
                         {
                             "name": r.name,

@@ -90,36 +90,26 @@ class CommandSearcher:
         if include_model_properties:
             models = CommandLoader.get_all_model_properties()
             for model in models:
-                # Load full model doc to search properties
-                model_doc = CommandLoader.load_model_property_doc(model["name"])
-                if not model_doc:
-                    continue
-
-                # Search each property in the model
-                for group in model_doc.get("property_groups", []):
-                    for prop in group.get("properties", []):
-                        score = self._score_model_property(
-                            model["name"],
-                            prop,
-                            query_lower,
-                            query_words
-                        )
-                        if score > 0:
-                            matches.append(CommandSearchResult(
-                                name=f"{model['name']}.{prop['keyword']}",
-                                score=score,
-                                doc_type=DocumentType.MODEL_PROPERTY,
-                                category=model["name"],
-                                metadata={
-                                    "file": model.get("file"),
-                                    "property_keyword": prop["keyword"],
-                                    "symbol": prop.get("symbol"),
-                                    "description": prop.get("description"),
-                                    "type": prop.get("type"),
-                                    "default": prop.get("default"),
-                                    "model_full_name": model.get("full_name")
-                                }
-                            ))
+                # Score the model itself (not individual properties)
+                score = self._score_model(
+                    model,
+                    query_lower,
+                    query_words
+                )
+                if score > 0:
+                    matches.append(CommandSearchResult(
+                        name=f"{model['name']}",
+                        score=score,
+                        doc_type=DocumentType.MODEL_PROPERTY,
+                        category=model["name"],
+                        metadata={
+                            "file": model.get("file"),
+                            "full_name": model.get("full_name"),
+                            "description": model.get("description"),
+                            "common_use": model.get("common_use"),
+                            "priority": model.get("priority")
+                        }
+                    ))
 
         # Sort by score (descending) and return top-N
         matches.sort(key=lambda x: x.score, reverse=True)
@@ -178,18 +168,16 @@ class CommandSearcher:
 
         return 0  # No match
 
-    def _score_model_property(
+    def _score_model(
         self,
-        model_name: str,
-        prop: dict,
+        model: dict,
         query_lower: str,
         query_words: Set[str]
     ) -> int:
-        """Calculate relevance score for a model property.
+        """Calculate relevance score for a contact model.
 
         Args:
-            model_name: Model name (e.g., "linear")
-            prop: Property dict with keyword, description, symbol
+            model: Model metadata dict from index.json
             query_lower: Lowercase query string
             query_words: Set of query words
 
@@ -197,37 +185,41 @@ class CommandSearcher:
             Score (0-950), 0 if no match
 
         Scoring logic:
-            - Exact property keyword match: 950
-            - Property keyword in query: 900
-            - Symbol match: 850
+            - Exact model name match: 950
+            - Full name contains query: 900
+            - Model name in query: 850
             - Description keyword match: 700-800 (based on coverage)
-            - Model name + keyword match: 950
+            - Common use keyword match: 600-700 (based on coverage)
         """
-        keyword = prop["keyword"].lower()
-        description = prop.get("description", "").lower()
-        symbol = prop.get("symbol", "").lower()
-        full_path = f"{model_name}.{keyword}".lower()
+        model_name = model["name"].lower()
+        full_name = model.get("full_name", "").lower()
+        description = model.get("description", "").lower()
+        common_use = model.get("common_use", "").lower()
 
-        # Exact matches (highest priority)
-        if query_lower == keyword:
-            return 950
-        if query_lower == full_path:
+        # Exact model name match
+        if query_lower == model_name:
             return 950
 
-        # Keyword substring match
-        if keyword in query_lower:
+        # Full name substring match
+        if query_lower in full_name or full_name in query_lower:
             return 900
 
-        # Symbol match (e.g., "k_n", "μ") - require at least 2 chars to avoid false positives
-        if symbol and len(symbol) >= 2 and symbol in query_lower:
+        # Model name substring match
+        if model_name in query_lower:
             return 850
 
         # Description keyword match
         description_words = set(description.split())
         matching_words = query_words & description_words
         if matching_words:
-            # Score based on coverage
             coverage = len(matching_words) / len(query_words) if query_words else 0
             return int(700 + coverage * 100)
+
+        # Common use keyword match
+        common_use_words = set(common_use.split())
+        matching_words = query_words & common_use_words
+        if matching_words:
+            coverage = len(matching_words) / len(query_words) if query_words else 0
+            return int(600 + coverage * 100)
 
         return 0  # No match

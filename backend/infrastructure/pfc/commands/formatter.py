@@ -111,6 +111,93 @@ class CommandFormatter:
         return "\n".join(parts)
 
     @staticmethod
+    def format_full_model(doc: Dict[str, Any]) -> str:
+        """Format a complete contact model documentation as markdown.
+
+        Args:
+            doc: Model documentation dict with all properties
+
+        Returns:
+            Formatted markdown string
+
+        Example:
+            >>> doc = {"model": "linear", "full_name": "Linear Model", ...}
+            >>> md = CommandFormatter.format_full_model(doc)
+            >>> "# Linear Model" in md
+            True
+        """
+        parts = []
+
+        model_name = doc.get("model", "unknown")
+        model_full_name = doc.get("full_name", model_name)
+
+        # Header
+        parts.append(f"# {model_full_name}")
+        parts.append(f"*Model name: `{model_name}`*")
+        parts.append("")
+
+        # Description
+        description = doc.get("description", "")
+        if description:
+            parts.append("## Description")
+            parts.append(description)
+            parts.append("")
+
+        # Typical Applications
+        typical_apps = doc.get("typical_applications", [])
+        if typical_apps:
+            parts.append("## Typical Applications")
+            for app in typical_apps:
+                parts.append(f"- {app}")
+            parts.append("")
+
+        # Property Groups
+        property_groups = doc.get("property_groups", [])
+        if property_groups:
+            parts.append("## Properties")
+            parts.append("")
+
+            for group in property_groups:
+                group_name = group.get("name", "Properties")
+                group_desc = group.get("description", "")
+
+                parts.append(f"### {group_name}")
+                if group_desc:
+                    parts.append(f"*{group_desc}*")
+                    parts.append("")
+
+                properties = group.get("properties", [])
+                if properties:
+                    # Create property table
+                    parts.append("| Property | Symbol | Description | Type | Default |")
+                    parts.append("|----------|--------|-------------|------|---------|")
+
+                    for prop in properties:
+                        keyword = prop.get("keyword", "")
+                        symbol = prop.get("symbol", "-")
+                        desc = prop.get("description", "")
+                        prop_type = prop.get("type", "")
+                        default = prop.get("default", "-")
+
+                        # Truncate description for table
+                        if len(desc) > 60:
+                            desc = desc[:57] + "..."
+
+                        parts.append(f"| `{keyword}` | {symbol} | {desc} | {prop_type} | {default} |")
+
+                    parts.append("")
+
+        # Usage Examples
+        parts.append("## Usage")
+        parts.append(f"Set properties for this model using:")
+        parts.append(f"- Command: `contact cmat add model {model_name} property <prop> <value>`")
+        parts.append(f"- Command: `contact property <prop> <value> range ...`")
+        parts.append(f"- Python: `contact.set_prop('<prop>', value)`")
+        parts.append("")
+
+        return "\n".join(parts)
+
+    @staticmethod
     def format_model_property(doc: Dict[str, Any], property_keyword: str) -> str:
         """Format a contact model property documentation as markdown.
 
@@ -230,13 +317,23 @@ class CommandFormatter:
         parts = [f"Found {len(results)} result(s):", ""]
 
         for i, result in enumerate(results, 1):
-            type_label = "[CMD]" if result.doc_type == DocumentType.COMMAND else "[PROP]"
+            type_label = "[CMD]" if result.doc_type == DocumentType.COMMAND else "[MODEL]"
             score_indicator = "★★★" if result.score >= 900 else ("★★" if result.score >= 700 else "★")
 
-            parts.append(f"{i}. **{type_label} {result.name}** {score_indicator}")
+            # Format display name
+            display_name = result.name
+            if result.doc_type == DocumentType.MODEL_PROPERTY and result.metadata:
+                full_name = result.metadata.get("full_name")
+                if full_name:
+                    display_name = f"{result.name} - {full_name}"
+
+            parts.append(f"{i}. **{type_label} {display_name}** {score_indicator}")
 
             if result.metadata:
-                desc = result.metadata.get("short_description") or result.metadata.get("description")
+                # For commands, show short_description; for models, show description or common_use
+                desc = (result.metadata.get("short_description") or
+                       result.metadata.get("description") or
+                       result.metadata.get("common_use"))
                 if desc:
                     # Truncate long descriptions
                     desc = desc[:100] + "..." if len(desc) > 100 else desc
