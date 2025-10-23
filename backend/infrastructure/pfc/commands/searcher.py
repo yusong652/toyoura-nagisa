@@ -218,8 +218,8 @@ class CommandSearcher:
         if keyword in query_lower:
             return 900
 
-        # Symbol match (e.g., "k_n", "μ")
-        if symbol and symbol in query_lower:
+        # Symbol match (e.g., "k_n", "μ") - require at least 2 chars to avoid false positives
+        if symbol and len(symbol) >= 2 and symbol in query_lower:
             return 850
 
         # Description keyword match
