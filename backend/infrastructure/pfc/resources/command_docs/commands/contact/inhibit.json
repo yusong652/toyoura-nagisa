@@ -25,8 +25,7 @@
       "type": "range",
       "required": true,
       "description": "Range specification identifying which contacts to inhibit. Required parameter."
-    }
-  },
+    }],
 
   "keywords": [
     {
