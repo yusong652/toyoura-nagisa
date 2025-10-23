@@ -11,7 +11,7 @@ Supports:
 """
 
 from typing import List, Dict, Any, Optional
-from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy as StrategyEnum
+from backend.infrastructure.pfc.shared.search.models import SearchResult, DocumentType, SearchStrategy as StrategyEnum
 from backend.infrastructure.pfc.shared.search.base import SearchStrategy
 from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 from backend.infrastructure.pfc.python_api.types.contact import ContactTypeResolver
@@ -81,8 +81,10 @@ class PathSearchStrategy(SearchStrategy):
             contact_result = ContactTypeResolver.resolve(query_stripped, quick_ref)
             if contact_result:
                 return [SearchResult(
-                    api_name=contact_result.internal_path,
+                    name=contact_result.internal_path,
                     score=999,  # Exact match score
+                    doc_type=DocumentType.API,
+                    category=self._extract_category(contact_result.internal_path),
                     strategy=StrategyEnum.PATH,
                     metadata={
                         "contact_type": contact_result.contact_type,
@@ -95,8 +97,10 @@ class PathSearchStrategy(SearchStrategy):
         if query_stripped in quick_ref:
             metadata = self._build_contact_metadata(query_stripped)
             return [SearchResult(
-                api_name=query_stripped,
+                name=query_stripped,
                 score=999,
+                doc_type=DocumentType.API,
+                category=self._extract_category(query_stripped),
                 strategy=StrategyEnum.PATH,
                 metadata=metadata
             )]
@@ -108,8 +112,10 @@ class PathSearchStrategy(SearchStrategy):
             if api_name.lower() == query_lower:
                 metadata = self._build_contact_metadata(api_name)
                 return [SearchResult(
-                    api_name=api_name,  # Return correctly-cased version
+                    name=api_name,  # Return correctly-cased version
                     score=999,
+                    doc_type=DocumentType.API,
+                    category=self._extract_category(api_name),
                     strategy=StrategyEnum.PATH,
                     metadata=metadata
                 )]
@@ -215,8 +221,10 @@ class PathSearchStrategy(SearchStrategy):
                 metadata["all_contact_types"] = CONTACT_TYPES
 
             return [SearchResult(
-                api_name=best_match[0],
+                name=best_match[0],
                 score=850,  # Lower than exact match (999) but indicates good match
+                doc_type=DocumentType.API,
+                category=self._extract_category(best_match[0]),
                 strategy=StrategyEnum.PATH,
                 metadata=metadata
             )]
@@ -261,6 +269,37 @@ class PathSearchStrategy(SearchStrategy):
             }
 
         return None
+
+    def _extract_category(self, api_name: str) -> str:
+        """Extract category from API name.
+
+        Args:
+            api_name: Full API path (e.g., "itasca.ball.create", "itasca.BallBallContact.force_global")
+
+        Returns:
+            Category name (e.g., "ball", "contact")
+
+        Example:
+            >>> self._extract_category("itasca.ball.create")
+            "ball"
+            >>> self._extract_category("itasca.BallBallContact.force_global")
+            "contact"
+        """
+        from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
+
+        parts = api_name.split('.')
+
+        # Check if any part is a Contact type
+        for part in parts:
+            if part in CONTACT_TYPES:
+                return "contact"
+
+        # Otherwise use the module name (second part if starts with "itasca.")
+        if len(parts) >= 2 and parts[0] == "itasca":
+            return parts[1].lower()
+
+        # Fallback
+        return "unknown"
 
     def _calculate_attr_match_score(self, query_attr: str, api_attr: str) -> int:
         """Calculate match quality between query attribute and API attribute.
