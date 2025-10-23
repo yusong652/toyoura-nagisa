@@ -1,19 +1,28 @@
 """Keyword-based search strategy for natural language queries.
 
 This strategy handles natural language queries by matching keywords
-from the query against a pre-built keyword index.
+from the query against a pre-built keyword index using unified search algorithms.
 
-Matching Algorithm:
-- Flexible word matching: all keyword words must appear in query
-- Score based on number of matching words
+Matching Algorithm (shared with command search):
+- BM25-inspired multi-factor scoring
+- Partial matching support (abbreviations like "pos" → "position")
+- Score based on keyword coverage + query precision + match count
 - Returns top-N results sorted by score
 """
 
 from typing import List, Dict, Set, Optional
-from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy as StrategyEnum
+from backend.infrastructure.pfc.shared.search.models import SearchResult, DocumentType, SearchStrategy as SearchStrategyEnum
 from backend.infrastructure.pfc.shared.search.base import SearchStrategy
+from backend.infrastructure.pfc.shared.search.keyword_matcher import (
+    calculate_relevance_score,
+    find_partial_matches,
+    word_match_quality
+)
 from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
+
+# Backward compatibility alias
+StrategyEnum = SearchStrategyEnum
 
 
 class KeywordSearchStrategy(SearchStrategy):
@@ -91,12 +100,12 @@ class KeywordSearchStrategy(SearchStrategy):
             # This allows queries like "pos" to match keywords like "ball position"
             unmatched_query = query_words - matching_words
             unmatched_keyword = keyword_words - matching_words
-            partial_matches, _ = self._find_partial_matches(unmatched_query, unmatched_keyword)
+            partial_matches, _ = find_partial_matches(unmatched_query, unmatched_keyword)
 
             # Match if there's either exact or partial overlap
             if len(matching_words) > 0 or len(partial_matches) > 0:
-                # Calculate multi-factor score (includes partial matching)
-                score = self._calculate_relevance_score(
+                # Calculate multi-factor score using shared algorithm
+                score = calculate_relevance_score(
                     keyword_words,
                     query_words,
                     matching_words
@@ -114,173 +123,6 @@ class KeywordSearchStrategy(SearchStrategy):
         results = self._deduplicate_with_contact_grouping(matches, top_n)
 
         return results
-
-    def _calculate_relevance_score(
-        self,
-        keyword_words: set,
-        query_words: set,
-        matching_words: set
-    ) -> int:
-        """Calculate relevance score using multi-factor ranking with partial matching.
-
-        Scoring factors (inspired by BM25):
-        1. Keyword coverage: How much of the keyword is covered by the query
-           - Includes both exact matches and partial matches (abbreviations)
-        2. Query precision: How focused is the match (fewer extra words = better)
-        3. Match count: Absolute number of matching words (tie-breaker)
-
-        Args:
-            keyword_words: Set of words in the keyword
-            query_words: Set of words in the query
-            matching_words: Set of overlapping words (exact matches)
-
-        Returns:
-            Integer score (higher = more relevant)
-
-        Example:
-            >>> # Query: "pos" (1 word)
-            >>> # Keyword: "ball position" (2 words)
-            >>> # Exact matching: {} (0 words)
-            >>> # Partial matching: "pos" → "position" (prefix, quality=0.8)
-            >>> # Coverage: 0.8 / 2 = 40%
-            >>> # Score: 400 + precision + matches ≈ 450-500
-        """
-        # Calculate exact and partial matches
-        exact_matches = matching_words
-        partial_matches, partial_quality = self._find_partial_matches(
-            query_words - exact_matches,
-            keyword_words - exact_matches
-        )
-
-        # Calculate effective coverage including partial matches
-        # Partial matches contribute based on their quality (0.6-0.8 weight)
-        exact_match_contribution = len(exact_matches)
-        partial_match_contribution = len(partial_matches) * partial_quality
-
-        total_match_value = exact_match_contribution + partial_match_contribution
-
-        # Factor 1: Keyword coverage (primary factor, 0-1000 points)
-        # How much of the keyword is covered by the query (exact + partial)
-        keyword_coverage = total_match_value / len(keyword_words)
-
-        # Factor 2: Query precision (secondary factor, 0-100 points)
-        # Penalize queries with many irrelevant words
-        # Partial matches count as 0.5 for precision (less precise than exact)
-        effective_query_matches = len(exact_matches) + len(partial_matches) * 0.5
-        query_precision = effective_query_matches / len(query_words)
-
-        # Factor 3: Match count (tie-breaker, 1-10 points)
-        # Exact matches worth more than partial matches
-        match_count = len(exact_matches) * 2 + len(partial_matches)
-
-        # Combined score (weighted sum)
-        score = int(
-            keyword_coverage * 1000 +  # Primary: complete matches rank highest
-            query_precision * 100 +     # Secondary: focused queries rank higher
-            match_count                 # Tie-breaker: exact matches > partial
-        )
-
-        return score
-
-    def _find_partial_matches(
-        self,
-        unmatched_query_words: set,
-        unmatched_keyword_words: set
-    ) -> tuple:
-        """Find partial matches between unmatched query and keyword words.
-
-        Uses the same logic as PathSearchStrategy for consistency:
-        - Prefix matching (minimum 3 chars): quality 0.8
-        - Substring matching: quality 0.6
-
-        Args:
-            unmatched_query_words: Query words that didn't exact-match
-            unmatched_keyword_words: Keyword words that didn't exact-match
-
-        Returns:
-            (partial_matches, avg_quality) where:
-            - partial_matches: set of (query_word, keyword_word) pairs
-            - avg_quality: average match quality (0.0-1.0)
-
-        Example:
-            >>> unmatched_query = {"pos", "vel"}
-            >>> unmatched_keyword = {"position", "velocity"}
-            >>> matches, quality = self._find_partial_matches(
-            ...     unmatched_query, unmatched_keyword
-            ... )
-            >>> matches
-            {('pos', 'position'), ('vel', 'velocity')}
-            >>> quality
-            0.8  # Both are prefix matches
-        """
-        partial_matches = set()
-        quality_scores = []
-
-        for q_word in unmatched_query_words:
-            best_match = None
-            best_quality = 0
-
-            for k_word in unmatched_keyword_words:
-                quality = self._word_match_quality(q_word, k_word)
-
-                if quality > best_quality:
-                    best_quality = quality
-                    best_match = k_word
-
-            # Only accept matches with quality >= 0.6 (substring match minimum)
-            if best_match and best_quality >= 0.6:
-                partial_matches.add((q_word, best_match))
-                quality_scores.append(best_quality)
-
-        # Calculate average quality
-        avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
-
-        return partial_matches, avg_quality
-
-    def _word_match_quality(self, query_word: str, keyword_word: str) -> float:
-        """Calculate match quality between two words.
-
-        Uses the same scoring logic as PathSearchStrategy._calculate_attr_match_score
-        for consistency across the search system.
-
-        Scoring rules:
-        - Exact match: 1.0 (shouldn't happen, handled by exact matching)
-        - Prefix match (3+ chars): 0.8
-        - Substring match: 0.6
-        - No match: 0.0
-
-        Args:
-            query_word: Word from query (lowercase)
-            keyword_word: Word from keyword (lowercase)
-
-        Returns:
-            Match quality score (0.0-1.0)
-
-        Example:
-            >>> self._word_match_quality("pos", "position")
-            0.8  # "pos" is prefix of "position"
-            >>> self._word_match_quality("vel", "velocity")
-            0.8  # "vel" is prefix of "velocity"
-            >>> self._word_match_quality("norm", "normal")
-            0.8  # "norm" is prefix of "normal"
-            >>> self._word_match_quality("xyz", "position")
-            0.0  # No match
-        """
-        if query_word == keyword_word:
-            return 1.0  # Exact match (shouldn't happen)
-
-        # Prefix matching (minimum 3 chars to avoid false positives like "a", "an")
-        min_prefix_len = 3
-        if len(query_word) >= min_prefix_len and len(keyword_word) >= min_prefix_len:
-            # Check if one is prefix of the other
-            if keyword_word.startswith(query_word) or query_word.startswith(keyword_word):
-                return 0.8
-
-        # Substring matching (one is contained in the other)
-        if query_word in keyword_word or keyword_word in query_word:
-            return 0.6
-
-        return 0.0
 
     def _deduplicate_with_contact_grouping(
         self,
@@ -349,8 +191,10 @@ class KeywordSearchStrategy(SearchStrategy):
                 if api_name not in seen_apis:
                     seen_apis.add(api_name)
                     results.append(SearchResult(
-                        api_name=api_name,
+                        name=api_name,
                         score=score,
+                        doc_type=DocumentType.API,
+                        category=self._extract_category(api_name),
                         strategy=StrategyEnum.KEYWORD,
                         metadata=None
                     ))
@@ -358,8 +202,10 @@ class KeywordSearchStrategy(SearchStrategy):
         # Add Contact methods to results
         for method_name, info in contact_methods.items():
             results.append(SearchResult(
-                api_name=info["api_name"],
+                name=info["api_name"],
                 score=info["score"],
+                doc_type=DocumentType.API,
+                category=self._extract_category(info["api_name"]),
                 strategy=StrategyEnum.KEYWORD,
                 metadata={
                     "all_contact_types": sorted(list(info["contact_types"])),  # Convert set to sorted list
@@ -403,3 +249,32 @@ class KeywordSearchStrategy(SearchStrategy):
                     }
 
         return None
+
+    def _extract_category(self, api_name: str) -> str:
+        """Extract category from API name.
+
+        Args:
+            api_name: Full API path (e.g., "itasca.ball.create", "itasca.BallBallContact.force_global")
+
+        Returns:
+            Category name (e.g., "ball", "contact")
+
+        Example:
+            >>> self._extract_category("itasca.ball.create")
+            "ball"
+            >>> self._extract_category("itasca.BallBallContact.force_global")
+            "contact"
+        """
+        parts = api_name.split('.')
+
+        # Check if any part is a Contact type
+        for part in parts:
+            if part in CONTACT_TYPES:
+                return "contact"
+
+        # Otherwise use the module name (second part if starts with "itasca.")
+        if len(parts) >= 2 and parts[0] == "itasca":
+            return parts[1].lower()
+
+        # Fallback
+        return "unknown"

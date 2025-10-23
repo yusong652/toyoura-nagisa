@@ -1,28 +1,43 @@
 """Command search orchestrator for PFC command documentation.
 
 This module provides keyword-based search for PFC commands with optional
-model properties integration.
+model properties integration using unified search algorithms.
 
 Features:
-- Keyword matching against command names, syntax, and descriptions
+- BM25-inspired keyword matching with partial matching support
+- Unified search algorithm shared with Python API search
+- Multi-factor scoring (keyword coverage + query precision + match count)
 - Optional model properties search (controlled by include_model_properties)
-- Scoring based on relevance (exact match > keyword match)
 - Configurable result limit
 """
 
-from typing import List, Set
-from backend.infrastructure.pfc.commands.models import CommandSearchResult, DocumentType
+from typing import List, Set, Tuple
+from backend.infrastructure.pfc.shared.search.models import SearchResult, DocumentType, SearchStrategy as SearchStrategyEnum
+from backend.infrastructure.pfc.shared.search.keyword_matcher import (
+    calculate_relevance_score,
+    find_partial_matches,
+    word_match_quality
+)
 from backend.infrastructure.pfc.commands.loader import CommandLoader
+
+# Backward compatibility alias
+CommandSearchResult = SearchResult
 
 
 class CommandSearcher:
-    """Search PFC command documentation using keyword matching.
+    """Search PFC command documentation using unified keyword matching.
 
-    This class provides a simple but effective keyword search that:
-    1. Searches command names, syntax, and descriptions
-    2. Optionally includes contact model properties
-    3. Scores results based on match quality
-    4. Returns top-N results sorted by score
+    This class uses the same BM25-inspired search algorithm as Python API search,
+    providing consistent behavior across all PFC documentation systems.
+
+    Algorithm:
+    1. Build keyword index from search_keywords fields
+    2. Match query words against keywords (exact + partial matching)
+    3. Score based on multi-factor ranking:
+       - Keyword coverage (primary): How much of keyword is covered
+       - Query precision (secondary): How focused is the match
+       - Match count (tie-breaker): Exact matches > partial matches
+    4. Return top-N results sorted by score
     """
 
     def search(
@@ -30,24 +45,28 @@ class CommandSearcher:
         query: str,
         top_n: int = 10,
         include_model_properties: bool = True
-    ) -> List[CommandSearchResult]:
-        """Search for commands and optionally model properties.
+    ) -> List[SearchResult]:
+        """Search for commands and optionally model properties using unified algorithm.
+
+        This method uses the same search algorithm as Python API search for consistency.
+        The algorithm supports:
+        - Exact keyword matching
+        - Partial matching (abbreviations like "pos" → "position")
+        - Multi-factor BM25-inspired scoring
 
         Args:
-            query: Search query (e.g., "ball create", "kn property", "contact model")
+            query: Search query (e.g., "ball create", "contact model", "linear")
             top_n: Maximum number of results to return (default: 10)
             include_model_properties: Whether to search model properties (default: True)
 
         Returns:
-            List of CommandSearchResult objects sorted by score (highest first)
+            List of SearchResult objects sorted by score (highest first)
 
-        Scoring:
-            - Exact command name match: 1000
-            - Command name substring: 800-900
-            - Syntax match: 700
-            - Description keyword match: 500-600
-            - Model property exact: 950
-            - Model property partial: 700-800
+        Scoring (multi-factor):
+            - Keyword coverage (0-1000): Primary factor
+            - Query precision (0-100): Secondary factor
+            - Match count (1-10): Tie-breaker
+            Total score range: 0-1100+
 
         Example:
             >>> searcher = CommandSearcher()
@@ -56,170 +75,128 @@ class CommandSearcher:
             "ball create"
             >>> results[0].doc_type
             DocumentType.COMMAND
+            >>> results[0].strategy
+            SearchStrategyEnum.KEYWORD
 
-            >>> results = searcher.search("kn stiffness", include_model_properties=True)
+            >>> results = searcher.search("linear model")
             >>> results[0].name
-            "linear.kn"
+            "linear"
             >>> results[0].doc_type
             DocumentType.MODEL_PROPERTY
         """
         query_lower = query.lower().strip()
         query_words = set(query_lower.split())
 
-        matches = []
+        # Load keyword index (cached)
+        keywords = CommandLoader.load_all_keywords()
 
-        # Search commands
-        commands = CommandLoader.get_all_commands()
-        for cmd in commands:
-            score = self._score_command(cmd, query_lower, query_words)
-            if score > 0:
-                matches.append(CommandSearchResult(
-                    name=f"{cmd['category']} {cmd['name']}",
-                    score=score,
-                    doc_type=DocumentType.COMMAND,
-                    category=cmd['category'],
-                    metadata={
-                        "file": cmd.get("file"),
-                        "short_description": cmd.get("short_description"),
-                        "syntax": cmd.get("syntax"),
-                        "python_available": cmd.get("python_available")
-                    }
-                ))
+        matches = []  # List of (name, score, doc_type, category, metadata) tuples
 
-        # Search model properties if enabled
-        if include_model_properties:
-            models = CommandLoader.get_all_model_properties()
-            for model in models:
-                # Score the model itself (not individual properties)
-                score = self._score_model(
-                    model,
-                    query_lower,
-                    query_words
+        # Match each keyword against query using unified algorithm
+        for keyword, names in keywords.items():
+            keyword_words = set(keyword.split())
+            matching_words = keyword_words & query_words
+
+            # Calculate potential partial matches
+            unmatched_query = query_words - matching_words
+            unmatched_keyword = keyword_words - matching_words
+            partial_matches, _ = find_partial_matches(unmatched_query, unmatched_keyword)
+
+            # Match if there's either exact or partial overlap
+            if len(matching_words) > 0 or len(partial_matches) > 0:
+                # Calculate multi-factor score using shared algorithm
+                score = calculate_relevance_score(
+                    keyword_words,
+                    query_words,
+                    matching_words
                 )
-                if score > 0:
-                    matches.append(CommandSearchResult(
-                        name=f"{model['name']}",
-                        score=score,
-                        doc_type=DocumentType.MODEL_PROPERTY,
-                        category=model["name"],
-                        metadata={
-                            "file": model.get("file"),
-                            "full_name": model.get("full_name"),
-                            "description": model.get("description"),
-                            "common_use": model.get("common_use"),
-                            "priority": model.get("priority")
-                        }
-                    ))
 
-        # Sort by score (descending) and return top-N
-        matches.sort(key=lambda x: x.score, reverse=True)
-        return matches[:top_n]
+                # Add all items associated with this keyword
+                for name in names:
+                    # Determine doc_type and build metadata
+                    doc_type, category, metadata = self._get_item_info(name)
 
-    def _score_command(
-        self,
-        cmd: dict,
-        query_lower: str,
-        query_words: Set[str]
-    ) -> int:
-        """Calculate relevance score for a command.
+                    # Skip model properties if not included
+                    if not include_model_properties and doc_type == DocumentType.MODEL_PROPERTY:
+                        continue
 
-        Args:
-            cmd: Command metadata dict
-            query_lower: Lowercase query string
-            query_words: Set of query words
+                    matches.append((name, score, doc_type, category, metadata))
 
-        Returns:
-            Score (0-1000), 0 if no match
+        # Sort by score (descending), then by name (for stability)
+        matches.sort(key=lambda x: (-x[1], x[0]))
 
-        Scoring logic:
-            - Exact command name match: 1000
-            - Command name contains query: 900
-            - Query contains command name: 800
-            - Syntax contains all query words: 700
-            - Short description keyword match: 500-600 (based on coverage)
-        """
-        cmd_name = cmd["name"].lower()
-        cmd_full = f"{cmd['category']} {cmd_name}".lower()
-        syntax = cmd.get("syntax", "").lower()
-        description = cmd.get("short_description", "").lower()
+        # Convert to SearchResult objects
+        results = []
+        for name, score, doc_type, category, metadata in matches[:top_n]:
+            results.append(SearchResult(
+                name=name,
+                score=score,
+                doc_type=doc_type,
+                category=category,
+                strategy=SearchStrategyEnum.KEYWORD,
+                metadata=metadata
+            ))
 
-        # Exact match (command name or full name)
-        if query_lower == cmd_name or query_lower == cmd_full:
-            return 1000
+        return results
 
-        # Command name substring match
-        if query_lower in cmd_full:
-            return 900
-        if cmd_full in query_lower:
-            return 800
-
-        # Syntax match (all query words appear in syntax)
-        syntax_words = set(syntax.split())
-        if query_words and query_words.issubset(syntax_words):
-            return 700
-
-        # Description keyword match
-        description_words = set(description.split())
-        matching_words = query_words & description_words
-        if matching_words:
-            # Score based on coverage: what percentage of query is matched?
-            coverage = len(matching_words) / len(query_words) if query_words else 0
-            return int(500 + coverage * 100)
-
-        return 0  # No match
-
-    def _score_model(
-        self,
-        model: dict,
-        query_lower: str,
-        query_words: Set[str]
-    ) -> int:
-        """Calculate relevance score for a contact model.
+    def _get_item_info(self, name: str) -> Tuple[DocumentType, str, dict]:
+        """Get document type, category, and metadata for a command or model.
 
         Args:
-            model: Model metadata dict from index.json
-            query_lower: Lowercase query string
-            query_words: Set of query words
+            name: Command name (e.g., "ball create") or model name (e.g., "linear")
 
         Returns:
-            Score (0-950), 0 if no match
+            Tuple of (doc_type, category, metadata)
 
-        Scoring logic:
-            - Exact model name match: 950
-            - Full name contains query: 900
-            - Model name in query: 850
-            - Description keyword match: 700-800 (based on coverage)
-            - Common use keyword match: 600-700 (based on coverage)
+        Example:
+            >>> self._get_item_info("ball create")
+            (DocumentType.COMMAND, "ball", {...})
+
+            >>> self._get_item_info("linear")
+            (DocumentType.MODEL_PROPERTY, "linear", {...})
         """
-        model_name = model["name"].lower()
-        full_name = model.get("full_name", "").lower()
-        description = model.get("description", "").lower()
-        common_use = model.get("common_use", "").lower()
+        # Check if this is a model property (single word, matches known models)
+        models = CommandLoader.get_all_model_properties()
+        model_names = {m["name"] for m in models}
 
-        # Exact model name match
-        if query_lower == model_name:
-            return 950
+        if name in model_names:
+            # This is a model property
+            model_meta = next(m for m in models if m["name"] == name)
+            return (
+                DocumentType.MODEL_PROPERTY,
+                name,
+                {
+                    "file": model_meta.get("file"),
+                    "full_name": model_meta.get("full_name"),
+                    "description": model_meta.get("description"),
+                    "common_use": model_meta.get("common_use"),
+                    "priority": model_meta.get("priority")
+                }
+            )
+        else:
+            # This is a command (format: "category name")
+            parts = name.split(maxsplit=1)
+            if len(parts) == 2:
+                category, cmd_name = parts
+            else:
+                # Fallback if format is unexpected
+                category = "unknown"
+                cmd_name = name
 
-        # Full name substring match
-        if query_lower in full_name or full_name in query_lower:
-            return 900
+            # Find command metadata
+            commands = CommandLoader.get_all_commands()
+            cmd_meta = next(
+                (c for c in commands if c["category"] == category and c["name"] == cmd_name),
+                None
+            )
 
-        # Model name substring match
-        if model_name in query_lower:
-            return 850
+            metadata = {}
+            if cmd_meta:
+                metadata = {
+                    "file": cmd_meta.get("file"),
+                    "short_description": cmd_meta.get("short_description"),
+                    "syntax": cmd_meta.get("syntax"),
+                    "python_available": cmd_meta.get("python_available")
+                }
 
-        # Description keyword match
-        description_words = set(description.split())
-        matching_words = query_words & description_words
-        if matching_words:
-            coverage = len(matching_words) / len(query_words) if query_words else 0
-            return int(700 + coverage * 100)
-
-        # Common use keyword match
-        common_use_words = set(common_use.split())
-        matching_words = query_words & common_use_words
-        if matching_words:
-            coverage = len(matching_words) / len(query_words) if query_words else 0
-            return int(600 + coverage * 100)
-
-        return 0  # No match
+            return (DocumentType.COMMAND, category, metadata)

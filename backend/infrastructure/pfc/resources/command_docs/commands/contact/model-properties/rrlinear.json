@@ -1,6 +1,7 @@
 {
   "model": "rrlinear",
   "full_name": "Rolling Resistance Linear Model",
+  "search_keywords": ["rrlinear", "rolling", "contact", "model"],
   "description": "Rolling resistance linear model extends the standard linear contact model by incorporating a torque mechanism that opposes rolling motion. This simple model simulates real-world effects like surface roughness and adhesion without requiring additional damping parameters. The rolling resistance torque counteracts rolling motion, making it particularly useful for granular materials where rolling behavior significantly affects overall response.",
 
   "typical_applications": [

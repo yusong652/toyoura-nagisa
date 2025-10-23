@@ -1,6 +1,7 @@
 {
   "model": "linearpbond",
   "full_name": "Linear Parallel Bond Model",
+  "search_keywords": ["linearpbond", "parallel", "bond", "contact", "model"],
   "description": "Linear parallel bond model simulates a finite-sized piece of cement-like material deposited between two contacting pieces. It combines a linear elastic interface with a parallel bond that transmits both force and moment, allowing the bonded interface to resist relative rotation. This is the most commonly used model for simulating cemented particulate materials.",
 
   "typical_applications": [

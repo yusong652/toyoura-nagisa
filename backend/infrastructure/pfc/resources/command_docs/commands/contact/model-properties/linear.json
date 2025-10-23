@@ -1,6 +1,7 @@
 {
   "model": "linear",
   "full_name": "Linear Model",
+  "search_keywords": ["linear", "contact", "model"],
   "description": "Linear elastic-frictional contact model with optional viscous damping. This is the default general-purpose contact model in PFC, providing linear elastic behavior in both normal and shear directions, with Coulomb friction and optional dashpot damping.",
 
   "typical_applications": [

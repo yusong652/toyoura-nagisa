@@ -1,6 +1,7 @@
 {
   "model": "hertz",
   "full_name": "Hertz Model",
+  "search_keywords": ["hertz", "contact", "model"],
   "description": "Hertz contact model implements a nonlinear formulation based on an approximation of the theory of Mindlin and Deresiewicz. Unlike linear models with constant stiffnesses, the Hertz model produces nonlinear force-displacement relationships through elastic sphere deformation analysis. Normal force follows F_n^h = -h_n|g_c|^(α_h) where α_h defaults to 1.5, and shear stiffness depends on current normal force, making the contact response highly nonlinear and velocity-dependent.",
 
   "typical_applications": [

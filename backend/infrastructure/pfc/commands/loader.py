@@ -249,6 +249,87 @@ class CommandLoader:
         return index.get("models", [])
 
     @staticmethod
+    @lru_cache(maxsize=1)
+    def load_all_keywords() -> Dict[str, List[str]]:
+        """Load all search keywords from commands and model properties.
+
+        This method builds a unified keyword index similar to Python API's
+        keywords.json format, enabling consistent keyword-based search across
+        commands and model properties.
+
+        The keyword index maps natural language keywords to command/model names:
+        - Command keywords: from search_keywords field + category context
+        - Model property keywords: from search_keywords field
+
+        Returns:
+            Dict mapping keywords to lists of command/model names:
+            {
+                "create ball": ["ball create"],
+                "linear contact model": ["linear"],
+                "contact model": ["linear", "rrlinear", "linearcbond", ...]
+            }
+
+        Example:
+            >>> keywords = CommandLoader.load_all_keywords()
+            >>> "create" in keywords
+            True
+            >>> "ball create" in keywords["create"]
+            True
+            >>> "linear" in keywords["contact model"]
+            True
+        """
+        keyword_index: Dict[str, List[str]] = {}
+
+        # 1. Load command keywords
+        all_commands = CommandLoader.get_all_commands()
+        for cmd in all_commands:
+            category = cmd["category"]
+            cmd_name = cmd["name"]
+            full_command = f"{category} {cmd_name}"
+
+            # Load full command doc to get search_keywords
+            cmd_doc = CommandLoader.load_command_doc(category, cmd_name)
+            if not cmd_doc:
+                continue
+
+            search_keywords = cmd_doc.get("search_keywords", [])
+
+            # Add each keyword to the index
+            for keyword in search_keywords:
+                keyword_lower = keyword.lower()
+                if keyword_lower not in keyword_index:
+                    keyword_index[keyword_lower] = []
+                keyword_index[keyword_lower].append(full_command)
+
+            # Also add category-qualified keyword (e.g., "ball create")
+            # This ensures "ball create" matches even if not in search_keywords
+            category_qualified = f"{category} {cmd_name}"
+            if category_qualified not in keyword_index:
+                keyword_index[category_qualified] = []
+            keyword_index[category_qualified].append(full_command)
+
+        # 2. Load model property keywords
+        all_models = CommandLoader.get_all_model_properties()
+        for model_meta in all_models:
+            model_name = model_meta["name"]
+
+            # Load full model doc to get search_keywords
+            model_doc = CommandLoader.load_model_property_doc(model_name)
+            if not model_doc:
+                continue
+
+            search_keywords = model_doc.get("search_keywords", [])
+
+            # Add each keyword to the index
+            for keyword in search_keywords:
+                keyword_lower = keyword.lower()
+                if keyword_lower not in keyword_index:
+                    keyword_index[keyword_lower] = []
+                keyword_index[keyword_lower].append(model_name)
+
+        return keyword_index
+
+    @staticmethod
     def clear_cache():
         """Clear all cached data.
 

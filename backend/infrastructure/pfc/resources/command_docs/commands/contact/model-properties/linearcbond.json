@@ -1,6 +1,7 @@
 {
   "model": "linearcbond",
   "full_name": "Linear Contact Bond Model",
+  "search_keywords": ["linearcbond", "bond", "contact", "model"],
   "description": "Linear contact bond model simulates a pair of elastic springs with constant normal and shear stiffnesses acting at the contact point. This model permits tensile forces while limiting shear forces through strength parameters rather than friction coefficients. When bonded, contacts can resist tension and prevent slip. When unbonded, behavior is equivalent to the linear model with Coulomb friction.",
 
   "typical_applications": [
