@@ -1,6 +1,7 @@
 {
   "command": "wall addfacet",
   "category": "wall",
+  "search_keywords": ["addfacet", "extend", "vertex"],
   "description": "Add a facet to a wall. The faceted wall is specified with the keywords id or name. If facets exist in the specified wall, then the proposed facet must share {a vertex in 2D; edge in 3D} with a preexisting facet. If the facet ID is not specified with the facetid keyword, the next available ID is assigned to the facet. The entire facet must fall within the model domain. The vertex keyword must be given {twice in 2D; three times in 3D} followed by the ID of the vertex in the specified wall or a position vector of the vertex position. At least {one vertex in 2D; 2 vertices in 3D} must be shared with the specified wall and the facet must not interpenetrate a preexisting facet. Note: While cycling, facets can only be added before cycle point 0 (i.e., when the timestep is calculated).",
 
   "syntax": "wall addfacet <keyword> ...",

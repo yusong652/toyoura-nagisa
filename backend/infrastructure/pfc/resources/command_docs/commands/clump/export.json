@@ -1,6 +1,7 @@
 {
   "command": "clump export",
   "category": "clump",
+  "search_keywords": ["export", "geometry", "STL"],
   "description": "Export clumps to geometry sets for post-processing or STL export. If no range is specified, all clumps in the model are exported. Currently only supports export to geometry sets. Clumps with surface descriptions will use those surfaces; otherwise, a geometrical representation of each pebble is exported.",
 
   "syntax": "clump export <keyword> <range>",

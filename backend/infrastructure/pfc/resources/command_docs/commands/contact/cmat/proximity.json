@@ -1,6 +1,7 @@
 {
   "command": "contact cmat proximity",
   "category": "contact cmat",
+  "search_keywords": ["cmat", "proximity", "gap"],
   "description": "Set the contact detection distance for the CMAT (Contact Model Assignment Table). This ensures that contacts will be subsequently detected between pieces with a surface gap less than or equal to the specified value. Contacts may also be created between pieces further apart. This command does NOT automatically trigger contact detection - contacts will be detected during subsequent cycles. To force immediate contact detection, use 'model clean' command. By default, only mechanical contacts are considered.",
 
   "syntax": "contact cmat <sprocess> proximity <fd>",

@@ -1,6 +1,7 @@
 {
   "command": "measure dump",
   "category": "measure",
+  "search_keywords": ["dump", "export", "distribution"],
   "description": "Dump the cumulative size distribution data from a measurement region. The size distribution must have been configured using the bins keyword in measure create or measure modify. Data can be exported to a PFC table for further analysis or plotting.",
 
   "syntax": "measure dump id <i> <keyword>",

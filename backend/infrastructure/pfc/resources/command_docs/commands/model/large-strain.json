@@ -1,6 +1,7 @@
 {
   "command": "model large-strain",
   "category": "model",
+  "search_keywords": ["large-strain", "deformation"],
   "description": "Sets the program to use the numerical formulation for large-strain deformation. The default is off. See the section 'Large- and Small-Strain Modes' for discussion of the additional calculations done in this formulation.",
 
   "syntax": "model large-strain <b>",

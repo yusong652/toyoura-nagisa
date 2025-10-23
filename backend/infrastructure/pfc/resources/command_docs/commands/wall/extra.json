@@ -1,6 +1,7 @@
 {
   "command": "wall extra",
   "category": "wall",
+  "search_keywords": ["extra", "custom"],
   "description": "Set wall or facet extra variables. The extra variable can be of any type (string, integer, float, vector) and is associated with the index i as if stored in an array. The optional facet keyword can be given before the optional range to specify that the extra variable will be applied to facets. In this case, the range is applied to the facets and not to walls.",
 
   "syntax": "wall extra <i> <a> <facet> <range>",

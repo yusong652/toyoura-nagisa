@@ -1,6 +1,7 @@
 {
   "command": "measure create",
   "category": "measure",
+  "search_keywords": ["create", "region", "porosity"],
   "description": "Create a measurement region. Measurement regions are disks in 2D and spheres in 3D. The measurement calculation is triggered whenever a clean command is invoked, or whenever a FISH intrinsic that queries a measured value is invoked. Measurement regions can calculate porosity, coordination number, stress, strain, and particle size distributions.",
 
   "syntax": "measure create <keyword> ...",

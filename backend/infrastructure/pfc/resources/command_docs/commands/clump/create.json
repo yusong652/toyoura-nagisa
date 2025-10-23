@@ -1,6 +1,7 @@
 {
   "command": "clump create",
   "category": "clump",
+  "search_keywords": ["create", "single", "pebble"],
   "description": "Create a single clump with the specified attributes. A model domain must be specified prior to clump creation. The clump will not be available for replication and will not have a surface description associated with it. Unit density is assumed at creation unless the density keyword is specified. Either all inertial attributes must be specified (position, volume, inertia tensor) or the calculate keyword must be given to calculate them from the pebble distribution. Unless the real moment of inertia is modified via FISH or via the clump attribute command, this value will be updated in response to changes in volume and density.",
 
   "syntax": "clump create <keyword> ...",

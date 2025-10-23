@@ -1,6 +1,7 @@
 {
   "command": "clump break",
   "category": "clump",
+  "search_keywords": ["break", "pebble", "fracture"],
   "description": "Break clumps into pebbles. The pebbles must be balls or rblocks to be broken (see the ball clump and rblock clump commands). The pebbles are returned to their original containers and contacts are retained with other pieces. The inertial properties of the pebbles are recomputed. The range is used to determine which clumps are to be broken. Clumps without pebbles are deleted, and the inertial properties of clumps with pebbles remaining are recomputed.",
 
   "syntax": "clump break <keyword> <range>",

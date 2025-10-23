@@ -1,6 +1,7 @@
 {
   "command": "wall tolerance",
   "category": "wall",
+  "search_keywords": ["tolerance", "contact-detection"],
   "description": "Set contact detection tolerances. The size of the extent with which a facet is inserted into the cell space is the minimum extent size plus twice the sum of: 1) maximum interaction distance; 2) constant contact-detection tolerance (constant - default 0); 3) maximum length of minimum extent multiplied by extent tolerance (extent - default 10⁻⁶); 4) maximum translational velocity component multiplied by velocity tolerance (velocity - default 0). The facet is remapped into cell space whenever it has translated cumulatively by this sum from last mapping. Contacts can be created whenever expanded extents of any pieces (balls, clump pebbles, or facets) overlap, but contacts cannot exist between facets. Note: Directly after model restore, must call 'model clean' prior to modifying extent tolerances.",
 
   "syntax": "wall tolerance <keyword> ...",

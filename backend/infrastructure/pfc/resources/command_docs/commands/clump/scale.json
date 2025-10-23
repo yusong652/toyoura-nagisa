@@ -1,6 +1,7 @@
 {
   "command": "clump scale",
   "category": "clump",
+  "search_keywords": ["scale", "size", "volume"],
   "description": "Scale clumps. The pebbles are scaled, their positions are modified, and the volume is updated. If the volume or moment of inertia has been previously specified by the user either via the clump attribute command or via FISH, the principal moments of inertia are in a fixed state and will not be scaled. This can be modified with FISH (see the clump.moi.fix intrinsic for further details). One can either scale the volume to a target value, the volume to the volume of an equivalent disk with unit thickness (2D) or sphere (3D) with a specified diameter, or via the return value of a FISH function. This operation may fail if a clump is scaled so that any of its pebbles fall outside of the model domain. If this happens for any clump, then no clumps are scaled.",
 
   "syntax": "clump scale <keyword> ... <range>",

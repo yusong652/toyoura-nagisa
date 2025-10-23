@@ -1,6 +1,7 @@
 {
   "command": "ball property",
   "category": "ball",
+  "search_keywords": ["property", "surface"],
   "description": "Assign ball surface properties used in contact models. Properties are surface conditions (e.g., stiffness, friction) distinct from ball attributes (position, velocity). Property names depend on the active contact model. See Contact Models documentation for available properties per model.",
 
   "syntax": "ball property <s a> <s1 a1> ... <range>",

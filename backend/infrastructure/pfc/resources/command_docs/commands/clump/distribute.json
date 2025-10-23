@@ -1,6 +1,7 @@
 {
   "command": "clump distribute",
   "category": "clump",
+  "search_keywords": ["distribute", "overlap", "porosity"],
   "description": "Distribute clumps with overlaps. This process ceases when a target porosity is achieved. By default, the clump positions and sizes are drawn from uniform distributions throughout the model domain. As a result, the set of clumps generated is affected by the state of the random-number generator (see model random). The clump sizes can also be drawn from a Gaussian distribution via the gauss keyword. A number of clump distributions, with size ranges and volume fractions each using a unique clump template, can be specified. The optional range is applied to each clump upon generation and, if the clump does not fall within the range, it is not added to the model and does not affect the stopping criteria. This command contrasts with the clump generate command where clumps, with sizes chosen from a single distribution, are generated without overlap until the target number of clumps, or the number of attempts to place clumps, is achieved.",
 
   "syntax": "clump distribute <keyword> ... <range>",

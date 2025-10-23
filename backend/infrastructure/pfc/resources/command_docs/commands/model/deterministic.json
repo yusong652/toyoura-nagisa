@@ -1,6 +1,7 @@
 {
   "command": "model deterministic",
   "category": "model",
+  "search_keywords": ["deterministic", "reproducible"],
   "description": "Set the deterministic mode. When a calculation is performed in parallel over multiple CPUs or cores, the order in which specific computations occur can and will change. This can cause roundoff errors to accumulate differently. Deterministic mode sacrifices efficiency and memory to force the parallel computation to result in the same answer every time, regardless of the number of CPUs it is performed on or their relative speed. All results are equally valid as they are within the range of finite-precision floating point error, but deterministic mode ensures repeatability. Deterministic mode is reset to the default setting whenever a 'model new' command is given.",
 
   "syntax": "model deterministic <default> <b>",

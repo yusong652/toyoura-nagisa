@@ -1,6 +1,7 @@
 {
   "command": "clump property",
   "category": "clump",
+  "search_keywords": ["property", "surface"],
   "description": "Assign clump or pebble surface properties used in contact models. Properties are surface conditions (e.g., stiffness, friction) distinct from clump attributes (position, velocity). Property names depend on the active contact model. Pebble properties are applied to all pebbles in the clump. See Contact Models documentation for available properties per model.",
 
   "syntax": "clump property <s a> <s1 a1> ... <range>",

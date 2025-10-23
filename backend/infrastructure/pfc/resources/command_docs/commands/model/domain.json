@@ -1,6 +1,7 @@
 {
   "command": "model domain",
   "category": "model",
+  "search_keywords": ["domain", "boundary", "extent"],
   "description": "Specify the domain boundaries and conditions. DFN fractures only exist within the domain extent. In FLAC3D, zones and structural elements are not aware of the model domain. In PFC, walls, clumps and balls must be inside of the domain and are aware of the domain boundary conditions.",
 
   "syntax": "model domain <keyword>",

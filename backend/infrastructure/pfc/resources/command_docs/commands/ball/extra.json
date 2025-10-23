@@ -1,6 +1,7 @@
 {
   "command": "ball extra",
   "category": "ball",
+  "search_keywords": ["extra", "custom"],
   "description": "Set ball extra variables. The extra variable can be of any type (number, vector, string) and is associated with the index as if stored in an array.",
 
   "syntax": "ball extra <i> <value> <range>",

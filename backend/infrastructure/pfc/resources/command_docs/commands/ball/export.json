@@ -1,6 +1,7 @@
 {
   "command": "ball export",
   "category": "ball",
+  "search_keywords": ["export", "geometry", "STL"],
   "description": "Export balls to geometry sets for post-processing or STL export. If no range is specified, all balls in the model are exported. Currently only supports export to geometry sets.",
 
   "syntax": "ball export <keyword> <range>",

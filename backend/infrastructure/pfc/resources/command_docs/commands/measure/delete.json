@@ -1,6 +1,7 @@
 {
   "command": "measure delete",
   "category": "measure",
+  "search_keywords": ["delete", "remove"],
   "description": "Delete one or more measurement objects. By default, all measurement objects are deleted. A range can be specified to restrict the operation to select objects, allowing targeted deletion based on measurement ID or other criteria.",
 
   "syntax": "measure delete <range>",

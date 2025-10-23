@@ -1,6 +1,7 @@
 {
   "command": "clump extra",
   "category": "clump",
+  "search_keywords": ["extra", "custom"],
   "description": "Set clump or pebble extra variables. The extra variable can be of any type (number, vector, string) and is associated with the index as if stored in an array. The optional pebble keyword can be given before the optional range to specify that the extra variable will be applied to pebbles. In this case, the range is applied to the pebbles and not to clumps.",
 
   "syntax": "clump extra <i> <a> <pebble> <range>",

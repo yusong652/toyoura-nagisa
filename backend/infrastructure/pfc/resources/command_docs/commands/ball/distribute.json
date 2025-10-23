@@ -1,6 +1,7 @@
 {
   "command": "ball distribute",
   "category": "ball",
+  "search_keywords": ["distribute", "porosity", "overlap", "packing"],
   "description": "Distribute balls with overlaps until a target porosity is achieved. Ball positions and radii are drawn from uniform distributions (or Gaussian/FISH distributions). Significant ball overlaps will likely result from this operation. This command contrasts with ball generate where balls are generated without overlap.",
 
   "syntax": "ball distribute <keyword> ... <range>",

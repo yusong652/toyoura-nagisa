@@ -10,10 +10,10 @@ Matching Algorithm:
 """
 
 from typing import List, Dict, Set, Optional
-from backend.infrastructure.pfc.sdk.models import SearchResult, SearchStrategy as StrategyEnum
-from backend.infrastructure.pfc.sdk.search.base import SearchStrategy
-from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
-from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy as StrategyEnum
+from backend.infrastructure.pfc.shared.search.base import SearchStrategy
+from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
+from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
 
 
 class KeywordSearchStrategy(SearchStrategy):

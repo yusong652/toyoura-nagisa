@@ -1,6 +1,7 @@
 {
   "command": "model range",
   "category": "model",
+  "search_keywords": ["range", "filter", "named"],
   "description": "Create/delete a named range. Creating a named range 'pre-defines' a range that, subsequently, can be applied efficiently using the 'named-range' keyword in a command's range phrase (e.g., [command] range named-range s). This can be particularly helpful if the underlying range definition is verbose. Named ranges can include logical operations (and, or, not, union) and can be combined with other range elements.",
 
   "syntax": "model range <keyword>",

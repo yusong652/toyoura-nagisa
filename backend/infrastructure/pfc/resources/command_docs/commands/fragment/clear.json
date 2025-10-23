@@ -1,6 +1,7 @@
 {
   "command": "fragment clear",
   "category": "fragment",
+  "search_keywords": ["clear", "reset"],
   "description": "Clear all fragment information. All fragment data is destroyed, event tracking is stopped, and the fragment IDs held in all bodies (balls and clumps) are reset to 0. This is a complete reset of the fragment tracking system.",
 
   "syntax": "fragment clear",

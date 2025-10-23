@@ -1,6 +1,7 @@
 {
   "command": "ball tractions",
   "category": "ball",
+  "search_keywords": ["stress", "initialization", "voronoi"],
   "description": "Compute contact tractions consistent with prescribed stress state using Voronoi tessellation. Computes ball volumes, surface areas, and contact forces based on constant stress tensor or gravitational stress. By default, updates ball positions and volumes to match Voronoi cells, and can create contacts between adjacent cells. Uses Voro++ library for tessellation. Useful for initializing in-situ stress states in geomechanics simulations.",
 
   "syntax": "ball tractions <keyword> ... <range>",

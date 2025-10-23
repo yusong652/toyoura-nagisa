@@ -1,6 +1,7 @@
 {
   "command": "ball fix",
   "category": "ball",
+  "search_keywords": ["fix", "velocity", "spin"],
   "description": "Fix the specified ball velocities. As a result, ball motion is constant in the specified directions (fixed velocities are not updated during cycling).",
 
   "syntax": "ball fix <keyword> ... <range>",

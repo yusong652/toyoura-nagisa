@@ -4,12 +4,15 @@ PFC Tools - ITASCA PFC simulation integration for aiNagisa.
 This package provides MCP tools for controlling ITASCA PFC simulations
 through a WebSocket connection to a PFC server running in the PFC GUI.
 
-Tools:
+Execution Tools:
 - pfc_execute_command: Execute native PFC commands (no return values)
 - pfc_execute_script: Execute Python SDK scripts (with return values)
 - pfc_check_task_status: Query status of long-running tasks
 - pfc_list_tasks: List all tracked long-running tasks
-- pfc_query_python_api: Query PFC Python SDK documentation (NEW)
+
+Documentation Query Tools:
+- pfc_query_python_api: Query PFC Python SDK documentation (115 APIs, modules, objects)
+- pfc_query_command: Query PFC command documentation (115 commands + model properties)
 """
 
 from .pfc_execute_command import register_pfc_tools
@@ -17,6 +20,7 @@ from .pfc_execute_script import register_pfc_script_tool
 from .pfc_task_status import register_pfc_task_status_tool
 from .pfc_list_tasks import register_pfc_list_tasks_tool
 from .pfc_query_python_api import register_pfc_query_python_api_tool
+from .pfc_query_command import register_pfc_query_command_tool
 
 __all__ = [
     "register_pfc_tools",
@@ -24,4 +28,5 @@ __all__ = [
     "register_pfc_task_status_tool",
     "register_pfc_list_tasks_tool",
     "register_pfc_query_python_api_tool",
+    "register_pfc_query_command_tool",
 ]

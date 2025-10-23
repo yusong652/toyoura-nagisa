@@ -1,6 +1,7 @@
 {
   "command": "contact activate",
   "category": "contact",
+  "search_keywords": ["activate", "flag", "active"],
   "description": "Change the contact activate flag for existing contacts. When set to 'on' (true), the activate flag ensures the contact remains in an active state until automatically deleted by the contact detection system, and also sets the inhibit flag to false. When set to 'off' (false), contact activity is determined by the contact model. By default, only mechanical contacts are considered. The activate flag is off by default.",
 
   "syntax": "contact activate <b> <keyword> <range>",

@@ -1,6 +1,7 @@
 {
   "command": "model mechanical",
   "category": "model",
+  "search_keywords": ["mechanical", "timestep"],
   "description": "Set parameters for a mechanical analysis. The mechanical process is on by default. This command controls mechanical calculation activity, timestep settings, and slave/master coupling for multi-physics simulations.",
 
   "syntax": "model mechanical <b> <keyword>",

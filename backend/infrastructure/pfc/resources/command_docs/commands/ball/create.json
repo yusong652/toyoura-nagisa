@@ -1,6 +1,7 @@
 {
   "command": "ball create",
   "category": "ball",
+  "search_keywords": ["create", "single"],
   "description": "Create a single ball with the specified attributes. A model domain must be specified prior to ball creation. While cycling, balls can only be created before cycle point 0 (i.e., when the timestep is calculated).",
 
   "syntax": "ball create <keyword> ...",

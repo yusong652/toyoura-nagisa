@@ -1,6 +1,7 @@
 {
   "command": "wall import",
   "category": "wall",
+  "search_keywords": ["import", "STL", "DXF"],
   "description": "Import a wall. Walls can be imported directly from files that are supported by the geometry logic (i.e., .stl or .dxf files) or from geometry objects directly. Wall importation is accomplished by stitching {vertex in 2D; edge in 3D} connected facets (i.e., {line segments in 2D; triangles in 3D}) starting with a seed facet. The seed facet is taken as the first {edge in 2D; polygon in 3D} that falls in the specified range unless the seed keyword is given. The surface must be manifold (i.e., no facets can interpenetrate or touch other facets) and orientable (i.e., the surface is {vertex connected in 2D; edge connected in 3D}). All facets must fall within the model domain. Note: A model domain must be specified prior to wall importation. While cycling, walls can only be created before cycle point 0 (i.e., when the timestep is calculated).",
 
   "syntax": "wall import <keyword> ... <range>",

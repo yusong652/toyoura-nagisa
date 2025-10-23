@@ -1,6 +1,7 @@
 {
   "command": "model thermal",
   "category": "model",
+  "search_keywords": ["thermal", "temperature"],
   "description": "This command sets parameters for a thermal material analysis (only available if 'model configure thermal' has been specified). The thermal process is on by default when the 'model configure thermal' command is given. The activity can be directly specified by providing b.",
 
   "syntax": "model thermal <b> <keyword>",

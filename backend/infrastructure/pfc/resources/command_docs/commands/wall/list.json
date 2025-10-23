@@ -1,6 +1,7 @@
 {
   "command": "wall list",
   "category": "wall",
+  "search_keywords": ["list", "query"],
   "description": "List wall information. By default, the wall ID, wall name, facet count, active/total contact count, and position are listed. Use the attribute keyword to list all wall attributes that can be listed. Note: Use the model precision command to change the precision of listed floating point values. The optional range always applies to walls and not facets.",
 
   "syntax": "wall list <keyword> <range>",

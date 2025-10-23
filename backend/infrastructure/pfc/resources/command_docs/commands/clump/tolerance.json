@@ -1,6 +1,7 @@
 {
   "command": "clump tolerance",
   "category": "clump",
+  "search_keywords": ["tolerance", "contact-detection"],
   "description": "Set contact detection tolerances. The size of the extent with which a clump pebble is inserted into the cell space is the minimum extent size plus twice the sum of the following quantities: 1) the maximum interaction distance; 2) the constant contact-detection tolerance (constant - default 0); 3) the maximum length of the minimum extent in all directions multiplied by the extent tolerance (extent - default 0); 4) the maximum component of translational velocity multiplied by the velocity tolerance (velocity - default 0). The pebble will be remapped into the cell space whenever it has translated cumulatively in any direction by this sum from the last time it was mapped into the cell space. Contacts can be created whenever the expanded extents of any pieces (i.e., balls, clump pebbles, or facets) overlap.",
 
   "syntax": "clump tolerance <keyword> ...",

@@ -1,6 +1,7 @@
 {
   "command": "model new",
   "category": "model",
+  "search_keywords": ["new", "clear", "reset"],
   "description": "Clear model-state information. Model information is cleared, allowing one to begin a new problem. The optional 'force' keyword suppresses the model reset confirmation dialog (which will normally appear if the model has changed since the last save when the model new command is used). Values associated with the project or program state are unaffected by the model new command. Model-state information includes any defined FISH functions and variables, histories, and tables.",
 
   "syntax": "model new <force>",

@@ -1,6 +1,7 @@
 {
   "command": "contact detection",
   "category": "contact",
+  "search_keywords": ["detection", "automatic", "lifecycle"],
   "description": "Control whether contacts are automatically detected during simulation. Contact detection is enabled (on) by default. When enabled, the system automatically creates new contacts when pieces come together and deletes contacts when pieces separate beyond detection criteria. When disabled (off), no new contacts are created and no existing contacts are deleted, regardless of piece motion. Detection can be controlled globally for all contact types or selectively by contact type (ball-ball, ball-facet, etc.). This is a fundamental control for managing contact lifecycle in PFC simulations.",
 
   "syntax": "contact detection <b> <keyword>",

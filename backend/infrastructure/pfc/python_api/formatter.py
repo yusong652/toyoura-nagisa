@@ -10,9 +10,9 @@ LLM-friendly markdown format. It handles:
 """
 
 from typing import Optional, Dict, Any, List
-from backend.infrastructure.pfc.sdk.models import SearchResult
-from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
-from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
+from backend.infrastructure.pfc.python_api.models import SearchResult
+from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
+from backend.infrastructure.pfc.python_api.types.mappings import CLASS_TO_MODULE
 
 
 class APIDocFormatter:

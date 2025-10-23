@@ -1,6 +1,7 @@
 {
   "command": "contact cmat default",
   "category": "contact cmat",
+  "search_keywords": ["cmat", "default"],
   "description": "Set the default slot(s) of the CMAT. Attempts to assign the following information to the default slot(s) of the CMAT. If the optional keyword 'type' is issued, then it must be followed by a valid contact type name, and the corresponding default slot of the CMAT will be modified. If no type is specified, then the command will attempt to modify all the default slots. By default, only mechanical contacts are considered.",
 
   "syntax": "contact cmat default <type stype> <keyword> ...",

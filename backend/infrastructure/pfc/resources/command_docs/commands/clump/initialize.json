@@ -1,6 +1,7 @@
 {
   "command": "clump initialize",
   "category": "clump",
+  "search_keywords": ["initialize", "attribute", "set"],
   "description": "Modify clump attributes. This is a synonym for the clump attribute command. See clump attribute for complete list of available keywords, modifiers, and detailed documentation.",
 
   "syntax": "clump initialize <keyword> ... <range>",

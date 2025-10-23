@@ -1,6 +1,7 @@
 {
   "command": "ball trace",
   "category": "ball",
+  "search_keywords": ["trace", "path"],
   "description": "Add a ball particle trace to record and visualize ball motion path. Positions and velocities are sampled and stored during model run. The trace can be visualized to show particle flow patterns. Use trace commands for subsequent manipulation of particle traces.",
 
   "syntax": "ball trace <id <id1>> id <id2> | position <v>",

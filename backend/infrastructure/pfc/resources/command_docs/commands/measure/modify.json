@@ -1,6 +1,7 @@
 {
   "command": "measure modify",
   "category": "measure",
+  "search_keywords": ["modify", "update"],
   "description": "Modify measurement region attributes. The ID must be specified to identify which measurement to modify. An error is thrown if no measurement region exists with the specified ID. Only specified attributes are changed; unspecified attributes retain their previous values. After modification, measurements must be recalculated with model clean.",
 
   "syntax": "measure modify <keyword> ...",

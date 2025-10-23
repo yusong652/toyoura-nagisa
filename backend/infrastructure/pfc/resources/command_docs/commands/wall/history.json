@@ -1,6 +1,7 @@
 {
   "command": "wall history",
   "category": "wall",
+  "search_keywords": ["history", "track", "monitor"],
   "description": "Adds a history of a wall value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The history can be assigned a name for later reference with the optional name keyword, if not the history will be given a default name based on its internally assigned id number. Following one of the keywords given below, either 1) an additional 'id' keyword followed by an integer id, 2) an additional 'name' keyword followed by a string s, or 3) an additional 'position' keyword followed by a position vector v must be given to define the specific wall.",
 
   "syntax": "wall history <name sid> <keyword> ...",

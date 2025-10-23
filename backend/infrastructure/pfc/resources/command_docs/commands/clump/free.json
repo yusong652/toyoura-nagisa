@@ -1,6 +1,7 @@
 {
   "command": "clump free",
   "category": "clump",
+  "search_keywords": ["free", "velocity", "spin"],
   "description": "Free the specified clump velocities. As a result, clump motion reflects the forces acting upon them (velocities are updated during cycling according to equations of motion).",
 
   "syntax": "clump free <keyword> ... <range>",

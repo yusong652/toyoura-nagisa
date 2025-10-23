@@ -1,6 +1,7 @@
 {
   "command": "measure history",
   "category": "measure",
+  "search_keywords": ["history", "track", "monitor"],
   "description": "Add a measurement history. A history is a floating point variable that can be sampled and stored during a model run, allowing tracking of measurement quantities over time. The history records values such as porosity, coordination number, stress, strain rate, position, or radius from a specified measurement object as the simulation progresses.",
 
   "syntax": "measure history <id id> <keyword> ...",

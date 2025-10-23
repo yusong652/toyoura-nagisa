@@ -1,6 +1,7 @@
 {
   "command": "ball history",
   "category": "ball",
+  "search_keywords": ["history", "track", "monitor"],
   "description": "Add a history of a ball value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The ball must be specified by either 'id' or 'position' keyword.",
 
   "syntax": "ball history name <name> <keyword> id <i> or position <v>",

@@ -1,6 +1,7 @@
 {
   "command": "ball generate",
   "category": "ball",
+  "search_keywords": ["generate", "packing", "cubic", "hexagonal"],
   "description": "Generate non-overlapping balls. The process ceases when the target number of balls are created or when the number of attempts to place balls without overlap is achieved. This command contrasts with ball distribute where balls are distributed without regard for overlap until a target porosity is achieved.",
 
   "syntax": "ball generate <keyword> ... <range>",

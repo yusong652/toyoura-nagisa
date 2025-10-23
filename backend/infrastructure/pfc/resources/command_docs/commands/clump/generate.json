@@ -1,6 +1,7 @@
 {
   "command": "clump generate",
   "category": "clump",
+  "search_keywords": ["generate", "packing", "count"],
   "description": "Generate non-overlapping clumps. The process ceases when the target number of clumps are created or when the number of attempts to place clumps without overlap is achieved. By default, the clump positions and sizes are drawn from uniform distributions throughout the model domain. As a result, the set of clumps generated is affected by the state of the random-number generator (see model random). The clump size can also be drawn from a Gaussian distribution via the gauss keyword. A number of clump templates can be used during a single clump generate command. The optional range is applied to each clump upon generation and, if the clump does not fall within the range, it is not added to the model and does not affect the stopping criteria. This command contrasts with the clump distribute command where clumps are distributed without regard for overlap until a target porosity is achieved.",
 
   "syntax": "clump generate <keyword> ... <range>",

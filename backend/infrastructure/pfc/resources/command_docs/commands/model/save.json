@@ -1,6 +1,7 @@
 {
   "command": "model save",
   "category": "model",
+  "search_keywords": ["save", "file"],
   "description": "Save all model-state information. The file s is created and, if no extension is provided, the extension is set to '.sav'. This information includes any defined FISH functions/variables, histories, tables, and other model components. The inputdir and localdir keywords can be placed after s to specify the location of the save file relative to the calling file or the project file. A saved model state can be re-activated via the 'model restore' command.",
 
   "syntax": "model save <s> <keyword>",

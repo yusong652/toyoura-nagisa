@@ -1,6 +1,7 @@
 {
   "command": "wall property",
   "category": "wall",
+  "search_keywords": ["property", "surface"],
   "description": "Assign facet surface properties used in contact models. Properties are surface conditions (e.g., stiffness, friction) that are distinct from wall attributes (position, velocity). Property names depend on the active contact model. Contact models prioritize checking object surface properties during contact resolution. See Contact Models documentation for available properties per model. Note: Be aware of the distinction between attributes and properties! The tutorial example 'Attributes and Properties' discusses this issue in detail.",
 
   "syntax": "wall property <s a> <s1 a1> ... <range>",

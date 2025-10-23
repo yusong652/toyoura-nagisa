@@ -1,6 +1,7 @@
 {
   "command": "wall generate",
   "category": "wall",
+  "search_keywords": ["generate", "box", "cylinder"],
   "description": "Generate walls with specified shapes. The wall shapes include: {box, circle, and point in 2D; box, cone, cylinder, disk, line, plane, point, polygon, and sphere in 3D}. Note: A model domain must be specified prior to wall creation. All wall facets must fall within the model domain. The id, name, and group keywords must be given prior to any additional keywords. While cycling, walls can only be created before cycle point 0 (i.e., when the timestep is calculated).",
 
   "syntax": "wall generate <keyword> ...",

@@ -25,7 +25,8 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_script_tool,
     register_pfc_task_status_tool,
     register_pfc_list_tasks_tool,
-    register_pfc_query_python_api_tool
+    register_pfc_query_python_api_tool,
+    register_pfc_query_command_tool
 )
 
 mcp = FastMCP(
@@ -54,6 +55,7 @@ register_pfc_script_tool(mcp)
 register_pfc_task_status_tool(mcp)
 register_pfc_list_tasks_tool(mcp)
 register_pfc_query_python_api_tool(mcp)
+register_pfc_query_command_tool(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

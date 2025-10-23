@@ -1,6 +1,7 @@
 {
   "command": "wall results",
   "category": "wall",
+  "search_keywords": ["results", "post-processing", "snapshot"],
   "description": "Modify the usage of the wall results logic. This logic allows for a reduced version of the model state (i.e., wall geometries plus wall attributes) at different instances of time to be output as binary files. The wall result can be used to re-create the model state, acting as a utility for efficient post processing (e.g., movie generation, residence time calculations, etc.). IMPORTANT: A wall result file DOES NOT replace a PFC model state file and models re-created with this logic should not be cycled. See the model results command to specify when results files are created and how to import these files subsequently.",
 
   "syntax": "wall results <keyword> ...",

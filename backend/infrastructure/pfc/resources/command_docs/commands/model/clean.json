@@ -1,6 +1,7 @@
 {
   "command": "model clean",
   "category": "model",
+  "search_keywords": ["clean", "initialize", "contact"],
   "description": "Clean the model. During model creation, prior to cycling, a model is not valid in the sense that there are no contacts between pieces, piece properties may not be set, and pieces may not be entered into a data structure for efficient spatial searching. The model clean command is a global command that can be given at any point during the model creation process to create all contacts in the model, initialize all piece properties, ensure that the data structures are present for spatial searching, and update the contact activity status based on the geometry. This command is invoked automatically when the 'model timestep fix' and 'model timestep auto' commands are given.",
 
   "syntax": "model clean <keyword>",

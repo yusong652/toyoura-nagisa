@@ -1,6 +1,7 @@
 {
   "command": "wall initialize",
   "category": "wall",
+  "search_keywords": ["initialize", "attribute", "set"],
   "description": "Synonym for the wall attribute command. See wall attribute for complete documentation.",
 
   "syntax": "wall initialize <keyword> ... <range>",

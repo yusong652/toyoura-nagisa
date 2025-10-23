@@ -1,6 +1,7 @@
 {
   "command": "clump results",
   "category": "clump",
+  "search_keywords": ["results", "post-processing", "snapshot"],
   "description": "Configure clump results logic for efficient post-processing. Creates lightweight snapshots of clump geometries and selected attributes at different time instances as binary files. This logic allows for a reduced version of the model state (clump geometries plus clump attributes) to be output and used to re-create the model state. IMPORTANT: Clump result files do NOT replace PFC model state files and models re-created with this logic should not be cycled. Use with model results command to control when/how result files are created and imported.",
 
   "syntax": "clump results <keyword> ...",

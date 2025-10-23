@@ -1,6 +1,7 @@
 {
   "command": "model display",
   "category": "model",
+  "search_keywords": ["display", "output"],
   "description": "Set information to display during cycling. Along with the baseline information, additional information can be displayed during cycling using the keywords below. This information will be updated every step.",
 
   "syntax": "model display <keyword>",

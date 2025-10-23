@@ -1,6 +1,7 @@
 {
   "command": "fragment register",
   "category": "fragment",
+  "search_keywords": ["register", "initialize", "type"],
   "description": "Register contact types for fragment analysis. This is the required initialization step before using any other fragment commands. By default, only bonded mechanical contacts are considered as criteria for inclusion in a fragment. If no contact types are specified, all available contact types are registered. At least one active contact of each contact type of interest must exist in the model when this command is given.",
 
   "syntax": "fragment register <s ...> <keyword> <range>",

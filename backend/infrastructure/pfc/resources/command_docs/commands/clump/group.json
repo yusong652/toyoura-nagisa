@@ -1,6 +1,7 @@
 {
   "command": "clump group",
   "category": "clump",
+  "search_keywords": ["group", "assign"],
   "description": "Specify clump or pebble group names. Groups are used to organize clumps and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'. Use the add keyword to assign the group name to the next available slot and the remove keyword to remove the group from all slots. The optional pebble keyword can be given before the optional range to specify that the group name will be applied to pebbles. In this case, the range is applied to pebbles and not to clumps.",
 
   "syntax": "clump group <s> <keyword> ... <pebble> <range>",

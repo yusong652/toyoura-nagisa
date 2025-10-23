@@ -1,6 +1,7 @@
 {
   "command": "ball initialize",
   "category": "ball",
+  "search_keywords": ["initialize", "attribute", "set"],
   "description": "Modify ball attributes. This is a synonym for the ball attribute command. See ball attribute for complete list of available keywords and modifiers.",
 
   "syntax": "ball initialize <keyword> ... <range>",

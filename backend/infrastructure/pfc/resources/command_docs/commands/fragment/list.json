@@ -1,6 +1,7 @@
 {
   "command": "fragment list",
   "category": "fragment",
+  "search_keywords": ["list", "query"],
   "description": "List fragment information. By default, lists fragment catalog information (catalog number, cycle, time, and fragment count). Use the catalog keyword to list all fragments at a specific catalog number, or the id keyword to list the complete history of a specific fragment.",
 
   "syntax": "fragment list <keyword>",

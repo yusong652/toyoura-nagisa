@@ -1,6 +1,7 @@
 {
   "command": "contact inhibit",
   "category": "contact",
+  "search_keywords": ["inhibit", "disable", "inactive"],
   "description": "Inhibit (disable) contacts in the specified range. When a contact is inhibited, it becomes inactive and does not compute forces, regardless of piece overlap or contact model logic. This provides temporary contact disabling without deletion. Inhibit has the highest priority among contact state flags - an inhibited contact remains inactive even if the activate flag is set. By default, only mechanical contacts are considered.",
 
   "syntax": "contact inhibit <bval> <keyword> <range>",

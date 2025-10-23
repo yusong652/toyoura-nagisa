@@ -1,6 +1,7 @@
 {
   "command": "clump replicate",
   "category": "clump",
+  "search_keywords": ["replicate", "template", "single"],
   "description": "Create a single clump from a template. If no size measure is given, then the clump template volume is retained. If the density keyword is not given, then the clump is given unit density. This command creates a single clump instance, contrasting with clump generate which creates multiple clumps.",
 
   "syntax": "clump replicate <keyword> ...",

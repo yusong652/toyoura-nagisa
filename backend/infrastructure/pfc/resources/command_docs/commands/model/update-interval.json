@@ -1,6 +1,7 @@
 {
   "command": "model update-interval",
   "category": "model",
+  "search_keywords": ["update-interval", "refresh"],
   "description": "Set the number of cycles taken between updating the existing plots in the user interface. The default value is 100. This controls how frequently the visual display is refreshed during cycling, affecting both visualization responsiveness and computational performance.",
 
   "syntax": "model update-interval <i>",

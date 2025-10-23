@@ -12,9 +12,9 @@ Architecture:
 """
 
 from typing import List, Optional
-from backend.infrastructure.pfc.sdk.models import SearchResult, SearchStrategy
-from backend.infrastructure.pfc.sdk.search.path_search import PathSearchStrategy
-from backend.infrastructure.pfc.sdk.search.keyword_search import KeywordSearchStrategy
+from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy
+from backend.infrastructure.pfc.python_api.search.path_search import PathSearchStrategy
+from backend.infrastructure.pfc.python_api.search.keyword_search import KeywordSearchStrategy
 
 
 class APISearcher:
@@ -110,7 +110,7 @@ class APISearcher:
             >>> self._check_module_path("itasca.ball")
             SearchResult(api_name="itasca.ball", score=999, ...)
         """
-        from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
+        from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 
         # Try to load as module
         doc = DocumentationLoader.load_api_doc(query)

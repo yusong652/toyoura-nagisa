@@ -1,6 +1,7 @@
 {
   "command": "clump trace",
   "category": "clump",
+  "search_keywords": ["trace", "path"],
   "description": "Add a clump or pebble particle trace. The positions and velocities of clumps/pebbles can be sampled and stored during a model run and the path through space can be visualized. The optional id directly following trace creates a particle trace with the specified ID. If not specified, then the next available particle trace ID is used. The optional pebble keyword indicates that a pebble is to be traced. Following this, either 1) a position vector or 2) an additional id keyword must be given to identify a specific clump or pebble. See the trace commands for details regarding the manipulation of particle traces.",
 
   "syntax": "clump trace <id <itrace>> <pebble> id <id> | <v>",

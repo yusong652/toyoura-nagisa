@@ -11,10 +11,10 @@ Supports:
 """
 
 from typing import List, Dict, Any, Optional
-from backend.infrastructure.pfc.sdk.models import SearchResult, SearchStrategy as StrategyEnum
-from backend.infrastructure.pfc.sdk.search.base import SearchStrategy
-from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
-from backend.infrastructure.pfc.sdk.types.contact import ContactTypeResolver
+from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy as StrategyEnum
+from backend.infrastructure.pfc.shared.search.base import SearchStrategy
+from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
+from backend.infrastructure.pfc.python_api.types.contact import ContactTypeResolver
 
 
 class PathSearchStrategy(SearchStrategy):
@@ -166,7 +166,7 @@ class PathSearchStrategy(SearchStrategy):
         # Track if this is a Contact type query (for metadata)
         contact_type_match = None
         if ContactTypeResolver.is_contact_query(query):
-            from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+            from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
             for ct in CONTACT_TYPES:
                 if ct.lower() == class_part:
                     contact_type_match = ct  # Remember original contact type
@@ -210,7 +210,7 @@ class PathSearchStrategy(SearchStrategy):
 
             # Add Contact type information if applicable
             if contact_type_match:
-                from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+                from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
                 metadata["contact_type"] = contact_type_match
                 metadata["all_contact_types"] = CONTACT_TYPES
 
@@ -242,7 +242,7 @@ class PathSearchStrategy(SearchStrategy):
             >>> self._build_contact_metadata("Ball.vel")
             None
         """
-        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+        from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
 
         # Extract class name from API path
         # Handle both "BallBallContact.gap" and "itasca.BallBallContact.gap"

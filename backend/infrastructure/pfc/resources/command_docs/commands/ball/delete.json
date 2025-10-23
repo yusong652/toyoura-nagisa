@@ -1,6 +1,7 @@
 {
   "command": "ball delete",
   "category": "ball",
+  "search_keywords": ["delete", "remove"],
   "description": "Delete balls. If no range is specified, then all balls in the model are deleted.",
 
   "syntax": "ball delete <range>",

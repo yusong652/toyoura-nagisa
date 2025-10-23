@@ -1,6 +1,7 @@
 {
   "command": "ball list",
   "category": "ball",
+  "search_keywords": ["list", "query"],
   "description": "List ball information. By default, lists ball ID, radius, contact count, fixity, and position. Use keywords to list specific attributes, contacts, groups, properties, or results. Use model precision command to control floating point precision.",
 
   "syntax": "ball list <keyword> <range>",

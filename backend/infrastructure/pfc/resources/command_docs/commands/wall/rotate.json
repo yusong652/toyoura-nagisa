@@ -1,6 +1,7 @@
 {
   "command": "wall rotate",
   "category": "wall",
+  "search_keywords": ["rotate", "orientation", "axis"],
   "description": "Rotate walls. Application with the point keyword may also modify the center of rotation. Rotations follow the right-hand rule where the rotation axis in 2D is toward the viewer. Rotations are not allowed that rotate the wall outside of the model domain. Should any facet conveyor velocities be nonzero, they will be rotated as well. Should the orientation tracking be active, then the orientation is updated by default, though this can be disabled (see the update-orientation keyword).",
 
   "syntax": "wall rotate <keyword> ... <range>",

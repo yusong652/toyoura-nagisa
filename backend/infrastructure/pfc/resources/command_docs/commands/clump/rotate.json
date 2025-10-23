@@ -1,6 +1,7 @@
 {
   "command": "clump rotate",
   "category": "clump",
+  "search_keywords": ["rotate", "orientation", "axis"],
   "description": "Rotate clumps using right-hand rule. Application with the point keyword may also modify the center of mass location. Rotations follow the right-hand rule where the rotation axis in 2D is toward the viewer. Rotations are not allowed that rotate clumps so that pebble centroids fall outside the model domain. No clumps will be rotated if any clumps fail this test. Should orientation tracking be active, then the orientation is updated by default, though this can be disabled via the update-orientation keyword.",
 
   "syntax": "clump rotate <keyword> ... <range>",

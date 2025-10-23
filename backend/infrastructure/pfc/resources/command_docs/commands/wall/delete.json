@@ -1,6 +1,7 @@
 {
   "command": "wall delete",
   "category": "wall",
+  "search_keywords": ["delete", "remove"],
   "description": "Delete walls and/or facets. If neither the walls nor facets keywords are given, then facets are deleted. When facets are deleted, walls without facets are automatically deleted as well.",
 
   "syntax": "wall delete <keyword> <range>",

@@ -1,6 +1,7 @@
 {
   "command": "fragment activate",
   "category": "fragment",
+  "search_keywords": ["activate", "auto", "computation"],
   "description": "Activate fragment auto-computation. Either the number of cycles or the time between fragment computations must be specified. Optionally, the fragment ID can be placed in a specified group slot for use with the range logic. Note that if contacts are manually removed or unbounded by the user, calling the fragment compute command is required so that the fragment auto-computation logic detects these changes. If fragment persistence is set to false when registering contact types, fragment auto-computation cannot be activated.",
 
   "syntax": "fragment activate <keyword>",

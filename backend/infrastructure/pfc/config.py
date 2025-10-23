@@ -20,6 +20,10 @@ _PROJECT_ROOT = _BACKEND_DIR.parent
 # Contains PFC Python SDK API documentation exported from official docs
 PFC_DOCS_SOURCE = _CURRENT_DIR / "resources" / "python_sdk_docs"
 
+# Command documentation root (version-controlled, JSON format)
+# Contains PFC command documentation with 115 commands across 7 categories
+PFC_COMMAND_DOCS_ROOT = _CURRENT_DIR / "resources" / "command_docs"
+
 # Runtime semantic index (generated dynamically, NOT version-controlled)
 # Future: Will contain ChromaDB/FAISS embeddings for semantic search
 PFC_DOCS_INDEX = _PROJECT_ROOT / "data" / "pfc" / "python_sdk_index"

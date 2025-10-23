@@ -1,6 +1,7 @@
 {
   "command": "model orientation-tracking",
   "category": "model",
+  "search_keywords": ["orientation", "tracking", "euler"],
   "description": "Specify the orientation tracking state. Orientation tracking applies to PFC entities (clumps and walls). When enabled, the orientation of objects is tracked during rotation, allowing access to Euler angles and orientation-based attributes.",
 
   "syntax": "model orientation-tracking <b>",

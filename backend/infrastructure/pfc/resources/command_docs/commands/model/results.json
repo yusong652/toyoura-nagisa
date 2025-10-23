@@ -1,6 +1,7 @@
 {
   "command": "model results",
   "category": "model",
+  "search_keywords": ["results", "export", "snapshot"],
   "description": "Perform file operations on results files. Results files are lightweight versions of save files (about 5% of save file size). Importing results files will fully overwrite the model state (as with 'model restore'), but only a small, predetermined portion of the complete model is included. A state imported from a results file cannot be further cycled. Results files are commonly used to export model states at regular intervals — both to allow the creation of a movie later and to make it easy to check the progress of a model during solution. The user controls what information is included in a results file using the 'results' keyword available to many model objects (e.g., 'zone results', 'ball results', 'clump results').",
 
   "syntax": "model results <keyword>",

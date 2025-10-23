@@ -1,6 +1,7 @@
 {
   "command": "ball group",
   "category": "ball",
+  "search_keywords": ["group", "assign"],
   "description": "Specify ball group names. Groups are used to organize balls and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'.",
 
   "syntax": "ball group <s> <keyword> ... <range>",

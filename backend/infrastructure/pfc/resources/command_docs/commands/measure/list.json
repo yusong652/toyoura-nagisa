@@ -1,6 +1,7 @@
 {
   "command": "measure list",
   "category": "measure",
+  "search_keywords": ["list", "query"],
   "description": "List information related to measurement regions. Displays details about all measurement objects including ID, position, radius, and calculated quantities such as porosity, coordination number, stress, and strain. This is the primary command for viewing measurement results.",
 
   "syntax": "measure list",

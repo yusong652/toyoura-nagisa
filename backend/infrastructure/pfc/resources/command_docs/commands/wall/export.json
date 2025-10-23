@@ -1,6 +1,7 @@
 {
   "command": "wall export",
   "category": "wall",
+  "search_keywords": ["export", "geometry", "STL"],
   "description": "Exports walls to geometry sets. If no range is specified, then all walls in the model are exported. At the moment, it is only possible to export walls to geometry sets. The geometry sets may in turn be directly used for post-processing or exported as STL files to be used by third-party CAD software.",
 
   "syntax": "wall export <keyword> <range>",

@@ -6,7 +6,7 @@ ensuring a consistent interface across different search implementations.
 
 from abc import ABC, abstractmethod
 from typing import List
-from backend.infrastructure.pfc.sdk.models import SearchResult
+from backend.infrastructure.pfc.python_api.models import SearchResult
 
 
 class SearchStrategy(ABC):

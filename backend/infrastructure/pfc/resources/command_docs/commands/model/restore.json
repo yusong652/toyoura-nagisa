@@ -1,6 +1,7 @@
 {
   "command": "model restore",
   "category": "model",
+  "search_keywords": ["restore", "load", "file"],
   "description": "Restore program-state information. The state information, resulting from a previous 'model save' command, is in the save file s. If s does not contain a file extension, then the extension '.f3sav' is added. The path to the save file can be included as part of s. All model state information (including any defined FISH functions/variables, histories, tables, or model components) is lost and replaced by the information contained in the file s. Information that is part of the project state (see 'project') or program state (see 'program') is not affected by a restore.",
 
   "syntax": "model restore <s>",

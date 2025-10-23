@@ -1,6 +1,7 @@
 {
   "command": "contact delete",
   "category": "contact",
+  "search_keywords": ["delete", "remove"],
   "description": "Delete contacts in the specified range. Deleted contacts are removed from the simulation and will no longer compute forces. Note that if contact detection is enabled (via 'contact detection' command), deleted contacts may be automatically recreated when pieces are remapped in the cell-space during subsequent cycles. To permanently prevent contact recreation, either disable contact detection or move pieces far enough apart.",
 
   "syntax": "contact delete <range>",

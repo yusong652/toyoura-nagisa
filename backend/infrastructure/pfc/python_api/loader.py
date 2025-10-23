@@ -224,7 +224,7 @@ class DocumentationLoader:
                 "PebblePebbleContact.gap": "modules/contact/Contact.json#gap"
                 "PebbleFacetContact.gap": "modules/contact/Contact.json#gap"
         """
-        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+        from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
 
         quick_ref = index.get("quick_ref", {})
 
@@ -283,7 +283,7 @@ class DocumentationLoader:
                 "itasca.ball.Ball.vel": "modules/ball/Ball.json#vel"
                 "itasca.wall.Wall.pos": "modules/wall/Wall.json#pos"
         """
-        from backend.infrastructure.pfc.sdk.types.mappings import CLASS_TO_MODULE
+        from backend.infrastructure.pfc.python_api.types.mappings import CLASS_TO_MODULE
 
         quick_ref = index.get("quick_ref", {})
 
@@ -397,7 +397,7 @@ class DocumentationLoader:
                     "itasca.PebbleFacetContact.gap"
                 ]}
         """
-        from backend.infrastructure.pfc.sdk.types.contact import CONTACT_TYPES
+        from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
 
         # Create a new dict to store expanded results
         expanded_keywords = defaultdict(list)

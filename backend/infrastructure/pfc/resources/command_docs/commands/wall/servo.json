@@ -1,6 +1,7 @@
 {
   "command": "wall servo",
   "category": "wall",
+  "search_keywords": ["servo", "force", "control"],
   "description": "The wall servo provides the ability to control the translational velocity of select walls using a servo-mechanism in order to apply or maintain a desired force. The servo-mechanism uses a proportional controller with adaptive gain. IMPORTANT: Only the component of the velocity in the direction of the target servo force is adjusted by the servo control. The orthogonal velocity is not altered. The target load is expressed as a force instead of a stress because PFC cannot assess which region of a wall is effectively applying load on the particles.",
 
   "syntax": "wall servo <keyword> ... <range>",

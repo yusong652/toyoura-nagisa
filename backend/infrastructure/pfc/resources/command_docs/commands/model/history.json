@@ -1,6 +1,7 @@
 {
   "command": "model history",
   "category": "model",
+  "search_keywords": ["history", "track", "monitor"],
   "description": "Create a history of a model quantity. These quantities are mostly associated with a process. The keyword 'name' may be used to give the history a unique identifier for later reference. If name is not specified the history will be given a name automatically based on the internally assigned ID number. Histories allow monitoring and recording of model values during cycling for analysis and post-processing.",
 
   "syntax": "model history <name <s>> <keyword>",

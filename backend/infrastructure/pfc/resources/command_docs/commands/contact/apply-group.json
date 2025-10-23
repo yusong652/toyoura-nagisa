@@ -1,6 +1,7 @@
 {
   "command": "contact apply-group",
   "category": "contact",
+  "search_keywords": ["apply-group", "propagate"],
   "description": "Apply contact group names to contacting pieces or bodies. This command traverses all contacts within the specified range and applies the contact group names to the pieces or bodies at the ends of each contact. By default, group names are applied to pieces (balls, clump pebbles, wall facets). Use the 'body' keyword to apply to bodies (balls, clumps, walls) instead. This is useful for propagating group assignments from contacts to the objects they connect. By default, only mechanical contacts are considered.",
 
   "syntax": "contact <sprocess> apply-group <keyword> <range>",

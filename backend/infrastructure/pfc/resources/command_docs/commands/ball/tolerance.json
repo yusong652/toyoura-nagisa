@@ -1,6 +1,7 @@
 {
   "command": "ball tolerance",
   "category": "ball",
+  "search_keywords": ["tolerance", "contact-detection"],
   "description": "Set contact detection tolerances. Controls the size of extent used when inserting balls into cell space for contact detection. The extent size includes: minimum extent + 2 × (max interaction distance + constant tolerance + extent tolerance × max extent length + velocity tolerance × max velocity component). Ball is remapped when cumulative translation exceeds this sum. See cycle operations 30.0 (Update Spatial Searching) and 35.0 (Create/delete Contacts) for details.",
 
   "syntax": "ball tolerance <keyword> ...",

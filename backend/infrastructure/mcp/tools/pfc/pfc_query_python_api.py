@@ -4,7 +4,7 @@ This MCP tool enables LLM to query PFC Python API documentation and should
 be used FIRST before falling back to itasca.command() strings.
 
 This is a thin wrapper around the core SDK documentation utilities in
-backend.infrastructure.pfc.sdk, handling only MCP protocol integration
+backend.infrastructure.pfc.python_api, handling only MCP protocol integration
 and error response formatting.
 """
 
@@ -13,7 +13,7 @@ from fastmcp import FastMCP
 from fastmcp.server.context import Context
 from pydantic import Field
 
-from backend.infrastructure.pfc.sdk import (
+from backend.infrastructure.pfc.python_api import (
     APISearcher,
     DocumentationLoader,
     APIDocFormatter

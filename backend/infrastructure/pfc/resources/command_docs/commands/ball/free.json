@@ -1,6 +1,7 @@
 {
   "command": "ball free",
   "category": "ball",
+  "search_keywords": ["free", "velocity", "spin"],
   "description": "Free the specified ball velocities. As a result, ball motion reflects the forces acting upon them (velocities are updated during cycling according to equations of motion).",
 
   "syntax": "ball free <keyword> ... <range>",

@@ -1,6 +1,7 @@
 {
   "command": "model cycle",
   "category": "model",
+  "search_keywords": ["cycle", "timestep", "step"],
   "description": "Execute timesteps. The synonym 'model step' may also be used. This is the equivalent of calling 'model solve' with the cycles keyword set to i. i timesteps are executed unless processing is interrupted by pressing Shift + Esc, which will terminate cycling, exit the current data file (and all levels of nested data files that may have been used to call it), and return input to the command prompt after the current step is completed. The optional calm keyword is used in mechanical processes to reset the linear and angular velocities to zero every i2 cycles.",
 
   "syntax": "model cycle <i> <calm <i2>>",

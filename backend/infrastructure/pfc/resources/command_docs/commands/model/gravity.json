@@ -1,6 +1,7 @@
 {
   "command": "model gravity",
   "category": "model",
+  "search_keywords": ["gravity", "acceleration"],
   "description": "Set the gravity as a vector or float. Gravity is set in units of acceleration. Body force is calculated as the product of the gravity vector and the real mass of an object. As a shorthand, only a single scalar value f may be specified instead. If this is done, gravity is set to (0,0,-f).",
 
   "syntax": "model gravity <v3> | <f>",

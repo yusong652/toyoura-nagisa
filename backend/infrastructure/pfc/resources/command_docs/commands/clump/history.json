@@ -1,6 +1,7 @@
 {
   "command": "clump history",
   "category": "clump",
+  "search_keywords": ["history", "track", "monitor"],
   "description": "Add a history of a clump value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The clump must be specified by either 'id' or 'position' keyword following the quantity keyword. The history can be assigned a name for later reference with the optional name keyword; if not, the history will be given a default name based on its internally assigned id number.",
 
   "syntax": "clump history name <name> <keyword> id <i> or position <v>",

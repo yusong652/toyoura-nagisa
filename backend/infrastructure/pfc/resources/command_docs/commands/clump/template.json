@@ -1,6 +1,7 @@
 {
   "command": "clump template",
   "category": "clump",
+  "search_keywords": ["template", "define", "bubblepack"],
   "description": "Operate on a single clump template. A clump template is a reduced version of a clump composed of pebbles. Additionally, a clump template may hold a surface description that can be used for the calculation of inertial parameters and clump visualization. Clump templates can be created, deleted, imported, and exported. Clump templates are not model components; instead, they may be used to create clumps using the clump replicate, clump generate, or clump distribute commands. Clumps that refer to clump templates may be visualized via their surface descriptions.",
 
   "syntax": "clump template <keyword> ...",

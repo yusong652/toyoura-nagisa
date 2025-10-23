@@ -1,6 +1,7 @@
 {
   "command": "fragment deactivate",
   "category": "fragment",
+  "search_keywords": ["deactivate", "stop"],
   "description": "Deactivate fragment auto-computation. The previously calculated fragments are not removed - fragment IDs remain assigned to bodies, allowing one to use fragment activate to reactivate automatic fragment calculation later. This only stops the automatic periodic updates; existing fragment data is preserved.",
 
   "syntax": "fragment deactivate",

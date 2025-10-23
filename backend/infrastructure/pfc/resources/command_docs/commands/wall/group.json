@@ -1,6 +1,7 @@
 {
   "command": "wall group",
   "category": "wall",
+  "search_keywords": ["group", "assign"],
   "description": "Specify wall or facet group names. Use of the group logic is described in Groups documentation. By default, s is assigned to the group slot 'Default'. Use the 'add' keyword to assign the group name to the next available slot and the 'remove' keyword to remove s from all slots. The optional 'facet' keyword can be given before the optional range to specify that the group name will be applied to facets. In this case, the range is applied to facets and not to walls.",
 
   "syntax": "wall group <s> <keyword> ... <facet> <range>",

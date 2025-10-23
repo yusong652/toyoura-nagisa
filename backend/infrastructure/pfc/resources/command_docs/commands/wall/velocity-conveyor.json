@@ -1,6 +1,7 @@
 {
   "command": "wall velocity-conveyor",
   "category": "wall",
+  "search_keywords": ["conveyor", "rotation", "drum"],
   "description": "Assign a rotational conveyor velocity to facets. This command handles the general case of rotation of an axis-symmetric wall (e.g., cylindrical drum) about its axis of symmetry. The wall does not actually rotate but the facet conveyor velocities are set so that the wall's apparent behavior is rotation. In cases where the tangential velocity calculated at the centroid of a facet is not parallel to the facet face, the conveyor velocity is set to the projection of the tangential velocity onto the plane of the facet. Use the wall attribute command to explicitly set the conveyor velocity directly.",
 
   "syntax": "wall velocity-conveyor <keyword> ... <range>",

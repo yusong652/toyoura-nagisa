@@ -6,7 +6,7 @@ This package provides pluggable search strategies for finding APIs:
 - Future: SemanticSearchStrategy for embedding-based search
 """
 
-from .base import SearchStrategy
+from backend.infrastructure.pfc.shared.search.base import SearchStrategy
 from .path_search import PathSearchStrategy
 from .keyword_search import KeywordSearchStrategy
 

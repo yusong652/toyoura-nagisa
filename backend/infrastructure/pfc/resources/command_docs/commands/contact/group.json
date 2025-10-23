@@ -1,6 +1,7 @@
 {
   "command": "contact group",
   "category": "contact",
+  "search_keywords": ["group", "assign"],
   "description": "Assign group names to contacts for organization and range-based selection. Groups are a fundamental organizational tool in PFC, allowing contacts to be categorized, selected, and manipulated based on group membership. Contacts can belong to multiple groups via different slots. By default, the group name is assigned to the 'Default' slot. Use 'add' keyword to assign to next available slot, 'remove' keyword to remove from all slots, and 'slot' keyword to specify a particular slot. By default, only mechanical contacts are considered.",
 
   "syntax": "contact group <s> <keyword> ... <range>",

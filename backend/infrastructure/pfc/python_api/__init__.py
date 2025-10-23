@@ -4,7 +4,7 @@ This module provides direct access to the PFC Python SDK documentation
 components without wrapper layers.
 
 Usage:
-    from backend.infrastructure.pfc.sdk import (
+    from backend.infrastructure.pfc.python_api import (
         APISearcher,
         DocumentationLoader,
         APIDocFormatter
@@ -30,10 +30,10 @@ Data Models:
     - SearchStrategy: Search strategy enumeration
 """
 
-from backend.infrastructure.pfc.sdk.searcher import APISearcher
-from backend.infrastructure.pfc.sdk.formatter import APIDocFormatter
-from backend.infrastructure.pfc.sdk.loader import DocumentationLoader
-from backend.infrastructure.pfc.sdk.models import SearchResult, APIDocumentation, SearchStrategy
+from backend.infrastructure.pfc.python_api.searcher import APISearcher
+from backend.infrastructure.pfc.python_api.formatter import APIDocFormatter
+from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
+from backend.infrastructure.pfc.python_api.models import SearchResult, APIDocumentation, SearchStrategy
 
 
 # Public API exports

@@ -1,6 +1,7 @@
 {
   "command": "ball clump",
   "category": "ball",
+  "search_keywords": ["clump", "convert", "pebble"],
   "description": "Create a single clump from the balls within range or add a ball to an existing clump. The balls are transformed to clump pebbles and are removed from the container of balls.",
 
   "syntax": "ball clump <keyword> <range>",

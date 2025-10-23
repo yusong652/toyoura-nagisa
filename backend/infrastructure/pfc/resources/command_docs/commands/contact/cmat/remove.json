@@ -1,6 +1,7 @@
 {
   "command": "contact cmat remove",
   "category": "contact cmat",
+  "search_keywords": ["cmat", "remove"],
   "description": "Remove an entry from the CMAT (Contact Model Assignment Table). Deletes the CMAT entry at the specified index. When an entry is removed, subsequent entries (higher indices) are shifted down to fill the gap. This command is used to clean up or modify the CMAT by removing specific contact model assignment rules. The default entry (index 0) typically should not be removed.",
 
   "syntax": "contact cmat remove <i>",

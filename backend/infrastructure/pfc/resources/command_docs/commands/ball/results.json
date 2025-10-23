@@ -1,6 +1,7 @@
 {
   "command": "ball results",
   "category": "ball",
+  "search_keywords": ["results", "post-processing", "snapshot"],
   "description": "Configure ball results logic for efficient post-processing. Creates lightweight snapshots of ball geometries and selected attributes at different time instances. IMPORTANT: Ball result files do NOT replace PFC model state files and should not be used to continue cycling. Use with model results command to control when/how result files are created and imported.",
 
   "syntax": "ball results <keyword> ...",

@@ -1,6 +1,7 @@
 {
   "command": "model solve",
   "category": "model",
+  "search_keywords": ["solve", "equilibrium", "convergence"],
   "description": "Solve to a specified limit. The solve logic provides a mechanism to continue cycling a model until specified criteria are met, oftentimes resulting in a model that is in equilibrium to some tolerance. Any combination of the keywords below can be given in a single model solve command. If multiple solve limits are given, then cycling will continue until one of the limits is met, unless the 'and' keyword is used, in which case all criteria must be met before cycling stops.",
 
   "syntax": "model solve <keyword> ...",

@@ -1,6 +1,7 @@
 {
   "command": "model calm",
   "category": "model",
+  "search_keywords": ["calm", "velocity", "zero"],
   "description": "Calm the model. For mechanical processes, all linear and rotational velocities are set to 0. This is useful for removing kinetic energy from the system and preparing for a new loading stage or when transitioning between different simulation phases.",
 
   "syntax": "model calm",

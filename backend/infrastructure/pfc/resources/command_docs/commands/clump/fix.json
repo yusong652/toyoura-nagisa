@@ -1,6 +1,7 @@
 {
   "command": "clump fix",
   "category": "clump",
+  "search_keywords": ["fix", "velocity", "spin"],
   "description": "Fix the specified clump velocities. As a result, clump motion is constant in the specified directions (fixed velocities are not updated during cycling).",
 
   "syntax": "clump fix <keyword> ... <range>",

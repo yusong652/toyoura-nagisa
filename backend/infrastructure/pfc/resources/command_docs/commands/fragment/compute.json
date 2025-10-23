@@ -1,6 +1,7 @@
 {
   "command": "fragment compute",
   "category": "fragment",
+  "search_keywords": ["compute", "connectivity"],
   "description": "Compute fragments based on current contact connectivity. The current cycle number and mechanical age are used to identify the record in the fragment history. Fragment IDs are assigned to bodies (balls and clumps). Bodies with fragment ID 0 are isolated (no contacts). If fragment persistence is turned off, isolated bodies are assigned unique fragment indices. The fragment register command must be given prior to issuing fragment compute.",
 
   "syntax": "fragment compute <keyword>",
