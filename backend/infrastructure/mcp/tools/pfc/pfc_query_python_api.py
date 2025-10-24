@@ -14,10 +14,10 @@ from fastmcp.server.context import Context
 from pydantic import Field
 
 from backend.infrastructure.pfc.python_api import (
-    APISearcher,
     DocumentationLoader,
     APIDocFormatter
 )
+from backend.infrastructure.pfc.shared.query import APISearch
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 # Default and maximum limits for search results
@@ -37,9 +37,6 @@ MAX_LOW_CONFIDENCE_DISPLAY = 2   # Show only top 2 results for low confidence
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
     """Register PFC Python API query tool with the MCP server."""
-
-    # Create searcher instance once
-    searcher = APISearcher()
 
     @mcp.tool(
         tags={"pfc", "python", "api", "documentation"},
@@ -73,8 +70,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
         when exploring related APIs, lower values when you know what you're looking for.
         """
         try:
-            # Search for matching APIs with user-specified limit
-            matches = searcher.search(query, top_n=limit)
+            # Search for matching APIs with user-specified limit using new search system
+            matches = APISearch.search(query, top_k=limit)
 
             # ===== Condition 1: No results found =====
             if not matches:
@@ -138,7 +135,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                         "reason": "low_confidence",
                         "suggestion": "Strongly recommended to use pfc_query_command",
                         "partial_results": [
-                            {"name": result.api_name, "score": result.score}
+                            {"name": result.document.id, "score": result.score}
                             for result in low_conf_matches
                         ]
                     }
@@ -146,7 +143,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
             # ===== Condition 3: High confidence results (score >= 700) =====
             best_result = matches[0]
-            api_path = best_result.api_name
+            api_path = best_result.document.id
 
             # Load full documentation for best match
             api_doc = DocumentationLoader.load_api_doc(api_path)
@@ -154,7 +151,8 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if not api_doc:
                 return error_response(f"API documentation not found for {api_path}")
 
-            # Format full documentation for best match (pass SearchResult for Contact types)
+            # Format full documentation for best match (pass metadata for Contact types)
+            # Note: APIDocFormatter expects old SearchResult format, so we pass document.metadata
             formatted_doc = APIDocFormatter.format_full_doc(api_doc, best_result)
 
             # Format related APIs (if multiple matches)
@@ -163,7 +161,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 related_apis = []
                 for result in matches[1:]:
                     # Pass metadata to formatter for Contact type handling
-                    sig = APIDocFormatter.format_signature(result.api_name, result.metadata)
+                    sig = APIDocFormatter.format_signature(result.document.id, result.document.metadata)
                     if sig:
                         related_apis.append(f"- {sig}")
 
@@ -198,10 +196,10 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     "has_limitations": bool(api_doc.get('limitations')),
                     "fallback_commands": api_doc.get('fallback_commands', []),
                     "match_count": len(matches),
-                    "is_contact_type": bool(best_result.metadata and 'contact_type' in best_result.metadata),
-                    "contact_type": best_result.metadata.get('contact_type') if best_result.metadata else None,
+                    "is_contact_type": bool(best_result.document.metadata and 'contact_type' in best_result.document.metadata),
+                    "contact_type": best_result.document.metadata.get('contact_type') if best_result.document.metadata else None,
                     "related_apis": [
-                        {"name": result.api_name, "score": result.score}
+                        {"name": result.document.id, "score": result.score}
                         for result in matches[1:]
                     ] if len(matches) > 1 else []
                 }

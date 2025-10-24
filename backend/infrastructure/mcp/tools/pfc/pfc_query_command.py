@@ -13,11 +13,12 @@ from fastmcp.server.context import Context
 from pydantic import Field
 
 from backend.infrastructure.pfc.commands import (
-    CommandSearcher,
     CommandLoader,
     CommandFormatter,
     DocumentType
 )
+from backend.infrastructure.pfc.shared.query import CommandSearch
+from backend.infrastructure.pfc.shared.models.document import DocumentType as SharedDocumentType
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 # Default and maximum limits for search results
@@ -27,9 +28,6 @@ MAX_SEARCH_LIMIT = 20
 
 def register_pfc_query_command_tool(mcp: FastMCP):
     """Register PFC command query tool with the MCP server."""
-
-    # Create searcher instance once
-    searcher = CommandSearcher()
 
     @mcp.tool(
         tags={"pfc", "command", "documentation"},
@@ -83,10 +81,10 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     f"Limit must be between 1 and {MAX_SEARCH_LIMIT}, got {limit}"
                 )
 
-            # Search for matching commands/properties
-            results = searcher.search(
+            # Search for matching commands/properties using new search system
+            results = CommandSearch.search(
                 query,
-                top_n=limit,
+                top_k=limit,
                 include_model_properties=include_model_properties
             )
 
@@ -114,26 +112,26 @@ def register_pfc_query_command_tool(mcp: FastMCP):
             best_result = results[0]
             formatted_doc = ""
 
-            if best_result.doc_type == DocumentType.COMMAND:
+            if best_result.document.doc_type == SharedDocumentType.COMMAND:
                 # Load full command documentation
-                category = best_result.category
-                command_name = best_result.name.split(maxsplit=1)[1]  # Remove category prefix
+                category = best_result.document.category
+                command_name = best_result.document.title.split(maxsplit=1)[1]  # Remove category prefix
                 cmd_doc = CommandLoader.load_command_doc(category, command_name)
 
                 if cmd_doc:
                     formatted_doc = CommandFormatter.format_command(cmd_doc, category)
                 else:
-                    formatted_doc = f"# {best_result.name}\n\n*Documentation not available*"
+                    formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
 
-            elif best_result.doc_type == DocumentType.MODEL_PROPERTY:
+            elif best_result.document.doc_type == SharedDocumentType.MODEL_PROPERTY:
                 # Load full model documentation (model-level, not individual property)
-                model_name = best_result.category
+                model_name = best_result.document.category
                 model_doc = CommandLoader.load_model_property_doc(model_name)
 
                 if model_doc:
                     formatted_doc = CommandFormatter.format_full_model(model_doc)
                 else:
-                    formatted_doc = f"# {best_result.name}\n\n*Documentation not available*"
+                    formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
 
             # Format related results (if multiple matches)
             related_section = ""
@@ -144,7 +142,7 @@ def register_pfc_query_command_tool(mcp: FastMCP):
             full_response = formatted_doc + related_section
 
             return success_response(
-                message=f"Found {len(results)} command(s): {best_result.name}" +
+                message=f"Found {len(results)} command(s): {best_result.document.title}" +
                         (f" + {len(results)-1} more" if len(results) > 1 else ""),
                 llm_content={
                     "parts": [{
@@ -154,17 +152,17 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                 },
                 data={
                     "query": query,
-                    "best_match": best_result.name,
-                    "match_type": best_result.doc_type.value,
-                    "category": best_result.category,
+                    "best_match": best_result.document.title,
+                    "match_type": best_result.document.doc_type.value,
+                    "category": best_result.document.category,
                     "score": best_result.score,
                     "total_results": len(results),
                     "include_model_properties": include_model_properties,
-                    "python_alternative": best_result.metadata.get("python_available") if best_result.metadata and best_result.doc_type == DocumentType.COMMAND else None,
+                    "python_alternative": best_result.document.metadata.get("python_available") if best_result.document.doc_type == SharedDocumentType.COMMAND else None,
                     "related_results": [
                         {
-                            "name": r.name,
-                            "type": r.doc_type.value,
+                            "name": r.document.title,
+                            "type": r.document.doc_type.value,
                             "score": r.score
                         }
                         for r in results[1:]
