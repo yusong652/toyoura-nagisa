@@ -14,11 +14,10 @@ from pydantic import Field
 
 from backend.infrastructure.pfc.commands import (
     CommandLoader,
-    CommandFormatter,
-    DocumentType
+    CommandFormatter
 )
 from backend.infrastructure.pfc.shared.query import CommandSearch
-from backend.infrastructure.pfc.shared.models.document import DocumentType as SharedDocumentType
+from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
 # Default and maximum limits for search results
@@ -112,32 +111,44 @@ def register_pfc_query_command_tool(mcp: FastMCP):
             best_result = results[0]
             formatted_doc = ""
 
-            if best_result.document.doc_type == SharedDocumentType.COMMAND:
+            if best_result.document.doc_type == DocumentType.COMMAND:
                 # Load full command documentation
                 category = best_result.document.category
-                command_name = best_result.document.title.split(maxsplit=1)[1]  # Remove category prefix
-                cmd_doc = CommandLoader.load_command_doc(category, command_name)
-
-                if cmd_doc:
-                    formatted_doc = CommandFormatter.format_command(cmd_doc, category)
+                if not category:
+                    formatted_doc = f"# {best_result.document.title}\n\n*Category information missing*"
                 else:
-                    formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
+                    command_name = best_result.document.title.split(maxsplit=1)[1]  # Remove category prefix
+                    cmd_doc = CommandLoader.load_command_doc(category, command_name)
 
-            elif best_result.document.doc_type == SharedDocumentType.MODEL_PROPERTY:
+                    if cmd_doc:
+                        formatted_doc = CommandFormatter.format_command(cmd_doc, category)
+                    else:
+                        formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
+
+            elif best_result.document.doc_type == DocumentType.MODEL_PROPERTY:
                 # Load full model documentation (model-level, not individual property)
                 model_name = best_result.document.category
-                model_doc = CommandLoader.load_model_property_doc(model_name)
-
-                if model_doc:
-                    formatted_doc = CommandFormatter.format_full_model(model_doc)
+                if not model_name:
+                    formatted_doc = f"# {best_result.document.title}\n\n*Model name missing*"
                 else:
-                    formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
+                    model_doc = CommandLoader.load_model_property_doc(model_name)
+
+                    if model_doc:
+                        formatted_doc = CommandFormatter.format_full_model(model_doc)
+                    else:
+                        formatted_doc = f"# {best_result.document.title}\n\n*Documentation not available*"
 
             # Format related results (if multiple matches)
             related_section = ""
             if len(results) > 1:
                 related_section = "\n\n---\n\n## Related Results\n\n"
-                related_section += CommandFormatter.format_search_results(results[1:])
+                # Format related results manually (new SearchResult format)
+                related_parts = [f"Found {len(results) - 1} related result(s):", ""]
+                for i, result in enumerate(results[1:], 1):
+                    type_label = "[CMD]" if result.document.doc_type == DocumentType.COMMAND else "[MODEL]"
+                    score_indicator = "★★★" if result.score >= 900 else ("★★" if result.score >= 700 else "★")
+                    related_parts.append(f"{i}. **{type_label} {result.document.title}** {score_indicator}")
+                related_section += "\n".join(related_parts)
 
             full_response = formatted_doc + related_section
 
@@ -158,7 +169,7 @@ def register_pfc_query_command_tool(mcp: FastMCP):
                     "score": best_result.score,
                     "total_results": len(results),
                     "include_model_properties": include_model_properties,
-                    "python_alternative": best_result.document.metadata.get("python_available") if best_result.document.doc_type == SharedDocumentType.COMMAND else None,
+                    "python_alternative": best_result.document.metadata.get("python_available") if best_result.document.doc_type == DocumentType.COMMAND else None,
                     "related_results": [
                         {
                             "name": r.document.title,
