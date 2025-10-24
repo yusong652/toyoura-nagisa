@@ -44,7 +44,7 @@ class CommandDocumentAdapter:
         Example:
             >>> docs = CommandDocumentAdapter.load_all()
             >>> doc = docs[0]
-            >>> doc.id
+            >>> doc.name
             'ball create'
             >>> doc.doc_type
             <DocumentType.COMMAND: 'command'>
@@ -82,7 +82,7 @@ class CommandDocumentAdapter:
 
             # Convert to SearchDocument
             doc = SearchDocument(
-                id=f"{category} {cmd_name}",
+                name=f"{category} {cmd_name}",
                 doc_type=DocumentType.COMMAND,
                 title=cmd_doc.get("command", f"{category} {cmd_name}"),
                 description=cmd_doc.get("description", ""),
@@ -134,7 +134,7 @@ class CommandDocumentAdapter:
 
             # Convert to SearchDocument
             doc = SearchDocument(
-                id=model_name,
+                name=model_name,
                 doc_type=DocumentType.MODEL_PROPERTY,
                 title=model_doc.get("full_name", model_name),
                 description=description,
@@ -183,7 +183,7 @@ class CommandDocumentAdapter:
             if cmd_doc:
                 # Build SearchDocument from command
                 return SearchDocument(
-                    id=doc_id,
+                    name=doc_id,
                     doc_type=DocumentType.COMMAND,
                     title=cmd_doc.get("command", doc_id),
                     description=cmd_doc.get("description", ""),
@@ -212,7 +212,7 @@ class CommandDocumentAdapter:
                     description += f"\n\nProperties: {', '.join(property_names)}"
 
             return SearchDocument(
-                id=doc_id,
+                name=doc_id,
                 doc_type=DocumentType.MODEL_PROPERTY,
                 title=model_doc.get("full_name", doc_id),
                 description=description,

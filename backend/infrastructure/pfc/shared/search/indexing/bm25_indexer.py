@@ -88,7 +88,7 @@ class BM25Indexer:
 
         # 1. Tokenize all documents (description + boosted keywords)
         for doc in documents:
-            doc_id = doc.id
+            doc_id = doc.name
 
             # Tokenize description (base content)
             desc_tokens = self.tokenizer.tokenize(doc.description)

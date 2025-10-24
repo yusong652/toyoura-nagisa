@@ -121,7 +121,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 # Format low confidence response manually (new SearchResult format)
                 simplified_results = []
                 for result in low_conf_matches:
-                    sig = APIDocFormatter.format_signature(result.document.id, result.document.metadata)
+                    sig = APIDocFormatter.format_signature(result.document.name, result.document.metadata)
                     if sig:
                         simplified_results.append(f"  {sig} (score: {result.score:.2f})")
 
@@ -154,7 +154,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                         "reason": "low_confidence",
                         "suggestion": "Strongly recommended to use pfc_query_command",
                         "partial_results": [
-                            {"name": result.document.id, "score": result.score}
+                            {"name": result.document.name, "score": result.score}
                             for result in low_conf_matches
                         ]
                     }
@@ -162,7 +162,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
             # ===== Condition 3: High confidence results (score >= 8.0) =====
             best_result = matches[0]
-            api_path = best_result.document.id
+            api_path = best_result.document.name
 
             # Load full documentation for best match
             api_doc = DocumentationLoader.load_api_doc(api_path)
@@ -176,7 +176,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
 
             # Adapt new SearchResult to old format for formatter
             old_format_result = OldSearchResult(
-                api_name=best_result.document.id,
+                api_name=best_result.document.name,
                 score=int(best_result.score),
                 strategy=SearchStrategy.KEYWORD,  # New BM25 search uses keyword strategy
                 metadata=best_result.document.metadata
@@ -190,7 +190,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 related_apis = []
                 for result in matches[1:]:
                     # Pass metadata to formatter for Contact type handling
-                    sig = APIDocFormatter.format_signature(result.document.id, result.document.metadata)
+                    sig = APIDocFormatter.format_signature(result.document.name, result.document.metadata)
                     if sig:
                         related_apis.append(f"- {sig}")
 
@@ -228,7 +228,7 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     "is_contact_type": bool(best_result.document.metadata and 'contact_type' in best_result.document.metadata),
                     "contact_type": best_result.document.metadata.get('contact_type') if best_result.document.metadata else None,
                     "related_apis": [
-                        {"name": result.document.id, "score": result.score}
+                        {"name": result.document.name, "score": result.score}
                         for result in matches[1:]
                     ] if len(matches) > 1 else []
                 }

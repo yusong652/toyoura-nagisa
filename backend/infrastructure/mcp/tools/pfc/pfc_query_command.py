@@ -127,7 +127,8 @@ def register_pfc_query_command_tool(mcp: FastMCP):
 
             elif best_result.document.doc_type == DocumentType.MODEL_PROPERTY:
                 # Load full model documentation (model-level, not individual property)
-                model_name = best_result.document.category
+                # Use document.name (e.g., "hertz") instead of category (e.g., "contact")
+                model_name = best_result.document.name
                 if not model_name:
                     formatted_doc = f"# {best_result.document.title}\n\n*Model name missing*"
                 else:

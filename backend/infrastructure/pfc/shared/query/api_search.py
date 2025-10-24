@@ -171,7 +171,7 @@ class APISearch:
 
         Example:
             >>> results = APISearch._expand_contact_query("Contact.gap", 5)
-            >>> results[0].document.id
+            >>> results[0].document.name
             "itasca.BallBallContact.gap"
         """
         # Extract method name from "Contact.method"
@@ -194,8 +194,8 @@ class APISearch:
         seen_ids = set()
         unique_results = []
         for result in all_results:
-            if result.document.id not in seen_ids:
-                seen_ids.add(result.document.id)
+            if result.document.name not in seen_ids:
+                seen_ids.add(result.document.name)
                 unique_results.append(result)
 
         # Sort by score (descending) and return top_n
@@ -314,14 +314,14 @@ class APISearch:
         Example:
             >>> # Path query (automatic detection)
             >>> results = APISearch.search("Ball.vel")
-            >>> results[0].document.id
+            >>> results[0].document.name
             "itasca.ball.Ball.vel"
             >>> results[0].score
             999.0  # High score from path matching
 
             >>> # Natural language query
             >>> results = APISearch.search("ball position")
-            >>> results[0].document.id
+            >>> results[0].document.name
             "itasca.ball.Ball.pos"
             >>> results[0].score
             10.0  # BM25 score

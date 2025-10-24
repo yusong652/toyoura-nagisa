@@ -40,7 +40,7 @@ class SearchDocument:
     - Type-safe: Explicit typing prevents errors
 
     Attributes:
-        id: Unique document identifier
+        name: Unique document name/identifier
             Examples:
             - COMMAND: "ball create", "contact property"
             - MODEL_PROPERTY: "linear", "hertz"
@@ -63,7 +63,7 @@ class SearchDocument:
     Usage:
         >>> # Command document
         >>> cmd_doc = SearchDocument(
-        ...     id="ball create",
+        ...     name="ball create",
         ...     doc_type=DocumentType.COMMAND,
         ...     title="ball create",
         ...     description="Create a new ball object...",
@@ -74,7 +74,7 @@ class SearchDocument:
 
         >>> # Model property document
         >>> model_doc = SearchDocument(
-        ...     id="linear",
+        ...     name="linear",
         ...     doc_type=DocumentType.MODEL_PROPERTY,
         ...     title="Linear Contact Model",
         ...     description="Linear elastic contact model...",
@@ -85,7 +85,7 @@ class SearchDocument:
     """
 
     # Required fields
-    id: str
+    name: str
     doc_type: DocumentType
     title: str
     description: str
@@ -155,7 +155,7 @@ class SearchDocument:
             Dictionary with all document fields
         """
         return {
-            "id": self.id,
+            "name": self.name,
             "doc_type": self.doc_type.value,
             "title": self.title,
             "description": self.description,

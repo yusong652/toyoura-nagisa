@@ -78,7 +78,7 @@ class BM25Scorer:
             return 0.0, {}
 
         # 2. Get document tokens
-        doc_id = document.id
+        doc_id = document.name
         doc_tokens = set(self.indexer.documents.get(doc_id, []))
         query_set = set(query_tokens)
 

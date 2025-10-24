@@ -31,7 +31,7 @@ class APIDocumentAdapter:
 
         >>> # Example document
         >>> doc = documents[0]
-        >>> doc.id
+        >>> doc.name
         'itasca.ball.create'
         >>> doc.doc_type
         <DocumentType.PYTHON_API: 'python_api'>
@@ -51,7 +51,7 @@ class APIDocumentAdapter:
         Example:
             >>> docs = APIDocumentAdapter.load_all()
             >>> api_doc = docs[0]
-            >>> api_doc.id
+            >>> api_doc.name
             'itasca.ball.create'
             >>> api_doc.syntax
             'itasca.ball.create(radius, pos=None)'
@@ -97,7 +97,7 @@ class APIDocumentAdapter:
 
             # Convert to SearchDocument
             doc = SearchDocument(
-                id=api_name,
+                name=api_name,
                 doc_type=DocumentType.PYTHON_API,
                 title=api_name,
                 description=description,
@@ -212,7 +212,7 @@ class APIDocumentAdapter:
                 keywords.append(keyword)
 
         return SearchDocument(
-            id=doc_id,
+            name=doc_id,
             doc_type=DocumentType.PYTHON_API,
             title=doc_id,
             description=description,
