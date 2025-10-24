@@ -12,13 +12,19 @@ from backend.infrastructure.pfc.shared.search.preprocessing.tokenizer import Tex
 
 
 class BM25Indexer:
-    """BM25 inverted index builder.
+    """BM25 inverted index builder with keyword boosting.
 
     Builds and maintains BM25 index structures for efficient scoring:
-    - Document tokens (preprocessed)
+    - Document tokens (preprocessed from description + boosted keywords)
     - Term frequencies per document
     - Document frequencies per term
     - Average document length
+
+    Keyword Boosting:
+    - Keywords field receives higher weight than description
+    - Controlled by KEYWORD_BOOST parameter (default: 3.0)
+    - Keywords tokens are repeated N times to increase term frequency
+    - BM25 saturation prevents over-amplification
 
     Design:
     - Pure Python implementation (no NumPy)
@@ -31,7 +37,16 @@ class BM25Indexer:
         >>> idf = indexer.get_idf("porosity")
         >>> idf
         2.345  # Example IDF value
+
+        >>> # Adjust keyword boost
+        >>> indexer.KEYWORD_BOOST = 5.0
+        >>> indexer.build(documents)  # Rebuild with new boost
     """
+
+    # Keyword boost factor (tunable parameter)
+    # Higher values give more weight to curated keywords
+    # Recommended range: 2.0-5.0, default: 3.0
+    KEYWORD_BOOST = 3.0
 
     def __init__(self):
         """Initialize empty BM25 index."""
@@ -43,7 +58,19 @@ class BM25Indexer:
         self.tokenizer = TextTokenizer()
 
     def build(self, documents: List[SearchDocument]) -> None:
-        """Build BM25 index from documents.
+        """Build BM25 index from documents with keyword boosting.
+
+        Indexing Strategy:
+        1. Tokenize description field (base content)
+        2. Tokenize keywords field (curated terms)
+        3. Boost keywords by repeating tokens KEYWORD_BOOST times
+        4. Combine description + boosted keywords for final index
+
+        This approach:
+        - Gives higher weight to human-curated keywords
+        - Enables matching on keyword-only terms (e.g., "packing")
+        - Preserves description-based natural language search
+        - Uses BM25 saturation to prevent over-amplification
 
         Args:
             documents: List of SearchDocument instances to index
@@ -54,24 +81,38 @@ class BM25Indexer:
             >>> indexer.doc_count
             3
             >>> indexer.avg_doc_len
-            45.2
+            62.5  # Longer due to boosted keywords
         """
         # Clear existing index
         self.clear()
 
-        # 1. Tokenize all documents
+        # 1. Tokenize all documents (description + boosted keywords)
         for doc in documents:
             doc_id = doc.id
-            # Tokenize description field for BM25
-            tokens = self.tokenizer.tokenize(doc.description)
-            self.documents[doc_id] = tokens
 
-            # Calculate term frequencies
-            term_counts = Counter(tokens)
+            # Tokenize description (base content)
+            desc_tokens = self.tokenizer.tokenize(doc.description)
+
+            # Tokenize keywords (curated terms)
+            kw_tokens = self.tokenizer.tokenize(" ".join(doc.keywords))
+
+            # Boost keywords by repeating tokens
+            # Example: KEYWORD_BOOST=3.0 → keywords appear 3 times in index
+            # This increases term frequency: tf(keyword) += 3
+            boost_count = int(self.KEYWORD_BOOST)
+            boosted_kw_tokens = kw_tokens * boost_count
+
+            # Combine description + boosted keywords
+            all_tokens = desc_tokens + boosted_kw_tokens
+
+            self.documents[doc_id] = all_tokens
+
+            # Calculate term frequencies (includes boosted keywords)
+            term_counts = Counter(all_tokens)
             self.term_freq[doc_id] = dict(term_counts)
 
             # Update document frequencies
-            for term in set(tokens):
+            for term in set(all_tokens):
                 self.term_doc_freq[term] = self.term_doc_freq.get(term, 0) + 1
 
         # 2. Calculate statistics
@@ -179,21 +220,23 @@ class BM25Indexer:
         """Get index statistics for debugging.
 
         Returns:
-            Dictionary with index statistics
+            Dictionary with index statistics including keyword boost info
 
         Example:
             >>> stats = indexer.get_stats()
             >>> stats
             {
                 'doc_count': 115,
-                'avg_doc_len': 45.2,
+                'avg_doc_len': 62.5,  # Increased due to keyword boost
                 'vocab_size': 1234,
-                'total_terms': 5198
+                'total_terms': 7198,  # Increased due to keyword boost
+                'keyword_boost': 3.0
             }
         """
         return {
             'doc_count': self.doc_count,
             'avg_doc_len': round(self.avg_doc_len, 2),
             'vocab_size': len(self.term_doc_freq),
-            'total_terms': sum(len(tokens) for tokens in self.documents.values())
+            'total_terms': sum(len(tokens) for tokens in self.documents.values()),
+            'keyword_boost': self.KEYWORD_BOOST
         }
