@@ -201,33 +201,37 @@ class PathSearchStrategy(SearchStrategy):
             if match_score > 0:
                 candidates.append((api_name, match_score))
 
-        # Return best match if any candidates found
+        # Return all candidates (sorted by match score)
         if candidates:
             # Sort by match score (descending)
             candidates.sort(key=lambda x: x[1], reverse=True)
-            best_match = candidates[0]
 
-            # Build metadata
-            metadata = {
-                "match_type": "partial",
-                "original_query": query,
-                "match_quality": best_match[1]
-            }
+            # Build results for all candidates
+            results = []
+            for api_name, match_quality in candidates:
+                # Build metadata
+                metadata = {
+                    "match_type": "partial",
+                    "original_query": query,
+                    "match_quality": match_quality
+                }
 
-            # Add Contact type information if applicable
-            if contact_type_match:
-                from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
-                metadata["contact_type"] = contact_type_match
-                metadata["all_contact_types"] = CONTACT_TYPES
+                # Add Contact type information if applicable
+                if contact_type_match:
+                    from backend.infrastructure.pfc.python_api.types.contact import CONTACT_TYPES
+                    metadata["contact_type"] = contact_type_match
+                    metadata["all_contact_types"] = CONTACT_TYPES
 
-            return [SearchResult(
-                name=best_match[0],
-                score=850,  # Lower than exact match (999) but indicates good match
-                doc_type=DocumentType.API,
-                category=self._extract_category(best_match[0]),
-                strategy=StrategyEnum.PATH,
-                metadata=metadata
-            )]
+                results.append(SearchResult(
+                    name=api_name,
+                    score=850 + (match_quality / 10),  # Score varies by match quality (850-860)
+                    doc_type=DocumentType.API,
+                    category=self._extract_category(api_name),
+                    strategy=StrategyEnum.PATH,
+                    metadata=metadata
+                ))
+
+            return results
 
         return []
 
@@ -306,6 +310,7 @@ class PathSearchStrategy(SearchStrategy):
 
         Scoring rules:
         - Exact match: 100 (shouldn't happen, handled by earlier strategies)
+        - Suffix match with underscore (e.g., "force_y" in "force_global_y"): 95
         - One is prefix of the other (3+ chars): 80
         - One is substring of the other: 60
         - No match: 0
@@ -322,9 +327,28 @@ class PathSearchStrategy(SearchStrategy):
             80  # "vel" is prefix of "velocity"
             >>> self._calculate_attr_match_score("pos", "position")
             80  # "pos" is prefix of "position"
+            >>> self._calculate_attr_match_score("force_y", "force_global_y")
+            95  # Suffix match (both end with "_y", both start with "force")
         """
         if query_attr == api_attr:
             return 100  # Exact match (shouldn't happen due to earlier strategies)
+
+        # Suffix matching with underscores
+        # Handle cases like "force_y" → "force_global_y"
+        if '_' in query_attr and '_' in api_attr:
+            query_parts = query_attr.split('_')
+            api_parts = api_attr.split('_')
+
+            # Must have at least 2 parts (prefix + suffix)
+            if len(query_parts) >= 2 and len(api_parts) >= 2:
+                query_prefix = query_parts[0]
+                query_suffix = query_parts[-1]
+                api_prefix = api_parts[0]
+                api_suffix = api_parts[-1]
+
+                # Check if prefix and suffix both match
+                if query_prefix == api_prefix and query_suffix == api_suffix:
+                    return 95  # High score for matching start and end
 
         # Prefix matching (minimum 3 chars to avoid false positives)
         min_prefix_len = 3

@@ -16,6 +16,7 @@ class TextTokenizer:
     Features:
     - Preserves technical terms and numbers
     - Handles hyphenated terms (e.g., "ball-ball" → ["ball", "ball"])
+    - Handles underscored terms (e.g., "vel_x" → ["vel", "x"])
     - Removes stopwords while preserving technical vocabulary
     - Lowercases for consistent matching
 
@@ -23,6 +24,7 @@ class TextTokenizer:
     - Regex-based for performance
     - No stemming (preserves exact technical terms)
     - No lemmatization (not needed for partial matching)
+    - Splits on hyphens and underscores for flexible matching
 
     Usage:
         >>> tokenizer = TextTokenizer()
@@ -31,6 +33,9 @@ class TextTokenizer:
 
         >>> tokenizer.tokenize("ball-ball contact model")
         ['ball', 'ball', 'contact', 'model']
+
+        >>> tokenizer.tokenize("velocity vel_x component")
+        ['velocity', 'vel', 'x', 'component']
     """
 
     # Regex pattern for word extraction
@@ -39,6 +44,10 @@ class TextTokenizer:
 
     # Minimum word length (avoid single-char noise)
     MIN_WORD_LENGTH = 2
+
+    # Technical single-character tokens that should be preserved
+    # These are common in scientific/engineering contexts
+    TECHNICAL_SINGLE_CHARS = {'x', 'y', 'z', 'r', 'n', 't'}  # Coordinates, radius, normal, tangent
 
     def __init__(self, remove_stopwords: bool = True, min_length: int = 2):
         """Initialize tokenizer.
@@ -83,13 +92,24 @@ class TextTokenizer:
         tokens = []
         for word in words:
             # Handle hyphenated terms (split and keep parts)
+            # Context: technical compound terms like "ball-ball"
             if '-' in word:
                 parts = word.split('-')
                 for part in parts:
-                    if self._is_valid_token(part):
+                    # In hyphenated context, preserve technical single chars
+                    if self._is_valid_token(part, from_technical_context=True):
+                        tokens.append(part)
+            # Handle underscored terms (e.g., "vel_x", "set_pos", "end_1")
+            # Split to improve matching: "vel_x" → ["vel", "x"]
+            # Context: API naming conventions with direction/index suffixes
+            elif '_' in word:
+                parts = word.split('_')
+                for part in parts:
+                    # In underscore context, preserve technical single chars
+                    if self._is_valid_token(part, from_technical_context=True):
                         tokens.append(part)
             else:
-                if self._is_valid_token(word):
+                if self._is_valid_token(word, from_technical_context=False):
                     tokens.append(word)
 
         return tokens
@@ -112,22 +132,38 @@ class TextTokenizer:
         """
         return set(self.tokenize(text))
 
-    def _is_valid_token(self, word: str) -> bool:
+    def _is_valid_token(self, word: str, from_technical_context: bool = False) -> bool:
         """Check if a word is a valid token.
 
         Args:
             word: Word to check
+            from_technical_context: True if word comes from underscore/hyphen splitting
+                                   (e.g., "x" from "vel_x", "1" from "end_1")
 
         Returns:
             True if word should be kept, False otherwise
 
         Filtering rules:
-        1. Length >= min_length (except numbers)
+        1. Length >= min_length (except numbers and technical context)
         2. Not a stopword (unless it's a technical term)
         3. Contains at least one alphanumeric character
+
+        Special handling for technical contexts:
+        - Single-character technical tokens (x, y, z, r, n, t) preserved in underscore/hyphen context
+        - Single-digit numbers always preserved
         """
-        # Must have minimum length (but allow single-digit numbers)
-        if len(word) < self.min_length and not word.isdigit():
+        # Allow single-digit numbers (e.g., "1" from "end_1")
+        if word.isdigit():
+            return True
+
+        # In technical context (from underscore/hyphen splitting),
+        # preserve technical single characters
+        if from_technical_context and len(word) == 1:
+            if word.lower() in self.TECHNICAL_SINGLE_CHARS:
+                return True
+
+        # Must have minimum length for non-technical contexts
+        if len(word) < self.min_length:
             return False
 
         # Must contain at least one alphanumeric character

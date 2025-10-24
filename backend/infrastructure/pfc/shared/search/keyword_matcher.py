@@ -207,7 +207,10 @@ def word_match_quality(query_word: str, keyword_word: str) -> float:
             return 0.8
 
     # Substring matching (one is contained in the other)
-    if query_word in keyword_word or keyword_word in query_word:
-        return 0.6
+    # IMPORTANT: Skip substring matching for single-character query words
+    # to avoid false positives (e.g., "z" matching "horizontal")
+    if len(query_word) > 1:
+        if query_word in keyword_word or keyword_word in query_word:
+            return 0.6
 
     return 0.0

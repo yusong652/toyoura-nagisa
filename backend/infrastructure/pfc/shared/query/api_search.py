@@ -2,8 +2,15 @@
 
 This module provides a simple, user-friendly API for searching PFC Python SDK
 documentation, abstracting away the complexity of search engines.
+
+Supports two search modes:
+1. Path-based search: Exact API path matching (e.g., "Ball.vel", "BallBallContact.gap")
+2. BM25 search: Natural language queries (e.g., "ball velocity", "contact force")
+
+The system automatically detects query type and routes to appropriate search strategy.
 """
 
+import re
 from typing import List, Optional, Dict, Any
 from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.pfc.shared.models.search_result import SearchResult
@@ -64,8 +71,196 @@ class APISearch:
         >>> results = APISearch.search("pos")  # Matches "position"
     """
 
-    # Singleton instance
+    # Singleton instances
     _engine: Optional[BM25SearchEngine] = None
+    _path_strategy = None  # Lazy loaded PathSearchStrategy
+
+    # Contact type definitions (abstract Contact → concrete types)
+    CONTACT_TYPES = [
+        'BallBallContact',
+        'BallFacetContact',
+        'BallPebbleContact',
+        'PebblePebbleContact',
+        'PebbleFacetContact'
+    ]
+
+    @classmethod
+    def _is_path_query(cls, query: str) -> bool:
+        """Detect if query is an API path pattern.
+
+        Path query characteristics:
+        - Contains dot notation (e.g., "Ball.vel", "ball.Ball.pos", "clump.pos_z")
+        - Follows API naming conventions (object.method pattern)
+        - Not a natural language phrase or version number
+
+        Examples of path queries:
+        - "Ball.vel" → True (Class.method)
+        - "ball.Ball.vel" → True (module.Class.method)
+        - "BallBallContact.gap" → True (ContactType.method)
+        - "clump.pos_z" → True (lowercase object.method)
+        - "ball velocity" → False (natural language, no dot)
+        - "3.14" → False (number)
+        - "PFC 7.0" → False (version number)
+
+        Args:
+            query: User query string
+
+        Returns:
+            True if query looks like an API path, False otherwise
+        """
+        query = query.strip()
+
+        # Must contain dot notation
+        if '.' not in query:
+            return False
+
+        # Exclude pure numbers (version numbers, floating point)
+        if re.match(r'^\d+\.[\d.]+$', query):
+            return False
+
+        # API path patterns:
+        # 1. Class.method: Ball.vel, Wall.pos, Clump.pos_z
+        # 2. module.Class.method: ball.Ball.vel, wall.Wall.pos
+        # 3. ContactType.method: BallBallContact.gap, BallFacetContact.force_global
+        # 4. Lowercase object.method: clump.pos_z, ball.vel (user shorthand)
+        # 5. Full path: itasca.ball.Ball.vel
+
+        # Relaxed pattern: accepts both capitalized and lowercase object names
+        # Format: word.word or word.Word.word (with optional prefix)
+        api_path_pattern = r'^([a-z]+\.)?[A-Za-z][a-zA-Z]*\.[a-z_]+$|^[a-z]+\.[A-Za-z][a-zA-Z]*\.[a-z_]+$'
+
+        return bool(re.match(api_path_pattern, query))
+
+    @classmethod
+    def _is_contact_query(cls, query: str) -> bool:
+        """Check if query uses abstract 'Contact' type.
+
+        Examples:
+            - "Contact.force_y" → True
+            - "Contact.gap" → True
+            - "BallBallContact.gap" → False (concrete type)
+            - "ball contact" → False (not path query)
+
+        Args:
+            query: User query string
+
+        Returns:
+            True if query starts with "Contact.", False otherwise
+        """
+        return query.strip().startswith("Contact.")
+
+    @classmethod
+    def _expand_contact_query(cls, query: str, top_n: int) -> List[SearchResult]:
+        """Expand abstract Contact query to all concrete contact types.
+
+        Transforms "Contact.force_y" into searches for:
+        - BallBallContact.force_y
+        - BallFacetContact.force_y
+        - BallPebbleContact.force_y
+        - PebblePebbleContact.force_y
+        - PebbleFacetContact.force_y
+
+        Then aggregates and deduplicates results.
+
+        Args:
+            query: Original query (e.g., "Contact.force_y")
+            top_n: Maximum results to return
+
+        Returns:
+            List of SearchResult objects from all contact types
+
+        Example:
+            >>> results = APISearch._expand_contact_query("Contact.gap", 5)
+            >>> results[0].document.id
+            "itasca.BallBallContact.gap"
+        """
+        # Extract method name from "Contact.method"
+        method_name = query.split('.', 1)[1]
+
+        path_strategy = cls._get_path_strategy()
+        all_results = []
+
+        # Search each concrete contact type
+        for contact_type in cls.CONTACT_TYPES:
+            concrete_query = f"{contact_type}.{method_name}"
+            results = path_strategy.search(concrete_query, top_n=top_n)
+
+            if results:
+                # Convert to new format
+                converted = cls._convert_old_to_new_format(results)
+                all_results.extend(converted)
+
+        # Deduplicate by document ID
+        seen_ids = set()
+        unique_results = []
+        for result in all_results:
+            if result.document.id not in seen_ids:
+                seen_ids.add(result.document.id)
+                unique_results.append(result)
+
+        # Sort by score (descending) and return top_n
+        unique_results.sort(key=lambda r: r.score, reverse=True)
+        return unique_results[:top_n]
+
+    @classmethod
+    def _get_path_strategy(cls):
+        """Get or create PathSearchStrategy (lazy loading).
+
+        Returns:
+            PathSearchStrategy instance
+
+        Example:
+            >>> strategy = APISearch._get_path_strategy()
+            >>> strategy.can_handle("Ball.vel")
+            True
+        """
+        if cls._path_strategy is None:
+            from backend.infrastructure.pfc.python_api.search.path_search import PathSearchStrategy
+            cls._path_strategy = PathSearchStrategy()
+
+        return cls._path_strategy
+
+    @classmethod
+    def _convert_old_to_new_format(cls, old_results: List) -> List[SearchResult]:
+        """Convert old SearchResult format to new SearchResult format.
+
+        Old format (from PathSearchStrategy):
+        - SearchResult with fields: name, score, doc_type, category, strategy, metadata
+
+        New format (BM25 SearchResult):
+        - SearchResult with fields: document, score, match_info, rank
+
+        Args:
+            old_results: List of old-format SearchResult objects
+
+        Returns:
+            List of new-format SearchResult objects
+        """
+        from backend.infrastructure.pfc.shared.models.document import SearchDocument
+
+        new_results = []
+        for rank, old_result in enumerate(old_results, start=1):
+            # Load full document
+            doc = APIDocumentAdapter.load_by_id(old_result.name)
+            if not doc:
+                continue
+
+            # Preserve metadata from old result (especially for Contact types)
+            if old_result.metadata:
+                if not doc.metadata:
+                    doc.metadata = {}
+                doc.metadata.update(old_result.metadata)
+
+            # Create new SearchResult
+            new_result = SearchResult(
+                document=doc,
+                score=float(old_result.score),
+                match_info={'strategy': 'path', 'original_metadata': old_result.metadata},
+                rank=rank
+            )
+            new_results.append(new_result)
+
+        return new_results
 
     @classmethod
     def _get_engine(cls) -> BM25SearchEngine:
@@ -96,14 +291,17 @@ class APISearch:
         category: Optional[str] = None,
         min_score: Optional[float] = None
     ) -> List[SearchResult]:
-        """Search for Python SDK APIs.
+        """Search for Python SDK APIs with automatic mode detection.
 
-        This is the main entry point for API search. It uses BM25 algorithm
-        with keyword boosting for high-quality results.
+        This method automatically detects the query type and routes to the
+        appropriate search strategy:
+        - Path queries (e.g., "Ball.vel") → PathSearchStrategy (exact matching)
+        - Natural language (e.g., "ball velocity") → BM25 (semantic matching)
 
         Args:
             query: Search query string
-                  Examples: "ball create", "Ball.vel", "contact gap", "pos"
+                  Path examples: "Ball.vel", "BallBallContact.gap", "ball.Ball.pos"
+                  Natural examples: "ball create", "contact gap", "ball velocity"
             top_k: Maximum number of results to return (default: 10)
             category: Optional category filter
                      Examples: "ball", "wall", "contact"
@@ -114,38 +312,60 @@ class APISearch:
             Empty list if no matches found
 
         Example:
-            >>> # Basic search
-            >>> results = APISearch.search("ball position")
-            >>> len(results)
-            3
-            >>> results[0].document.title
-            "itasca.ball.Ball.pos"
+            >>> # Path query (automatic detection)
+            >>> results = APISearch.search("Ball.vel")
+            >>> results[0].document.id
+            "itasca.ball.Ball.vel"
+            >>> results[0].score
+            999.0  # High score from path matching
 
-            >>> # Filter by category
+            >>> # Natural language query
+            >>> results = APISearch.search("ball position")
+            >>> results[0].document.id
+            "itasca.ball.Ball.pos"
+            >>> results[0].score
+            10.0  # BM25 score
+
+            >>> # Contact type path query
+            >>> results = APISearch.search("BallBallContact.gap")
+            >>> results[0].document.metadata.get("contact_type")
+            "BallBallContact"
+
+            >>> # With filters
             >>> results = APISearch.search(
             ...     "velocity",
-            ...     category="ball"
-            ... )
-            >>> results[0].document.category
-            "ball"
-
-            >>> # Abbreviation matching
-            >>> results = APISearch.search("vel")
-            >>> "velocity" in results[0].document.description.lower()
-            True
-
-            >>> # Contact type search
-            >>> results = APISearch.search("contact gap")
-            >>> any("Contact" in r.document.title for r in results)
-            True
-
-            >>> # With minimum score
-            >>> results = APISearch.search(
-            ...     "create",
-            ...     min_score=10.0
+            ...     category="ball",
+            ...     min_score=8.0
             ... )
         """
-        # Get singleton engine
+        # ===== Step 1: Contact Type Expansion =====
+        # Handle abstract "Contact" queries by expanding to all concrete types
+        if cls._is_contact_query(query):
+            contact_results = cls._expand_contact_query(query, top_n=top_k)
+            if contact_results:
+                # Contact expansion successful, return results
+                return contact_results
+            # No results from expansion, fall through to BM25
+
+        # ===== Step 2: Path Query Detection =====
+        if cls._is_path_query(query):
+            # Use path-based search for exact API path matching
+            path_strategy = cls._get_path_strategy()
+            old_format_results = path_strategy.search(query, top_n=top_k)
+
+            if old_format_results:
+                # Convert to new format
+                path_results = cls._convert_old_to_new_format(old_format_results)
+
+                # Check if path match is high confidence (score >= 850)
+                # 999 = exact match, 850 = partial match
+                if path_results and path_results[0].score >= 850:
+                    # High confidence path match, return immediately
+                    return path_results[:top_k]
+
+                # Low confidence path match, fall through to BM25
+
+        # ===== Step 3: BM25 Search (fallback or primary) =====
         engine = cls._get_engine()
 
         # Build filter dictionary
@@ -157,7 +377,7 @@ class APISearch:
         if min_score is not None:
             filters["min_score"] = min_score
 
-        # Execute search
+        # Execute BM25 search
         results = engine.search(
             query=query,
             top_k=top_k,
