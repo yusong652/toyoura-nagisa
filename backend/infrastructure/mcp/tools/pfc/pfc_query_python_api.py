@@ -111,11 +111,24 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                 low_conf_matches = matches[:MAX_LOW_CONFIDENCE_DISPLAY]
 
                 message = f"Found {len(low_conf_matches)} low-confidence matches (best score: {best_score}/{HIGH_CONFIDENCE_THRESHOLD})"
-                llm_text = APIDocFormatter.format_low_confidence_response(
-                    query,
-                    low_conf_matches,
-                    best_score,
-                    HIGH_CONFIDENCE_THRESHOLD
+
+                # Format low confidence response manually (new SearchResult format)
+                simplified_results = []
+                for result in low_conf_matches:
+                    sig = APIDocFormatter.format_signature(result.document.id, result.document.metadata)
+                    if sig:
+                        simplified_results.append(f"  {sig} (score: {result.score:.0f})")
+
+                results_text = "\n".join(simplified_results) if simplified_results else "  None"
+
+                llm_text = (
+                    f"**Python SDK Search Results** | Confidence: LOW | Best Score: {best_score:.0f}/{HIGH_CONFIDENCE_THRESHOLD}\n\n"
+                    f"Found {len(low_conf_matches)} partial matches:\n\n"
+                    f"{results_text}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"**Low confidence match** - These may not be what you need.\n\n"
+                    f"**Recommended Next Step**: Use pfc_query_command to search "
+                    f"for PFC command-based alternatives, which may have more options."
                 )
 
                 return success_response(
@@ -151,9 +164,19 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if not api_doc:
                 return error_response(f"API documentation not found for {api_path}")
 
-            # Format full documentation for best match (pass metadata for Contact types)
-            # Note: APIDocFormatter expects old SearchResult format, so we pass document.metadata
-            formatted_doc = APIDocFormatter.format_full_doc(api_doc, best_result)
+            # Format full documentation manually (new SearchResult format)
+            # Create a compatible object for formatter
+            from backend.infrastructure.pfc.python_api.models import SearchResult as OldSearchResult, SearchStrategy
+
+            # Adapt new SearchResult to old format for formatter
+            old_format_result = OldSearchResult(
+                api_name=best_result.document.id,
+                score=int(best_result.score),
+                strategy=SearchStrategy.KEYWORD,  # New BM25 search uses keyword strategy
+                metadata=best_result.document.metadata
+            )
+
+            formatted_doc = APIDocFormatter.format_full_doc(api_doc, old_format_result)
 
             # Format related APIs (if multiple matches)
             related_section = ""
