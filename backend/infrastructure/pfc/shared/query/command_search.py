@@ -15,7 +15,7 @@ class CommandSearch:
     """Unified command and model property search interface.
 
     This class provides a high-level API for searching PFC commands and
-    contact model properties using BM25 algorithm with keyword boosting.
+    contact model properties using BM25 algorithm with multi-field scoring.
 
     Features:
     - Automatic index initialization (lazy loading)
@@ -25,7 +25,7 @@ class CommandSearch:
 
     Design Decisions:
     - Unified search (commands + model properties) for better UX
-    - BM25 with keyword boost (KEYWORD_BOOST=3.0) for quality results
+    - BM25 with multi-field scoring (name=0.5, keywords=0.3, description=0.2)
     - Automatic index building on first query
     - Thread-safe singleton pattern
 
@@ -67,8 +67,7 @@ class CommandSearch:
         """
         if cls._engine is None:
             cls._engine = BM25SearchEngine(
-                document_loader=CommandDocumentAdapter.load_all,
-                keyword_boost=3.0  # Optimal balance based on testing
+                document_loader=CommandDocumentAdapter.load_all
             )
             cls._engine.build()
 
@@ -86,7 +85,7 @@ class CommandSearch:
         """Search for PFC commands and optionally model properties.
 
         This is the main entry point for command search. It uses BM25 algorithm
-        with keyword boosting for high-quality results.
+        with multi-field scoring for high-quality results.
 
         Args:
             query: Search query string
@@ -271,10 +270,9 @@ class CommandSearch:
         Returns:
             Dictionary with index statistics:
             - doc_count: Number of indexed documents
-            - avg_doc_len: Average document length
-            - vocab_size: Vocabulary size
-            - total_terms: Total terms in index
-            - keyword_boost: Current keyword boost factor
+            - name_field: Name field statistics (avg_doc_len, vocab_size, total_terms)
+            - description_field: Description field statistics
+            - keywords_field: Keywords field statistics
 
         Example:
             >>> stats = CommandSearch.get_index_stats()
