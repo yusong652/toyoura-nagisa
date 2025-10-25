@@ -5,32 +5,41 @@ components without wrapper layers.
 
 Usage:
     from backend.infrastructure.pfc.python_api import (
-        APISearcher,
         DocumentationLoader,
         APIDocFormatter
     )
 
-    # Search for APIs
-    searcher = APISearcher()
-    results = searcher.search("create ball")
+    # For API search, use the unified search system:
+    from backend.infrastructure.pfc.shared.query import APISearch
+    results = APISearch.search("create ball")
 
     # Load and format documentation
     for result in results:
-        doc = DocumentationLoader.load_api_doc(result.api_name)
-        markdown = APIDocFormatter.format_full_doc(doc, result)
+        doc = DocumentationLoader.load_api_doc(result.document.name)
+        # Format using old SearchResult format for compatibility
+        from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy
+        old_result = SearchResult(
+            api_name=result.document.name,
+            score=int(result.score),
+            strategy=SearchStrategy.KEYWORD,
+            metadata=result.document.metadata
+        )
+        markdown = APIDocFormatter.format_full_doc(doc, old_result)
 
 Core Components:
-    - APISearcher: Smart search with automatic strategy selection
     - DocumentationLoader: Load documentation for specific APIs
     - APIDocFormatter: Format documentation as markdown
 
 Data Models:
-    - SearchResult: Search result with score and metadata
+    - SearchResult: Search result with score and metadata (legacy format)
     - APIDocumentation: Structured API documentation
     - SearchStrategy: Search strategy enumeration
+
+Note:
+    For API search functionality, use the unified search system:
+    - backend.infrastructure.pfc.shared.query.APISearch (BM25-based search)
 """
 
-from backend.infrastructure.pfc.python_api.searcher import APISearcher
 from backend.infrastructure.pfc.python_api.formatter import APIDocFormatter
 from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 from backend.infrastructure.pfc.python_api.models import SearchResult, APIDocumentation, SearchStrategy
@@ -39,7 +48,6 @@ from backend.infrastructure.pfc.python_api.models import SearchResult, APIDocume
 # Public API exports
 __all__ = [
     # Core components
-    "APISearcher",
     "DocumentationLoader",
     "APIDocFormatter",
     # Data models
