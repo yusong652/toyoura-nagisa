@@ -10,7 +10,6 @@ LLM-friendly markdown format. It handles:
 """
 
 from typing import Optional, Dict, Any, List
-from backend.infrastructure.pfc.python_api.models import SearchResult
 from backend.infrastructure.pfc.python_api.loader import DocumentationLoader
 from backend.infrastructure.pfc.python_api.types.mappings import CLASS_TO_MODULE
 
@@ -71,7 +70,8 @@ class APIDocFormatter:
     @staticmethod
     def format_full_doc(
         api_doc: Dict[str, Any],
-        result: SearchResult
+        api_name: str,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Format complete API documentation with Contact type support.
 
@@ -86,7 +86,8 @@ class APIDocFormatter:
 
         Args:
             api_doc: Documentation dict from DocumentationLoader.load_api_doc()
-            result: SearchResult with api_name and metadata
+            api_name: API name (e.g., "Ball.vel", "itasca.ball.create")
+            metadata: Optional metadata dict (for Contact type info, etc.)
 
         Returns:
             Formatted markdown string
@@ -110,18 +111,15 @@ class APIDocFormatter:
         lines = []
 
         # Generate official API path for display
-        display_path = APIDocFormatter._get_display_path(
-            result.api_name,
-            result.metadata
-        )
+        display_path = APIDocFormatter._get_display_path(api_name, metadata)
 
         # Header
         lines.append(f"# {display_path}")
         lines.append("")
 
         # Add Contact type availability info
-        if result.metadata and 'all_contact_types' in result.metadata:
-            all_types = result.metadata['all_contact_types']
+        if metadata and 'all_contact_types' in metadata:
+            all_types = metadata['all_contact_types']
             lines.append(f"**Available for**: {', '.join(all_types)}")
             lines.append("")
 
@@ -259,56 +257,3 @@ class APIDocFormatter:
             f"**Next Step**: Use pfc_query_command tool to search for PFC commands instead"
         )
 
-    @staticmethod
-    def format_low_confidence_response(
-        query: str,
-        low_confidence_matches: List[SearchResult],
-        best_score: int,
-        confidence_threshold: int
-    ) -> str:
-        """Format LLM content for low-confidence search results.
-
-        Shows simplified results with clear warning and fallback recommendation.
-        Uses consistent formatting with other PFC tool responses.
-
-        Args:
-            query: Original search query
-            low_confidence_matches: List of SearchResult objects (typically top 2)
-            best_score: Score of the best match
-            confidence_threshold: Threshold value for comparison
-
-        Returns:
-            Formatted markdown string for LLM consumption
-
-        Example output:
-            **Python SDK Search Results** | Confidence: LOW | Best Score: 450/700
-
-            Found 2 partial matches:
-
-              `ball.pos() -> vec` - Get ball position (score: 450)
-              `ball.vel() -> vec` - Get ball velocity (score: 420)
-
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-            **Low confidence match** - These may not be what you need.
-
-            **Recommended Next Step**: Use pfc_query_command to search for PFC command-based alternatives, which may have more options.
-        """
-        # Format simplified results (only show signatures)
-        simplified_results = []
-        for result in low_confidence_matches:
-            sig = APIDocFormatter.format_signature(result.api_name, result.metadata)
-            if sig:
-                simplified_results.append(f"  {sig} (score: {result.score})")
-
-        results_text = "\n".join(simplified_results) if simplified_results else "  None"
-
-        return (
-            f"**Python SDK Search Results** | Confidence: LOW | Best Score: {best_score}/{confidence_threshold}\n\n"
-            f"Found {len(low_confidence_matches)} partial matches:\n\n"
-            f"{results_text}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"**Low confidence match** - These may not be what you need.\n\n"
-            f"**Recommended Next Step**: Use pfc_query_command to search "
-            f"for PFC command-based alternatives, which may have more options."
-        )

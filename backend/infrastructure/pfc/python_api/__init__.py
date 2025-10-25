@@ -16,15 +16,11 @@ Usage:
     # Load and format documentation
     for result in results:
         doc = DocumentationLoader.load_api_doc(result.document.name)
-        # Format using old SearchResult format for compatibility
-        from backend.infrastructure.pfc.python_api.models import SearchResult, SearchStrategy
-        old_result = SearchResult(
+        markdown = APIDocFormatter.format_full_doc(
+            doc,
             api_name=result.document.name,
-            score=int(result.score),
-            strategy=SearchStrategy.KEYWORD,
             metadata=result.document.metadata
         )
-        markdown = APIDocFormatter.format_full_doc(doc, old_result)
 
 Core Components:
     - DocumentationLoader: Load documentation for specific APIs

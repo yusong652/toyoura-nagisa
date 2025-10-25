@@ -104,19 +104,12 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
             if not api_doc:
                 return error_response(f"API documentation not found for {api_path}")
 
-            # Format full documentation manually (new SearchResult format)
-            # Create a compatible object for formatter
-            from backend.infrastructure.pfc.python_api.models import SearchResult as OldSearchResult, SearchStrategy
-
-            # Adapt new SearchResult to old format for formatter
-            old_format_result = OldSearchResult(
+            # Format full documentation using new simplified API
+            formatted_doc = APIDocFormatter.format_full_doc(
+                api_doc,
                 api_name=best_result.document.name,
-                score=int(best_result.score),
-                strategy=SearchStrategy.KEYWORD,  # New BM25 search uses keyword strategy
                 metadata=best_result.document.metadata
             )
-
-            formatted_doc = APIDocFormatter.format_full_doc(api_doc, old_format_result)
 
             # Format related APIs (if multiple matches)
             related_section = ""
