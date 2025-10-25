@@ -86,7 +86,7 @@ class ContactTypeResolver:
         - Case-insensitive: "ballballcontact.gap"
 
         Note: Partial method name matching (e.g., "BallBallContact.force" → "Contact.force_global")
-        is handled by PathSearchStrategy._partial_path_match for consistency.
+        is handled by BM25 search through tokenization and partial matching.
 
         Args:
             api_path: API path string to resolve
@@ -99,7 +99,7 @@ class ContactTypeResolver:
             >>> resolve("BallBallContact.gap", {"Contact.gap": "..."})
             ContactQueryResult(internal_path="Contact.gap", ...)
             >>> resolve("ballballcontact.force", {...})
-            None  # Partial match handled by PathSearchStrategy
+            None  # Partial match handled by BM25 search
             >>> resolve("itasca.ball.create", {...})
             None
         """
@@ -118,7 +118,7 @@ class ContactTypeResolver:
                     internal_path = f"Contact.{method_name}"
 
                     # Only return exact matches
-                    # Partial matching is delegated to PathSearchStrategy
+                    # Partial matching is handled by BM25 search
                     if ContactTypeResolver._verify_method(internal_path, quick_ref):
                         return ContactQueryResult(
                             internal_path=internal_path,

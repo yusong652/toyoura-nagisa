@@ -29,9 +29,11 @@ class SearchStrategy(ABC):
             List of SearchResult objects sorted by score (highest first)
 
         Example:
-            >>> strategy = PathSearchStrategy()
-            >>> results = strategy.search("itasca.ball.create")
-            >>> results[0].api_name
+            >>> # Note: Direct strategy use is deprecated
+            >>> # Use APISearch.search() instead for unified BM25 search
+            >>> from backend.infrastructure.pfc.shared.query import APISearch
+            >>> results = APISearch.search("itasca.ball.create")
+            >>> results[0].document.name
             "itasca.ball.create"
         """
         pass
@@ -47,10 +49,10 @@ class SearchStrategy(ABC):
             True if this strategy is applicable to the query
 
         Example:
-            >>> strategy = PathSearchStrategy()
-            >>> strategy.can_handle("itasca.ball.create")
-            True
-            >>> strategy.can_handle("create a ball")
-            False
+            >>> # Note: Direct strategy use is deprecated
+            >>> # BM25 search handles all query types automatically
+            >>> from backend.infrastructure.pfc.shared.query import APISearch
+            >>> APISearch.search("itasca.ball.create")  # Path query
+            >>> APISearch.search("create a ball")  # Natural language query
         """
         pass

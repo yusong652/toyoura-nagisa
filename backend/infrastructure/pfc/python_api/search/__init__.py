@@ -1,17 +1,11 @@
 """Search strategies for PFC SDK documentation.
 
-This package provides pluggable search strategies for finding APIs:
-- PathSearchStrategy: Exact path matching (used for API path queries)
+This package previously provided pluggable search strategies.
+Now all search is handled by the unified BM25 engine:
+- backend.infrastructure.pfc.shared.query.APISearch (BM25-based search)
 
-Note:
-    Natural language search now uses the unified BM25 engine:
-    - backend.infrastructure.pfc.shared.query.APISearch (BM25-based search)
+The BM25 engine handles both natural language and API path queries
+through smart tokenization and name boosting.
 """
 
-from backend.infrastructure.pfc.shared.search.base import SearchStrategy
-from .path_search import PathSearchStrategy
-
-__all__ = [
-    "SearchStrategy",
-    "PathSearchStrategy"
-]
+__all__ = []

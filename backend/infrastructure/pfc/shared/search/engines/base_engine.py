@@ -184,11 +184,16 @@ class BaseSearchEngine(ABC):
             ]
 
         # Filter by category
+        # Supports both exact match and partial match
+        # Examples: "ball" matches "itasca.ball", "contact" matches "itasca.contact"
         if "category" in filters:
-            category_filter = filters["category"]
+            category_filter = filters["category"].lower()
             filtered = [
                 r for r in filtered
-                if r.document.category == category_filter
+                if r.document.category and (
+                    r.document.category.lower() == category_filter or
+                    r.document.category.lower().endswith(f".{category_filter}")
+                )
             ]
 
         # Filter by minimum score
