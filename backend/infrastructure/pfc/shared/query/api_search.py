@@ -1,13 +1,15 @@
 """High-level Python API search interface.
 
 This module provides a simple, user-friendly API for searching PFC Python SDK
-documentation using BM25 algorithm with keyword boosting.
+documentation using BM25 algorithm with multi-field scoring.
 
 Features:
 - Natural language queries (e.g., "ball velocity", "contact force")
 - API path queries (e.g., "Ball.vel", "BallBallContact.gap") via tokenization
-- Automatic index initialization (lazy loading)
+- Fresh index built per search (~240ms) for consistency
 - Abbreviation support through partial matching
+- Contact API consolidation (5 types → 1 result with metadata)
+- Component API consolidation (x/y/z variants → base method with metadata)
 """
 
 from typing import List, Optional, Dict, Any
@@ -25,7 +27,7 @@ class APISearch:
     """Python SDK API search interface.
 
     This class provides a high-level API for searching PFC Python SDK
-    documentation using BM25 algorithm with keyword boosting.
+    documentation using BM25 algorithm with multi-field scoring.
 
     Search Scope:
     - Module functions: itasca.ball.create, itasca.wall.create, etc.
@@ -35,18 +37,18 @@ class APISearch:
 
     Features:
     - Unified BM25 search for all API types
-    - Automatic index initialization (lazy loading)
-    - Singleton pattern for efficient memory usage
+    - Fresh index per search (~240ms) for consistency
     - Smart tokenization handles API paths (Ball.vel → ["ball", "vel"])
+    - Technical single-char preservation (x, y, z, r, n, t)
     - Abbreviation support through partial matching (pos → position)
-    - Name boosting for better path matching
+    - Contact API consolidation (5 types → 1 result)
+    - Component API consolidation (x/y/z variants → base method)
 
     Design Decisions:
-    - BM25 with keyword boost (KEYWORD_BOOST=3.0) for quality results
-    - BM25 with name boost (NAME_BOOST=2.0) for path queries
+    - Multi-field BM25: name (0.5), keywords (0.3), description (0.2)
     - Single search() method handles all query types
     - Category filter for module-specific searches
-    - Thread-safe singleton pattern
+    - No caching: ensures fresh results, acceptable ~240ms overhead
 
     Usage:
         >>> # Natural language search
@@ -74,29 +76,6 @@ class APISearch:
         >>> # Abbreviations (partial matching)
         >>> results = APISearch.search("pos")  # Matches "position"
     """
-
-    # Singleton BM25 engine instance
-    _engine: Optional[BM25SearchEngine] = None
-
-    @classmethod
-    def _get_engine(cls) -> BM25SearchEngine:
-        """Get or create BM25 search engine (singleton pattern).
-
-        Returns:
-            BM25SearchEngine instance (shared across all calls)
-
-        Example:
-            >>> engine = APISearch._get_engine()
-            >>> engine.is_built()
-            True
-        """
-        if cls._engine is None:
-            cls._engine = BM25SearchEngine(
-                document_loader=APIDocumentAdapter.load_all
-            )
-            cls._engine.build()
-
-        return cls._engine
 
     @classmethod
     def search(
@@ -148,8 +127,11 @@ class APISearch:
             ...     min_score=5.0
             ... )
         """
-        # Get BM25 engine (lazy initialization)
-        engine = cls._get_engine()
+        # Create and build BM25 search engine (no caching)
+        # Each search builds a fresh index (~240ms overhead)
+        # This ensures consistency and avoids stale cache issues in development
+        engine = BM25SearchEngine(document_loader=APIDocumentAdapter.load_all)
+        engine.build()
 
         # Build filter dictionary
         filters: Dict[str, Any] = {}
@@ -186,38 +168,3 @@ class APISearch:
 
         # Return final top_k results after consolidation
         return consolidated[:top_k]
-
-    @classmethod
-    def rebuild_index(cls) -> None:
-        """Rebuild search index from scratch.
-
-        Use this when:
-        - Documentation files have been updated
-        - Index parameters need to be changed
-        - Troubleshooting index issues
-
-        Example:
-            >>> APISearch.rebuild_index()
-        """
-        if cls._engine is not None:
-            cls._engine.rebuild()
-
-    @classmethod
-    def get_index_stats(cls) -> Dict[str, Any]:
-        """Get search index statistics.
-
-        Returns:
-            Dictionary with index statistics:
-            - doc_count: Number of indexed documents (1006 APIs)
-            - avg_doc_len: Average document length
-            - vocab_size: Vocabulary size
-            - total_terms: Total terms in index
-            - keyword_boost: Current keyword boost factor
-
-        Example:
-            >>> stats = APISearch.get_index_stats()
-            >>> stats['doc_count']
-            1006  # All Python SDK APIs
-        """
-        engine = cls._get_engine()
-        return engine.get_index_stats()
