@@ -17,6 +17,7 @@ class TextTokenizer:
     - Preserves technical terms and numbers
     - Handles hyphenated terms (e.g., "ball-ball" → ["ball", "ball"])
     - Handles underscored terms (e.g., "vel_x" → ["vel", "x"])
+    - Smart dot splitting for API paths vs. decimals
     - Removes stopwords while preserving technical vocabulary
     - Lowercases for consistent matching
 
@@ -24,12 +25,18 @@ class TextTokenizer:
     - Regex-based for performance
     - No stemming (preserves exact technical terms)
     - No lemmatization (not needed for partial matching)
-    - Splits on hyphens and underscores for flexible matching
+    - Splits on hyphens, underscores, and dots (smart split)
 
     Usage:
         >>> tokenizer = TextTokenizer()
         >>> tokenizer.tokenize("Create ball with radius 1.5")
         ['create', 'ball', 'radius', '1.5']
+
+        >>> tokenizer.tokenize("Ball.vel velocity")
+        ['ball', 'vel', 'velocity']
+
+        >>> tokenizer.tokenize("itasca.ball.Ball.vel")
+        ['itasca', 'ball', 'ball', 'vel']
 
         >>> tokenizer.tokenize("ball-ball contact model")
         ['ball', 'ball', 'contact', 'model']
@@ -41,6 +48,20 @@ class TextTokenizer:
     # Regex pattern for word extraction
     # Matches: alphanumeric + hyphens + underscores + dots (for numbers)
     WORD_PATTERN = re.compile(r'\b[\w.-]+\b')
+
+    # Pattern for numeric values (decimals, scientific notation)
+    # Examples: 1.5, 0.001, .5, 1e-5, 2.5e10, -1.5e+20
+    NUMERIC_PATTERN = re.compile(
+        r'^'
+        r'[+-]?'  # Optional sign
+        r'(?:'
+            r'\d+\.?\d*'  # Integer or decimal (1, 1., 1.5)
+            r'|'
+            r'\.\d+'      # Decimal starting with dot (.5)
+        r')'
+        r'(?:[eE][+-]?\d+)?'  # Optional scientific notation
+        r'$'
+    )
 
     # Minimum word length (avoid single-char noise)
     MIN_WORD_LENGTH = 2
@@ -91,9 +112,41 @@ class TextTokenizer:
         # 3. Process each word
         tokens = []
         for word in words:
+            # Handle dotted terms (smart split: API paths vs. decimals)
+            # Context: API paths like "itasca.ball.Ball.vel" vs. decimals like "1.5"
+            if '.' in word:
+                # Check if it's a numeric value (decimal or scientific notation)
+                if self.NUMERIC_PATTERN.match(word):
+                    # Numeric value - keep intact
+                    if self._is_valid_token(word, from_technical_context=False):
+                        tokens.append(word)
+                else:
+                    # API path - split on dots
+                    # "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
+                    parts = word.split('.')
+                    for part in parts:
+                        # Process each path component (may contain underscores)
+                        if '_' in part:
+                            # Handle underscores within path components
+                            # "force_global" → ["force", "global"]
+                            subparts = part.split('_')
+                            for subpart in subparts:
+                                if self._is_valid_token(subpart, from_technical_context=True):
+                                    tokens.append(subpart)
+                        elif '-' in part:
+                            # Handle hyphens within path components
+                            # "ball-ball" → ["ball", "ball"]
+                            subparts = part.split('-')
+                            for subpart in subparts:
+                                if self._is_valid_token(subpart, from_technical_context=True):
+                                    tokens.append(subpart)
+                        else:
+                            # Simple path component
+                            if self._is_valid_token(part, from_technical_context=True):
+                                tokens.append(part)
             # Handle hyphenated terms (split and keep parts)
             # Context: technical compound terms like "ball-ball"
-            if '-' in word:
+            elif '-' in word:
                 parts = word.split('-')
                 for part in parts:
                     # In hyphenated context, preserve technical single chars

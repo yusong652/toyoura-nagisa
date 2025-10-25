@@ -15,10 +15,22 @@ class BM25Indexer:
     """BM25 inverted index builder with keyword boosting.
 
     Builds and maintains BM25 index structures for efficient scoring:
-    - Document tokens (preprocessed from description + boosted keywords)
+    - Document tokens (name + title + description + boosted keywords)
     - Term frequencies per document
     - Document frequencies per term
     - Average document length
+
+    Indexing Strategy:
+    - Document name (API paths, command names) → Tokenized, boosted, and indexed
+    - Title (if different from name) → Tokenized and indexed
+    - Description (main content) → Tokenized and indexed
+    - Keywords (curated terms) → Tokenized, boosted, and indexed
+
+    Name Boosting:
+    - Name field receives higher weight for exact path matching
+    - Controlled by NAME_BOOST parameter (default: 2.0)
+    - Ensures "Ball.vel" ranks higher than "Ball.vel_y"
+    - Name tokens repeated N times to increase term frequency
 
     Keyword Boosting:
     - Keywords field receives higher weight than description
@@ -26,9 +38,14 @@ class BM25Indexer:
     - Keywords tokens are repeated N times to increase term frequency
     - BM25 saturation prevents over-amplification
 
+    Path-Based Search:
+    - With improved tokenizer, API paths are split properly
+    - "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
+    - Enables partial path matching: "Ball.vel" matches "itasca.ball.Ball.vel"
+
     Design:
     - Pure Python implementation (no NumPy)
-    - Optimized for ~200 documents (commands + APIs)
+    - Optimized for ~1000 documents (commands + APIs)
     - Supports incremental updates
 
     Usage:
@@ -43,10 +60,18 @@ class BM25Indexer:
         >>> indexer.build(documents)  # Rebuild with new boost
     """
 
+    # Name boost factor (tunable parameter)
+    # Higher values prioritize exact name/path matches
+    # Recommended range: 1.5-3.0, default: 2.0
+    # Example: "Ball.vel" should rank higher than "Ball.vel_y"
+    NAME_BOOST = 2.0
+
     # Keyword boost factor (tunable parameter)
     # Higher values give more weight to curated keywords
-    # Recommended range: 2.0-5.0, default: 3.0
-    KEYWORD_BOOST = 3.0
+    # Recommended range: 1.0-3.0, default: 2.0
+    # Note: Too high values can cause length penalty issues
+    # (documents with many keywords become too long and get penalized)
+    KEYWORD_BOOST = 2.0
 
     def __init__(self):
         """Initialize empty BM25 index."""
@@ -86,9 +111,27 @@ class BM25Indexer:
         # Clear existing index
         self.clear()
 
-        # 1. Tokenize all documents (description + boosted keywords)
+        # 1. Tokenize all documents (name + description + boosted keywords)
         for doc in documents:
             doc_id = doc.name
+
+            # Tokenize document name (API path or command name)
+            # Critical for path-based queries like "Ball.vel" or "itasca.ball.create"
+            # With improved tokenizer, paths are split properly:
+            # "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
+            name_tokens = self.tokenizer.tokenize(doc.name)
+
+            # Boost name tokens for exact path matching
+            # Example: NAME_BOOST=2.0 → name tokens appear 2 times in index
+            # This ensures "Ball.vel" ranks higher than "Ball.vel_y"
+            name_boost_count = int(self.NAME_BOOST)
+            boosted_name_tokens = name_tokens * name_boost_count
+
+            # Tokenize title if different from name
+            # Some documents have more descriptive titles
+            title_tokens = []
+            if doc.title and doc.title != doc.name:
+                title_tokens = self.tokenizer.tokenize(doc.title)
 
             # Tokenize description (base content)
             desc_tokens = self.tokenizer.tokenize(doc.description)
@@ -99,11 +142,12 @@ class BM25Indexer:
             # Boost keywords by repeating tokens
             # Example: KEYWORD_BOOST=3.0 → keywords appear 3 times in index
             # This increases term frequency: tf(keyword) += 3
-            boost_count = int(self.KEYWORD_BOOST)
-            boosted_kw_tokens = kw_tokens * boost_count
+            kw_boost_count = int(self.KEYWORD_BOOST)
+            boosted_kw_tokens = kw_tokens * kw_boost_count
 
-            # Combine description + boosted keywords
-            all_tokens = desc_tokens + boosted_kw_tokens
+            # Combine boosted name + title + description + boosted keywords
+            # Boosted name tokens come first for path-based queries
+            all_tokens = boosted_name_tokens + title_tokens + desc_tokens + boosted_kw_tokens
 
             self.documents[doc_id] = all_tokens
 
@@ -220,16 +264,17 @@ class BM25Indexer:
         """Get index statistics for debugging.
 
         Returns:
-            Dictionary with index statistics including keyword boost info
+            Dictionary with index statistics including boost parameters
 
         Example:
             >>> stats = indexer.get_stats()
             >>> stats
             {
                 'doc_count': 115,
-                'avg_doc_len': 62.5,  # Increased due to keyword boost
+                'avg_doc_len': 72.5,  # Increased due to name and keyword boost
                 'vocab_size': 1234,
-                'total_terms': 7198,  # Increased due to keyword boost
+                'total_terms': 8322,  # Increased due to name and keyword boost
+                'name_boost': 2.0,
                 'keyword_boost': 3.0
             }
         """
@@ -238,5 +283,6 @@ class BM25Indexer:
             'avg_doc_len': round(self.avg_doc_len, 2),
             'vocab_size': len(self.term_doc_freq),
             'total_terms': sum(len(tokens) for tokens in self.documents.values()),
+            'name_boost': self.NAME_BOOST,
             'keyword_boost': self.KEYWORD_BOOST
         }
