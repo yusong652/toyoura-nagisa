@@ -15,7 +15,10 @@ from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.pfc.shared.models.search_result import SearchResult
 from backend.infrastructure.pfc.shared.adapters.api_adapter import APIDocumentAdapter
 from backend.infrastructure.pfc.shared.search.engines.bm25_engine import BM25SearchEngine
-from backend.infrastructure.pfc.shared.search.postprocessing import consolidate_contact_apis
+from backend.infrastructure.pfc.shared.search.postprocessing import (
+    consolidate_contact_apis,
+    consolidate_component_apis
+)
 
 
 class APISearch:
@@ -175,6 +178,11 @@ class APISearch:
         # This reduces redundancy (e.g., BallBallContact.gap, BallFacetContact.gap → single result)
         # while preserving type information in metadata['all_contact_types']
         consolidated = consolidate_contact_apis(results)
+
+        # Consolidate component APIs (_x, _y, _z variants)
+        # This reduces redundancy (e.g., force_global, force_global_x/y/z → single result)
+        # while preserving component information in metadata['has_components']
+        consolidated = consolidate_component_apis(consolidated)
 
         # Return final top_k results after consolidation
         return consolidated[:top_k]
