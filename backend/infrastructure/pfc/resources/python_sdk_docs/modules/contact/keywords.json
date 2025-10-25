@@ -716,6 +716,9 @@
     "contact properties": [
       "itasca.contact.Contact.props"
     ],
+    "contact model properties": [
+      "itasca.contact.Contact.props"
+    ],
     "get properties": [
       "itasca.contact.Contact.props"
     ],
