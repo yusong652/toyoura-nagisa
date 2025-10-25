@@ -1,102 +1,90 @@
-"""BM25 inverted index builder for PFC search system.
+"""BM25 inverted index builder for PFC search system with multi-field support.
 
 This module implements BM25 indexing using only Python standard library
 (no NumPy dependency), optimized for technical documentation search.
+
+Multi-Field Design:
+- Separate BM25 indexes for name, description, and keywords fields
+- Each field maintains its own term frequencies, document frequencies, and lengths
+- Enables field-specific scoring and flexible weighting at query time
 """
 
 import math
 from collections import Counter
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 from backend.infrastructure.pfc.shared.models.document import SearchDocument
 from backend.infrastructure.pfc.shared.search.preprocessing.tokenizer import TextTokenizer
 
 
 class BM25Indexer:
-    """BM25 inverted index builder with keyword boosting.
+    """BM25 inverted index builder with multi-field support.
 
-    Builds and maintains BM25 index structures for efficient scoring:
-    - Document tokens (name + title + description + boosted keywords)
+    Builds and maintains separate BM25 index structures for each field:
+    - Name field: API paths, command names (highest semantic importance)
+    - Description field: Detailed explanations (medium importance)
+    - Keywords field: Curated search terms (high importance)
+
+    Each field has independent:
+    - Document tokens (real lengths, no artificial boosting)
     - Term frequencies per document
     - Document frequencies per term
     - Average document length
 
-    Indexing Strategy:
-    - Document name (API paths, command names) → Tokenized, boosted, and indexed
-    - Title (if different from name) → Tokenized and indexed
-    - Description (main content) → Tokenized and indexed
-    - Keywords (curated terms) → Tokenized, boosted, and indexed
-
-    Name Boosting:
-    - Name field receives higher weight for exact path matching
-    - Controlled by NAME_BOOST parameter (default: 2.0)
-    - Ensures "Ball.vel" ranks higher than "Ball.vel_y"
-    - Name tokens repeated N times to increase term frequency
-
-    Keyword Boosting:
-    - Keywords field receives higher weight than description
-    - Controlled by KEYWORD_BOOST parameter (default: 3.0)
-    - Keywords tokens are repeated N times to increase term frequency
-    - BM25 saturation prevents over-amplification
-
-    Path-Based Search:
-    - With improved tokenizer, API paths are split properly
-    - "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
-    - Enables partial path matching: "Ball.vel" matches "itasca.ball.Ball.vel"
+    Advantages over single-field approach:
+    - Real document lengths (no inflation from boosting)
+    - Field-specific IDF values reflect true term distribution
+    - Can distinguish name matches from description matches
+    - Flexible field weighting at query time
 
     Design:
     - Pure Python implementation (no NumPy)
     - Optimized for ~1000 documents (commands + APIs)
-    - Supports incremental updates
+    - Three independent indexes (simple, no over-engineering)
 
     Usage:
         >>> indexer = BM25Indexer()
         >>> indexer.build(documents)
-        >>> idf = indexer.get_idf("porosity")
-        >>> idf
-        2.345  # Example IDF value
-
-        >>> # Adjust keyword boost
-        >>> indexer.KEYWORD_BOOST = 5.0
-        >>> indexer.build(documents)  # Rebuild with new boost
+        >>>
+        >>> # Get IDF for a term in the name field
+        >>> name_idf = indexer.get_idf("ball", field="name")
+        >>>
+        >>> # Get term frequency in description field
+        >>> desc_tf = indexer.get_term_freq("itasca.ball.Ball.vel", "velocity", field="description")
     """
 
-    # Name boost factor (tunable parameter)
-    # Higher values prioritize exact name/path matches
-    # Recommended range: 2.0-5.0, default: 4.0
-    # Should be > KEYWORD_BOOST to ensure name matching takes priority
-    # Example: "BallBallContact" should rank higher than "Ball" with contact keywords
-    NAME_BOOST = 4.0
-
-    # Keyword boost factor (tunable parameter)
-    # Higher values give more weight to curated keywords
-    # Recommended range: 1.0-3.0, default: 2.0
-    # Note: Too high values can cause length penalty issues
-    # (documents with many keywords become too long and get penalized)
-    KEYWORD_BOOST = 2.0
-
     def __init__(self):
-        """Initialize empty BM25 index."""
-        self.documents: Dict[str, List[str]] = {}  # doc_id → tokens
+        """Initialize empty multi-field BM25 index."""
+        # Name field index
+        self.name_documents: Dict[str, List[str]] = {}  # doc_id → tokens
+        self.name_term_freq: Dict[str, Dict[str, int]] = {}  # doc_id → {term → count}
+        self.name_term_doc_freq: Dict[str, int] = {}  # term → document frequency
+        self.name_avg_doc_len: float = 0.0
+
+        # Description field index
+        self.desc_documents: Dict[str, List[str]] = {}
+        self.desc_term_freq: Dict[str, Dict[str, int]] = {}
+        self.desc_term_doc_freq: Dict[str, int] = {}
+        self.desc_avg_doc_len: float = 0.0
+
+        # Keywords field index
+        self.kw_documents: Dict[str, List[str]] = {}
+        self.kw_term_freq: Dict[str, Dict[str, int]] = {}
+        self.kw_term_doc_freq: Dict[str, int] = {}
+        self.kw_avg_doc_len: float = 0.0
+
+        # Common
         self.doc_count: int = 0
-        self.avg_doc_len: float = 0.0
-        self.term_doc_freq: Dict[str, int] = {}  # term → document frequency
-        self.term_freq: Dict[str, Dict[str, int]] = {}  # doc_id → {term → count}
         self.tokenizer = TextTokenizer()
 
     def build(self, documents: List[SearchDocument]) -> None:
-        """Build BM25 index from documents with keyword boosting.
+        """Build multi-field BM25 index from documents.
 
-        Indexing Strategy:
-        1. Tokenize description field (base content)
-        2. Tokenize keywords field (curated terms)
-        3. Boost keywords by repeating tokens KEYWORD_BOOST times
-        4. Combine description + boosted keywords for final index
+        Each field is indexed independently with its real token counts:
+        - Name field: Tokenize document name (API path or command name)
+        - Description field: Tokenize description text
+        - Keywords field: Tokenize and concatenate keywords list
 
-        This approach:
-        - Gives higher weight to human-curated keywords
-        - Enables matching on keyword-only terms (e.g., "packing")
-        - Preserves description-based natural language search
-        - Uses BM25 saturation to prevent over-amplification
+        No artificial boosting - field importance is handled at scoring time.
 
         Args:
             documents: List of SearchDocument instances to index
@@ -106,93 +94,89 @@ class BM25Indexer:
             >>> indexer.build([doc1, doc2, doc3])
             >>> indexer.doc_count
             3
-            >>> indexer.avg_doc_len
-            62.5  # Longer due to boosted keywords
+            >>> indexer.name_avg_doc_len  # Real length
+            4.2
+            >>> indexer.desc_avg_doc_len
+            18.7
         """
-        # Clear existing index
+        # Clear existing indexes
         self.clear()
 
-        # 1. Tokenize all documents (name + description + boosted keywords)
+        # Process each document
         for doc in documents:
             doc_id = doc.name
 
-            # Tokenize document name (API path or command name)
-            # Critical for path-based queries like "Ball.vel" or "itasca.ball.create"
-            # With improved tokenizer, paths are split properly:
-            # "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
+            # 1. Index name field
             name_tokens = self.tokenizer.tokenize(doc.name)
+            self.name_documents[doc_id] = name_tokens
+            self.name_term_freq[doc_id] = dict(Counter(name_tokens))
+            for term in set(name_tokens):
+                self.name_term_doc_freq[term] = self.name_term_doc_freq.get(term, 0) + 1
 
-            # Boost name tokens for exact path matching
-            # Example: NAME_BOOST=2.0 → name tokens appear 2 times in index
-            # This ensures "Ball.vel" ranks higher than "Ball.vel_y"
-            name_boost_count = int(self.NAME_BOOST)
-            boosted_name_tokens = name_tokens * name_boost_count
-
-            # Tokenize title if different from name
-            # Some documents have more descriptive titles
-            title_tokens = []
-            if doc.title and doc.title != doc.name:
-                title_tokens = self.tokenizer.tokenize(doc.title)
-
-            # Tokenize description (base content)
+            # 2. Index description field
             desc_tokens = self.tokenizer.tokenize(doc.description)
+            self.desc_documents[doc_id] = desc_tokens
+            self.desc_term_freq[doc_id] = dict(Counter(desc_tokens))
+            for term in set(desc_tokens):
+                self.desc_term_doc_freq[term] = self.desc_term_doc_freq.get(term, 0) + 1
 
-            # Tokenize keywords (curated terms)
+            # 3. Index keywords field
             kw_tokens = self.tokenizer.tokenize(" ".join(doc.keywords))
+            self.kw_documents[doc_id] = kw_tokens
+            self.kw_term_freq[doc_id] = dict(Counter(kw_tokens))
+            for term in set(kw_tokens):
+                self.kw_term_doc_freq[term] = self.kw_term_doc_freq.get(term, 0) + 1
 
-            # Boost keywords by repeating tokens
-            # Example: KEYWORD_BOOST=3.0 → keywords appear 3 times in index
-            # This increases term frequency: tf(keyword) += 3
-            kw_boost_count = int(self.KEYWORD_BOOST)
-            boosted_kw_tokens = kw_tokens * kw_boost_count
+        # Calculate statistics
+        self.doc_count = len(documents)
 
-            # Combine boosted name + title + description + boosted keywords
-            # Boosted name tokens come first for path-based queries
-            all_tokens = boosted_name_tokens + title_tokens + desc_tokens + boosted_kw_tokens
-
-            self.documents[doc_id] = all_tokens
-
-            # Calculate term frequencies (includes boosted keywords)
-            term_counts = Counter(all_tokens)
-            self.term_freq[doc_id] = dict(term_counts)
-
-            # Update document frequencies
-            for term in set(all_tokens):
-                self.term_doc_freq[term] = self.term_doc_freq.get(term, 0) + 1
-
-        # 2. Calculate statistics
-        self.doc_count = len(self.documents)
         if self.doc_count > 0:
-            total_len = sum(len(tokens) for tokens in self.documents.values())
-            self.avg_doc_len = total_len / self.doc_count
-        else:
-            self.avg_doc_len = 0.0
+            # Name field stats
+            name_total_len = sum(len(tokens) for tokens in self.name_documents.values())
+            self.name_avg_doc_len = name_total_len / self.doc_count
 
-    def get_idf(self, term: str) -> float:
-        """Calculate IDF (Inverse Document Frequency) for a term.
+            # Description field stats
+            desc_total_len = sum(len(tokens) for tokens in self.desc_documents.values())
+            self.desc_avg_doc_len = desc_total_len / self.doc_count
+
+            # Keywords field stats
+            kw_total_len = sum(len(tokens) for tokens in self.kw_documents.values())
+            self.kw_avg_doc_len = kw_total_len / self.doc_count
+        else:
+            self.name_avg_doc_len = 0.0
+            self.desc_avg_doc_len = 0.0
+            self.kw_avg_doc_len = 0.0
+
+    def get_idf(self, term: str, field: str = "name") -> float:
+        """Calculate IDF (Inverse Document Frequency) for a term in a specific field.
 
         Uses BM25 IDF formula (Robertson-Spärck Jones):
         IDF(t) = log((N - df(t) + 0.5) / (df(t) + 0.5) + 1)
 
-        where:
-        - N = total number of documents
-        - df(t) = number of documents containing term t
-
         Args:
             term: Term to calculate IDF for
+            field: Field name ("name", "description", or "keywords")
 
         Returns:
             IDF score (>= 0)
 
         Example:
-            >>> indexer.doc_count = 100
-            >>> indexer.term_doc_freq = {"ball": 30, "porosity": 5}
-            >>> indexer.get_idf("ball")
-            1.203  # Common term → lower IDF
-            >>> indexer.get_idf("porosity")
-            2.944  # Rare term → higher IDF
+            >>> indexer.get_idf("ball", field="name")
+            2.456  # "ball" is rare in name field
+            >>> indexer.get_idf("ball", field="description")
+            0.823  # "ball" is common in description field
         """
-        df = self.term_doc_freq.get(term, 0)
+        # Select appropriate term_doc_freq dict
+        if field == "name":
+            term_doc_freq = self.name_term_doc_freq
+        elif field == "description":
+            term_doc_freq = self.desc_term_doc_freq
+        elif field == "keywords":
+            term_doc_freq = self.kw_term_doc_freq
+        else:
+            raise ValueError(f"Unknown field: {field}. Must be 'name', 'description', or 'keywords'")
+
+        df = term_doc_freq.get(term, 0)
         N = self.doc_count
 
         if N == 0 or df == 0:
@@ -200,40 +184,109 @@ class BM25Indexer:
 
         # BM25 IDF formula
         idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
-        return max(0.0, idf)  # Ensure non-negative
+        return max(0.0, idf)
 
-    def get_term_freq(self, doc_id: str, term: str) -> int:
-        """Get term frequency in a specific document.
+    def get_term_freq(self, doc_id: str, term: str, field: str = "name") -> int:
+        """Get term frequency in a specific document and field.
 
         Args:
             doc_id: Document ID
             term: Term to look up
+            field: Field name ("name", "description", or "keywords")
 
         Returns:
             Term frequency (0 if not found)
 
         Example:
-            >>> indexer.get_term_freq("ball create", "ball")
-            2  # "ball" appears twice
-            >>> indexer.get_term_freq("ball create", "xyz")
-            0  # Not found
+            >>> indexer.get_term_freq("itasca.ball.Ball.vel", "ball", field="name")
+            2  # "ball" appears twice in name
+            >>> indexer.get_term_freq("itasca.ball.Ball.vel", "velocity", field="description")
+            3  # "velocity" appears 3 times in description
         """
-        return self.term_freq.get(doc_id, {}).get(term, 0)
+        if field == "name":
+            term_freq = self.name_term_freq
+        elif field == "description":
+            term_freq = self.desc_term_freq
+        elif field == "keywords":
+            term_freq = self.kw_term_freq
+        else:
+            raise ValueError(f"Unknown field: {field}")
 
-    def get_doc_length(self, doc_id: str) -> int:
-        """Get document length (number of tokens).
+        return term_freq.get(doc_id, {}).get(term, 0)
+
+    def get_doc_length(self, doc_id: str, field: str = "name") -> int:
+        """Get document length (number of tokens) for a specific field.
 
         Args:
             doc_id: Document ID
+            field: Field name ("name", "description", or "keywords")
 
         Returns:
             Document length
 
         Example:
-            >>> indexer.get_doc_length("ball create")
-            45  # Document has 45 tokens
+            >>> indexer.get_doc_length("itasca.ball.Ball.vel", field="name")
+            4  # Real token count in name
+            >>> indexer.get_doc_length("itasca.ball.Ball.vel", field="description")
+            18  # Real token count in description
         """
-        return len(self.documents.get(doc_id, []))
+        if field == "name":
+            documents = self.name_documents
+        elif field == "description":
+            documents = self.desc_documents
+        elif field == "keywords":
+            documents = self.kw_documents
+        else:
+            raise ValueError(f"Unknown field: {field}")
+
+        return len(documents.get(doc_id, []))
+
+    def get_avg_doc_length(self, field: str = "name") -> float:
+        """Get average document length for a specific field.
+
+        Args:
+            field: Field name ("name", "description", or "keywords")
+
+        Returns:
+            Average document length
+
+        Example:
+            >>> indexer.get_avg_doc_length(field="name")
+            4.2
+            >>> indexer.get_avg_doc_length(field="description")
+            18.7
+        """
+        if field == "name":
+            return self.name_avg_doc_len
+        elif field == "description":
+            return self.desc_avg_doc_len
+        elif field == "keywords":
+            return self.kw_avg_doc_len
+        else:
+            raise ValueError(f"Unknown field: {field}")
+
+    def get_field_tokens(self, doc_id: str, field: str = "name") -> List[str]:
+        """Get tokenized content for a specific field.
+
+        Args:
+            doc_id: Document ID
+            field: Field name ("name", "description", or "keywords")
+
+        Returns:
+            List of tokens (empty list if not found)
+
+        Example:
+            >>> indexer.get_field_tokens("itasca.ball.Ball.vel", field="name")
+            ['itasca', 'ball', 'ball', 'vel']
+        """
+        if field == "name":
+            return self.name_documents.get(doc_id, [])
+        elif field == "description":
+            return self.desc_documents.get(doc_id, [])
+        elif field == "keywords":
+            return self.kw_documents.get(doc_id, [])
+        else:
+            raise ValueError(f"Unknown field: {field}")
 
     def get_all_doc_ids(self) -> Set[str]:
         """Get all document IDs in the index.
@@ -243,47 +296,82 @@ class BM25Indexer:
 
         Example:
             >>> indexer.get_all_doc_ids()
-            {'ball create', 'wall create', 'contact property', ...}
+            {'itasca.ball.Ball.vel', 'itasca.wall.create', ...}
         """
-        return set(self.documents.keys())
+        return set(self.name_documents.keys())
 
     def clear(self) -> None:
-        """Clear all index data.
+        """Clear all index data for all fields.
 
         Example:
             >>> indexer.clear()
             >>> indexer.doc_count
             0
         """
-        self.documents.clear()
-        self.term_doc_freq.clear()
-        self.term_freq.clear()
+        # Clear name field
+        self.name_documents.clear()
+        self.name_term_freq.clear()
+        self.name_term_doc_freq.clear()
+        self.name_avg_doc_len = 0.0
+
+        # Clear description field
+        self.desc_documents.clear()
+        self.desc_term_freq.clear()
+        self.desc_term_doc_freq.clear()
+        self.desc_avg_doc_len = 0.0
+
+        # Clear keywords field
+        self.kw_documents.clear()
+        self.kw_term_freq.clear()
+        self.kw_term_doc_freq.clear()
+        self.kw_avg_doc_len = 0.0
+
+        # Clear common
         self.doc_count = 0
-        self.avg_doc_len = 0.0
 
     def get_stats(self) -> Dict:
         """Get index statistics for debugging.
 
         Returns:
-            Dictionary with index statistics including boost parameters
+            Dictionary with multi-field index statistics
 
         Example:
             >>> stats = indexer.get_stats()
             >>> stats
             {
-                'doc_count': 115,
-                'avg_doc_len': 72.5,  # Increased due to name and keyword boost
-                'vocab_size': 1234,
-                'total_terms': 8322,  # Increased due to name and keyword boost
-                'name_boost': 2.0,
-                'keyword_boost': 3.0
+                'doc_count': 1006,
+                'name_field': {
+                    'avg_doc_len': 4.2,
+                    'vocab_size': 245,
+                    'total_terms': 4242
+                },
+                'description_field': {
+                    'avg_doc_len': 18.7,
+                    'vocab_size': 1543,
+                    'total_terms': 18802
+                },
+                'keywords_field': {
+                    'avg_doc_len': 8.1,
+                    'vocab_size': 654,
+                    'total_terms': 8146
+                }
             }
         """
         return {
             'doc_count': self.doc_count,
-            'avg_doc_len': round(self.avg_doc_len, 2),
-            'vocab_size': len(self.term_doc_freq),
-            'total_terms': sum(len(tokens) for tokens in self.documents.values()),
-            'name_boost': self.NAME_BOOST,
-            'keyword_boost': self.KEYWORD_BOOST
+            'name_field': {
+                'avg_doc_len': round(self.name_avg_doc_len, 2),
+                'vocab_size': len(self.name_term_doc_freq),
+                'total_terms': sum(len(tokens) for tokens in self.name_documents.values())
+            },
+            'description_field': {
+                'avg_doc_len': round(self.desc_avg_doc_len, 2),
+                'vocab_size': len(self.desc_term_doc_freq),
+                'total_terms': sum(len(tokens) for tokens in self.desc_documents.values())
+            },
+            'keywords_field': {
+                'avg_doc_len': round(self.kw_avg_doc_len, 2),
+                'vocab_size': len(self.kw_term_doc_freq),
+                'total_terms': sum(len(tokens) for tokens in self.kw_documents.values())
+            }
         }

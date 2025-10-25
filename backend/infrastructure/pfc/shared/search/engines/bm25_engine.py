@@ -1,7 +1,7 @@
-"""BM25-based search engine for PFC documentation.
+"""BM25-based search engine for PFC documentation with multi-field support.
 
 This module implements a complete search engine using BM25 algorithm with
-keyword boosting, providing a high-level interface for document search.
+multi-field scoring, providing a high-level interface for document search.
 """
 
 from typing import List, Dict, Any, Optional, Callable
@@ -13,65 +13,58 @@ from backend.infrastructure.pfc.shared.search.scoring.bm25_scorer import BM25Sco
 
 
 class BM25SearchEngine(BaseSearchEngine):
-    """BM25 search engine with keyword boosting.
+    """BM25 search engine with multi-field scoring.
 
     This engine provides a complete search solution using BM25 algorithm:
+    - Multi-field indexing (name, description, keywords)
+    - Field-specific BM25 scoring with weighted combination
     - Automatic index building on first query
-    - Keyword boost for curated terms (default: 3.0x)
     - Partial matching support (abbreviations)
-    - Multi-field indexing (description + boosted keywords)
 
     Features:
     - Pure Python implementation (no NumPy dependency)
-    - Optimized for ~200 documents (commands + APIs)
-    - Fast indexing (<100ms) and query (<10ms)
+    - Optimized for ~1000 documents (commands + APIs)
+    - Fast indexing (<200ms) and query (<15ms)
     - Automatic result ranking and filtering
 
     Algorithm Details:
     - BM25 parameters: K1=1.5, B=0.75
-    - KEYWORD_BOOST: 3.0 (tunable, range: 2.0-5.0)
-    - IDF formula: Robertson-Spärck Jones
-    - Saturation prevents keyword stuffing
+    - Field weights: name=0.5, keywords=0.3, description=0.2
+    - IDF formula: Robertson-Spärck Jones (field-specific)
+    - Real document lengths (no artificial boosting)
 
     Usage:
         >>> from backend.infrastructure.pfc.shared.adapters.command_adapter import CommandDocumentAdapter
         >>> engine = BM25SearchEngine(document_loader=CommandDocumentAdapter.load_all)
         >>> engine.build()
-        >>> results = engine.search("ball porosity", top_k=5)
+        >>> results = engine.search("Ball.vel", top_k=5)
         >>> for result in results:
-        ...     print(f"{result.document.title}: {result.score:.3f}")
+        ...     print(f"{result.document.name}: {result.score:.3f}")
+        ...     print(f"  Field scores: {result.match_info['field_scores']}")
     """
 
-    def __init__(
-        self,
-        document_loader: Callable[[], List[SearchDocument]],
-        keyword_boost: float = 3.0
-    ):
-        """Initialize BM25 search engine.
+    def __init__(self, document_loader: Callable[[], List[SearchDocument]]):
+        """Initialize BM25 search engine with multi-field support.
 
         Args:
             document_loader: Callable that returns list of SearchDocument objects
-            keyword_boost: Keyword boost factor (default: 3.0, range: 2.0-5.0)
-                          Higher values give more weight to curated keywords
 
         Example:
             >>> engine = BM25SearchEngine(
-            ...     document_loader=CommandDocumentAdapter.load_all,
-            ...     keyword_boost=5.0  # Boost keyword importance
+            ...     document_loader=CommandDocumentAdapter.load_all
             ... )
         """
         super().__init__(document_loader)
         self.indexer = BM25Indexer()
-        self.indexer.KEYWORD_BOOST = keyword_boost
         self.scorer: Optional[BM25Scorer] = None
 
     def build(self) -> None:
-        """Build BM25 index from loaded documents.
+        """Build multi-field BM25 index from loaded documents.
 
         This method:
         1. Loads documents using document_loader()
-        2. Builds BM25 inverted index with keyword boosting
-        3. Creates BM25 scorer with partial matching support
+        2. Builds separate BM25 indexes for name/description/keywords fields
+        3. Creates multi-field BM25 scorer with weighted combination
 
         Raises:
             Exception: If document loading or indexing fails
@@ -80,9 +73,9 @@ class BM25SearchEngine(BaseSearchEngine):
             >>> engine.build()
             >>> stats = engine.indexer.get_stats()
             >>> stats['doc_count']
-            120
-            >>> stats['keyword_boost']
-            3.0
+            1006
+            >>> stats['name_field']['avg_doc_len']
+            4.2
         """
         # Load documents
         self.documents = self.document_loader()
@@ -90,10 +83,10 @@ class BM25SearchEngine(BaseSearchEngine):
         if not self.documents:
             raise ValueError("Document loader returned empty list")
 
-        # Build BM25 index
+        # Build multi-field BM25 index
         self.indexer.build(self.documents)
 
-        # Create scorer
+        # Create multi-field scorer
         self.scorer = BM25Scorer(self.indexer)
 
         # Mark as built
@@ -169,15 +162,14 @@ class BM25SearchEngine(BaseSearchEngine):
         return search_results[:top_k]
 
     def get_index_stats(self) -> Dict[str, Any]:
-        """Get BM25 index statistics.
+        """Get multi-field BM25 index statistics.
 
         Returns:
-            Dictionary with index statistics:
+            Dictionary with index statistics for each field:
             - doc_count: Number of indexed documents
-            - avg_doc_len: Average document length (tokens)
-            - vocab_size: Vocabulary size (unique terms)
-            - total_terms: Total terms in index
-            - keyword_boost: Current keyword boost factor
+            - name_field: Statistics for name field (avg_doc_len, vocab_size, total_terms)
+            - description_field: Statistics for description field
+            - keywords_field: Statistics for keywords field
 
         Raises:
             ValueError: If engine not built
@@ -187,11 +179,22 @@ class BM25SearchEngine(BaseSearchEngine):
             >>> stats = engine.get_index_stats()
             >>> stats
             {
-                'doc_count': 120,
-                'avg_doc_len': 49.09,
-                'vocab_size': 1159,
-                'total_terms': 5891,
-                'keyword_boost': 3.0
+                'doc_count': 1006,
+                'name_field': {
+                    'avg_doc_len': 4.2,
+                    'vocab_size': 245,
+                    'total_terms': 4242
+                },
+                'description_field': {
+                    'avg_doc_len': 18.7,
+                    'vocab_size': 1543,
+                    'total_terms': 18802
+                },
+                'keywords_field': {
+                    'avg_doc_len': 8.1,
+                    'vocab_size': 654,
+                    'total_terms': 8146
+                }
             }
         """
         if not self._is_built:
@@ -199,15 +202,31 @@ class BM25SearchEngine(BaseSearchEngine):
 
         return self.indexer.get_stats()
 
-    def set_keyword_boost(self, boost: float) -> None:
-        """Update keyword boost factor and rebuild index.
+    def set_field_weights(
+        self,
+        weight_name: float | None = None,
+        weight_desc: float | None = None,
+        weight_kw: float | None = None
+    ) -> None:
+        """Update field weights for scoring.
+
+        Field weights control the relative importance of each field in the final score.
+        Weights should sum to 1.0 for proper normalization.
 
         Args:
-            boost: New keyword boost factor (recommended: 2.0-5.0)
+            weight_name: Name field weight (default: 0.5)
+            weight_desc: Description field weight (default: 0.2)
+            weight_kw: Keywords field weight (default: 0.3)
 
         Example:
-            >>> engine.set_keyword_boost(5.0)  # Stronger keyword weighting
-            >>> engine.search("packing")  # Re-indexed with new boost
+            >>> # Increase name field importance for API path queries
+            >>> engine.set_field_weights(weight_name=0.6, weight_desc=0.15, weight_kw=0.25)
+            >>>
+            >>> # Balance keywords and description more evenly
+            >>> engine.set_field_weights(weight_name=0.5, weight_desc=0.25, weight_kw=0.25)
         """
-        self.indexer.KEYWORD_BOOST = boost
-        self.rebuild()
+        BM25Scorer.set_parameters(
+            weight_name=weight_name,
+            weight_desc=weight_desc,
+            weight_kw=weight_kw
+        )
