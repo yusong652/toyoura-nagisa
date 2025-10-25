@@ -24,22 +24,6 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 DEFAULT_SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 20
 
-# Confidence threshold for BM25 query results
-# BM25 Score ranges (with KEYWORD_BOOST=3.0):
-#   12+:     High-quality match (strong keyword overlap, exact terms)
-#   8-12:    Medium-quality match (partial keyword match, related terms)
-#   4-8:     Low-quality match (weak relevance, triggers fallback suggestion)
-#   0-4:     Very weak match (likely noise, treated as no results)
-#
-# Examples from real queries:
-#   "create ball" → 14.23 (high confidence, exact API match)
-#   "ball position" → 10.00 (medium-high confidence, good keyword match)
-#   "contact gap" → 12.50 (high confidence, exact match)
-#   "velocity" → 6.00 (medium confidence, partial match)
-#   "pos" (abbrev) → 4.27 (low confidence, abbreviation)
-HIGH_CONFIDENCE_THRESHOLD = 8.0  # Filters out low-quality matches
-MAX_LOW_CONFIDENCE_DISPLAY = 2   # Show only top 2 results for low confidence
-
 
 def register_pfc_query_python_api_tool(mcp: FastMCP):
     """Register PFC Python API query tool with the MCP server."""
@@ -109,60 +93,10 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                     }
                 )
 
-            # ===== Condition 2: Low confidence results =====
-            best_score = matches[0].score
-
-            if best_score < HIGH_CONFIDENCE_THRESHOLD:
-                # Low-quality match - show simplified results and recommend fallback
-                low_conf_matches = matches[:MAX_LOW_CONFIDENCE_DISPLAY]
-
-                message = f"Found {len(low_conf_matches)} low-confidence matches (best score: {best_score:.2f}/{HIGH_CONFIDENCE_THRESHOLD})"
-
-                # Format low confidence response manually (new SearchResult format)
-                simplified_results = []
-                for result in low_conf_matches:
-                    sig = APIDocFormatter.format_signature(result.document.name, result.document.metadata)
-                    if sig:
-                        simplified_results.append(f"  {sig} (score: {result.score:.2f})")
-
-                results_text = "\n".join(simplified_results) if simplified_results else "  None"
-
-                llm_text = (
-                    f"**Python SDK Search Results** | Confidence: LOW | Best Score: {best_score:.2f}/{HIGH_CONFIDENCE_THRESHOLD}\n\n"
-                    f"Found {len(low_conf_matches)} partial matches:\n\n"
-                    f"{results_text}\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"**Low confidence match** - These may not be what you need.\n\n"
-                    f"**Recommended Next Step**: Use pfc_query_command to search "
-                    f"for PFC command-based alternatives, which may have more options."
-                )
-
-                return success_response(
-                    message=message,
-                    llm_content={
-                        "parts": [{
-                            "type": "text",
-                            "text": llm_text
-                        }]
-                    },
-                    data={
-                        "query": query,
-                        "matches_found": len(matches),
-                        "displayed_count": len(low_conf_matches),
-                        "best_score": best_score,
-                        "confidence": "low",
-                        "reason": "low_confidence",
-                        "suggestion": "Strongly recommended to use pfc_query_command",
-                        "partial_results": [
-                            {"name": result.document.name, "score": result.score}
-                            for result in low_conf_matches
-                        ]
-                    }
-                )
-
-            # ===== Condition 3: High confidence results (score >= 8.0) =====
+            # ===== Condition 2: Results found - show full documentation =====
             best_result = matches[0]
             api_path = best_result.document.name
+            best_score = best_result.score
 
             # Load full documentation for best match
             api_doc = DocumentationLoader.load_api_doc(api_path)
@@ -202,21 +136,12 @@ def register_pfc_query_python_api_tool(mcp: FastMCP):
                         + "\n".join(related_apis)
                     )
 
-            # Optional gentle hint for medium-confidence results with few matches
-            # (score 8-12, less than 3 results)
-            optional_hint = ""
-            if best_score < 12.0 and len(matches) < 3:
-                optional_hint = (
-                    f"\n\n---\n\n"
-                    f"**Note**: If these don't match your needs, you may also try pfc_query_command."
-                )
-
             return success_response(
                 message=f"Found {len(matches)} Python SDK API(s): {api_path}" + (f" + {len(matches)-1} more" if len(matches) > 1 else ""),
                 llm_content={
                     "parts": [{
                         "type": "text",
-                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}{optional_hint}"
+                        "text": f"**STATUS**: Python SDK Available (preferred approach)\n\n{formatted_doc}{related_section}"
                     }]
                 },
                 data={
