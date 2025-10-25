@@ -176,9 +176,16 @@ class BM25Scorer:
         exact_matches = query_tokens & doc_tokens
 
         # 3. Find partial matches for unmatched query terms
-        unmatched_query = query_tokens - exact_matches
-        unmatched_doc = doc_tokens - exact_matches
-        partial_matches, quality = find_partial_matches(unmatched_query, unmatched_doc)
+        # Note: Name field requires exact matching only (no partial matches for API paths)
+        if field == "name":
+            # Disable partial matching for name field (API paths should match exactly)
+            partial_matches = set()
+            quality = 1.0
+        else:
+            # Enable partial matching for description and keywords fields
+            unmatched_query = query_tokens - exact_matches
+            unmatched_doc = doc_tokens - exact_matches
+            partial_matches, quality = find_partial_matches(unmatched_query, unmatched_doc)
 
         # 4. Score exact matches
         term_scores = {}
