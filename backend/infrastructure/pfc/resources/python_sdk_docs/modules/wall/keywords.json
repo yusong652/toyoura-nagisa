@@ -673,46 +673,58 @@
     "get wall force": [
       "itasca.wall.Wall.force_contact"
     ],
-    "contact force": [
+    "total contact force": [
+      "itasca.wall.Wall.force_contact"
+    ],
+    "get total contact force": [
+      "itasca.wall.Wall.force_contact"
+    ],
+    "sum contact forces": [
+      "itasca.wall.Wall.force_contact"
+    ],
+    "wall contact force sum": [
+      "itasca.wall.Wall.force_contact"
+    ],
+    "total force from contacts": [
       "itasca.wall.Wall.force_contact"
     ],
     "force from contacts": [
       "itasca.wall.Wall.force_contact"
     ],
-    "wall contact force x": [
+    "wall total contact force x": [
       "itasca.wall.Wall.force_contact_x"
     ],
-    "wall force x": [
+    "wall total force x": [
       "itasca.wall.Wall.force_contact_x"
     ],
-    "contact force x": [
+    "total contact force x": [
       "itasca.wall.Wall.force_contact_x"
     ],
-    "force x": [
+    "total force x": [
       "itasca.wall.Wall.force_contact_x"
     ],
-    "wall contact force y": [
+    "wall total contact force y": [
       "itasca.wall.Wall.force_contact_y"
     ],
-    "wall force y": [
+    "wall total force y": [
       "itasca.wall.Wall.force_contact_y"
     ],
-    "contact force y": [
+    "total contact force y": [
       "itasca.wall.Wall.force_contact_y"
     ],
-    "force y": [
+    "total force y": [
       "itasca.wall.Wall.force_contact_y"
     ],
-    "wall contact force z": [
+    "wall total contact force z": [
       "itasca.wall.Wall.force_contact_z"
     ],
-    "wall force z": [
+    "wall total force z": [
       "itasca.wall.Wall.force_contact_z"
     ],
-    "contact force z": [
+    "total contact force z": [
       "itasca.wall.Wall.force_contact_z"
     ],
-    "force z": [
+    "total force z": [
       "itasca.wall.Wall.force_contact_z"
     ],
     "set wall contact force": [

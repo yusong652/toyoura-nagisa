@@ -367,6 +367,18 @@
     "get contact force": [
       "itasca.contact.Contact.force_global"
     ],
+    "individual contact force": [
+      "itasca.contact.Contact.force_global"
+    ],
+    "single contact force": [
+      "itasca.contact.Contact.force_global"
+    ],
+    "contact point force": [
+      "itasca.contact.Contact.force_global"
+    ],
+    "force at contact": [
+      "itasca.contact.Contact.force_global"
+    ],
     "force global": [
       "itasca.contact.Contact.force_global"
     ],

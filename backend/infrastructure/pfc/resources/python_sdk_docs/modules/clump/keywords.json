@@ -647,40 +647,49 @@
     "apply force z": [
       "itasca.clump.Clump.set_force_app_z"
     ],
-    "contact force": [
-      "itasca.clump.Clump.force_contact"
-    ],
-    "get contact force": [
-      "itasca.clump.Clump.force_contact"
-    ],
     "total contact force": [
       "itasca.clump.Clump.force_contact"
     ],
-    "contact force x": [
+    "get total contact force": [
+      "itasca.clump.Clump.force_contact"
+    ],
+    "sum contact forces": [
+      "itasca.clump.Clump.force_contact"
+    ],
+    "clump contact force sum": [
+      "itasca.clump.Clump.force_contact"
+    ],
+    "total force from contacts": [
+      "itasca.clump.Clump.force_contact"
+    ],
+    "force from contacts": [
+      "itasca.clump.Clump.force_contact"
+    ],
+    "total contact force x": [
       "itasca.clump.Clump.force_contact_x"
     ],
-    "force contact x": [
+    "total force contact x": [
       "itasca.clump.Clump.force_contact_x"
     ],
-    "x contact force": [
+    "x total contact force": [
       "itasca.clump.Clump.force_contact_x"
     ],
-    "contact force y": [
+    "total contact force y": [
       "itasca.clump.Clump.force_contact_y"
     ],
-    "force contact y": [
+    "total force contact y": [
       "itasca.clump.Clump.force_contact_y"
     ],
-    "y contact force": [
+    "y total contact force": [
       "itasca.clump.Clump.force_contact_y"
     ],
-    "contact force z": [
+    "total contact force z": [
       "itasca.clump.Clump.force_contact_z"
     ],
-    "force contact z": [
+    "total force contact z": [
       "itasca.clump.Clump.force_contact_z"
     ],
-    "z contact force": [
+    "z total contact force": [
       "itasca.clump.Clump.force_contact_z"
     ],
     "set contact force": [

@@ -588,22 +588,31 @@
     "apply force z": [
       "itasca.ball.Ball.set_force_app_z"
     ],
-    "contact force": [
+    "total contact force": [
       "itasca.ball.Ball.force_contact"
     ],
-    "get contact force": [
+    "get total contact force": [
+      "itasca.ball.Ball.force_contact"
+    ],
+    "sum contact forces": [
+      "itasca.ball.Ball.force_contact"
+    ],
+    "ball contact force sum": [
+      "itasca.ball.Ball.force_contact"
+    ],
+    "total force from contacts": [
       "itasca.ball.Ball.force_contact"
     ],
     "force from contacts": [
       "itasca.ball.Ball.force_contact"
     ],
-    "contact force x": [
+    "total contact force x": [
       "itasca.ball.Ball.force_contact_x"
     ],
-    "contact force y": [
+    "total contact force y": [
       "itasca.ball.Ball.force_contact_y"
     ],
-    "contact force z": [
+    "total contact force z": [
       "itasca.ball.Ball.force_contact_z"
     ],
     "set contact force": [
