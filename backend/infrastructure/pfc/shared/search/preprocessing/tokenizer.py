@@ -246,25 +246,26 @@ class TextTokenizer:
             True if word should be kept, False otherwise
 
         Filtering rules:
-        1. Length >= min_length (except numbers and technical context)
+        1. Length >= min_length (except numbers and technical single chars)
         2. Not a stopword (unless it's a technical term)
         3. Contains at least one alphanumeric character
 
-        Special handling for technical contexts:
-        - Single-character technical tokens (x, y, z, r, n, t) preserved in underscore/hyphen context
+        Special handling:
+        - Technical single characters (x, y, z, r, n, t) ALWAYS preserved
         - Single-digit numbers always preserved
+        - Rationale: In scientific/engineering docs, x/y/z are semantically meaningful
         """
         # Allow single-digit numbers (e.g., "1" from "end_1")
         if word.isdigit():
             return True
 
-        # In technical context (from underscore/hyphen splitting),
-        # preserve technical single characters
-        if from_technical_context and len(word) == 1:
-            if word.lower() in self.TECHNICAL_SINGLE_CHARS:
-                return True
+        # ALWAYS preserve technical single characters (regardless of context)
+        # This is critical for keywords like "force global y", "contact force x"
+        # where x/y/z are semantically important but not in underscore/hyphen context
+        if len(word) == 1 and word.lower() in self.TECHNICAL_SINGLE_CHARS:
+            return True
 
-        # Must have minimum length for non-technical contexts
+        # Must have minimum length for other tokens
         if len(word) < self.min_length:
             return False
 
