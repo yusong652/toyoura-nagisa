@@ -15,6 +15,7 @@ from backend.infrastructure.pfc.shared.models.document import DocumentType
 from backend.infrastructure.pfc.shared.models.search_result import SearchResult
 from backend.infrastructure.pfc.shared.adapters.api_adapter import APIDocumentAdapter
 from backend.infrastructure.pfc.shared.search.engines.bm25_engine import BM25SearchEngine
+from backend.infrastructure.pfc.shared.search.postprocessing import consolidate_contact_apis
 
 
 class APISearch:
@@ -156,14 +157,27 @@ class APISearch:
         if min_score is not None:
             filters["min_score"] = min_score
 
-        # Execute BM25 search
+        # Execute BM25 search with over-fetching to account for Contact API consolidation
+        # Contact API consolidation can reduce result count significantly (5 types → 1 result)
+        # Strategy: Fetch 3x top_k results, consolidate, then return top_k
+        # This balances performance (single search call) with accuracy (enough unique results)
+
+        # Calculate search limit: 3x for Contact consolidation, capped at 100
+        search_limit = min(top_k * 3, 100)
+
         results = engine.search(
             query=query,
-            top_k=top_k,
+            top_k=search_limit,
             filters=filters if filters else None
         )
 
-        return results
+        # Consolidate Contact API duplicates
+        # This reduces redundancy (e.g., BallBallContact.gap, BallFacetContact.gap → single result)
+        # while preserving type information in metadata['all_contact_types']
+        consolidated = consolidate_contact_apis(results)
+
+        # Return final top_k results after consolidation
+        return consolidated[:top_k]
 
     @classmethod
     def rebuild_index(cls) -> None:
