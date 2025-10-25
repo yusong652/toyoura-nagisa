@@ -25,7 +25,8 @@ class TextTokenizer:
     - Regex-based for performance
     - No stemming (preserves exact technical terms)
     - No lemmatization (not needed for partial matching)
-    - Splits on hyphens, underscores, and dots (smart split)
+    - CamelCase splitting for better term matching
+    - Splits on hyphens, underscores, dots, and CamelCase boundaries
 
     Usage:
         >>> tokenizer = TextTokenizer()
@@ -43,6 +44,12 @@ class TextTokenizer:
 
         >>> tokenizer.tokenize("velocity vel_x component")
         ['velocity', 'vel', 'x', 'component']
+
+        >>> tokenizer.tokenize("BallBallContact")
+        ['ball', 'ball', 'contact']
+
+        >>> tokenizer.tokenize("IterMechanical system")
+        ['iter', 'mechanical', 'system']
     """
 
     # Regex pattern for word extraction
@@ -103,15 +110,16 @@ class TextTokenizer:
         if not text:
             return []
 
-        # 1. Convert to lowercase
-        text = text.lower()
+        # 1. Extract words BEFORE lowercasing (to preserve CamelCase info)
+        original_words = self.WORD_PATTERN.findall(text)
 
-        # 2. Extract words using regex
-        words = self.WORD_PATTERN.findall(text)
+        # 2. Create lowercase version for matching
+        text_lower = text.lower()
+        lowercase_words = self.WORD_PATTERN.findall(text_lower)
 
-        # 3. Process each word
+        # 3. Process each word (preserve original for CamelCase detection)
         tokens = []
-        for word in words:
+        for original_word, word in zip(original_words, lowercase_words):
             # Handle dotted terms (smart split: API paths vs. decimals)
             # Context: API paths like "itasca.ball.Ball.vel" vs. decimals like "1.5"
             if '.' in word:
@@ -123,8 +131,10 @@ class TextTokenizer:
                 else:
                     # API path - split on dots
                     # "itasca.ball.Ball.vel" → ["itasca", "ball", "ball", "vel"]
-                    parts = word.split('.')
-                    for part in parts:
+                    # Split both original and lowercase to preserve CamelCase info
+                    original_parts = original_word.split('.')
+                    lowercase_parts = word.split('.')
+                    for original_part, part in zip(original_parts, lowercase_parts):
                         # Process each path component (may contain underscores)
                         if '_' in part:
                             # Handle underscores within path components
@@ -141,9 +151,12 @@ class TextTokenizer:
                                 if self._is_valid_token(subpart, from_technical_context=True):
                                     tokens.append(subpart)
                         else:
-                            # Simple path component
-                            if self._is_valid_token(part, from_technical_context=True):
-                                tokens.append(part)
+                            # Simple path component - check for CamelCase
+                            # Example: "Ball" in "itasca.ball.Ball.vel"
+                            camel_parts = self._split_camel_case(original_part)
+                            for camel_part in camel_parts:
+                                if self._is_valid_token(camel_part, from_technical_context=True):
+                                    tokens.append(camel_part)
             # Handle hyphenated terms (split and keep parts)
             # Context: technical compound terms like "ball-ball"
             elif '-' in word:
@@ -162,8 +175,14 @@ class TextTokenizer:
                     if self._is_valid_token(part, from_technical_context=True):
                         tokens.append(part)
             else:
-                if self._is_valid_token(word, from_technical_context=False):
-                    tokens.append(word)
+                # Check if original word is CamelCase and split it
+                # Example: "BallBallContact" → ["ball", "ball", "contact"]
+                # Use original_word to preserve CamelCase info
+                camel_parts = self._split_camel_case(original_word)
+
+                for part in camel_parts:
+                    if self._is_valid_token(part, from_technical_context=False):
+                        tokens.append(part)
 
         return tokens
 
@@ -184,6 +203,36 @@ class TextTokenizer:
             {'ball', 'contact'}
         """
         return set(self.tokenize(text))
+
+    def _split_camel_case(self, word: str) -> List[str]:
+        """Split CamelCase word into components.
+
+        Args:
+            word: Word to split (e.g., "BallBallContact", "IterMechanical")
+
+        Returns:
+            List of lowercase components
+
+        Example:
+            >>> self._split_camel_case("BallBallContact")
+            ['ball', 'ball', 'contact']
+            >>> self._split_camel_case("IterMechanical")
+            ['iter', 'mechanical']
+            >>> self._split_camel_case("simple")
+            ['simple']  # Not CamelCase, return as-is
+        """
+        # Pattern: insert space before uppercase letters (except at start)
+        # BallBallContact → Ball Ball Contact
+        spaced = re.sub(r'(?<!^)(?=[A-Z])', ' ', word)
+
+        # Split on spaces and lowercase
+        parts = spaced.split()
+
+        # Only return split if there are multiple parts (actual CamelCase)
+        if len(parts) > 1:
+            return [p.lower() for p in parts]
+        else:
+            return [word.lower()]
 
     def _is_valid_token(self, word: str, from_technical_context: bool = False) -> bool:
         """Check if a word is a valid token.
@@ -228,44 +277,6 @@ class TextTokenizer:
             return False
 
         return True
-
-    def extract_technical_terms(self, text: str) -> Set[str]:
-        """Extract technical terms from text.
-
-        Technical terms are identified as:
-        - All-caps abbreviations (2-5 chars): PFC, DEM, FEM
-        - CamelCase terms: BallBallContact, IterMechanical
-        - Terms with numbers: 2D, 3D, C3D8
-
-        Args:
-            text: Input text
-
-        Returns:
-            Set of extracted technical terms (lowercased)
-
-        Example:
-            >>> tokenizer = TextTokenizer()
-            >>> tokenizer.extract_technical_terms("Use PFC 2D for BallBallContact analysis")
-            {'pfc', '2d', 'ballballcontact'}
-        """
-        terms = set()
-
-        # 1. Extract all-caps abbreviations (2-5 chars)
-        caps_pattern = re.compile(r'\b[A-Z]{2,5}\b')
-        caps_terms = caps_pattern.findall(text)
-        terms.update(t.lower() for t in caps_terms)
-
-        # 2. Extract CamelCase terms
-        camel_pattern = re.compile(r'\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b')
-        camel_terms = camel_pattern.findall(text)
-        terms.update(t.lower() for t in camel_terms)
-
-        # 3. Extract terms with numbers
-        number_pattern = re.compile(r'\b(?:[A-Z]*\d+[A-Z]*|[A-Z]+\d+)\b', re.IGNORECASE)
-        number_terms = number_pattern.findall(text)
-        terms.update(t.lower() for t in number_terms)
-
-        return terms
 
     @staticmethod
     def normalize_query(query: str) -> str:

@@ -197,16 +197,18 @@ class BM25Scorer:
         return results
 
     @classmethod
-    def set_parameters(cls, k1: float = None, b: float = None):
+    def set_parameters(cls, k1: float | None = None, b: float | None = None):
         """Set BM25 hyperparameters.
 
         Args:
-            k1: Term frequency saturation (default: 1.5)
-            b: Length normalization (default: 0.75)
+            k1: Term frequency saturation (default: 1.5, range: 1.2-2.0)
+                If None, parameter is not changed
+            b: Length normalization (default: 0.75, range: 0.5-0.8)
+               If None, parameter is not changed
 
         Example:
-            >>> BM25Scorer.set_parameters(k1=2.0, b=0.5)
-            >>> # All future BM25Scorer instances use new parameters
+            >>> BM25Scorer.set_parameters(k1=2.0)  # Only update k1
+            >>> BM25Scorer.set_parameters(k1=2.0, b=0.5)  # Update both
         """
         if k1 is not None:
             cls.K1 = k1

@@ -89,7 +89,7 @@ class APISearch:
         if cls._engine is None:
             cls._engine = BM25SearchEngine(
                 document_loader=APIDocumentAdapter.load_all,
-                keyword_boost=3.0  # Optimal balance based on testing
+                keyword_boost=2.0  # Reduced to prioritize API name matching
             )
             cls._engine.build()
 

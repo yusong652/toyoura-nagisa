@@ -62,9 +62,10 @@ class BM25Indexer:
 
     # Name boost factor (tunable parameter)
     # Higher values prioritize exact name/path matches
-    # Recommended range: 1.5-3.0, default: 2.0
-    # Example: "Ball.vel" should rank higher than "Ball.vel_y"
-    NAME_BOOST = 2.0
+    # Recommended range: 2.0-5.0, default: 4.0
+    # Should be > KEYWORD_BOOST to ensure name matching takes priority
+    # Example: "BallBallContact" should rank higher than "Ball" with contact keywords
+    NAME_BOOST = 4.0
 
     # Keyword boost factor (tunable parameter)
     # Higher values give more weight to curated keywords
