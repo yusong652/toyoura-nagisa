@@ -85,9 +85,20 @@ class CommandFormatter:
                     parts.append("```")
             parts.append("")
 
-        # Python SDK Alternative
+        # Python SDK Alternative (supports both old and new format)
         python_alt = doc.get("python_alternative", "")
-        if python_alt:
+        python_sdk_alt = doc.get("python_sdk_alternative", {})
+
+        if python_sdk_alt:
+            # New format - directly embed workaround field
+            workaround = python_sdk_alt.get("workaround", "")
+            if workaround:
+                parts.append("## Python Usage")
+                parts.append(workaround)
+                parts.append("")
+
+        elif python_alt:
+            # Old format - keep for backward compatibility
             parts.append("## Python SDK Alternative")
             parts.append(python_alt)
             parts.append("")
