@@ -80,8 +80,7 @@ class ToolProfileManager:
         # PFC documentation query tools
         "pfc_query_python_api",      # Query Python SDK docs (try first)
         "pfc_query_command",          # Query command docs + model properties
-        # PFC execution tools
-        "pfc_execute_command",
+        # PFC execution tools (script-only workflow)
         "pfc_execute_script",
         "pfc_check_task_status",
         "pfc_list_tasks"
@@ -101,12 +100,11 @@ class ToolProfileManager:
         "grep",
         # Search tools for finding PFC documentation and examples
         "web_search",
-        # PFC documentation query tools (use before execution)
-        "pfc_query_python_api",     # Query PFC Python SDK docs (ALWAYS try first for Python approach)
-        "pfc_query_command",         # Query PFC command docs + contact model properties (fallback)
-        # PFC execution tools (WebSocket-based ITASCA SDK control)
-        "pfc_execute_command",      # Execute native PFC commands (no return values)
-        "pfc_execute_script",       # Execute Python SDK scripts (with return values)
+        # PFC documentation query tools (MANDATORY: use before writing scripts)
+        "pfc_query_python_api",     # Query PFC Python SDK docs (try first for Python approach)
+        "pfc_query_command",         # Query PFC command docs + model properties (use for itasca.command() syntax)
+        # PFC execution tools (script-only workflow: all commands via itasca.command())
+        "pfc_execute_script",       # Execute Python scripts (test + production)
         "pfc_check_task_status",    # Query status of long-running tasks
         "pfc_list_tasks",           # List all tracked long-running tasks
     ]
@@ -133,9 +131,9 @@ class ToolProfileManager:
         
         AgentProfile.PFC: ToolProfile(
             name="PFC Expert",
-            description="ITASCA PFC simulation specialist with real-time SDK control and analysis tools",
+            description="ITASCA PFC simulation specialist with script-based workflow (query docs → test → production)",
             tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # 15 tools: 10 basic + 5 PFC tools (2 query + 3 execution)
+            estimated_tokens=len(PFC_TOOLS) * 282,  # 14 tools: 10 basic + 4 PFC tools (2 query + 2 execution + 1 status)
             color="#9C27B0",  # Purple
             icon="⚛️"
         ),
@@ -144,7 +142,7 @@ class ToolProfileManager:
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=GENERAL_TOOLS,
-            estimated_tokens=len(GENERAL_TOOLS) * 282,  # Coding + Lifestyle + PFC (2 query + 5 execution)
+            estimated_tokens=len(GENERAL_TOOLS) * 282,  # Coding + Lifestyle + PFC (2 query + 3 execution)
             color="#607D8B",  # Blue-grey
             icon="🤖"
         ),
