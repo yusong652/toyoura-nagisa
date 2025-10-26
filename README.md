@@ -65,13 +65,21 @@ The user experience is a top priority. We've built a modern, responsive frontend
 
 ### 🔬 **LLM-Driven Industrial Software Integration (PFC)**
 
-aiNagisa implements an experimental LLM agent system for ITASCA PFC discrete element simulations, demonstrating how AI assistants can interact with specialized industrial software.
+aiNagisa implements an experimental LLM agent system for ITASCA PFC discrete element simulations, demonstrating how AI assistants can interact with specialized industrial software through a **documentation-driven, script-only workflow**.
 
+- **Documentation-Driven Development**: LLM queries command documentation before writing any code, ensuring correct syntax and understanding
+- **Script-Only Execution**: All PFC operations flow through Python scripts using `itasca.command()`, eliminating dual-tool complexity
+- **Test-First Validation**: Mandatory small-scale testing before production runs catches errors early
+- **Systematic Error Handling**: Clear escalation chain (docs → API → web search → user) for troubleshooting
 - **WebSocket-Based Communication**: Real-time bidirectional communication between aiNagisa and PFC through a dedicated WebSocket server
 - **State-Aware Agent Design**: The LLM maintains awareness of simulation state evolution, treating simulations as dynamic systems rather than static code
-- **Hybrid Task Execution**: Intelligent classification of short (immediate) vs. long-running tasks with non-blocking execution and progress monitoring
-- **Three-Phase Workflow**: Validation through interactive commands, codification into reusable scripts, and production execution with state management
 - **Thread-Safe Architecture**: All PFC SDK calls execute in the main thread using queue-based coordination to ensure callback compatibility
+
+**Workflow Pattern**:
+```
+Query Documentation → Write Test Script → Execute (small scale) →
+Fix Errors (if any) → Write Production Script → Execute (full scale) → Monitor Progress
+```
 
 This integration represents an initial exploration of LLM-driven control for complex industrial software, with room for further refinement and generalization.
 
@@ -141,7 +149,7 @@ aiNagisa/
 │   │   │   ├── smart_mcp_server.py # Main MCP server
 │   │   │   ├── tool_profile_manager.py # Agent profile management
 │   │   │   └── tools/             # Tool implementations by category
-│   │   │       └── pfc/           # PFC simulation tools
+│   │   │       └── pfc/           # PFC simulation tools (query + execute + monitor)
 │   │   ├── pfc/                   # PFC WebSocket client integration
 │   │   │   └── websocket_client.py # Auto-reconnecting WebSocket client
 │   │   ├── memory/                # Mem0-powered long-term memory system
@@ -281,6 +289,19 @@ exec(open(r'/path/to/aiNagisa/pfc-server/start_server.py', encoding='utf-8').rea
 
 # 3. In aiNagisa, select "PFC Expert" agent profile
 # 4. Interact with PFC through natural language
+```
+
+**PFC Workflow Example**:
+```
+You: "Create a ball settling simulation with 1000 particles"
+
+Nagisa:
+1. Queries command documentation for 'ball generate', 'model gravity', etc.
+2. Writes test script with 10 particles (small scale)
+3. Executes test → validates syntax
+4. Writes production script with 1000 particles
+5. Executes production → monitors progress
+6. Reports results
 ```
 
 See `pfc-server/README.md` for detailed setup and usage instructions.
