@@ -80,8 +80,8 @@ class LLMClient(ABC):
 |---------|-----------|-------------|----------|
 | **Coding** | 10 tools | 2,820 tokens | Code development, debugging |
 | **Lifestyle** | 14 tools | 3,948 tokens | Email, calendar, communication |
-| **PFC Expert** | 14 tools | 3,948 tokens | Scientific simulations |
-| **General** | 28 tools | 7,896 tokens | Multi-domain tasks |
+| **PFC Expert** | 14 tools | 3,948 tokens | Scientific simulations (script-only workflow) |
+| **General** | 27 tools | 7,614 tokens | Multi-domain tasks |
 | **Disabled** | 0 tools | 0 tokens | Text-only conversation |
 
 **Impact**: Coding profile uses 64% fewer tokens than General, enabling longer context windows.
@@ -109,7 +109,7 @@ class ToolResult:
 | `builtin/` | web_search | Internet search |
 | `coding/` | write, read, edit, bash, glob, grep, etc. | Development tools |
 | `lifestyle/` | email, calendar, contacts, location, time, etc. | Productivity tools |
-| `pfc/` | pfc_execute_command/script, check_status, list_tasks | PFC simulation control |
+| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_script, pfc_check_task_status, pfc_list_tasks | PFC simulation control (script-only workflow) |
 
 **Benefits**:
 - Explicit schema for automatic documentation
@@ -123,26 +123,30 @@ class ToolResult:
 1. Thread-safety (PFC SDK requires main thread execution)
 2. Long-running tasks (simulations can run for hours)
 3. Progress visibility (commands are non-interruptible)
-4. Type system mismatch (Python types → PFC command strings)
+4. Documentation-driven workflow (LLM needs command syntax guidance)
 
 **Solution Architecture**:
 ```
-WebSocket Client → Queue → Main Thread Executor → PFC SDK
-                     ↓
-                TaskManager (independent status tracking)
+Documentation Query → Test Script → Production Script → WebSocket → PFC SDK
+     ↓                    ↓              ↓
+Query Tools      Small-Scale Test   Full Simulation
+(syntax ref)     (quick validate)   (task tracking)
 ```
 
 **Key Components**:
 - **Main Thread Executor**: Queue-based execution ensuring thread safety (`pfc-server/server/main_thread_executor.py`)
 - **Task Manager**: Non-blocking lifecycle tracking (`pfc-server/server/task_manager.py:19`)
 - **Script Executor**: Real-time output capture for progress monitoring (`pfc-server/server/script_executor.py:28`)
-- **Command Executor**: Type-driven command assembly (`pfc-server/server/executor.py:152`)
+- **Documentation System**: Command syntax + Python usage examples (`backend/infrastructure/pfc/commands/`)
 
-**PFC Tools Workflow**:
-1. `pfc_execute_command`: Immediate commands (returns success/failure)
-2. `pfc_execute_script`: Long simulations (returns task_id immediately)
-3. `pfc_check_task_status`: Query progress with real-time output
-4. `pfc_list_tasks`: Overview of all tracked tasks
+**PFC Tools Workflow (Script-Only)**:
+1. **Query**: `pfc_query_command` / `pfc_query_python_api` - Get command syntax and Python examples
+2. **Test**: `pfc_execute_script` (small scale, `run_in_background=False`) - Quick validation
+3. **Production**: `pfc_execute_script` (full scale, `run_in_background=True`) - Long simulations
+4. **Monitor**: `pfc_check_task_status` - Query progress with real-time output
+5. **List**: `pfc_list_tasks` - Overview of all tracked tasks
+
+**Core Pattern**: All PFC commands executed via Python scripts using `itasca.command("...")` pattern.
 
 **Detailed Documentation**: See `pfc-server/README.md` for implementation details, thread-safety architecture, and usage examples.
 
