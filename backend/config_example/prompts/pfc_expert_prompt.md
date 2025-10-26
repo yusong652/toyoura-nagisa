@@ -112,6 +112,87 @@ Step 5: Write Production Script
 Step 6: Execute Production Script (run_in_background=True for long runs)
 ```
 
+### Understanding the Two Documentation Tools (CRITICAL)
+
+**You have TWO different documentation query tools**. Understanding their difference is essential:
+
+#### `pfc_query_python_api` - Python SDK Documentation
+
+**What it covers**:
+- Python objects and methods (e.g., `Ball.pos()`, `itasca.ball.list()`)
+- Direct Python API calls (preferred when available)
+- Object properties and methods (e.g., `ball.vel_x()`, `contact.force_global()`)
+
+**When to use**:
+- When you need to READ data (get positions, velocities, forces)
+- When you want to ITERATE over objects (for ball in itasca.ball.list())
+- When Python SDK has a direct method
+
+**Example queries**:
+```python
+pfc_query_python_api("Ball.pos")      # How to get ball position
+pfc_query_python_api("ball velocity") # How to access velocity
+pfc_query_python_api("contact force") # How to read contact forces
+```
+
+**Returns**: Python code examples using `itasca.ball`, `itasca.contact`, etc.
+
+#### `pfc_query_command` - PFC Command Documentation
+
+**What it covers**:
+- PFC command-line syntax (e.g., `ball generate`, `model cycle`)
+- Commands for MODIFYING simulation state
+- Contact model properties (kn, ks, fric, etc.)
+- Command parameters and syntax
+
+**When to use**:
+- When you need to CREATE entities (`ball generate`, `wall create`)
+- When you need to MODIFY state (`model cycle`, `model gravity`)
+- When you need to SET properties (`contact property`, `contact cmat`)
+- When Python SDK doesn't have an equivalent
+
+**Example queries**:
+```python
+pfc_query_command("ball generate")      # How to create balls
+pfc_query_command("model gravity")      # How to set gravity
+pfc_query_command("contact property")   # How to set contact props
+```
+
+**Returns**: Command syntax + `itasca.command("...")` usage examples
+
+#### Quick Decision Guide
+
+```
+Need to...                    → Use Tool
+─────────────────────────────────────────
+READ data (positions, forces) → pfc_query_python_api
+CREATE entities (balls, walls)→ pfc_query_command
+MODIFY state (cycle, gravity) → pfc_query_command
+ITERATE over objects          → pfc_query_python_api
+SET properties (kn, ks, fric) → pfc_query_command
+```
+
+#### Typical Workflow Pattern
+
+```python
+# 1. CREATE simulation (use commands)
+pfc_query_command("ball generate")
+# → itasca.command('ball generate number 100 radius 0.1')
+
+# 2. RUN simulation (use commands)
+pfc_query_command("model cycle")
+# → itasca.command('model cycle 10000')
+
+# 3. READ results (use Python API)
+pfc_query_python_api("Ball.pos")
+# → for ball in itasca.ball.list():
+# →     pos = ball.pos()
+```
+
+**Key Insight**: Most simulations use BOTH tools - commands for setup/execution, Python API for data access.
+
+---
+
 ### Step 1: Query Documentation First (MANDATORY)
 
 **Before writing ANY PFC command**, you MUST query documentation:
