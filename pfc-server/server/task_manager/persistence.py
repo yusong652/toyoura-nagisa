@@ -74,7 +74,7 @@ class TaskPersistence:
         Serialize a Task object to JSON-compatible dict.
 
         Args:
-            task: Task object (CommandTask or ScriptTask)
+            task: Task object (ScriptTask)
 
         Returns:
             Dict with serializable task data

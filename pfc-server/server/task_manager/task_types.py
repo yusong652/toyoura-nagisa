@@ -1,8 +1,8 @@
 """
-Task Type Implementations - Concrete task classes for different execution types.
+Task Type Implementations - Script execution task class.
 
-This module contains CommandTask and ScriptTask implementations, providing
-type-specific behavior for command execution and script execution with output capture.
+This module contains ScriptTask implementation, providing type-specific
+behavior for Python script execution with real-time output capture.
 
 Python 3.6 compatible implementation.
 """
@@ -14,130 +14,6 @@ from .task_base import Task
 
 # Module logger
 logger = logging.getLogger("PFC-Server")
-
-
-class CommandTask(Task):
-    """
-    Task for PFC command execution.
-
-    Simple task type without output capture, suitable for immediate
-    commands that return results directly.
-    """
-
-    def __init__(self, task_id, session_id, future, command, on_status_change=None):
-        # type: (str, str, Any, str, Any) -> None
-        """
-        Initialize command task.
-
-        Args:
-            task_id: Unique task identifier
-            session_id: Session identifier for task isolation
-            future: asyncio Future object for the task
-            command: PFC command string being executed
-            on_status_change: Optional callback function(task) called when task status changes
-        """
-        super(CommandTask, self).__init__(task_id, session_id, future, command, "command", on_status_change)
-        self.command = command
-
-        logger.info("✓ Command task registered: {} (ID: {}, Session: {})".format(
-            command, task_id, session_id
-        ))
-
-    def get_status_response(self):
-        # type: () -> Dict[str, Any]
-        """Get command task status with result data."""
-        elapsed_time = self.get_elapsed_time()
-
-        if self.status == "running":
-            # Task still executing
-            return {
-                "status": "running",
-                "message": "Command still executing: {}\nElapsed time: {:.2f}s".format(
-                    self.description, elapsed_time
-                ),
-                "data": {
-                    "task_id": self.task_id,
-                    "session_id": self.session_id,
-                    "task_type": self.task_type,
-                    "description": self.description,
-                    "elapsed_time": elapsed_time
-                }
-            }
-
-        # Task completed or failed - retrieve result
-        try:
-            result = self.future.result(timeout=0)
-        except Exception as e:
-            result = None
-            if self.status == "completed":
-                logger.warning("Status mismatch for task {}: status='completed' but future raised: {}".format(
-                    self.task_id, str(e)
-                ))
-
-        if self.status == "completed":
-            # Command completed successfully
-            logger.info("✓ Task completed: {} (ID: {}, Time: {:.2f}s)".format(
-                self.description, self.task_id, elapsed_time
-            ))
-
-            # Serialize result data
-            serialized_result = self._serialize_result(result)
-
-            # Build response
-            if serialized_result is not None:
-                message = "Command completed: {}\nElapsed time: {:.2f}s\nResult: {}".format(
-                    self.description, elapsed_time, serialized_result
-                )
-            else:
-                message = "Command completed: {}\nElapsed time: {:.2f}s".format(
-                    self.description, elapsed_time
-                )
-
-            response_data = serialized_result if isinstance(serialized_result, dict) else {}
-            if not isinstance(response_data, dict):
-                response_data = {"result": serialized_result}
-            response_data["task_id"] = self.task_id
-            response_data["session_id"] = self.session_id
-            response_data["elapsed_time"] = elapsed_time
-
-            return {
-                "status": "success",
-                "message": message,
-                "data": response_data
-            }
-
-        else:  # status == "failed"
-            # Command failed
-            logger.error("✗ Command task failed: {} (ID: {})".format(self.description, self.task_id))
-
-            error_msg = "Task execution failed"
-            message = "Command failed: {}\nElapsed time: {:.2f}s\nError: {}".format(
-                self.description, elapsed_time, error_msg
-            )
-
-            return {
-                "status": "error",
-                "message": message,
-                "data": {"task_id": self.task_id, "session_id": self.session_id, "error": error_msg, "elapsed_time": elapsed_time}
-            }
-
-    def get_task_info(self):
-        # type: () -> Dict[str, Any]
-        """Get command task summary for listing."""
-        info = {
-            "task_id": self.task_id,
-            "session_id": self.session_id,
-            "task_type": self.task_type,
-            "description": self.description,
-            "status": self.status,
-            "elapsed_time": self.get_elapsed_time(),
-            "start_time": self.start_time,
-            "name": self.command  # Display name for list view (command text)
-        }
-        # Add end_time for completed/failed tasks
-        if self.status in ["completed", "failed"] and self.end_time is not None:
-            info["end_time"] = self.end_time
-        return info
 
 
 class ScriptTask(Task):

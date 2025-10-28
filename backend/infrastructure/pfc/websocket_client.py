@@ -19,7 +19,11 @@ logger = logging.getLogger("PFC-Client")
 
 
 class PFCWebSocketClient:
-    """WebSocket client for communicating with PFC server."""
+    """WebSocket client for communicating with PFC server.
+
+    Script-only workflow: All PFC operations are executed through Python scripts.
+    Direct command execution is not supported.
+    """
 
     def __init__(
         self,
@@ -323,146 +327,6 @@ class PFCWebSocketClient:
                 logger.info("Unexpected error, starting auto-reconnect...")
                 if not self._reconnecting and (not self._reconnect_task or self._reconnect_task.done()):
                     self._reconnect_task = asyncio.create_task(self._auto_reconnect())
-
-    async def send_command(
-        self,
-        command: str,
-        arg: Optional[Union[bool, int, float, str, tuple]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        timeout_ms: int = 30000,
-        run_in_background: bool = False,
-        session_id: str = "default",
-        max_retries: int = 2
-    ) -> Dict[str, Any]:
-        """
-        Send command to PFC server and wait for result.
-
-        WebSocket communication timeout is automatically calculated based on timeout_ms
-        and run_in_background to ensure sufficient time for command execution and
-        result transmission (infrastructure overhead is handled transparently).
-
-        Args:
-            command: PFC command name (e.g., "model gravity", "contact cmat default", "ball create")
-            arg: Optional positional argument (value without keyword) using native Python types
-                Supported types: bool, int, float, str, tuple
-                Examples:
-                  • True (bool) → "model large-strain true"
-                  • 9.81 (float) → "model gravity 9.81"
-                  • (0, 0, -9.81) (tuple) → "model gravity (0,0,-9.81)"
-                Note: Most PFC commands use keyword parameters (params dict).
-                      Positional args are typically numeric values, booleans, or tuples.
-            params: Optional dictionary with keyword parameters (values can be None for boolean flags)
-                Examples:
-                  • {"radius": 1.0, "position": [0, 0, 0], "group": "my_balls"}
-                  • {"condition": "stop"} → "model domain condition stop"
-                  • {"model": "linear", "inheritance": None} → boolean flag
-            timeout_ms: Command execution timeout in milliseconds (default: 30000ms)
-                Passed to executor for command execution timeout control.
-                WebSocket timeout is auto-calculated: timeout_ms/1000 + buffer.
-            run_in_background: Background execution control (default: False - synchronous)
-                Passed to executor to control execution mode.
-                Affects WebSocket timeout: background=10s, foreground=dynamic.
-            session_id: Session identifier for task isolation (default: "default")
-                Used to separate tasks across different client sessions.
-            max_retries: Maximum retry attempts on connection failure (default: 2)
-
-        Returns:
-            Result dictionary from PFC server with structure:
-                - type: "result" - Message type identifier
-                - request_id: str - Unique request identifier
-                - status: Literal["success", "error"] - Operation outcome
-                - message: str - User-friendly message (success description or error details)
-                - data: Optional[Any] - Command result data (success only)
-
-        Raises:
-            ConnectionError: If connection to PFC server fails after retries
-            TimeoutError: If command execution or WebSocket communication times out
-
-        Note:
-            - arg accepts native Python types (int, float, str, tuple) for type-driven formatting
-            - Server assembles complete command string: "command arg keyword1 value1 keyword2 ..."
-            - Params with None values are boolean flags (keyword without value)
-            - Type-driven formatting enables cleaner API: 9.81 instead of "9.81"
-            - WebSocket timeout is infrastructure detail, automatically managed
-        """
-        for attempt in range(max_retries):
-            try:
-                # Wait for reconnection if in progress
-                if self._reconnecting:
-                    logger.info("Waiting for auto-reconnect to complete...")
-                    # Wait up to 30 seconds for reconnection
-                    for _ in range(60):  # 60 * 0.5s = 30s
-                        if not self._reconnecting and self.connected:
-                            break
-                        await asyncio.sleep(0.5)
-
-                    if not self.connected:
-                        raise ConnectionError("Auto-reconnect did not complete in time")
-
-                # Ensure connected (manual reconnect if needed)
-                if not self.connected:
-                    self._should_stop = False  # Allow reconnection
-                    success = await self.connect()
-                    if not success:
-                        raise ConnectionError("Failed to connect to PFC server")
-
-                request_id = str(uuid4())
-                params = params or {}
-
-                # Auto-calculate WebSocket timeout (infrastructure detail)
-                websocket_timeout_ms = self._calculate_websocket_timeout_ms(timeout_ms, run_in_background)
-
-                # Create command message
-                message = {
-                    "type": "command",
-                    "request_id": request_id,
-                    "session_id": session_id,
-                    "command": command,
-                    "arg": arg,
-                    "params": params,
-                    "timeout_ms": timeout_ms,
-                    "run_in_background": run_in_background
-                }
-
-                # Create future for result
-                future = asyncio.get_event_loop().create_future()
-                self.pending_requests[request_id] = future
-
-                try:
-                    # Send command
-                    await self.websocket.send(json.dumps(message))
-                    logger.debug(f"Command sent: {request_id} - {command}")
-
-                    # Wait for result with auto-calculated timeout (convert ms to seconds for asyncio)
-                    result = await asyncio.wait_for(future, timeout=websocket_timeout_ms / 1000.0)
-                    return result
-
-                except asyncio.TimeoutError:
-                    self.pending_requests.pop(request_id, None)
-                    raise TimeoutError(
-                        f"Command '{command}' timed out after {websocket_timeout_ms}ms "
-                        f"(command timeout: {timeout_ms}ms + infrastructure buffer)"
-                    )
-
-            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
-                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
-                self.connected = False
-
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(0.5)  # Brief delay before retry
-                    continue
-                else:
-                    raise ConnectionError(
-                        "Failed to execute command after retries. "
-                        "Please ensure PFC server is running."
-                    ) from e
-
-            except Exception as e:
-                logger.error(f"Command execution failed: {e}")
-                raise
-
-        # Fallback: should never reach here due to retry logic
-        raise RuntimeError("Unexpected code path in send_command")
 
     async def send_script(
         self,
@@ -841,7 +705,7 @@ async def get_client() -> PFCWebSocketClient:
 
     Example:
         >>> client = await get_client()
-        >>> result = await client.send_command("ball.count", {})
+        >>> result = await client.send_script("/path/to/script.py", "Test script")
     """
     global _client_instance
 

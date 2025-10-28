@@ -1,26 +1,24 @@
 """
 PFC Task Manager - Long-running task tracking and lifecycle management.
 
-This package provides task lifecycle management separate from command execution.
-Status queries do not go through the executor as they are not PFC commands.
+This package provides task lifecycle management for Python script execution.
+Status queries do not execute PFC commands, only query task state.
 
 Public API:
     - TaskManager: Main task registry and management interface
     - Task: Abstract base class for task types (for type hints)
-    - CommandTask: Command execution task type
-    - ScriptTask: Script execution task type with output capture
+    - ScriptTask: Python script execution task type with real-time output capture
 
 Python 3.6 compatible implementation.
 """
 
-# Public API exports (for backward compatibility)
+# Public API exports
 from .manager import TaskManager
 from .task_base import Task
-from .task_types import CommandTask, ScriptTask
+from .task_types import ScriptTask
 
 __all__ = [
     "TaskManager",
     "Task",
-    "CommandTask",
     "ScriptTask",
 ]

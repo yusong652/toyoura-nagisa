@@ -12,7 +12,7 @@ import logging
 from typing import Any, Dict, Optional, List
 
 from .task_base import Task
-from .task_types import CommandTask, ScriptTask
+from .task_types import ScriptTask
 from .persistence import TaskPersistence
 
 # Module logger
@@ -23,12 +23,12 @@ class TaskManager:
     """
     Manage long-running task tracking and status queries.
 
-    This class is separate from PFCCommandExecutor to maintain clear
-    separation of concerns: executor executes commands, task manager
+    This class is separate from PFCScriptExecutor to maintain clear
+    separation of concerns: executor executes scripts, task manager
     tracks their lifecycle.
 
-    Tasks are represented as polymorphic Task objects (CommandTask, ScriptTask),
-    eliminating conditional type checking and enabling clean extension.
+    Tasks are represented as ScriptTask objects for Python script execution,
+    enabling clean extension and type-specific behavior.
     """
 
     def __init__(self, enable_persistence=True):
@@ -71,29 +71,6 @@ class TaskManager:
             logger.info("✓ Loaded {} historical task(s)".format(len(tasks_data)))
         except Exception as e:
             logger.error("Failed to load historical tasks: {}".format(e))
-
-    def create_command_task(self, session_id, future, command):
-        # type: (str, Any, str) -> str
-        """
-        Register a new long-running PFC command task.
-
-        Args:
-            session_id: Session identifier for task isolation
-            future: asyncio Future object for the task
-            command: PFC command string being executed
-
-        Returns:
-            str: Unique task ID for tracking
-        """
-        task_id = uuid.uuid4().hex[:8]
-        # Pass save callback for automatic persistence on status change
-        task = CommandTask(task_id, session_id, future, command, on_status_change=self._on_task_status_change)
-        self.tasks[task_id] = task
-
-        # Save to disk immediately
-        self._save_tasks()
-
-        return task_id
 
     def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None):
         # type: (str, Any, str, Optional[str], Any, Optional[str]) -> str

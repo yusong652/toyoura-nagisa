@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 import websockets
 from websockets.server import WebSocketServerProtocol #type: ignore
 
-from .executor import PFCCommandExecutor
 from .script_executor import PFCScriptExecutor
 from .main_thread_executor import MainThreadExecutor
 from .task_manager import TaskManager
@@ -24,7 +23,11 @@ logger = logging.getLogger("PFC-Server")
 
 
 class PFCWebSocketServer:
-    """WebSocket server for PFC command execution via main thread queue."""
+    """WebSocket server for PFC script execution via main thread queue.
+
+    Script-only workflow: All PFC operations must be executed through Python
+    scripts using itasca.command(). Direct command execution is no longer supported.
+    """
 
     def __init__(
         self,
@@ -53,7 +56,6 @@ class PFCWebSocketServer:
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
         self.task_manager = TaskManager()
-        self.executor = PFCCommandExecutor(main_executor, self.task_manager)
         self.script_executor = PFCScriptExecutor(main_executor, self.task_manager)
         self.active_connections = set()
         self.server = None
@@ -93,39 +95,9 @@ class PFCWebSocketServer:
                     data = json.loads(message)
                     logger.debug(f"Received message: {data}")
 
-                    msg_type = data.get("type", "command")
+                    msg_type = data.get("type", "script")
 
-                    if msg_type == "command":
-                        # Execute command
-                        request_id = data.get("request_id", "unknown")
-                        session_id = data.get("session_id", "default")  # Session ID for task isolation
-                        command = data.get("command", "")
-                        arg = data.get("arg")  # Single positional argument (can be None)
-                        params = data.get("params", {})
-                        timeout_ms = data.get("timeout_ms", 30000)  # Default 30 seconds
-                        run_in_background = data.get("run_in_background", False)  # Default synchronous
-
-                        result = await self.executor.execute_command(session_id, command, arg, params, timeout_ms, run_in_background)
-
-                        # Truncate message before sending (prevent oversized JSON)
-                        if "message" in result:
-                            result["message"] = self._truncate_message(result["message"])
-
-                        # Send result back
-                        response = {
-                            "type": "result",
-                            "request_id": request_id,
-                            **result
-                        }
-
-                        try:
-                            await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
-                        except websockets.exceptions.ConnectionClosed:
-                            logger.warning(f"Cannot send result, connection closed: {request_id}")
-                            break  # Exit message loop
-
-                    elif msg_type == "script":
+                    if msg_type == "script":
                         # Execute Python script from file path
                         request_id = data.get("request_id", "unknown")
                         session_id = data.get("session_id", "default")  # Session ID for task isolation
