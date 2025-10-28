@@ -4,9 +4,10 @@ PFC Task Status Tool - MCP tool for checking individual task status.
 Provides real-time status monitoring and output retrieval for long-running PFC tasks.
 """
 
+import asyncio
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pydantic import Field
 from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
@@ -42,6 +43,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
             ge=1,
             le=100,
             description="Lines to display (default: 10, max: 100)"
+        ),
+        filter: Optional[str] = Field(
+            None,
+            description="Optional text filter - only show lines containing this text (case-sensitive)"
+        ),
+        wait_seconds: float = Field(
+            1,
+            ge=1,
+            le=3600,
+            description="Wait N seconds before checking status (0-3600s). Use to avoid frequent polling. Example: wait_seconds=30 for long simulations"
         )
     ) -> Dict[str, Any]:
         """
@@ -52,8 +63,17 @@ def register_pfc_task_status_tool(mcp: FastMCP):
 
         Pagination helps manage long outputs efficiently. All scripts (foreground/background)
         are tracked until server restart. Use pfc_list_tasks to find task IDs.
+
+        Optional filtering allows focusing on specific output (e.g., errors, warnings).
+
+        Rate limiting: Use wait_seconds to avoid frequent polling (e.g., wait_seconds=30
+        waits 30s before checking, useful for long simulations).
         """
         try:
+            # Wait before checking (rate limiting for long-running tasks)
+            if wait_seconds > 0:
+                await asyncio.sleep(wait_seconds)
+
             # Get current session ID from context (for ownership marking)
             current_session_id = getattr(context, 'client_id', 'unknown')
 
@@ -93,7 +113,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
-                output_text, pagination = format_paginated_output(output, offset, limit)
+                output_text, pagination = format_paginated_output(output, offset, limit, filter)
 
                 # Build navigation hints
                 nav_hints = []
@@ -113,12 +133,15 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build filter info
+                filter_info = f" | Filter: '{filter}'" if filter else ""
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
                     f"**STATUS**: Running | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
-                    f"Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output ━━━\n"
@@ -154,7 +177,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
-                output_text, pagination = format_paginated_output(output, offset, limit)
+                output_text, pagination = format_paginated_output(output, offset, limit, filter)
 
                 # Build navigation hints
                 nav_hints = []
@@ -174,13 +197,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build filter info
+                filter_info = f" | Filter: '{filter}'" if filter else ""
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
                     f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Result: {task_result}\n"
-                    f"Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output ━━━\n"
@@ -216,7 +242,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
-                output_text, pagination = format_paginated_output(output, offset, limit)
+                output_text, pagination = format_paginated_output(output, offset, limit, filter)
 
                 # Build navigation hints
                 nav_hints = []
@@ -236,13 +262,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build filter info
+                filter_info = f" | Filter: '{filter}'" if filter else ""
+
                 # Build LLM-friendly text with three-line format
                 llm_text = (
                     f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{session_marker}\n"
                     f"  Script: {script_path}\n"
                     f"  → {description}\n\n"
                     f"Error: {error_msg}\n"
-                    f"Output: {pagination['total_lines']} lines total | "
+                    f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
                     f"Showing: lines {pagination['line_range']} "
                     f"({'most recent' if offset == 0 else f'offset {offset}'})\n\n"
                     f"━━━ Output before error ━━━\n"

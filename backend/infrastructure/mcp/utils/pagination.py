@@ -5,13 +5,14 @@ Provides reusable pagination functions for efficient context usage
 when displaying long outputs from various tools.
 """
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 
 def format_paginated_output(
     output: str,
     offset: int,
     limit: int,
+    filter_text: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Format output with pagination for efficient context usage.
@@ -20,6 +21,7 @@ def format_paginated_output(
         output: Complete output string to paginate
         offset: Line offset from newest (0 = most recent)
         limit: Number of lines to display
+        filter_text: Optional substring to filter lines (case-sensitive)
 
     Returns:
         Tuple of (formatted_output, pagination_metadata)
@@ -30,6 +32,8 @@ def format_paginated_output(
         >>> # Shows: "line4\\nline5" (most recent 2 lines)
         >>> text, meta = format_paginated_output(output, offset=2, limit=2)
         >>> # Shows: "line2\\nline3" (skip 2 newest, show next 2)
+        >>> text, meta = format_paginated_output(output, offset=0, limit=10, filter_text="error")
+        >>> # Shows: only lines containing "error"
     """
     # Parse output into lines
     lines = output.split('\n') if output else []
@@ -43,8 +47,39 @@ def format_paginated_output(
             "limit": limit,
             "line_range": "0-0",
             "has_earlier": False,
-            "has_later": False
+            "has_later": False,
+            "filter_text": filter_text,
+            "filtered_lines": 0
         }
+
+    # Apply filtering if filter_text is provided
+    if filter_text:
+        # Store original line numbers and filter
+        filtered_lines_with_numbers = [
+            (idx, line) for idx, line in enumerate(lines)
+            if filter_text in line
+        ]
+
+        if not filtered_lines_with_numbers:
+            # No matches found
+            return f"(no lines matching '{filter_text}')", {
+                "total_lines": total_lines,
+                "displayed_count": 0,
+                "offset": offset,
+                "limit": limit,
+                "line_range": "0-0",
+                "has_earlier": False,
+                "has_later": False,
+                "filter_text": filter_text,
+                "filtered_lines": 0
+            }
+
+        # Extract filtered lines and their original indices
+        original_indices = [idx for idx, _ in filtered_lines_with_numbers]
+        lines = [line for _, line in filtered_lines_with_numbers]
+        total_lines = len(lines)  # Update total_lines to filtered count
+    else:
+        original_indices = None
 
     # Calculate slice indices (offset from end, newest = highest index)
     # offset=0, limit=10: show lines [-10:] (most recent 10 lines)
@@ -66,8 +101,14 @@ def format_paginated_output(
     #   start_idx = 307 - 290 - 10 = 7
     #   displayed = lines[7:17] (array indices 7-16)
     #   Should display as "lines 7-16"
-    first_line_num = start_idx  # First array index in the slice
-    last_line_num = end_idx - 1  # Last array index in the slice
+
+    # If filtered, use original line numbers; otherwise use slice indices
+    if original_indices:
+        first_line_num = original_indices[start_idx] if start_idx < len(original_indices) else 0
+        last_line_num = original_indices[end_idx - 1] if end_idx > 0 and end_idx - 1 < len(original_indices) else 0
+    else:
+        first_line_num = start_idx  # First array index in the slice
+        last_line_num = end_idx - 1  # Last array index in the slice
 
     # Format output
     output_text = '\n'.join(displayed) if displayed else "(no lines in range)"
@@ -84,7 +125,9 @@ def format_paginated_output(
         "limit": limit,
         "line_range": f"{first_line_num}-{last_line_num}",
         "has_earlier": has_earlier,
-        "has_later": has_later
+        "has_later": has_later,
+        "filter_text": filter_text,
+        "filtered_lines": total_lines if filter_text else None
     }
 
     return output_text, metadata
