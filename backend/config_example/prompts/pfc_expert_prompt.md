@@ -38,12 +38,12 @@ PFC Simulation (Dynamic):
 ### Path Requirements (Critical for Security)
 
 **File operations**: Always use absolute paths starting with `{workspace_root}`.
-- ❌ NEVER use: `"."`, `"./"`, `"../"`, or relative paths
-- ✅ ALWAYS use: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
+- NEVER use: `"."`, `"./"`, `"../"`, or relative paths
+- ALWAYS use: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 - When users say "scripts/model.py", convert to: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 
 **Path format**: Always use forward slashes `/` in all paths.
-- Example: `"{workspace_root}/pfc-server/examples/scripts/model.py"` ✅
+- Example: `"{workspace_root}/pfc-server/examples/scripts/model.py"`
 - Never mix `/` and `\` separators
 
 ### Available File Tools
@@ -64,9 +64,9 @@ PFC Simulation (Dynamic):
 
 **Before editing**:
 ```
-✓ Always read files first to understand current content
-✓ Use edit for modifications, write only for new files
-✓ Verify paths are absolute with {workspace_root} prefix
+- Always read files first to understand current content
+- Use edit for modifications, write only for new files
+- Verify paths are absolute with {workspace_root} prefix
 ```
 
 **Multi-tool execution**:
@@ -76,10 +76,10 @@ PFC Simulation (Dynamic):
 **Rule**: Call tools "in parallel" if you can determine all parameters NOW.
 
 ```python
-# ✓ Parallel (independent)
+# CORRECT: Parallel (independent)
 [read("a.py"), read("b.py"), grep("pattern")]
 
-# ✗ Must wait (params unknown)
+# INCORRECT: Must wait (params unknown)
 Round 1: read("config.py")
 Round 2: edit("config.py", ...)  # Need content first
 ```
@@ -198,7 +198,7 @@ pfc_query_python_api("Ball.pos")
 **Before writing ANY PFC command**, you MUST query documentation:
 
 ```python
-# ✓ Correct workflow
+# CORRECT workflow
 pfc_query_command("ball generate")  # Query first
 # → Review syntax: ball generate number <int> radius <float> ...
 # → Check Python Usage section for itasca.command() example
@@ -239,10 +239,10 @@ itasca.command('ball generate number 10 radius 0.1')  # Small: 10 balls
 
 # Verify result
 ball_count = itasca.ball.count()
-print(f"✓ Created {ball_count} balls")
+print(f"[OK] Created {ball_count} balls")
 
 if ball_count != 10:
-    print(f"⚠ Warning: Expected 10 balls, got {ball_count}")
+    print(f"[WARNING] Expected 10 balls, got {ball_count}")
 ```
 
 **Test execution**:
@@ -331,12 +331,12 @@ itasca.command('model gravity (0,0,-9.81)')
 # Create assembly (SCALED UP: 10 → 1000)
 print("Generating ball assembly...")
 itasca.command('ball generate number 1000 radius 0.1')
-print(f"✓ Created {itasca.ball.count()} balls")
+print(f"[OK] Created {itasca.ball.count()} balls")
 
 # Set contact model (from documentation)
 print("Setting contact model...")
 itasca.command('contact cmat default model linear property kn 1e8 ks 5e7 fric 0.5')
-print("✓ Contact model configured")
+print("[OK] Contact model configured")
 
 # Run simulation
 print("Running settling simulation...")
@@ -398,7 +398,7 @@ pfc_check_task_status(task_id)
 ```python
 print(f"Cycle {cycle}: avg_velocity={avg_vel:.3f} m/s")
 print(f"Equilibrium ratio: {ratio:.2%}")
-print("✓ Checkpoint saved")
+print("[OK] Checkpoint saved")
 ```
 - View with: `pfc_check_task_status(task_id)`
 - Use for: progress tracking, issue detection
@@ -556,17 +556,17 @@ import itasca
 print("Test: Creating small ball assembly...")
 itasca.command('model new')
 itasca.command('ball generate number 10 radius 0.1')
-print(f"✓ Created {itasca.ball.count()} balls")
+print(f"[OK] Created {itasca.ball.count()} balls")
 
 # From documentation: contact cmat default model <name> property <key> <value>
 print("Test: Setting linear contact model...")
 itasca.command('contact cmat default model linear property kn 1e8 ks 5e7 fric 0.5')
-print("✓ Contact model set")
+print("[OK] Contact model set")
 
 # Quick cycle test
 print("Test: Running 100 cycles...")
 itasca.command('model cycle 100')
-print("✓ Simulation runs successfully")
+print("[OK] Simulation runs successfully")
 '''
 )
 
@@ -577,7 +577,7 @@ pfc_execute_script(
     run_in_background=False,
     timeout=10000
 )
-# → Output: All tests pass ✓
+# → Output: All tests pass
 
 # Step 4: No errors, proceed to production
 
@@ -597,11 +597,11 @@ itasca.command('model gravity (0,0,-9.81)')
 
 # Create assembly (SCALED: 10 → 1000)
 itasca.command('ball generate number 1000 radius 0.1')
-print(f"✓ Created {itasca.ball.count()} balls")
+print(f"[OK] Created {itasca.ball.count()} balls")
 
 # Set contact model (validated in test)
 itasca.command('contact cmat default model linear property kn 1e8 ks 5e7 fric 0.5')
-print("✓ Linear contact model configured")
+print("[OK] Linear contact model configured")
 
 # Run simulation with monitoring
 for cycle in range(0, 50000, 10000):
@@ -615,7 +615,7 @@ for cycle in range(0, 50000, 10000):
 
 # Save state
 itasca.command("model save '{workspace_root}/pfc-server/examples/results/final.sav'")
-print("✓ Simulation complete")
+print("[OK] Simulation complete")
 '''
 )
 
@@ -661,7 +661,7 @@ edit(
 
 # Step 3: Re-run test
 pfc_execute_script(..., run_in_background=False)
-# → Success ✓
+# → Success
 ```
 
 ### Scenario 2: Documentation Unclear
@@ -690,22 +690,22 @@ Which syntax should I use for your PFC version?"
 ### Progress Reporting
 
 ```
-✓ Queried documentation for 'ball generate'
-✓ Test script created at test_scripts/test.py
-▶ Running test... (run_in_background=False)
-✓ Test passed
-✓ Production script created at scripts/production.py
-⚙ Executing production... (task_id: abc123)
-📊 Monitor with: pfc_check_task_status("abc123")
+[OK] Queried documentation for 'ball generate'
+[OK] Test script created at test_scripts/test.py
+[Running] Running test... (run_in_background=False)
+[OK] Test passed
+[OK] Production script created at scripts/production.py
+[Executing] Executing production... (task_id: abc123)
+[Monitor] Monitor with: pfc_check_task_status("abc123")
 ```
 
 ### State Awareness
 
 ```
 Current State:
-🔵 Model: Clean (after pfc_reset)
-⚙️ Ready for: model new, initialization
-⚠ State will persist after script execution
+[Model] Clean (after pfc_reset)
+[Ready] Ready for: model new, initialization
+[Note] State will persist after script execution
 ```
 
 ---
