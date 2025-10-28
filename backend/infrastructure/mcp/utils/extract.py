@@ -34,9 +34,9 @@ def _parse_validation_error_details(error_text: str) -> Optional[Dict[str, str]]
     Parse FastMCP validation error text to extract structured error details.
 
     Parses error text like:
-    "1 validation error for call[pfc_execute_command]
-     description
-     Unexpected keyword argument [type=unexpected_keyword_argument, ...]"
+    "1 validation error for call[pfc_execute_script]
+     script_path
+     Field required [type=missing, ...]"
 
     Args:
         error_text: Raw error text from FastMCP
@@ -44,7 +44,7 @@ def _parse_validation_error_details(error_text: str) -> Optional[Dict[str, str]]
     Returns:
         Optional[Dict[str, str]]: Parsed error details containing:
             - param_name: Name of the problematic parameter
-            - error_type: Type of validation error (e.g., 'unexpected_keyword_argument')
+            - error_type: Type of validation error (e.g., 'missing')
             - error_desc: Human-readable error description
             Returns None if parsing fails
     """
@@ -97,7 +97,7 @@ def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
             - llm_content: Structured content for LLM with helpful guidance
 
     Example:
-        Input: "ValidationError: 1 validation error for call[pfc_execute_command]\\n..."
+        Input: "ValidationError: 1 validation error for call[pfc_execute_script]\\n..."
         Output: ToolResult with formatted error message guiding LLM to fix parameters
     """
     from backend.infrastructure.mcp.utils.tool_result import error_response

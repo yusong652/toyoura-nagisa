@@ -79,7 +79,8 @@ def register_pfc_script_tool(mcp: FastMCP):
             4. After completion, process exported files
 
         Note:
-            For simple commands, use pfc_execute_command instead.
+            All PFC commands must be executed through Python scripts using itasca.command().
+            Query pfc_query_command for command syntax before writing scripts.
         """
         try:
             # Get session ID from MCP context for task isolation
