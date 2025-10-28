@@ -1,33 +1,13 @@
 {
   "command": "contact activate",
   "category": "contact",
-  "search_keywords": ["activate", "flag", "active"],
-  "description": "Change the contact activate flag for existing contacts. When set to 'on' (true), the activate flag ensures the contact remains in an active state until automatically deleted by the contact detection system, and also sets the inhibit flag to false. When set to 'off' (false), contact activity is determined by the contact model. By default, only mechanical contacts are considered. The activate flag is off by default.",
-
-  "syntax": "contact activate <b> <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "b",
-      "type": "boolean",
-      "required": true,
-      "description": "Boolean value to set activate flag: true/on (always active) or false/off (model-determined activity)",
-      "valid_values": ["true", "false", "on", "off"]
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to specify contact type (mechanical or thermal)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which contacts are affected. If omitted, all contacts are affected"
-    }
+  "search_keywords": [
+    "activate",
+    "flag",
+    "active"
   ],
-
+  "description": "Change the contact activate flag for existing contacts. When set to 'on' (true), the activate flag ensures the contact remains in an active state until automatically deleted by the contact detection system, and also sets the inhibit flag to false. When set to 'off' (false), contact activity is determined by the contact model. By default, only mechanical contacts are considered. The activate flag is off by default.",
+  "syntax": "contact activate <b> <keyword> <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -40,7 +20,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact activate on",
@@ -73,7 +52,6 @@
       "use_case": "Keep null contacts in system even though they transmit no forces"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -110,14 +88,12 @@
       "python": "for c in it.contact.list(): c.activate(True)"
     }
   },
-
   "related_commands": [
     "contact inhibit",
     "contact model",
     "contact cmat add",
     "model clean"
   ],
-
   "notes": [
     "Activate flag is OFF by default - contacts follow model-determined activity logic",
     "Setting activate to ON: contact always active until deleted by contact detection",
@@ -128,7 +104,6 @@
     "Activation does not prevent contact deletion by the contact detection system",
     "Affects EXISTING contacts, not future contact creation"
   ],
-
   "activate_vs_active_vs_inhibit": {
     "activate_flag": {
       "description": "Control flag determining whether contact is forced to stay active",
@@ -171,7 +146,6 @@
       ]
     }
   },
-
   "contact_activity_logic": {
     "description": "How PFC determines whether a contact is active",
     "decision_tree": [
@@ -201,7 +175,6 @@
       ]
     }
   },
-
   "common_use_cases": [
     {
       "use_case": "Force contacts to stay active during simulation phase",
@@ -252,7 +225,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Identify contacts that need forced activation",
     "2. Use range specification to target specific contacts if needed",
@@ -261,7 +233,6 @@
     "5. Contacts remain active until deleted by contact detection",
     "6. To return to default: contact activate false"
   ],
-
   "activate_true_effects": {
     "description": "What happens when you set activate = true",
     "immediate_effects": [
@@ -283,7 +254,6 @@
       "Can manually deactivate with: contact activate false"
     ]
   },
-
   "activate_false_effects": {
     "description": "What happens when you set activate = false (default behavior)",
     "immediate_effects": [
@@ -302,7 +272,6 @@
       "Null model: always inactive (no forces)"
     ]
   },
-
   "range_specifications": {
     "description": "Range limits which contacts are affected by the activation command",
     "common_ranges": {
@@ -318,7 +287,6 @@
       "contact activate true range model linearpbond"
     ]
   },
-
   "performance_considerations": {
     "command_interface": "Very fast - bulk activation state change in C++ core",
     "python_iteration": "Slower - Python loop overhead + method call per contact",
@@ -336,7 +304,6 @@
       }
     ]
   },
-
   "warnings": [
     {
       "type": "always_active",
@@ -363,7 +330,6 @@
       "mitigation": "If pieces move far apart, contact may still be deleted even if activated"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Contacts becoming inactive when shouldn't",
@@ -411,7 +377,6 @@
       ]
     }
   ],
-
   "activate_vs_inhibit": {
     "contact_activate": {
       "function": "Force contact to STAY ACTIVE",
@@ -435,7 +400,6 @@
       "To return to normal: contact activate false AND contact inhibit false"
     ]
   },
-
   "ball_facet_behavior": {
     "description": "Special behavior for ball-facet and pebble-facet contacts",
     "note": "Activity state is set to true regardless of contact resolution strategy for ball-facet or pebble-facet contacts",
@@ -444,7 +408,6 @@
     "solution": "Use contact activate true range type ball-facet to keep them active",
     "related": "Similar behavior for pebble-facet contacts"
   },
-
   "default_behavior": {
     "description": "Behavior when activate flag is off (default)",
     "activate_flag": "false (off by default)",
@@ -457,7 +420,6 @@
     ],
     "why_default_is_off": "Allows contact model to efficiently manage contact activity based on physical state"
   },
-
   "when_to_use_activation": {
     "use_activate_true": [
       "Want to keep contact forces even with small separations",

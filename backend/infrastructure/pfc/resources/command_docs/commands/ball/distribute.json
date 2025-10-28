@@ -1,44 +1,14 @@
 {
   "command": "ball distribute",
   "category": "ball",
-  "search_keywords": ["distribute", "porosity", "overlap", "packing"],
-  "description": "Distribute balls with overlaps until a target porosity is achieved. Ball positions and radii are drawn from uniform distributions (or Gaussian/FISH distributions). Significant ball overlaps will likely result from this operation. This command contrasts with ball generate where balls are generated without overlap.",
-
-  "syntax": "ball distribute <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "porosity",
-      "type": "float",
-      "required": false,
-      "description": "Target porosity (default: 0.16 in 2D, 0.359 in 3D - tight mono-disperse packing)"
-    },
-    {
-      "name": "box",
-      "type": "box specification",
-      "required": false,
-      "description": "Bounding box for ball distribution (default: model domain)"
-    },
-    {
-      "name": "number-bins",
-      "type": "integer",
-      "required": false,
-      "description": "Number of size distributions to use"
-    },
-    {
-      "name": "resolution",
-      "type": "float",
-      "required": false,
-      "description": "Multiplicative factor for ball radii (default: 1.0)"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Applied to each generated ball to ensure final distribution meets criteria"
-    }
+  "search_keywords": [
+    "distribute",
+    "porosity",
+    "overlap",
+    "packing"
   ],
-
+  "description": "Distribute balls with overlaps until a target porosity is achieved. Ball positions and radii are drawn from uniform distributions (or Gaussian/FISH distributions). Significant ball overlaps will likely result from this operation. This command contrasts with ball generate where balls are generated without overlap.",
+  "syntax": "ball distribute <keyword> ... <range>",
   "keywords": [
     {
       "name": "porosity",
@@ -59,7 +29,13 @@
       "name": "bin",
       "syntax": "bin <i> <keywords>...",
       "description": "Specify distribution properties for bin i",
-      "sub_keywords": ["radius", "gauss", "fish-distribution", "volume-fraction", "group"]
+      "sub_keywords": [
+        "radius",
+        "gauss",
+        "fish-distribution",
+        "volume-fraction",
+        "group"
+      ]
     },
     {
       "name": "resolution",
@@ -67,7 +43,6 @@
       "description": "Multiplicative factor for all generated ball radii"
     }
   ],
-
   "bin_keywords": [
     {
       "name": "radius",
@@ -95,7 +70,6 @@
       "description": "Assign generated balls to group"
     }
   ],
-
   "examples": [
     {
       "command": "ball distribute radius 1.0 1.6 porosity 0.30",
@@ -114,7 +88,6 @@
       "description": "Single distribution assigned to group 'layer1'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball distribute ...') - no Python SDK equivalent for porosity-based distribution with overlaps"

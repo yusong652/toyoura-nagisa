@@ -1,26 +1,13 @@
 {
   "command": "contact model",
   "category": "contact",
-  "search_keywords": ["model", "assign", "linear"],
-  "description": "Assign contact models to existing contacts. The selected contact model applies to contacts in the specified range. If no range is specified, then all contacts in the model are affected. This command replaces the contact model entirely - all information stored in the previous contact model is lost. The contact model can be a built-in model or a plug-in model registered with the program load command. By default, mechanical contacts are considered.",
-
-  "syntax": "contact model <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "model name",
-      "required": true,
-      "description": "Contact model name (e.g., 'linear', 'linearpbond', 'hertz'). Can be built-in or custom plug-in model"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which contacts are affected. If omitted, all contacts are affected"
-    }
+  "search_keywords": [
+    "model",
+    "assign",
+    "linear"
   ],
-
+  "description": "Assign contact models to existing contacts. The selected contact model applies to contacts in the specified range. If no range is specified, then all contacts in the model are affected. This command replaces the contact model entirely - all information stored in the previous contact model is lost. The contact model can be a built-in model or a plug-in model registered with the program load command. By default, mechanical contacts are considered.",
+  "syntax": "contact model <keyword> <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -108,7 +95,6 @@
       "description": "Assign Null Model - no force transmission, effectively disables contact"
     }
   ],
-
   "examples": [
     {
       "command": "contact model null range group 'bottom-platen' match 2",
@@ -146,7 +132,6 @@
       "model": "linear"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -167,7 +152,6 @@
       "Use range specification in command interface to avoid Python iteration"
     ]
   },
-
   "model_properties_reference": {
     "path": "model-properties/index.json",
     "description": "After assigning a model, set its properties using 'contact property' command. See model-properties documentation for available properties.",
@@ -179,14 +163,12 @@
       "rrlinear": "model-properties/rrlinear.json"
     }
   },
-
   "related_commands": [
     "contact property",
     "contact cmat add",
     "contact cmat default",
     "contact cmat apply"
   ],
-
   "notes": [
     "WARNING: Changing model COMPLETELY REPLACES the contact model - all previous model data is LOST",
     "Affects EXISTING contacts, not future contact creation (unlike CMAT commands)",
@@ -197,7 +179,6 @@
     "Model assignment takes effect immediately",
     "More efficient than Python iteration for bulk model changes"
   ],
-
   "model_vs_cmat": {
     "contact_model": {
       "target": "EXISTING contacts",
@@ -217,7 +198,6 @@
     },
     "workflow": "Use CMAT to configure initial model assignment, use 'contact model' if you need to change models during simulation"
   },
-
   "model_vs_property": {
     "contact_model": {
       "function": "Change the contact model TYPE",
@@ -235,7 +215,6 @@
     },
     "typical_sequence": "1. Assign model: contact model linearpbond\n2. Set properties: contact property pb_kn 1e9 pb_ks 5e8 pb_ten 1e7"
   },
-
   "common_use_cases": [
     {
       "use_case": "Switch from unbonded to bonded simulation",
@@ -277,7 +256,6 @@
       ]
     }
   ],
-
   "available_models_summary": {
     "linear_based": [
       "linear - Basic elastic-frictional",
@@ -303,7 +281,6 @@
       "null - No force transmission"
     ]
   },
-
   "typical_workflow": [
     "1. Check current contact models (optional): list contacts or query model",
     "2. Identify contacts to modify (use range if needed)",
@@ -314,7 +291,6 @@
     "7. Verify changes (optional): check contact properties",
     "8. Continue simulation - new model takes effect immediately"
   ],
-
   "range_specifications": {
     "description": "Range limits which contacts are affected by the model change",
     "common_ranges": {
@@ -330,7 +306,6 @@
       "contact model null range model linear"
     ]
   },
-
   "warnings": [
     {
       "type": "data_loss",
@@ -357,7 +332,6 @@
       "mitigation": "Use range specification if you only want to change specific contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Contacts have unexpected behavior after model change",
@@ -392,7 +366,6 @@
       ]
     }
   ],
-
   "performance_considerations": {
     "command_interface": "Very fast - bulk model assignment in C++ core",
     "python_iteration": "Slower - Python loop overhead",

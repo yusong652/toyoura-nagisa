@@ -1,21 +1,13 @@
 {
   "command": "clump template",
   "category": "clump",
-  "search_keywords": ["template", "define", "bubblepack"],
-  "description": "Operate on a single clump template. A clump template is a reduced version of a clump composed of pebbles. Additionally, a clump template may hold a surface description that can be used for the calculation of inertial parameters and clump visualization. Clump templates can be created, deleted, imported, and exported. Clump templates are not model components; instead, they may be used to create clumps using the clump replicate, clump generate, or clump distribute commands. Clumps that refer to clump templates may be visualized via their surface descriptions.",
-
-  "syntax": "clump template <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Operation to perform on clump template",
-      "options": ["create", "delete", "export", "import"]
-    }
+  "search_keywords": [
+    "template",
+    "define",
+    "bubblepack"
   ],
-
+  "description": "Operate on a single clump template. A clump template is a reduced version of a clump composed of pebbles. Additionally, a clump template may hold a surface description that can be used for the calculation of inertial parameters and clump visualization. Clump templates can be created, deleted, imported, and exported. Clump templates are not model components; instead, they may be used to create clumps using the clump replicate, clump generate, or clump distribute commands. Clumps that refer to clump templates may be visualized via their surface descriptions.",
+  "syntax": "clump template <keyword> ...",
   "keywords": [
     {
       "name": "create",
@@ -143,7 +135,6 @@
       ]
     }
   ],
-
   "notes": [
     "Clump templates are NOT model components - they are used to create clumps via replicate/generate/distribute commands",
     "Clump templates are assumed to have unit density - inertia must reflect this",
@@ -152,7 +143,6 @@
     "Bubble Pack algorithm: Taghavi (2011) - automatic pebble generation from surface mesh",
     "Three ways to specify inertial attributes: 1) direct (volume+inertia+position), 2) calculate from pebbles, 3) calculate from surface"
   ],
-
   "examples": [
     {
       "command": "clump template create name 'three_peb' calculate-pebbles pebbles 3 0.25 (-0.55,0.0,0.6) 0.25 (-0.75,0.0,0.15) 0.25 (-0.75,0.0,0.4)",
@@ -183,7 +173,6 @@
       "description": "Import template from file, name it 'imported_rock'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump template ...') - Python SDK does not provide direct clump template management"

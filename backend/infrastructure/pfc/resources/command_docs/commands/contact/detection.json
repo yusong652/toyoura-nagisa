@@ -1,27 +1,13 @@
 {
   "command": "contact detection",
   "category": "contact",
-  "search_keywords": ["detection", "automatic", "lifecycle"],
-  "description": "Control whether contacts are automatically detected during simulation. Contact detection is enabled (on) by default. When enabled, the system automatically creates new contacts when pieces come together and deletes contacts when pieces separate beyond detection criteria. When disabled (off), no new contacts are created and no existing contacts are deleted, regardless of piece motion. Detection can be controlled globally for all contact types or selectively by contact type (ball-ball, ball-facet, etc.). This is a fundamental control for managing contact lifecycle in PFC simulations.",
-
-  "syntax": "contact detection <b> <keyword>",
-
-  "parameters": [
-    {
-      "name": "b",
-      "type": "boolean",
-      "required": true,
-      "description": "Boolean value to set detection state: true/on (enable detection) or false/off (disable detection)",
-      "valid_values": ["true", "false", "on", "off"]
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional 'type' keyword to specify which contact types are affected. If omitted, applies to all contact types."
-    }
+  "search_keywords": [
+    "detection",
+    "automatic",
+    "lifecycle"
   ],
-
+  "description": "Control whether contacts are automatically detected during simulation. Contact detection is enabled (on) by default. When enabled, the system automatically creates new contacts when pieces come together and deletes contacts when pieces separate beyond detection criteria. When disabled (off), no new contacts are created and no existing contacts are deleted, regardless of piece motion. Detection can be controlled globally for all contact types or selectively by contact type (ball-ball, ball-facet, etc.). This is a fundamental control for managing contact lifecycle in PFC simulations.",
+  "syntax": "contact detection <b> <keyword>",
   "keywords": [
     {
       "name": "type",
@@ -67,7 +53,6 @@
       ]
     }
   ],
-
   "examples": [
     {
       "command": "contact detection off",
@@ -100,13 +85,11 @@
       "use_case": "Restore dynamic ball-ball contact management after temporary freeze"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact detection <on/off>') - Python SDK does not provide direct contact detection control API. Must use command interface.",
     "note": "Detection state is a global simulation setting, not a per-contact property, so Python SDK does not expose this functionality."
   },
-
   "related_commands": [
     "contact delete",
     "contact persist",
@@ -114,7 +97,6 @@
     "model clean",
     "contact create"
   ],
-
   "notes": [
     "Contact detection is ON by default - automatic contact management",
     "Detection OFF: no new contacts created, no existing contacts deleted",
@@ -126,7 +108,6 @@
     "Type-specific control allows fine-grained contact management",
     "Common temporary disable: contact detection off → manipulate → contact detection on"
   ],
-
   "detection_mechanism": {
     "description": "How PFC automatically detects contacts when detection is enabled",
     "criteria": "Based on pieces moving outside their tolerance extents",
@@ -136,7 +117,6 @@
     "frequency": "Automatic during cycling - no manual intervention needed",
     "efficiency": "Uses spatial hashing and cell-space for efficient pair finding"
   },
-
   "detection_on_behavior": {
     "description": "Behavior when contact detection is enabled (default)",
     "contact_creation": {
@@ -153,7 +133,6 @@
     },
     "typical_use": "Standard simulations - fully automatic contact management"
   },
-
   "detection_off_behavior": {
     "description": "Behavior when contact detection is disabled",
     "contact_creation": {
@@ -170,7 +149,6 @@
     },
     "typical_use": "Manual contact control, specific analysis phases, preventing changes"
   },
-
   "common_use_cases": [
     {
       "use_case": "Temporary contact network freeze",
@@ -230,7 +208,6 @@
       "notes": "Control timing of contact formation"
     }
   ],
-
   "typical_workflow": [
     "1. Identify need to control contact detection (temporary freeze, manual control, etc.)",
     "2. Disable detection: contact detection off",
@@ -240,7 +217,6 @@
     "6. (Optional) Force immediate detection: model clean",
     "7. Resume normal automatic contact management"
   ],
-
   "detection_vs_related_commands": {
     "contact_detection": {
       "function": "Global ON/OFF switch for contact detection system",
@@ -276,7 +252,6 @@
       "detection_clean": "Detection happens during cycles; clean forces immediate check"
     }
   },
-
   "type_specific_control": {
     "description": "Detection can be controlled separately for each contact type",
     "benefit": "Fine-grained control over contact management",
@@ -302,7 +277,6 @@
     "independence": "Each type's detection state is independent",
     "default": "All types start with detection ON"
   },
-
   "performance_considerations": {
     "detection_on": {
       "overhead": "Continuous checking for contact creation/deletion during cycling",
@@ -318,7 +292,6 @@
     },
     "recommendation": "Keep detection ON for normal simulations - overhead is small and automatic management is valuable"
   },
-
   "warnings": [
     {
       "type": "no_new_contacts",
@@ -349,7 +322,6 @@
       "mitigation": "Document detection state clearly in simulation scripts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "New contacts not forming despite pieces overlapping",
@@ -401,7 +373,6 @@
       ]
     }
   ],
-
   "detection_and_cmat_proximity": {
     "description": "Detection works in conjunction with CMAT proximity setting",
     "proximity_role": "Defines distance threshold for contact detection",
@@ -421,7 +392,6 @@
       "6. Detection resumes using current proximity setting"
     ]
   },
-
   "model_clean_interaction": {
     "description": "model clean forces immediate contact detection",
     "when_to_use": [
@@ -437,14 +407,12 @@
     ],
     "note": "model clean has no effect if detection is OFF"
   },
-
   "default_state": {
     "initial": "Contact detection is ON by default when simulation starts",
     "all_types": "All contact types have detection enabled initially",
     "persistence": "Detection state persists throughout simulation until changed",
     "typical_behavior": "Most simulations never change detection state - automatic management works well"
   },
-
   "best_practices": [
     "Keep detection ON for normal simulations - automatic management is efficient",
     "Document all detection on/off calls clearly in scripts",
@@ -455,7 +423,6 @@
     "Prefer 'contact persist' for selective contact preservation over global detection off",
     "Test detection state if unexpected contact behavior occurs"
   ],
-
   "advanced_usage": {
     "mixed_detection_states": {
       "description": "Different contact types with different detection states",

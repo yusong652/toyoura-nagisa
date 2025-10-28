@@ -1,26 +1,13 @@
 {
   "command": "ball tractions",
   "category": "ball",
-  "search_keywords": ["stress", "initialization", "voronoi"],
-  "description": "Compute contact tractions consistent with prescribed stress state using Voronoi tessellation. Computes ball volumes, surface areas, and contact forces based on constant stress tensor or gravitational stress. By default, updates ball positions and volumes to match Voronoi cells, and can create contacts between adjacent cells. Uses Voro++ library for tessellation. Useful for initializing in-situ stress states in geomechanics simulations.",
-
-  "syntax": "ball tractions <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Configuration options for traction computation and Voronoi tessellation"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of balls to apply tractions (default: all balls)"
-    }
+  "search_keywords": [
+    "stress",
+    "initialization",
+    "voronoi"
   ],
-
+  "description": "Compute contact tractions consistent with prescribed stress state using Voronoi tessellation. Computes ball volumes, surface areas, and contact forces based on constant stress tensor or gravitational stress. By default, updates ball positions and volumes to match Voronoi cells, and can create contacts between adjacent cells. Uses Voro++ library for tessellation. Useful for initializing in-situ stress states in geomechanics simulations.",
+  "syntax": "ball tractions <keyword> ... <range>",
   "keywords": [
     {
       "name": "constant",
@@ -98,7 +85,6 @@
       "description": "Assign group name s to balls with contacts at Voronoi region boundaries. Useful for identifying model boundaries. Default slot: 'Default'"
     }
   ],
-
   "examples": [
     {
       "command": "ball tractions constant -1e6 -1e6 -1e6 0 0 0",
@@ -129,7 +115,6 @@
       "description": "Apply stress and tag boundary balls for subsequent operations"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball tractions ...') - Python SDK does not provide Voronoi-based traction computation"

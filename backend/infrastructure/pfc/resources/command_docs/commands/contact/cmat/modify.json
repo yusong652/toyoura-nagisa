@@ -1,26 +1,12 @@
 {
   "command": "contact cmat modify",
   "category": "contact cmat",
-  "search_keywords": ["cmat", "modify"],
-  "description": "Modify an existing entry in the CMAT (Contact Model Assignment Table). Assigns the information specified by the keywords to the entry at index i of the CMAT. This command allows updating contact model, properties, methods, and other settings for an existing CMAT entry without removing and re-adding it. The range specification is optional. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact cmat modify <i> <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Index of the CMAT entry to modify. Must be a valid existing entry index (i >= 0)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification. If provided, updates the range criterion for this entry"
-    }
+  "search_keywords": [
+    "cmat",
+    "modify"
   ],
-
+  "description": "Modify an existing entry in the CMAT (Contact Model Assignment Table). Assigns the information specified by the keywords to the entry at index i of the CMAT. This command allows updating contact model, properties, methods, and other settings for an existing CMAT entry without removing and re-adding it. The range specification is optional. By default, only mechanical contacts are considered.",
+  "syntax": "contact cmat modify <i> <keyword> ... <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -151,7 +137,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact cmat modify 1 model linearpbond method deformability emod 1e6 kratio 0.5 method pb_deformability emod 1e6 kratio 0.5 property fric 0.25 dp_nratio 0.2 pb_ten 1e8 pb_coh 1e8 pb_fa 30.0",
@@ -178,17 +163,14 @@
       "description": "Update the range specification for entry 2 to apply to 'soil' group"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact cmat modify ...') - Python SDK does not provide direct CMAT API, must use command interface"
   },
-
   "model_properties_reference": {
     "path": "../model-properties/index.json",
     "description": "For detailed property information for each contact model, see the model-properties reference documentation"
   },
-
   "related_commands": [
     "contact cmat add",
     "contact cmat list",
@@ -196,7 +178,6 @@
     "contact cmat apply",
     "contact cmat remove"
   ],
-
   "notes": [
     "Entry index i must be a valid existing entry (use 'contact cmat list' to check)",
     "Index 0 is the default entry and can be modified",
@@ -208,7 +189,6 @@
     "Multiple methods can be registered in a single command",
     "Range specification is optional - if omitted, previous range is retained"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Update bond strengths after calibration",
@@ -236,7 +216,6 @@
       "description": "Comprehensive modification including model, methods, and properties"
     }
   ],
-
   "typical_workflow": [
     "1. Use 'contact cmat list' to identify the entry index to modify",
     "2. Execute 'contact cmat modify <i>' with desired changes",
@@ -245,7 +224,6 @@
     "5. If needed, use 'contact cmat apply' to update existing contacts",
     "6. Test contact creation to ensure modified entry works as expected"
   ],
-
   "modify_vs_other_commands": {
     "modify_vs_add": {
       "modify": "Updates existing entry at specific index, preserves index number",
@@ -260,7 +238,6 @@
       "default": "Specifically for setting default entry, can use 'type' keyword to target specific contact types"
     }
   },
-
   "partial_modification_behavior": {
     "description": "When modifying an entry, only the specified keywords are updated. Unspecified properties retain their previous values.",
     "examples": [
@@ -276,7 +253,6 @@
       }
     ]
   },
-
   "warnings": [
     {
       "type": "model_change",
@@ -289,7 +265,6 @@
       "mitigation": "Use 'contact cmat apply' after modification to update existing contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Invalid entry index error",

@@ -1,20 +1,13 @@
 {
   "command": "model new",
   "category": "model",
-  "search_keywords": ["new", "clear", "reset"],
-  "description": "Clear model-state information. Model information is cleared, allowing one to begin a new problem. The optional 'force' keyword suppresses the model reset confirmation dialog (which will normally appear if the model has changed since the last save when the model new command is used). Values associated with the project or program state are unaffected by the model new command. Model-state information includes any defined FISH functions and variables, histories, and tables.",
-
-  "syntax": "model new <force>",
-
-  "parameters": [
-    {
-      "name": "force",
-      "type": "keyword",
-      "required": false,
-      "description": "Suppress the model reset confirmation dialog"
-    }
+  "search_keywords": [
+    "new",
+    "clear",
+    "reset"
   ],
-
+  "description": "Clear model-state information. Model information is cleared, allowing one to begin a new problem. The optional 'force' keyword suppresses the model reset confirmation dialog (which will normally appear if the model has changed since the last save when the model new command is used). Values associated with the project or program state are unaffected by the model new command. Model-state information includes any defined FISH functions and variables, histories, and tables.",
+  "syntax": "model new <force>",
   "keywords": [
     {
       "name": "force",
@@ -22,7 +15,6 @@
       "description": "Suppress the model reset confirmation dialog (which normally appears if model has changed since last save)"
     }
   ],
-
   "notes": [
     "Clears ALL model-state information",
     "Allows starting a new problem from scratch",
@@ -40,7 +32,6 @@
     "Alternative: FISH can write/read data to files (see File Utilities) for selective data preservation",
     "Deterministic mode is reset to default setting after 'model new'"
   ],
-
   "examples": [
     {
       "command": "model new",
@@ -67,7 +58,6 @@
       "description": "Call multiple problem files with 'model new' between them"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model new') or itasca.command('model new force') - Python SDK does not provide direct model.new() function"

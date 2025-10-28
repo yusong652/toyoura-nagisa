@@ -1,38 +1,12 @@
 {
   "command": "ball create",
   "category": "ball",
-  "search_keywords": ["create", "single"],
-  "description": "Create a single ball with the specified attributes. A model domain must be specified prior to ball creation. While cycling, balls can only be created before cycle point 0 (i.e., when the timestep is calculated).",
-
-  "syntax": "ball create <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "radius",
-      "type": "float",
-      "required": false,
-      "description": "Ball radius. Default: 1/40th of minimum domain extent. Max: 1/4th of minimum domain extent"
-    },
-    {
-      "name": "position",
-      "type": "vector",
-      "required": false,
-      "description": "Ball position (default: origin). Can use position or position-x/y/z components"
-    },
-    {
-      "name": "id",
-      "type": "integer",
-      "required": false,
-      "description": "Ball ID. Default: next available ID. Error if ID already exists"
-    },
-    {
-      "name": "group",
-      "type": "string",
-      "required": false,
-      "description": "Group name to assign to ball (default slot)"
-    }
+  "search_keywords": [
+    "create",
+    "single"
   ],
-
+  "description": "Create a single ball with the specified attributes. A model domain must be specified prior to ball creation. While cycling, balls can only be created before cycle point 0 (i.e., when the timestep is calculated).",
+  "syntax": "ball create <keyword> ...",
   "keywords": [
     {
       "name": "radius",
@@ -70,7 +44,6 @@
       "description": "Assign ball to group s in slot (default slot if not specified)"
     }
   ],
-
   "examples": [
     {
       "command": "ball create radius 0.5 position (1.0,2.0,3.0)",
@@ -89,7 +62,6 @@
       "description": "Create ball at (2,3,4) with default radius (1/40th of domain extent)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "itasca.ball.create(radius, centroid, id=None) - creates single ball with specified parameters"

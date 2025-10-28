@@ -1,20 +1,13 @@
 {
   "command": "clump replicate",
   "category": "clump",
-  "search_keywords": ["replicate", "template", "single"],
-  "description": "Create a single clump from a template. If no size measure is given, then the clump template volume is retained. If the density keyword is not given, then the clump is given unit density. This command creates a single clump instance, contrasting with clump generate which creates multiple clumps.",
-
-  "syntax": "clump replicate <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Clump creation keywords: name (required), angle, axis, density, diameter, fish-size, group, id, original-position, position, position-x/y/z, size"
-    }
+  "search_keywords": [
+    "replicate",
+    "template",
+    "single"
   ],
-
+  "description": "Create a single clump from a template. If no size measure is given, then the clump template volume is retained. If the density keyword is not given, then the clump is given unit density. This command creates a single clump instance, contrasting with clump generate which creates multiple clumps.",
+  "syntax": "clump replicate <keyword> ...",
   "keywords": [
     {
       "name": "name",
@@ -87,7 +80,6 @@
       "description": "The group slot slot is set to s for the newly created clump. If slot is not specified, then s is assigned to the group slot Default. The pebble keyword specifies that the group is assigned to the pebbles and not to the clump"
     }
   ],
-
   "notes": [
     "A model domain must be specified prior to clump replication",
     "The replicated clump must fall entirely within the model domain",
@@ -97,7 +89,6 @@
     "Cannot use both position and original-position keywords simultaneously",
     "Rotation is applied via angle and axis keywords using right-hand rule"
   ],
-
   "examples": [
     {
       "command": "clump replicate diameter [r2 * 2.0] name 'ball1'",
@@ -120,7 +111,6 @@
       "description": "Create clump with volume 1.5, assign to group 'aggregate' in slot 'material'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump replicate ...') - Python SDK cannot directly replicate clumps from templates"

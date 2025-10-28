@@ -1,26 +1,12 @@
 {
   "command": "model deterministic",
   "category": "model",
-  "search_keywords": ["deterministic", "reproducible"],
-  "description": "Set the deterministic mode. When a calculation is performed in parallel over multiple CPUs or cores, the order in which specific computations occur can and will change. This can cause roundoff errors to accumulate differently. Deterministic mode sacrifices efficiency and memory to force the parallel computation to result in the same answer every time, regardless of the number of CPUs it is performed on or their relative speed. All results are equally valid as they are within the range of finite-precision floating point error, but deterministic mode ensures repeatability. Deterministic mode is reset to the default setting whenever a 'model new' command is given.",
-
-  "syntax": "model deterministic <default> <b>",
-
-  "parameters": [
-    {
-      "name": "default",
-      "type": "keyword",
-      "required": false,
-      "description": "If specified, sets the default deterministic mode setting. Without this keyword, only the current mode is changed"
-    },
-    {
-      "name": "b",
-      "type": "boolean",
-      "required": true,
-      "description": "Enable (on/true) or disable (off/false) deterministic mode"
-    }
+  "search_keywords": [
+    "deterministic",
+    "reproducible"
   ],
-
+  "description": "Set the deterministic mode. When a calculation is performed in parallel over multiple CPUs or cores, the order in which specific computations occur can and will change. This can cause roundoff errors to accumulate differently. Deterministic mode sacrifices efficiency and memory to force the parallel computation to result in the same answer every time, regardless of the number of CPUs it is performed on or their relative speed. All results are equally valid as they are within the range of finite-precision floating point error, but deterministic mode ensures repeatability. Deterministic mode is reset to the default setting whenever a 'model new' command is given.",
+  "syntax": "model deterministic <default> <b>",
   "keywords": [
     {
       "name": "default",
@@ -28,7 +14,6 @@
       "description": "Set the default deterministic mode setting to b. This default is used when 'model new' is given. Can also be changed via 'Determinism by default' checkbox in Options Dialog"
     }
   ],
-
   "notes": [
     "On installation (prior to user changes), default determinism is ON",
     "'model new' resets deterministic mode to the default setting",
@@ -46,7 +31,6 @@
     "  - For archival: store resulting save files along with input data",
     "  - Support issues may not be replicable - may need to rerun with determinism ON"
   ],
-
   "examples": [
     {
       "command": "model deterministic on",
@@ -77,7 +61,6 @@
       "description": "Enable determinism for debugging/support - ensures repeatable results"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model deterministic on') or itasca.command('model deterministic off') - Python SDK does not provide direct deterministic control"

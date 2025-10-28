@@ -1,21 +1,13 @@
 {
   "command": "model solve",
   "category": "model",
-  "search_keywords": ["solve", "equilibrium", "convergence"],
-  "description": "Solve to a specified limit. The solve logic provides a mechanism to continue cycling a model until specified criteria are met, oftentimes resulting in a model that is in equilibrium to some tolerance. Any combination of the keywords below can be given in a single model solve command. If multiple solve limits are given, then cycling will continue until one of the limits is met, unless the 'and' keyword is used, in which case all criteria must be met before cycling stops.",
-
-  "syntax": "model solve <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Solve criteria and options",
-      "options": ["and", "or", "calm", "clock", "convergence", "creep", "cycles", "cycles-super", "cycles-total", "dynamic", "elastic", "fish-call", "fish-halt", "fluid", "mechanical", "ratio", "ratio-average", "ratio-local", "ratio-maximum", "thermal", "time", "time-total", "time-total-zone", "unbalanced-average", "unbalanced-maximum"]
-    }
+  "search_keywords": [
+    "solve",
+    "equilibrium",
+    "convergence"
   ],
-
+  "description": "Solve to a specified limit. The solve logic provides a mechanism to continue cycling a model until specified criteria are met, oftentimes resulting in a model that is in equilibrium to some tolerance. Any combination of the keywords below can be given in a single model solve command. If multiple solve limits are given, then cycling will continue until one of the limits is met, unless the 'and' keyword is used, in which case all criteria must be met before cycling stops.",
+  "syntax": "model solve <keyword> ...",
   "keywords": [
     {
       "name": "and",
@@ -348,7 +340,6 @@
       ]
     }
   ],
-
   "notes": [
     "Primary purpose: cycle model until specified criteria are met (often to equilibrium)",
     "Multiple keywords can be combined in a single solve command",
@@ -369,7 +360,6 @@
     "Super-cycles: for loosely coupled multi-process systems",
     "See documentation: 'Equilibrium' for ratio definitions"
   ],
-
   "examples": [
     {
       "command": "model solve",
@@ -436,7 +426,6 @@
       "description": "Solve until 1.0 time units accumulated during this solve"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model solve ratio 1e-5') - Python SDK does not provide direct solve() function. For custom solve loops in Python:\n\nwhile True:\n    itasca.cycle(100)\n    ratio = itasca.mech_ratio()\n    if ratio < 1e-5:\n        break"

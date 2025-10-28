@@ -1,21 +1,13 @@
 {
   "command": "model range",
   "category": "model",
-  "search_keywords": ["range", "filter", "named"],
-  "description": "Create/delete a named range. Creating a named range 'pre-defines' a range that, subsequently, can be applied efficiently using the 'named-range' keyword in a command's range phrase (e.g., [command] range named-range s). This can be particularly helpful if the underlying range definition is verbose. Named ranges can include logical operations (and, or, not, union) and can be combined with other range elements.",
-
-  "syntax": "model range <keyword>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Range operation",
-      "options": ["create", "delete"]
-    }
+  "search_keywords": [
+    "range",
+    "filter",
+    "named"
   ],
-
+  "description": "Create/delete a named range. Creating a named range 'pre-defines' a range that, subsequently, can be applied efficiently using the 'named-range' keyword in a command's range phrase (e.g., [command] range named-range s). This can be particularly helpful if the underlying range definition is verbose. Named ranges can include logical operations (and, or, not, union) and can be combined with other range elements.",
+  "syntax": "model range <keyword>",
   "keywords": [
     {
       "name": "create",
@@ -28,7 +20,6 @@
       "description": "Delete the range with name s"
     }
   ],
-
   "notes": [
     "Named ranges 'pre-define' range specifications for efficient reuse",
     "Particularly helpful when range definitions are verbose or complex",
@@ -51,7 +42,6 @@
     "Named ranges are dynamic: if objects move, range membership may change",
     "See documentation: 'Named Ranges' and 'Logical Operations in a Range Phrase'"
   ],
-
   "examples": [
     {
       "command": "model range create 'walls' group 'West' or 'East' or 'North' or 'South'",
@@ -114,7 +104,6 @@
       "description": "Generate balls only within pre-defined named range"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model range create \"walls\" group \"West\" or \"East\"')\nitasca.command('ball attribute density 2500 range named-range \"walls\"')\n\n# Python SDK does not provide direct range management. For dynamic range-based operations in Python, filter objects manually:\n\nimport itasca\n\n# Example: filter balls by position\nfor ball in itasca.ball.list():\n    pos = ball.pos()\n    if 0 <= pos[0] <= 1 and 0 <= pos[1] <= 1:\n        ball.set_density(2500)"

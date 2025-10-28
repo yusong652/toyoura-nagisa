@@ -1,27 +1,13 @@
 {
   "command": "fragment register",
   "category": "fragment",
-  "search_keywords": ["register", "initialize", "type"],
-  "description": "Register contact types for fragment analysis. This is the required initialization step before using any other fragment commands. By default, only bonded mechanical contacts are considered as criteria for inclusion in a fragment. If no contact types are specified, all available contact types are registered. At least one active contact of each contact type of interest must exist in the model when this command is given.",
-
-  "syntax": "fragment register <s ...> <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "s",
-      "type": "string/contact-type",
-      "required": false,
-      "description": "Contact types to register (e.g., 'ball-ball', 'ball-facet'). If omitted, all available contact types are registered",
-      "examples": ["ball-ball", "ball-facet", "clump-clump"]
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification that will apply to contacts under consideration until fragment clear is issued"
-    }
+  "search_keywords": [
+    "register",
+    "initialize",
+    "type"
   ],
-
+  "description": "Register contact types for fragment analysis. This is the required initialization step before using any other fragment commands. By default, only bonded mechanical contacts are considered as criteria for inclusion in a fragment. If no contact types are specified, all available contact types are registered. At least one active contact of each contact type of interest must exist in the model when this command is given.",
+  "syntax": "fragment register <s ...> <keyword> <range>",
   "keywords": [
     {
       "name": "ignorebond",
@@ -40,12 +26,16 @@
           "type": "boolean",
           "required": true,
           "description": "True (default) to enable persistence, false for faster computation without history",
-          "valid_values": ["true", "false", "on", "off"]
+          "valid_values": [
+            "true",
+            "false",
+            "on",
+            "off"
+          ]
         }
       ]
     }
   ],
-
   "notes": [
     "REQUIRED: Must be called before any fragment compute or fragment activate commands",
     "At least one active contact of each specified contact type must exist when calling this command",
@@ -58,7 +48,6 @@
     "Only needs to be called once per fragment tracking session",
     "After fragment clear, may need to call register again"
   ],
-
   "examples": [
     {
       "command": "fragment register",
@@ -101,7 +90,6 @@
       "use_case": "Fragment analysis limited to specific model region"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "notes": [
@@ -115,7 +103,6 @@
       "python": "itasca.command('fragment register ball-ball')"
     }
   },
-
   "related_commands": [
     "fragment compute",
     "fragment activate",
@@ -123,7 +110,6 @@
     "fragment list",
     "contact cmat default"
   ],
-
   "prerequisites": {
     "description": "Requirements before fragment register can succeed",
     "required_conditions": [
@@ -153,7 +139,6 @@
       }
     ]
   },
-
   "common_use_cases": [
     {
       "use_case": "Standard bonded fragment analysis",
@@ -199,7 +184,6 @@
       "notes": "Useful for complex geometries with multiple interaction types"
     }
   ],
-
   "typical_workflow": [
     "1. Setup model geometry and contact materials",
     "2. Generate contacts: model clean",
@@ -207,7 +191,6 @@
     "4. Compute or activate: fragment compute or fragment activate",
     "5. Fragment tracking is now operational"
   ],
-
   "bonded_vs_ignorebond": {
     "default_behavior": {
       "setting": "Bonded contacts only",
@@ -234,13 +217,24 @@
       "result": "Any contact (active) connects bodies into same fragment"
     },
     "comparison": {
-      "aspect": ["Connectivity criterion", "Typical use", "Bond requirement"],
-      "default": ["Bonded contacts only", "Fracture mechanics, BPM", "Must have bonds"],
-      "ignorebond": ["Any contact", "Granular flow, DEM", "No bonds needed"]
+      "aspect": [
+        "Connectivity criterion",
+        "Typical use",
+        "Bond requirement"
+      ],
+      "default": [
+        "Bonded contacts only",
+        "Fracture mechanics, BPM",
+        "Must have bonds"
+      ],
+      "ignorebond": [
+        "Any contact",
+        "Granular flow, DEM",
+        "No bonds needed"
+      ]
     },
     "recommendation": "Use default for bonded materials, ignorebond for unbonded granular materials"
   },
-
   "persist_true_vs_false": {
     "persist_true": {
       "setting": "persist true (default)",
@@ -280,13 +274,27 @@
       "note": "Cannot activate auto-computation with persist false"
     },
     "comparison": {
-      "aspect": ["Computation speed", "Memory usage", "History tracking", "Auto-computation"],
-      "persist_true": ["Slower", "Higher", "Yes", "Allowed"],
-      "persist_false": ["Faster", "Lower", "No", "Not allowed"]
+      "aspect": [
+        "Computation speed",
+        "Memory usage",
+        "History tracking",
+        "Auto-computation"
+      ],
+      "persist_true": [
+        "Slower",
+        "Higher",
+        "Yes",
+        "Allowed"
+      ],
+      "persist_false": [
+        "Faster",
+        "Lower",
+        "No",
+        "Not allowed"
+      ]
     },
     "recommendation": "Use persist true unless performance is a critical issue"
   },
-
   "contact_type_specification": {
     "description": "How to specify which contact types to register",
     "all_types": {
@@ -326,7 +334,6 @@
       }
     ]
   },
-
   "range_specification": {
     "description": "Using range to limit which contacts are considered",
     "purpose": "Apply fragment analysis only to specific subset of contacts",
@@ -345,7 +352,6 @@
     ],
     "note": "Range is preserved until fragment clear - affects all subsequent fragment computations"
   },
-
   "performance_considerations": {
     "registration_cost": "One-time cost - register once per session",
     "persist_impact": {
@@ -366,7 +372,6 @@
       "Registration itself is fast - don't over-optimize"
     ]
   },
-
   "warnings": [
     {
       "type": "contacts_must_exist",
@@ -393,7 +398,6 @@
       "mitigation": "Remember that range applies to all future fragment operations until cleared"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "fragment register fails or produces error",
@@ -443,7 +447,6 @@
       ]
     }
   ],
-
   "registration_permanence": {
     "description": "How long does fragment registration last",
     "duration": "Registration persists until fragment clear is called",
@@ -451,32 +454,41 @@
     "recommendation": "Register once at start of fragment tracking session",
     "clearing": "fragment clear may require re-registration for next tracking session"
   },
-
   "initialization_sequence": {
     "description": "Proper sequence for initializing fragment tracking",
     "steps": [
       {
         "step": 1,
         "action": "Define geometry and contact materials",
-        "commands": ["ball generate ...", "contact cmat default ..."],
+        "commands": [
+          "ball generate ...",
+          "contact cmat default ..."
+        ],
         "purpose": "Create model structure"
       },
       {
         "step": 2,
         "action": "Generate contacts",
-        "commands": ["model clean"],
+        "commands": [
+          "model clean"
+        ],
         "purpose": "Ensure at least one contact exists"
       },
       {
         "step": 3,
         "action": "Register fragment tracking",
-        "commands": ["fragment register <options>"],
+        "commands": [
+          "fragment register <options>"
+        ],
         "purpose": "Initialize fragment system"
       },
       {
         "step": 4,
         "action": "Compute or activate",
-        "commands": ["fragment compute", "fragment activate cycles 100"],
+        "commands": [
+          "fragment compute",
+          "fragment activate cycles 100"
+        ],
         "purpose": "Start fragment tracking"
       }
     ],
@@ -486,7 +498,6 @@
       "Not understanding default bonded-only behavior"
     ]
   },
-
   "persist_false_restriction": {
     "description": "Important limitation when persist is false",
     "restriction": "Cannot activate auto-computation with persist false",
@@ -501,7 +512,6 @@
     "reason": "Auto-computation requires history tracking, which persist false disables",
     "workaround": "Use persist true if auto-computation is needed"
   },
-
   "when_to_register": {
     "good_times": [
       "After model geometry is defined and contacts generated",

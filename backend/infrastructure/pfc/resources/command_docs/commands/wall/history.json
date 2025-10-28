@@ -1,32 +1,13 @@
 {
   "command": "wall history",
   "category": "wall",
-  "search_keywords": ["history", "track", "monitor"],
-  "description": "Adds a history of a wall value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The history can be assigned a name for later reference with the optional name keyword, if not the history will be given a default name based on its internally assigned id number. Following one of the keywords given below, either 1) an additional 'id' keyword followed by an integer id, 2) an additional 'name' keyword followed by a string s, or 3) an additional 'position' keyword followed by a position vector v must be given to define the specific wall.",
-
-  "syntax": "wall history <name sid> <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "name",
-      "type": "string",
-      "required": false,
-      "description": "Name for the history. Default: based on internally assigned ID number"
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": true,
-      "description": "Attribute to track (e.g., displacement, velocity, force-contact, etc.)"
-    },
-    {
-      "name": "wall_identifier",
-      "type": "keyword",
-      "required": true,
-      "description": "Wall specification: 'id <i>', 'name <s>', or 'position <v>'"
-    }
+  "search_keywords": [
+    "history",
+    "track",
+    "monitor"
   ],
-
+  "description": "Adds a history of a wall value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The history can be assigned a name for later reference with the optional name keyword, if not the history will be given a default name based on its internally assigned id number. Following one of the keywords given below, either 1) an additional 'id' keyword followed by an integer id, 2) an additional 'name' keyword followed by a string s, or 3) an additional 'position' keyword followed by a position vector v must be given to define the specific wall.",
+  "syntax": "wall history <name sid> <keyword> ...",
   "keywords": [
     {
       "name": "displacement",
@@ -169,7 +150,6 @@
       "description": "Z-component of the wall velocity (3D ONLY)"
     }
   ],
-
   "examples": [
     {
       "command": "wall history name 'wall1_force' force-contact id 1",
@@ -200,7 +180,6 @@
       "description": "Track extra variable at index 1 (float type) for wall ID 10"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('wall history ...') - Python SDK does not provide history recording. Use history commands for manipulation"

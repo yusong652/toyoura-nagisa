@@ -1,27 +1,13 @@
 {
   "command": "clump break",
   "category": "clump",
-  "search_keywords": ["break", "pebble", "fracture"],
-  "description": "Break clumps into pebbles. The pebbles must be balls or rblocks to be broken (see the ball clump and rblock clump commands). The pebbles are returned to their original containers and contacts are retained with other pieces. The inertial properties of the pebbles are recomputed. The range is used to determine which clumps are to be broken. Clumps without pebbles are deleted, and the inertial properties of clumps with pebbles remaining are recomputed.",
-
-  "syntax": "clump break <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Breaking method keyword: pebbles (by ID) or plane (by plane geometry)",
-      "options": ["pebbles", "plane"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": true,
-      "description": "Range of clumps to break"
-    }
+  "search_keywords": [
+    "break",
+    "pebble",
+    "fracture"
   ],
-
+  "description": "Break clumps into pebbles. The pebbles must be balls or rblocks to be broken (see the ball clump and rblock clump commands). The pebbles are returned to their original containers and contacts are retained with other pieces. The inertial properties of the pebbles are recomputed. The range is used to determine which clumps are to be broken. Clumps without pebbles are deleted, and the inertial properties of clumps with pebbles remaining are recomputed.",
+  "syntax": "clump break <keyword> <range>",
   "keywords": [
     {
       "name": "pebbles",
@@ -56,7 +42,6 @@
       "description": "Specify the tolerance for computing the inertial attributes of the remaining or new clumps. Values between 0.00005 and 1 are accepted. Default: 0.01. Lower values produce more accurate inertial attribute estimates"
     }
   ],
-
   "notes": [
     "Pebbles must be balls or rblocks to be broken",
     "Pebbles are returned to their original containers (balls or rblocks)",
@@ -65,7 +50,6 @@
     "Inertial properties are recomputed for remaining clumps",
     "Cannot use both pebbles and plane keywords simultaneously"
   ],
-
   "examples": [
     {
       "command": "clump break pebbles 1 2 3 range id 100",
@@ -84,7 +68,6 @@
       "description": "Break all clumps using a vertical plane at x=10, do not combine broken pieces"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump break ...') - Python SDK cannot directly break clumps into pebbles"

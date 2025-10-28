@@ -1,40 +1,63 @@
 {
   "command": "clump list",
   "category": "clump",
-  "search_keywords": ["list", "query"],
-  "description": "List clump information. By default, lists clump ID, template name, pebble count, active/total contact count, fixity, and position. Use keywords to list specific attributes, contacts, groups, properties, templates, or results. Use model precision command to control floating point precision. The optional range always applies to clumps and not pebbles.",
-
-  "syntax": "clump list <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Information category to list",
-      "options": ["attribute", "contact", "extra", "group", "property", "result", "template"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of clumps to list (default: all clumps). Always applies to clumps, not pebbles"
-    }
+  "search_keywords": [
+    "list",
+    "query"
   ],
-
+  "description": "List clump information. By default, lists clump ID, template name, pebble count, active/total contact count, fixity, and position. Use keywords to list specific attributes, contacts, groups, properties, templates, or results. Use model precision command to control floating point precision. The optional range always applies to clumps and not pebbles.",
+  "syntax": "clump list <keyword> <range>",
   "keywords": [
     {
       "name": "attribute",
       "syntax": "attribute <attr>",
       "description": "List clump attributes. If no attribute specified, shows available attributes. Attributes are characteristics of clumps such as mass and velocity. These are distinct from properties that represent surface conditions and are used in contact models.",
       "sub_keywords": {
-        "geometry": ["position", "position-x/y/z", "volume", "displacement", "displacement-x/y/z"],
-        "kinematics": ["velocity", "velocity-x/y/z", "spin", "spin-x/y/z (3D)", "rotation (2D)"],
-        "orientation": ["euler-x (3D)", "euler-y (3D)", "euler-z (3D)", "rotation (2D)"],
-        "forces": ["force-applied", "force-contact", "force-contact-x/y/z"],
-        "moments": ["moment-applied", "moment-applied-x/y/z (3D)", "moment-contact", "moment-contact-x/y/z (3D)"],
-        "inertial": ["moi-11", "moi-12", "moi-13", "moi-22", "moi-23", "moi-33", "moi-principal (3D)"],
-        "other": ["damp", "density", "fragment"]
+        "geometry": [
+          "position",
+          "position-x/y/z",
+          "volume",
+          "displacement",
+          "displacement-x/y/z"
+        ],
+        "kinematics": [
+          "velocity",
+          "velocity-x/y/z",
+          "spin",
+          "spin-x/y/z (3D)",
+          "rotation (2D)"
+        ],
+        "orientation": [
+          "euler-x (3D)",
+          "euler-y (3D)",
+          "euler-z (3D)",
+          "rotation (2D)"
+        ],
+        "forces": [
+          "force-applied",
+          "force-contact",
+          "force-contact-x/y/z"
+        ],
+        "moments": [
+          "moment-applied",
+          "moment-applied-x/y/z (3D)",
+          "moment-contact",
+          "moment-contact-x/y/z (3D)"
+        ],
+        "inertial": [
+          "moi-11",
+          "moi-12",
+          "moi-13",
+          "moi-22",
+          "moi-23",
+          "moi-33",
+          "moi-principal (3D)"
+        ],
+        "other": [
+          "damp",
+          "density",
+          "fragment"
+        ]
       }
     },
     {
@@ -68,14 +91,12 @@
       "description": "List information regarding clump templates, including the clump template name, referenced status, pebble count, volume, and density. The 'attribute' keyword without s lists the available attributes. If s is specified, then the value of that attribute is listed for each clump template."
     }
   ],
-
   "notes": [
     "Use model precision command to change the precision of listed floating point values",
     "The optional range always applies to clumps and not pebbles",
     "Default listing: clump ID, template name, pebble count, active/total contact count, fixity, and position",
     "Attributes are characteristics (mass, velocity) distinct from properties (surface conditions for contact models)"
   ],
-
   "examples": [
     {
       "command": "clump list",
@@ -126,7 +147,6 @@
       "description": "List volume attribute for each clump template"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Clump getter methods: Clump.pos(), Clump.vel(), Clump.density(), Clump.volume(), etc. - requires iteration: for c in itasca.clump.list(): print(c.pos())"

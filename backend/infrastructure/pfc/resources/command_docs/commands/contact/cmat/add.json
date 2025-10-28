@@ -1,26 +1,13 @@
 {
   "command": "contact cmat add",
   "category": "contact cmat",
-  "search_keywords": ["cmat", "add", "rule"],
-  "description": "Adds a new entry to the CMAT (Contact Model Assignment Table). If i is not specified or if i is greater than the total number of entries minus one, then the new entry is added to the end of the CMAT; otherwise, the new entry is inserted at slot i (i>0) while incrementing subsequent entry indices as necessary. The range token is mandatory and must be specified last. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact cmat add <i> <keyword> ... range",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": false,
-      "description": "Entry index. If not specified or > (total entries - 1), adds to end. If specified (i>0), inserts at position i and increments subsequent indices"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification for which contacts this entry applies to. MUST be specified last"
-    }
+  "search_keywords": [
+    "cmat",
+    "add",
+    "rule"
   ],
-
+  "description": "Adds a new entry to the CMAT (Contact Model Assignment Table). If i is not specified or if i is greater than the total number of entries minus one, then the new entry is added to the end of the CMAT; otherwise, the new entry is inserted at slot i (i>0) while incrementing subsequent entry indices as necessary. The range token is mandatory and must be specified last. By default, only mechanical contacts are considered.",
+  "syntax": "contact cmat add <i> <keyword> ... range",
   "keywords": [
     {
       "name": "inheritance",
@@ -174,7 +161,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact cmat add model linear property kn 1e8 ks 5e7 fric 0.5 range group 'soil'",
@@ -205,19 +191,16 @@
       "description": "Add thermal contact entry for 'heated' group"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact cmat add ...') - Python SDK does not provide direct CMAT API, must use command interface"
   },
-
   "related_commands": [
     "contact cmat default",
     "contact cmat remove",
     "contact model assign",
     "contact property"
   ],
-
   "notes": [
     "The range keyword is MANDATORY and must be specified LAST",
     "Entry index 0 is reserved for the default CMAT entry",
@@ -229,7 +212,6 @@
     "Use 'mechanical' (default) or 'thermal' to specify contact type",
     "Methods registered via 'method' keyword execute automatically at contact creation"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Default contact behavior",

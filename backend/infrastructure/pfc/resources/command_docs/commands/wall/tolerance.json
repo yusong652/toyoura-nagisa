@@ -1,20 +1,12 @@
 {
   "command": "wall tolerance",
   "category": "wall",
-  "search_keywords": ["tolerance", "contact-detection"],
-  "description": "Set contact detection tolerances. The size of the extent with which a facet is inserted into the cell space is the minimum extent size plus twice the sum of: 1) maximum interaction distance; 2) constant contact-detection tolerance (constant - default 0); 3) maximum length of minimum extent multiplied by extent tolerance (extent - default 10⁻⁶); 4) maximum translational velocity component multiplied by velocity tolerance (velocity - default 0). The facet is remapped into cell space whenever it has translated cumulatively by this sum from last mapping. Contacts can be created whenever expanded extents of any pieces (balls, clump pebbles, or facets) overlap, but contacts cannot exist between facets. Note: Directly after model restore, must call 'model clean' prior to modifying extent tolerances.",
-
-  "syntax": "wall tolerance <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": true,
-      "description": "Tolerance parameter: automatic, constant, extent, or velocity"
-    }
+  "search_keywords": [
+    "tolerance",
+    "contact-detection"
   ],
-
+  "description": "Set contact detection tolerances. The size of the extent with which a facet is inserted into the cell space is the minimum extent size plus twice the sum of: 1) maximum interaction distance; 2) constant contact-detection tolerance (constant - default 0); 3) maximum length of minimum extent multiplied by extent tolerance (extent - default 10⁻⁶); 4) maximum translational velocity component multiplied by velocity tolerance (velocity - default 0). The facet is remapped into cell space whenever it has translated cumulatively by this sum from last mapping. Contacts can be created whenever expanded extents of any pieces (balls, clump pebbles, or facets) overlap, but contacts cannot exist between facets. Note: Directly after model restore, must call 'model clean' prior to modifying extent tolerances.",
+  "syntax": "wall tolerance <keyword> ...",
   "keywords": [
     {
       "name": "automatic",
@@ -37,7 +29,6 @@
       "description": "Assign velocity contact-detection tolerance. Global setting for all facets. Default: 0"
     }
   ],
-
   "tolerance_calculation": {
     "description": "Facet extent size in cell space",
     "formula": "extent = min_extent + 2 * (max_interaction_dist + tol_constant + max_extent_length * tol_extent + max_velocity * tol_velocity)",
@@ -64,7 +55,6 @@
       }
     ]
   },
-
   "important_notes": [
     "Must call 'model clean' after model restore before modifying extent tolerances",
     "Facet remapped when cumulative translation exceeds tolerance sum",
@@ -73,7 +63,6 @@
     "Automatic mode prevents timestep reduction when few facets are moving",
     "Constant tolerance is per-facet, extent and velocity are global"
   ],
-
   "use_cases": [
     {
       "use_case": "Fast-moving walls",
@@ -92,7 +81,6 @@
       "description": "Set constant tolerance per-facet for walls requiring different detection sensitivity"
     }
   ],
-
   "examples": [
     {
       "command": "wall tolerance automatic true",
@@ -119,7 +107,6 @@
       "description": "Set per-facet constant tolerance for walls with IDs 1-10"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('wall tolerance ...') - Python SDK does not provide contact detection tolerance settings. This is a low-level algorithmic control"

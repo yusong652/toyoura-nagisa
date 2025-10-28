@@ -1,13 +1,12 @@
 {
   "command": "contact cmat list",
   "category": "contact cmat",
-  "search_keywords": ["cmat", "list"],
+  "search_keywords": [
+    "cmat",
+    "list"
+  ],
   "description": "Lists the CMAT (Contact Model Assignment Table). Displays all current entries in the CMAT including their indices, models, properties, and range specifications. This is useful for reviewing the current contact model assignment rules and debugging CMAT configuration. By default, only mechanical contacts are considered.",
-
   "syntax": "contact cmat list <keyword>",
-
-  "parameters": [],
-
   "keywords": [
     {
       "name": "mechanical",
@@ -20,7 +19,6 @@
       "description": "List thermal CMAT entries (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact cmat list",
@@ -35,19 +33,16 @@
       "description": "List thermal CMAT entries"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact cmat list') - Python SDK does not provide direct CMAT API, must use command interface. Output goes to console, cannot be captured directly in Python."
   },
-
   "related_commands": [
     "contact cmat add",
     "contact cmat apply",
     "contact cmat default",
     "contact cmat remove"
   ],
-
   "output_format": {
     "description": "The command outputs a formatted table showing CMAT entries",
     "typical_columns": [
@@ -63,7 +58,6 @@
       "Output format may vary depending on PFC version"
     ]
   },
-
   "notes": [
     "Lists all CMAT entries including the default entry (index 0)",
     "CMAT entries are evaluated in the order they appear (lower indices first)",
@@ -73,7 +67,6 @@
     "Shows which models and properties will be assigned to new contacts",
     "Entry ranges show the conditions under which each entry is applied"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Review current CMAT configuration",
@@ -96,7 +89,6 @@
       "description": "List both mechanical and thermal CMAT entries to compare configurations"
     }
   ],
-
   "typical_workflow": [
     "1. Configure CMAT entries using 'contact cmat add' and 'contact cmat default'",
     "2. Use 'contact cmat list' to review the configuration",
@@ -105,7 +97,6 @@
     "5. Create contacts - they will be assigned according to CMAT rules",
     "6. If unexpected behavior, use 'contact cmat list' again to debug"
   ],
-
   "interpreting_output": {
     "entry_index": "Lower indices are checked first when contacts are created. Entry 0 is the default/fallback.",
     "model_name": "The contact model that will be assigned (e.g., linear, linearpbond, hertz)",
@@ -114,7 +105,6 @@
     "methods": "Methods that will be invoked at contact creation (e.g., 'deformability emod=1e9', 'bond')",
     "inheritance": "Whether properties can inherit from contacting pieces"
   },
-
   "troubleshooting": [
     {
       "issue": "Contacts not getting expected properties",

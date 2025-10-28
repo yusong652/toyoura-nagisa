@@ -1,21 +1,13 @@
 {
   "command": "ball results",
   "category": "ball",
-  "search_keywords": ["results", "post-processing", "snapshot"],
-  "description": "Configure ball results logic for efficient post-processing. Creates lightweight snapshots of ball geometries and selected attributes at different time instances. IMPORTANT: Ball result files do NOT replace PFC model state files and should not be used to continue cycling. Use with model results command to control when/how result files are created and imported.",
-
-  "syntax": "ball results <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Operation to perform",
-      "options": ["active", "add-attribute", "remove-attribute"]
-    }
+  "search_keywords": [
+    "results",
+    "post-processing",
+    "snapshot"
   ],
-
+  "description": "Configure ball results logic for efficient post-processing. Creates lightweight snapshots of ball geometries and selected attributes at different time instances. IMPORTANT: Ball result files do NOT replace PFC model state files and should not be used to continue cycling. Use with model results command to control when/how result files are created and imported.",
+  "syntax": "ball results <keyword> ...",
   "keywords": [
     {
       "name": "active",
@@ -33,7 +25,6 @@
       "description": "Remove ball attribute from results recording. Use 'group' and 'extra' keywords for groups and extra variables."
     }
   ],
-
   "examples": [
     {
       "command": "ball results add-attribute velocity active true",
@@ -56,7 +47,6 @@
       "description": "Disable ball results creation"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball results ...') - Python SDK does not provide results configuration"

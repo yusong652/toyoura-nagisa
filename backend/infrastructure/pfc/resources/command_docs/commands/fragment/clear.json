@@ -1,15 +1,13 @@
 {
   "command": "fragment clear",
   "category": "fragment",
-  "search_keywords": ["clear", "reset"],
+  "search_keywords": [
+    "clear",
+    "reset"
+  ],
   "description": "Clear all fragment information. All fragment data is destroyed, event tracking is stopped, and the fragment IDs held in all bodies (balls and clumps) are reset to 0. This is a complete reset of the fragment tracking system.",
-
   "syntax": "fragment clear",
-
-  "parameters": [],
-
   "keywords": [],
-
   "notes": [
     "Destructive operation - all fragment information is permanently lost",
     "All fragment IDs in balls and clumps are reset to 0",
@@ -20,7 +18,6 @@
     "Useful for resetting fragment analysis between simulation phases",
     "No parameters required - clears all fragments globally"
   ],
-
   "examples": [
     {
       "command": "fragment clear",
@@ -48,7 +45,6 @@
       "use_case": "Compare fragment states at different simulation stages"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "notes": [
@@ -62,7 +58,6 @@
       "python": "itasca.command('fragment clear')\n# Verify: ball.fragment() returns 0 for all balls"
     }
   },
-
   "related_commands": [
     "fragment activate",
     "fragment deactivate",
@@ -70,7 +65,6 @@
     "fragment list",
     "fragment register"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Reset fragment tracking between simulation phases",
@@ -112,14 +106,12 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Stop auto-computation (optional): fragment deactivate",
     "2. Clear all fragments: fragment clear",
     "3. Verify IDs reset (optional): check ball.fragment() returns 0",
     "4. Reactivate if needed: fragment activate or fragment compute"
   ],
-
   "what_gets_cleared": {
     "description": "Comprehensive list of what fragment clear affects",
     "cleared_data": [
@@ -136,7 +128,6 @@
       "Group slot assignments (though fragment IDs in slots become 0)"
     ]
   },
-
   "clear_vs_deactivate": {
     "fragment_clear": {
       "function": "Remove all fragment data",
@@ -158,12 +149,26 @@
       "2. fragment clear (erase all data)"
     ],
     "comparison_table": {
-      "aspect": ["Auto-computation", "Fragment IDs", "Event tracking", "Contact persistence"],
-      "fragment_clear": ["Unchanged", "Reset to 0", "Stopped", "Unchanged"],
-      "fragment_deactivate": ["Stopped", "Unchanged", "Unchanged", "Unchanged"]
+      "aspect": [
+        "Auto-computation",
+        "Fragment IDs",
+        "Event tracking",
+        "Contact persistence"
+      ],
+      "fragment_clear": [
+        "Unchanged",
+        "Reset to 0",
+        "Stopped",
+        "Unchanged"
+      ],
+      "fragment_deactivate": [
+        "Stopped",
+        "Unchanged",
+        "Unchanged",
+        "Unchanged"
+      ]
     }
   },
-
   "destructive_operation_warning": {
     "description": "fragment clear is a destructive operation",
     "cannot_undo": "Once cleared, fragment data cannot be recovered",
@@ -180,7 +185,6 @@
       "Consider whether deactivate (non-destructive) is sufficient instead"
     ]
   },
-
   "performance_considerations": {
     "operation_cost": "Very fast - O(n) where n is number of bodies",
     "memory_freed": "Frees memory used by fragment tracking data structures",
@@ -191,7 +195,6 @@
     ],
     "impact": "Minimal performance impact - simple reset operation"
   },
-
   "event_tracking": {
     "description": "Fragment clear stops event tracking",
     "what_is_event_tracking": "System that monitors fragment changes (merges, splits, etc.)",
@@ -199,7 +202,6 @@
     "restart_tracking": "Reactivate with fragment activate to restart event tracking",
     "note": "Event tracking details depend on specific fragment tracking implementation"
   },
-
   "verification_after_clear": {
     "description": "How to verify fragment clear was successful",
     "python_checks": [
@@ -222,7 +224,6 @@
       }
     ]
   },
-
   "warnings": [
     {
       "type": "destructive",
@@ -249,7 +250,6 @@
       "mitigation": "Export or analyze event data before clearing if needed"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Fragment IDs not staying at 0 after clear",
@@ -288,7 +288,6 @@
       ]
     }
   ],
-
   "clear_compute_activate_comparison": {
     "description": "Comparison of three related fragment commands",
     "fragment_clear": {
@@ -319,7 +318,6 @@
       "4. Fragments update automatically every 100 cycles"
     ]
   },
-
   "simulation_phase_pattern": {
     "description": "Common pattern: independent fragment analysis in different phases",
     "example_workflow": [

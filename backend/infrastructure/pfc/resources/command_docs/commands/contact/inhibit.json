@@ -1,32 +1,13 @@
 {
   "command": "contact inhibit",
   "category": "contact",
-  "search_keywords": ["inhibit", "disable", "inactive"],
+  "search_keywords": [
+    "inhibit",
+    "disable",
+    "inactive"
+  ],
   "description": "Inhibit (disable) contacts in the specified range. When a contact is inhibited, it becomes inactive and does not compute forces, regardless of piece overlap or contact model logic. This provides temporary contact disabling without deletion. Inhibit has the highest priority among contact state flags - an inhibited contact remains inactive even if the activate flag is set. By default, only mechanical contacts are considered.",
-
   "syntax": "contact inhibit <bval> <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "bval",
-      "type": "boolean",
-      "required": true,
-      "description": "Boolean value to set inhibit state: true/on (inhibit contact) or false/off (uninhibit, allow normal activity)",
-      "valid_values": ["true", "false", "on", "off"]
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to specify contact type (mechanical or thermal)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification identifying which contacts to inhibit. Required parameter."
-    }],
-
   "keywords": [
     {
       "name": "mechanical",
@@ -39,7 +20,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact inhibit on range position-x 1.1 1.9",
@@ -77,7 +57,6 @@
       "use_case": "Re-enable contacts in region after temporary disabling"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -106,7 +85,6 @@
       "python": "for c in it.contact.list():\\n    if c.in_group('boundary'):\\n        c.set_inhibit(True)"
     }
   },
-
   "related_commands": [
     "contact activate",
     "contact persist",
@@ -114,7 +92,6 @@
     "contact model",
     "contact fix"
   ],
-
   "notes": [
     "Inhibit flag forces contact to be INACTIVE (no force computation)",
     "Inhibit has HIGHEST PRIORITY - overrides activate flag",
@@ -126,7 +103,6 @@
     "Useful for temporary contact disabling without deletion",
     "Inhibit does not prevent contact deletion by detection system"
   ],
-
   "inhibit_behavior": {
     "when_inhibited": {
       "description": "Behavior of contacts when inhibit flag is true",
@@ -145,7 +121,6 @@
       "default": "This is the standard behavior"
     }
   },
-
   "priority_hierarchy": {
     "description": "How inhibit, activate, and model logic interact",
     "priority_order": [
@@ -172,7 +147,6 @@
     ],
     "key_insight": "Inhibit is the 'master off switch' - when on, nothing else matters"
   },
-
   "inhibit_vs_activate": {
     "contact_inhibit": {
       "function": "Force contact to be INACTIVE (disable)",
@@ -198,7 +172,6 @@
     },
     "override_note": "Setting activate=true automatically sets inhibit=false to allow activation"
   },
-
   "common_use_cases": [
     {
       "use_case": "Temporarily disable boundary forces",
@@ -259,7 +232,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Identify contacts to inhibit (by type, location, model, etc.)",
     "2. Use range specification to target specific contacts",
@@ -269,7 +241,6 @@
     "6. When needed, uninhibit: contact inhibit off range ...",
     "7. Contacts resume normal force computation"
   ],
-
   "inhibit_vs_other_operations": {
     "contact_inhibit": {
       "function": "Temporarily DISABLE contacts (force inactive)",
@@ -314,7 +285,6 @@
       "for_constant_forces": "contact fix"
     }
   },
-
   "range_specifications": {
     "description": "Range specification is REQUIRED to identify which contacts to inhibit",
     "common_ranges": {
@@ -335,7 +305,6 @@
       "contact inhibit on range contact gap 0 100"
     ]
   },
-
   "performance_considerations": {
     "inhibited_contacts": {
       "force_calculation": "Skipped - no computation overhead",
@@ -345,7 +314,6 @@
     },
     "recommendation": "Use inhibit for temporary disabling; delete for permanent removal if memory/iteration performance critical"
   },
-
   "warnings": [
     {
       "type": "highest_priority",
@@ -374,7 +342,6 @@
       "mitigation": "Always provide range, even 'range contact' for all contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Contacts not computing forces despite overlap",
@@ -421,7 +388,6 @@
       ]
     }
   ],
-
   "state_control_three_commands": {
     "description": "Inhibit, activate, and persist form the state control triad",
     "contact_inhibit": {
@@ -452,7 +418,6 @@
       "can_combine": "Can use both activity and lifetime controls simultaneously"
     }
   },
-
   "mechanical_vs_thermal_contacts": {
     "mechanical": {
       "description": "Default contact type for force transmission",
@@ -468,7 +433,6 @@
       "note": "Only relevant if thermal process is active"
     }
   },
-
   "advanced_usage": {
     "progressive_inhibit_patterns": {
       "description": "Gradually inhibit/uninhibit contacts for controlled transitions",
@@ -511,14 +475,12 @@
       ]
     }
   },
-
   "default_behavior": {
     "inhibit_flag": "false (off) by default",
     "activity_control": "Contact activity determined by model and activate flag when not inhibited",
     "force_computation": "Normal force calculation when not inhibited",
     "why_default_off": "Contacts should normally be active to transmit forces"
   },
-
   "best_practices": [
     "Use inhibit for temporary/reversible contact disabling",
     "Prefer inhibit over delete when you might need to re-enable contacts",
@@ -529,7 +491,6 @@
     "For permanent disabling, consider delete instead of long-term inhibit",
     "Combine with persist if you need both activity control and lifetime control"
   ],
-
   "inhibit_and_activate_interaction": {
     "description": "How contact activate command interacts with inhibit flag",
     "important_note": "Setting activate=true automatically sets inhibit=false",

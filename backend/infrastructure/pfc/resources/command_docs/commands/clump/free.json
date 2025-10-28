@@ -1,27 +1,13 @@
 {
   "command": "clump free",
   "category": "clump",
-  "search_keywords": ["free", "velocity", "spin"],
-  "description": "Free the specified clump velocities. As a result, clump motion reflects the forces acting upon them (velocities are updated during cycling according to equations of motion).",
-
-  "syntax": "clump free <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Velocity component(s) to free",
-      "options": ["velocity", "velocity-x", "velocity-y", "velocity-z", "spin", "spin-x", "spin-y", "spin-z"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of clumps to free (default: all clumps)"
-    }
+  "search_keywords": [
+    "free",
+    "velocity",
+    "spin"
   ],
-
+  "description": "Free the specified clump velocities. As a result, clump motion reflects the forces acting upon them (velocities are updated during cycling according to equations of motion).",
+  "syntax": "clump free <keyword> ... <range>",
   "keywords": [
     {
       "name": "velocity",
@@ -56,13 +42,11 @@
       "description": "Free z-component of angular velocity (3D only)"
     }
   ],
-
   "notes": [
     "Multiple velocity components can be freed simultaneously",
     "Freed velocities are updated during cycling according to forces acting on clumps",
     "This command reverses the effect of clump fix command"
   ],
-
   "examples": [
     {
       "command": "clump free velocity spin",
@@ -81,7 +65,6 @@
       "description": "Free all translational velocities for clumps 1-100"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Clump.set_fix(component, False) where component: 0=X, 1=Y, 2=Z, 3=RX, 4=RY, 5=RZ - requires iteration: for c in itasca.clump.list(): c.set_fix(component, False)"

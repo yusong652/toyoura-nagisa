@@ -1,22 +1,13 @@
 {
   "command": "model random",
   "category": "model",
-  "search_keywords": ["random", "seed"],
-  "description": "Set the seed for the random-number generator. By default i = 10,000. The value specified should be of the same magnitude as the default value. If the model random keyword is given after a model new command, identical models can be generated for multiple runs. The seed is not reset by the model new command. The value of the random-number seed is emitted into the record, so the record can be used to exactly recreate the original model.",
-
-  "syntax": "model random <i>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Seed for the random-number generator. Default: 10,000. Should be of same magnitude as default value"
-    }
+  "search_keywords": [
+    "random",
+    "seed"
   ],
-
+  "description": "Set the seed for the random-number generator. By default i = 10,000. The value specified should be of the same magnitude as the default value. If the model random keyword is given after a model new command, identical models can be generated for multiple runs. The seed is not reset by the model new command. The value of the random-number seed is emitted into the record, so the record can be used to exactly recreate the original model.",
+  "syntax": "model random <i>",
   "keywords": [],
-
   "notes": [
     "Default random seed: 10,000",
     "Specified value should be of same magnitude as default (around 10,000)",
@@ -32,7 +23,6 @@
     "Important for reproducible research and debugging",
     "Same seed + same operations = identical results (if deterministic mode on)"
   ],
-
   "examples": [
     {
       "command": "model random 10000",
@@ -59,7 +49,6 @@
       "description": "Set seed before using FISH random functions for reproducibility"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model random 12345') - Python SDK does not provide direct random seed control"

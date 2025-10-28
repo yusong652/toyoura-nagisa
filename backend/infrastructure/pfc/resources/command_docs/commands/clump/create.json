@@ -1,20 +1,13 @@
 {
   "command": "clump create",
   "category": "clump",
-  "search_keywords": ["create", "single", "pebble"],
-  "description": "Create a single clump with the specified attributes. A model domain must be specified prior to clump creation. The clump will not be available for replication and will not have a surface description associated with it. Unit density is assumed at creation unless the density keyword is specified. Either all inertial attributes must be specified (position, volume, inertia tensor) or the calculate keyword must be given to calculate them from the pebble distribution. Unless the real moment of inertia is modified via FISH or via the clump attribute command, this value will be updated in response to changes in volume and density.",
-
-  "syntax": "clump create <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Clump creation keywords: calculate, density, group, id, inertia, pebbles, position, volume"
-    }
+  "search_keywords": [
+    "create",
+    "single",
+    "pebble"
   ],
-
+  "description": "Create a single clump with the specified attributes. A model domain must be specified prior to clump creation. The clump will not be available for replication and will not have a surface description associated with it. Unit density is assumed at creation unless the density keyword is specified. Either all inertial attributes must be specified (position, volume, inertia tensor) or the calculate keyword must be given to calculate them from the pebble distribution. Unless the real moment of inertia is modified via FISH or via the clump attribute command, this value will be updated in response to changes in volume and density.",
+  "syntax": "clump create <keyword> ...",
   "keywords": [
     {
       "name": "pebbles",
@@ -72,7 +65,6 @@
       "description": "Set volume (2D: per unit thickness; 3D: total volume) to f. Must also specify inertia tensor. Cannot be used with calculate keyword. Note: This parameter doesn't affect clump geometry - apparent geometric volume remains unchanged. This is the volume used to compute mass for law of motion"
     }
   ],
-
   "notes": [
     "A model domain must be specified prior to clump creation",
     "While cycling, clumps can only be created before cycle point 0 (i.e., when the timestep is calculated)",
@@ -82,7 +74,6 @@
     "Real moment of inertia is auto-updated with volume/density changes unless modified via FISH or clump attribute command",
     "For calculate keyword: lower tolerance values require more computational effort but provide more accuracy"
   ],
-
   "examples": [
     {
       "command": "clump create id 1 pebble 1 1.0 (0,0,5) calculate 0.1",
@@ -101,7 +92,6 @@
       "description": "Create clump with three pebbles and density 2500. Inertial attributes calculated from pebble distribution"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump create ...') - Python SDK cannot directly create clumps with pebbles"

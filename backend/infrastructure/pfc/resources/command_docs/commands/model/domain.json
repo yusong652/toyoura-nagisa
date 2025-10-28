@@ -1,21 +1,13 @@
 {
   "command": "model domain",
   "category": "model",
-  "search_keywords": ["domain", "boundary", "extent"],
-  "description": "Specify the domain boundaries and conditions. DFN fractures only exist within the domain extent. In FLAC3D, zones and structural elements are not aware of the model domain. In PFC, walls, clumps and balls must be inside of the domain and are aware of the domain boundary conditions.",
-
-  "syntax": "model domain <keyword>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Domain configuration keyword",
-      "options": ["condition", "extent"]
-    }
+  "search_keywords": [
+    "domain",
+    "boundary",
+    "extent"
   ],
-
+  "description": "Specify the domain boundaries and conditions. DFN fractures only exist within the domain extent. In FLAC3D, zones and structural elements are not aware of the model domain. In PFC, walls, clumps and balls must be inside of the domain and are aware of the domain boundary conditions.",
+  "syntax": "model domain <keyword>",
   "keywords": [
     {
       "name": "condition",
@@ -50,7 +42,6 @@
       "description": "Specify the locations of the sides of the domain. Each set of values applies to the lower and upper bound of that dimension of the domain. If fxl and fxu are specified alone, then the domain is a cube"
     }
   ],
-
   "notes": [
     "DFN fractures only exist within the domain extent",
     "FLAC3D: zones and structural elements are NOT aware of model domain",
@@ -65,7 +56,6 @@
     "extent: if only fxl and fxu specified, creates cubic domain",
     "Domain must be set before creating PFC objects"
   ],
-
   "examples": [
     {
       "command": "model domain extent -10 10",
@@ -104,7 +94,6 @@
       "description": "Reflect condition (not recommended - may cause instabilities)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "python_code": "# Set domain extent\nitasca.set_domain_min(-10, -10, -10)\nitasca.set_domain_max(10, 10, 10)\n\n# Set domain conditions\nitasca.set_domain_condition('x', 'periodic')\nitasca.set_domain_condition('y', 'stop')\nitasca.set_domain_condition('z', 'stop')",

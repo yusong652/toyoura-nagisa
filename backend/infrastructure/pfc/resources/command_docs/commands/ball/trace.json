@@ -1,26 +1,12 @@
 {
   "command": "ball trace",
   "category": "ball",
-  "search_keywords": ["trace", "path"],
-  "description": "Add a ball particle trace to record and visualize ball motion path. Positions and velocities are sampled and stored during model run. The trace can be visualized to show particle flow patterns. Use trace commands for subsequent manipulation of particle traces.",
-
-  "syntax": "ball trace <id <id1>> id <id2> | position <v>",
-
-  "parameters": [
-    {
-      "name": "id (trace)",
-      "type": "integer",
-      "required": false,
-      "description": "Optional trace ID. If not specified, next available trace ID is used automatically."
-    },
-    {
-      "name": "id (ball) or position",
-      "type": "integer or vector",
-      "required": true,
-      "description": "Specify ball to trace: use 'id <id2>' for ball ID, or 'position <v>' to find nearest ball to position vector"
-    }
+  "search_keywords": [
+    "trace",
+    "path"
   ],
-
+  "description": "Add a ball particle trace to record and visualize ball motion path. Positions and velocities are sampled and stored during model run. The trace can be visualized to show particle flow patterns. Use trace commands for subsequent manipulation of particle traces.",
+  "syntax": "ball trace <id <id1>> id <id2> | position <v>",
   "examples": [
     {
       "command": "ball trace id 1",
@@ -39,7 +25,6 @@
       "description": "Create trace ID 10 for ball nearest to (-2,3,0)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball trace ...') - Python SDK does not provide trace creation. Use trace commands for manipulation."

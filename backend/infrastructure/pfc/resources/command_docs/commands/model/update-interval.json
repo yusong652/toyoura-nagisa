@@ -1,22 +1,13 @@
 {
   "command": "model update-interval",
   "category": "model",
-  "search_keywords": ["update-interval", "refresh"],
-  "description": "Set the number of cycles taken between updating the existing plots in the user interface. The default value is 100. This controls how frequently the visual display is refreshed during cycling, affecting both visualization responsiveness and computational performance.",
-
-  "syntax": "model update-interval <i>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Number of cycles between plot updates. Default: 100"
-    }
+  "search_keywords": [
+    "update-interval",
+    "refresh"
   ],
-
+  "description": "Set the number of cycles taken between updating the existing plots in the user interface. The default value is 100. This controls how frequently the visual display is refreshed during cycling, affecting both visualization responsiveness and computational performance.",
+  "syntax": "model update-interval <i>",
   "keywords": [],
-
   "notes": [
     "Default update interval: 100 cycles",
     "Controls frequency of plot/visualization updates in the user interface",
@@ -29,7 +20,6 @@
     "For headless/batch runs, larger intervals recommended to maximize performance",
     "For interactive visualization, smaller intervals provide smoother updates"
   ],
-
   "examples": [
     {
       "command": "model update-interval 100",
@@ -60,7 +50,6 @@
       "description": "Different intervals for interactive vs. batch modes"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model update-interval 100') - Python SDK does not provide direct update-interval control. Note: When running via Python SDK, visualization updates may behave differently"

@@ -1,21 +1,13 @@
 {
   "command": "model results",
   "category": "model",
-  "search_keywords": ["results", "export", "snapshot"],
-  "description": "Perform file operations on results files. Results files are lightweight versions of save files (about 5% of save file size). Importing results files will fully overwrite the model state (as with 'model restore'), but only a small, predetermined portion of the complete model is included. A state imported from a results file cannot be further cycled. Results files are commonly used to export model states at regular intervals — both to allow the creation of a movie later and to make it easy to check the progress of a model during solution. The user controls what information is included in a results file using the 'results' keyword available to many model objects (e.g., 'zone results', 'ball results', 'clump results').",
-
-  "syntax": "model results <keyword>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Results file operation",
-      "options": ["clear-map", "export", "import", "index", "interval", "list", "map", "prefix", "warn"]
-    }
+  "search_keywords": [
+    "results",
+    "export",
+    "snapshot"
   ],
-
+  "description": "Perform file operations on results files. Results files are lightweight versions of save files (about 5% of save file size). Importing results files will fully overwrite the model state (as with 'model restore'), but only a small, predetermined portion of the complete model is included. A state imported from a results file cannot be further cycled. Results files are commonly used to export model states at regular intervals — both to allow the creation of a movie later and to make it easy to check the progress of a model during solution. The user controls what information is included in a results file using the 'results' keyword available to many model objects (e.g., 'zone results', 'ball results', 'clump results').",
+  "syntax": "model results <keyword>",
   "keywords": [
     {
       "name": "clear-map",
@@ -122,7 +114,6 @@
       "description": "Specify whether the user will be notified if a results file overwrites an existing results file when cycling is initiated from the console"
     }
   ],
-
   "notes": [
     "Results files are lightweight save files (about 5% of size)",
     "Importing results overwrites model state completely (like 'model restore')",
@@ -144,7 +135,6 @@
     "Options Dialog: 'Results' section controls output interval and values",
     "For loosely coupled analyses: steps are 'super-cycles' (exclude slave process steps)"
   ],
-
   "examples": [
     {
       "command": "model results export 'final_state.p3result'",
@@ -219,7 +209,6 @@
       "description": "Clear the current list of tabulated results"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model results ...') - Python SDK does not provide direct results file control. For exporting states in Python, use:\n\n# Setup automatic export\nitasca.command('model results prefix \"simulation\"')\nitasca.command('model results interval step 1000')\n\n# Manual export\nitasca.command('model results export \"snapshot.p3result\"')\n\n# Import\nitasca.command('model results import \"snapshot.p3result\"')"

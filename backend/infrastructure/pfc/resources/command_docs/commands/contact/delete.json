@@ -1,22 +1,13 @@
 {
   "command": "contact delete",
   "category": "contact",
-  "search_keywords": ["delete", "remove"],
-  "description": "Delete contacts in the specified range. Deleted contacts are removed from the simulation and will no longer compute forces. Note that if contact detection is enabled (via 'contact detection' command), deleted contacts may be automatically recreated when pieces are remapped in the cell-space during subsequent cycles. To permanently prevent contact recreation, either disable contact detection or move pieces far enough apart.",
-
-  "syntax": "contact delete <range>",
-
-  "parameters": [
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification identifying which contacts to delete. At least one range criterion must be provided"
-    }
+  "search_keywords": [
+    "delete",
+    "remove"
   ],
-
+  "description": "Delete contacts in the specified range. Deleted contacts are removed from the simulation and will no longer compute forces. Note that if contact detection is enabled (via 'contact detection' command), deleted contacts may be automatically recreated when pieces are remapped in the cell-space during subsequent cycles. To permanently prevent contact recreation, either disable contact detection or move pieces far enough apart.",
+  "syntax": "contact delete <range>",
   "keywords": [],
-
   "examples": [
     {
       "command": "contact delete range contact inactive",
@@ -54,13 +45,11 @@
       "use_case": "Break bonds in simulation"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact delete range ...') - Python SDK does not provide direct contact deletion API. Individual Contact objects become invalid when deleted, but there's no contact.delete() method. Use command interface for contact deletion.",
     "note": "Contacts can become invalid during simulation (e.g., when pieces separate beyond detection distance). Check contact.valid() to verify contact still exists before accessing properties."
   },
-
   "related_commands": [
     "contact detection",
     "contact create",
@@ -68,7 +57,6 @@
     "contact activate",
     "contact inhibit"
   ],
-
   "notes": [
     "Range specification is REQUIRED - cannot delete all contacts without explicit range",
     "Deleted contacts are immediately removed and stop computing forces",
@@ -80,7 +68,6 @@
     "Performance: deleting inactive contacts can improve simulation speed",
     "Bonded contacts: deletion breaks bonds (cannot be undone)"
   ],
-
   "contact_deletion_and_recreation": {
     "description": "How contact deletion interacts with automatic contact detection",
     "deletion_behavior": {
@@ -121,7 +108,6 @@
       }
     ]
   },
-
   "contact_detection_interaction": {
     "detection_on": {
       "description": "Contact detection is enabled (default behavior)",
@@ -154,7 +140,6 @@
       "5. Contacts detected in next cycle"
     ]
   },
-
   "common_use_cases": [
     {
       "use_case": "Clean up inactive contacts",
@@ -209,7 +194,6 @@
       "notes": "Null model is better than deletion when you might want to reactivate"
     }
   ],
-
   "typical_workflow": [
     "1. Identify contacts to delete using range criteria",
     "2. (Optional) Disable contact detection if preventing recreation: contact detection off",
@@ -218,7 +202,6 @@
     "5. (Optional) Re-enable detection: contact detection on",
     "6. Continue simulation - deleted contacts no longer compute forces"
   ],
-
   "deletion_vs_alternatives": {
     "contact_delete": {
       "function": "Permanently remove contacts from simulation",
@@ -247,7 +230,6 @@
       "compromise": "contact model null"
     }
   },
-
   "range_specifications": {
     "description": "Range specification is REQUIRED to identify which contacts to delete",
     "common_ranges": {
@@ -270,7 +252,6 @@
     ],
     "safety": "Always use specific range to avoid unintended mass deletion"
   },
-
   "performance_considerations": {
     "deletion_cost": "Fast - O(number of contacts deleted)",
     "memory_benefit": "Frees memory proportional to contacts deleted",
@@ -286,7 +267,6 @@
     ],
     "recommendation": "Periodically delete inactive contacts in large simulations for performance"
   },
-
   "warnings": [
     {
       "type": "range_required",
@@ -313,7 +293,6 @@
       "mitigation": "Use more specific range unless you truly want to delete all contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Deleted contacts keep reappearing",
@@ -363,7 +342,6 @@
       ]
     }
   ],
-
   "deletion_permanence": {
     "truly_permanent": [
       "Contact detection is OFF",
@@ -382,7 +360,6 @@
       "4. (Optional) Re-enable detection when needed: contact detection on"
     ]
   },
-
   "inactive_contacts": {
     "definition": "Contacts where pieces are separated (gap > 0) and contact is not activated",
     "why_they_exist": [
@@ -398,7 +375,6 @@
     "how_to_delete": "contact delete range contact inactive",
     "recreation": "If pieces come back into contact, new contacts will be created (if detection is on)"
   },
-
   "advanced_usage": {
     "selective_deletion_by_model": {
       "description": "Delete contacts with specific models while preserving others",
@@ -441,7 +417,6 @@
       "note": "Useful when changing contact model strategies mid-simulation"
     }
   },
-
   "contact_detection_command": {
     "description": "Related command that controls automatic contact detection",
     "enable": "contact detection on (default)",
@@ -454,7 +429,6 @@
       "contact detection off → contact delete range ... → contact detection on"
     ]
   },
-
   "best_practices": [
     "Use specific ranges to avoid unintended mass deletion",
     "Delete inactive contacts periodically in large simulations for performance",

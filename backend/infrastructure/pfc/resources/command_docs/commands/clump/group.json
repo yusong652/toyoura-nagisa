@@ -1,39 +1,12 @@
 {
   "command": "clump group",
   "category": "clump",
-  "search_keywords": ["group", "assign"],
-  "description": "Specify clump or pebble group names. Groups are used to organize clumps and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'. Use the add keyword to assign the group name to the next available slot and the remove keyword to remove the group from all slots. The optional pebble keyword can be given before the optional range to specify that the group name will be applied to pebbles. In this case, the range is applied to pebbles and not to clumps.",
-
-  "syntax": "clump group <s> <keyword> ... <pebble> <range>",
-
-  "parameters": [
-    {
-      "name": "s",
-      "type": "string",
-      "required": true,
-      "description": "Group name to assign"
-    },
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Optional modifier (add, remove, slot)",
-      "options": ["add", "remove", "slot"]
-    },
-    {
-      "name": "pebble",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to apply group to pebbles instead of clumps. When specified, the range is applied to pebbles not clumps"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of clumps (or pebbles if pebble keyword specified) to assign to group (default: all clumps)"
-    }
+  "search_keywords": [
+    "group",
+    "assign"
   ],
-
+  "description": "Specify clump or pebble group names. Groups are used to organize clumps and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'. Use the add keyword to assign the group name to the next available slot and the remove keyword to remove the group from all slots. The optional pebble keyword can be given before the optional range to specify that the group name will be applied to pebbles. In this case, the range is applied to pebbles and not to clumps.",
+  "syntax": "clump group <s> <keyword> ... <pebble> <range>",
   "keywords": [
     {
       "name": "slot",
@@ -56,14 +29,12 @@
       "description": "Apply group to pebbles instead of clumps. When this keyword is used, the range is applied to pebbles and not to clumps"
     }
   ],
-
   "notes": [
     "Default behavior: group assigned to slot 'Default'",
     "With pebble keyword: range applies to pebbles, not clumps",
     "Without pebble keyword: range applies to clumps",
     "Use of the group logic is described in Groups documentation"
   ],
-
   "examples": [
     {
       "command": "clump group 'outer'",
@@ -90,7 +61,6 @@
       "description": "Assign group 'pebble_group' to pebbles with IDs 1-50 (range applies to pebbles)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Clump.set_group(group_name, slot=None) for clumps - requires iteration: for c in itasca.clump.list(): c.set_group('name'). For pebbles: use Ball.set_group() on pebble balls"

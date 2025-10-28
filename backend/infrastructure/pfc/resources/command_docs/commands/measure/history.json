@@ -1,26 +1,13 @@
 {
   "command": "measure history",
   "category": "measure",
-  "search_keywords": ["history", "track", "monitor"],
-  "description": "Add a measurement history. A history is a floating point variable that can be sampled and stored during a model run, allowing tracking of measurement quantities over time. The history records values such as porosity, coordination number, stress, strain rate, position, or radius from a specified measurement object as the simulation progresses.",
-
-  "syntax": "measure history <id id> <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "id (first occurrence)",
-      "type": "integer",
-      "required": false,
-      "description": "Optional history ID. If not specified, the next available history ID is used automatically."
-    },
-    {
-      "name": "id (second occurrence)",
-      "type": "integer",
-      "required": true,
-      "description": "Measurement object ID. Specifies which measurement to track. Must follow the quantity keyword (e.g., porosity id 1)."
-    }
+  "search_keywords": [
+    "history",
+    "track",
+    "monitor"
   ],
-
+  "description": "Add a measurement history. A history is a floating point variable that can be sampled and stored during a model run, allowing tracking of measurement quantities over time. The history records values such as porosity, coordination number, stress, strain rate, position, or radius from a specified measurement object as the simulation progresses.",
+  "syntax": "measure history <id id> <keyword> ...",
   "keywords": [
     {
       "name": "porosity",
@@ -259,7 +246,6 @@
       "required": false
     }
   ],
-
   "notes": [
     "History records floating point values sampled during model run",
     "Allows tracking measurement quantities over time (e.g., porosity evolution)",
@@ -273,7 +259,6 @@
     "3D-only components: zz, xz, yz, zx, zy (not available in 2D models)",
     "History data can be exported, plotted, or queried with standard PFC history commands"
   ],
-
   "examples": [
     {
       "command": "measure history porosity id 1",
@@ -311,7 +296,6 @@
       "use_case": "Compare porosity evolution at different locations"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "notes": [
@@ -325,7 +309,6 @@
       "python": "# Python SDK can access history data\n# Consult PFC documentation for history access methods"
     }
   },
-
   "related_commands": [
     "measure create",
     "measure list",
@@ -335,7 +318,6 @@
     "history list",
     "history delete"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Track porosity evolution during compaction",
@@ -386,7 +368,6 @@
       "notes": "Coordination number drops indicate material damage"
     }
   ],
-
   "typical_workflow": [
     "1. Create measurement region: measure create id <i> ...",
     "2. Setup history: measure history <quantity> id <i>",
@@ -395,7 +376,6 @@
     "5. Export history: history export or analyze",
     "6. Plot or analyze time evolution"
   ],
-
   "history_id_management": {
     "auto_assignment": {
       "syntax": "measure history porosity id 1",
@@ -409,7 +389,6 @@
     },
     "recommendation": "Use auto-assignment unless specific IDs needed for scripting"
   },
-
   "measurement_vs_history_id": {
     "description": "Understanding two ID parameters",
     "first_id": {
@@ -426,7 +405,6 @@
     },
     "confusion_warning": "Two 'id' keywords with different meanings - first for history, second for measurement"
   },
-
   "available_quantities": {
     "scalar_quantities": [
       {
@@ -477,13 +455,22 @@
       }
     ]
   },
-
   "tensor_components_2d_vs_3d": {
-    "2d_available": ["xx", "yy", "xy", "yx"],
-    "3d_only": ["zz", "xz", "yz", "zx", "zy"],
+    "2d_available": [
+      "xx",
+      "yy",
+      "xy",
+      "yx"
+    ],
+    "3d_only": [
+      "zz",
+      "xz",
+      "yz",
+      "zx",
+      "zy"
+    ],
     "note": "3D-only components will cause errors in 2D models"
   },
-
   "history_sampling": {
     "description": "When and how histories are sampled",
     "sampling_timing": "Automatically during model cycle or model solve",
@@ -491,7 +478,6 @@
     "triggering": "No manual triggering needed - happens during cycling",
     "data_storage": "Stored in memory, can be exported to file"
   },
-
   "multiple_histories_from_same_measurement": {
     "description": "Can track multiple quantities from same measurement",
     "example": [
@@ -504,7 +490,6 @@
     "benefit": "Comprehensive monitoring of single region",
     "note": "Each quantity gets separate history ID"
   },
-
   "multiple_histories_from_different_measurements": {
     "description": "Can track same quantity from different measurements",
     "example": [
@@ -516,7 +501,6 @@
     "benefit": "Spatial comparison of same property",
     "note": "Each measurement gets separate history"
   },
-
   "warnings": [
     {
       "type": "measurement_must_exist",
@@ -543,7 +527,6 @@
       "mitigation": "Export and clear histories periodically for very long simulations"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "measure history fails or gives error",
@@ -591,14 +574,12 @@
       ]
     }
   ],
-
   "performance_considerations": {
     "history_overhead": "Minimal - sampling is fast",
     "memory_usage": "Proportional to number of samples × number of histories",
     "sampling_frequency": "Default every cycle - can be adjusted",
     "recommendation": "History tracking adds minimal overhead to simulation"
   },
-
   "history_commands_integration": {
     "description": "measure history integrates with PFC history system",
     "common_commands": [
@@ -621,7 +602,6 @@
     ],
     "note": "Review PFC documentation for complete history command set"
   },
-
   "export_and_analysis": {
     "description": "Typical workflow for exporting and analyzing history data",
     "steps": [
@@ -646,7 +626,6 @@
       }
     ]
   },
-
   "when_to_use_measure_history": {
     "good_use_cases": [
       "Track porosity evolution during compaction",
@@ -662,7 +641,6 @@
       "Global properties not specific to measurement regions"
     ]
   },
-
   "stress_strainrate_general_vs_components": {
     "description": "Difference between stress/strainrate and component keywords",
     "general_keywords": {

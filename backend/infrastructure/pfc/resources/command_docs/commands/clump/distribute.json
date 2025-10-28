@@ -1,26 +1,13 @@
 {
   "command": "clump distribute",
   "category": "clump",
-  "search_keywords": ["distribute", "overlap", "porosity"],
-  "description": "Distribute clumps with overlaps. This process ceases when a target porosity is achieved. By default, the clump positions and sizes are drawn from uniform distributions throughout the model domain. As a result, the set of clumps generated is affected by the state of the random-number generator (see model random). The clump sizes can also be drawn from a Gaussian distribution via the gauss keyword. A number of clump distributions, with size ranges and volume fractions each using a unique clump template, can be specified. The optional range is applied to each clump upon generation and, if the clump does not fall within the range, it is not added to the model and does not affect the stopping criteria. This command contrasts with the clump generate command where clumps, with sizes chosen from a single distribution, are generated without overlap until the target number of clumps, or the number of attempts to place clumps, is achieved.",
-
-  "syntax": "clump distribute <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Distribution control keywords: bin, box, diameter, fish-size, number-bins, porosity, resolution"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Optional range applied to each clump upon generation. Clumps not falling within range are not added to model and do not affect stopping criteria"
-    }
+  "search_keywords": [
+    "distribute",
+    "overlap",
+    "porosity"
   ],
-
+  "description": "Distribute clumps with overlaps. This process ceases when a target porosity is achieved. By default, the clump positions and sizes are drawn from uniform distributions throughout the model domain. As a result, the set of clumps generated is affected by the state of the random-number generator (see model random). The clump sizes can also be drawn from a Gaussian distribution via the gauss keyword. A number of clump distributions, with size ranges and volume fractions each using a unique clump template, can be specified. The optional range is applied to each clump upon generation and, if the clump does not fall within the range, it is not added to the model and does not affect the stopping criteria. This command contrasts with the clump generate command where clumps, with sizes chosen from a single distribution, are generated without overlap until the target number of clumps, or the number of attempts to place clumps, is achieved.",
+  "syntax": "clump distribute <keyword> ... <range>",
   "keywords": [
     {
       "name": "number-bins",
@@ -110,7 +97,6 @@
       "description": "Optional resolution that can be used as a multiplicative factor of the size of each clump generated. Default: 1.0"
     }
   ],
-
   "notes": [
     "A model domain must be specified prior to clump generation",
     "Significant clump overlaps will likely result from this operation",
@@ -119,7 +105,6 @@
     "Volume fractions of all bins must sum to 1",
     "Contrasts with clump generate command: distribute allows overlaps and stops at target porosity, while generate creates clumps without overlap until target number or attempt limit is reached"
   ],
-
   "examples": [
     {
       "command": "clump distribute porosity 0.4 diameter template 'triangle' size 2 4 box -9 9",
@@ -134,7 +119,6 @@
       "description": "Create multi-component assembly with 6 bins, each with different size ranges, volume fractions, groups, and templates. Volume fractions sum to 1.0. Stops at porosity 0.3"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump distribute ...') - Python SDK cannot directly distribute clumps with templating system"

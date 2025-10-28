@@ -1,26 +1,12 @@
 {
   "command": "wall delete",
   "category": "wall",
-  "search_keywords": ["delete", "remove"],
-  "description": "Delete walls and/or facets. If neither the walls nor facets keywords are given, then facets are deleted. When facets are deleted, walls without facets are automatically deleted as well.",
-
-  "syntax": "wall delete <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Specify what to delete: 'facets' or 'walls'. Default: facets"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Range specification to filter which walls/facets to delete. If not specified, all are deleted"
-    }
+  "search_keywords": [
+    "delete",
+    "remove"
   ],
-
+  "description": "Delete walls and/or facets. If neither the walls nor facets keywords are given, then facets are deleted. When facets are deleted, walls without facets are automatically deleted as well.",
+  "syntax": "wall delete <keyword> <range>",
   "keywords": [
     {
       "name": "facets",
@@ -33,7 +19,6 @@
       "description": "Delete entire walls"
     }
   ],
-
   "examples": [
     {
       "command": "wall delete",
@@ -60,7 +45,6 @@
       "description": "Delete all facets in group 'boundary'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Wall.delete() or Facet.delete() methods - requires iteration: for w in itasca.wall.list(): w.delete() or for f in itasca.wall.facet.list(): f.delete()"

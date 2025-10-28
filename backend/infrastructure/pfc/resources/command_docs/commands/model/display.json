@@ -1,21 +1,12 @@
 {
   "command": "model display",
   "category": "model",
-  "search_keywords": ["display", "output"],
-  "description": "Set information to display during cycling. Along with the baseline information, additional information can be displayed during cycling using the keywords below. This information will be updated every step.",
-
-  "syntax": "model display <keyword>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Type of display information to configure",
-      "options": ["active", "fish", "history"]
-    }
+  "search_keywords": [
+    "display",
+    "output"
   ],
-
+  "description": "Set information to display during cycling. Along with the baseline information, additional information can be displayed during cycling using the keywords below. This information will be updated every step.",
+  "syntax": "model display <keyword>",
   "keywords": [
     {
       "name": "active",
@@ -33,7 +24,6 @@
       "description": "Add the tabulated value of the history with ID i to the cycle output. Only the result of one history can be shown"
     }
   ],
-
   "notes": [
     "Information is updated every step during cycling",
     "Baseline information is always displayed",
@@ -44,7 +34,6 @@
     "Useful for monitoring specific values during long simulations",
     "Display settings persist until changed or model new"
   ],
-
   "examples": [
     {
       "command": "model display active on",
@@ -79,7 +68,6 @@
       "description": "Monitor unbalanced force ratio during cycling"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model display ...') - Python SDK does not provide display control. For monitoring, use print statements or logging in Python loop with itasca.cycle() and itasca.fish_get()"

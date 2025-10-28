@@ -60,15 +60,24 @@ class CommandFormatter:
             parts.append("```")
             parts.append("")
 
-        # Parameters
-        parameters = doc.get("parameters", [])
-        if parameters:
-            parts.append("## Parameters")
-            for param in parameters:
-                param_name = param.get("name", "")
-                param_desc = param.get("description", "")
-                parts.append(f"- **{param_name}**: {param_desc}")
-            parts.append("")
+        # Keywords
+        keywords = doc.get("keywords", [])
+        if keywords:
+            parts.append("## Keywords")
+            for kw in keywords:
+                kw_name = kw.get("name", "")
+                kw_syntax = kw.get("syntax", "")
+                kw_desc = kw.get("description", "")
+
+                # Format: syntax as header, description as content
+                if kw_syntax:
+                    parts.append(f"### `{kw_syntax}`")
+                else:
+                    parts.append(f"### `{kw_name}`")
+
+                if kw_desc:
+                    parts.append(kw_desc)
+                parts.append("")
 
         # Examples
         examples = doc.get("examples", [])

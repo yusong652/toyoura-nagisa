@@ -1,32 +1,12 @@
 {
   "command": "contact group",
   "category": "contact",
-  "search_keywords": ["group", "assign"],
-  "description": "Assign group names to contacts for organization and range-based selection. Groups are a fundamental organizational tool in PFC, allowing contacts to be categorized, selected, and manipulated based on group membership. Contacts can belong to multiple groups via different slots. By default, the group name is assigned to the 'Default' slot. Use 'add' keyword to assign to next available slot, 'remove' keyword to remove from all slots, and 'slot' keyword to specify a particular slot. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact group <s> <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "s",
-      "type": "string",
-      "required": true,
-      "description": "Group name to assign to contacts"
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keywords to control group assignment behavior (add, remove, slot, mechanical, thermal)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification identifying which contacts to assign to the group"
-    }
+  "search_keywords": [
+    "group",
+    "assign"
   ],
-
+  "description": "Assign group names to contacts for organization and range-based selection. Groups are a fundamental organizational tool in PFC, allowing contacts to be categorized, selected, and manipulated based on group membership. Contacts can belong to multiple groups via different slots. By default, the group name is assigned to the 'Default' slot. Use 'add' keyword to assign to next available slot, 'remove' keyword to remove from all slots, and 'slot' keyword to specify a particular slot. By default, only mechanical contacts are considered.",
+  "syntax": "contact group <s> <keyword> ... <range>",
   "keywords": [
     {
       "name": "slot",
@@ -61,7 +41,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact group 'Lining' range cylinder end-1 (16.0,-6.0,6.0) end-2 (16.0,6.0,6.0) radius 4.0",
@@ -104,7 +83,6 @@
       "use_case": "Select contacts based on state criteria"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -164,7 +142,6 @@
       "python": "for c in it.contact.list():\\n    if c.end1().type_id() == 'ball' and c.end2().type_id() == 'facet':\\n        c.set_group('boundary')"
     }
   },
-
   "related_commands": [
     "contact apply-group",
     "ball group",
@@ -172,7 +149,6 @@
     "clump group",
     "contact list"
   ],
-
   "notes": [
     "Group names are case-sensitive strings",
     "Contacts can belong to multiple groups using different slots",
@@ -184,7 +160,6 @@
     "Groups are fundamental to PFC's organizational system",
     "Group membership persists until explicitly changed or contact deleted"
   ],
-
   "group_slots_concept": {
     "description": "Contacts can have multiple group names assigned via different 'slots'",
     "purpose": "Allows multiple independent classification schemes for the same contacts",
@@ -205,7 +180,6 @@
       "Different slots for different analysis purposes"
     ]
   },
-
   "slot_vs_add_vs_remove": {
     "default_behavior": {
       "command": "contact group 'boundary' range ...",
@@ -228,7 +202,6 @@
       "effect": "Removes 'temporary' from all slots where it appears"
     }
   },
-
   "common_use_cases": [
     {
       "use_case": "Identify boundary contacts",
@@ -278,7 +251,6 @@
       "notes": "Powerful organization for complex models"
     }
   ],
-
   "typical_workflow": [
     "1. Identify contacts to group based on criteria (type, location, model, etc.)",
     "2. Choose group name (descriptive string)",
@@ -288,7 +260,6 @@
     "6. Use group for range selection: range group <name>",
     "7. Apply operations, queries, or analysis to grouped contacts"
   ],
-
   "group_based_selection": {
     "description": "Groups enable powerful range-based selection",
     "syntax": "range group <group_name>",
@@ -306,7 +277,6 @@
       "Reusable selections across commands"
     ]
   },
-
   "range_specifications": {
     "description": "Range specification is REQUIRED to identify which contacts to assign to group",
     "common_ranges": {
@@ -328,7 +298,6 @@
       "contact group 'interface' range plane dip 0 origin 0 0 5 dist 0.1"
     ]
   },
-
   "performance_considerations": {
     "command_interface": "Very fast - bulk group assignment in C++ core",
     "python_iteration": "Slower - Python loop overhead + method call per contact",
@@ -336,7 +305,6 @@
     "memory": "Group names are strings - minimal memory overhead",
     "query_performance": "Group-based range selection is optimized, very fast"
   },
-
   "warnings": [
     {
       "type": "slot_overwriting",
@@ -358,7 +326,6 @@
       "mitigation": "Always provide range, even 'range contact' for all contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Group assignment not working",
@@ -405,7 +372,6 @@
       ]
     }
   ],
-
   "group_vs_apply_group": {
     "contact_group": {
       "function": "Assign group names TO contacts",
@@ -427,7 +393,6 @@
       "3. Both contacts and pieces now have 'boundary' group"
     ]
   },
-
   "advanced_usage": {
     "hierarchical_organization": {
       "description": "Use multiple slots for hierarchical classification",
@@ -467,7 +432,6 @@
       ]
     }
   },
-
   "best_practices": [
     "Use descriptive, meaningful group names",
     "Establish naming convention (e.g., lowercase, underscore-separated)",
@@ -478,7 +442,6 @@
     "Use group-based selection to simplify range specifications",
     "Clean up temporary groups with 'remove' keyword when done"
   ],
-
   "mechanical_vs_thermal_contacts": {
     "mechanical": {
       "description": "Default contact type for force transmission",
@@ -492,11 +455,17 @@
       "note": "Only relevant if thermal process is active"
     }
   },
-
   "groups_documentation_reference": {
     "description": "Groups are a fundamental PFC concept used throughout the software",
     "general_group_logic": "See PFC documentation section 'Groups' for comprehensive information",
-    "applies_to": ["balls", "walls", "clumps", "contacts", "facets", "pebbles"],
+    "applies_to": [
+      "balls",
+      "walls",
+      "clumps",
+      "contacts",
+      "facets",
+      "pebbles"
+    ],
     "universal_concepts": [
       "Group slots for multiple classifications",
       "Group-based range selection",

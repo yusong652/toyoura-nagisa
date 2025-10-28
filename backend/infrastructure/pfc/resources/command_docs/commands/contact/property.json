@@ -1,32 +1,14 @@
 {
   "command": "contact property",
   "category": "contact",
-  "search_keywords": ["property", "stiffness", "friction", "damping"],
-  "description": "Assign contact properties to existing contacts. All contacts with a contact model that recognizes the specified property are affected. This command modifies properties of existing contacts directly, unlike CMAT commands which define rules for future contact creation. Property inheritance may also be modified with the optional 'inheritance' keyword. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact property <keyword> ... <inheritance b> ... <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "property name and value pairs",
-      "required": true,
-      "description": "One or more property names followed by their values. Property names are model-specific (e.g., 'kn', 'ks', 'fric' for linear model; 'pb_kn', 'pb_ten' for linearpbond model)"
-    },
-    {
-      "name": "inheritance",
-      "type": "boolean",
-      "required": false,
-      "description": "Optional inheritance flag. If specified, must be followed by a boolean (true/false) to enable/disable property inheritance"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which contacts are affected. If omitted, all contacts with the contact model that recognizes the property are affected"
-    }
+  "search_keywords": [
+    "property",
+    "stiffness",
+    "friction",
+    "damping"
   ],
-
+  "description": "Assign contact properties to existing contacts. All contacts with a contact model that recognizes the specified property are affected. This command modifies properties of existing contacts directly, unlike CMAT commands which define rules for future contact creation. Property inheritance may also be modified with the optional 'inheritance' keyword. By default, only mechanical contacts are considered.",
+  "syntax": "contact property <keyword> ... <inheritance b> ... <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -52,7 +34,6 @@
       "notes": "Only applicable to inheritable properties. Not all properties support inheritance."
     }
   ],
-
   "applicable_contact_models": [
     "linear",
     "linearpbond",
@@ -72,7 +53,6 @@
     "bilinear",
     "softbond"
   ],
-
   "examples": [
     {
       "command": "contact property pb_kn 1e7 pb_ks 1e7 pb_ten 4e5 pb_coh 4e5 pb_fa 20.0",
@@ -120,7 +100,6 @@
       "model": "linear, linearpbond, linearcbond"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -141,7 +120,6 @@
       "Use range specification in command interface to avoid iterating in Python"
     ]
   },
-
   "model_properties_reference": {
     "path": "model-properties/index.json",
     "description": "For comprehensive property information for each contact model, see the model-properties reference documentation",
@@ -154,14 +132,12 @@
     },
     "note": "Property documentation includes types, ranges, defaults, inheritance info, and usage notes"
   },
-
   "related_commands": [
     "contact cmat add",
     "contact cmat default",
     "contact cmat apply",
     "contact model assign"
   ],
-
   "notes": [
     "Affects EXISTING contacts, not future contact creation (unlike CMAT commands)",
     "Only contacts whose model recognizes the property are affected",
@@ -173,7 +149,6 @@
     "Changes take effect immediately - no need to apply",
     "More efficient than Python iteration for bulk updates"
   ],
-
   "property_vs_cmat": {
     "contact_property": {
       "target": "EXISTING contacts",
@@ -191,7 +166,6 @@
     },
     "both_needed": "Use CMAT to configure initial contact behavior, then use 'contact property' to adjust properties during simulation or after calibration"
   },
-
   "common_use_cases": [
     {
       "use_case": "Update bond strengths after calibration",
@@ -235,7 +209,6 @@
       ]
     }
   ],
-
   "property_inheritance": {
     "concept": "Some properties can inherit values from the contacting pieces (balls, walls). When inheritance is enabled, the property value is calculated from the piece properties rather than being set directly.",
     "inheritable_properties": [
@@ -260,7 +233,6 @@
       "See model-properties documentation for which properties are inheritable"
     ]
   },
-
   "typical_workflow": [
     "1. Check current property values using contact list or Python",
     "2. Identify contacts to modify (use range if needed)",
@@ -268,7 +240,6 @@
     "4. Verify changes (optional): list properties or query specific contacts",
     "5. Continue simulation - changes take effect immediately"
   ],
-
   "performance_considerations": {
     "command_interface": "Very fast - bulk update in C++ core",
     "python_iteration": "Slower - Python loop overhead",
@@ -286,7 +257,6 @@
       }
     ]
   },
-
   "range_specifications": {
     "description": "Range limits which contacts are affected by the property command",
     "common_ranges": {
@@ -302,7 +272,6 @@
       "contact property pb_ten 2e5 range model linearpbond"
     ]
   },
-
   "troubleshooting": [
     {
       "issue": "Property not changing",
@@ -336,7 +305,6 @@
       ]
     }
   ],
-
   "warnings": [
     {
       "type": "model_compatibility",
@@ -351,7 +319,11 @@
     {
       "type": "read_only_properties",
       "message": "Some properties are calculated automatically and cannot be set directly",
-      "examples": ["pb_sigma (normal stress)", "pb_tau (shear stress)", "hz_slip (slip state)"]
+      "examples": [
+        "pb_sigma (normal stress)",
+        "pb_tau (shear stress)",
+        "hz_slip (slip state)"
+      ]
     }
   ]
 }

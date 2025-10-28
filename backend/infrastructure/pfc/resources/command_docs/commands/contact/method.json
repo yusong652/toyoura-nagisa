@@ -1,32 +1,14 @@
 {
   "command": "contact method",
   "category": "contact",
-  "search_keywords": ["method", "deformability", "bond", "modulus"],
-  "description": "Execute contact model methods on existing contacts. The specified method, along with its arguments, is invoked for all contacts in the range that have a contact model supporting that method. Methods are model-specific functions that perform specialized operations like activating bonds, setting deformability parameters, or other model-specific behaviors. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact method <method_name> <arg_name> <arg_value> ... <range>",
-
-  "parameters": [
-    {
-      "name": "method_name",
-      "type": "string",
-      "required": true,
-      "description": "Name of the contact model method to invoke (e.g., 'bond', 'deformability', 'pb_deformability')"
-    },
-    {
-      "name": "arg_name arg_value pairs",
-      "type": "method-specific",
-      "required": false,
-      "description": "Method-specific argument name-value pairs. Arguments vary by method and contact model"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which contacts are affected. If omitted, all contacts with models supporting the method are affected"
-    }
+  "search_keywords": [
+    "method",
+    "deformability",
+    "bond",
+    "modulus"
   ],
-
+  "description": "Execute contact model methods on existing contacts. The specified method, along with its arguments, is invoked for all contacts in the range that have a contact model supporting that method. Methods are model-specific functions that perform specialized operations like activating bonds, setting deformability parameters, or other model-specific behaviors. By default, only mechanical contacts are considered.",
+  "syntax": "contact method <method_name> <arg_name> <arg_value> ... <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -39,7 +21,6 @@
       "description": "Apply method to thermal contacts (instead of mechanical)"
     }
   ],
-
   "available_methods_by_model": {
     "linear": [
       {
@@ -155,7 +136,6 @@
       }
     ]
   },
-
   "examples": [
     {
       "command": "contact method bond gap 0.0 pb_deformability emod 60e9 kratio 2.5",
@@ -188,7 +168,6 @@
       "model": "any model with deformability method"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -213,14 +192,12 @@
       "python": "for c in it.contact.list(): c.method('bond', {'gap': 0.0})"
     }
   },
-
   "related_commands": [
     "contact model",
     "contact property",
     "contact cmat add",
     "contact cmat default"
   ],
-
   "notes": [
     "Methods are model-specific - only contacts whose model supports the method are affected",
     "Contacts whose model doesn't support the method are silently ignored",
@@ -232,7 +209,6 @@
     "The 'deformability' method calculates stiffnesses from material properties (emod, kratio)",
     "The 'bond' method activates bonds that were previously inactive"
   ],
-
   "method_vs_property": {
     "contact_method": {
       "function": "Execute model-specific operations",
@@ -259,7 +235,6 @@
     "when_to_use_method": "When you need to perform complex operations (bonding, deformability calculation) that involve multiple property updates or state changes",
     "when_to_use_property": "When you need to directly set specific property values"
   },
-
   "common_use_cases": [
     {
       "use_case": "Bond assembly after positioning",
@@ -300,7 +275,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Ensure contacts exist and have appropriate contact models assigned",
     "2. Set any required properties first (e.g., bond strengths before bonding)",
@@ -309,7 +283,6 @@
     "5. Verify results (optional): check bonded state, stiffness values, etc.",
     "6. Continue simulation with modified contact behavior"
   ],
-
   "deformability_method": {
     "purpose": "Calculate contact stiffnesses from material properties (Young's modulus and stiffness ratio)",
     "arguments": {
@@ -342,7 +315,6 @@
       "flatjoint"
     ]
   },
-
   "bond_method": {
     "purpose": "Activate bonds at contacts for bonded contact models (linearpbond, linearcbond)",
     "arguments": {
@@ -373,7 +345,6 @@
       "4. Check bonded state: contact.bonded() returns True"
     ]
   },
-
   "range_specifications": {
     "description": "Range limits which contacts the method is applied to",
     "common_ranges": {
@@ -389,7 +360,6 @@
       "contact method pb_deformability emod 60e10 kratio 1.5 range type ball-ball"
     ]
   },
-
   "performance_considerations": {
     "command_interface": "Very fast - bulk method execution in C++ core",
     "python_iteration": "Slower - Python loop overhead + method call for each contact",
@@ -407,7 +377,6 @@
       }
     ]
   },
-
   "warnings": [
     {
       "type": "method_availability",
@@ -430,7 +399,6 @@
       "example": "If pb_ten and pb_coh are not set, bonds may break immediately after activation"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Method has no effect",
@@ -477,13 +445,11 @@
       ]
     }
   ],
-
   "model_properties_reference": {
     "path": "model-properties/index.json",
     "description": "For detailed property information for each contact model (which properties to set before calling methods), see the model-properties reference documentation",
     "note": "Bond methods typically require bond strength properties to be set first"
   },
-
   "advanced_usage": {
     "chaining_methods": {
       "description": "Multiple methods can be executed in a single command",

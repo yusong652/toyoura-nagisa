@@ -1,26 +1,12 @@
 {
   "command": "wall list",
   "category": "wall",
-  "search_keywords": ["list", "query"],
-  "description": "List wall information. By default, the wall ID, wall name, facet count, active/total contact count, and position are listed. Use the attribute keyword to list all wall attributes that can be listed. Note: Use the model precision command to change the precision of listed floating point values. The optional range always applies to walls and not facets.",
-
-  "syntax": "wall list <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "What to list: attribute, contact, extra, group, property, or result. Default: basic info (ID, name, facet count, contacts, position)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Range of walls to list. Always applies to walls, not facets. Default: all walls"
-    }
+  "search_keywords": [
+    "list",
+    "query"
   ],
-
+  "description": "List wall information. By default, the wall ID, wall name, facet count, active/total contact count, and position are listed. Use the attribute keyword to list all wall attributes that can be listed. Note: Use the model precision command to change the precision of listed floating point values. The optional range always applies to walls and not facets.",
+  "syntax": "wall list <keyword> <range>",
   "keywords": [
     {
       "name": "attribute",
@@ -53,7 +39,6 @@
       "description": "List wall model results that have been tabulated. See wall results command for details"
     }
   ],
-
   "attribute_keywords": [
     "cutoff-angle",
     "displacement",
@@ -86,7 +71,6 @@
     "velocity-conveyor-y",
     "velocity-conveyor-z (3D)"
   ],
-
   "examples": [
     {
       "command": "wall list",
@@ -129,7 +113,6 @@
       "description": "List z-component of angular velocity for walls named 'drum' (3D)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Use Wall object getter methods: wall.pos(), wall.vel(), wall.spin(), wall.disp(), wall.cutoff(), wall.extra(i), wall.group(slot), etc. Access walls via itasca.wall.list(). For contacts: wall.contacts(). For properties: iterate through wall.facets() and use facet.prop(name)"

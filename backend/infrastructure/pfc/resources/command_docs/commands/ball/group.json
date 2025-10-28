@@ -1,33 +1,12 @@
 {
   "command": "ball group",
   "category": "ball",
-  "search_keywords": ["group", "assign"],
-  "description": "Specify ball group names. Groups are used to organize balls and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'.",
-
-  "syntax": "ball group <s> <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "s",
-      "type": "string",
-      "required": true,
-      "description": "Group name to assign"
-    },
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Optional modifier (add, remove, slot)",
-      "options": ["add", "remove", "slot"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of balls to assign to group (default: all balls)"
-    }
+  "search_keywords": [
+    "group",
+    "assign"
   ],
-
+  "description": "Specify ball group names. Groups are used to organize balls and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'.",
+  "syntax": "ball group <s> <keyword> ... <range>",
   "keywords": [
     {
       "name": "slot",
@@ -45,7 +24,6 @@
       "description": "Remove group s from all slots"
     }
   ],
-
   "examples": [
     {
       "command": "ball group 'top_grip' range position-y 0.049 0.05",
@@ -68,7 +46,6 @@
       "description": "Remove group 'old_group' from all balls in all slots"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Ball.set_group(group_name, slot=None) - requires iteration: for b in itasca.ball.list(): b.set_group('name')"

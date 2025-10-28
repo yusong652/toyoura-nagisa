@@ -1,22 +1,13 @@
 {
   "command": "contact cmat remove",
   "category": "contact cmat",
-  "search_keywords": ["cmat", "remove"],
-  "description": "Remove an entry from the CMAT (Contact Model Assignment Table). Deletes the CMAT entry at the specified index. When an entry is removed, subsequent entries (higher indices) are shifted down to fill the gap. This command is used to clean up or modify the CMAT by removing specific contact model assignment rules. The default entry (index 0) typically should not be removed.",
-
-  "syntax": "contact cmat remove <i>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Index of the CMAT entry to remove. Must be a valid entry index (i > 0 typically). Removing index 0 (default entry) is generally not recommended."
-    }
+  "search_keywords": [
+    "cmat",
+    "remove"
   ],
-
+  "description": "Remove an entry from the CMAT (Contact Model Assignment Table). Deletes the CMAT entry at the specified index. When an entry is removed, subsequent entries (higher indices) are shifted down to fill the gap. This command is used to clean up or modify the CMAT by removing specific contact model assignment rules. The default entry (index 0) typically should not be removed.",
+  "syntax": "contact cmat remove <i>",
   "keywords": [],
-
   "examples": [
     {
       "command": "contact cmat remove 1",
@@ -27,19 +18,16 @@
       "description": "Remove CMAT entry at index 5"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact cmat remove <i>') - Python SDK does not provide direct CMAT API, must use command interface"
   },
-
   "related_commands": [
     "contact cmat add",
     "contact cmat list",
     "contact cmat default",
     "contact cmat apply"
   ],
-
   "notes": [
     "Entry index must be valid (exist in the CMAT)",
     "Subsequent entries (higher indices) are shifted down after removal",
@@ -49,7 +37,6 @@
     "To update existing contacts after CMAT changes, use 'contact cmat apply'",
     "Cannot undo removal - consider using 'contact cmat list' to document before removing"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Clean up unused CMAT entry",
@@ -67,7 +54,6 @@
       "description": "Remove specific rule entry to simplify CMAT logic"
     }
   ],
-
   "typical_workflow": [
     "1. Use 'contact cmat list' to see current CMAT entries and their indices",
     "2. Identify the entry index to remove",
@@ -76,14 +62,12 @@
     "5. Note that subsequent entries have shifted down by one index",
     "6. If needed, use 'contact cmat apply' to update existing contacts with new CMAT"
   ],
-
   "behavior_details": {
     "index_shifting": "After removing entry i, all entries with indices > i are decremented by 1. For example, if you remove entry 2, the old entry 3 becomes new entry 2, old entry 4 becomes new entry 3, etc.",
     "default_entry": "Entry 0 (default) should typically not be removed as it serves as the fallback when no other entries match. Removing it may cause unexpected behavior.",
     "existing_contacts": "Removal only affects how new contacts are assigned. Existing contacts retain their current models and properties until 'contact cmat apply' is used.",
     "empty_cmat": "If all entries except default are removed, only the default entry remains and will be used for all new contacts."
   },
-
   "warnings": [
     {
       "type": "index_shift",
@@ -101,7 +85,6 @@
       "mitigation": "Document CMAT configuration with 'contact cmat list' before removing entries"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Invalid index error",

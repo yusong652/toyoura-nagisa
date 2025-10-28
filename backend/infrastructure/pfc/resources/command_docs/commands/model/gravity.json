@@ -1,28 +1,13 @@
 {
   "command": "model gravity",
   "category": "model",
-  "search_keywords": ["gravity", "acceleration"],
-  "description": "Set the gravity as a vector or float. Gravity is set in units of acceleration. Body force is calculated as the product of the gravity vector and the real mass of an object. As a shorthand, only a single scalar value f may be specified instead. If this is done, gravity is set to (0,0,-f).",
-
-  "syntax": "model gravity <v3> | <f>",
-
-  "parameters": [
-    {
-      "name": "v3",
-      "type": "vector",
-      "required": false,
-      "description": "Gravity vector (x, y, z components) in units of acceleration"
-    },
-    {
-      "name": "f",
-      "type": "float",
-      "required": false,
-      "description": "Scalar gravity value (shorthand for (0,0,-f))"
-    }
+  "search_keywords": [
+    "gravity",
+    "acceleration"
   ],
-
+  "description": "Set the gravity as a vector or float. Gravity is set in units of acceleration. Body force is calculated as the product of the gravity vector and the real mass of an object. As a shorthand, only a single scalar value f may be specified instead. If this is done, gravity is set to (0,0,-f).",
+  "syntax": "model gravity <v3> | <f>",
   "keywords": [],
-
   "notes": [
     "Gravity is in units of acceleration (e.g., m/s², ft/s²)",
     "Body force = gravity vector × real mass of object",
@@ -34,7 +19,6 @@
     "Can be changed at any time during simulation",
     "Non-zero gravity affects equilibrium state"
   ],
-
   "examples": [
     {
       "command": "model gravity 9.81",
@@ -73,7 +57,6 @@
       "description": "Set gravity in ft/s² units (standard gravity in imperial units)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "python_code": "# Set gravity using scalar (shorthand)\nitasca.set_gravity(9.81)\n\n# Set gravity using vector\nitasca.set_gravity_vector((0, 0, -9.81))\n\n# Get current gravity\ngrav = itasca.get_gravity()\nprint(grav)  # Returns vector (x, y, z)",

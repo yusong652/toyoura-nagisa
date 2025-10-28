@@ -1,42 +1,15 @@
 {
   "command": "clump attribute",
   "category": "clump",
-  "search_keywords": ["attribute", "set", "density", "velocity", "position"],
-  "description": "Set the value of clump attributes. This command is a synonym for the clump initialize command. Individual attributes can be listed with the clump list command and all attributes can be visualized. Clump attributes are characteristics of the clumps such as position or size. These are distinct from clump properties (assigned with the clump property command) that are surface properties of the clumps that are used to fill contact model properties.",
-
-  "syntax": "clump attribute <keyword> <value> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Attribute to set",
-      "categories": {
-        "geometry": ["position", "position-x/y/z", "volume", "displacement", "displacement-x/y/z"],
-        "kinematics": ["velocity", "velocity-x/y/z", "spin", "spin-x/y/z (3D)", "rotation (2D)"],
-        "orientation": ["euler-x/y/z (3D)", "rotation (2D)"],
-        "forces": ["force-applied", "force-contact", "force-contact-x/y/z"],
-        "moments": ["moment-applied", "moment-applied-x/y/z (3D)", "moment-contact", "moment-contact-x/y/z (3D)"],
-        "inertial": ["moi-11", "moi-12", "moi-13", "moi-22", "moi-23", "moi-33", "moi-principal (3D)", "density"],
-        "material": ["density", "damp"],
-        "other": ["fragment"]
-      }
-    },
-    {
-      "name": "value",
-      "type": "float or vector",
-      "required": true,
-      "description": "Value to set (can be modified with add/multiply/gradient/replace modifiers)"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of clumps to apply the attribute to"
-    }
+  "search_keywords": [
+    "attribute",
+    "set",
+    "density",
+    "velocity",
+    "position"
   ],
-
+  "description": "Set the value of clump attributes. This command is a synonym for the clump initialize command. Individual attributes can be listed with the clump list command and all attributes can be visualized. Clump attributes are characteristics of the clumps such as position or size. These are distinct from clump properties (assigned with the clump property command) that are surface properties of the clumps that are used to fill contact model properties.",
+  "syntax": "clump attribute <keyword> <value> <range>",
   "keywords": [
     {
       "name": "damp",
@@ -154,7 +127,6 @@
       "description": "Clump volume. When modified, only mass and real mass are changed (not moment of inertia or pebble sizes). Sets moments to fixed state. Fix state modifiable via FISH (clump.moi.fix)"
     }
   ],
-
   "modifiers": [
     {
       "name": "add",
@@ -182,13 +154,11 @@
       "description": "Apply linear gradient in specific direction starting at origin"
     }
   ],
-
   "notes": [
     "Modification of clump geometry will fail if the resulting clump would not fall entirely within the model domain",
     "Be aware of the distinction between attributes and properties! See tutorial 'Attributes and Properties' for details",
     "Specifying moment of inertia or volume via command line sets them to fixed state (not auto-updated when scaling/changing density)"
   ],
-
   "examples": [
     {
       "command": "clump attribute density 1.0e3 damp 0.7",
@@ -207,7 +177,6 @@
       "description": "Multiply volume by 1.2 for clumps with ID 1-100 (sets moment of inertia to fixed state)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Use Clump.set_*() methods (e.g., Clump.set_density(), Clump.set_vel(), Clump.set_pos()) - requires iteration over clump range"

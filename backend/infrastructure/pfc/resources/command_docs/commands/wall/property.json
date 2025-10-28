@@ -1,53 +1,72 @@
 {
   "command": "wall property",
   "category": "wall",
-  "search_keywords": ["property", "surface"],
-  "description": "Assign facet surface properties used in contact models. Properties are surface conditions (e.g., stiffness, friction) that are distinct from wall attributes (position, velocity). Property names depend on the active contact model. Contact models prioritize checking object surface properties during contact resolution. See Contact Models documentation for available properties per model. Note: Be aware of the distinction between attributes and properties! The tutorial example 'Attributes and Properties' discusses this issue in detail.",
-
-  "syntax": "wall property <s a> <s1 a1> ... <range>",
-
-  "parameters": [
-    {
-      "name": "s a",
-      "type": "property name-value pairs",
-      "required": true,
-      "description": "Facet surface property name (string) and value. Properties depend on contact model (linear: kn/ks, hertz: hz_kn, linear bond: lb_coh, parallel bond: pb_kn/pb_ks, flat joint: fj_kn/fj_coh, smooth joint: sj_kn/sj_ks, etc.). Can specify multiple name-value pairs."
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of walls to assign properties. Properties are applied to all facets within the range. Default: all walls"
-    }
+  "search_keywords": [
+    "property",
+    "surface"
   ],
-
+  "description": "Assign facet surface properties used in contact models. Properties are surface conditions (e.g., stiffness, friction) that are distinct from wall attributes (position, velocity). Property names depend on the active contact model. Contact models prioritize checking object surface properties during contact resolution. See Contact Models documentation for available properties per model. Note: Be aware of the distinction between attributes and properties! The tutorial example 'Attributes and Properties' discusses this issue in detail.",
+  "syntax": "wall property <s a> <s1 a1> ... <range>",
   "common_properties": [
     {
       "model": "Linear",
-      "properties": ["kn (normal stiffness)", "ks (shear stiffness)", "fric (friction coefficient)"]
+      "properties": [
+        "kn (normal stiffness)",
+        "ks (shear stiffness)",
+        "fric (friction coefficient)"
+      ]
     },
     {
       "model": "Hertz",
-      "properties": ["hz_kn (Hertz normal stiffness)", "fric (friction coefficient)"]
+      "properties": [
+        "hz_kn (Hertz normal stiffness)",
+        "fric (friction coefficient)"
+      ]
     },
     {
       "model": "Linear Contact Bond",
-      "properties": ["lb_kn", "lb_ks", "lb_coh (cohesion)", "lb_ten (tensile strength)", "fric"]
+      "properties": [
+        "lb_kn",
+        "lb_ks",
+        "lb_coh (cohesion)",
+        "lb_ten (tensile strength)",
+        "fric"
+      ]
     },
     {
       "model": "Linear Parallel Bond",
-      "properties": ["pb_kn", "pb_ks", "pb_coh", "pb_ten", "pb_fa (friction angle)", "fric"]
+      "properties": [
+        "pb_kn",
+        "pb_ks",
+        "pb_coh",
+        "pb_ten",
+        "pb_fa (friction angle)",
+        "fric"
+      ]
     },
     {
       "model": "Flat Joint",
-      "properties": ["fj_kn", "fj_ks", "fj_coh", "fj_ten", "fj_fa", "fric"]
+      "properties": [
+        "fj_kn",
+        "fj_ks",
+        "fj_coh",
+        "fj_ten",
+        "fj_fa",
+        "fric"
+      ]
     },
     {
       "model": "Smooth Joint",
-      "properties": ["sj_kn", "sj_ks", "sj_coh", "sj_ten", "sj_fa", "fric"]
+      "properties": [
+        "sj_kn",
+        "sj_ks",
+        "sj_coh",
+        "sj_ten",
+        "sj_fa",
+        "fric"
+      ]
     }
   ],
-
   "examples": [
     {
       "command": "wall property 'fric' 0.8",
@@ -78,7 +97,6 @@
       "description": "Set flat joint properties for walls in group 'boundary'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Wall.set_prop(name, value) to set property for all facets in a wall, or Facet.set_prop(name, value) for individual facets - requires iteration: for w in itasca.wall.list(): w.set_prop('kn', 1e7) or for f in itasca.wall.facet.list(): f.set_prop('kn', 1e7)"

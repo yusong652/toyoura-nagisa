@@ -1,15 +1,13 @@
 {
   "command": "fragment deactivate",
   "category": "fragment",
-  "search_keywords": ["deactivate", "stop"],
+  "search_keywords": [
+    "deactivate",
+    "stop"
+  ],
   "description": "Deactivate fragment auto-computation. The previously calculated fragments are not removed - fragment IDs remain assigned to bodies, allowing one to use fragment activate to reactivate automatic fragment calculation later. This only stops the automatic periodic updates; existing fragment data is preserved.",
-
   "syntax": "fragment deactivate",
-
-  "parameters": [],
-
   "keywords": [],
-
   "notes": [
     "Stops automatic fragment computation (if it was active)",
     "Fragment IDs remain assigned to bodies - data is preserved",
@@ -20,7 +18,6 @@
     "Reduces computational overhead when fragment tracking is not needed",
     "If fragments were never activated, this command has no effect"
   ],
-
   "examples": [
     {
       "command": "fragment deactivate",
@@ -48,7 +45,6 @@
       "use_case": "Complete cleanup of fragment tracking system"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "notes": [
@@ -62,7 +58,6 @@
       "python": "itasca.command('fragment deactivate')\n# Fragment IDs still available: ball.fragment()"
     }
   },
-
   "related_commands": [
     "fragment activate",
     "fragment clear",
@@ -70,7 +65,6 @@
     "fragment list",
     "fragment register"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Reduce overhead after fragment tracking phase",
@@ -118,7 +112,6 @@
       "notes": "Ensures clean fragment state around manual modifications"
     }
   ],
-
   "typical_workflow": [
     "1. Auto-computation is running: fragment activate cycles <i>",
     "2. Decide to stop: fragment deactivate",
@@ -126,7 +119,6 @@
     "4. Optionally reactivate later: fragment activate cycles <i>",
     "5. Or clear data: fragment clear (if no longer needed)"
   ],
-
   "what_happens_when_deactivated": {
     "description": "Detailed effects of fragment deactivate",
     "stopped": [
@@ -148,7 +140,6 @@
       "Can manually compute: fragment compute (updates IDs)"
     ]
   },
-
   "deactivate_vs_clear": {
     "fragment_deactivate": {
       "function": "Stop automatic fragment computation",
@@ -175,12 +166,26 @@
       "Result: No tracking, no data, clean state"
     ],
     "comparison_table": {
-      "aspect": ["Auto-computation", "Fragment IDs", "Fragment history", "Can reactivate"],
-      "deactivate": ["Stopped", "Preserved", "Preserved", "Yes"],
-      "clear": ["Unchanged", "Reset to 0", "Cleared", "Yes (but starts from scratch)"]
+      "aspect": [
+        "Auto-computation",
+        "Fragment IDs",
+        "Fragment history",
+        "Can reactivate"
+      ],
+      "deactivate": [
+        "Stopped",
+        "Preserved",
+        "Preserved",
+        "Yes"
+      ],
+      "clear": [
+        "Unchanged",
+        "Reset to 0",
+        "Cleared",
+        "Yes (but starts from scratch)"
+      ]
     }
   },
-
   "reactivation": {
     "description": "How to restart fragment auto-computation after deactivation",
     "simple_reactivation": {
@@ -207,7 +212,6 @@
       "note": "Ensures fragment IDs reflect current state before reactivating"
     }
   },
-
   "performance_considerations": {
     "overhead_removed": "Fragment computation can be expensive - deactivation eliminates this cost",
     "when_to_deactivate": [
@@ -223,7 +227,6 @@
     },
     "recommendation": "Deactivate when not actively tracking fragments to maximize performance"
   },
-
   "use_after_deactivation": {
     "description": "What you can do with fragments after deactivation",
     "available_operations": [
@@ -257,7 +260,6 @@
       "Automatic updates during cycling - must reactivate for that"
     ]
   },
-
   "frozen_state_benefits": {
     "description": "Advantages of deactivated (frozen) fragment state",
     "benefits": [
@@ -274,7 +276,6 @@
       "Debugging fragment-related issues"
     ]
   },
-
   "warnings": [
     {
       "type": "data_preserved",
@@ -301,7 +302,6 @@
       "mitigation": "Call fragment compute after manual changes, or reactivate auto-computation"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Fragment IDs not updating after deactivate",
@@ -341,7 +341,6 @@
       ]
     }
   ],
-
   "deactivate_compute_clear_comparison": {
     "description": "Three ways to manage fragment computation state",
     "fragment_deactivate": {
@@ -363,48 +362,61 @@
       "use_when": "Want to remove all fragment information"
     }
   },
-
   "lifecycle_management": {
     "description": "Typical fragment tracking lifecycle",
     "phases": [
       {
         "phase": "Initialization",
-        "commands": ["fragment register"],
+        "commands": [
+          "fragment register"
+        ],
         "note": "One-time setup"
       },
       {
         "phase": "Activation",
-        "commands": ["fragment activate cycles 100"],
+        "commands": [
+          "fragment activate cycles 100"
+        ],
         "note": "Start automatic tracking"
       },
       {
         "phase": "Tracking",
-        "commands": ["model cycle/solve"],
+        "commands": [
+          "model cycle/solve"
+        ],
         "note": "Fragments update automatically during cycling"
       },
       {
         "phase": "Deactivation",
-        "commands": ["fragment deactivate"],
+        "commands": [
+          "fragment deactivate"
+        ],
         "note": "Stop tracking, preserve data"
       },
       {
         "phase": "Analysis",
-        "commands": ["fragment list", "export data"],
+        "commands": [
+          "fragment list",
+          "export data"
+        ],
         "note": "Analyze frozen fragment state"
       },
       {
         "phase": "Cleanup (optional)",
-        "commands": ["fragment clear"],
+        "commands": [
+          "fragment clear"
+        ],
         "note": "Remove fragment data if no longer needed"
       },
       {
         "phase": "Reactivation (optional)",
-        "commands": ["fragment activate cycles 100"],
+        "commands": [
+          "fragment activate cycles 100"
+        ],
         "note": "Resume tracking for next phase"
       }
     ]
   },
-
   "no_effect_scenarios": {
     "description": "When fragment deactivate has no effect",
     "scenarios": [
@@ -428,7 +440,6 @@
       }
     ]
   },
-
   "when_to_deactivate": {
     "good_reasons": [
       "Fragment tracking phase is complete",

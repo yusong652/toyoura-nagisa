@@ -1,44 +1,13 @@
 {
   "command": "wall rotate",
   "category": "wall",
-  "search_keywords": ["rotate", "orientation", "axis"],
-  "description": "Rotate walls. Application with the point keyword may also modify the center of rotation. Rotations follow the right-hand rule where the rotation axis in 2D is toward the viewer. Rotations are not allowed that rotate the wall outside of the model domain. Should any facet conveyor velocities be nonzero, they will be rotated as well. Should the orientation tracking be active, then the orientation is updated by default, though this can be disabled (see the update-orientation keyword).",
-
-  "syntax": "wall rotate <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "axis",
-      "type": "vector",
-      "required": true,
-      "description": "Axis of rotation (3D). In 2D, rotation axis is toward viewer"
-    },
-    {
-      "name": "angle",
-      "type": "float",
-      "required": true,
-      "description": "Angle of rotation in degrees using right-hand rule"
-    },
-    {
-      "name": "point",
-      "type": "vector",
-      "required": false,
-      "description": "Point about which rotation occurs. Also rotates the center of rotation. If absent, rotation occurs about each wall's center of rotation"
-    },
-    {
-      "name": "update-orientation",
-      "type": "boolean",
-      "required": false,
-      "description": "Set orientation update status when orientation tracking is enabled. Default: true (orientation is updated)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Range of walls to rotate. Default: all walls"
-    }
+  "search_keywords": [
+    "rotate",
+    "orientation",
+    "axis"
   ],
-
+  "description": "Rotate walls. Application with the point keyword may also modify the center of rotation. Rotations follow the right-hand rule where the rotation axis in 2D is toward the viewer. Rotations are not allowed that rotate the wall outside of the model domain. Should any facet conveyor velocities be nonzero, they will be rotated as well. Should the orientation tracking be active, then the orientation is updated by default, though this can be disabled (see the update-orientation keyword).",
+  "syntax": "wall rotate <keyword> ... <range>",
   "keywords": [
     {
       "name": "axis",
@@ -61,7 +30,6 @@
       "description": "Explicitly set orientation update status. Used when orientation tracking is enabled. Default: true (orientation updated)"
     }
   ],
-
   "important_notes": [
     "Rotations follow right-hand rule (in 2D, rotation axis is toward viewer)",
     "Rotations are NOT allowed that move wall outside model domain",
@@ -69,7 +37,6 @@
     "If orientation tracking is active, orientation is updated by default",
     "Center of rotation is also rotated if 'point' keyword is used"
   ],
-
   "examples": [
     {
       "command": "wall rotate axis (1,0,0) angle 90 point (0,0,0)",
@@ -96,7 +63,6 @@
       "description": "Rotate walls in group 'gear' 90° around x-axis at origin (3D)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('wall rotate ...') - Python SDK does not provide wall rotation functionality"

@@ -1,27 +1,12 @@
 {
   "command": "model mechanical",
   "category": "model",
-  "search_keywords": ["mechanical", "timestep"],
-  "description": "Set parameters for a mechanical analysis. The mechanical process is on by default. This command controls mechanical calculation activity, timestep settings, and slave/master coupling for multi-physics simulations.",
-
-  "syntax": "model mechanical <b> <keyword>",
-
-  "parameters": [
-    {
-      "name": "b",
-      "type": "boolean",
-      "required": false,
-      "description": "Directly specify mechanical process activity (on/off)"
-    },
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Mechanical parameter to configure",
-      "options": ["active", "dynamic", "list", "time-total", "slave", "substep", "timestep"]
-    }
+  "search_keywords": [
+    "mechanical",
+    "timestep"
   ],
-
+  "description": "Set parameters for a mechanical analysis. The mechanical process is on by default. This command controls mechanical calculation activity, timestep settings, and slave/master coupling for multi-physics simulations.",
+  "syntax": "model mechanical <b> <keyword>",
   "keywords": [
     {
       "name": "active",
@@ -96,7 +81,6 @@
       ]
     }
   ],
-
   "notes": [
     "Mechanical process is ON by default",
     "timestep automatic: default mode - calculates stable timestep from stiffnesses and masses",
@@ -112,7 +96,6 @@
     "FLAC3D static analysis: timestep is arbitrary, default 1.0, masses scaled for stability",
     "See documentation: 'Mechanical Timestep Determination for Numerical Stability' for mass scaling details"
   ],
-
   "examples": [
     {
       "command": "model mechanical active off",
@@ -167,7 +150,6 @@
       "description": "Configure automatic timestep with safety factor and maximum limit"
     }
   ],
-
   "python_sdk_alternative": {
     "available": "partial",
     "python_code": "# Get timestep\ndt = itasca.timestep()\n\n# Set fixed timestep\nitasca.set_timestep(1e-6)\n\n# Get mechanical time\ntime = itasca.mech_time()\n\n# For other settings use command:\nitasca.command('model mechanical timestep safety-factor 0.9')",

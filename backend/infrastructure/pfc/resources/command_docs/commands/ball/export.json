@@ -1,35 +1,25 @@
 {
   "command": "ball export",
   "category": "ball",
-  "search_keywords": ["export", "geometry", "STL"],
-  "description": "Export balls to geometry sets for post-processing or STL export. If no range is specified, all balls in the model are exported. Currently only supports export to geometry sets.",
-
-  "syntax": "ball export <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Export target (currently only 'geometry' is supported)",
-      "options": ["geometry"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of balls to export (default: all balls)"
-    }
+  "search_keywords": [
+    "export",
+    "geometry",
+    "STL"
   ],
-
+  "description": "Export balls to geometry sets for post-processing or STL export. If no range is specified, all balls in the model are exported. Currently only supports export to geometry sets.",
+  "syntax": "ball export <keyword> <range>",
   "keywords": [
     {
       "name": "geometry",
       "description": "Export balls as triangulated geometry",
-      "sub_keywords": ["set", "resolution", "split", "positions"]
+      "sub_keywords": [
+        "set",
+        "resolution",
+        "split",
+        "positions"
+      ]
     }
   ],
-
   "geometry_keywords": [
     {
       "name": "set",
@@ -52,7 +42,6 @@
       "description": "Create only geometry nodes from ball positions (no triangulated surfaces)"
     }
   ],
-
   "examples": [
     {
       "command": "ball export geometry",
@@ -75,7 +64,6 @@
       "description": "Export balls 1-100 with lower resolution (coarser triangulation)"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball export geometry ...') - no Python SDK equivalent for geometry export"

@@ -1,33 +1,12 @@
 {
   "command": "contact persist",
   "category": "contact",
-  "search_keywords": ["persist", "lifetime"],
-  "description": "Set the contact persistence flag for contacts in the specified range. When persistence is set to 'on' (true), contacts will not be automatically deleted by the contact detection system regardless of relative motion between contacting pieces. This prevents contact deletion even when pieces separate beyond normal detection distance. Note that if one piece is deleted, the contact is deleted regardless of persistence flag state. The persist flag is off by default. For contacts in non-mechanical processes, setting persistence on also sets persistence on for corresponding mechanical contacts. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact persist <bval> <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "bval",
-      "type": "boolean",
-      "required": true,
-      "description": "Boolean value to set persistence flag: true/on (contact persists) or false/off (normal deletion behavior)",
-      "valid_values": ["true", "false", "on", "off"]
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to specify contact type (mechanical or thermal)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification identifying which contacts to set persistence flag. Required parameter."
-    }
+  "search_keywords": [
+    "persist",
+    "lifetime"
   ],
-
+  "description": "Set the contact persistence flag for contacts in the specified range. When persistence is set to 'on' (true), contacts will not be automatically deleted by the contact detection system regardless of relative motion between contacting pieces. This prevents contact deletion even when pieces separate beyond normal detection distance. Note that if one piece is deleted, the contact is deleted regardless of persistence flag state. The persist flag is off by default. For contacts in non-mechanical processes, setting persistence on also sets persistence on for corresponding mechanical contacts. By default, only mechanical contacts are considered.",
+  "syntax": "contact persist <bval> <keyword> <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -40,7 +19,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact persist on",
@@ -78,7 +56,6 @@
       "use_case": "Allow normal deletion in specific zone"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "methods": [
@@ -107,7 +84,6 @@
       "python": "for c in it.contact.list(): c.set_persist(True)"
     }
   },
-
   "related_commands": [
     "contact detection",
     "contact delete",
@@ -115,7 +91,6 @@
     "contact inhibit",
     "model clean"
   ],
-
   "notes": [
     "Persist flag is OFF by default - contacts can be deleted by contact detection",
     "When persist = ON: contact survives even when pieces separate beyond detection distance",
@@ -127,7 +102,6 @@
     "Persistence persists until explicitly changed or contact deleted",
     "Does not affect force calculation - only contact lifetime"
   ],
-
   "persistence_behavior": {
     "persist_on": {
       "description": "Contact will not be deleted by contact detection system",
@@ -147,7 +121,6 @@
       "effect": "Contact count managed automatically, separated contacts removed"
     }
   },
-
   "why_use_persistence": {
     "reasons": [
       {
@@ -178,7 +151,6 @@
       "May need manual cleanup"
     ]
   },
-
   "common_use_cases": [
     {
       "use_case": "Track bond breakage history",
@@ -231,7 +203,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Identify contacts that should persist (by type, location, model, etc.)",
     "2. Use range specification to target specific contacts",
@@ -241,7 +212,6 @@
     "6. (Optional) Disable persistence when done: contact persist off range ...",
     "7. (Optional) Clean up: contact delete range contact inactive"
   ],
-
   "persist_vs_other_contact_commands": {
     "contact_persist": {
       "function": "Control contact LIFETIME (deletion prevention)",
@@ -272,7 +242,6 @@
       "typical_use": "Prevent all contact changes"
     }
   },
-
   "persistence_and_piece_deletion": {
     "critical_note": "Persistence does NOT prevent deletion if a piece is deleted",
     "behavior": [
@@ -287,7 +256,6 @@
       "Piece deletion always triggers contact cleanup"
     ]
   },
-
   "mechanical_thermal_interaction": {
     "description": "Special behavior when setting persistence on non-mechanical contacts",
     "note_from_docs": "If one sets the persistence flag to 'on' for contacts belonging to processes other than the mechanical process, then the persistence flag of the corresponding mechanical contact is also turned on",
@@ -302,7 +270,6 @@
       "effect": "Both thermal AND corresponding mechanical contacts persist"
     }
   },
-
   "performance_considerations": {
     "memory_impact": {
       "persist_on": "Memory usage increases as separated contacts accumulate",
@@ -327,7 +294,6 @@
       "Monitor contact count"
     ]
   },
-
   "range_specifications": {
     "description": "Range specification is REQUIRED to identify which contacts to set persistence flag",
     "common_ranges": {
@@ -347,7 +313,6 @@
       "contact persist on range group 'analysis-zone'"
     ]
   },
-
   "warnings": [
     {
       "type": "memory_accumulation",
@@ -374,7 +339,6 @@
       "mitigation": "Always provide range, even 'range contact' for all contacts"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Contacts being deleted when shouldn't",
@@ -423,7 +387,6 @@
       ]
     }
   ],
-
   "default_behavior": {
     "persist_flag": "false (off) by default",
     "deletion_behavior": "Contact detection system automatically deletes contacts when:",
@@ -435,7 +398,6 @@
     "why_default_off": "Automatic contact management keeps simulation efficient by removing unnecessary contacts",
     "when_to_enable": "Only when contact history tracking or special analysis requirements demand it"
   },
-
   "best_practices": [
     "Use persistence selectively (specific ranges) rather than globally",
     "Enable only when contact history is genuinely needed",
@@ -446,7 +408,6 @@
     "Consider memory constraints when using persistence in large simulations",
     "Save contact data before deleting pieces if preservation is critical"
   ],
-
   "comparison_table": {
     "scenario": "Contact between two pieces that separate",
     "persist_off": {

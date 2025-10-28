@@ -1,44 +1,14 @@
 {
   "command": "ball generate",
   "category": "ball",
-  "search_keywords": ["generate", "packing", "cubic", "hexagonal"],
-  "description": "Generate non-overlapping balls. The process ceases when the target number of balls are created or when the number of attempts to place balls without overlap is achieved. This command contrasts with ball distribute where balls are distributed without regard for overlap until a target porosity is achieved.",
-
-  "syntax": "ball generate <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "radius",
-      "type": "float range",
-      "required": false,
-      "description": "Radius range (radlow, radhi). Default: 1.0 1.0"
-    },
-    {
-      "name": "number",
-      "type": "integer",
-      "required": false,
-      "description": "Target number of balls to generate"
-    },
-    {
-      "name": "box",
-      "type": "box specification",
-      "required": false,
-      "description": "Generation region (default: model domain)"
-    },
-    {
-      "name": "tries",
-      "type": "integer",
-      "required": false,
-      "description": "Maximum attempts to place balls (default: 20,000)"
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Applied to each generated ball; ball not added if outside range"
-    }
+  "search_keywords": [
+    "generate",
+    "packing",
+    "cubic",
+    "hexagonal"
   ],
-
+  "description": "Generate non-overlapping balls. The process ceases when the target number of balls are created or when the number of attempts to place balls without overlap is achieved. This command contrasts with ball distribute where balls are distributed without regard for overlap until a target porosity is achieved.",
+  "syntax": "ball generate <keyword> ... <range>",
   "keywords": [
     {
       "name": "radius",
@@ -91,7 +61,6 @@
       "description": "Assign generated balls to group s"
     }
   ],
-
   "examples": [
     {
       "command": "ball generate radius 0.5 0.7 number 100 box -5.0 0.0 -5.0 5.0",
@@ -114,7 +83,6 @@
       "description": "Generate balls with IDs 1-500, assign to group 'layer1'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('ball generate ...') - Python SDK only has itasca.ball.create() for single ball creation"

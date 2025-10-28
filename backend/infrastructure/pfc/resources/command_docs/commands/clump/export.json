@@ -1,35 +1,25 @@
 {
   "command": "clump export",
   "category": "clump",
-  "search_keywords": ["export", "geometry", "STL"],
-  "description": "Export clumps to geometry sets for post-processing or STL export. If no range is specified, all clumps in the model are exported. Currently only supports export to geometry sets. Clumps with surface descriptions will use those surfaces; otherwise, a geometrical representation of each pebble is exported.",
-
-  "syntax": "clump export <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Export target (currently only 'geometry' is supported)",
-      "options": ["geometry"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of clumps to export (default: all clumps)"
-    }
+  "search_keywords": [
+    "export",
+    "geometry",
+    "STL"
   ],
-
+  "description": "Export clumps to geometry sets for post-processing or STL export. If no range is specified, all clumps in the model are exported. Currently only supports export to geometry sets. Clumps with surface descriptions will use those surfaces; otherwise, a geometrical representation of each pebble is exported.",
+  "syntax": "clump export <keyword> <range>",
   "keywords": [
     {
       "name": "geometry",
       "description": "Export clumps as triangulated geometry",
-      "sub_keywords": ["set", "resolution", "split", "surfaces"]
+      "sub_keywords": [
+        "set",
+        "resolution",
+        "split",
+        "surfaces"
+      ]
     }
   ],
-
   "geometry_keywords": [
     {
       "name": "set",
@@ -52,7 +42,6 @@
       "description": "If set to true, clump surface descriptions will be exported (when available) in place of a geometric representation of the clump pebbles. Default: true"
     }
   ],
-
   "notes": [
     "Clumps with surface descriptions use those surfaces when exported (if surfaces=true)",
     "Clumps without surface descriptions export geometrical representation of each pebble",
@@ -60,7 +49,6 @@
     "With split keyword: existing sets with same name are overridden",
     "Without split keyword: existing geometry objects in the set are not deleted"
   ],
-
   "examples": [
     {
       "command": "clump export geometry",
@@ -83,7 +71,6 @@
       "description": "Export only clumps in 'aggregate' group to single geometry set 'assembly'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump export geometry ...') - no Python SDK equivalent for geometry export"

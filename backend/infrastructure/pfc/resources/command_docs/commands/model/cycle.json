@@ -1,26 +1,13 @@
 {
   "command": "model cycle",
   "category": "model",
-  "search_keywords": ["cycle", "timestep", "step"],
-  "description": "Execute timesteps. The synonym 'model step' may also be used. This is the equivalent of calling 'model solve' with the cycles keyword set to i. i timesteps are executed unless processing is interrupted by pressing Shift + Esc, which will terminate cycling, exit the current data file (and all levels of nested data files that may have been used to call it), and return input to the command prompt after the current step is completed. The optional calm keyword is used in mechanical processes to reset the linear and angular velocities to zero every i2 cycles.",
-
-  "syntax": "model cycle <i> <calm <i2>>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Number of timesteps to execute"
-    },
-    {
-      "name": "calm",
-      "type": "integer",
-      "required": false,
-      "description": "Optional: reset velocities to zero every i2 cycles"
-    }
+  "search_keywords": [
+    "cycle",
+    "timestep",
+    "step"
   ],
-
+  "description": "Execute timesteps. The synonym 'model step' may also be used. This is the equivalent of calling 'model solve' with the cycles keyword set to i. i timesteps are executed unless processing is interrupted by pressing Shift + Esc, which will terminate cycling, exit the current data file (and all levels of nested data files that may have been used to call it), and return input to the command prompt after the current step is completed. The optional calm keyword is used in mechanical processes to reset the linear and angular velocities to zero every i2 cycles.",
+  "syntax": "model cycle <i> <calm <i2>>",
   "keywords": [
     {
       "name": "calm",
@@ -28,7 +15,6 @@
       "description": "Reset linear and angular velocities to zero every i2 cycles during mechanical processes"
     }
   ],
-
   "notes": [
     "Synonym: 'model step' can be used instead of 'model cycle'",
     "Equivalent to 'model solve cycles <i>'",
@@ -39,7 +25,6 @@
     "Each cycle advances simulation by one timestep (dt)",
     "Timestep can be automatic (model timestep auto) or fixed (model timestep fix)"
   ],
-
   "examples": [
     {
       "command": "model cycle 1000",
@@ -66,7 +51,6 @@
       "description": "Generate balls, clean to create contacts, then cycle"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "python_code": "itasca.cycle(1000)",

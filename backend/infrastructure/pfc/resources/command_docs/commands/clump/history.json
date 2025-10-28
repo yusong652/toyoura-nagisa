@@ -1,42 +1,54 @@
 {
   "command": "clump history",
   "category": "clump",
-  "search_keywords": ["history", "track", "monitor"],
-  "description": "Add a history of a clump value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The clump must be specified by either 'id' or 'position' keyword following the quantity keyword. The history can be assigned a name for later reference with the optional name keyword; if not, the history will be given a default name based on its internally assigned id number.",
-
-  "syntax": "clump history name <name> <keyword> id <i> or position <v>",
-
-  "parameters": [
-    {
-      "name": "name",
-      "type": "string",
-      "required": false,
-      "description": "Optional name for the history (default: auto-generated based on internal id)"
-    },
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Quantity to record (see categories below)"
-    },
-    {
-      "name": "id or position",
-      "type": "integer or vector",
-      "required": true,
-      "description": "Specify clump by ID number or position (finds nearest clump to position)"
-    }
+  "search_keywords": [
+    "history",
+    "track",
+    "monitor"
   ],
-
+  "description": "Add a history of a clump value. A history is a table of floating point values assigned by sampling a model attribute periodically during a simulation. The clump must be specified by either 'id' or 'position' keyword following the quantity keyword. The history can be assigned a name for later reference with the optional name keyword; if not, the history will be given a default name based on its internally assigned id number.",
+  "syntax": "clump history name <name> <keyword> id <i> or position <v>",
   "quantity_categories": {
-    "position": ["position-x", "position-y", "position-z", "displacement", "displacement-x/y/z"],
-    "velocity": ["velocity", "velocity-x", "velocity-y", "velocity-z", "spin", "spin-x/y/z (3D)"],
-    "orientation": ["euler-x (3D)", "euler-y (3D)", "euler-z (3D)", "rotation (2D)"],
-    "forces": ["force-contact", "force-contact-x/y/z", "force-unbalanced", "force-unbalanced-x/y/z"],
-    "moments": ["moment-contact", "moment-contact-x/y/z (3D)", "moment-unbalanced", "moment-unbalanced-x/y/z (3D)"],
-    "stress": ["stress"],
-    "other": ["extra"]
+    "position": [
+      "position-x",
+      "position-y",
+      "position-z",
+      "displacement",
+      "displacement-x/y/z"
+    ],
+    "velocity": [
+      "velocity",
+      "velocity-x",
+      "velocity-y",
+      "velocity-z",
+      "spin",
+      "spin-x/y/z (3D)"
+    ],
+    "orientation": [
+      "euler-x (3D)",
+      "euler-y (3D)",
+      "euler-z (3D)",
+      "rotation (2D)"
+    ],
+    "forces": [
+      "force-contact",
+      "force-contact-x/y/z",
+      "force-unbalanced",
+      "force-unbalanced-x/y/z"
+    ],
+    "moments": [
+      "moment-contact",
+      "moment-contact-x/y/z (3D)",
+      "moment-unbalanced",
+      "moment-unbalanced-x/y/z (3D)"
+    ],
+    "stress": [
+      "stress"
+    ],
+    "other": [
+      "extra"
+    ]
   },
-
   "keywords": [
     {
       "name": "id",
@@ -144,13 +156,11 @@
       "description": "Record clump stress. Use quantity keyword to specify the stress component to be recorded"
     }
   ],
-
   "notes": [
     "Following one of the quantity keywords, either 1) an 'id' keyword followed by an integer id, or 2) a 'position' keyword followed by a position vector must be given to define the specific clump",
     "Review the common history commands for details regarding the manipulation of histories",
     "Orientation tracking must be enabled (model orientation-tracking) to record euler angles or rotation"
   ],
-
   "examples": [
     {
       "command": "clump history name 'clump_pos' position-x id 1",
@@ -177,7 +187,6 @@
       "description": "Record intermediate principal stress of clump 50"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump history ...') or manually record values using itasca.set_callback() with Clump getter methods"

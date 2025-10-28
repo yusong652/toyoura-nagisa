@@ -1,15 +1,13 @@
 {
   "command": "measure list",
   "category": "measure",
-  "search_keywords": ["list", "query"],
+  "search_keywords": [
+    "list",
+    "query"
+  ],
   "description": "List information related to measurement regions. Displays details about all measurement objects including ID, position, radius, and calculated quantities such as porosity, coordination number, stress, and strain. This is the primary command for viewing measurement results.",
-
   "syntax": "measure list",
-
-  "parameters": [],
-
   "keywords": [],
-
   "notes": [
     "Lists all measurement objects in the model",
     "Shows measurement ID, position, radius",
@@ -21,7 +19,6 @@
     "Use after measure create to verify measurement setup",
     "Use after model clean to see measurement results"
   ],
-
   "examples": [
     {
       "command": "measure list",
@@ -49,7 +46,6 @@
       "use_case": "Typical measurement workflow during simulation"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "notes": [
@@ -63,7 +59,6 @@
       "python": "# Python SDK approach - consult PFC documentation\n# itasca.measure module provides query methods\n# Can iterate over measurements and query properties"
     }
   },
-
   "related_commands": [
     "measure create",
     "measure delete",
@@ -71,7 +66,6 @@
     "measure dump",
     "model clean"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Verify measurement setup",
@@ -115,7 +109,6 @@
       "notes": "Before/after comparison for simulation analysis"
     }
   ],
-
   "typical_workflow": [
     "1. Create measurements: measure create ...",
     "2. Trigger calculation: model clean",
@@ -123,7 +116,6 @@
     "4. Analyze output: porosity, coordination, stress, strain",
     "5. Export if needed: measure dump"
   ],
-
   "output_information": {
     "description": "What information measure list displays",
     "measurement_id": {
@@ -158,7 +150,6 @@
       "use": "Track deformation in region"
     }
   },
-
   "measurement_calculation_requirement": {
     "description": "Measurements must be calculated before meaningful results appear",
     "uncalculated_measurements": {
@@ -173,7 +164,6 @@
     },
     "recommendation": "Always call model clean before measure list to ensure current values"
   },
-
   "interpreting_output": {
     "porosity": {
       "low_values": "< 0.2 (20%) - dense packing",
@@ -198,7 +188,6 @@
       "use": "Measure deformation in specific regions"
     }
   },
-
   "no_measurements_scenario": {
     "description": "What happens when no measurements exist",
     "output": "Empty list or message indicating no measurements",
@@ -208,7 +197,6 @@
     ],
     "solution": "Create measurements with measure create"
   },
-
   "warnings": [
     {
       "type": "uncalculated_values",
@@ -229,7 +217,6 @@
       "mitigation": "Use Python SDK for selective querying if needed"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "measure list shows empty or no measurements",
@@ -278,14 +265,12 @@
       ]
     }
   ],
-
   "performance_considerations": {
     "listing_cost": "Very fast - just displays stored data",
     "no_recalculation": "measure list does NOT trigger recalculation",
     "output_size": "Output size proportional to number of measurements",
     "recommendation": "Safe to call frequently for monitoring"
   },
-
   "list_vs_dump": {
     "measure_list": {
       "function": "Display measurement information in console",
@@ -301,7 +286,6 @@
     },
     "recommendation": "Use list for viewing, dump for exporting"
   },
-
   "when_to_use_measure_list": {
     "good_times": [
       "After measure create to verify configuration",
@@ -316,7 +300,6 @@
       "During automated scripts (unless debugging)"
     ]
   },
-
   "output_format": {
     "description": "Typical format of measure list output",
     "format": "Tabular display with columns",
@@ -331,7 +314,6 @@
     ],
     "note": "Exact format may vary by PFC version and 2D/3D mode"
   },
-
   "multiple_measurements": {
     "description": "How measure list handles multiple measurements",
     "all_displayed": "All measurements shown in single output",
@@ -339,7 +321,6 @@
     "comparison": "Easy to compare values across different regions",
     "use_case": "Spatial variation analysis - compare porosity, stress across regions"
   },
-
   "measurement_state": {
     "description": "Different states measurements can be in",
     "created_not_calculated": {

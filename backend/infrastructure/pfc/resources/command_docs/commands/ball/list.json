@@ -1,39 +1,53 @@
 {
   "command": "ball list",
   "category": "ball",
-  "search_keywords": ["list", "query"],
-  "description": "List ball information. By default, lists ball ID, radius, contact count, fixity, and position. Use keywords to list specific attributes, contacts, groups, properties, or results. Use model precision command to control floating point precision.",
-
-  "syntax": "ball list <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Information category to list",
-      "options": ["attribute", "contact", "extra", "group", "property", "result"]
-    },
-    {
-      "name": "range",
-      "type": "range specification",
-      "required": false,
-      "description": "Range of balls to list (default: all balls)"
-    }
+  "search_keywords": [
+    "list",
+    "query"
   ],
-
+  "description": "List ball information. By default, lists ball ID, radius, contact count, fixity, and position. Use keywords to list specific attributes, contacts, groups, properties, or results. Use model precision command to control floating point precision.",
+  "syntax": "ball list <keyword> <range>",
   "keywords": [
     {
       "name": "attribute",
       "syntax": "attribute <attr>",
       "description": "List ball attributes. If no attribute specified, shows available attributes.",
       "sub_keywords": {
-        "geometry": ["radius", "position", "position-x/y/z"],
-        "kinematics": ["velocity", "velocity-x/y/z", "spin", "spin-x/y/z (3D)", "displacement", "displacement-x/y/z"],
-        "orientation": ["euler", "euler-x/y/z (3D)", "rotation (2D)"],
-        "forces": ["force-applied", "force-applied-x/y/z", "force-contact", "force-contact-x/y/z"],
-        "moments": ["moment-applied", "moment-applied-x/y/z (3D)", "moment-contact", "moment-contact-x/y/z (3D)"],
-        "other": ["damp", "density", "fragment"]
+        "geometry": [
+          "radius",
+          "position",
+          "position-x/y/z"
+        ],
+        "kinematics": [
+          "velocity",
+          "velocity-x/y/z",
+          "spin",
+          "spin-x/y/z (3D)",
+          "displacement",
+          "displacement-x/y/z"
+        ],
+        "orientation": [
+          "euler",
+          "euler-x/y/z (3D)",
+          "rotation (2D)"
+        ],
+        "forces": [
+          "force-applied",
+          "force-applied-x/y/z",
+          "force-contact",
+          "force-contact-x/y/z"
+        ],
+        "moments": [
+          "moment-applied",
+          "moment-applied-x/y/z (3D)",
+          "moment-contact",
+          "moment-contact-x/y/z (3D)"
+        ],
+        "other": [
+          "damp",
+          "density",
+          "fragment"
+        ]
       }
     },
     {
@@ -62,7 +76,6 @@
       "description": "List tabulated ball model results (see ball results command)"
     }
   ],
-
   "examples": [
     {
       "command": "ball list",
@@ -89,7 +102,6 @@
       "description": "List all contacts (active and inactive) for balls 1-100"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Ball getter methods: Ball.pos(), Ball.vel(), Ball.radius(), Ball.density(), etc. - requires iteration: for b in itasca.ball.list(): print(b.pos())"

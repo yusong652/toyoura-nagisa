@@ -1,23 +1,13 @@
 {
   "command": "measure delete",
   "category": "measure",
-  "search_keywords": ["delete", "remove"],
-  "description": "Delete one or more measurement objects. By default, all measurement objects are deleted. A range can be specified to restrict the operation to select objects, allowing targeted deletion based on measurement ID or other criteria.",
-
-  "syntax": "measure delete <range>",
-
-  "parameters": [
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which measurements are deleted. If omitted, all measurements are deleted.",
-      "examples": ["range id 1", "range id 1 5"]
-    }
+  "search_keywords": [
+    "delete",
+    "remove"
   ],
-
+  "description": "Delete one or more measurement objects. By default, all measurement objects are deleted. A range can be specified to restrict the operation to select objects, allowing targeted deletion based on measurement ID or other criteria.",
+  "syntax": "measure delete <range>",
   "keywords": [],
-
   "notes": [
     "Default behavior: deletes ALL measurement objects if no range specified",
     "Use range to selectively delete specific measurements",
@@ -28,7 +18,6 @@
     "No confirmation prompt - deletion is immediate",
     "Safe to delete non-existent measurement ID (no error)"
   ],
-
   "examples": [
     {
       "command": "measure delete",
@@ -56,7 +45,6 @@
       "use_case": "Verify deletion with before/after listing"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "notes": [
@@ -69,13 +57,11 @@
       "python": "# Python SDK approach - consult PFC documentation for exact syntax\n# itasca.measure module provides deletion functionality"
     }
   },
-
   "related_commands": [
     "measure create",
     "measure list",
     "measure modify"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Remove specific measurement after analysis complete",
@@ -118,14 +104,12 @@
       "notes": "Reduce saved model size by removing analysis artifacts"
     }
   ],
-
   "typical_workflow": [
     "1. Identify measurements to delete: measure list",
     "2. Delete specific measurement: measure delete range id <i>",
     "3. Or delete all: measure delete",
     "4. Verify deletion (optional): measure list"
   ],
-
   "delete_all_vs_selective": {
     "delete_all": {
       "command": "measure delete",
@@ -150,7 +134,6 @@
       "benefit": "Preserves other measurements"
     }
   },
-
   "range_specifications": {
     "description": "Common range specifications for measure delete",
     "single_id": {
@@ -169,7 +152,6 @@
       "example": "measure delete"
     }
   },
-
   "deletion_permanence": {
     "description": "What happens when measurements are deleted",
     "immediate_effect": "Measurement object removed from model immediately",
@@ -179,7 +161,6 @@
     "history_cleared": "Any measurement history associated with deleted measurement is lost",
     "recommendation": "Export important data with measure dump before deleting"
   },
-
   "warnings": [
     {
       "type": "no_confirmation",
@@ -206,7 +187,6 @@
       "mitigation": "Use measure dump to export data before deletion if needed"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Accidentally deleted all measurements",
@@ -246,14 +226,12 @@
       ]
     }
   ],
-
   "performance_considerations": {
     "deletion_cost": "Very fast - O(1) or O(n) for small n",
     "no_calculation": "No measurements recalculated on deletion",
     "memory_freed": "Memory used by measurement object freed",
     "impact": "Negligible performance impact even for many measurements"
   },
-
   "delete_vs_modify": {
     "measure_delete": {
       "function": "Remove measurement object completely",
@@ -277,7 +255,6 @@
     },
     "recommendation": "Use modify when possible; delete only when measurement no longer needed"
   },
-
   "id_reuse_after_deletion": {
     "description": "What happens to measurement IDs after deletion",
     "id_freed": "Deleted measurement ID becomes available",
@@ -286,7 +263,6 @@
     "explicit_reuse": "Use 'measure create id <deleted_id>' to explicitly reuse",
     "example": "measure delete range id 5, then measure create id 5 radius 3.0"
   },
-
   "when_to_delete_measurements": {
     "good_reasons": [
       "Analysis complete, measurement no longer needed",
@@ -301,7 +277,6 @@
       "Thinking deletion is required before modification (it's not)"
     ]
   },
-
   "batch_operations": {
     "description": "Deleting multiple measurements efficiently",
     "delete_all": {

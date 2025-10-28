@@ -1,32 +1,12 @@
 {
   "command": "contact apply-group",
   "category": "contact",
-  "search_keywords": ["apply-group", "propagate"],
-  "description": "Apply contact group names to contacting pieces or bodies. This command traverses all contacts within the specified range and applies the contact group names to the pieces or bodies at the ends of each contact. By default, group names are applied to pieces (balls, clump pebbles, wall facets). Use the 'body' keyword to apply to bodies (balls, clumps, walls) instead. This is useful for propagating group assignments from contacts to the objects they connect. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact <sprocess> apply-group <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "sprocess",
-      "type": "string",
-      "required": false,
-      "description": "Optional process name. If specified, only contacts within this process are considered. If omitted, mechanical contacts are used by default."
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keywords to control group application behavior (body, slot, group, piece-slot, body-slot)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Optional range specification to limit which contacts are processed. If omitted, all contacts are processed"
-    }
+  "search_keywords": [
+    "apply-group",
+    "propagate"
   ],
-
+  "description": "Apply contact group names to contacting pieces or bodies. This command traverses all contacts within the specified range and applies the contact group names to the pieces or bodies at the ends of each contact. By default, group names are applied to pieces (balls, clump pebbles, wall facets). Use the 'body' keyword to apply to bodies (balls, clumps, walls) instead. This is useful for propagating group assignments from contacts to the objects they connect. By default, only mechanical contacts are considered.",
+  "syntax": "contact <sprocess> apply-group <keyword> <range>",
   "keywords": [
     {
       "name": "body",
@@ -85,7 +65,6 @@
       "notes": "Only relevant when 'body' keyword is used"
     }
   ],
-
   "examples": [
     {
       "command": "contact apply-group",
@@ -123,12 +102,10 @@
       "use_case": "Selective propagation based on contact type"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact apply-group ...') - Python SDK does not provide direct apply-group functionality. Manual implementation requires:\n1. Iterate through contacts\n2. Get contact group name: contact.group(slot)\n3. Get contact ends: contact.end1(), contact.end2()\n4. Apply group to pieces/bodies: piece.set_group() or body.set_group()\n\nExample:\nfor c in it.contact.list():\n    group_name = c.group('Default')\n    if group_name:\n        c.end1().set_group(group_name, 'Default')\n        c.end2().set_group(group_name, 'Default')"
   },
-
   "related_commands": [
     "contact group",
     "ball group",
@@ -136,7 +113,6 @@
     "clump group",
     "contact list"
   ],
-
   "notes": [
     "This command APPLIES (copies) contact group names TO pieces/bodies, not the reverse",
     "Default behavior: applies to pieces (balls, pebbles, facets)",
@@ -147,7 +123,6 @@
     "More efficient than Python iteration for bulk group propagation",
     "Useful for organizing model based on contact topology"
   ],
-
   "group_propagation_concept": {
     "description": "Apply-group propagates group assignments from contacts to the objects they connect",
     "workflow": [
@@ -159,18 +134,25 @@
     "direction": "Contact → Piece/Body (one-way propagation)",
     "typical_use": "Identify pieces/bodies based on contact topology or contact properties"
   },
-
   "piece_vs_body": {
     "pieces": {
       "description": "Fundamental geometric entities",
-      "types": ["balls", "clump pebbles", "wall facets"],
+      "types": [
+        "balls",
+        "clump pebbles",
+        "wall facets"
+      ],
       "default_behavior": "Groups applied to pieces by default",
       "command": "contact apply-group (no 'body' keyword)",
       "when_to_use": "Standard simulations, when working with individual geometric entities"
     },
     "bodies": {
       "description": "Collections or parent entities",
-      "types": ["balls (standalone)", "clumps (collection of pebbles)", "walls (collection of facets)"],
+      "types": [
+        "balls (standalone)",
+        "clumps (collection of pebbles)",
+        "walls (collection of facets)"
+      ],
       "command": "contact apply-group body",
       "when_to_use": "When working with clumps and need to assign groups to entire clump rather than individual pebbles"
     },
@@ -184,7 +166,6 @@
       "body_mode": "The clump itself gets group 'specimen'"
     }
   },
-
   "slot_mapping": {
     "description": "How slots map from contacts to pieces/bodies",
     "default_behavior": {
@@ -204,7 +185,6 @@
       "3. Pieces in 'region' slot now have group names from 'interface' contact slot"
     ]
   },
-
   "multiple_contacts_behavior": {
     "description": "What happens when a piece/body has multiple contacts with different group names",
     "rule": "LAST contact group name is applied (overwrites previous)",
@@ -216,7 +196,6 @@
     ],
     "mitigation": "Use 'group' keyword to apply only specific group name: contact apply-group group 'specimen'"
   },
-
   "common_use_cases": [
     {
       "use_case": "Identify pieces by contact topology",
@@ -266,7 +245,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Assign groups to contacts using 'contact group' command",
     "2. Decide whether to apply to pieces or bodies",
@@ -275,7 +253,6 @@
     "5. Groups are now propagated from contacts to pieces/bodies",
     "6. Use propagated groups for range selection or analysis"
   ],
-
   "apply_group_vs_contact_group": {
     "contact_group": {
       "function": "Assign group names TO contacts",
@@ -297,7 +274,6 @@
       "3. Pieces now have 'specimen' group from contacts"
     ]
   },
-
   "group_keyword_usage": {
     "without_group_keyword": {
       "behavior": "All contact group names are applied to pieces/bodies",
@@ -312,7 +288,6 @@
     },
     "typical_use": "Use 'group' keyword when contacts have multiple group names but you only want to propagate specific one"
   },
-
   "range_specifications": {
     "description": "Range limits which contacts are processed for group propagation",
     "common_ranges": {
@@ -329,7 +304,6 @@
     ],
     "note": "Range restricts which CONTACTS are processed, not which pieces/bodies receive groups"
   },
-
   "performance_considerations": {
     "command_interface": "Fast - bulk group propagation in C++ core",
     "python_manual": "Slow - requires iteration over contacts and manual group assignment",
@@ -337,7 +311,6 @@
     "complexity": "O(number of contacts × contacts per piece/body)",
     "note": "Command is efficient even for large contact sets"
   },
-
   "warnings": [
     {
       "type": "last_wins",
@@ -364,7 +337,6 @@
       "mitigation": "Be explicit with slot keywords when working with multiple group slots"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Groups not being applied to pieces",
@@ -411,7 +383,6 @@
       ]
     }
   ],
-
   "advanced_usage": {
     "multiple_slot_organization": {
       "description": "Use different slots for different classification schemes",
@@ -452,7 +423,6 @@
       ]
     }
   },
-
   "process_specification": {
     "description": "Optional process name for multi-process simulations",
     "mechanical": {

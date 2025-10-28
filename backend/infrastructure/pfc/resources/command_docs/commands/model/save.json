@@ -1,27 +1,12 @@
 {
   "command": "model save",
   "category": "model",
-  "search_keywords": ["save", "file"],
-  "description": "Save all model-state information. The file s is created and, if no extension is provided, the extension is set to '.sav'. This information includes any defined FISH functions/variables, histories, tables, and other model components. The inputdir and localdir keywords can be placed after s to specify the location of the save file relative to the calling file or the project file. A saved model state can be re-activated via the 'model restore' command.",
-
-  "syntax": "model save <s> <keyword>",
-
-  "parameters": [
-    {
-      "name": "s",
-      "type": "string",
-      "required": true,
-      "description": "Save file name. If no extension provided, '.sav' is automatically added"
-    },
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Save options",
-      "options": ["compress", "nocompress", "readonly", "text", "inputdir", "localdir"]
-    }
+  "search_keywords": [
+    "save",
+    "file"
   ],
-
+  "description": "Save all model-state information. The file s is created and, if no extension is provided, the extension is set to '.sav'. This information includes any defined FISH functions/variables, histories, tables, and other model components. The inputdir and localdir keywords can be placed after s to specify the location of the save file relative to the calling file or the project file. A saved model state can be re-activated via the 'model restore' command.",
+  "syntax": "model save <s> <keyword>",
   "keywords": [
     {
       "name": "compress",
@@ -54,7 +39,6 @@
       "description": "Specify the location of the save file relative to the project file"
     }
   ],
-
   "notes": [
     "Default file extension: '.sav' (added if not specified)",
     "Saves ALL model-state information:",
@@ -75,7 +59,6 @@
     "Complement command: 'model restore' restores saved state",
     "Use for: checkpointing, archiving, creating restart points, saving results"
   ],
-
   "examples": [
     {
       "command": "model save 'checkpoint.sav'",
@@ -126,7 +109,6 @@
       "description": "Save relative to project, read-only and compressed for archival"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model save \"filename.sav\"') or itasca.command('model save \"filename\" compress') - Python SDK does not provide direct save function. Note: Use double quotes around filename in command string if path contains spaces"

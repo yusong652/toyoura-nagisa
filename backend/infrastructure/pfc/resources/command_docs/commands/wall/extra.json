@@ -1,38 +1,12 @@
 {
   "command": "wall extra",
   "category": "wall",
-  "search_keywords": ["extra", "custom"],
-  "description": "Set wall or facet extra variables. The extra variable can be of any type (string, integer, float, vector) and is associated with the index i as if stored in an array. The optional facet keyword can be given before the optional range to specify that the extra variable will be applied to facets. In this case, the range is applied to the facets and not to walls.",
-
-  "syntax": "wall extra <i> <a> <facet> <range>",
-
-  "parameters": [
-    {
-      "name": "i",
-      "type": "integer",
-      "required": true,
-      "description": "Extra variable slot index (array-like storage)"
-    },
-    {
-      "name": "a",
-      "type": "any",
-      "required": true,
-      "description": "Value to store. Can be string, integer, float, vector, or any other type"
-    },
-    {
-      "name": "facet",
-      "type": "keyword",
-      "required": false,
-      "description": "If specified, apply extra variable to facets instead of walls (range applies to facets)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Range of walls or facets to apply the extra variable to. Default: all"
-    }
+  "search_keywords": [
+    "extra",
+    "custom"
   ],
-
+  "description": "Set wall or facet extra variables. The extra variable can be of any type (string, integer, float, vector) and is associated with the index i as if stored in an array. The optional facet keyword can be given before the optional range to specify that the extra variable will be applied to facets. In this case, the range is applied to the facets and not to walls.",
+  "syntax": "wall extra <i> <a> <facet> <range>",
   "keywords": [
     {
       "name": "facet",
@@ -40,7 +14,6 @@
       "description": "Apply extra variable to facets instead of walls. When specified, range applies to facets"
     }
   ],
-
   "examples": [
     {
       "command": "wall extra 1 'Fred'",
@@ -71,7 +44,6 @@
       "description": "Set extra variable slot 10 to FISH variable value for walls named 'container'"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Wall.set_extra(slot, value) or Facet.set_extra(slot, value) - requires iteration over wall/facet range"

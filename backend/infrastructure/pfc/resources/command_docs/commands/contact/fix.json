@@ -1,33 +1,13 @@
 {
   "command": "contact fix",
   "category": "contact",
-  "search_keywords": ["fix", "freeze", "constant"],
-  "description": "Fix contacts in the specified range. When a contact is fixed, its contact forces remain unchanged (frozen at current values) regardless of piece movements or contact state changes. This is useful for applying constant contact forces or boundary conditions, or for temporarily freezing contact forces during specific simulation phases. By default, only mechanical contacts are considered.",
-
-  "syntax": "contact fix <bval> <keyword> <range>",
-
-  "parameters": [
-    {
-      "name": "bval",
-      "type": "boolean",
-      "required": true,
-      "description": "Boolean value to set fix state: true/on (fix forces) or false/off (unfix, allow normal force calculation)",
-      "valid_values": ["true", "false", "on", "off"]
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to specify contact type (mechanical or thermal)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": true,
-      "description": "Range specification identifying which contacts to fix. Required parameter."
-    }
+  "search_keywords": [
+    "fix",
+    "freeze",
+    "constant"
   ],
-
+  "description": "Fix contacts in the specified range. When a contact is fixed, its contact forces remain unchanged (frozen at current values) regardless of piece movements or contact state changes. This is useful for applying constant contact forces or boundary conditions, or for temporarily freezing contact forces during specific simulation phases. By default, only mechanical contacts are considered.",
+  "syntax": "contact fix <bval> <keyword> <range>",
   "keywords": [
     {
       "name": "mechanical",
@@ -40,7 +20,6 @@
       "description": "Apply to thermal contacts (instead of mechanical)"
     }
   ],
-
   "examples": [
     {
       "command": "contact fix on range position-x 1.1 1.9",
@@ -78,13 +57,11 @@
       "use_case": "Re-enable force calculation for bond contacts"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('contact fix <bval> range ...') - Python SDK does not provide direct contact fix functionality. No contact.fix() method exists in the SDK.",
     "note": "Contact force values can be read via contact.force_global(), contact.force_local(), etc., but fixing forces must be done via command interface."
   },
-
   "related_commands": [
     "ball fix",
     "wall fix",
@@ -92,7 +69,6 @@
     "contact model",
     "contact free"
   ],
-
   "notes": [
     "Fixed contact forces remain constant regardless of piece movements",
     "Forces are frozen at their values when 'fix on' is executed",
@@ -104,7 +80,6 @@
     "Fixing does not prevent contact deletion by contact detection",
     "Typically used for boundary conditions or special analyses"
   ],
-
   "fix_behavior": {
     "when_fixed": {
       "description": "Behavior of contacts when fix flag is true",
@@ -130,7 +105,6 @@
       "subsequent_cycles": "Frozen force values used in all subsequent cycles until unfixed"
     }
   },
-
   "common_use_cases": [
     {
       "use_case": "Constant boundary force application",
@@ -186,7 +160,6 @@
       ]
     }
   ],
-
   "typical_workflow": [
     "1. Run simulation to desired force state",
     "2. Identify contacts to fix using range specification",
@@ -196,7 +169,6 @@
     "6. When needed, unfix: contact fix off range ...",
     "7. Normal force calculation resumes"
   ],
-
   "fix_vs_other_constraints": {
     "contact_fix": {
       "function": "Fix CONTACT FORCES at current values",
@@ -225,7 +197,6 @@
       "example": "Fix wall velocity to prevent motion, fix contact forces to prevent force changes"
     }
   },
-
   "fix_on_effects": {
     "immediate": {
       "force_snapshot": "Current force values are recorded",
@@ -243,7 +214,6 @@
       "manual_release": "Must explicitly unfix to restore dynamic calculation"
     }
   },
-
   "fix_off_effects": {
     "immediate": {
       "calculation_resumed": "Normal force calculation resumes immediately",
@@ -260,7 +230,6 @@
       "mitigation": "Consider gradual unfixing or equilibration period after unfixing"
     }
   },
-
   "range_specifications": {
     "description": "Range specification is REQUIRED to identify which contacts to fix",
     "common_ranges": {
@@ -281,7 +250,6 @@
       "contact fix on range contact gap 0 100"
     ]
   },
-
   "performance_considerations": {
     "calculation_cost": "Fixed contacts skip force calculation - slight performance benefit",
     "memory": "No additional memory overhead for fixed contacts",
@@ -289,7 +257,6 @@
     "typical_impact": "Minimal performance difference unless large fraction of contacts fixed",
     "recommendation": "Use fix for physical/analytical reasons, not primarily for performance"
   },
-
   "warnings": [
     {
       "type": "force_discontinuity",
@@ -316,7 +283,6 @@
       "mitigation": "Document fix/unfix in simulation scripts, verify fix state before analysis"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "Contact forces not updating",
@@ -365,7 +331,6 @@
       ]
     }
   ],
-
   "fix_vs_free": {
     "contact_fix_on": {
       "function": "Fix contact forces (freeze at current values)",
@@ -387,7 +352,6 @@
       "note": "May not exist in all PFC versions - 'fix off' is standard"
     }
   },
-
   "mechanical_vs_thermal_contacts": {
     "mechanical": {
       "description": "Default contact type for force transmission",
@@ -403,7 +367,6 @@
       "note": "Only relevant if thermal process is active"
     }
   },
-
   "advanced_usage": {
     "partial_fix_patterns": {
       "description": "Fix some contacts while leaving others dynamic",
@@ -456,7 +419,6 @@
       ]
     }
   },
-
   "best_practices": [
     "Use fix for specific physical purposes (boundary conditions, analysis), not as general practice",
     "Document all fix/unfix operations clearly in simulation scripts",
@@ -466,7 +428,6 @@
     "Use specific ranges to avoid accidentally fixing unintended contacts",
     "Consider alternatives (prescribed piece motion, null model) before using contact fix"
   ],
-
   "comparison_with_prescribed_motion": {
     "description": "Relationship between fixing contact forces vs. fixing piece motion",
     "fix_contact_forces": {

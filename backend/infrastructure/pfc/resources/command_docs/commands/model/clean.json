@@ -1,21 +1,13 @@
 {
   "command": "model clean",
   "category": "model",
-  "search_keywords": ["clean", "initialize", "contact"],
-  "description": "Clean the model. During model creation, prior to cycling, a model is not valid in the sense that there are no contacts between pieces, piece properties may not be set, and pieces may not be entered into a data structure for efficient spatial searching. The model clean command is a global command that can be given at any point during the model creation process to create all contacts in the model, initialize all piece properties, ensure that the data structures are present for spatial searching, and update the contact activity status based on the geometry. This command is invoked automatically when the 'model timestep fix' and 'model timestep auto' commands are given.",
-
-  "syntax": "model clean <keyword>",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": false,
-      "description": "Optional keyword to control clean behavior",
-      "options": ["all"]
-    }
+  "search_keywords": [
+    "clean",
+    "initialize",
+    "contact"
   ],
-
+  "description": "Clean the model. During model creation, prior to cycling, a model is not valid in the sense that there are no contacts between pieces, piece properties may not be set, and pieces may not be entered into a data structure for efficient spatial searching. The model clean command is a global command that can be given at any point during the model creation process to create all contacts in the model, initialize all piece properties, ensure that the data structures are present for spatial searching, and update the contact activity status based on the geometry. This command is invoked automatically when the 'model timestep fix' and 'model timestep auto' commands are given.",
+  "syntax": "model clean <keyword>",
   "keywords": [
     {
       "name": "all",
@@ -23,7 +15,6 @@
       "description": "If this keyword is given, then the PFC objects are remapped in the cellspace and cell extents are updated"
     }
   ],
-
   "notes": [
     "FLAC3D objects (zones and structural elements) are NOT affected - this command is for PFC objects only (balls, walls, etc.)",
     "Creates all contacts between pieces",
@@ -36,7 +27,6 @@
     "'all' keyword: remaps PFC objects in cellspace and updates cell extents",
     "Useful when modifying model geometry after initial setup"
   ],
-
   "examples": [
     {
       "command": "model clean",
@@ -63,7 +53,6 @@
       "description": "Create geometry, clean to initialize, then solve to equilibrium"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('model clean') or itasca.command('model clean all') - Python SDK does not provide direct clean method"

@@ -1,38 +1,14 @@
 {
   "command": "wall attribute",
   "category": "wall",
-  "search_keywords": ["attribute", "set", "velocity", "displacement"],
-  "description": "Set the value of wall attributes. This command is a synonym for the wall initialize command. Individual attributes can be listed with the wall list command and all attributes can be visualized. The optional vertex keyword can be used with the velocity keywords to set the vertex velocities for vertices in the specified range. The optional facet keyword can be used with the conveyor velocity keywords to set the facet conveyor velocities for facets in the specified range. Note: Be aware of the distinction between attributes and properties! The tutorial example 'Attributes and Properties' discusses this issue in detail.",
-
-  "syntax": "wall attribute <facet> <vertex> <keyword> ... <range>",
-
-  "parameters": [
-    {
-      "name": "facet",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to apply range to facets (used with conveyor velocity keywords)"
-    },
-    {
-      "name": "vertex",
-      "type": "keyword",
-      "required": false,
-      "description": "Optional keyword to apply range to vertices (used with velocity keywords)"
-    },
-    {
-      "name": "keyword",
-      "type": "keyword",
-      "required": true,
-      "description": "Attribute to set (e.g., velocity, position, spin, etc.)"
-    },
-    {
-      "name": "range",
-      "type": "range",
-      "required": false,
-      "description": "Range to apply the attribute change"
-    }
+  "search_keywords": [
+    "attribute",
+    "set",
+    "velocity",
+    "displacement"
   ],
-
+  "description": "Set the value of wall attributes. This command is a synonym for the wall initialize command. Individual attributes can be listed with the wall list command and all attributes can be visualized. The optional vertex keyword can be used with the velocity keywords to set the vertex velocities for vertices in the specified range. The optional facet keyword can be used with the conveyor velocity keywords to set the facet conveyor velocities for facets in the specified range. Note: Be aware of the distinction between attributes and properties! The tutorial example 'Attributes and Properties' discusses this issue in detail.",
+  "syntax": "wall attribute <facet> <vertex> <keyword> ... <range>",
   "keywords": [
     {
       "name": "cutoff-angle",
@@ -185,7 +161,6 @@
       "description": "Z-component of facet conveyor velocity (3D ONLY). Cannot be active with vertex velocities"
     }
   ],
-
   "modifiers": [
     {
       "name": "add",
@@ -223,7 +198,6 @@
       "description": "Replace the existing value with f"
     }
   ],
-
   "examples": [
     {
       "command": "wall attribute velocity-z [platenVel] range name 'platenBottom'",
@@ -246,7 +220,6 @@
       "description": "Set angular velocity (spinning around z-axis) for wall named rotating_drum"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "workaround": "Wall.set_*() methods (e.g., Wall.set_vel(), Wall.set_spin(), Wall.set_pos(), Wall.set_disp(), Wall.set_rotation_center()) - requires iteration over wall range"

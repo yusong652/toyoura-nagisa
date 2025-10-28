@@ -1,21 +1,13 @@
 {
   "command": "clump results",
   "category": "clump",
-  "search_keywords": ["results", "post-processing", "snapshot"],
-  "description": "Configure clump results logic for efficient post-processing. Creates lightweight snapshots of clump geometries and selected attributes at different time instances as binary files. This logic allows for a reduced version of the model state (clump geometries plus clump attributes) to be output and used to re-create the model state. IMPORTANT: Clump result files do NOT replace PFC model state files and models re-created with this logic should not be cycled. Use with model results command to control when/how result files are created and imported.",
-
-  "syntax": "clump results <keyword> ...",
-
-  "parameters": [
-    {
-      "name": "keyword",
-      "type": "string",
-      "required": true,
-      "description": "Operation to perform",
-      "options": ["active", "add-attribute", "remove-attribute"]
-    }
+  "search_keywords": [
+    "results",
+    "post-processing",
+    "snapshot"
   ],
-
+  "description": "Configure clump results logic for efficient post-processing. Creates lightweight snapshots of clump geometries and selected attributes at different time instances as binary files. This logic allows for a reduced version of the model state (clump geometries plus clump attributes) to be output and used to re-create the model state. IMPORTANT: Clump result files do NOT replace PFC model state files and models re-created with this logic should not be cycled. Use with model results command to control when/how result files are created and imported.",
+  "syntax": "clump results <keyword> ...",
   "keywords": [
     {
       "name": "active",
@@ -33,7 +25,6 @@
       "description": "Remove clump attribute s from results recording. Use 'group' and 'extra' keywords for groups and extra variables."
     }
   ],
-
   "notes": [
     "Clump result files are for efficient post-processing (e.g., movie generation, residence time calculations)",
     "Clump results act as a utility for efficient post-processing, not for continuing simulations",
@@ -41,7 +32,6 @@
     "Use model results command to specify when results files are created and how to import them",
     "Result files contain reduced model state: clump geometries plus selected clump attributes"
   ],
-
   "examples": [
     {
       "command": "clump results active true add-attribute fragment",
@@ -68,7 +58,6 @@
       "description": "Disable clump results creation"
     }
   ],
-
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('clump results ...') - Python SDK does not provide results configuration"

@@ -1,20 +1,13 @@
 {
   "command": "measure dump",
   "category": "measure",
-  "search_keywords": ["dump", "export", "distribution"],
-  "description": "Dump the cumulative size distribution data from a measurement region. The size distribution must have been configured using the bins keyword in measure create or measure modify. Data can be exported to a PFC table for further analysis or plotting.",
-
-  "syntax": "measure dump id <i> <keyword>",
-
-  "parameters": [
-    {
-      "name": "id",
-      "type": "integer",
-      "required": true,
-      "description": "ID of the measurement to dump data from"
-    }
+  "search_keywords": [
+    "dump",
+    "export",
+    "distribution"
   ],
-
+  "description": "Dump the cumulative size distribution data from a measurement region. The size distribution must have been configured using the bins keyword in measure create or measure modify. Data can be exported to a PFC table for further analysis or plotting.",
+  "syntax": "measure dump id <i> <keyword>",
   "keywords": [
     {
       "name": "table",
@@ -46,7 +39,6 @@
       "availability": "not_available"
     }
   ],
-
   "notes": [
     "Exports cumulative size distribution data calculated from measurement region",
     "Requires bins keyword to have been specified in measure create or measure modify",
@@ -58,7 +50,6 @@
     "Must call model clean before dump to ensure data is calculated",
     "Table format: bin edge vs. cumulative volume percentage"
   ],
-
   "examples": [
     {
       "command": "measure create id 1 bins 100 0.0 0.50 radius 4.0\nmeasure dump id 1 table 1",
@@ -86,7 +77,6 @@
       "use_case": "Refine and re-export size distribution"
     }
   ],
-
   "python_sdk_alternative": {
     "available": true,
     "notes": [
@@ -100,7 +90,6 @@
       "python": "# Python SDK can access measurement data\n# Consult PFC documentation for exact methods"
     }
   },
-
   "related_commands": [
     "measure create",
     "measure list",
@@ -108,7 +97,6 @@
     "model clean",
     "table export"
   ],
-
   "common_use_cases": [
     {
       "use_case": "Export particle size distribution for plotting",
@@ -156,7 +144,6 @@
       "notes": "Determine appropriate bin count for analysis"
     }
   ],
-
   "typical_workflow": [
     "1. Create measurement with bins: measure create id <i> bins <n> <fl> <fh> radius <r>",
     "2. Calculate: model clean",
@@ -164,7 +151,6 @@
     "4. Export table: table <itab> export 'filename.txt'",
     "5. Analyze/plot in external tools"
   ],
-
   "bins_requirement": {
     "description": "measure dump requires bins to be specified",
     "why": "Size distribution calculation requires bin configuration",
@@ -172,7 +158,6 @@
     "error_if_missing": "dump may fail or produce no data if bins not configured",
     "example": "measure create id 1 bins 100 0.0 0.5 radius 4.0"
   },
-
   "table_output_format": {
     "description": "Structure of exported table data",
     "columns": [
@@ -190,7 +175,6 @@
     "note": "Percentage for a bin is given with the entry holding the lower bin boundary",
     "typical_use": "Plot cumulative % vs. diameter for size distribution curve"
   },
-
   "cumulative_distribution": {
     "description": "What cumulative size distribution means",
     "definition": "Percentage of total particle volume with diameter less than or equal to specified size",
@@ -203,7 +187,6 @@
     ],
     "example": "0.5 at diameter 0.3 means 50% of volume in particles ≤ 0.3 diameter"
   },
-
   "table_creation_overwrite": {
     "description": "How measure dump handles tables",
     "table_exists": "Overwrites existing table with new data",
@@ -211,7 +194,6 @@
     "no_warning": "No warning when overwriting - data replaced silently",
     "recommendation": "Use unique table IDs or check before dumping to avoid accidental overwrites"
   },
-
   "file_keyword_unavailable": {
     "description": "file keyword is not yet implemented",
     "status": "Not available",
@@ -222,7 +204,6 @@
     ],
     "future": "May be implemented in future PFC versions"
   },
-
   "warnings": [
     {
       "type": "bins_required",
@@ -255,7 +236,6 @@
       "mitigation": "Always specify 'id <i>' when using measure dump"
     }
   ],
-
   "troubleshooting": [
     {
       "issue": "measure dump fails or produces no data",
@@ -305,14 +285,12 @@
       ]
     }
   ],
-
   "performance_considerations": {
     "dump_cost": "Very fast - just exports already-calculated data",
     "calculation_cost": "Size distribution calculated during model clean",
     "table_size": "Proportional to number of bins",
     "recommendation": "Dumping is inexpensive - main cost is model clean calculation"
   },
-
   "dump_vs_list": {
     "measure_dump": {
       "function": "Export size distribution data to table",
@@ -330,7 +308,6 @@
     },
     "recommendation": "Use list for viewing, dump for exporting size distributions"
   },
-
   "when_to_use_dump": {
     "good_use_cases": [
       "Exporting particle size distribution for external analysis",
@@ -345,7 +322,6 @@
       "Measurements without bins configured (no size distribution)"
     ]
   },
-
   "table_export_workflow": {
     "description": "Complete workflow to export size distribution to file",
     "steps": [
@@ -375,7 +351,6 @@
       }
     ]
   },
-
   "multiple_measurements_dumping": {
     "description": "Dumping data from multiple measurements",
     "approach": "Use different table IDs for each measurement",
@@ -391,7 +366,6 @@
       "table 3 export 'region3_psd.txt'"
     ]
   },
-
   "size_distribution_interpretation": {
     "description": "How to interpret dumped size distribution data",
     "x_axis": "Particle diameter (volume-equivalent sphere)",
