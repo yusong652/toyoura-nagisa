@@ -560,29 +560,21 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             "id": "reasoning_xxx"
         }
 
-        We include reasoning as assistant messages with <thinking> tags.
+        Input format:
+        {
+            "type": "reasoning",
+            "summary": [{"type": "summary_text", "text": "..."}]
+        }
+
+        Keep as reasoning type, just remove output-only fields (id, status).
         """
         summary = message.get("summary", [])
 
         if not summary:
             return None
 
-        # Extract reasoning text from summary
-        reasoning_parts = []
-        for part in summary:
-            if isinstance(part, dict):
-                if part.get("type") == "summary_text":
-                    text = part.get("text", "")
-                    if text:
-                        reasoning_parts.append(text)
-
-        if not reasoning_parts:
-            return None
-
-        # Combine reasoning text
-        reasoning_text = "\n".join(reasoning_parts)
-
+        # Keep as reasoning type, only remove id and status
         return {
-            "role": "assistant",
-            "content": f"<thinking>{reasoning_text}</thinking>"
+            "type": "reasoning",
+            "summary": summary
         }
