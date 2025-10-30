@@ -1,20 +1,22 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import { StreamingTextRendererProps } from '../types'
+import { cleanTextForDisplay } from '../../../utils/textFilters'
 
 /**
  * Streaming text renderer component.
- * 
+ *
  * Handles streaming text display with chunk-based animations for bot messages.
  * Focuses purely on text content rendering without tool state coupling.
- * 
+ * Filters out emotion keyword markers ([[keyword]]) before rendering.
+ *
  * Args:
  *     displayText: Current accumulated text content
  *     chunks: Array of text chunks for animation
  *     streaming: Whether message is currently streaming
  *     isLoading: Whether message is in loading state
  *     className: Optional CSS class name
- * 
+ *
  * Returns:
  *     JSX element with streaming text or null if no content
  */
@@ -25,8 +27,8 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
   isLoading,
   className = 'message-text'
 }) => {
-  // Pure text content rendering - no tool state coupling
-  const textToDisplay = displayText
+  // Clean text content - remove emotion keywords before display
+  const textToDisplay = cleanTextForDisplay(displayText)
     
   // Use non-streaming rendering when not streaming
   const shouldUseNonStreaming = !streaming
