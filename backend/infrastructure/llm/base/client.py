@@ -291,6 +291,8 @@ class LLMClientBase(ABC):
                 text_buffer += chunk.content
 
             # Build complete content blocks
+            # Note: Each content block type appears only once in the array to avoid
+            # rendering issues (multiple text blocks would render as separate lines)
             content_blocks = []
             if thinking_buffer:
                 content_blocks.append({"type": "thinking", "thinking": thinking_buffer})

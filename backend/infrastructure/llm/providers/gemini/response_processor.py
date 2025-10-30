@@ -149,12 +149,14 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     "thinking": full_thinking_content,
                 })
 
-        # Add all text parts as separate blocks (preserves multipart responses)
-        for text_part in text_parts:
-            if text_part.strip():  # Only add non-empty parts
+        # Merge all text parts into single block for consistent rendering
+        # Note: Multiple text blocks would render as separate lines in frontend
+        if text_parts:
+            combined_text = "".join(text_parts).strip()
+            if combined_text:
                 content.append({
                     "type": "text",
-                    "text": text_part  # Keep original format for proper markdown rendering
+                    "text": combined_text
                 })
         
         # If no content was extracted, add empty text

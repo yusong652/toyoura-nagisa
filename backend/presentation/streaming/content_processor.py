@@ -85,8 +85,11 @@ async def process_content_pipeline(
         from backend.presentation.streaming.tts_processor import process_tts_pipeline
         # Use cleaned text without keyword markers for TTS
         async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
-            # Send TTS chunks only via WebSocket (no SSE for TTS)
-            await send_tts_chunk_via_websocket(session_id, chunk, ai_msg_id)
+            # Send TTS chunks via WebSocket
+            # For streaming messages: audio-only (text already displayed)
+            # For non-streaming messages: text+audio (for incremental text display)
+            is_streaming = bool(message_id)
+            await send_tts_chunk_via_websocket(session_id, chunk, ai_msg_id, is_streaming)
     else:
         # Send MESSAGE_CREATE only if message was not created during streaming
         if not message_id:
@@ -95,7 +98,8 @@ async def process_content_pipeline(
         # Send empty text chunk for consistency when only keywords are present
         empty_chunk_data = {'text': '', 'audio': None, 'index': 0}
         empty_sse_chunk = f"data: {json.dumps(empty_chunk_data)}\n\n"
-        await send_tts_chunk_via_websocket(session_id, empty_sse_chunk, ai_msg_id)
+        is_streaming = bool(message_id)
+        await send_tts_chunk_via_websocket(session_id, empty_sse_chunk, ai_msg_id, is_streaming)
 
 
 async def send_message_create_via_websocket(session_id: str, message_id: str):
@@ -138,7 +142,12 @@ async def send_message_create_via_websocket(session_id: str, message_id: str):
         logger.warning(f"Failed to send MESSAGE_CREATE via WebSocket to session {session_id}: {e}")
 
 
-async def send_tts_chunk_via_websocket(session_id: str, sse_chunk: str, message_id: Optional[str] = None):
+async def send_tts_chunk_via_websocket(
+    session_id: str,
+    sse_chunk: str,
+    message_id: Optional[str] = None,
+    is_streaming: bool = False
+):
     """
     Send TTS chunk data via WebSocket to frontend.
 
@@ -148,6 +157,8 @@ async def send_tts_chunk_via_websocket(session_id: str, sse_chunk: str, message_
     Args:
         session_id: WebSocket session ID
         sse_chunk: SSE formatted chunk from TTS processor
+        message_id: Optional message ID for association
+        is_streaming: If True, only send audio (text already displayed via streaming)
     """
     try:
         # Get WebSocket connection manager
@@ -167,12 +178,16 @@ async def send_tts_chunk_via_websocket(session_id: str, sse_chunk: str, message_
 
         chunk_data = json.loads(json_str)
 
+        # For streaming messages: clear text field (audio-only)
+        # For non-streaming messages: keep text field (incremental display)
+        text_content = '' if is_streaming else chunk_data.get('text', '')
+
         # Create WebSocket TTS chunk message
         tts_message = create_message(
             MessageType.TTS_CHUNK,
             session_id=session_id,
             message_id=message_id,
-            text=chunk_data.get('text', ''),
+            text=text_content,
             audio=chunk_data.get('audio'),
             index=chunk_data.get('index', 0),
             processing_time=chunk_data.get('processing_time'),

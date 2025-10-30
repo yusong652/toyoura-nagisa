@@ -98,37 +98,37 @@ export const useWebSocketTTS = ({
     chunk: ChunkData,
     messageId: string
   ): Promise<void> => {
-    // Process text if present
-    if (chunk.text !== undefined && chunk.text !== null) {
+    // Process text if present and not empty
+    // Note: Backend sends empty text for streaming messages (text already displayed)
+    if (chunk.text !== undefined && chunk.text !== null && chunk.text.length > 0) {
       const newText = chunk.text
+      currentMessageRef.current += newText
 
-      if (newText.length > 0) {
-        currentMessageRef.current += newText
-
-        // Update message text immediately
-        if (!ttsEnabled) {
-          updateMessageText(messageId, currentMessageRef.current, {
-            streaming: true,
-            isLoading: false
-          })
-        } else {
-          updateMessageText(messageId, currentMessageRef.current, {
-            newText,
-            streaming: true,
-            isLoading: false
-          })
-        }
-
-        // Small delay for smooth rendering
-        await new Promise(resolve => setTimeout(resolve, 10))
+      // Update message text immediately
+      if (!ttsEnabled) {
+        updateMessageText(messageId, currentMessageRef.current, {
+          streaming: true,
+          isLoading: false
+        })
+      } else {
+        updateMessageText(messageId, currentMessageRef.current, {
+          newText,
+          streaming: true,
+          isLoading: false
+        })
       }
+
+      // Small delay for smooth rendering
+      await new Promise(resolve => setTimeout(resolve, 10))
     }
 
     // Process audio if TTS is enabled
+    // Audio is sent regardless of whether text is present (for streaming messages)
     if (ttsEnabled && chunk.audio && typeof chunk.audio === 'string' && chunk.audio.length > 0) {
       try {
         await processAudioData(chunk.audio, audioCountRef.current++)
       } catch (error) {
+        // Silent fail for audio processing errors
       }
     }
   }, [ttsEnabled, processAudioData, updateMessageText])
