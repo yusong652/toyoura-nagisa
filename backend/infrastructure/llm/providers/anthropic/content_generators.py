@@ -19,6 +19,7 @@ from backend.infrastructure.llm.shared.utils.text_processing import parse_title_
 from .message_formatter import MessageFormatter
 from backend.config import get_llm_settings
 from .config import get_anthropic_client_config
+from .response_processor import AnthropicResponseProcessor
 
 
 class TitleGenerator(BaseTitleGenerator):
@@ -32,7 +33,7 @@ class TitleGenerator(BaseTitleGenerator):
 
     @staticmethod
     async def generate_title_from_messages(
-        client: anthropic.Anthropic,
+        client: anthropic.AsyncAnthropic,
         latest_messages: List[BaseMessage],
     ) -> Optional[str]:
         """
@@ -74,9 +75,12 @@ class TitleGenerator(BaseTitleGenerator):
 
             # Override parameters specific to title generation
             api_kwargs.update({
-                "max_tokens": 1024,
+                "max_tokens": 2048,
                 "temperature": 1.0
             })
+            # Update thinking budget if thinking is enabled
+            if "thinking" in api_kwargs:
+                api_kwargs["thinking"]["budget_tokens"] = 1024
             from backend.config import get_llm_settings
             llm_settings = get_llm_settings()
             debug = llm_settings.debug
@@ -85,13 +89,12 @@ class TitleGenerator(BaseTitleGenerator):
                 import pprint
                 pprint.pprint(api_kwargs)
 
-            response = client.messages.create(**api_kwargs)
+            response = await client.messages.create(**api_kwargs)
 
-            if response.content and len(response.content) > 0:
-                # Handle different content block types safely
-                first_content = response.content[0]
-                title_response_text = getattr(first_content, 'text', str(first_content))
+            # Extract text content using ResponseProcessor (skips thinking blocks)
+            title_response_text = AnthropicResponseProcessor.extract_text_content(response)
 
+            if title_response_text:
                 # Parse title using shared utility function
                 # Using max_length=30 to match original Anthropic behavior
                 return parse_title_response(title_response_text, max_length=30)
@@ -111,8 +114,8 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
     """
 
     @staticmethod
-    def perform_web_search(
-        client: anthropic.Anthropic,
+    async def perform_web_search(
+        client: anthropic.AsyncAnthropic,
         query: str,
         debug: bool = False,
         **kwargs
@@ -161,11 +164,14 @@ class AnthropicWebSearchGenerator(BaseWebSearchGenerator):
             # Override some parameters specific to web search
             api_kwargs.update({
                 "max_tokens": 4096,
-                "temperature": 0.1
+                "temperature": 1.0
             })
+            # Update thinking budget if thinking is enabled
+            if "thinking" in api_kwargs:
+                api_kwargs["thinking"]["budget_tokens"] = 2048
             
-            # Call the API with web search tool (sync version - Anthropic client is not async)
-            response = client.messages.create(**api_kwargs)
+            # Call the API with web search tool (async version)
+            response = await client.messages.create(**api_kwargs)
             
             # Extract response text and tool usage information
             response_text = ""
@@ -219,7 +225,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
     @staticmethod
     async def generate_text_to_image_prompt(
-        client: anthropic.Anthropic,
+        client: anthropic.AsyncAnthropic,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -254,8 +260,8 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             
             # Use the model from context (which now correctly uses Anthropic's model)
             model_for_text_to_image = context.get('model', llm_anthropic_config.model)
-            
-            response = client.messages.create(
+
+            response = await client.messages.create(
                 model=model_for_text_to_image,
                 max_tokens=4096,
                 temperature=context.get('temperature', 1.0),

@@ -165,12 +165,46 @@ class MessageFormatter(BaseMessageFormatter):
         for msg in messages:
             # 处理普通消息
             content = []
-            
+
             # Handle message content based on format
             if isinstance(msg.content, list):
-                # Multi-part message (text + optional multimodal content)
+                # Multi-part message (text + optional multimodal content + tool_result + tool_use)
                 for item in msg.content:
-                    if "text" in item and item["text"]:
+                    # Handle tool_result type (from history)
+                    if item.get("type") == "tool_result":
+                        # Extract nested content.parts and format it
+                        nested_content = item.get("content", {})
+                        if isinstance(nested_content, dict) and "parts" in nested_content:
+                            # Use format_tool_result_content with adapted structure
+                            formatted_content = MessageFormatter.format_tool_result_content({
+                                "llm_content": nested_content
+                            })
+                        else:
+                            # Fallback: use content as-is
+                            formatted_content = nested_content
+
+                        # Build tool_result block for API
+                        content.append({
+                            "type": "tool_result",
+                            "tool_use_id": item.get("tool_use_id", ""),
+                            "content": formatted_content
+                        })
+                    # Handle tool_use type (from assistant history)
+                    elif item.get("type") == "tool_use":
+                        content.append({
+                            "type": "tool_use",
+                            "id": item.get("id", ""),
+                            "name": item.get("name", ""),
+                            "input": item.get("input", {})
+                        })
+                    # Handle thinking type (from assistant history)
+                    elif item.get("type") == "thinking":
+                        thinking_block = {"type": "thinking", "thinking": item.get("thinking", "")}
+                        # Only include signature if present
+                        if "signature" in item and item["signature"]:
+                            thinking_block["signature"] = item["signature"]
+                        content.append(thinking_block)
+                    elif "text" in item and item["text"]:
                         content.append({
                             "type": "text",
                             "text": item["text"]
@@ -183,7 +217,7 @@ class MessageFormatter(BaseMessageFormatter):
             else:
                 # Simple text message
                 content.append({
-                    "type": "text", 
+                    "type": "text",
                     "text": str(msg.content)
                 })
             
@@ -211,12 +245,46 @@ class MessageFormatter(BaseMessageFormatter):
             return {}
             
         content = []
-        
+
         # Handle message content based on format
         if isinstance(message.content, list):
-            # Multi-part message (text + optional multimodal content)
+            # Multi-part message (text + optional multimodal content + tool_result + tool_use)
             for item in message.content:
-                if "text" in item and item["text"]:
+                # Handle tool_result type (from history)
+                if item.get("type") == "tool_result":
+                    # Extract nested content.parts and format it
+                    nested_content = item.get("content", {})
+                    if isinstance(nested_content, dict) and "parts" in nested_content:
+                        # Use format_tool_result_content with adapted structure
+                        formatted_content = MessageFormatter.format_tool_result_content({
+                            "llm_content": nested_content
+                        })
+                    else:
+                        # Fallback: use content as-is
+                        formatted_content = nested_content
+
+                    # Build tool_result block for API
+                    content.append({
+                        "type": "tool_result",
+                        "tool_use_id": item.get("tool_use_id", ""),
+                        "content": formatted_content
+                    })
+                # Handle tool_use type (from assistant history)
+                elif item.get("type") == "tool_use":
+                    content.append({
+                        "type": "tool_use",
+                        "id": item.get("id", ""),
+                        "name": item.get("name", ""),
+                        "input": item.get("input", {})
+                    })
+                # Handle thinking type (from assistant history)
+                elif item.get("type") == "thinking":
+                    thinking_block = {"type": "thinking", "thinking": item.get("thinking", "")}
+                    # Only include signature if present
+                    if "signature" in item and item["signature"]:
+                        thinking_block["signature"] = item["signature"]
+                    content.append(thinking_block)
+                elif "text" in item and item["text"]:
                     content.append({
                         "type": "text",
                         "text": item["text"]
@@ -229,7 +297,7 @@ class MessageFormatter(BaseMessageFormatter):
         else:
             # Simple text message
             content.append({
-                "type": "text", 
+                "type": "text",
                 "text": str(message.content)
             })
         
