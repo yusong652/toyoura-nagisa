@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastmcp.server.context import Context  # type: ignore
 from backend.config.text_to_image import TextToImageSettings
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
+from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
 from .comfyui_client import ComfyUIClient
 
 load_dotenv()
@@ -97,9 +98,12 @@ async def generate_image(context: Context) -> dict[str, Any]:
             "Image generation failed: LLM client unavailable"
         )
 
-    # Build prompts using the LLM client
+    # Build prompts using ContentGeneratorFactory
     try:
-        prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
+        prompt_result = await ContentGeneratorFactory.generate_text_to_image_prompt(
+            llm_client,
+            session_id=session_id
+        )
     except Exception as e:
         return error_response(
             "Image generation failed: Prompt generation failed"

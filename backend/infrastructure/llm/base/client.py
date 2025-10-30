@@ -7,17 +7,13 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Type, TYPE_CHECKING, AsyncGenerator
+from typing import List, Optional, Dict, Any, Type, AsyncGenerator
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 from backend.shared.exceptions import UserRejectionInterruption
-
-if TYPE_CHECKING:
-    from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
-    from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
 
 
 class LLMClientBase(ABC):
@@ -411,74 +407,6 @@ class LLMClientBase(ABC):
         # Continue recursively
         return await self._recursive_tool_calling(session_id, iterations + 1)
 
-    async def generate_title_from_messages(
-        self,
-        latest_messages: List[BaseMessage]
-    ) -> Optional[str]:
-        """
-        [Optional Interface] Generate title from conversation messages.
-
-        This method uses provider-specific title generator for implementation.
-        Override _get_title_generator() to provide custom generator.
-
-        Args:
-            latest_messages: Recent conversation messages to generate title from
-
-        Returns:
-            Generated title string, or None if failed
-
-        Raises:
-            NotImplementedError: If client doesn't support this functionality
-        """
-        generator = self._get_title_generator()
-        if not generator:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} does not support title generation"
-            )
-
-        # Get debug setting from provider config
-        provider_config = self._get_provider_config()
-
-        # Call provider-specific generator with unified signature
-        return await generator.generate_title_from_messages(
-            self.client,
-            latest_messages
-        )
-
-    async def generate_text_to_image_prompt(
-        self,
-        session_id: Optional[str] = None
-    ) -> Optional[Dict[str, str]]:
-        """
-        [Optional Interface] Generate text-to-image prompt.
-
-        This method uses provider-specific image prompt generator for implementation.
-        Override _get_image_prompt_generator() to provide custom generator.
-
-        Args:
-            session_id: Session ID for getting conversation context
-
-        Returns:
-            Dictionary containing text prompt and negative prompt, or None if failed
-
-        Raises:
-            NotImplementedError: If client doesn't support this functionality
-        """
-        generator = self._get_image_prompt_generator()
-        if not generator:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} does not support image prompt generation"
-            )
-
-        # Get debug setting from provider config
-        provider_config = self._get_provider_config()
-
-        # Call provider-specific generator with unified signature
-        return await generator.generate_text_to_image_prompt(
-            self.client,
-            session_id=session_id
-        )
-
     @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
         """
@@ -487,28 +415,6 @@ class LLMClientBase(ABC):
         Returns:
             Optional[BaseResponseProcessor]: Provider-specific response processor instance (e.g., GeminiResponseProcessor)
                                            Returns None if not implemented by provider
-        """
-        pass
-
-    @abstractmethod
-    def _get_title_generator(self) -> Optional[Type['BaseTitleGenerator']]:
-        """
-        Get provider-specific title generator class.
-
-        Returns:
-            Optional[Type[BaseTitleGenerator]]: Title generator class for this provider,
-                                                or None if title generation is not supported
-        """
-        pass
-
-    @abstractmethod
-    def _get_image_prompt_generator(self) -> Optional[Type['BaseImagePromptGenerator']]:
-        """
-        Get provider-specific image prompt generator class.
-
-        Returns:
-            Optional[Type[BaseImagePromptGenerator]]: Image prompt generator class for this provider,
-                                                      or None if image prompt generation is not supported
         """
         pass
 

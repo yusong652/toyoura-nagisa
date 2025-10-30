@@ -12,6 +12,7 @@ from backend.infrastructure.storage.image_storage import (
 from backend.infrastructure.mcp.tools.lifestyle.tools.text_to_image import (
     generate_image_from_description
 )
+from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
 
 
 class ImageService:
@@ -46,8 +47,11 @@ class ImageService:
                 - error: str - Error message (if failed)
         """
         try:
-            # Step 1: Generate image prompts from conversation
-            prompt_result = await llm_client.generate_text_to_image_prompt(session_id)
+            # Step 1: Generate image prompts from conversation using ContentGeneratorFactory
+            prompt_result = await ContentGeneratorFactory.generate_text_to_image_prompt(
+                llm_client,
+                session_id=session_id
+            )
 
             if not prompt_result:
                 return {

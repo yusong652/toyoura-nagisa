@@ -165,14 +165,6 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific response processor instance."""
         return OpenAIResponseProcessor()
 
-    def _get_title_generator(self):
-        """Get OpenAI-specific title generator class."""
-        return TitleGenerator
-
-    def _get_image_prompt_generator(self):
-        """Get OpenAI-specific image prompt generator class."""
-        return ImagePromptGenerator
-
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager

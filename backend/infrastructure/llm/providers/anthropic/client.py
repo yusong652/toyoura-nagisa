@@ -60,14 +60,6 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific response processor instance."""
         return AnthropicResponseProcessor()
 
-    def _get_title_generator(self):
-        """Get Anthropic-specific title generator class."""
-        return TitleGenerator
-
-    def _get_image_prompt_generator(self):
-        """Get Anthropic-specific image prompt generator class."""
-        return ImagePromptGenerator
-
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager

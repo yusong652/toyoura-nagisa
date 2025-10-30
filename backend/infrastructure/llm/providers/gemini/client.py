@@ -19,7 +19,6 @@ from .context_manager import GeminiContextManager
 from .debug import GeminiDebugger
 from .response_processor import GeminiResponseProcessor
 from .tool_manager import GeminiToolManager
-from .content_generators import GeminiTitleGenerator, GeminiImagePromptGenerator
 
 
 class GeminiClient(LLMClientBase):
@@ -170,14 +169,6 @@ class GeminiClient(LLMClientBase):
     def _get_response_processor(self):
         """Get Gemini-specific response processor instance."""
         return GeminiResponseProcessor()
-
-    def _get_title_generator(self):
-        """Get Gemini-specific title generator class."""
-        return GeminiTitleGenerator
-
-    def _get_image_prompt_generator(self):
-        """Get Gemini-specific image prompt generator class."""
-        return GeminiImagePromptGenerator
 
     def _get_context_manager_class(self):
         """Get Gemini-specific context manager class."""

@@ -11,6 +11,7 @@ from backend.infrastructure.storage.session_manager import (
     load_history
 )
 from backend.domain.models.message_factory import message_factory
+from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
 
 
 class TitleService:
@@ -141,8 +142,11 @@ class TitleService:
         # Create a list of latest messages for title generation
         latest_messages = [latest_user_msg, latest_assistant_msg]
 
-        # Use LLM client's built-in title generation method directly
-        title = await llm_client.generate_title_from_messages(latest_messages)
+        # Use ContentGeneratorFactory for title generation
+        title = await ContentGeneratorFactory.generate_title_from_messages(
+            llm_client,
+            latest_messages
+        )
         return title
 
     async def generate_title_for_session(
