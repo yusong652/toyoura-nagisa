@@ -71,7 +71,7 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
           }
           return <ToolUseBlock key={index} block={block} />
         case 'thinking':
-          return <ThinkingBlock key={index} block={block} />
+          return <ThinkingBlock key={index} block={block} streaming={streaming} />
         default:
           return null
       }

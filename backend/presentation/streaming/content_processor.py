@@ -17,7 +17,8 @@ from backend.presentation.websocket.message_types import MessageType, create_mes
 
 async def process_content_pipeline(
     final_message: BaseMessage,  # AssistantMessage with List content
-    session_id: str
+    session_id: str,
+    message_id: Optional[str] = None  # Optional: use existing message ID from streaming
 ) -> None:
     """
     Content processing pipeline for final LLM responses.
@@ -31,6 +32,7 @@ async def process_content_pipeline(
     Args:
         final_message: Final LLM response message
         session_id: Current session ID
+        message_id: Optional existing message ID (from streaming), if None creates new message
 
     Returns:
         None: All processing is handled via WebSocket communication
@@ -49,11 +51,18 @@ async def process_content_pipeline(
     parsed_result = parse_llm_output(text_content)
     extracted_keyword = parsed_result['keyword']
 
-    # Save complete content including thinking blocks to conversation history
-    ai_msg_id = save_assistant_message(
-        content,  # Content is guaranteed to be List[Dict[str, Any]]
-        session_id
-    )
+    # Save or update message in conversation history
+    if message_id:
+        # Update existing message (created during streaming)
+        from backend.shared.utils.helpers import update_assistant_message
+        update_assistant_message(message_id, content, session_id)
+        ai_msg_id = message_id
+    else:
+        # Create new message (non-streaming path)
+        ai_msg_id = save_assistant_message(
+            content,  # Content is guaranteed to be List[Dict[str, Any]]
+            session_id
+        )
     
     # Send emotional keywords via WebSocket if available
     if extracted_keyword:
@@ -64,8 +73,9 @@ async def process_content_pipeline(
     
     # Process TTS pipeline if clean text content is available
     if parsed_result['text'].strip():
-        # Send MESSAGE_CREATE first to create the bot message
-        await send_message_create_via_websocket(session_id, ai_msg_id)
+        # Send MESSAGE_CREATE only if message was not created during streaming
+        if not message_id:
+            await send_message_create_via_websocket(session_id, ai_msg_id)
 
         # Get TTS engine from app state
         from backend.shared.utils.app_context import get_tts_engine
@@ -78,8 +88,9 @@ async def process_content_pipeline(
             # Send TTS chunks only via WebSocket (no SSE for TTS)
             await send_tts_chunk_via_websocket(session_id, chunk, ai_msg_id)
     else:
-        # Send MESSAGE_CREATE even for empty content (keyword-only responses)
-        await send_message_create_via_websocket(session_id, ai_msg_id)
+        # Send MESSAGE_CREATE only if message was not created during streaming
+        if not message_id:
+            await send_message_create_via_websocket(session_id, ai_msg_id)
 
         # Send empty text chunk for consistency when only keywords are present
         empty_chunk_data = {'text': '', 'audio': None, 'index': 0}

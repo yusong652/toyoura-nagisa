@@ -111,14 +111,15 @@ async def process_chat_request(
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
             # Use simplified session-based response method - All configuration retrieved from context manager
-            final_message = await llm_client.get_response_from_session(session_id)
+            final_message, streaming_message_id = await llm_client.get_response_from_session(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
                 # Process content via WebSocket
                 # Note: keyword extraction is handled in content_processor
+                # Pass streaming_message_id to avoid duplicate message creation
                 await process_content_pipeline(
-                    final_message, session_id
+                    final_message, session_id, message_id=streaming_message_id
                 )
 
             # ========== PHASE 4: Post-processing pipeline ==========

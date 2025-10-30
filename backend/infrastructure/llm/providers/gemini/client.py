@@ -5,12 +5,13 @@ This implementation inherits from the base LLMClientBase and uses shared compone
 where possible, while implementing Gemini-specific functionality.
 """
 
-from typing import List, Optional, Dict, Any, cast
+from typing import List, Optional, Dict, Any, cast, AsyncGenerator
 
 from google import genai
 from google.genai import types
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
+from backend.domain.models.streaming import StreamingChunk
 
 # Import Gemini-specific implementations
 from .config import get_gemini_client_config
@@ -245,5 +246,205 @@ class GeminiClient(LLMClientBase):
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""
         return self.gemini_config
+
+    async def call_api_with_context_streaming(
+        self,
+        context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
+        **kwargs
+    ) -> AsyncGenerator[StreamingChunk, None]:
+        """
+        Execute streaming Gemini API call with real-time chunk delivery.
+
+        Streams responses from Gemini API and converts native chunks into
+        standardized StreamingChunk objects for consistent handling.
+
+        Args:
+            context_contents: Complete Gemini context contents
+            api_config: Gemini-specific configuration with 'config' key
+            **kwargs: Additional API parameters (temperature, max_output_tokens, etc.)
+
+        Yields:
+            StreamingChunk: Standardized streaming chunks containing thinking,
+                          text, or function_call content
+
+        Raises:
+            Exception: If streaming API call fails
+        """
+        debug = self.gemini_config.debug
+
+        # Extract Gemini config from api_config
+        config = api_config.get('config')
+        if not config:
+            # Fallback to basic config if not provided
+            config_kwargs = self.gemini_config.get_generation_config_kwargs(
+                system_prompt="",
+                tool_schemas=[]
+            )
+            config_kwargs.update(kwargs)
+            config = types.GenerateContentConfig(**config_kwargs)
+        else:
+            # Apply any additional kwargs to the provided config
+            if kwargs:
+                config_dict = config.model_dump()
+                config_dict.update(kwargs)
+                config = types.GenerateContentConfig(**config_dict)
+
+        if debug:
+            print(f"[DEBUG] Streaming API call with {len(context_contents)} context items")
+            GeminiDebugger.print_debug_request(context_contents, config)
+
+        try:
+            # Use streaming API
+            stream_generator = self.client.aio.models.generate_content_stream(
+                model=self.gemini_config.model_settings.model,
+                contents=cast(Any, context_contents),
+                config=config,
+            )
+
+            # Process streaming chunks and convert to standardized format
+            async for chunk in await stream_generator:
+                if not chunk.candidates or not chunk.candidates[0].content:
+                    continue
+                if not chunk.candidates[0].content.parts:
+                    continue
+
+                for part in chunk.candidates[0].content.parts:
+                    # Thinking part (with thought flag)
+                    if part.thought and part.text:
+                        yield StreamingChunk(
+                            chunk_type="thinking",
+                            content=part.text,
+                            metadata={
+                                "thought": True,
+                                "has_signature": bool(part.thought_signature)
+                            },
+                            thought_signature=part.thought_signature if part.thought_signature else None
+                        )
+
+                    # Regular text part
+                    elif part.text and not part.thought:
+                        yield StreamingChunk(
+                            chunk_type="text",
+                            content=part.text,
+                            metadata={}
+                        )
+
+                    # Function call part
+                    elif part.function_call:
+                        yield StreamingChunk(
+                            chunk_type="function_call",
+                            content=part.function_call.name,
+                            metadata={
+                                "args": dict(part.function_call.args),
+                                "has_signature": bool(part.thought_signature)
+                            },
+                            thought_signature=part.thought_signature if part.thought_signature else None,
+                            function_call={
+                                "name": part.function_call.name,
+                                "args": dict(part.function_call.args)
+                            }
+                        )
+
+            if debug:
+                print(f"[DEBUG] Streaming API call completed successfully")
+
+        except Exception as e:
+            error_message = f"Gemini streaming API call failed: {str(e)}"
+            if debug:
+                print(f"[DEBUG] {error_message}")
+            raise Exception(error_message)
+
+    def _construct_response_from_streaming_chunks(
+        self,
+        chunks: List[StreamingChunk]
+    ) -> types.GenerateContentResponse:
+        """
+        Construct Gemini response object from collected streaming chunks.
+
+        Converts list of StreamingChunk objects back into Gemini's native
+        GenerateContentResponse format for tool call detection and context management.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            types.GenerateContentResponse: Complete Gemini response object with
+                                          all parts preserved for tool calling
+
+        Note:
+            This reconstruction preserves all essential fields including:
+            - Thinking content with thought flags
+            - Text content
+            - Function calls with thought_signature
+            - All metadata needed for tool calling logic
+        """
+        # Convert StreamingChunk objects to Gemini Part format
+        parts_data = []
+
+        for chunk in chunks:
+            part_dict = {}
+
+            if chunk.chunk_type == "thinking":
+                part_dict["text"] = chunk.content
+                part_dict["thought"] = True
+                if chunk.thought_signature:
+                    part_dict["thought_signature"] = chunk.thought_signature
+
+            elif chunk.chunk_type == "text":
+                part_dict["text"] = chunk.content
+
+            elif chunk.chunk_type == "function_call":
+                # Function call requires special handling
+                part_dict["function_call"] = types.FunctionCall(
+                    name=chunk.function_call["name"],
+                    args=chunk.function_call["args"]
+                )
+                if chunk.thought_signature:
+                    part_dict["thought_signature"] = chunk.thought_signature
+
+            if part_dict:
+                parts_data.append(part_dict)
+
+        # Build Gemini response structure
+        # Create Part objects
+        parts = []
+        for part_data in parts_data:
+            # Handle different part types appropriately
+            if "function_call" in part_data:
+                # Function call part
+                part = types.Part(
+                    function_call=part_data["function_call"]
+                )
+                # Add thought_signature if present
+                if "thought_signature" in part_data:
+                    part.thought_signature = part_data["thought_signature"]
+            elif "thought" in part_data:
+                # Thinking part
+                part = types.Part(
+                    text=part_data["text"],
+                    thought=True
+                )
+                if "thought_signature" in part_data:
+                    part.thought_signature = part_data["thought_signature"]
+            else:
+                # Regular text part
+                part = types.Part(text=part_data["text"])
+
+            parts.append(part)
+
+        # Create Content with parts
+        content = types.Content(parts=parts, role="model")
+
+        # Create Candidate with content
+        candidate = types.Candidate(
+            content=content,
+            finish_reason=types.FinishReason.STOP
+        )
+
+        # Create complete GenerateContentResponse
+        response = types.GenerateContentResponse(candidates=[candidate])
+
+        return response
 
     # _streaming_tool_calling_loop is inherited from LLMClientBase

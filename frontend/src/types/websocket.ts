@@ -37,6 +37,9 @@ export enum MessageType {
   // Message management
   MESSAGE_CREATE = "MESSAGE_CREATE",
 
+  // Streaming updates
+  STREAMING_UPDATE = "STREAMING_UPDATE",
+
   // Emotion and animation
   EMOTION_KEYWORD = "EMOTION_KEYWORD"
 }
@@ -132,6 +135,13 @@ export interface ChatMessage extends BaseWebSocketMessage {
   metadata?: Record<string, any>;
 }
 
+export interface StreamingUpdateMessage extends BaseWebSocketMessage {
+  type: MessageType.STREAMING_UPDATE;
+  message_id: string;
+  content: Array<Record<string, any>>;  // ContentBlock array from backend
+  streaming: boolean;
+}
+
 export interface EmotionKeywordMessage extends BaseWebSocketMessage {
   type: MessageType.EMOTION_KEYWORD;
   keyword: string;
@@ -147,6 +157,7 @@ export type WebSocketMessage =
   | LocationRequestMessage
   | LocationResponseMessage
   | MessageCreateMessage
+  | StreamingUpdateMessage
   | TTSChunkMessage
   | TTSMessage
   | ChatMessage

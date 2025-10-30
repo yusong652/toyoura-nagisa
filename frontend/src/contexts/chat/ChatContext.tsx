@@ -8,6 +8,7 @@ import { useMemory } from '../MemoryContext'
 import { useChatMessage } from './useChatMessage'
 import { useStreamHandler } from './useStreamHandler'
 import { useWebSocketTTS } from './useWebSocketTTS'
+import { useStreamingUpdateHandler } from './useStreamingUpdateHandler'
 import { useMessageStateManager } from './useMessageStateManager'
 import { useImageGenerator } from './useImageGenerator'
 import { useVideoGenerator } from './useVideoGenerator'
@@ -88,6 +89,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     updateMessageText,
     finalizeMessage
   })
+
+  // Use streaming update handler for real-time thinking/text content
+  useStreamingUpdateHandler({ setMessages })
 
   // Use stream processing hook for SSE metadata events only
   const { processStreamResponse: handleStreamResponse } = useStreamHandler({

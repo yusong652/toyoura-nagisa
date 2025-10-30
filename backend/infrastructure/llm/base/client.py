@@ -7,8 +7,9 @@ clients inherit from, implementing common patterns extracted from the Gemini imp
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Type, TYPE_CHECKING
+from typing import List, Optional, Dict, Any, Type, TYPE_CHECKING, AsyncGenerator
 from backend.domain.models.messages import BaseMessage
+from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
@@ -106,6 +107,56 @@ class LLMClientBase(ABC):
         """
         pass
 
+    @abstractmethod
+    async def call_api_with_context_streaming(
+        self,
+        context_contents: List[Dict[str, Any]],
+        api_config: Dict[str, Any],
+        **kwargs
+    ) -> AsyncGenerator[StreamingChunk, None]:
+        """
+        Execute streaming LLM API call with real-time chunk delivery.
+
+        This method performs a streaming API call and yields standardized StreamingChunk
+        objects as they arrive from the provider. This enables real-time display of
+        thinking content and text generation.
+
+        Args:
+            context_contents: Complete context contents in provider-specific format
+            api_config: Provider-specific API configuration dictionary
+            **kwargs: Additional runtime API parameters
+
+        Yields:
+            StreamingChunk: Standardized streaming data chunks containing:
+                - chunk_type: "thinking" | "text" | "function_call"
+                - content: The actual content text
+                - metadata: Additional context-specific data
+                - thought_signature: Optional cryptographic signature (Gemini)
+                - function_call: Optional function call details
+
+        Raises:
+            Exception: If streaming API call fails
+            NotImplementedError: If not implemented by provider
+
+        Example:
+            # Streaming usage
+            context, config = await self._prepare_complete_context(session_id)
+            async for chunk in self.call_api_with_context_streaming(context, config):
+                if chunk.chunk_type == "thinking":
+                    await send_thinking_to_websocket(chunk.content)
+                elif chunk.chunk_type == "text":
+                    await send_text_to_websocket(chunk.content)
+
+        Note:
+            This method is the core streaming interface. Providers must implement
+            this to convert their native streaming format into StreamingChunk objects.
+        """
+        pass
+        # Make this an async generator by yielding nothing
+        # Subclasses will override with actual implementation
+        if False:
+            yield
+
     async def add_user_message_to_session(self, session_id: str, parsed_data: dict) -> None:
         """
         Add user message to specified session (async).
@@ -135,7 +186,7 @@ class LLMClientBase(ABC):
     async def get_response_from_session(
         self,
         session_id: str
-    ) -> BaseMessage:
+    ) -> tuple[BaseMessage, Optional[str]]:
         """
         Generate response from specified session.
 
@@ -143,7 +194,7 @@ class LLMClientBase(ABC):
             session_id: Session ID
 
         Returns:
-            BaseMessage: Final response message
+            tuple[BaseMessage, Optional[str]]: (Final response message, optional message_id from streaming)
 
         Raises:
             UserRejectionInterruption: When user rejects tool execution (not an error)
@@ -163,7 +214,11 @@ class LLMClientBase(ABC):
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(content=[{"type": "text", "text": "Response processing unavailable"}])
 
-            return final_message
+            # Get streaming message_id from context manager (if streaming was used)
+            context_manager = self.get_or_create_context_manager(session_id)
+            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+
+            return final_message, streaming_message_id
 
         except UserRejectionInterruption:
             # User rejection is not an error - re-raise as-is
@@ -208,14 +263,74 @@ class LLMClientBase(ABC):
             session_id=session_id
         )
 
-        # Stateless API call with context and configuration
-        current_response = await self.call_api_with_context(complete_context, api_config)
+        # Create placeholder message before streaming starts
+        from backend.shared.utils.helpers import save_assistant_message
+        message_id = save_assistant_message([], session_id)  # Empty content placeholder
+
+        # Send MESSAGE_CREATE notification to frontend
+        await self._send_message_create_notification(session_id, message_id, streaming=True)
+
+        # Store message_id in context manager for retrieval by process_content_pipeline
         context_manager = self.get_or_create_context_manager(session_id)
+        context_manager.streaming_message_id = message_id
+
+        # Use streaming API call with accumulated content updates
+        # Collect chunks and send accumulated content blocks via WebSocket
+        collected_chunks: List[StreamingChunk] = []
+        thinking_buffer = ""
+        text_buffer = ""
+
+        async for chunk in self.call_api_with_context_streaming(complete_context, api_config):
+            # Collect chunk for context assembly
+            collected_chunks.append(chunk)
+
+            # Accumulate chunk content
+            if chunk.chunk_type == "thinking":
+                thinking_buffer += chunk.content
+            elif chunk.chunk_type == "text":
+                text_buffer += chunk.content
+
+            # Build complete content blocks
+            content_blocks = []
+            if thinking_buffer:
+                content_blocks.append({"type": "thinking", "thinking": thinking_buffer})
+            if text_buffer:
+                content_blocks.append({"type": "text", "text": text_buffer})
+
+            # Send accumulated content update to WebSocket
+            if content_blocks:
+                await self._send_streaming_update(
+                    session_id=session_id,
+                    message_id=message_id,
+                    content=content_blocks,
+                    streaming=True
+                )
+
+        # Construct complete response from collected chunks
+        current_response = self._construct_response_from_streaming_chunks(collected_chunks)
+        context_manager = self.get_or_create_context_manager(session_id)
+
         # Check if response contains tool calls
         processor = self._get_response_processor()
         if not (processor and processor.has_tool_calls(current_response)):
-            # Add final response to context manager before returning
+            # Add final response to context manager
             context_manager.add_response(current_response)
+
+            # Format response for storage and update message in database
+            final_message = processor.format_response_for_storage(current_response) if processor else None
+            if final_message:
+                from backend.shared.utils.helpers import update_assistant_message
+                content = final_message.content if isinstance(final_message.content, list) else [{"type": "text", "text": str(final_message.content)}]
+                update_assistant_message(message_id, content, session_id)
+
+                # Send final streaming update with streaming=False to mark completion
+                await self._send_streaming_update(
+                    session_id=session_id,
+                    message_id=message_id,
+                    content=content,
+                    streaming=False
+                )
+
             return current_response  # Normal completion
 
         # Process tool calls - add response to context manager
@@ -225,21 +340,25 @@ class LLMClientBase(ABC):
         processor = self._get_response_processor()
         tool_calls = processor.extract_tool_calls(current_response) if processor else []
 
-        # Save assistant message with tool_use to database
-        # Pass extracted tool_calls to reuse the same IDs (avoid regenerating UUIDs)
+        # Update streaming message with complete content (before tool calls)
+        # This ensures the streaming placeholder is updated with any thinking/text content
         if processor:
             try:
+                from backend.shared.utils.helpers import update_assistant_message
                 tool_call_message = processor.format_response_for_storage(current_response, tool_calls)
-                from backend.shared.utils.helpers import save_assistant_message
-                # Ensure content is in list format (format_response_for_storage always returns list)
                 content = tool_call_message.content if isinstance(tool_call_message.content, list) else [{"type": "text", "text": str(tool_call_message.content)}]
-                message_id = save_assistant_message(content, session_id)
+                update_assistant_message(message_id, content, session_id)
 
-                # Send WebSocket notification to refresh messages
-                await self._send_message_saved_notification(session_id, message_id, 'assistant')
+                # Send final streaming update to mark completion
+                await self._send_streaming_update(
+                    session_id=session_id,
+                    message_id=message_id,
+                    content=content,
+                    streaming=False
+                )
             except Exception as e:
                 # Log error but don't fail the execution
-                print(f"[WARNING] Failed to save assistant message with tool_use: {e}")
+                print(f"[WARNING] Failed to update streaming message with tool call content: {e}")
 
         if tool_calls:
             # Execute tools serially with rejection cascade
@@ -485,6 +604,197 @@ class LLMClientBase(ABC):
             Do NOT store configuration in instance attributes to avoid concurrency issues.
         """
         pass
+
+    @abstractmethod
+    def _construct_response_from_streaming_chunks(
+        self,
+        chunks: List[StreamingChunk]
+    ) -> Any:
+        """
+        Construct complete response object from collected streaming chunks.
+
+        This method converts a list of StreamingChunk objects back into
+        the provider's native response format for tool call detection and context management.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            Any: Provider-specific complete response object:
+                - Gemini: types.GenerateContentResponse
+                - Anthropic: Message
+                - OpenAI: ChatCompletion
+                - Must contain all necessary data for tool call detection
+
+        Note:
+            This reconstruction is necessary because we need the complete response
+            for tool call detection and context management, while streaming provides
+            only incremental chunks.
+        """
+        pass
+
+    async def _send_streaming_chunk_to_websocket(
+        self,
+        session_id: str,
+        chunk: StreamingChunk
+    ) -> None:
+        """
+        Send streaming chunk to WebSocket for real-time display.
+
+        This method pushes individual streaming chunks to the frontend via WebSocket,
+        enabling real-time display of thinking content and text generation.
+
+        Args:
+            session_id: Target session ID
+            chunk: Standardized streaming chunk to send
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the
+            streaming process. This ensures robustness even when WebSocket
+            connections are unstable.
+        """
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                return
+
+            # Construct WebSocket message
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            ws_message = create_message(
+                MessageType.STREAMING_CHUNK,
+                session_id=session_id,
+                chunk_type=chunk.chunk_type,
+                content=chunk.content,
+                metadata=chunk.metadata
+            )
+
+            await connection_manager.send_json(session_id, ws_message.model_dump())
+
+        except Exception as e:
+            # Streaming display failure should not interrupt main flow
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send streaming chunk to WebSocket: {e}")
+
+    async def _send_streaming_update(
+        self,
+        session_id: str,
+        message_id: str,
+        content: List[Dict[str, Any]],
+        streaming: bool = True
+    ) -> None:
+        """
+        Send accumulated content update to WebSocket for real-time display.
+
+        This method sends complete accumulated content blocks instead of individual chunks,
+        making frontend logic simpler and consistent with session refresh data structure.
+
+        The frontend receives complete thinking/text content and simply replaces message content,
+        ensuring data structure consistency between real-time streaming and database storage.
+
+        Args:
+            session_id: Target session ID
+            message_id: Message ID to update
+            content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
+            streaming: Whether message is still streaming (True) or complete (False)
+
+        Example:
+            await self._send_streaming_update(
+                session_id="session-123",
+                message_id="msg-456",
+                content=[
+                    {"type": "thinking", "thinking": "Complete thinking so far..."},
+                    {"type": "text", "text": "Complete text so far..."}
+                ],
+                streaming=True
+            )
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the streaming process.
+        """
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                return
+
+            # Construct WebSocket message
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            ws_message = create_message(
+                MessageType.STREAMING_UPDATE,
+                session_id=session_id,
+                message_id=message_id,
+                content=content,
+                streaming=streaming
+            )
+
+            await connection_manager.send_json(session_id, ws_message.model_dump())
+
+        except Exception as e:
+            # Streaming display failure should not interrupt main flow
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send streaming update to WebSocket: {e}")
+
+    async def _send_message_create_notification(
+        self,
+        session_id: str,
+        message_id: str,
+        streaming: bool = True,
+        initial_text: str = ""
+    ) -> None:
+        """
+        Send MESSAGE_CREATE notification to frontend to create message container.
+
+        This notification tells the frontend to create a new message placeholder
+        before streaming content begins. The message container will receive
+        streaming updates via STREAMING_UPDATE messages.
+
+        Args:
+            session_id: Target session ID
+            message_id: ID of the created message
+            streaming: Whether this message will receive streaming updates
+            initial_text: Optional initial text content
+
+        Example:
+            await self._send_message_create_notification(
+                session_id="session-123",
+                message_id="msg-456",
+                streaming=True
+            )
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the process.
+        """
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                return
+
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            ws_message = create_message(
+                MessageType.MESSAGE_CREATE,
+                session_id=session_id,
+                message_id=message_id,
+                role="assistant",
+                initial_text=initial_text,
+                streaming=streaming
+            )
+
+            await connection_manager.send_json(session_id, ws_message.model_dump())
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send message create notification: {e}")
 
     def _is_tool_rejected(self, tool_result: Dict[str, Any]) -> bool:
         """

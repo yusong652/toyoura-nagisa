@@ -33,8 +33,9 @@ class MessageType(str, Enum):
     CHAT_STREAM_START = "CHAT_STREAM_START"
     CHAT_STREAM_CHUNK = "CHAT_STREAM_CHUNK"
     CHAT_STREAM_END = "CHAT_STREAM_END"
-    
-    
+    STREAMING_CHUNK = "STREAMING_CHUNK"  # Real-time thinking/text streaming (legacy, individual chunks)
+    STREAMING_UPDATE = "STREAMING_UPDATE"  # Real-time content update (accumulated complete content)
+
     # Tool use notifications (for frontend display)
     NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
     NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED"
@@ -220,6 +221,59 @@ class BackgroundProcessNotification(BaseWebSocketMessage):
     exit_code: Optional[int] = None
 
 
+class StreamingChunkMessage(BaseWebSocketMessage):
+    """
+    Streaming chunk message for real-time thinking/text display.
+
+    Provides real-time streaming of LLM response chunks including thinking
+    content, text generation, and function calls. Enables progressive display
+    of AI reasoning and response generation.
+
+    Attributes:
+        chunk_type: Type of content ("thinking", "text", "function_call")
+        content: The actual text content of this chunk
+        metadata: Additional context (e.g., has_signature, args for function calls)
+    """
+    type: MessageType = MessageType.STREAMING_CHUNK
+    chunk_type: str  # "thinking" | "text" | "function_call"
+    content: str
+    metadata: Dict[str, Any] = {}
+
+
+class StreamingUpdateMessage(BaseWebSocketMessage):
+    """
+    Streaming update message for real-time content display with accumulated content.
+
+    Sends complete accumulated content blocks instead of individual chunks,
+    making frontend logic simpler and consistent with session refresh data structure.
+    Frontend receives complete thinking/text content and simply replaces message content.
+
+    This approach ensures data structure consistency between:
+    - Real-time streaming (accumulated content blocks)
+    - Stored messages (content[] array format)
+    - Session refresh (loads content[] from database)
+
+    Attributes:
+        content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
+        streaming: Whether message is still streaming (true) or complete (false)
+
+    Example:
+        {
+            "type": "STREAMING_UPDATE",
+            "message_id": "msg-123",
+            "session_id": "session-456",
+            "content": [
+                {"type": "thinking", "thinking": "Current complete thinking content..."},
+                {"type": "text", "text": "Current complete text content..."}
+            ],
+            "streaming": true
+        }
+    """
+    type: MessageType = MessageType.STREAMING_UPDATE
+    content: List[Dict[str, Any]]  # ContentBlock array: [{"type": "thinking", "thinking": "..."}, ...]
+    streaming: bool = True
+
+
 # Incoming message schemas (messages that frontend sends to backend)
 INCOMING_MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT_ACK: HeartbeatMessage,
@@ -241,6 +295,8 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
     MessageType.TTS_CHUNK: TTSChunk,
+    MessageType.STREAMING_CHUNK: StreamingChunkMessage,  # Real-time thinking/text streaming (legacy)
+    MessageType.STREAMING_UPDATE: StreamingUpdateMessage,  # Real-time content update (accumulated)
     # Used via specialized creation functions
     MessageType.TOOL_CONFIRMATION_REQUEST: ToolConfirmationRequestMessage,
     # Background process notifications

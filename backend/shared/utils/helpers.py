@@ -122,6 +122,46 @@ def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> st
     return message_id
 
 
+def update_assistant_message(message_id: str, content: List[Dict[str, Any]], session_id: str) -> None:
+    """
+    Update existing assistant message content in history.
+
+    Used for updating streaming message placeholders with complete content
+    after streaming finishes.
+
+    Args:
+        message_id: ID of the message to update
+        content: New structured content list
+        session_id: Session ID
+
+    Example:
+        >>> # After streaming completes, update the placeholder message
+        >>> update_assistant_message(
+        ...     message_id="msg-123",
+        ...     content=[
+        ...         {"type": "thinking", "thinking": "Complete thinking..."},
+        ...         {"type": "text", "text": "Complete response..."}
+        ...     ],
+        ...     session_id="session-456"
+        ... )
+    """
+    # Load complete history
+    from backend.infrastructure.storage.session_manager import load_all_message_history
+    history = load_all_message_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+    # Find and update the message
+    for msg in history_msgs:
+        if hasattr(msg, 'id') and msg.id == message_id:
+            # Update content (AssistantMessage has content attribute)
+            if hasattr(msg, 'content'):
+                msg.content = content
+            break
+
+    # Save updated history
+    save_history(session_id, history_msgs)
+
+
 def save_tool_result_message(
     tool_call_id: str,
     tool_name: str,

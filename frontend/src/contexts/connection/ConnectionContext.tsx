@@ -341,6 +341,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           }))
         }
 
+        // Handle streaming content updates
+        if (data.type === 'STREAMING_UPDATE') {
+          // Dispatch custom event for streaming content updates
+          window.dispatchEvent(new CustomEvent('streamingUpdate', {
+            detail: {
+              messageId: data.message_id,
+              content: data.content,
+              streaming: data.streaming
+            }
+          }))
+        }
+
         // Handle title update notifications
         if (data.type === 'TITLE_UPDATE') {
           // Dispatch custom event for title updates
