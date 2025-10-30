@@ -13,6 +13,7 @@ from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 from backend.shared.exceptions import UserRejectionInterruption
 
 
@@ -263,7 +264,7 @@ class LLMClientBase(ABC):
         message_id = save_assistant_message([], session_id)  # Empty content placeholder
 
         # Send MESSAGE_CREATE notification to frontend
-        await self._send_message_create_notification(session_id, message_id, streaming=True)
+        await WebSocketNotificationService.send_message_create(session_id, message_id, streaming=True)
 
         # Store message_id in context manager for retrieval by process_content_pipeline
         context_manager = self.get_or_create_context_manager(session_id)
@@ -296,7 +297,7 @@ class LLMClientBase(ABC):
 
             # Send accumulated content update to WebSocket
             if content_blocks:
-                await self._send_streaming_update(
+                await WebSocketNotificationService.send_streaming_update(
                     session_id=session_id,
                     message_id=message_id,
                     content=content_blocks,
@@ -321,7 +322,7 @@ class LLMClientBase(ABC):
                 update_assistant_message(message_id, content, session_id)
 
                 # Send final streaming update with streaming=False to mark completion
-                await self._send_streaming_update(
+                await WebSocketNotificationService.send_streaming_update(
                     session_id=session_id,
                     message_id=message_id,
                     content=content,
@@ -347,7 +348,7 @@ class LLMClientBase(ABC):
                 update_assistant_message(message_id, content, session_id)
 
                 # Send final streaming update to mark completion
-                await self._send_streaming_update(
+                await WebSocketNotificationService.send_streaming_update(
                     session_id=session_id,
                     message_id=message_id,
                     content=content,
@@ -389,7 +390,7 @@ class LLMClientBase(ABC):
                     )
 
                     # Send WebSocket notification to refresh messages after each tool result
-                    await self._send_message_saved_notification(session_id, message_id, 'user')
+                    await WebSocketNotificationService.send_message_saved(session_id, message_id, 'user')
                 except Exception as e:
                     # Log error but don't fail the execution
                     print(f"[WARNING] Failed to save tool result for {tool_call['name']}: {e}")
@@ -494,169 +495,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    async def _send_streaming_chunk_to_websocket(
-        self,
-        session_id: str,
-        chunk: StreamingChunk
-    ) -> None:
-        """
-        Send streaming chunk to WebSocket for real-time display.
-
-        This method pushes individual streaming chunks to the frontend via WebSocket,
-        enabling real-time display of thinking content and text generation.
-
-        Args:
-            session_id: Target session ID
-            chunk: Standardized streaming chunk to send
-
-        Note:
-            Failures in WebSocket sending are logged but do not interrupt the
-            streaming process. This ensures robustness even when WebSocket
-            connections are unstable.
-        """
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-            connection_manager = get_connection_manager()
-
-            if not connection_manager:
-                return
-
-            # Construct WebSocket message
-            from backend.presentation.websocket.message_types import MessageType, create_message
-
-            ws_message = create_message(
-                MessageType.STREAMING_CHUNK,
-                session_id=session_id,
-                chunk_type=chunk.chunk_type,
-                content=chunk.content,
-                metadata=chunk.metadata
-            )
-
-            await connection_manager.send_json(session_id, ws_message.model_dump())
-
-        except Exception as e:
-            # Streaming display failure should not interrupt main flow
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to send streaming chunk to WebSocket: {e}")
-
-    async def _send_streaming_update(
-        self,
-        session_id: str,
-        message_id: str,
-        content: List[Dict[str, Any]],
-        streaming: bool = True
-    ) -> None:
-        """
-        Send accumulated content update to WebSocket for real-time display.
-
-        This method sends complete accumulated content blocks instead of individual chunks,
-        making frontend logic simpler and consistent with session refresh data structure.
-
-        The frontend receives complete thinking/text content and simply replaces message content,
-        ensuring data structure consistency between real-time streaming and database storage.
-
-        Args:
-            session_id: Target session ID
-            message_id: Message ID to update
-            content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
-            streaming: Whether message is still streaming (True) or complete (False)
-
-        Example:
-            await self._send_streaming_update(
-                session_id="session-123",
-                message_id="msg-456",
-                content=[
-                    {"type": "thinking", "thinking": "Complete thinking so far..."},
-                    {"type": "text", "text": "Complete text so far..."}
-                ],
-                streaming=True
-            )
-
-        Note:
-            Failures in WebSocket sending are logged but do not interrupt the streaming process.
-        """
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-            connection_manager = get_connection_manager()
-
-            if not connection_manager:
-                return
-
-            # Construct WebSocket message
-            from backend.presentation.websocket.message_types import MessageType, create_message
-
-            ws_message = create_message(
-                MessageType.STREAMING_UPDATE,
-                session_id=session_id,
-                message_id=message_id,
-                content=content,
-                streaming=streaming
-            )
-
-            await connection_manager.send_json(session_id, ws_message.model_dump())
-
-        except Exception as e:
-            # Streaming display failure should not interrupt main flow
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to send streaming update to WebSocket: {e}")
-
-    async def _send_message_create_notification(
-        self,
-        session_id: str,
-        message_id: str,
-        streaming: bool = True,
-        initial_text: str = ""
-    ) -> None:
-        """
-        Send MESSAGE_CREATE notification to frontend to create message container.
-
-        This notification tells the frontend to create a new message placeholder
-        before streaming content begins. The message container will receive
-        streaming updates via STREAMING_UPDATE messages.
-
-        Args:
-            session_id: Target session ID
-            message_id: ID of the created message
-            streaming: Whether this message will receive streaming updates
-            initial_text: Optional initial text content
-
-        Example:
-            await self._send_message_create_notification(
-                session_id="session-123",
-                message_id="msg-456",
-                streaming=True
-            )
-
-        Note:
-            Failures in WebSocket sending are logged but do not interrupt the process.
-        """
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-            connection_manager = get_connection_manager()
-
-            if not connection_manager:
-                return
-
-            from backend.presentation.websocket.message_types import MessageType, create_message
-
-            ws_message = create_message(
-                MessageType.MESSAGE_CREATE,
-                session_id=session_id,
-                message_id=message_id,
-                role="assistant",
-                initial_text=initial_text,
-                streaming=streaming
-            )
-
-            await connection_manager.send_json(session_id, ws_message.model_dump())
-
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to send message create notification: {e}")
-
     def _is_tool_rejected(self, tool_result: Dict[str, Any]) -> bool:
         """
         Check if tool execution was rejected by user.
@@ -673,52 +511,6 @@ class LLMClientBase(ABC):
         """Clear session context - shared implementation."""
         # Clear session-specific context manager
         self.cleanup_session_context(session_id)
-
-    async def _send_message_saved_notification(
-        self,
-        session_id: str,
-        message_id: str,
-        role: str
-    ):
-        """
-        Send notification that a message was saved to database.
-
-        This triggers frontend to refresh and display the new message immediately.
-
-        Args:
-            session_id: Target session ID
-            message_id: ID of the saved message
-            role: Message role ('user' for tool_result, 'assistant' for tool_use)
-        """
-        if not session_id:
-            return
-
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-
-            connection_manager = get_connection_manager()
-            if not connection_manager:
-                print("[DEBUG] Connection manager not available for MESSAGE_SAVED")
-                return
-
-            # Send custom event to trigger message refresh
-            notification = {
-                'type': 'MESSAGE_SAVED',
-                'message_id': message_id,
-                'role': role,
-                'session_id': session_id
-            }
-
-            # Send via WebSocket to trigger frontend message refresh
-            success = await connection_manager.send_json(session_id, notification)
-
-            if success:
-                print(f"[DEBUG] Sent MESSAGE_SAVED notification for {role} message {message_id}")
-            else:
-                print(f"[DEBUG] Failed to send MESSAGE_SAVED notification (no connection for session {session_id})")
-
-        except Exception as e:
-            print(f"[DEBUG] Failed to send message saved notification: {e}")
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:
