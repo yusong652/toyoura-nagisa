@@ -13,7 +13,7 @@ class AnthropicModelConfig(BaseModel):
     
     # 模型参数
     model: str = Field(
-        default="claude-3-5-sonnet-20241022",  # 平衡性能和成本的优秀选择
+        default="claude-sonnet-4-5-20250929",  # 平衡性能和成本的优秀选择
         description="Claude model to use"
     )
     max_tokens: int = Field(

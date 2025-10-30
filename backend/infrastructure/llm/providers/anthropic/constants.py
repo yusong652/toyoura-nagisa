@@ -16,7 +16,6 @@ SUPPORTED_MODELS = [
     # Claude 3.7 系列
     "claude-3-7-sonnet-20250219",
     # Claude 3.5 系列
-    "claude-3-5-sonnet-20241022",  # v2
     "claude-3-5-haiku-20241022",
     # Claude 3 系列 (传统)
     "claude-3-haiku-20240307",
