@@ -5,86 +5,74 @@ Handles processing of OpenAI API responses including text extraction,
 tool call detection, and response formatting for storage.
 """
 
-import re
 import json
 from typing import List, Dict, Any, Optional
+from openai.types.responses import (
+    Response,
+    ResponseFunctionToolCall,
+    ResponseOutputMessage,
+    ResponseReasoningItem,
+)
+from openai.types.responses.response_output_text import ResponseOutputText
 from backend.domain.models.messages import AssistantMessage
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
 class OpenAIResponseProcessor(BaseResponseProcessor):
     """
-    Process OpenAI API responses and extract relevant information
-    
-    Handles tool call extraction, thinking content processing,
-    and response formatting for consistent storage and display.
+    Process OpenAI API responses and extract relevant information.
     """
-    
+
     @staticmethod
     def extract_text_content(response) -> str:
         """
-        Extract text content from OpenAI response
-        
+        Extract text content from OpenAI Responses API result.
+
         Args:
-            response: OpenAI API response object
-            
+            response: OpenAI Responses API response object
+
         Returns:
-            Extracted text content
+            Extracted text content as a single string.
         """
-        if not hasattr(response, 'choices') or not response.choices:
+        if not isinstance(response, Response) or not response.output:
             return ""
-        
-        choice = response.choices[0]
-        if not hasattr(choice, 'message'):
-            return ""
-        
-        return choice.message.content or ""
-    
+
+        text_segments: List[str] = []
+
+        for item in response.output:
+            if isinstance(item, ResponseOutputMessage):
+                for part in item.content:
+                    if isinstance(part, ResponseOutputText):
+                        text_segments.append(part.text)
+
+        return "".join(text_segments)
+
     @staticmethod
     def has_tool_calls(response) -> bool:
         """
-        Check if response contains tool calls
-
-        Args:
-            response: OpenAI API response object
-
-        Returns:
-            True if tool calls are present in the response
+        Check if response contains tool calls.
         """
-        if not hasattr(response, 'choices') or not response.choices:
+        if not isinstance(response, Response) or not response.output:
             return False
 
-        choice = response.choices[0]
-        if not hasattr(choice, 'message'):
-            return False
+        return any(isinstance(item, ResponseFunctionToolCall) for item in response.output)
 
-        return (
-            hasattr(choice.message, 'tool_calls') and
-            choice.message.tool_calls and
-            len(choice.message.tool_calls) > 0
-        )
-    
     @staticmethod
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
         """
-        Extract tool calls from OpenAI response
-        
-        Args:
-            response: OpenAI API response object
-            
-        Returns:
-            List of tool call dictionaries with name, arguments, and id
+        Extract tool calls from OpenAI Responses API result.
         """
-        if not OpenAIResponseProcessor.has_tool_calls(response):
+        if not isinstance(response, Response) or not response.output:
             return []
-        
-        choice = response.choices[0]
-        tool_calls = []
-        
-        for tool_call in choice.message.tool_calls:
+
+        tool_calls: List[Dict[str, Any]] = []
+
+        for item in response.output:
+            if not isinstance(item, ResponseFunctionToolCall):
+                continue
+
             try:
-                # Parse arguments if they're a JSON string
-                arguments = tool_call.function.arguments
+                arguments = item.arguments
                 if isinstance(arguments, str):
                     try:
                         parsed_args = json.loads(arguments)
@@ -92,86 +80,72 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                         parsed_args = arguments
                 else:
                     parsed_args = arguments
-                
-                # OpenAI always provides tool_call.id, but fallback to UUID just in case
+
                 import uuid
-                tool_call_id = tool_call.id if hasattr(tool_call, 'id') and tool_call.id else str(uuid.uuid4())
 
+                tool_call_id = item.call_id or item.id or str(uuid.uuid4())
                 tool_calls.append({
-                    'name': tool_call.function.name,
-                    'arguments': parsed_args,
-                    'id': tool_call_id
+                    "name": item.name,
+                    "arguments": parsed_args,
+                    "id": tool_call_id
                 })
-            except Exception as e:
-                print(f"[WARNING] Failed to parse tool call: {e}")
+            except Exception as exc:
+                print(f"[WARNING] Failed to parse tool call: {exc}")
                 continue
-        
+
         return tool_calls
-    
-    
-    
+
     @staticmethod
-    def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> AssistantMessage:
+    def format_response_for_storage(
+        response,
+        tool_calls: Optional[List[Dict[str, Any]]] = None
+    ) -> AssistantMessage:
         """
-        Format OpenAI response for storage in message history
-
-        Args:
-            response: OpenAI API response object
-            tool_calls: Pre-extracted tool calls (optional). If provided, reuses these instead of re-extracting.
-                       This ensures consistent IDs between extract_tool_calls() and format_response_for_storage().
-
-        Returns:
-            AssistantMessage object ready for storage
+        Format OpenAI Responses API output for storage in message history.
         """
-        if not hasattr(response, 'choices') or not response.choices:
-            return AssistantMessage(
-                role="assistant",
-                content=[{"type": "text", "text": ""}]
-            )
+        if not isinstance(response, Response):
+            return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
 
-        choice = response.choices[0].message
-        content_blocks = []
+        content_blocks: List[Dict[str, Any]] = []
 
-        # Handle text content - preserve original format
+        # Include reasoning summary as thinking content if available
+        if response.output:
+            for item in response.output:
+                if isinstance(item, ResponseReasoningItem):
+                    for summary in item.summary:
+                        summary_text = getattr(summary, "text", "")
+                        if summary_text:
+                            content_blocks.append({
+                                "type": "thinking",
+                                "thinking": summary_text
+                            })
+
         text_content = OpenAIResponseProcessor.extract_text_content(response)
         if text_content:
-            content_blocks.append({
-                "type": "text",
-                "text": text_content
-            })
+            content_blocks.append({"type": "text", "text": text_content})
 
         # Reuse pre-extracted tool calls if provided, otherwise extract now
-        if tool_calls is None and hasattr(choice, 'tool_calls') and choice.tool_calls:
+        if tool_calls is None:
             tool_calls = OpenAIResponseProcessor.extract_tool_calls(response)
 
-        # Create AssistantMessage
         message = AssistantMessage(
             role="assistant",
             content=content_blocks if content_blocks else [{"type": "text", "text": ""}]
         )
 
-        # Add tool calls if present
         if tool_calls:
             message.tool_calls = tool_calls
 
         return message
-    
+
     @staticmethod
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
-        Extract web search sources from OpenAI response
-        
-        Note: OpenAI doesn't have built-in web search like Gemini.
-        This method is a placeholder for MCP-based web search results.
-        
-        Args:
-            response: OpenAI API response object
-            debug: Enable debug output
-            
-        Returns:
-            List of source dictionaries (empty for OpenAI)
+        Extract web search sources from OpenAI response.
+
+        Note: OpenAI doesn't have built-in web search like Gemini. Placeholder for MCP-based sources.
         """
         if debug:
             print("[DEBUG] OpenAI doesn't support built-in web search - using MCP tools instead")
-        
-        return []  # OpenAI requires external tools for web search
+
+        return []

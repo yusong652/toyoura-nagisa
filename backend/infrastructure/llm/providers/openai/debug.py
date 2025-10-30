@@ -8,6 +8,13 @@ including request/response logging and performance monitoring.
 import json
 import pprint
 from typing import Dict, Any, List
+from openai.types.responses import (
+    Response,
+    ResponseFunctionToolCall,
+    ResponseOutputMessage,
+    ResponseReasoningItem,
+)
+from openai.types.responses.response_output_text import ResponseOutputText
 
 
 class OpenAIDebugger:
@@ -109,10 +116,18 @@ class OpenAIDebugger:
             simplified['temperature'] = kwargs['temperature']
         if 'max_tokens' in kwargs:
             simplified['max_tokens'] = kwargs['max_tokens']
+        if 'max_output_tokens' in kwargs:
+            simplified['max_output_tokens'] = kwargs['max_output_tokens']
         if 'top_p' in kwargs:
             simplified['top_p'] = kwargs['top_p']
         
-        # Messages with content truncation
+        # Instructions preview
+        if kwargs.get('instructions'):
+            simplified['instructions_preview'] = OpenAIDebugger._truncate_text(
+                kwargs['instructions'], 160, 'instructions'
+            )
+
+        # Messages with content truncation (legacy chat API)
         if 'messages' in kwargs:
             simplified['messages'] = []
             for i, msg in enumerate(kwargs['messages']):
@@ -174,35 +189,111 @@ class OpenAIDebugger:
                     simplified_msg['tool_call_id'] = msg['tool_call_id']
                 
                 simplified['messages'].append(simplified_msg)
+
+        # Responses API input items
+        if 'input' in kwargs:
+            simplified['input'] = []
+            for item in kwargs['input']:
+                if not isinstance(item, dict):
+                    simplified['input'].append(str(item))
+                    continue
+
+                item_type = item.get('type', 'message')
+                summary = {'type': item_type}
+
+                if item_type == 'message':
+                    summary['role'] = item.get('role')
+                    summary['content'] = OpenAIDebugger._summarize_input_content(
+                        item.get('content'),
+                        is_assistant=item.get('role') == 'assistant'
+                    )
+                elif item_type == 'function_call':
+                    summary['name'] = item.get('name')
+                    summary['call_id'] = item.get('call_id')
+                elif item_type == 'function_call_output':
+                    summary['call_id'] = item.get('call_id')
+                    summary['output_preview'] = OpenAIDebugger._truncate_text(
+                        item.get('output', ''), 120, 'tool output'
+                    )
+                else:
+                    summary['data'] = str(item)[:80] + ("..." if len(str(item)) > 80 else "")
+
+                simplified['input'].append(summary)
         
         # Tools with truncated descriptions
         if 'tools' in kwargs and kwargs['tools']:
             simplified['tools'] = []
             for tool in kwargs['tools']:
-                if isinstance(tool, dict) and 'function' in tool:
-                    func = tool['function']
-                    simplified_tool = {
-                        'type': tool.get('type', 'function'),
-                        'function': {
-                            'name': func.get('name', 'unknown'),
-                            'description': OpenAIDebugger._truncate_text(
-                                func.get('description', ''), 100, 'tool description'
-                            )
+                if isinstance(tool, dict):
+                    if 'function' in tool:
+                        func = tool['function']
+                        simplified_tool = {
+                            'type': tool.get('type', 'function'),
+                            'function': {
+                                'name': func.get('name', 'unknown'),
+                                'description': OpenAIDebugger._truncate_text(
+                                    func.get('description', ''), 100, 'tool description'
+                                )
+                            }
                         }
-                    }
-                    
-                    # Add simplified parameters info
-                    if 'parameters' in func:
-                        params = func['parameters']
+
+                        params = func.get('parameters')
                         if isinstance(params, dict) and 'properties' in params:
                             prop_count = len(params['properties'])
                             simplified_tool['function']['parameters'] = f"[{prop_count} parameters]"
-                        else:
+                        elif params is not None:
                             simplified_tool['function']['parameters'] = str(params)[:50] + "..."
-                    
-                    simplified['tools'].append(simplified_tool)
+
+                        simplified['tools'].append(simplified_tool)
+                    elif 'name' in tool:
+                        params = tool.get('parameters', {})
+                        if isinstance(params, dict) and 'properties' in params:
+                            prop_count = len(params['properties'])
+                            params_preview = f"[{prop_count} parameters]"
+                        elif params:
+                            params_preview = str(params)[:50] + "..."
+                        else:
+                            params_preview = "[]"
+
+                        simplified['tools'].append({
+                            'type': tool.get('type', 'function'),
+                            'name': tool.get('name', 'unknown'),
+                            'description': OpenAIDebugger._truncate_text(
+                                tool.get('description', ''), 100, 'tool description'
+                            ),
+                            'parameters': params_preview
+                        })
         
         return simplified
+    
+    @staticmethod
+    def _summarize_input_content(content: Any, is_assistant: bool = False) -> List[str]:
+        """Summarize Responses API message content items for debugging."""
+        if not content:
+            return []
+
+        summary: List[str] = []
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    part_type = part.get('type')
+                    if part_type == 'input_text':
+                        text = part.get('text', '')
+                        summary.append(OpenAIDebugger._truncate_text(text, 80, 'text'))
+                    elif part_type == 'input_image':
+                        summary.append("image:input_image")
+                    elif part_type == 'input_file':
+                        summary.append("file:input_file")
+                    elif part_type == 'output_text' and is_assistant:
+                        text = part.get('text', '')
+                        summary.append(OpenAIDebugger._truncate_text(text, 80, 'assistant'))
+                    else:
+                        summary.append(f"{part_type}:item")
+                else:
+                    summary.append(str(part))
+        else:
+            summary.append(OpenAIDebugger._truncate_text(str(content), 80, 'text'))
+        return summary
     
     @staticmethod
     def _truncate_text(text: str, max_length: int = 100, field_name: str = "text") -> str:
@@ -236,7 +327,42 @@ class OpenAIDebugger:
         print("\n========== OpenAI API Response ==========")
         print(f"📤 Response type: {type(response).__name__}")
         
-        # Check for choices and process them
+        # Responses API structured output
+        if isinstance(response, Response):
+            output = response.output or []
+            print(f"📦 Output items: {len(output)}")
+            for item in output:
+                item_type = getattr(item, 'type', item.__class__.__name__)
+                print(f"  • {item_type}")
+                if isinstance(item, ResponseOutputMessage):
+                    text_preview = ""
+                    for part in item.content:
+                        if isinstance(part, ResponseOutputText):
+                            text_preview += part.text
+                    if text_preview:
+                        print(f"      💬 {OpenAIDebugger._truncate_text(text_preview, 200, 'response text')}")
+                elif isinstance(item, ResponseFunctionToolCall):
+                    print(f"      ⚙️ Tool call: {item.name}")
+                elif isinstance(item, ResponseReasoningItem):
+                    summary_preview = " ".join(
+                        OpenAIDebugger._truncate_text(getattr(summary, 'text', ''), 120, 'reasoning')
+                        for summary in item.summary
+                        if getattr(summary, 'text', '')
+                    ).strip()
+                    if summary_preview:
+                        print(f"      🧠 Reasoning: {summary_preview}")
+
+            usage = response.usage
+            if usage:
+                print("📊 Token Usage:")
+                print(f"    📝 Input: {getattr(usage, 'input_tokens', 'n/a')}")
+                print(f"    🤖 Output: {getattr(usage, 'output_tokens', 'n/a')}")
+                print(f"    📈 Total: {getattr(usage, 'total_tokens', 'n/a')}")
+
+            print("========== END ==========")
+            return
+
+        # Legacy Chat Completions (fallback)
         if hasattr(response, 'choices') and response.choices:
             print(f"📋 Choices: {len(response.choices)}")
             

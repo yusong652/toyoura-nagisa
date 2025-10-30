@@ -7,6 +7,8 @@ maintaining compatibility with the unified content generation interface.
 """
 
 from typing import Optional, Dict, Any, List
+from openai.types.responses import Response, ResponseOutputMessage
+from openai.types.responses.response_output_text import ResponseOutputText, AnnotationURLCitation
 from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
@@ -16,6 +18,7 @@ from backend.infrastructure.llm.shared.constants import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 )
 from backend.infrastructure.llm.shared.utils.text_processing import parse_title_response
+from .response_processor import OpenAIResponseProcessor
 from .message_formatter import OpenAIMessageFormatter
 from .debug import OpenAIDebugger
 from .constants import *
@@ -60,26 +63,24 @@ class TitleGenerator(BaseTitleGenerator):
                 "Please generate a title for the above conversation"
             )
 
-            # Format messages for OpenAI API
+            # Format messages and convert to Responses API input
             formatted_messages = OpenAIMessageFormatter.format_messages(messages)
+            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
 
-            # Add system prompt
-            api_messages = [{"role": "system", "content": system_prompt}] + formatted_messages
-
-            # Prepare API kwargs for debugging
             api_kwargs = {
                 "model": DEFAULT_TITLE_MODEL,
-                "messages": api_messages,
+                "instructions": system_prompt,
+                "input": input_items,
                 "temperature": TITLE_GENERATION_TEMPERATURE,
-                "max_tokens": 100
+                "max_output_tokens": 100
             }
-            # Use smaller model for title generation
-            response = client.chat.completions.create(**api_kwargs)
 
-            if not response.choices:
+            response: Response = client.responses.create(**api_kwargs)
+
+            if not response.output:
                 return None
-
-            title_response_text = response.choices[0].message.content or ""
+            
+            title_response_text = OpenAIResponseProcessor.extract_text_content(response)
 
             # Parse title using shared utility function
             return parse_title_response(title_response_text, max_length=TITLE_MAX_LENGTH)
@@ -131,38 +132,34 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             # Build messages using inherited method
             messages = ImagePromptGenerator.build_messages_for_generation(context)
             
-            # Format messages using OpenAI formatter
+            # Format messages using OpenAI formatter and convert to Responses input
             formatted_messages = OpenAIMessageFormatter.format_messages(messages)
-            
-            # Add system prompt
-            api_messages = [{"role": "system", "content": context['system_prompt']}] + formatted_messages
-            
-            if debug:
-                OpenAIDebugger.print_debug_request_payload({
-                    'model': DEFAULT_IMAGE_PROMPT_MODEL,
-                    'messages': api_messages
-                })
-            
-            # Use the model from context (which now correctly uses OpenAI's model)
+            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
+
             model_for_text_to_image = context.get('model', llm_openai_config.model)
-            
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model=model_for_text_to_image,
-                messages=api_messages,
-                temperature=context.get('temperature', 1.0),
-                max_tokens=1024
-            )
-            
+
+            api_kwargs = {
+                "model": model_for_text_to_image,
+                "instructions": context['system_prompt'],
+                "input": input_items,
+                "temperature": context.get('temperature', 1.0),
+                "max_output_tokens": 1024
+            }
+
+            if debug:
+                OpenAIDebugger.print_debug_request_payload(api_kwargs)
+
+            response: Response = client.responses.create(**api_kwargs)
+
             # Debug response printing (similar to Gemini)
             if debug:
                 print("[DEBUG] Image prompt generation response:")
                 OpenAIDebugger.log_raw_response(response)
             
-            if not response.choices:
-                return None
+            prompt_text = OpenAIResponseProcessor.extract_text_content(response)
             
-            prompt_text = response.choices[0].message.content or ""
+            if not prompt_text:
+                return None
             
             if debug:
                 print(f"[text_to_image] Raw response: {prompt_text[:200]}...")
@@ -218,25 +215,21 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             # Create user message using base class method
             user_message = BaseWebSearchGenerator.create_search_user_message(query)
             
-            # Format message for OpenAI API
+            # Format message for OpenAI Responses API
             formatted_messages = OpenAIMessageFormatter.format_messages([user_message])
+            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
             
-            # Build API messages with system prompt
-            api_messages = [
-                {"role": "system", "content": DEFAULT_WEB_SEARCH_SYSTEM_PROMPT}
-            ] + formatted_messages
-            
-            # Prepare API kwargs for web search
-            # Note: gpt-4o-search-preview doesn't support temperature parameter
+            # Prepare API kwargs for web search (Responses API)
             api_kwargs = {
                 "model": "gpt-4o-search-preview",  # Specific model for web search
-                "web_search_options": {},  # Enable web search
-                "messages": api_messages,
-                "max_tokens": 2048
+                "instructions": DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
+                "input": input_items,
+                "max_output_tokens": 2048,
+                "tools": [{"type": "web_search"}],
+                "metadata": {"generator": "web_search"}
             }
             
             print(f"[WebSearchGenerator] About to call OpenAI API with model: {api_kwargs['model']}")
-            print(f"[WebSearchGenerator] Web search options: {api_kwargs.get('web_search_options', {})}")
             
             # Debug request
             if debug:
@@ -245,75 +238,61 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             
             # Perform the web search
             print("[WebSearchGenerator] Making API call...")
-            # Check if client is async or sync
-            if hasattr(client, 'chat') and hasattr(client.chat, 'completions'):
-                response = client.chat.completions.create(**api_kwargs)
+            response: Response = client.responses.create(**api_kwargs)
 
-                # Debug response
-                if debug:
-                    print("[DEBUG] Web search response:")
-                    OpenAIDebugger.log_raw_response(response)
-            else:
-                raise ValueError("Invalid OpenAI client - missing chat.completions interface")
+            if debug:
+                print("[DEBUG] Web search response:")
+                OpenAIDebugger.log_raw_response(response)
             
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)
             
-            if response.choices and response.choices[0].message:
-                response_text = response.choices[0].message.content or ""
-                print(f"[WebSearchGenerator] Response text length: {len(response_text)}")
-                
-                # Extract sources from annotations in the response
-                sources = []
-                
-                # Check if the response has annotations with url_citations
-                print(f"[WebSearchGenerator] Checking for annotations...")
-                print(f"[WebSearchGenerator] Has 'annotations' attr: {hasattr(response.choices[0].message, 'annotations')}")
-                
-                if hasattr(response.choices[0].message, 'annotations') and response.choices[0].message.annotations:
-                    print(f"[WebSearchGenerator] Found {len(response.choices[0].message.annotations)} annotations")
-                    for i, annotation in enumerate(response.choices[0].message.annotations):
-                        print(f"[WebSearchGenerator] Annotation {i}: type={getattr(annotation, 'type', 'unknown')}")
-                        if annotation.type == 'url_citation' and hasattr(annotation, 'url_citation'):
-                            citation = annotation.url_citation
-                            sources.append({
-                                'title': citation.title if hasattr(citation, 'title') else '',
-                                'url': citation.url if hasattr(citation, 'url') else '',
-                                'snippet': response_text[citation.start_index:citation.end_index] if hasattr(citation, 'start_index') and hasattr(citation, 'end_index') else ''
-                            })
-                            print(f"[WebSearchGenerator] Added source: {citation.url if hasattr(citation, 'url') else 'no-url'}")
-                    
-                    if debug:
-                        print(f"[WebSearch] Found {len(sources)} URL citations in annotations")
-                else:
-                    print("[WebSearchGenerator] No annotations found in response")
-                
-                # If no sources found, log for debugging
-                if not sources:
-                    print(f"[WebSearchGenerator] No sources found in annotations, using response text only")
-                    if debug:
-                        print("[WebSearch] No sources found in annotations, using response text only")
-                
-                # Build structured result using base class method
-                result = BaseWebSearchGenerator.format_search_result(
-                    query=query,
-                    response_text=response_text,
-                    sources=sources
-                )
-                
-                # Use base class debug method
-                BaseWebSearchGenerator.debug_search_results(
-                    len(sources), len(response_text), debug
-                )
-                
-                return result
-            else:
+            if not response.output:
                 if debug:
                     print("[WebSearch] No response content found")
-                return BaseWebSearchGenerator.format_search_error(
-                    query, "No search results found"
-                )
+                return BaseWebSearchGenerator.format_search_error(query, "No search results found")
+            
+            response_text = ""
+            sources: List[Dict[str, Any]] = []
+            
+            for item in response.output:
+                if not isinstance(item, ResponseOutputMessage):
+                    continue
                 
+                for part in item.content:
+                    if not isinstance(part, ResponseOutputText):
+                        continue
+                    
+                    text_segment = part.text or ""
+                    response_text += text_segment
+                    
+                    for annotation in part.annotations or []:
+                        if isinstance(annotation, AnnotationURLCitation):
+                            snippet = text_segment[
+                                annotation.start_index:annotation.end_index
+                            ]
+                            sources.append({
+                                "title": getattr(annotation, "title", ""),
+                                "url": getattr(annotation, "url", ""),
+                                "snippet": snippet
+                            })
+                            print(f"[WebSearchGenerator] Added source: {annotation.url}")
+            
+            if not sources:
+                print("[WebSearchGenerator] No URL citations returned; using response text only")
+            
+            result = BaseWebSearchGenerator.format_search_result(
+                query=query,
+                response_text=response_text,
+                sources=sources
+            )
+            
+            BaseWebSearchGenerator.debug_search_results(
+                len(sources), len(response_text), debug
+            )
+            
+            return result
+
         except Exception as e:
             error_msg = f"An error occurred during web search: {str(e)}"
             print(f"[WebSearchGenerator] ERROR: {error_msg}")

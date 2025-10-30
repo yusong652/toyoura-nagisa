@@ -95,12 +95,10 @@ class OpenAIToolManager(BaseToolManager):
             # which may not work well with optional parameters in MCP tools
             openai_tool = {
                 "type": "function",
-                "function": {
-                    "name": tool_schema.name,
-                    "description": tool_schema.description,
-                    "parameters": input_schema_dict
-                    # "strict": True  # Temporarily disabled - causes issues with optional params
-                }
+                "name": tool_schema.name,
+                "description": tool_schema.description,
+                "parameters": input_schema_dict,
+                "strict": False
             }
                    
             return openai_tool

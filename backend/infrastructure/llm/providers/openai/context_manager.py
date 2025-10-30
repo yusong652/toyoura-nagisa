@@ -6,10 +6,11 @@ Handles message formatting, tool result integration, and state management.
 """
 
 from typing import Any, Optional, Dict, List
+from openai.types.responses import Response, ResponseFunctionToolCall, ResponseOutputMessage, ResponseReasoningItem
+from openai.types.responses.response_output_text import ResponseOutputText
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 from .message_formatter import OpenAIMessageFormatter
-from .response_processor import OpenAIResponseProcessor
 
 
 class OpenAIContextManager(BaseContextManager):
@@ -44,33 +45,20 @@ class OpenAIContextManager(BaseContextManager):
             formatted_response = formatter_class.format_single_message(response)
 
             self.working_contents.append(formatted_response)
-        else:
-            # Handle original OpenAI API response
-            if not hasattr(response, 'choices') or not response.choices:
+        elif isinstance(response, Response):
+            if not response.output:
                 return
-            
-            choice = response.choices[0].message
-            
-            # Build assistant message
-            assistant_message = {
-                "role": "assistant",
-                "content": choice.content or ""
-            }
-            
-            # Add tool calls if present
-            if hasattr(choice, 'tool_calls') and choice.tool_calls:
-                assistant_message["tool_calls"] = []
-                for tool_call in choice.tool_calls:
-                    assistant_message["tool_calls"].append({
-                        "id": tool_call.id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments
-                        }
-                    })
-            
-            self.working_contents.append(assistant_message)
+
+            # Directly use response.output items as recommended by OpenAI docs
+            # This avoids double conversion (Response -> Chat Completions -> Response API)
+            for item in response.output:
+                # Convert Pydantic models to dict for JSON serialization
+                if hasattr(item, 'model_dump'):
+                    item_dict = item.model_dump(mode='json', exclude_none=True)
+                    self.working_contents.append(item_dict)
+                else:
+                    # Fallback for items that are already dicts
+                    self.working_contents.append(item)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """

@@ -22,16 +22,15 @@ class OpenAIModelSettings:
     
     def to_api_params(self) -> Dict[str, Any]:
         """Convert to OpenAI API parameters"""
+        # Responses API ignores frequency/presence penalties; omit for compatibility.
         params = {
             'model': self.model,
             'temperature': self.temperature,
-            'top_p': self.top_p,
-            'frequency_penalty': self.frequency_penalty,
-            'presence_penalty': self.presence_penalty
+            'top_p': self.top_p
         }
         
         if self.max_tokens is not None:
-            params['max_tokens'] = self.max_tokens
+            params['max_output_tokens'] = self.max_tokens
             
         return params
 
@@ -46,36 +45,36 @@ class OpenAIClientConfig:
     
     def get_api_call_kwargs(
         self,
-        system_prompt: str,
-        messages: List[Dict[str, Any]],
+        *,
+        instructions: Optional[str],
+        input_items: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
-        Build complete kwargs for OpenAI API call
-        
+        Build complete kwargs for OpenAI Responses API call.
+
         Args:
-            system_prompt: System instruction
-            messages: Formatted message history
-            tools: Optional tool schemas
-            
+            instructions: System instructions to provide via Responses API.
+            input_items: Conversation items formatted for Responses API.
+            tools: Optional tool schemas in Responses API format.
+
         Returns:
-            Dict containing all API call parameters
+            Dict containing all API call parameters.
         """
-        # Insert system prompt as first message
-        api_messages = [{"role": "system", "content": system_prompt}] + messages
-        
-        # Build base parameters
-        kwargs = {
-            "messages": api_messages,
+        kwargs: Dict[str, Any] = {
+            "input": input_items,
             "timeout": self.timeout,
-            **self.model_settings.to_api_params()
         }
-        
-        # Add tools if provided
+
+        kwargs.update(self.model_settings.to_api_params())
+
+        if instructions:
+            kwargs["instructions"] = instructions
+
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
-        
+
         return kwargs
 
 
