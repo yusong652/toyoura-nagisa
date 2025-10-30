@@ -18,7 +18,6 @@ from backend.shared.exceptions import UserRejectionInterruption
 if TYPE_CHECKING:
     from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
     from backend.infrastructure.llm.base.content_generators.image_prompt import BaseImagePromptGenerator
-    from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
 
 
 class LLMClientBase(ABC):
@@ -480,41 +479,6 @@ class LLMClientBase(ABC):
             session_id=session_id
         )
 
-    async def perform_web_search(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        [Optional Interface] Perform web search.
-
-        This method uses provider-specific web search generator for implementation.
-        Override _get_web_search_generator() to provide custom generator.
-
-        Args:
-            query: Search query
-            **kwargs: Additional search parameters (max_uses, etc.)
-
-        Returns:
-            Dictionary containing search results with sources and metadata
-
-        Raises:
-            NotImplementedError: If client doesn't support this functionality
-        """
-        generator = self._get_web_search_generator()
-        if not generator:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} does not support web search"
-            )
-
-        # Get debug setting from provider config
-        provider_config = self._get_provider_config()
-        debug = getattr(provider_config, 'debug', False)
-
-        # Call provider-specific generator with unified signature
-        return await generator.perform_web_search(
-            self.client,
-            query,
-            debug=debug,
-            **kwargs
-        )
-
     @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
         """
@@ -545,17 +509,6 @@ class LLMClientBase(ABC):
         Returns:
             Optional[Type[BaseImagePromptGenerator]]: Image prompt generator class for this provider,
                                                       or None if image prompt generation is not supported
-        """
-        pass
-
-    @abstractmethod
-    def _get_web_search_generator(self) -> Optional[Type['BaseWebSearchGenerator']]:
-        """
-        Get provider-specific web search generator class.
-
-        Returns:
-            Optional[Type[BaseWebSearchGenerator]]: Web search generator class for this provider,
-                                                     or None if web search is not supported
         """
         pass
 

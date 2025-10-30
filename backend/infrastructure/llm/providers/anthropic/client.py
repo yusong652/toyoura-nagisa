@@ -68,11 +68,6 @@ class AnthropicClient(LLMClientBase):
         """Get Anthropic-specific image prompt generator class."""
         return ImagePromptGenerator
 
-    def _get_web_search_generator(self):
-        """Get Anthropic-specific web search generator class."""
-        from .content_generators import AnthropicWebSearchGenerator
-        return AnthropicWebSearchGenerator
-
     def _get_context_manager_class(self):
         """Get Anthropic-specific context manager class."""
         return AnthropicContextManager

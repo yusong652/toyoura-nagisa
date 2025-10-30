@@ -16,7 +16,7 @@ from .context_manager import OpenAIContextManager
 from .debug import OpenAIDebugger
 from .response_processor import OpenAIResponseProcessor
 from .tool_manager import OpenAIToolManager
-from .content_generators import TitleGenerator, ImagePromptGenerator, WebSearchGenerator
+from .content_generators import TitleGenerator, ImagePromptGenerator
 
 
 class OpenAIClient(LLMClientBase):
@@ -172,10 +172,6 @@ class OpenAIClient(LLMClientBase):
     def _get_image_prompt_generator(self):
         """Get OpenAI-specific image prompt generator class."""
         return ImagePromptGenerator
-
-    def _get_web_search_generator(self):
-        """Get OpenAI-specific web search generator class."""
-        return WebSearchGenerator
 
     def _get_context_manager_class(self):
         """Get OpenAI-specific context manager class."""
