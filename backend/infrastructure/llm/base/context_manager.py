@@ -13,7 +13,7 @@ Key Features:
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
 
@@ -65,6 +65,9 @@ class BaseContextManager(ABC):
         # PFC task status transition tracking (session-scoped, memory-only)
         self._notified_completions: set = set()  # Task IDs that have been notified as completed/failed
         self._last_task_states: Dict[str, str] = {}  # Last known status for each task_id
+
+        # Streaming message tracking (set during streaming responses)
+        self.streaming_message_id: Optional[str] = None  # Message ID for streaming response updates
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """

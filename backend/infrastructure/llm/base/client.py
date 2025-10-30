@@ -272,7 +272,7 @@ class LLMClientBase(ABC):
 
         # Store message_id in context manager for retrieval by process_content_pipeline
         context_manager = self.get_or_create_context_manager(session_id)
-        context_manager.streaming_message_id = message_id
+        context_manager.streaming_message_id = message_id 
 
         # Use streaming API call with accumulated content updates
         # Collect chunks and send accumulated content blocks via WebSocket

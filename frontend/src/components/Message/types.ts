@@ -1,4 +1,5 @@
 import { Message, MessageStatus, MessageRole } from '../../types/chat'
+import { VideoFormat } from '../VideoPlayer/types'
 
 // 基础消息属性
 export interface BaseMessageProps {
@@ -15,7 +16,7 @@ export interface UserMessageRendererProps extends BaseMessageProps {
 // 机器人消息渲染器属性
 export interface BotMessageRendererProps extends BaseMessageProps {
   onImageClick: (imageUrl: string) => void
-  onVideoClick: (videoUrl: string, format: string) => void
+  onVideoClick: (videoUrl: string, format?: VideoFormat) => void
 }
 
 // 消息文本组件属性
@@ -38,7 +39,7 @@ export interface MessageFilesProps {
   files: any[]
   isLoading: boolean
   onImageClick: (imageUrl: string) => void
-  onVideoClick?: (videoUrl: string, format: string) => void
+  onVideoClick?: (videoUrl: string, format?: VideoFormat) => void
   role: MessageRole
 }
 
@@ -50,7 +51,7 @@ export interface FilePreviewProps {
     data: string
   }
   onImageClick?: (imageUrl: string) => void
-  onVideoClick?: (videoUrl: string, format: string) => void
+  onVideoClick?: (videoUrl: string, format?: VideoFormat) => void
   role: MessageRole
 }
 
@@ -88,7 +89,7 @@ export interface MessageEventHandlers {
   onMessageClick: (e: React.MouseEvent) => void
   onDeleteMessage: (e: React.MouseEvent) => void
   onImageClick: (imageUrl: string) => void
-  onVideoClick: (videoUrl: string, format: string) => void
+  onVideoClick: (videoUrl: string, format?: VideoFormat) => void
 }
 
 // 消息状态 Hook 返回类型

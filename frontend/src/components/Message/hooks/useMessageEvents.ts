@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Message } from '../../../types/chat'
 import { useChat } from '../../../contexts/chat/ChatContext'
 import { useErrorDisplay } from '../../../hooks/useErrorDisplay'
+import { VideoFormat } from '../../VideoPlayer/types'
 import { MessageEventHandlers } from '../types'
 
 /**
@@ -17,15 +18,15 @@ import { MessageEventHandlers } from '../types'
  *     setCurrentImageUrl: Function to set current image URL for viewer
  *     setViewerOpen: Function to control image viewer visibility
  *     setCurrentVideoUrl: Function to set current video URL for player
- *     setCurrentVideoFormat: Function to set video format
+ *     setCurrentVideoFormat: Function to set video format (VideoFormat type)
  *     setShowVideoPlayer: Function to control video player visibility
- * 
+ *
  * Returns:
  *     MessageEventHandlers: Object containing standardized event handlers:
  *         - onMessageClick: (e: React.MouseEvent) => void
  *         - onDeleteMessage: (e: React.MouseEvent) => void
  *         - onImageClick: (imageUrl: string) => void
- *         - onVideoClick: (videoUrl: string, format: string) => void
+ *         - onVideoClick: (videoUrl: string, format?: VideoFormat) => void
  */
 export const useMessageEvents = (
   message: Message,
@@ -34,7 +35,7 @@ export const useMessageEvents = (
   setCurrentImageUrl: React.Dispatch<React.SetStateAction<string>>,
   setViewerOpen: React.Dispatch<React.SetStateAction<boolean>>,
   setCurrentVideoUrl: React.Dispatch<React.SetStateAction<string>>,
-  setCurrentVideoFormat: React.Dispatch<React.SetStateAction<string>>,
+  setCurrentVideoFormat: React.Dispatch<React.SetStateAction<VideoFormat>>,
   setShowVideoPlayer: React.Dispatch<React.SetStateAction<boolean>>
 ): MessageEventHandlers => {
   const { deleteMessage } = useChat()
@@ -67,7 +68,7 @@ export const useMessageEvents = (
     setViewerOpen(true)
   }, [setCurrentImageUrl, setViewerOpen])
   
-  const handleVideoClick = useCallback((videoUrl: string, format: string = 'mp4') => {
+  const handleVideoClick = useCallback((videoUrl: string, format: VideoFormat = 'mp4') => {
     setCurrentVideoUrl(videoUrl)
     setCurrentVideoFormat(format)
     setShowVideoPlayer(true)

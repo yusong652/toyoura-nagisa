@@ -5,6 +5,7 @@ import { useImageNavigation } from '../../hooks/useImageNavigation'
 import { useErrorDisplay } from '../../hooks/useErrorDisplay'
 import ImageViewer from '../ImageViewer'
 import VideoPlayer from '../VideoPlayer'
+import { VideoFormat } from '../VideoPlayer/types'
 import UnifiedErrorDisplay from '../UnifiedErrorDisplay'
 
 // New architecture components
@@ -63,7 +64,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('')
   const [showVideoPlayer, setShowVideoPlayer] = useState(false)
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('')
-  const [currentVideoFormat, setCurrentVideoFormat] = useState<string>('mp4')
+  const [currentVideoFormat, setCurrentVideoFormat] = useState<VideoFormat>('mp4')
   
   // Hooks for state and events
   const { isSelected } = useMessageState(message, selectedMessageId)
@@ -90,8 +91,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
     hideAvatarTooltip()
   }
   
-  // Determine effective role for display
-  let displayRole = role
+  // Determine effective role for display (CSS class name)
+  let displayRole: string = role
   if (isToolResultMessage) {
     displayRole = 'tool-result'
   } else if (hasToolContent) {
