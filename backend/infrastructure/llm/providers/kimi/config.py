@@ -104,43 +104,49 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
     # Check if there's a kimi_config method, otherwise use defaults
     try:
         kimi_config = llm_settings.get_kimi_config()
-        model = kimi_config.model
+        # Model will be determined based on use_openrouter later
         temperature = kimi_config.temperature
         max_tokens = kimi_config.max_tokens
         top_p = kimi_config.top_p if kimi_config.top_p is not None else 1.0
         api_key = kimi_config.moonshot_api_key
     except (AttributeError, KeyError):
         # Fallback to defaults if kimi config not available
-        model = "moonshot-v1-32k"
         temperature = 0.7
         max_tokens = None
         top_p = 1.0
         api_key = None
 
-    # Get OpenRouter settings
+    # Get OpenRouter settings and determine model
     if kimi_config is not None:
         try:
             use_openrouter = kimi_config.use_openrouter
             if use_openrouter:
+                # Use OpenRouter configuration
                 base_url = kimi_config.openrouter_base_url
                 openrouter_headers = {
                     "HTTP-Referer": kimi_config.openrouter_http_referer,
                     "X-Title": kimi_config.openrouter_title,
                 }
-                # Use OpenRouter API key when using OpenRouter
+                # Use OpenRouter model and API key
+                model = kimi_config.openrouter_model
                 api_key = kimi_config.openrouter_api_key or api_key
             else:
+                # Use direct Moonshot API configuration
                 base_url = "https://api.moonshot.ai/v1"
                 openrouter_headers = None
+                model = kimi_config.model
         except AttributeError:
+            # Fallback if OpenRouter config is incomplete
             use_openrouter = False
             base_url = "https://api.moonshot.ai/v1"
             openrouter_headers = None
+            model = getattr(kimi_config, 'model', "kimi-k2-0905-preview")
     else:
         # Fallback when kimi_config is not available
         use_openrouter = False
         base_url = "https://api.moonshot.ai/v1"
         openrouter_headers = None
+        model = "kimi-k2-0905-preview"
 
     # Build model settings
     model_settings_dict = {
