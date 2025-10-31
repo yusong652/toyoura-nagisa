@@ -189,12 +189,35 @@ class KimiResponseProcessor(BaseResponseProcessor):
         """
         Extract web search sources from Kimi response.
 
-        Note: Kimi doesn't have built-in web search like Gemini. Uses MCP-based sources.
+        Kimi supports web search through the $web_search builtin_function tool.
+        Search results are integrated directly into the response text.
         """
-        if debug:
-            print("[DEBUG] Kimi doesn't support built-in web search - using MCP tools instead")
+        sources = []
 
-        return []
+        if not isinstance(response, ChatCompletion):
+            return sources
+
+        if not response.choices:
+            return sources
+
+        # Check if web search tool was used
+        message = response.choices[0].message
+        if message.tool_calls:
+            for tool_call in message.tool_calls:
+                if hasattr(tool_call, 'function') and tool_call.function.name == '$web_search':
+                    # Web search was performed
+                    # Kimi integrates results into text, so we mark it
+                    sources.append({
+                        "title": "Kimi Web Search",
+                        "url": "",
+                        "snippet": "Search results integrated into response",
+                        "type": "web_search"
+                    })
+
+        if debug and sources:
+            print(f"[DEBUG] Extracted {len(sources)} web search sources from Kimi response")
+
+        return sources
 
 
 __all__ = ['KimiResponseProcessor']

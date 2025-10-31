@@ -13,10 +13,10 @@ class WebSearchToolFactory:
     def get_web_search_generator(llm_type: str):
         """
         Get the appropriate web search generator based on LLM type.
-        
+
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', or 'openai')
-            
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
+
         Returns:
             WebSearchGenerator class for the specified LLM type
         """
@@ -28,6 +28,9 @@ class WebSearchToolFactory:
             return WebSearchGenerator
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import WebSearchGenerator
+            return WebSearchGenerator
+        elif llm_type.lower() == 'kimi':
+            from backend.infrastructure.llm.providers.kimi.content_generators import KimiWebSearchGenerator as WebSearchGenerator
             return WebSearchGenerator
         else:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
@@ -59,7 +62,7 @@ class WebSearchToolFactory:
             
             # Get LLM-specific configuration
             llm_settings = get_llm_settings()
-            
+
             # Use configured max_uses if not provided
             if max_uses is None:
                 if llm_type.lower() == 'gemini':
@@ -71,6 +74,9 @@ class WebSearchToolFactory:
                 elif llm_type.lower() == 'openai':
                     # OpenAI doesn't use max_uses but we keep it for compatibility
                     max_uses = 5
+                elif llm_type.lower() == 'kimi':
+                    # Kimi uses built-in $web_search tool, max_uses not applicable
+                    max_uses = 1
                 else:
                     max_uses = 5
             
@@ -118,6 +124,18 @@ class WebSearchToolFactory:
                 if asyncio.iscoroutine(result):
                     return await result
                 return result
+            elif llm_type.lower() == 'kimi':
+                # Kimi web search is async (uses asyncio.to_thread internally)
+                result = WebSearchGenerator.perform_web_search(
+                    client=cast(Any, client),  # Type cast for Kimi client
+                    query=query,
+                    debug=debug,
+                    max_uses=max_uses  # Accepted for compatibility
+                )
+                # Handle async result
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
             else:
                 return {
                     "error": f"Unsupported LLM type: {llm_type}",
@@ -135,17 +153,20 @@ class WebSearchToolFactory:
     def detect_llm_type(llm_client) -> str:
         """
         Auto-detect LLM type from client instance.
-        
+
         Args:
             llm_client: The LLM client instance
-            
+
         Returns:
-            LLM type string ('gemini', 'anthropic', or 'openai')
+            LLM type string ('gemini', 'anthropic', 'openai', or 'kimi')
         """
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
-        
-        if 'gemini' in client_type or 'gemini' in client_module:
+
+        # Check Kimi FIRST before OpenAI (since Kimi uses OpenAI-compatible API)
+        if 'kimi' in client_type or 'kimi' in client_module:
+            return 'kimi'
+        elif 'gemini' in client_type or 'gemini' in client_module:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
             return 'anthropic'
