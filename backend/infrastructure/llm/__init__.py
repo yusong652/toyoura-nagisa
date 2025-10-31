@@ -14,6 +14,7 @@ from backend.domain.models.response_models import LLMResponse
 from backend.infrastructure.llm.providers.gemini import GeminiClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
+from backend.infrastructure.llm.providers.kimi import KimiClient
 
 try:
     from backend.infrastructure.llm.providers.local import LocalLLMClient
@@ -28,16 +29,17 @@ __all__ = [
     "LLMFactory",
     "get_default_factory",
     "initialize_factory",
-    
+
     # Base classes and models
     "LLMClientBase",
     "LLMResponse",
     "LLMResponseItem",
     "ErrorResponse",
-    
+
     # Specific client implementations
     "GeminiClient",
     "AnthropicClient",
     "OpenAIClient",
+    "KimiClient",
     "LocalLLMClient",
 ] 

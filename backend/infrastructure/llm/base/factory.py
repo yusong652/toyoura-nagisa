@@ -38,12 +38,14 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.gemini import GeminiClient
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
+        from backend.infrastructure.llm.providers.kimi import KimiClient
         from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
-        
+
         self.register_client("gemini", GeminiClient)
         self.register_client("anthropic", AnthropicClient)
         self.register_client("gpt", OpenAIClient)
         self.register_client("openai", OpenAIClient)  # Alias for GPT
+        self.register_client("kimi", KimiClient)
         self.register_client("local_llm", LocalLLMClient)
     
     def register_client(self, name: str, client_class: Type[LLMClientBase]) -> None:
@@ -117,6 +119,7 @@ class LLMFactory:
                 f"   - gemini: Cloud-based Gemini API with tool calling\n"
                 f"   - anthropic: Anthropic Claude with function calling\n"
                 f"   - gpt/openai: OpenAI GPT with function calling\n"
+                f"   - kimi: Kimi/Moonshot \n"
                 f"   - local_llm: Local LLM inference server (includes Ollama)\n"
                 f"💡 Solution: Configure your LLM to use one of the supported clients."
             )
@@ -222,6 +225,18 @@ class LLMFactory:
                 "max_tokens": openai_config.max_tokens,
                 "debug": llm_settings.debug,
             })
+        elif name == "kimi":
+            kimi_config = llm_settings.get_kimi_config()
+            if not kimi_config.moonshot_api_key:
+                raise ValueError("Moonshot API key (MOONSHOT_API_KEY) 未配置")
+            client_config["api_key"] = kimi_config.moonshot_api_key
+            client_config["extra_config"].update({
+                "model": kimi_config.model,
+                "temperature": kimi_config.temperature,
+                "top_p": kimi_config.top_p,
+                "max_tokens": kimi_config.max_tokens,
+                "debug": llm_settings.debug,
+            })
         elif name == "local_llm":
             local_llm_config = llm_settings.get_local_llm_config()
             client_config.update({
@@ -235,7 +250,7 @@ class LLMFactory:
                 "top_p": local_llm_config.top_p,
                 "max_tokens": local_llm_config.max_tokens,
             })
-        
+
         return client_config
     
     def _generate_cache_key(self, name: str, config: Dict[str, Any]) -> str:
