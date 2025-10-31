@@ -15,11 +15,11 @@ from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 
-# Import Kimi-specific implementations (reuse OpenAI components where applicable)
+# Import Kimi-specific implementations (aliases for OpenAI components)
 from .config import get_kimi_client_config
 from .message_formatter import KimiMessageFormatter
-from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
-from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
+from .tool_manager import KimiToolManager
+from .context_manager import KimiContextManager
 
 
 class KimiClient(LLMClientBase):
@@ -92,8 +92,8 @@ class KimiClient(LLMClientBase):
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
 
-        # Initialize unified tool manager (reuse OpenAI's implementation)
-        self.tool_manager = OpenAIToolManager()
+        # Initialize unified tool manager (uses OpenAI-compatible format)
+        self.tool_manager = KimiToolManager()
 
     # ========== CORE API METHODS ==========
 
@@ -317,8 +317,8 @@ class KimiClient(LLMClientBase):
             session_id: Unique session identifier
 
         Returns:
-            OpenAIContextManager instance for this session
+            KimiContextManager instance for this session
         """
         if session_id not in self._session_context_managers:
-            self._session_context_managers[session_id] = OpenAIContextManager()
+            self._session_context_managers[session_id] = KimiContextManager()
         return self._session_context_managers[session_id]
