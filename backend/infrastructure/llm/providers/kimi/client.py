@@ -17,7 +17,7 @@ from backend.domain.models.streaming import StreamingChunk
 
 # Import Kimi-specific implementations (reuse OpenAI components where applicable)
 from .config import get_kimi_client_config
-from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
+from .message_formatter import KimiMessageFormatter
 from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
 from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
 

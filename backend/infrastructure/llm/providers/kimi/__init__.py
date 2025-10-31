@@ -17,10 +17,12 @@ from .config import (
     KimiModelSettings,
     get_kimi_client_config
 )
+from .message_formatter import KimiMessageFormatter
 
 __all__ = [
     'KimiClient',
     'KimiClientConfig',
     'KimiModelSettings',
     'get_kimi_client_config',
+    'KimiMessageFormatter',
 ]
