@@ -7,6 +7,7 @@ maintaining compatibility with the unified content generation interface.
 """
 
 from typing import Optional, Dict, Any, List
+import asyncio
 from openai.types.responses import Response, ResponseOutputMessage
 from openai.types.responses.response_output_text import ResponseOutputText, AnnotationURLCitation
 from backend.domain.models.messages import BaseMessage, UserMessage
@@ -184,7 +185,7 @@ class WebSearchGenerator(BaseWebSearchGenerator):
     """
 
     @staticmethod
-    def perform_web_search(
+    async def perform_web_search(
         client,  # OpenAI client instance
         query: str,
         debug: bool = False,
@@ -237,8 +238,12 @@ class WebSearchGenerator(BaseWebSearchGenerator):
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
             
             # Perform the web search
+            # Use asyncio.to_thread to avoid blocking the event loop
             print("[WebSearchGenerator] Making API call...")
-            response: Response = client.responses.create(**api_kwargs)
+            response: Response = await asyncio.to_thread(
+                client.responses.create,
+                **api_kwargs
+            )
 
             if debug:
                 print("[DEBUG] Web search response:")

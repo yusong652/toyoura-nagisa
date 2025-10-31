@@ -113,14 +113,14 @@ class WebSearchToolFactory:
                     return await result
                 return result
             elif llm_type.lower() == 'openai':
-                # OpenAI web search is sync
+                # OpenAI web search is async (uses asyncio.to_thread internally)
                 result = WebSearchGenerator.perform_web_search(
                     client=cast(Any, client),  # Type cast for OpenAI client
                     query=query,
                     debug=debug,
                     max_uses=max_uses  # Accepted for compatibility but not used
                 )
-                # Ensure we return Dict[str, Any] for sync methods
+                # Handle async result
                 if asyncio.iscoroutine(result):
                     return await result
                 return result
