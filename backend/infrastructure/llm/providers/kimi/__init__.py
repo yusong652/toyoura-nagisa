@@ -24,6 +24,8 @@ from .config import (
 from .message_formatter import KimiMessageFormatter
 from .context_manager import KimiContextManager
 from .tool_manager import KimiToolManager
+from .response_processor import KimiResponseProcessor
+from .debug import KimiDebugger
 
 __all__ = [
     'KimiClient',
@@ -33,4 +35,6 @@ __all__ = [
     'KimiMessageFormatter',
     'KimiContextManager',
     'KimiToolManager',
+    'KimiResponseProcessor',
+    'KimiDebugger',
 ]
