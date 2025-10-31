@@ -22,7 +22,7 @@ class ContentGeneratorFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', or 'openai')
+            LLM type string ('gemini', 'anthropic', 'openai', or 'kimi')
 
         Raises:
             ValueError: If LLM type cannot be detected
@@ -30,7 +30,10 @@ class ContentGeneratorFactory:
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        if 'gemini' in client_type or 'gemini' in client_module:
+        # Check Kimi FIRST before OpenAI (since Kimi uses OpenAI-compatible API)
+        if 'kimi' in client_type or 'kimi' in client_module:
+            return 'kimi'
+        elif 'gemini' in client_type or 'gemini' in client_module:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
             return 'anthropic'
@@ -56,7 +59,7 @@ class ContentGeneratorFactory:
         Get the appropriate title generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', or 'openai')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
 
         Returns:
             TitleGenerator class for the specified LLM type
@@ -73,6 +76,10 @@ class ContentGeneratorFactory:
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import TitleGenerator
             return TitleGenerator
+        elif llm_type.lower() == 'kimi':
+            # Kimi has its own TitleGenerator using Chat Completions API
+            from backend.infrastructure.llm.providers.kimi.content_generators import TitleGenerator
+            return TitleGenerator
         else:
             raise ValueError(f"Unsupported LLM type for title generation: {llm_type}")
 
@@ -82,7 +89,7 @@ class ContentGeneratorFactory:
         Get the appropriate image prompt generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', or 'openai')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
 
         Returns:
             ImagePromptGenerator class for the specified LLM type
@@ -98,6 +105,10 @@ class ContentGeneratorFactory:
             return ImagePromptGenerator
         elif llm_type.lower() == 'openai':
             from backend.infrastructure.llm.providers.openai.content_generators import ImagePromptGenerator
+            return ImagePromptGenerator
+        elif llm_type.lower() == 'kimi':
+            # Kimi has its own ImagePromptGenerator using Chat Completions API
+            from backend.infrastructure.llm.providers.kimi.content_generators import ImagePromptGenerator
             return ImagePromptGenerator
         else:
             raise ValueError(f"Unsupported LLM type for image prompt generation: {llm_type}")

@@ -34,6 +34,9 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
         return OpenAIMessageFormatter
+    elif provider_name == "kimi":
+        from backend.infrastructure.llm.providers.kimi.message_formatter import KimiMessageFormatter
+        return KimiMessageFormatter
     else:
         raise ValueError(f"Unsupported provider: {provider_name}")
 
@@ -60,6 +63,9 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.context_manager import OpenAIContextManager
         return OpenAIContextManager
+    elif provider_name == "kimi":
+        from backend.infrastructure.llm.providers.kimi.context_manager import KimiContextManager
+        return KimiContextManager
     else:
         raise ValueError(f"Unsupported provider: {provider_name}")
 
@@ -86,12 +92,15 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "openai":
         from backend.infrastructure.llm.providers.openai.tool_manager import OpenAIToolManager
         return OpenAIToolManager
+    elif provider_name == "kimi":
+        from backend.infrastructure.llm.providers.kimi.tool_manager import KimiToolManager
+        return KimiToolManager
     else:
         raise ValueError(f"Unsupported provider: {provider_name}")
 
 
 # Provider registry for future extensibility
-SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "local"]
+SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "kimi", "local"]
 
 
 def is_provider_supported(provider_name: str) -> bool:

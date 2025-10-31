@@ -9,19 +9,21 @@ import json
 import time
 from typing import List, Optional, Dict, Any, AsyncGenerator
 from openai import OpenAI, AsyncOpenAI
-from openai.types.responses import Response, ResponseFunctionToolCall
-from openai.types.responses.response_completed_event import ResponseCompletedEvent
-from openai.types.responses.response_function_call_arguments_delta_event import ResponseFunctionCallArgumentsDeltaEvent
-from openai.types.responses.response_function_call_arguments_done_event import ResponseFunctionCallArgumentsDoneEvent
-from openai.types.responses.response_output_item_added_event import ResponseOutputItemAddedEvent
-from openai.types.responses.response_reasoning_delta_event import ResponseReasoningDeltaEvent
-from openai.types.responses.response_reasoning_summary_delta_event import ResponseReasoningSummaryDeltaEvent
-from openai.types.responses.response_reasoning_summary_part_added_event import ResponseReasoningSummaryPartAddedEvent
-from openai.types.responses.response_reasoning_summary_text_delta_event import ResponseReasoningSummaryTextDeltaEvent
-from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
-from openai.types.responses.response_output_message import ResponseOutputMessage
-from openai.types.responses.response_output_text import ResponseOutputText
-from openai.types.responses.response_reasoning_item import ResponseReasoningItem
+from openai.types.responses import (
+    Response,
+    ResponseFunctionToolCall,
+    ResponseCompletedEvent,
+    ResponseFunctionCallArgumentsDeltaEvent,
+    ResponseFunctionCallArgumentsDoneEvent,
+    ResponseOutputItemAddedEvent,
+    ResponseReasoningTextDeltaEvent,
+    ResponseReasoningSummaryPartAddedEvent,
+    ResponseReasoningSummaryTextDeltaEvent,
+    ResponseTextDeltaEvent,
+    ResponseOutputMessage,
+    ResponseOutputText,
+    ResponseReasoningItem,
+)
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
@@ -278,7 +280,7 @@ class OpenAIClient(LLMClientBase):
                                     "summary_index": event.summary_index
                                 }
                             )
-                    elif isinstance(event, ResponseReasoningSummaryDeltaEvent):
+                    elif isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
                         delta = event.delta
                         summary_text = ""
                         if isinstance(delta, dict):
@@ -305,7 +307,7 @@ class OpenAIClient(LLMClientBase):
                                     "summary_index": event.summary_index
                                 }
                             )
-                    elif isinstance(event, ResponseReasoningDeltaEvent):
+                    elif isinstance(event, ResponseReasoningTextDeltaEvent):
                         if event.delta:
                             yield StreamingChunk(
                                 chunk_type="thinking",
