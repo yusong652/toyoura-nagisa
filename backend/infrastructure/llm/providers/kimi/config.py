@@ -98,6 +98,9 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
     # Get base settings from global config
     llm_settings = get_llm_settings()
 
+    # Initialize kimi_config to avoid unbound variable issues
+    kimi_config = None
+
     # Check if there's a kimi_config method, otherwise use defaults
     try:
         kimi_config = llm_settings.get_kimi_config()
@@ -115,22 +118,28 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
         api_key = None
 
     # Get OpenRouter settings
-    try:
-        use_openrouter = kimi_config.use_openrouter
-        if use_openrouter:
-            base_url = kimi_config.openrouter_base_url
-            openrouter_headers = {
-                "HTTP-Referer": kimi_config.openrouter_http_referer,
-                "X-Title": kimi_config.openrouter_title,
-            }
-            # Use OpenRouter API key when using OpenRouter
-            api_key = kimi_config.openrouter_api_key or api_key
-        else:
-            base_url = "https://api.moonshot.cn/v1"
+    if kimi_config is not None:
+        try:
+            use_openrouter = kimi_config.use_openrouter
+            if use_openrouter:
+                base_url = kimi_config.openrouter_base_url
+                openrouter_headers = {
+                    "HTTP-Referer": kimi_config.openrouter_http_referer,
+                    "X-Title": kimi_config.openrouter_title,
+                }
+                # Use OpenRouter API key when using OpenRouter
+                api_key = kimi_config.openrouter_api_key or api_key
+            else:
+                base_url = "https://api.moonshot.ai/v1"
+                openrouter_headers = None
+        except AttributeError:
+            use_openrouter = False
+            base_url = "https://api.moonshot.ai/v1"
             openrouter_headers = None
-    except AttributeError:
+    else:
+        # Fallback when kimi_config is not available
         use_openrouter = False
-        base_url = "https://api.moonshot.cn/v1"
+        base_url = "https://api.moonshot.ai/v1"
         openrouter_headers = None
 
     # Build model settings
