@@ -163,9 +163,12 @@ class WebSearchToolFactory:
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        # Check Kimi FIRST before OpenAI (since Kimi uses OpenAI-compatible API)
+        # Check specific providers FIRST (Kimi, OpenRouter) before OpenAI
+        # (since they use OpenAI-compatible API)
         if 'kimi' in client_type or 'kimi' in client_module:
             return 'kimi'
+        elif 'openrouter' in client_type or 'openrouter' in client_module:
+            return 'openrouter'
         elif 'gemini' in client_type or 'gemini' in client_module:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:

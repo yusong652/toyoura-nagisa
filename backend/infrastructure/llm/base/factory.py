@@ -39,6 +39,7 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         from backend.infrastructure.llm.providers.kimi import KimiClient
+        from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
         from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
 
         self.register_client("gemini", GeminiClient)
@@ -46,6 +47,7 @@ class LLMFactory:
         self.register_client("gpt", OpenAIClient)
         self.register_client("openai", OpenAIClient)  # Alias for GPT
         self.register_client("kimi", KimiClient)
+        self.register_client("openrouter", OpenRouterClient)
         self.register_client("local_llm", LocalLLMClient)
     
     def register_client(self, name: str, client_class: Type[LLMClientBase]) -> None:
@@ -250,6 +252,16 @@ class LLMFactory:
                 "temperature": kimi_config.temperature,
                 "top_p": kimi_config.top_p,
                 "max_tokens": kimi_config.max_tokens,
+                "debug": llm_settings.debug,
+            })
+        elif name == "openrouter":
+            openrouter_config = llm_settings.get_openrouter_config()
+            client_config["api_key"] = openrouter_config.openrouter_api_key
+            client_config["extra_config"].update({
+                "model": openrouter_config.model,
+                "temperature": openrouter_config.temperature,
+                "top_p": openrouter_config.top_p,
+                "max_tokens": openrouter_config.max_tokens,
                 "debug": llm_settings.debug,
             })
         elif name == "local_llm":
