@@ -59,11 +59,57 @@ class AnthropicConfig(BaseSettings):
         env_prefix='',
         extra='ignore'
     )
-    
+
+
+class KimiConfig(BaseSettings):
+    """Kimi (Moonshot) Configuration"""
+
+    # API Keys - 支持直连或 OpenRouter
+    moonshot_api_key: Optional[str] = Field(default=None, description="Moonshot 官方 API 密钥")
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API 密钥")
+
+    # 使用哪个服务
+    use_openrouter: bool = Field(default=False, description="是否使用 OpenRouter 中转")
+
+    # OpenRouter 配置
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API base URL"
+    )
+    openrouter_http_referer: str = Field(
+        default="https://github.com/yusong652/aiNagisa",
+        description="OpenRouter HTTP Referer header"
+    )
+    openrouter_title: str = Field(
+        default="aiNagisa Voice Assistant",
+        description="OpenRouter X-Title header"
+    )
+    openrouter_model: str = Field(
+        default="moonshotai/kimi-k2-0905",
+        description="OpenRouter 模型名称"
+    )
+
+    # 有合理默认值的配置
+    model: str = Field(default="kimi-k2-0905-preview", description="模型名称 (直连 Moonshot API)")
+    # Direct API models: kimi-k2-0905-preview, moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+    # OpenRouter models: moonshotai/kimi-k2-0905
+    # Kimi excels at long-context understanding (up to 200K tokens)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="采样温度")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
+    max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
+
+    model_config = SettingsConfigDict(
+        env_file='backend/.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
+
 
 class LLMSettings(BaseSettings):
     """LLM Configuration"""
-    type: Literal["gpt", "gemini", "anthropic"] = Field(default="gemini", description="LLM type (gpt, gemini, anthropic)")
+    type: Literal["gpt", "gemini", "anthropic", "kimi"] = Field(default="gemini", description="LLM type (gpt, gemini, anthropic, kimi)")
     debug: bool = Field(default=False, description="Enable debug mode")
     recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context")
     max_tool_iterations: int = Field(default=10, ge=1, le=50, description="Maximum number of tool calling iterations per request")
@@ -78,15 +124,19 @@ class LLMSettings(BaseSettings):
     def get_openai_config(self) -> OpenAIConfig:
         """Retrieve OpenAI configuration"""
         return OpenAIConfig()
-    
+
     def get_gemini_config(self) -> GeminiConfig:
         """Retrieve Gemini configuration"""
         return GeminiConfig()
-    
+
     def get_anthropic_config(self) -> AnthropicConfig:
         """Retrieve Anthropic configuration"""
         return AnthropicConfig()
-    
+
+    def get_kimi_config(self) -> KimiConfig:
+        """Retrieve Kimi configuration"""
+        return KimiConfig()
+
     def get_current_llm_config(self):
         """Retrieve current LLM configuration based on type"""
         if self.type == "gpt":
@@ -95,6 +145,8 @@ class LLMSettings(BaseSettings):
             return self.get_gemini_config()
         elif self.type == "anthropic":
             return self.get_anthropic_config()
+        elif self.type == "kimi":
+            return self.get_kimi_config()
         else:
             raise ValueError(f"Unsupported llm provider: {self.type}")
     
