@@ -178,9 +178,9 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 class WebSearchGenerator(BaseWebSearchGenerator):
     """
     Handles web search using OpenAI's native web search capabilities.
-    
-    Uses the gpt-4o-search-preview model with web_search_options to perform
-    searches and return structured results with sources.
+
+    Uses the gpt-5 model with web_search tool to perform searches
+    and return structured results with sources.
     """
 
     @staticmethod
@@ -221,7 +221,7 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             
             # Prepare API kwargs for web search (Responses API)
             api_kwargs = {
-                "model": "gpt-4o-search-preview",  # Specific model for web search
+                "model": "gpt-5",  # GPT-5 supports web_search tool in Responses API
                 "instructions": DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
                 "input": input_items,
                 "max_output_tokens": 2048,
