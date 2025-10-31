@@ -123,6 +123,8 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
                 "HTTP-Referer": kimi_config.openrouter_http_referer,
                 "X-Title": kimi_config.openrouter_title,
             }
+            # Use OpenRouter API key when using OpenRouter
+            api_key = kimi_config.openrouter_api_key or api_key
         else:
             base_url = "https://api.moonshot.cn/v1"
             openrouter_headers = None
