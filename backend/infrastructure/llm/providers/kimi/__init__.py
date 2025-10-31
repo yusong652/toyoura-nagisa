@@ -11,8 +11,12 @@ Available models:
 - kimi-k2-0905-preview: Latest K2 model
 
 Architecture:
-All Kimi components are lightweight aliases to OpenAI implementations,
-since Kimi uses standard OpenAI Chat Completions API format.
+Kimi uses OpenAI-compatible Chat Completions API (not Responses API).
+Key differences from OpenAI provider:
+- KimiToolManager: Standalone implementation using nested tool schema format
+- KimiResponseProcessor: Handles ChatCompletion objects (not Response objects)
+- KimiContextManager: Manages ChatCompletion responses
+- KimiMessageFormatter: Alias to OpenAI formatter (Chat Completions compatible)
 """
 
 from .client import KimiClient

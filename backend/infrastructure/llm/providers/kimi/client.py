@@ -7,19 +7,23 @@ since Kimi/Moonshot provides full OpenAI compatibility.
 Base URL: https://api.moonshot.cn/v1
 """
 
-from typing import List, Optional, Dict, Any, AsyncGenerator
+import json
+import time
+from typing import List, Optional, Dict, Any, AsyncGenerator, Type
 from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
+from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
 # Import Kimi-specific implementations (aliases for OpenAI components)
 from .config import get_kimi_client_config
 from .message_formatter import KimiMessageFormatter
 from .tool_manager import KimiToolManager
 from .context_manager import KimiContextManager
+from .debug import KimiDebugger
 
 
 class KimiClient(LLMClientBase):
@@ -72,8 +76,16 @@ class KimiClient(LLMClientBase):
 
         self.kimi_config = get_kimi_client_config(**config_overrides)
 
-        print(f"Kimi Client initialized with model: {self.kimi_config.model_settings.model}")
-        print(f"Kimi Base URL: {self.kimi_config.base_url}")
+        # Log initialization
+        print(f"Kimi Client initialized")
+        print(f"  Model: {self.kimi_config.model_settings.model}")
+        print(f"  Base URL: {self.kimi_config.base_url}")
+        print(f"  Using OpenRouter: {self.kimi_config.use_openrouter}")
+
+        # Debug: Print masked API key to verify it's passed correctly
+        if self.api_key:
+            masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***"
+            print(f"  API Key (masked): {masked_key}")
 
         # Initialize both sync and async OpenAI clients with Kimi base URL
         client_kwargs: Dict[str, Any] = {
@@ -81,13 +93,21 @@ class KimiClient(LLMClientBase):
             "base_url": self.kimi_config.base_url
         }
 
+        # Add OpenRouter headers if using OpenRouter
+        if self.kimi_config.use_openrouter and self.kimi_config.openrouter_headers:
+            client_kwargs['default_headers'] = self.kimi_config.openrouter_headers
+            print(f"  OpenRouter headers: {list(self.kimi_config.openrouter_headers.keys())}")
+
         # Allow custom base URL override
         if 'base_url' in self.extra_config:
             client_kwargs['base_url'] = self.extra_config['base_url']
 
-        # Add custom headers if needed
+        # Add custom headers if needed (merge with OpenRouter headers)
         if 'default_headers' in self.extra_config:
-            client_kwargs['default_headers'] = self.extra_config['default_headers']
+            if 'default_headers' in client_kwargs:
+                client_kwargs['default_headers'].update(self.extra_config['default_headers'])
+            else:
+                client_kwargs['default_headers'] = self.extra_config['default_headers']
 
         self.client = OpenAI(**client_kwargs)
         self.async_client = AsyncOpenAI(**client_kwargs)
@@ -156,10 +176,7 @@ class KimiClient(LLMClientBase):
             api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
-            print(f"[DEBUG] Kimi API call:")
-            print(f"[DEBUG] Model: {api_kwargs['model']}")
-            print(f"[DEBUG] Messages count: {len(messages)}")
-            print(f"[DEBUG] Tools count: {len(tools)}")
+            KimiDebugger.print_api_request(api_kwargs, messages, tools)
 
         try:
             response = await self.async_client.chat.completions.create(**api_kwargs)
@@ -234,9 +251,7 @@ class KimiClient(LLMClientBase):
             api_kwargs['top_p'] = kwargs['top_p']
 
         if debug:
-            print(f"[DEBUG] Kimi streaming API call:")
-            print(f"[DEBUG] Model: {api_kwargs['model']}")
-            print(f"[DEBUG] Messages count: {len(messages)}")
+            KimiDebugger.print_api_request(api_kwargs, messages, tools)
 
         try:
             stream = await self.async_client.chat.completions.create(**api_kwargs)
@@ -288,26 +303,29 @@ class KimiClient(LLMClientBase):
                 # Check if tool call is complete
                 if choice.finish_reason == "tool_calls" and current_tool_calls:
                     for tool_call in current_tool_calls.values():
+                        # Parse arguments string to dict
+                        arguments_str = tool_call["function"]["arguments"]
+                        try:
+                            arguments_dict = json.loads(arguments_str) if arguments_str else {}
+                        except json.JSONDecodeError:
+                            arguments_dict = {}
+
                         yield StreamingChunk(
                             chunk_type="function_call",
-                            content="",
+                            content=tool_call["function"]["name"],
                             metadata={
                                 "tool_call_id": tool_call["id"],
-                                "function_name": tool_call["function"]["name"],
-                                "function_args": tool_call["function"]["arguments"]
+                                "args": arguments_dict
                             },
                             function_call={
-                                "id": tool_call["id"],
                                 "name": tool_call["function"]["name"],
-                                "arguments": tool_call["function"]["arguments"]
+                                "args": arguments_dict
                             }
                         )
                     current_tool_calls.clear()
 
-        except Exception as exc:
-            if debug:
-                print(f"[DEBUG] Kimi streaming failed: {exc}")
-            raise
+        except Exception as e:
+            raise e
 
     def get_or_create_context_manager(self, session_id: str):
         """
@@ -320,5 +338,144 @@ class KimiClient(LLMClientBase):
             KimiContextManager instance for this session
         """
         if session_id not in self._session_context_managers:
-            self._session_context_managers[session_id] = KimiContextManager()
+            self._session_context_managers[session_id] = KimiContextManager(session_id=session_id)
         return self._session_context_managers[session_id]
+
+    # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
+
+    def _get_response_processor(self):
+        """Get Kimi-specific response processor instance."""
+        from .response_processor import KimiResponseProcessor
+        return KimiResponseProcessor()
+
+    def _get_context_manager_class(self):
+        """Get Kimi-specific context manager class."""
+        return KimiContextManager
+
+    def _get_provider_config(self):
+        """Get Kimi-specific configuration object."""
+        return self.kimi_config
+
+    async def _prepare_complete_context(
+        self,
+        session_id: str
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Prepare complete context and API configuration for stateless Kimi API call.
+
+        This method consolidates all context preparation logic for Kimi
+        and returns all necessary configuration for thread-safe API calls.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Tuple containing:
+            - context_contents: Messages for Kimi API (without system prompt)
+            - api_config: Dictionary with 'tools' and 'system_prompt' keys
+        """
+        # Get context manager and extract its properties
+        context_manager = self.get_or_create_context_manager(session_id)
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        enable_memory = getattr(context_manager, 'enable_memory', True)
+
+        # Get tool schemas for API
+        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
+
+        # Get tool schemas formatted for system prompt
+        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
+
+        # Build system prompt with tool schemas and memory
+        from backend.shared.utils.prompt.builder import build_system_prompt
+
+        system_prompt = await build_system_prompt(
+            agent_profile=agent_profile,
+            session_id=session_id,
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
+        )
+
+        # Get working contents from context manager
+        working_contents = context_manager.get_working_contents()
+
+        # Return context and config as separate values for thread-safe API call
+        api_config = {
+            'tools': tool_schemas,
+            'system_prompt': system_prompt
+        }
+        return working_contents, api_config
+
+    def _construct_response_from_streaming_chunks(
+        self,
+        chunks: List[StreamingChunk]
+    ) -> ChatCompletion:
+        """
+        Convert collected streaming chunks back into a complete ChatCompletion object.
+
+        Args:
+            chunks: List of streaming chunks
+
+        Returns:
+            ChatCompletion object reconstructed from chunks
+        """
+        # Check if we have a final response stored in metadata
+        for chunk in reversed(chunks):
+            metadata = chunk.metadata or {}
+            final_response = metadata.get("__kimi_final_response")
+            if final_response:
+                return final_response
+
+        # If no final response found, construct from chunks
+        # Collect text content
+        text_content = ""
+        tool_calls = []
+
+        for chunk in chunks:
+            if chunk.chunk_type == "text" and chunk.content:
+                text_content += chunk.content
+            elif chunk.chunk_type == "function_call" and chunk.function_call:
+                # Get tool_call_id from metadata if available
+                tool_call_id = chunk.metadata.get("tool_call_id", "") if chunk.metadata else ""
+
+                # Convert args dict to JSON string for ChatCompletion format
+                args_dict = chunk.function_call.get("args", {})
+                arguments_str = json.dumps(args_dict) if args_dict else ""
+
+                tool_calls.append({
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": chunk.function_call.get("name", ""),
+                        "arguments": arguments_str
+                    }
+                })
+
+        # Construct a mock ChatCompletion object
+        from openai.types.chat import ChatCompletion, ChatCompletionMessage
+        from openai.types.chat.chat_completion import Choice
+        from openai.types.completion_usage import CompletionUsage
+
+        message = ChatCompletionMessage(
+            role="assistant",
+            content=text_content if text_content else None,
+            tool_calls=tool_calls if tool_calls else None
+        )
+
+        choice = Choice(
+            index=0,
+            message=message,
+            finish_reason="stop" if not tool_calls else "tool_calls"
+        )
+
+        return ChatCompletion(
+            id="constructed_from_chunks",
+            model=self.kimi_config.model_settings.model,
+            created=int(time.time()),
+            object="chat.completion",
+            choices=[choice],
+            usage=CompletionUsage(
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0
+            )
+        )

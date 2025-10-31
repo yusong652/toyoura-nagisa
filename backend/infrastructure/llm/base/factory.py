@@ -227,9 +227,24 @@ class LLMFactory:
             })
         elif name == "kimi":
             kimi_config = llm_settings.get_kimi_config()
-            if not kimi_config.moonshot_api_key:
-                raise ValueError("Moonshot API key (MOONSHOT_API_KEY) 未配置")
-            client_config["api_key"] = kimi_config.moonshot_api_key
+
+            # Determine which API key to use
+            use_openrouter = kimi_config.use_openrouter
+            api_key = kimi_config.moonshot_api_key
+
+            # Auto-switch to OpenRouter if official key is missing
+            if not api_key and kimi_config.openrouter_api_key:
+                use_openrouter = True
+
+            if use_openrouter:
+                api_key = kimi_config.openrouter_api_key
+                if not api_key:
+                    raise ValueError("OpenRouter API key (OPENROUTER_API_KEY) 未配置")
+            else:
+                if not api_key:
+                    raise ValueError("Moonshot API key (MOONSHOT_API_KEY) 未配置")
+
+            client_config["api_key"] = api_key
             client_config["extra_config"].update({
                 "model": kimi_config.model,
                 "temperature": kimi_config.temperature,

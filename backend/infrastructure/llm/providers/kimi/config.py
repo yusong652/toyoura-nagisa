@@ -48,6 +48,10 @@ class KimiClientConfig:
     timeout: float = 60.0  # Longer timeout for long-context processing
     max_retries: int = 3
 
+    # OpenRouter support
+    use_openrouter: bool = False
+    openrouter_headers: Optional[Dict[str, str]] = None
+
     def get_api_call_kwargs(
         self,
         *,
@@ -110,6 +114,23 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
         top_p = 1.0
         api_key = None
 
+    # Get OpenRouter settings
+    try:
+        use_openrouter = kimi_config.use_openrouter
+        if use_openrouter:
+            base_url = kimi_config.openrouter_base_url
+            openrouter_headers = {
+                "HTTP-Referer": kimi_config.openrouter_http_referer,
+                "X-Title": kimi_config.openrouter_title,
+            }
+        else:
+            base_url = "https://api.moonshot.cn/v1"
+            openrouter_headers = None
+    except AttributeError:
+        use_openrouter = False
+        base_url = "https://api.moonshot.cn/v1"
+        openrouter_headers = None
+
     # Build model settings
     model_settings_dict = {
         'model': model,
@@ -128,7 +149,9 @@ def get_kimi_client_config(**overrides) -> KimiClientConfig:
     config_dict = {
         'model_settings': model_settings,
         'api_key': overrides.get('api_key', api_key),
-        'base_url': overrides.get('base_url', "https://api.moonshot.cn/v1"),
+        'base_url': overrides.get('base_url', base_url),
+        'use_openrouter': use_openrouter,
+        'openrouter_headers': openrouter_headers,
         'debug': overrides.get('debug', llm_settings.debug),
         'timeout': overrides.get('timeout', 60.0),
         'max_retries': overrides.get('max_retries', 3)
