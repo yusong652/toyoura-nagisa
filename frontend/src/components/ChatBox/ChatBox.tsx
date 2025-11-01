@@ -45,8 +45,8 @@ interface ChatBoxProps {
 }
 
 const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
-  // Get messages from context
-  const { messages } = useChat()
+  // Get messages and thinking state from context
+  const { messages, isLLMThinking } = useChat()
   
   // Custom hooks for separated logic
   const { selectedMessageId, setSelectedMessageId } = useMessageSelection()
@@ -86,6 +86,14 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
             selectedMessageId={selectedMessageId}
             onMessageSelect={setSelectedMessageId}
           />
+
+          {/* Global LLM thinking indicator */}
+          {isLLMThinking && (
+            <div className="llm-thinking-indicator">
+              <div className="thinking-spinner" />
+              <span className="thinking-label">Nagisa is thinking...</span>
+            </div>
+          )}
 
           {/* Scroll anchor for maintaining position */}
           <div className="scroll-anchor" />

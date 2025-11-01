@@ -206,6 +206,60 @@
   margin-bottom: 20px;
 }
 
+/* Global LLM thinking indicator */
+.llm-thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  background-color: rgba(74, 144, 226, 0.08);
+  border-radius: 12px;
+  border-left: 3px solid var(--primary-color, #4a90e2);
+  animation: thinking-fade-in 0.3s ease-in-out;
+  width: fit-content;
+  max-width: 90%;
+}
+
+@keyframes thinking-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thinking-spinner {
+  border: 3px solid rgba(74, 144, 226, 0.2);
+  border-top: 3px solid var(--primary-color, #4a90e2);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin-breath 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.thinking-label {
+  font-size: 14px;
+  color: var(--primary-color, #4a90e2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .llm-thinking-indicator {
+    background-color: rgba(74, 144, 226, 0.12);
+  }
+
+  .thinking-spinner {
+    border-color: rgba(74, 144, 226, 0.3);
+    border-top-color: var(--primary-color, #4a90e2);
+  }
+}
+
 /* 刷新标题按钮样式 */
 .refresh-title-button {
   position: relative;

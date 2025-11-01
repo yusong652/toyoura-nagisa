@@ -29,6 +29,7 @@ interface ChatProviderProps {
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
+  const [isLLMThinking, setIsLLMThinking] = useState(false)  // Global LLM thinking status
   const { queueAndPlayAudio, resetAudioState } = useAudio()
   const { ttsEnabled } = useTtsEnable()
   const { memoryEnabled } = useMemory()
@@ -59,7 +60,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     sessionSwitchSession,
     ttsEnabled,
     currentProfile,
-    memoryEnabled
+    memoryEnabled,
+    setIsLLMThinking  // Pass LLM thinking status setter
   })
 
   // Process audio data - ensure Promise resolves after audio playback completes
@@ -91,7 +93,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   })
 
   // Use streaming update handler for real-time thinking/text content
-  useStreamingUpdateHandler({ setMessages })
+  useStreamingUpdateHandler({ setMessages, setIsLLMThinking })
 
   // Use stream processing hook for SSE metadata events only
   const { processStreamResponse: handleStreamResponse } = useStreamHandler({
@@ -146,6 +148,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     <ChatContext.Provider value={{
       messages,
       isLoading,
+      isLLMThinking,
       sendMessage,
       clearChat,
       deleteMessage,

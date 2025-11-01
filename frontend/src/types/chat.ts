@@ -150,6 +150,7 @@ export interface FileData {
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
+  isLLMThinking: boolean;  // Global LLM thinking status (includes text streaming and tool preparation)
 }
 
 /**

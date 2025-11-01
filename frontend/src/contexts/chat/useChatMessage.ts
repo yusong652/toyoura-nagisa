@@ -24,6 +24,7 @@ export interface UseChatMessageOptions {
   ttsEnabled?: boolean
   currentProfile?: string
   memoryEnabled?: boolean
+  setIsLLMThinking?: (thinking: boolean) => void  // Callback to update global LLM thinking status
 }
 
 export interface UseChatMessageReturn {
@@ -48,7 +49,8 @@ export const useChatMessage = ({
   sessionSwitchSession,
   ttsEnabled = false,
   currentProfile = "general",
-  memoryEnabled = true
+  memoryEnabled = true,
+  setIsLLMThinking
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -202,6 +204,9 @@ export const useChatMessage = ({
 
       // Only create assistant messages
       if (role === 'assistant') {
+        // Set global LLM thinking status (LLM started working)
+        setIsLLMThinking?.(true)
+
         // Create new assistant message with specified ID
         const newBotMessage: Message = {
           id: messageId,
@@ -222,7 +227,7 @@ export const useChatMessage = ({
     return () => {
       window.removeEventListener('messageCreate', handleMessageCreate)
     }
-  }, [])
+  }, [setIsLLMThinking])
 
   // Subscribe to message saved events to refresh messages immediately
   useEffect(() => {

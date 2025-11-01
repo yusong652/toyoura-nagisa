@@ -24,9 +24,10 @@ interface StreamingUpdateDetail {
 
 interface UseStreamingUpdateHandlerProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  setIsLLMThinking?: (thinking: boolean) => void  // Callback to update global LLM thinking status
 }
 
-export const useStreamingUpdateHandler = ({ setMessages }: UseStreamingUpdateHandlerProps) => {
+export const useStreamingUpdateHandler = ({ setMessages, setIsLLMThinking }: UseStreamingUpdateHandlerProps) => {
   useEffect(() => {
     const handleStreamingUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<StreamingUpdateDetail>
@@ -45,6 +46,18 @@ export const useStreamingUpdateHandler = ({ setMessages }: UseStreamingUpdateHan
         }
         return msg
       }))
+
+      // Check if LLM has finished (streaming=false and no tool_use blocks)
+      if (!streaming && content) {
+        const hasToolUse = content.some((block: any) => block.type === 'tool_use')
+        if (!hasToolUse) {
+          // LLM finished completely (no tools to execute)
+          setIsLLMThinking?.(false)
+          console.log('[StreamingUpdate] LLM thinking complete (no tools)')
+        } else {
+          console.log('[StreamingUpdate] LLM text complete, preparing tools...')
+        }
+      }
     }
 
     // Listen for streaming update events from ConnectionContext
@@ -53,7 +66,7 @@ export const useStreamingUpdateHandler = ({ setMessages }: UseStreamingUpdateHan
     return () => {
       window.removeEventListener('streamingUpdate', handleStreamingUpdate)
     }
-  }, [setMessages])
+  }, [setMessages, setIsLLMThinking])
 }
 
 export default useStreamingUpdateHandler
