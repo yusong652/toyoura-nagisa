@@ -783,6 +783,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
+  text-align: left;
 }
 
 .bash-command-text {
@@ -798,6 +799,7 @@
   white-space: pre-wrap;
   word-break: break-all;
   margin-bottom: 6px;
+  text-align: left;
 }
 
 .bash-confirmation-status {
