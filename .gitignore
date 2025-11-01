@@ -73,6 +73,9 @@ backend/chat/local/config.py
 workspace/
 backend/location_data/
 
+# PFC server examples (user-specific test files)
+pfc-server/examples/
+
 # Test coverage
 .coverage
 htmlcov/
