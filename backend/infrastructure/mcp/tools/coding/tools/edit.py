@@ -290,34 +290,20 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
         except Exception as e:
             return error_response(f"Failed to write file: {e}")
 
-        
+
         # ------------------------------------------------------------------
-        # Build Claude Code aligned response
+        # Build response
         # ------------------------------------------------------------------
 
-        # Build user-facing message aligned with Claude Code format
-        # Use absolute path with forward slashes for LLM consistency (matches Claude Code)
+        # Use absolute path with forward slashes for LLM consistency
         abs_path = path_to_llm_format(target_file)
         message = f"The file {abs_path} has been updated."
-
-        # Build Claude Code style llm_content with file preview
-        try:
-            with target_file.open('r', encoding=TEXT_CHARSET_DEFAULT) as f:
-                lines = f.readlines()
-            preview_lines = []
-            for i, line in enumerate(lines[:10], 1):  # Show first 10 lines like Claude
-                preview_lines.append(f"{i:>6}→{line.rstrip()}")
-            preview = "\n".join(preview_lines)
-            llm_content = f"{message} Here's the result of running `cat -n` on a snippet of the edited file:\n{preview}"
-        except Exception:
-            # Fallback to simple message if file preview fails
-            llm_content = message
 
         return success_response(
             message,
             llm_content={
                 "parts": [
-                    {"type": "text", "text": llm_content}
+                    {"type": "text", "text": message}
                 ]
             },
         )
