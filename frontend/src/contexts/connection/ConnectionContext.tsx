@@ -532,6 +532,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     <ConnectionContext.Provider value={{
       connectionStatus,
       connectionError,
+      sessionId: currentSessionIdRef.current,
       wsRef,
       connectToSession,
       disconnect,

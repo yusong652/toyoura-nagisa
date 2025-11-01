@@ -21,7 +21,7 @@ import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
-  const { connectionStatus, connectionError, checkConnection, sendMessage, sessionId } = useConnection()
+  const { connectionStatus, connectionError, checkConnection, sendWebSocketMessage, sessionId } = useConnection()
 
   const { executeSlashCommand, executionQueue } = useSlashCommandExecution()
 
@@ -32,19 +32,22 @@ function AppContent(): React.ReactElement {
         console.log('[App] ESC key pressed - sending interrupt signal')
 
         // Send USER_INTERRUPT message via WebSocket
-        if (sendMessage && sessionId) {
-          sendMessage({
+        if (sendWebSocketMessage && sessionId) {
+          sendWebSocketMessage({
             type: 'USER_INTERRUPT',
             session_id: sessionId,
             timestamp: new Date().toISOString()
           })
+          console.log('[App] USER_INTERRUPT sent to backend')
+        } else {
+          console.warn('[App] Cannot send interrupt: WebSocket or sessionId not available')
         }
       }
     }
 
     window.addEventListener('keydown', handleEscKey)
     return () => window.removeEventListener('keydown', handleEscKey)
-  }, [sendMessage, sessionId])
+  }, [sendWebSocketMessage, sessionId])
 
   return (
     <div className="app-container">

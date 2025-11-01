@@ -276,17 +276,17 @@ class LLMClientBase(ABC):
             if context_manager.user_interrupted:
                 print(f"[INFO] Streaming interrupted by user at iteration {iterations}")
 
-                # Add interrupt marker to text content
-                interrupt_marker = "\n\n[interrupted by user]"
-                if text_buffer:
-                    text_buffer += interrupt_marker
-                else:
-                    # If no text was generated yet, add marker to thinking
-                    if thinking_buffer:
-                        thinking_buffer += interrupt_marker
-                    else:
-                        # Neither text nor thinking, create minimal text content
-                        text_buffer = interrupt_marker
+                # Create interrupt chunk and add to collected_chunks
+                # This ensures the interrupt marker is included in the provider-native response
+                interrupt_chunk = StreamingChunk(
+                    chunk_type="text",
+                    content="\n\n[interrupted by user]",
+                    metadata={"interrupted": True}
+                )
+                collected_chunks.append(interrupt_chunk)
+
+                # Update text_buffer for display
+                text_buffer += "\n\n[interrupted by user]"
 
                 # Build final content blocks with interrupt marker
                 content_blocks = []
@@ -295,9 +295,20 @@ class LLMClientBase(ABC):
                 if text_buffer:
                     content_blocks.append({"type": "text", "text": text_buffer})
 
-                # Save partial content to database
-                from backend.shared.utils.helpers import update_assistant_message
-                update_assistant_message(message_id, content_blocks, session_id)
+                # Construct partial response from complete chunks (now includes interrupt marker)
+                partial_response = self._construct_response_from_streaming_chunks(collected_chunks)
+
+                # Add to context manager (preserves provider-native format with interrupt)
+                context_manager.add_response(partial_response)
+
+                # Format for storage and save to database
+                processor = self._get_response_processor()
+                if processor:
+                    final_message = processor.format_response_for_storage(partial_response)
+                    if final_message:
+                        from backend.shared.utils.helpers import update_assistant_message
+                        storage_content = final_message.content if isinstance(final_message.content, list) else [{"type": "text", "text": str(final_message.content)}]
+                        update_assistant_message(message_id, storage_content, session_id)
 
                 # Send final update with streaming=False
                 await WebSocketNotificationService.send_streaming_update(
@@ -307,22 +318,7 @@ class LLMClientBase(ABC):
                     streaming=False
                 )
 
-                # Construct partial response for context manager
-                # Use collected chunks so far to build response
-                if collected_chunks:
-                    partial_response = self._construct_response_from_streaming_chunks(collected_chunks)
-                else:
-                    # No chunks collected yet - create minimal response
-                    # This will vary by provider, so just return None for now
-                    # The interrupt message will still be saved to DB and visible to user
-                    partial_response = None
-
-                # Add partial response to context manager if available
-                if partial_response:
-                    context_manager.add_response(partial_response)
-
-                # Return partial response (or None if no chunks yet)
-                # This allows user to send next message
+                # Return partial response (allows user to send next message)
                 return partial_response
 
             # Collect chunk for context assembly

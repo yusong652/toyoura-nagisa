@@ -21,6 +21,7 @@ export interface ToolConfirmationData {
 export interface ConnectionContextType {
   connectionStatus: ConnectionStatus
   connectionError: string | null
+  sessionId: string | null
   wsRef: React.RefObject<WebSocket | null>
   connectToSession: (sessionId: string) => void
   disconnect: () => void

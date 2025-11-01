@@ -182,12 +182,15 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
           <div className="bash-command-label">
             {block.name === 'bash' ? 'Command:' :
              block.name === 'edit' ? 'Edit:' :
-             block.name === 'write' ? 'Write:' : 'Operation:'}
+             block.name === 'write' ? 'Write:' :
+             block.name === 'pfc_execute_script' ? 'PFC Script:' : 'Operation:'}
           </div>
           <code className="bash-command-text">
             {block.name === 'bash' && block.input?.command ? block.input.command as string :
              block.name === 'edit' && block.input?.file_path ? `${block.input.file_path}` :
              block.name === 'write' && block.input?.file_path ? `${block.input.file_path}` :
+             block.name === 'pfc_execute_script' && block.input?.script_path ?
+               `${block.input.script_path}${block.input?.run_in_background ? ' (background)' : ' (foreground)'}` :
              'Unknown operation'}
           </code>
 

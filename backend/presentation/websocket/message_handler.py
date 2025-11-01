@@ -236,9 +236,10 @@ class UserInterruptHandler(MessageHandler):
             try:
                 print(f"[UserInterruptHandler] Processing USER_INTERRUPT from session {session_id}", flush=True)
 
-                # Get context manager for this session
-                from backend.infrastructure.llm.base.client import get_runtime_context_manager
-                context_manager = get_runtime_context_manager(session_id)
+                # Get LLM client and context manager for this session
+                from backend.shared.utils.app_context import get_llm_client
+                llm_client = get_llm_client()
+                context_manager = llm_client.get_or_create_context_manager(session_id)
 
                 if context_manager:
                     # Set interrupt flag
