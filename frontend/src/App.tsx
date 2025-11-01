@@ -21,9 +21,30 @@ import { useConnection } from './contexts/connection/ConnectionContext'
 import { ConnectionStatus } from './types/connection'
 
 function AppContent(): React.ReactElement {
-  const { connectionStatus, connectionError, checkConnection } = useConnection()
-  
+  const { connectionStatus, connectionError, checkConnection, sendMessage, sessionId } = useConnection()
+
   const { executeSlashCommand, executionQueue } = useSlashCommandExecution()
+
+  // Global ESC key listener for interrupt
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        console.log('[App] ESC key pressed - sending interrupt signal')
+
+        // Send USER_INTERRUPT message via WebSocket
+        if (sendMessage && sessionId) {
+          sendMessage({
+            type: 'USER_INTERRUPT',
+            session_id: sessionId,
+            timestamp: new Date().toISOString()
+          })
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleEscKey)
+    return () => window.removeEventListener('keydown', handleEscKey)
+  }, [sendMessage, sessionId])
 
   return (
     <div className="app-container">

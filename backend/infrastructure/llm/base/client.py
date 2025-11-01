@@ -165,6 +165,9 @@ class LLMClientBase(ABC):
         """
         context_manager = self.get_or_create_context_manager(session_id)
 
+        # Reset interrupt flag for new conversation turn
+        context_manager.user_interrupted = False
+
         # Initialize context manager if needed
         if not context_manager._initialized_from_history:
             from backend.infrastructure.storage.session_manager import load_history
@@ -269,6 +272,59 @@ class LLMClientBase(ABC):
         text_buffer = ""
 
         async for chunk in self.call_api_with_context_streaming(complete_context, api_config):
+            # Check for user interrupt
+            if context_manager.user_interrupted:
+                print(f"[INFO] Streaming interrupted by user at iteration {iterations}")
+
+                # Add interrupt marker to text content
+                interrupt_marker = "\n\n[interrupted by user]"
+                if text_buffer:
+                    text_buffer += interrupt_marker
+                else:
+                    # If no text was generated yet, add marker to thinking
+                    if thinking_buffer:
+                        thinking_buffer += interrupt_marker
+                    else:
+                        # Neither text nor thinking, create minimal text content
+                        text_buffer = interrupt_marker
+
+                # Build final content blocks with interrupt marker
+                content_blocks = []
+                if thinking_buffer:
+                    content_blocks.append({"type": "thinking", "thinking": thinking_buffer})
+                if text_buffer:
+                    content_blocks.append({"type": "text", "text": text_buffer})
+
+                # Save partial content to database
+                from backend.shared.utils.helpers import update_assistant_message
+                update_assistant_message(message_id, content_blocks, session_id)
+
+                # Send final update with streaming=False
+                await WebSocketNotificationService.send_streaming_update(
+                    session_id=session_id,
+                    message_id=message_id,
+                    content=content_blocks,
+                    streaming=False
+                )
+
+                # Construct partial response for context manager
+                # Use collected chunks so far to build response
+                if collected_chunks:
+                    partial_response = self._construct_response_from_streaming_chunks(collected_chunks)
+                else:
+                    # No chunks collected yet - create minimal response
+                    # This will vary by provider, so just return None for now
+                    # The interrupt message will still be saved to DB and visible to user
+                    partial_response = None
+
+                # Add partial response to context manager if available
+                if partial_response:
+                    context_manager.add_response(partial_response)
+
+                # Return partial response (or None if no chunks yet)
+                # This allows user to send next message
+                return partial_response
+
             # Collect chunk for context assembly
             collected_chunks.append(chunk)
 
@@ -351,71 +407,58 @@ class LLMClientBase(ABC):
                 print(f"[WARNING] Failed to update streaming message with tool call content: {e}")
 
         if tool_calls:
-            # Check iteration limit BEFORE executing tools
-            # Get max iterations and calculate effective max
-            from backend.config import get_llm_settings
-            max_iterations = get_llm_settings().max_tool_iterations
-            effective_max = max_iterations + context_manager.approved_extra_iterations
+            # Check iteration limit BEFORE executing tools (fixed limit: 64)
+            MAX_ITERATIONS = 64
 
             # Check if we've reached the iteration limit
-            if iterations >= effective_max:
-                # Request user confirmation to continue
-                approved = await self._request_iteration_limit_confirmation(
-                    session_id, iterations, max_iterations
+            if iterations >= MAX_ITERATIONS:
+                # Reached limit - stop execution gracefully
+                print(f"[INFO] Tool calling stopped at iteration {iterations}: reached maximum limit ({MAX_ITERATIONS})")
+
+                # Create informative tool results for each tool call
+                from backend.infrastructure.mcp.utils.tool_result import success_response
+                stop_message = (
+                    f"⚠️ Tool execution stopped: Reached iteration limit ({MAX_ITERATIONS} iterations).\n\n"
+                    f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
+                    f"Note: This is a safety mechanism to prevent infinite loops."
                 )
 
-                if not approved:
-                    # User declined - don't execute tools, add explanatory tool results
-                    print(f"[INFO] Tool calling stopped at iteration {iterations} by user decision")
+                for i, tool_call in enumerate(tool_calls):
+                    is_last_tool = (i == len(tool_calls) - 1)
 
-                    # Create informative tool results for each tool call
-                    from backend.infrastructure.mcp.utils.tool_result import success_response
-                    stop_message = (
-                        f"⚠️ Tool execution stopped: Reached iteration limit ({max_iterations} iterations).\n\n"
-                        f"User declined to continue. The task may be incomplete.\n\n"
-                        f"You can ask the user to continue if needed, or provide a summary of what was accomplished."
+                    # Create explanatory result
+                    limit_result = success_response(
+                        stop_message,
+                        llm_content={
+                            "parts": [{"type": "text", "text": stop_message}]
+                        }
                     )
 
-                    for i, tool_call in enumerate(tool_calls):
-                        is_last_tool = (i == len(tool_calls) - 1)
+                    # Add to context
+                    await context_manager.add_tool_result(
+                        tool_call['id'],
+                        tool_call['name'],
+                        limit_result,
+                        inject_reminders=is_last_tool
+                    )
 
-                        # Create explanatory result
-                        limit_result = success_response(
-                            stop_message,
-                            llm_content={
-                                "parts": [{"type": "text", "text": stop_message}]
-                            }
+                    # Save to database
+                    try:
+                        from backend.shared.utils.helpers import save_tool_result_message
+                        message_id = save_tool_result_message(
+                            tool_call_id=tool_call['id'],
+                            tool_name=tool_call['name'],
+                            tool_result=limit_result,
+                            session_id=session_id
                         )
+                        await WebSocketNotificationService.send_message_saved(session_id, message_id, 'user')
+                    except Exception as e:
+                        print(f"[WARNING] Failed to save iteration limit tool result: {e}")
 
-                        # Add to context
-                        await context_manager.add_tool_result(
-                            tool_call['id'],
-                            tool_call['name'],
-                            limit_result,
-                            inject_reminders=is_last_tool
-                        )
+                # Return current response - LLM will see these tool results on next user request
+                return current_response
 
-                        # Save to database
-                        try:
-                            from backend.shared.utils.helpers import save_tool_result_message
-                            message_id = save_tool_result_message(
-                                tool_call_id=tool_call['id'],
-                                tool_name=tool_call['name'],
-                                tool_result=limit_result,
-                                session_id=session_id
-                            )
-                            await WebSocketNotificationService.send_message_saved(session_id, message_id, 'user')
-                        except Exception as e:
-                            print(f"[WARNING] Failed to save iteration limit tool result: {e}")
-
-                    # Return current response - LLM will see these tool results on next user request
-                    return current_response
-
-                # User approved - grant 5 additional iterations
-                context_manager.approved_extra_iterations += 5
-                print(f"[INFO] User approved continuation. Granted 5 more iterations (total approved: {context_manager.approved_extra_iterations})")
-
-            # Execute tools normally (either within limit or user approved)
+            # Execute tools normally (within limit)
             # This aligns with Claude Code's behavior: serial execution with intelligent cascade
             results = await self.tool_manager.handle_multiple_function_calls(
                 tool_calls,
@@ -460,6 +503,12 @@ class LLMClientBase(ABC):
             # Note: cascade_blocked tools are not considered rejections for interruption
             if rejected_tools:
                 raise UserRejectionInterruption(session_id, rejected_tools)
+
+        # Check for user interrupt before continuing recursion
+        if context_manager.user_interrupted:
+            print(f"[INFO] Tool calling interrupted by user at iteration {iterations}")
+            # Return current response - user can send next message
+            return current_response
 
         # Continue recursively
         return await self._recursive_tool_calling(session_id, iterations + 1)
@@ -551,69 +600,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    async def _request_iteration_limit_confirmation(
-        self,
-        session_id: str,
-        current_iteration: int,
-        original_limit: int
-    ) -> bool:
-        """
-        Request user confirmation to continue beyond iteration limit.
-
-        Args:
-            session_id: Session ID
-            current_iteration: Current iteration count
-            original_limit: Original configured limit
-
-        Returns:
-            bool: True if user approved, False otherwise
-        """
-        try:
-            from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
-            from backend.config import get_llm_settings
-
-            llm_settings = get_llm_settings()
-            confirmation_service = get_tool_confirmation_service()
-
-            if not confirmation_service:
-                if llm_settings.debug:
-                    print("[WARNING] Tool confirmation service not available, denying iteration limit override")
-                return False  # Safe default: deny if service unavailable
-
-            # Build confirmation message
-            command = f"Continue tool calling (iteration {current_iteration}/{original_limit})"
-            description = (
-                f"⚠️ Tool calling has reached the configured limit ({original_limit} iterations).\n\n"
-                f"**Current iteration**: {current_iteration}\n"
-                f"**If approved**: 5 additional iterations will be granted.\n\n"
-                f"⚠️ **Warning**: Continuing may indicate an infinite loop. "
-                f"Please review the conversation before approving."
-            )
-
-            if llm_settings.debug:
-                print(f"[INFO] Requesting iteration limit confirmation at iteration {current_iteration}")
-
-            # Request confirmation (no timeout - wait indefinitely)
-            approved, user_message = await confirmation_service.request_confirmation(
-                session_id=session_id,
-                tool_call_id=f"iteration_limit_{current_iteration}",
-                tool_name="continue_iteration",
-                command=command,
-                description=description
-            )
-
-            if llm_settings.debug:
-                if approved:
-                    print(f"[INFO] User approved continuation at iteration {current_iteration}")
-                else:
-                    rejection_reason = f" ({user_message})" if user_message else ""
-                    print(f"[INFO] User denied continuation at iteration {current_iteration}{rejection_reason}")
-
-            return approved
-
-        except Exception as e:
-            print(f"[ERROR] Failed to request iteration limit confirmation: {e}")
-            return False  # Safe default: deny on error
 
     def _is_tool_rejected(self, tool_result: Dict[str, Any]) -> bool:
         """

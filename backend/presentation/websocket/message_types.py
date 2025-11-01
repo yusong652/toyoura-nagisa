@@ -65,6 +65,9 @@ class MessageType(str, Enum):
     TOOL_CONFIRMATION_REQUEST = "TOOL_CONFIRMATION_REQUEST"
     TOOL_CONFIRMATION_RESPONSE = "TOOL_CONFIRMATION_RESPONSE"
 
+    # User interrupt control
+    USER_INTERRUPT = "USER_INTERRUPT"
+
     # Background process notifications
     BACKGROUND_PROCESS_STARTED = "BACKGROUND_PROCESS_STARTED"
     BACKGROUND_PROCESS_OUTPUT_UPDATE = "BACKGROUND_PROCESS_OUTPUT_UPDATE"
@@ -192,6 +195,11 @@ class ToolConfirmationResponseMessage(BaseWebSocketMessage):
     user_message: Optional[str] = None
 
 
+class UserInterruptMessage(BaseWebSocketMessage):
+    """User interrupt message schema (ESC key pressed)"""
+    type: MessageType = MessageType.USER_INTERRUPT
+
+
 class TitleUpdateMessage(BaseWebSocketMessage):
     """Title update message schema for session title changes"""
     type: MessageType = MessageType.TITLE_UPDATE
@@ -280,6 +288,7 @@ INCOMING_MESSAGE_SCHEMAS = {
     MessageType.LOCATION_RESPONSE: LocationResponseMessage,
     MessageType.CHAT_MESSAGE: ChatMessageRequest,
     MessageType.TOOL_CONFIRMATION_RESPONSE: ToolConfirmationResponseMessage,
+    MessageType.USER_INTERRUPT: UserInterruptMessage,
 }
 
 # Outgoing message schemas (backend creates these messages to send to frontend)

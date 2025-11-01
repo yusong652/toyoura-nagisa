@@ -51,11 +51,15 @@ class WebSocketMessageProcessor:
         # Initialize tool confirmation handler
         tool_confirmation_handler = ToolConfirmationHandler(connection_manager)
 
+        # Initialize user interrupt handler
+        user_interrupt_handler = UserInterruptHandler(connection_manager)
+
         self.handlers: Dict[MessageType, MessageHandler] = {
             MessageType.HEARTBEAT_ACK: heartbeat_handler,
             MessageType.LOCATION_RESPONSE: location_handler,  # Only handle responses from frontend
             MessageType.CHAT_MESSAGE: chat_handler,
             MessageType.TOOL_CONFIRMATION_RESPONSE: tool_confirmation_handler,
+            MessageType.USER_INTERRUPT: user_interrupt_handler,
         }
         
         # Store location handler for external tool access
@@ -215,6 +219,40 @@ class ChatHandler(MessageHandler):
                     session_id,
                     "CHAT_PROCESSING_ERROR",
                     f"Failed to process chat message: {str(e)}"
+                )
+
+
+class UserInterruptHandler(MessageHandler):
+    """
+    Handle user interrupt requests (ESC key pressed).
+
+    Purpose: Process ESC key presses from frontend to interrupt ongoing LLM reasoning
+    or tool execution. Sets the interrupt flag in the context manager to gracefully
+    stop the current operation.
+    """
+
+    async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
+        if message.type == MessageType.USER_INTERRUPT:
+            try:
+                print(f"[UserInterruptHandler] Processing USER_INTERRUPT from session {session_id}", flush=True)
+
+                # Get context manager for this session
+                from backend.infrastructure.llm.base.client import get_runtime_context_manager
+                context_manager = get_runtime_context_manager(session_id)
+
+                if context_manager:
+                    # Set interrupt flag
+                    context_manager.user_interrupted = True
+                    print(f"[UserInterruptHandler] Set user_interrupted flag for session {session_id}", flush=True)
+                else:
+                    logger.warning(f"No context manager found for session {session_id}")
+
+            except Exception as e:
+                logger.error(f"Error processing user interrupt: {e}")
+                await self.send_error(
+                    session_id,
+                    "INTERRUPT_PROCESSING_ERROR",
+                    f"Failed to process user interrupt: {str(e)}"
                 )
 
 
