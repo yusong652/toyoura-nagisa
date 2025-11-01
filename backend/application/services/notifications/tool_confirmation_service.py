@@ -47,7 +47,7 @@ class ToolConfirmationService:
         tool_name: str,
         command: str,
         description: Optional[str] = None,
-        timeout_seconds: int = 60
+        timeout_seconds: Optional[int] = None
     ) -> tuple[bool, Optional[str]]:
         """
         Request user confirmation for a tool execution.
@@ -60,7 +60,7 @@ class ToolConfirmationService:
             tool_name: Name of the tool requiring confirmation (bash, edit, write)
             command: The command/operation to execute
             description: Optional description of what the command does
-            timeout_seconds: Timeout for waiting for confirmation (default 60s)
+            timeout_seconds: Timeout for waiting for confirmation (default None = infinite wait)
 
         Returns:
             tuple[bool, Optional[str]]: (approved, user_message) - approved is True if approved,
@@ -90,7 +90,7 @@ class ToolConfirmationService:
                 logger.warning(f"Session {session_id} not connected, auto-rejecting tool: {tool_name}")
                 return (False, None)
 
-            # Wait for response with timeout
+            # Wait for response (infinite wait if timeout_seconds is None)
             try:
                 approved, user_message = await asyncio.wait_for(
                     confirmation_future,
@@ -101,7 +101,8 @@ class ToolConfirmationService:
                     logger.info(f"User message: {user_message}")
                 return (approved, user_message)
             except asyncio.TimeoutError:
-                logger.warning(f"Tool call {tool_call_id} confirmation timed out after {timeout_seconds}s")
+                timeout_str = f"{timeout_seconds}s" if timeout_seconds else "unknown"
+                logger.warning(f"Tool call {tool_call_id} confirmation timed out after {timeout_str}")
                 return (False, None)
 
         finally:

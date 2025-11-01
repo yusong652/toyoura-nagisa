@@ -56,6 +56,9 @@ class BaseContextManager(ABC):
         self.agent_profile = "general"
         self.enable_memory = True
 
+        # Tool calling iteration control
+        self.approved_extra_iterations: int = 0  # User-approved additional iterations beyond configured limit
+
         # Tool call tracking
         self._has_tool_calls = False
 

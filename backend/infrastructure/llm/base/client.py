@@ -245,14 +245,6 @@ class LLMClientBase(ABC):
         Raises:
             UserRejectionInterruption: When user rejects any tool
         """
-        # Get max iterations from config
-        from backend.config import get_llm_settings
-        max_iterations = get_llm_settings().max_tool_iterations
-
-        # Check iteration limit
-        if iterations >= max_iterations:
-            raise Exception(f"Exceeded max iterations ({max_iterations})")
-
         # Prepare complete context with all necessary components
         # Returns both context and configuration for stateless API call
         complete_context, api_config = await self._prepare_complete_context(
@@ -359,7 +351,71 @@ class LLMClientBase(ABC):
                 print(f"[WARNING] Failed to update streaming message with tool call content: {e}")
 
         if tool_calls:
-            # Execute tools serially with rejection cascade
+            # Check iteration limit BEFORE executing tools
+            # Get max iterations and calculate effective max
+            from backend.config import get_llm_settings
+            max_iterations = get_llm_settings().max_tool_iterations
+            effective_max = max_iterations + context_manager.approved_extra_iterations
+
+            # Check if we've reached the iteration limit
+            if iterations >= effective_max:
+                # Request user confirmation to continue
+                approved = await self._request_iteration_limit_confirmation(
+                    session_id, iterations, max_iterations
+                )
+
+                if not approved:
+                    # User declined - don't execute tools, add explanatory tool results
+                    print(f"[INFO] Tool calling stopped at iteration {iterations} by user decision")
+
+                    # Create informative tool results for each tool call
+                    from backend.infrastructure.mcp.utils.tool_result import success_response
+                    stop_message = (
+                        f"⚠️ Tool execution stopped: Reached iteration limit ({max_iterations} iterations).\n\n"
+                        f"User declined to continue. The task may be incomplete.\n\n"
+                        f"You can ask the user to continue if needed, or provide a summary of what was accomplished."
+                    )
+
+                    for i, tool_call in enumerate(tool_calls):
+                        is_last_tool = (i == len(tool_calls) - 1)
+
+                        # Create explanatory result
+                        limit_result = success_response(
+                            stop_message,
+                            llm_content={
+                                "parts": [{"type": "text", "text": stop_message}]
+                            }
+                        )
+
+                        # Add to context
+                        await context_manager.add_tool_result(
+                            tool_call['id'],
+                            tool_call['name'],
+                            limit_result,
+                            inject_reminders=is_last_tool
+                        )
+
+                        # Save to database
+                        try:
+                            from backend.shared.utils.helpers import save_tool_result_message
+                            message_id = save_tool_result_message(
+                                tool_call_id=tool_call['id'],
+                                tool_name=tool_call['name'],
+                                tool_result=limit_result,
+                                session_id=session_id
+                            )
+                            await WebSocketNotificationService.send_message_saved(session_id, message_id, 'user')
+                        except Exception as e:
+                            print(f"[WARNING] Failed to save iteration limit tool result: {e}")
+
+                    # Return current response - LLM will see these tool results on next user request
+                    return current_response
+
+                # User approved - grant 5 additional iterations
+                context_manager.approved_extra_iterations += 5
+                print(f"[INFO] User approved continuation. Granted 5 more iterations (total approved: {context_manager.approved_extra_iterations})")
+
+            # Execute tools normally (either within limit or user approved)
             # This aligns with Claude Code's behavior: serial execution with intelligent cascade
             results = await self.tool_manager.handle_multiple_function_calls(
                 tool_calls,
@@ -494,6 +550,70 @@ class LLMClientBase(ABC):
             only incremental chunks.
         """
         pass
+
+    async def _request_iteration_limit_confirmation(
+        self,
+        session_id: str,
+        current_iteration: int,
+        original_limit: int
+    ) -> bool:
+        """
+        Request user confirmation to continue beyond iteration limit.
+
+        Args:
+            session_id: Session ID
+            current_iteration: Current iteration count
+            original_limit: Original configured limit
+
+        Returns:
+            bool: True if user approved, False otherwise
+        """
+        try:
+            from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
+            from backend.config import get_llm_settings
+
+            llm_settings = get_llm_settings()
+            confirmation_service = get_tool_confirmation_service()
+
+            if not confirmation_service:
+                if llm_settings.debug:
+                    print("[WARNING] Tool confirmation service not available, denying iteration limit override")
+                return False  # Safe default: deny if service unavailable
+
+            # Build confirmation message
+            command = f"Continue tool calling (iteration {current_iteration}/{original_limit})"
+            description = (
+                f"⚠️ Tool calling has reached the configured limit ({original_limit} iterations).\n\n"
+                f"**Current iteration**: {current_iteration}\n"
+                f"**If approved**: 5 additional iterations will be granted.\n\n"
+                f"⚠️ **Warning**: Continuing may indicate an infinite loop. "
+                f"Please review the conversation before approving."
+            )
+
+            if llm_settings.debug:
+                print(f"[INFO] Requesting iteration limit confirmation at iteration {current_iteration}")
+
+            # Request confirmation (no timeout - wait indefinitely)
+            approved, user_message = await confirmation_service.request_confirmation(
+                session_id=session_id,
+                tool_call_id=f"iteration_limit_{current_iteration}",
+                tool_name="continue_iteration",
+                command=command,
+                description=description
+            )
+
+            if llm_settings.debug:
+                if approved:
+                    print(f"[INFO] User approved continuation at iteration {current_iteration}")
+                else:
+                    rejection_reason = f" ({user_message})" if user_message else ""
+                    print(f"[INFO] User denied continuation at iteration {current_iteration}{rejection_reason}")
+
+            return approved
+
+        except Exception as e:
+            print(f"[ERROR] Failed to request iteration limit confirmation: {e}")
+            return False  # Safe default: deny on error
 
     def _is_tool_rejected(self, tool_result: Dict[str, Any]) -> bool:
         """

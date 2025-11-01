@@ -408,9 +408,10 @@ class BaseToolManager(ABC):
         _ = tool_args  # Reserved for future command filtering
         # Define tools that require user confirmation
         CONFIRMATION_REQUIRED_TOOLS = {
-            "bash": True,   # All bash commands require confirmation
-            "edit": True,   # All file edits require confirmation
-            "write": True,  # All file writes require confirmation
+            "bash": True,              # All bash commands require confirmation
+            "edit": True,              # All file edits require confirmation
+            "write": True,             # All file writes require confirmation
+            "pfc_execute_script": True,  # PFC script execution requires confirmation
             # Add other tools here as needed
             # "system_command": True,  # Example: other system commands
         }
@@ -466,6 +467,12 @@ class BaseToolManager(ABC):
                 file_path = tool_args.get("file_path", "unknown")
                 command = f"Write file: {file_path}"
                 description = tool_args.get("description", None)
+            elif tool_name == "pfc_execute_script":
+                script_path = tool_args.get("script_path", "unknown")
+                run_in_background = tool_args.get("run_in_background", True)
+                bg_info = " (background)" if run_in_background else " (foreground)"
+                command = f"Execute PFC script{bg_info}: {script_path}"
+                description = tool_args.get("description", None)
             else:
                 command = f"{tool_name} operation"
                 description = tool_args.get("description", None)
@@ -473,14 +480,13 @@ class BaseToolManager(ABC):
             if llm_settings.debug:
                 print(f"[BaseToolManager] Requesting user confirmation for {tool_name} (tool_id={tool_id}): {command}")
 
-            # Request confirmation with 60 second timeout
+            # Request confirmation (no timeout - wait indefinitely)
             approved, user_message = await confirmation_service.request_confirmation(
                 session_id=session_id,
                 tool_call_id=tool_id,
                 tool_name=tool_name,
                 command=command,
-                description=description,
-                timeout_seconds=60
+                description=description
             )
 
             if llm_settings.debug:
