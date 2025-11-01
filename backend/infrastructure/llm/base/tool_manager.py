@@ -35,6 +35,10 @@ class BaseToolManager(ABC):
 
         # MCP client will be retrieved from app state when needed
         self._mcp_client = None
+
+        # Track files read per session (for edit prerequisite validation)
+        # Not affected by context window truncation - real-time tracking
+        self._session_read_files: Dict[str, set] = {}  # {session_id: {normalized_paths}}
     
     def get_mcp_client(self) -> MCPClient:
         """
@@ -49,6 +53,82 @@ class BaseToolManager(ABC):
             self._mcp_client = get_mcp_client()
         return self._mcp_client
 
+    def _normalize_file_path(self, file_path: str) -> str:
+        """
+        Normalize file path for consistent comparison.
+
+        Resolves absolute paths and handles path separators uniformly.
+
+        Args:
+            file_path: Raw file path from tool arguments
+
+        Returns:
+            str: Normalized absolute path
+        """
+        from pathlib import Path
+        try:
+            # Resolve to absolute path for consistent comparison
+            return str(Path(file_path).resolve())
+        except Exception:
+            # If path is invalid, return as-is for error handling elsewhere
+            return file_path
+
+    def _track_read_file(self, session_id: str, file_path: str) -> None:
+        """
+        Track that a file has been read in this session.
+
+        Real-time tracking independent of context window - files remain
+        tracked even if read messages are truncated from context.
+
+        Args:
+            session_id: Session identifier
+            file_path: File path that was successfully read
+        """
+        if session_id not in self._session_read_files:
+            self._session_read_files[session_id] = set()
+
+        normalized_path = self._normalize_file_path(file_path)
+        self._session_read_files[session_id].add(normalized_path)
+
+        llm_settings = get_llm_settings()
+        if llm_settings.debug:
+            print(f"[BaseToolManager] Tracked read file for session {session_id}: {normalized_path}")
+
+    def _has_read_file(self, session_id: str, file_path: str) -> bool:
+        """
+        Check if a file has been read in this session.
+
+        Args:
+            session_id: Session identifier
+            file_path: File path to check
+
+        Returns:
+            bool: True if file was read in this session, False otherwise
+        """
+        normalized_path = self._normalize_file_path(file_path)
+        has_read = normalized_path in self._session_read_files.get(session_id, set())
+
+        llm_settings = get_llm_settings()
+        if llm_settings.debug:
+            print(f"[BaseToolManager] Check read file {normalized_path}: {has_read}")
+
+        return has_read
+
+    def clear_session_read_tracking(self, session_id: str) -> None:
+        """
+        Clear read file tracking for a session.
+
+        Should be called when a session ends to free memory.
+
+        Args:
+            session_id: Session identifier to clear
+        """
+        if session_id in self._session_read_files:
+            del self._session_read_files[session_id]
+
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Cleared read file tracking for session {session_id}")
 
     async def get_standardized_tools(self, session_id: str, agent_profile: str = 'general') -> Dict[str, ToolSchema]:
         """
@@ -324,6 +404,32 @@ class BaseToolManager(ABC):
         # 2. User confirmation matching (frontend uses it to match confirmation requests to tool blocks)
 
         try:
+            # Step 0: Validate edit prerequisite (must read file before editing)
+            if tool_name == "edit":
+                file_path = tool_args.get("file_path", "")
+                if file_path and not self._has_read_file(session_id, file_path):
+                    from backend.infrastructure.mcp.utils.tool_result import error_response
+
+                    error_message = (
+                        f"File has not been read yet. Read it first before writing to it.\n\n"
+                        f"You must use the Read tool to read {file_path} before editing it. "
+                        f"This ensures you have the current file content and correct line numbers."
+                    )
+
+                    llm_settings = get_llm_settings()
+                    if llm_settings.debug:
+                        print(f"[BaseToolManager] Edit blocked: {file_path} not read yet in session {session_id}")
+
+                    return error_response(
+                        error_message,
+                        llm_content={
+                            "parts": [{
+                                "type": "text",
+                                "text": error_message
+                            }]
+                        }
+                    )
+
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
                 rejection_result = await self._handle_user_confirmation(tool_name, tool_args, tool_id, session_id)
@@ -334,6 +440,12 @@ class BaseToolManager(ABC):
             # Step 2: Execute the tool (user approved or no confirmation needed)
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
+
+            # Step 2.5: Track successful read operations for edit prerequisite validation
+            if tool_name == "read" and tool_result.get("status") == "success":
+                file_path = tool_args.get("path", "")
+                if file_path:
+                    self._track_read_file(session_id, file_path)
 
             # Step 3: Return tool result directly (already in standardized ToolResult format)
             return tool_result

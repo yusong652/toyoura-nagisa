@@ -656,3 +656,7 @@ class LLMClientBase(ABC):
         if session_id in self._session_context_managers:
             self._session_context_managers[session_id].clear_runtime_context()
             del self._session_context_managers[session_id]
+
+        # Clear tool manager's read file tracking for this session
+        if self.tool_manager:
+            self.tool_manager.clear_session_read_tracking(session_id)
