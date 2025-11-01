@@ -148,6 +148,8 @@ class BaseToolManager(ABC):
         Executes tools one by one, stopping subsequent tools if:
         1. User rejects a tool → block all remaining tools
         2. PFC tool fails → block remaining PFC tools only (stateful dependency chain)
+        3. Any tool fails when pfc_execute_script is in queue → block all remaining tools
+           (pfc_execute_script depends on preparatory tools like file creation, data processing)
 
         This implements Claude Code's intelligent cascade pattern with contextual
         error messages to help LLM understand why each tool was blocked.
@@ -173,15 +175,24 @@ class BaseToolManager(ABC):
             If one PFC tool fails, subsequent PFC tools will likely fail too
             (e.g., "ball generate" requires successful "model new").
 
-            Other tools (read, write, bash) are stateless and independent,
-            so they continue executing even if PFC tools fail.
+            pfc_execute_script is special: it often depends on preparatory tools
+            (file creation, data processing). If queue contains pfc_execute_script,
+            any tool failure blocks all subsequent tools.
 
-            This aligns with Claude Code's behavior: tool errors don't block
-            subsequent tools, only user rejection does.
+            Other tools (read, write, bash) are stateless and independent,
+            so they continue executing even if PFC tools fail (unless pfc_execute_script
+            is in the queue).
         """
+        # Check if queue contains pfc_execute_script (triggers strict dependency mode)
+        has_pfc_execute_script = any(
+            call.get("name") == "pfc_execute_script"
+            for call in function_calls
+        )
+
         results = []
         user_rejected_tool = None  # Track which tool was rejected by user
         failed_pfc_tool = None  # Track which PFC tool failed
+        failed_tool = None  # Track any failed tool (when pfc_execute_script present)
 
         for function_call in function_calls:
             tool_name = function_call.get("name", "unknown")
@@ -228,6 +239,29 @@ class BaseToolManager(ABC):
                     print(f"[BaseToolManager] Cascade blocking PFC tool {tool_name} due to failure of {failed_pfc_tool}")
                 continue
 
+            # Cascade blocking check 3: Any tool failure when pfc_execute_script in queue (blocks all)
+            if has_pfc_execute_script and failed_tool is not None:
+                from backend.infrastructure.mcp.utils.tool_result import error_response
+
+                cascade_message = (
+                    f"Cannot execute {tool_name}: Previous tool failed ({failed_tool}). "
+                    f"Stopping all subsequent tools because pfc_execute_script in queue depends on preparatory tools. "
+                    f"Fix the error before executing PFC script."
+                )
+                cascade_result = error_response(
+                    cascade_message,
+                    llm_content={
+                        "parts": [{"type": "text", "text": cascade_message}]
+                    }
+                )
+                cascade_result["cascade_blocked"] = True
+                results.append(cascade_result)
+
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Cascade blocking {tool_name} due to failure of {failed_tool} (pfc_execute_script dependency mode)")
+                continue
+
             # Execute tool normally
             result = await self.handle_function_call(function_call, session_id)
             results.append(result)
@@ -247,6 +281,14 @@ class BaseToolManager(ABC):
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
                     print(f"[BaseToolManager] PFC tool {tool_name} failed, will cascade block remaining PFC tools")
+
+            # Trigger 3: Any tool error when pfc_execute_script in queue (blocks all)
+            # Note: status="pending" (background tasks) is not considered failure
+            if has_pfc_execute_script and result.get('status') == 'error':
+                failed_tool = tool_name
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Tool {tool_name} failed (pfc_execute_script dependency mode), will cascade block remaining tools")
 
         return results
 
