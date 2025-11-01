@@ -65,7 +65,13 @@ class APIDocFormatter:
             contact_types = metadata["all_contact_types"]
             contact_suffix = f" (supports: {', '.join(contact_types)})"
 
-        return f"`{api_doc['signature']}`{return_info} - {brief_desc}{contact_suffix}"
+        # Add component access information if available
+        component_suffix = ""
+        if metadata and "has_components" in metadata:
+            components = metadata["has_components"]
+            component_suffix = f" [has _{', _'.join(components)} components]"
+
+        return f"`{api_doc['signature']}`{return_info} - {brief_desc}{contact_suffix}{component_suffix}"
 
     @staticmethod
     def format_full_doc(
@@ -121,6 +127,18 @@ class APIDocFormatter:
         if metadata and 'all_contact_types' in metadata:
             all_types = metadata['all_contact_types']
             lines.append(f"**Available for**: {', '.join(all_types)}")
+            lines.append("")
+
+        # Add component access info if available
+        if metadata and 'has_components' in metadata:
+            components = metadata['has_components']
+            method_name = api_name.split('.')[-1]
+            component_list = ', '.join([f"`{method_name}_{c}()`" for c in components])
+            lines.append(f"**Component Access**: {component_list}")
+            lines.append("")
+            lines.append(f"This method returns a vector. Individual components can be accessed via:")
+            for c in components:
+                lines.append(f"- `{method_name}_{c}()` - Get {c}-component only")
             lines.append("")
 
         # Signature

@@ -142,13 +142,19 @@ class APISearch:
         if min_score is not None:
             filters["min_score"] = min_score
 
-        # Execute BM25 search with over-fetching to account for Contact API consolidation
-        # Contact API consolidation can reduce result count significantly (5 types → 1 result)
-        # Strategy: Fetch 3x top_k results, consolidate, then return top_k
-        # This balances performance (single search call) with accuracy (enough unique results)
+        # Execute BM25 search with over-fetching to account for consolidation
+        # Two-stage consolidation can reduce result count significantly:
+        # - Contact consolidation: 5 contact types → 1 result (5:1 ratio)
+        # - Component consolidation: base + _x/_y/_z → 1 result (4:1 ratio)
+        # - Combined worst case: 5 × 4 = 20:1 compression ratio
+        #
+        # Strategy: Fetch 10x top_k results, consolidate twice, then return top_k
+        # Example: top_k=8 → search 80 → after consolidation ≈ 4-8 results
+        #
+        # This balances performance (single search call) with accuracy (enough diverse results)
 
-        # Calculate search limit: 3x for Contact consolidation, capped at 100
-        search_limit = min(top_k * 3, 100)
+        # Calculate search limit: 10x for two-stage consolidation, capped at 100
+        search_limit = min(top_k * 10, 100)
 
         results = engine.search(
             query=query,
