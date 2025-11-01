@@ -93,22 +93,22 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
     
     @staticmethod
     def _format_multimodal_content(
-        content: List[Dict[str, Any]], 
+        content: List[Dict[str, Any]],
         preserve_thinking: bool = True
     ) -> Union[str, List[Dict[str, Any]]]:
         """
         Format multimodal content for OpenAI API
-        
+
         Args:
             content: List of content blocks
             preserve_thinking: Whether to preserve thinking content
-            
+
         Returns:
             OpenAI-formatted content - either string for text-only or array for multimodal
         """
         formatted_content = []
         has_non_text_content = False
-        
+
         for block in content:
             if not isinstance(block, dict):
                 formatted_content.append({
@@ -116,7 +116,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                     "text": str(block)
                 })
                 continue
-            
+
             # Handle text content
             if block.get("type") == "text" and block.get("text"):
                 formatted_content.append({
@@ -128,7 +128,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                     "type": "text",
                     "text": block["text"]
                 })
-            
+
             # Handle image content
             elif "inline_data" in block or block.get("type") == "image":
                 inline_data = block.get("inline_data", block)
@@ -136,27 +136,37 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 if image_block:
                     formatted_content.append(image_block)
                     has_non_text_content = True
-            
+
             # Handle pre-formatted image_url content
             elif block.get("type") == "image_url":
                 formatted_content.append(block)
                 has_non_text_content = True
-            
+
             # Handle thinking content
             elif block.get("type") == "thinking" and preserve_thinking:
                 thinking_text = block.get("thinking", "")
                 if thinking_text:
                     formatted_content.append({
-                        "type": "text", 
+                        "type": "text",
                         "text": f"<thinking>{thinking_text}</thinking>"
                     })
-        
+
+            # Skip tool_use and tool_result blocks (cross-provider compatibility)
+            # These blocks are from Anthropic/Gemini format and should be ignored
+            # when loading history with OpenAI/Kimi provider
+            elif block.get("type") in ["tool_use", "tool_result"]:
+                continue
+
         # Return optimization for text-only content
         if not has_non_text_content:
             text_parts = [block.get("text", "") for block in formatted_content if block.get("type") == "text"]
             combined_text = "".join(text_parts)
-            return combined_text if combined_text else ""
-        
+            # If content only had tool_use/tool_result blocks (cross-provider format mismatch),
+            # return placeholder text to avoid empty assistant messages
+            if not combined_text:
+                return "[Tool execution completed]"
+            return combined_text
+
         return formatted_content
     
     @staticmethod

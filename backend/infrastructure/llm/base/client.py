@@ -228,6 +228,19 @@ class LLMClientBase(ABC):
             import traceback
             print(f"[ERROR] Exception in execute_with_thinking: {e}")
             print(f"[ERROR] Traceback: {traceback.format_exc()}")
+
+            # Clean up the empty placeholder message created before streaming
+            # This prevents leaving empty assistant messages in history that cause API errors on reload
+            context_manager = self.get_or_create_context_manager(session_id)
+            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+            if streaming_message_id:
+                try:
+                    from backend.infrastructure.storage.session_manager import delete_message
+                    delete_message(session_id, streaming_message_id)
+                    print(f"[DEBUG] Cleaned up placeholder message {streaming_message_id} after API failure")
+                except Exception as cleanup_error:
+                    print(f"[WARNING] Failed to clean up placeholder message: {cleanup_error}")
+
             raise Exception(f"Execution failed: {e}")
 
     async def _recursive_tool_calling(
