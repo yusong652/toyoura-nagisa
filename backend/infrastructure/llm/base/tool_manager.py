@@ -447,6 +447,13 @@ class BaseToolManager(ABC):
                 if file_path:
                     self._track_read_file(session_id, file_path)
 
+            # Step 2.6: Track successful write operations as "read" for edit prerequisite
+            # This allows edit tool to modify files that were just written
+            if tool_name == "write" and tool_result.get("status") == "success":
+                file_path = tool_args.get("file_path", "")
+                if file_path:
+                    self._track_read_file(session_id, file_path)
+
             # Step 3: Return tool result directly (already in standardized ToolResult format)
             return tool_result
 
