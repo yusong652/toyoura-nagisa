@@ -252,7 +252,24 @@ export const useChatMessage = ({
 
             // Convert all messages using the converter manager
             const convertedMessages = messageConverterManager.convertMany(backendMessages)
-            setMessages(convertedMessages)
+
+            // Preserve unsaved streaming messages (created via MESSAGE_CREATE but not yet saved to DB)
+            setMessages(prev => {
+              // Find unsaved streaming messages (not in converted messages)
+              const unsavedStreamingMessages = prev.filter(msg =>
+                msg.streaming && !convertedMessages.some(converted => converted.id === msg.id)
+              )
+
+              // Merge: converted messages from DB + unsaved streaming messages
+              const mergedMessages = [...convertedMessages, ...unsavedStreamingMessages]
+
+              if (unsavedStreamingMessages.length > 0) {
+                console.log(`[useChatMessage] Preserved ${unsavedStreamingMessages.length} unsaved streaming message(s)`)
+              }
+
+              return mergedMessages
+            })
+
             console.log('[useChatMessage] Messages refreshed successfully after message save')
           }
         } catch (error) {
