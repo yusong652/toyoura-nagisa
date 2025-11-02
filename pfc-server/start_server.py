@@ -70,6 +70,9 @@ print("Initializing PFC WebSocket Server...")
 # ===== Create Main Thread Executor =====
 main_executor = MainThreadExecutor()
 
+# ===== Create Event for Task Loop Control =====
+stop_event = threading.Event()
+
 # ===== Configure PFC Python State =====
 # Prevent PFC from resetting Python state/cache on initialization
 try:
@@ -132,41 +135,52 @@ except ImportError:
     processing_mode = "manual"
 
 # ===== Utility Functions =====
-def run_task_loop(interval=0.05):
+def run_task_loop(interval=0.01):
     """
-    Run continuous task processing loop (blocks IPython).
+    Run continuous task processing loop (improved with threading.Event).
 
     This function provides an alternative task processing mode when
     IPython hooks are not sufficient or not available.
 
     Args:
-        interval: Check interval in seconds (default: 0.05 = 20Hz)
+        interval: Check interval in seconds (default: 0.01 = 100Hz)
 
     Note:
-        This will BLOCK the IPython prompt while running.
-        Press Ctrl+C to stop and return to hook mode.
+        This will BLOCK the IPython prompt while running, but uses
+        threading.Event.wait() for better GIL release and GUI responsiveness.
+        Press Ctrl+C to stop, or call stop_task_loop() from another context.
 
     Example:
         >>> run_task_loop()  # Start continuous processing
         >>> # Press Ctrl+C to stop
     """
     print("=" * 70)
-    print("Task Processing Loop Mode")
+    print("Task Processing Loop Mode (Event-based)")
     print("=" * 70)
     print("  • Interval: {:.0f}ms".format(interval * 1000))
     print("  • IPython shell BLOCKED (press Ctrl+C to stop)")
     print("  • Server continues running in background")
+    print("  • Using threading.Event for better responsiveness")
     print("=" * 70)
     print()
+    print("Note: GUI may take a few seconds to stabilize...")
+    print()
+
+    # Clear stop event before starting
+    stop_event.clear()
 
     try:
-        while True:
+        while not stop_event.is_set():
             main_executor.process_tasks()
-            time.sleep(interval)
+            # Use Event.wait() instead of time.sleep() for better GIL release
+            stop_event.wait(interval)
     except KeyboardInterrupt:
         print()
-        print("✓ Loop stopped")
+        print("✓ Loop stopped (Ctrl+C)")
         print("  → Tasks will now process via IPython hooks")
+    finally:
+        # Always clear the stop event on exit
+        stop_event.clear()
 
 def get_queue_size():
     """
@@ -180,6 +194,26 @@ def get_queue_size():
         5  # 5 tasks pending
     """
     return main_executor.queue_size()
+
+def stop_task_loop():
+    """
+    Stop the running task loop gracefully.
+
+    This function can be called from another context (e.g., a signal handler
+    or another thread) to stop the task loop without using Ctrl+C.
+
+    Example:
+        >>> # In one IPython session:
+        >>> run_task_loop()
+
+        >>> # To stop programmatically (e.g., from a callback):
+        >>> stop_task_loop()
+    """
+    if stop_event.is_set():
+        print("Task loop is not running or already stopping")
+    else:
+        print("Stopping task loop...")
+        stop_event.set()
 
 def server_status():
     """
@@ -203,11 +237,13 @@ def server_status():
     print("Commands:")
     print("  • server_status()      - Show this status")
     print("  • get_queue_size()     - Get pending task count")
-    print("  • run_task_loop()      - Run continuous processing loop")
+    print("  • run_task_loop()      - Run continuous processing loop (Event-based)")
+    print("  • stop_task_loop()     - Stop the running loop gracefully")
     print()
     print("Trigger Task Processing:")
     print("  • Run any IPython command (e.g., pass, 1+1)")
     print("  • Or use: run_task_loop() for continuous mode")
+    print("  • Improved: Event.wait() for better GUI responsiveness")
     print("=" * 70)
 
 # ===== Startup Complete =====
