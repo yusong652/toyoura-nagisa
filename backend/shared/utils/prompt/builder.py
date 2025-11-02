@@ -17,6 +17,66 @@ from backend.infrastructure.mcp.utils.path_normalization import normalize_path_s
 logger = logging.getLogger(__name__)
 
 
+def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) -> str:
+    """
+    Determine workspace root based on agent profile and session context.
+
+    Workspace Strategy:
+        - PFC profile with session_id: Session-isolated workspace
+          → backend/chat/data/sessions/{session_id}/pfc_workspace
+        - PFC profile without session_id (standalone): Global PFC workspace
+          → aiNagisa/pfc_workspace
+        - Other profiles (coding, general, lifestyle, etc.): Unified workspace
+          → aiNagisa/workspace
+
+    Args:
+        agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
+        session_id: Optional session ID for workspace isolation (only for PFC profile)
+
+    Returns:
+        Absolute workspace root path as string
+    """
+    # PFC-specific workspace logic
+    if agent_profile == "pfc":
+        try:
+            from .config import BASE_DIR
+
+            if session_id:
+                # Session-isolated workspace: backend/chat/data/sessions/{session_id}/pfc_workspace
+                pfc_workspace = BASE_DIR / "chat" / "data" / "sessions" / session_id / "pfc_workspace"
+                # Ensure directory exists
+                pfc_workspace.mkdir(parents=True, exist_ok=True)
+                return str(pfc_workspace)
+            else:
+                # Standalone mode: global pfc_workspace at project root
+                pfc_workspace = BASE_DIR.parent / "pfc_workspace"
+                pfc_workspace.mkdir(parents=True, exist_ok=True)
+                return str(pfc_workspace)
+        except Exception as e:
+            logger.warning(f"Failed to determine PFC workspace, using fallback: {e}")
+            # Fallback to project root pfc_workspace
+            try:
+                from .config import BASE_DIR
+                fallback = BASE_DIR.parent / "pfc_workspace"
+                fallback.mkdir(parents=True, exist_ok=True)
+                return str(fallback)
+            except Exception:
+                return str(Path.cwd() / "pfc_workspace")
+
+    # Non-PFC profiles: use aiNagisa/workspace
+    try:
+        from .config import BASE_DIR
+        workspace = BASE_DIR.parent / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        return str(workspace)
+    except Exception as e:
+        logger.warning(f"Failed to determine workspace, using fallback: {e}")
+        # Fallback to project root workspace
+        fallback = Path.cwd() / "workspace"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return str(fallback)
+
+
 def _build_env_info(session_id: Optional[str] = None) -> str:
     """
     Build environment information string similar to Claude Code.
@@ -114,13 +174,8 @@ async def build_system_prompt(
         sections.append("</functions>")
         tool_schemas_section = "\n".join(sections)
 
-    # 3. Get workspace root for path substitution
-    try:
-        from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
-        workspace_root = str(WORKSPACE_ROOT)
-    except ImportError:
-        from .config import BASE_DIR
-        workspace_root = str(BASE_DIR)
+    # 3. Get workspace root for path substitution (dynamic based on profile and session)
+    workspace_root = _get_workspace_root(agent_profile, session_id)
 
     # Normalize workspace_root to forward slashes for LLM consistency
     # This ensures LLM always sees paths in the same format (like Claude Code)
