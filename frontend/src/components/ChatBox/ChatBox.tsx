@@ -74,10 +74,10 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
       <div className="chatbox-container">
         {/* Top Shadow for scroll indication */}
         <ShadowOverlay position="top" />
-        
+
         {/* Scrollable Message Area */}
-        <div 
-          className="chatbox" 
+        <div
+          className="chatbox"
           ref={chatboxRef}
           onClick={handleChatboxClick}
         >
@@ -87,24 +87,24 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
             onMessageSelect={setSelectedMessageId}
           />
 
-          {/* Global LLM thinking indicator */}
-          {isLLMThinking && (
-            <div className="llm-thinking-indicator">
-              <div className="thinking-spinner" />
-              <span className="thinking-label">Nagisa is thinking...</span>
-            </div>
-          )}
-
           {/* Scroll anchor for maintaining position */}
           <div className="scroll-anchor" />
         </div>
-        
+
+        {/* Global LLM thinking/status indicator - fixed at bottom left */}
+        {isLLMThinking && (
+          <div className="llm-thinking-indicator">
+            <div className="thinking-spinner" />
+            <span className="thinking-label">thinking</span>
+          </div>
+        )}
+
         {/* Control Buttons */}
         <ChatBoxControls />
-        
+
         {/* Bottom Shadow for scroll indication */}
         <ShadowOverlay position="bottom" />
-        
+
         {/* Status panel via props composition */}
         {statusPanel}
       </div>
