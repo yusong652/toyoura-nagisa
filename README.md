@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/Nagisa.png" alt="aiNagisa Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/Nagisa.png?v=2" alt="aiNagisa Logo" width="200"/>
 </p>
 
 <h1 align="center">aiNagisa</h1>
