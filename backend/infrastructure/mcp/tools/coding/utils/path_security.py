@@ -6,7 +6,7 @@ It includes workspace root configuration, path validation, and symlink safety ch
 """
 
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 from .config import get_tools_config
 
 __all__ = [
@@ -84,7 +84,7 @@ WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
 # Core path validation
 # ---------------------------------------------------------------------------
 
-def validate_path_in_workspace(path: Union[str, Path]) -> str | None:
+def validate_path_in_workspace(path: Union[str, Path], workspace_root: Optional[Path] = None) -> str | None:
     """Return absolute path *str* if *path* is located inside workspace root.
 
     This is the primary security function that ensures all file operations
@@ -92,6 +92,8 @@ def validate_path_in_workspace(path: Union[str, Path]) -> str | None:
 
     Args:
         path: Path to validate (str or Path object)
+        workspace_root: Optional workspace root to validate against.
+                       If None, uses static workspace root from config.
 
     Returns:
         Absolute path as string if valid, None if outside workspace
@@ -111,8 +113,9 @@ def validate_path_in_workspace(path: Union[str, Path]) -> str | None:
         >>> validate_path_in_workspace("../../../etc/passwd")
         None  # Path traversal attempt blocked
     """
-    # Get dynamic workspace root for current context
-    workspace_root = get_workspace_root()
+    # Use provided workspace root or fallback to static config
+    if workspace_root is None:
+        workspace_root = get_workspace_root()
 
     p = Path(str(path)).expanduser()
 
@@ -135,11 +138,13 @@ def validate_path_in_workspace(path: Union[str, Path]) -> str | None:
 # Symlink security functions
 # ---------------------------------------------------------------------------
 
-def is_safe_symlink(path: Path) -> bool:
+def is_safe_symlink(path: Path, workspace_root: Optional[Path] = None) -> bool:
     """Check if a symlink is safe (points within workspace).
 
     Args:
         path: Path object to check
+        workspace_root: Optional workspace root to validate against.
+                       If None, uses static workspace root from config.
 
     Returns:
         True if the path is not a symlink or if it's a safe symlink.
@@ -158,10 +163,14 @@ def is_safe_symlink(path: Path) -> bool:
     if not path.is_symlink():
         return True
 
+    # Use provided workspace root or fallback to static config
+    if workspace_root is None:
+        workspace_root = get_workspace_root()
+
     try:
         # Resolve the symlink and check if it's within workspace
         real_path = path.resolve()
-        workspace_real = get_workspace_root().resolve()
+        workspace_real = workspace_root.resolve()
 
         # Check if the resolved path is within workspace
         try:
@@ -175,7 +184,7 @@ def is_safe_symlink(path: Path) -> bool:
         return False
 
 
-def check_parent_symlinks(path: Path) -> bool:
+def check_parent_symlinks(path: Path, workspace_root: Optional[Path] = None) -> bool:
     """Check if any parent directory is an unsafe symlink.
 
     This function walks up the directory tree from the given path to the
@@ -184,6 +193,8 @@ def check_parent_symlinks(path: Path) -> bool:
 
     Args:
         path: Path object to check
+        workspace_root: Optional workspace root to validate against.
+                       If None, uses static workspace root from config.
 
     Returns:
         True if all parent directories are safe (not symlinks or safe symlinks).
@@ -199,11 +210,15 @@ def check_parent_symlinks(path: Path) -> bool:
         >>> check_parent_symlinks(unsafe_path)
         False
     """
+    # Use provided workspace root or fallback to static config
+    if workspace_root is None:
+        workspace_root = get_workspace_root()
+
     current = path.parent
-    workspace_real = get_workspace_root().resolve()
+    workspace_real = workspace_root.resolve()
 
     while current != workspace_real and current != current.parent:
-        if current.is_symlink() and not is_safe_symlink(current):
+        if current.is_symlink() and not is_safe_symlink(current, workspace_root):
             return False
         current = current.parent
 

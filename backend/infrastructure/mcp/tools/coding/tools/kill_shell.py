@@ -15,7 +15,7 @@ from ..utils.background_process_manager import get_process_manager
 __all__ = ["kill_shell", "register_kill_shell_tool"]
 
 
-def kill_shell(
+async def kill_shell(
     context: Context,
     shell_id: str = Field(
         ...,

@@ -8,13 +8,14 @@ from typing import List, Dict, Any, Optional
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
     validate_path_in_workspace,
-    WORKSPACE_ROOT
+    get_workspace_root_async
 )
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
-from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
+from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["grep", "register_grep_tool"]
 
@@ -211,7 +212,8 @@ def _process_output(
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def grep(
+async def grep(
+    context: Context,
     pattern: str = Field(
         ...,
         description="The regular expression pattern to search for in file contents",
@@ -305,13 +307,16 @@ def grep(
     # Check if git is available
     if not shutil.which("git"):
         return error_response("git is not installed or not available in PATH")
-    
+
+    # Get workspace root dynamically based on current session (needed for git root search)
+    workspace_root = await get_workspace_root_async(context)
+
     # Find git repository root
     git_root = None
     try:
         # Try to find git root from various possible locations
-        search_dirs = [WORKSPACE_ROOT, WORKSPACE_ROOT.parent, Path.cwd()]
-        
+        search_dirs = [workspace_root, workspace_root.parent, Path.cwd()]
+
         for search_dir in search_dirs:
             git_check = subprocess.run(
                 ["git", "rev-parse", "--show-toplevel"],
@@ -323,10 +328,10 @@ def grep(
             if git_check.returncode == 0:
                 git_root = Path(git_check.stdout.strip())
                 break
-        
+
         if git_root is None:
             return error_response("Not in a git repository - git grep requires a git repository")
-            
+
     except Exception:
         return error_response("Unable to check git repository status")
 
@@ -334,19 +339,21 @@ def grep(
     if path:
         # Normalize path separators for cross-platform compatibility
         # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
+        # Keep original path for LLM-friendly error messages (forward slashes)
+        original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 
-        # Validate provided path
-        search_path_abs = validate_path_in_workspace(path)
+        # Validate provided path against dynamic workspace
+        search_path_abs = validate_path_in_workspace(path, workspace_root)
         if search_path_abs is None:
-            return error_response(f"Path is outside workspace: {path}")
-        
+            return error_response(f"Path is outside workspace: {original_path_for_display}")
+
         search_path = Path(search_path_abs)
         if not search_path.exists():
-            return error_response(f"Path does not exist: {path}")
+            return error_response(f"Path does not exist: {original_path_for_display}")
     else:
-        # Default to workspace root
-        search_path = WORKSPACE_ROOT
+        # Default to dynamic workspace root
+        search_path = workspace_root
 
     try:
         # Run git grep with untracked file support

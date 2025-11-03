@@ -5,7 +5,7 @@ Provides output retrieval functionality for aiNagisa's background bash execution
 designed to match Claude Code's BashOutput tool behavior.
 """
 
-import time
+import asyncio
 from typing import Dict, Any, Optional
 from pydantic import Field
 from fastmcp.server.context import Context  # type: ignore
@@ -16,7 +16,7 @@ from ..utils.background_process_manager import get_process_manager
 __all__ = ["bash_output", "register_bash_output_tool"]
 
 
-def bash_output(
+async def bash_output(
     context: Context,
     bash_id: str = Field(
         ...,
@@ -43,9 +43,9 @@ def bash_output(
     if not bash_id or not bash_id.strip():
         return error_response("bash_id parameter is required and cannot be empty")
 
-    # Wait before checking output (prevents excessive polling)
+    # Wait before checking output (prevents excessive polling, non-blocking)
     if wait > 0:
-        time.sleep(wait)
+        await asyncio.sleep(wait)
 
     try:
         # Get session ID from MCP context for session isolation

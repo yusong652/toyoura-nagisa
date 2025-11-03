@@ -17,10 +17,11 @@ from enum import Enum
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
     validate_path_in_workspace,
-    WORKSPACE_ROOT,
+    get_workspace_root_async,
     is_safe_symlink,
     check_parent_symlinks
 )
@@ -295,7 +296,8 @@ def _read_file_safely(
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def read(
+async def read(
+    context: Context,
     path: str = Field(
         ...,
         description="The absolute path to the file to read",
@@ -339,13 +341,9 @@ Usage:
     # Validate parameters
     if offset is not None and offset < 0:
         return error_response("offset must be non-negative")
-    
+
     if limit is not None and limit <= 0:
         return error_response("limit must be positive")
-
-    # Validate workspace access
-    if not validate_path_in_workspace("."):
-        return error_response("Cannot access workspace directory")
 
     # ------------------------------------------------------------------
     # Path validation and security checks
@@ -355,33 +353,43 @@ Usage:
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
     if not path or not path.strip():
         return error_response("path is required and cannot be empty")
+
+    # Keep original path for LLM-friendly error messages (forward slashes)
+    original_path_for_display = path_to_llm_format(path.strip())
     path = normalize_path_separators(path.strip())
 
-    # Validate file path
-    abs_file_path = validate_path_in_workspace(path)
+    # Get workspace root dynamically based on current session
+    workspace_root = await get_workspace_root_async(context)
+
+    # Validate file path against dynamic workspace
+    abs_file_path = validate_path_in_workspace(path, workspace_root)
     if abs_file_path is None:
-        return error_response(f"File path is outside workspace: {path}")
+        return error_response(f"File path is outside workspace: {original_path_for_display}")
 
     try:
         file_path = Path(abs_file_path)
-        
+
         # Check file existence and type
         if not file_path.exists():
-            return error_response(f"File does not exist: {path}")
-        
+            return error_response(f"File does not exist: {original_path_for_display}")
+
         if not file_path.is_file():
-            return error_response(f"Path is not a file: {path}")
+            # Provide more helpful error message for directories
+            if file_path.is_dir():
+                return error_response(f"Cannot read directory (use glob tool to list files): {original_path_for_display}")
+            else:
+                return error_response(f"Path is not a regular file: {original_path_for_display}")
         
         # Check file size
         file_size = file_path.stat().st_size
         if file_size > MAX_FILE_SIZE_BYTES:
             return error_response(f"File too large: {file_size // 1024 // 1024}MB exceeds {MAX_FILE_SIZE_BYTES // 1024 // 1024}MB limit")
         
-        # Security checks
-        if file_path.is_symlink() and not is_safe_symlink(file_path):
+        # Security checks (use dynamic workspace root for consistency)
+        if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
             return error_response("Cannot read unsafe symlink pointing outside workspace")
-        
-        if not check_parent_symlinks(file_path):
+
+        if not check_parent_symlinks(file_path, workspace_root):
             return error_response("Cannot read file with unsafe parent symlinks")
 
         # ------------------------------------------------------------------

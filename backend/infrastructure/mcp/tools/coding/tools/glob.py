@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Set
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 # Use pathspec for GitWildMatch pattern matching (already a project dependency)
 try:
@@ -25,7 +26,7 @@ except ImportError:
 
 from ..utils.path_security import (
     validate_path_in_workspace,
-    WORKSPACE_ROOT,
+    get_workspace_root_async,
     is_safe_symlink,
     check_parent_symlinks
 )
@@ -113,7 +114,8 @@ def _sort_by_modification_time(files: List[Path]) -> List[Path]:
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def glob(
+async def glob(
+    context: Context,
     pattern: str = Field(
         ...,
         description="The glob pattern to match files against",
@@ -136,25 +138,30 @@ def glob(
     if not pattern or not pattern.strip():
         return error_response("Pattern is required and cannot be empty")
 
+    # Get workspace root dynamically based on current session
+    workspace_root = await get_workspace_root_async(context)
+
     # Determine search directory
     if path:
         # Normalize path separators for cross-platform compatibility
         # This handles cases where LLM generates mixed separators (e.g., C:\path/to/dir)
+        # Keep original path for LLM-friendly error messages (forward slashes)
+        original_path_for_display = path_to_llm_format(path.strip())
         path = normalize_path_separators(path.strip())
 
-        # Validate provided path
-        search_path = validate_path_in_workspace(path)
+        # Validate provided path against dynamic workspace
+        search_path = validate_path_in_workspace(path, workspace_root)
         if search_path is None:
-            return error_response(f"Path is outside workspace: {path}")
-        
+            return error_response(f"Path is outside workspace: {original_path_for_display}")
+
         search_dir = Path(search_path)
         if not search_dir.exists():
-            return error_response(f"Directory does not exist: {path}")
+            return error_response(f"Directory does not exist: {original_path_for_display}")
         if not search_dir.is_dir():
-            return error_response(f"Path is not a directory: {path}")
+            return error_response(f"Path is not a directory: {original_path_for_display}")
     else:
-        # Default to workspace root
-        search_dir = WORKSPACE_ROOT
+        # Default to dynamic workspace root
+        search_dir = workspace_root
 
     try:
         # Get git-visible files (respecting .gitignore)
@@ -184,11 +191,11 @@ def glob(
 
                         # Use pathspec GitWildMatch for correct ** and * handling
                         if spec.match_file(rel_path_str):
-                            # Check symlink safety
-                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                            # Check symlink safety (use dynamic workspace root for consistency)
+                            if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
                                 continue
 
-                            if not check_parent_symlinks(file_path):
+                            if not check_parent_symlinks(file_path, workspace_root):
                                 continue
 
                             safe_files.append(file_path)
@@ -204,11 +211,11 @@ def glob(
                 for file_path in git_visible_files:
                     try:
                         if file_path.match(pattern):
-                            # Check symlink safety
-                            if file_path.is_symlink() and not is_safe_symlink(file_path):
+                            # Check symlink safety (use dynamic workspace root for consistency)
+                            if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
                                 continue
 
-                            if not check_parent_symlinks(file_path):
+                            if not check_parent_symlinks(file_path, workspace_root):
                                 continue
 
                             safe_files.append(file_path)

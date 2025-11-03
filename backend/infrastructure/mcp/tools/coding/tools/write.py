@@ -14,13 +14,14 @@ from datetime import datetime
 
 from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 # from .config import get_tools_config  # Removed unused import
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 from ..utils.path_security import (
-    WORKSPACE_ROOT,
     validate_path_in_workspace,
+    get_workspace_root_async,
     is_safe_symlink,
     check_parent_symlinks
 )
@@ -32,13 +33,14 @@ MAX_CONTENT_SIZE_BYTES = 20 * 1024 * 1024  # 20 MiB (same as read_file limit)
 MAX_CONTENT_SIZE_CHARS = MAX_CONTENT_SIZE_BYTES // 2  # Conservative estimate for UTF-8
 
 
-def write(
+async def write(
+    context: Context,
     file_path: str = Field(
-        ..., 
+        ...,
         description="The absolute path to the file to write"
     ),
     content: str = Field(
-        ..., 
+        ...,
         description="The content to write to the file"
     ),
 ) -> Dict[str, Any]:
@@ -68,12 +70,18 @@ def write(
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
     if not file_path or not file_path.strip():
         return error_response("file_path is required and cannot be empty")
+
+    # Keep original path for LLM-friendly error messages (forward slashes)
+    original_path_for_display = path_to_llm_format(file_path.strip())
     file_path = normalize_path_separators(file_path.strip())
 
-    # Validate path security
-    abs_path = validate_path_in_workspace(file_path)
+    # Get workspace root dynamically based on current session
+    workspace_root = await get_workspace_root_async(context)
+
+    # Validate path security against dynamic workspace
+    abs_path = validate_path_in_workspace(file_path, workspace_root)
     if abs_path is None:
-        return error_response(f"Path is outside of workspace: {file_path}")
+        return error_response(f"Path is outside of workspace: {original_path_for_display}")
 
     # Validate content size to prevent disk exhaustion
     content_size_chars = len(content)
@@ -93,21 +101,21 @@ def write(
         # Check if file already exists
         file_existed = abs_p.exists()
         
-        # Symlink security checks
+        # Symlink security checks (use dynamic workspace root for consistency)
         if file_existed:
             # Check if target file itself is an unsafe symlink
-            if abs_p.is_symlink() and not is_safe_symlink(abs_p):
+            if abs_p.is_symlink() and not is_safe_symlink(abs_p, workspace_root):
                 return error_response("Cannot write to symlink pointing outside workspace")
-        
+
         # Check if any parent directory is an unsafe symlink
-        if not check_parent_symlinks(abs_p):
+        if not check_parent_symlinks(abs_p, workspace_root):
             return error_response("Cannot write to path with parent symlink pointing outside workspace")
-        
+
         # Create parent directories if they don't exist
         abs_p.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Additional check after mkdir - ensure created directories are safe
-        if not check_parent_symlinks(abs_p):
+        if not check_parent_symlinks(abs_p, workspace_root):
             return error_response("Parent directory creation resulted in unsafe symlink structure")
         
         # Write the content (always overwrite)

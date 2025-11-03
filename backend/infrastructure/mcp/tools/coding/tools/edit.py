@@ -13,10 +13,11 @@ from typing import Dict, Any, Optional, Tuple
 from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
+from fastmcp.server.context import Context  # type: ignore
 
 from ..utils.path_security import (
     validate_path_in_workspace,
-    WORKSPACE_ROOT,
+    get_workspace_root_async,
     is_safe_symlink,
     check_parent_symlinks
 )
@@ -127,7 +128,8 @@ def _validate_uniqueness(content: str, old_string: str, replace_all: bool) -> Tu
 # Main implementation
 # -----------------------------------------------------------------------------
 
-def edit(
+async def edit(
+    context: Context,
     file_path: str = Field(
         ...,
         description="The absolute path to the file to modify",
@@ -181,6 +183,8 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
 
     # Normalize path separators for cross-platform compatibility
     # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file)
+    # Keep original path for LLM-friendly error messages (forward slashes)
+    original_path_for_display = path_to_llm_format(file_path.strip())
     file_path = normalize_path_separators(file_path.strip())
 
     # Check if old_string and new_string are the same
@@ -193,24 +197,23 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
     if len(new_string) > MAX_NEW_STRING_LENGTH:
         return error_response(f"new_string too long: {len(new_string)} chars (max: {MAX_NEW_STRING_LENGTH})")
 
-    # Validate workspace access
-    if not validate_path_in_workspace("."):
-        return error_response("Cannot access workspace directory")
+    # Get workspace root dynamically based on current session
+    workspace_root = await get_workspace_root_async(context)
 
     # Validate file path is within workspace
-    validated_path = validate_path_in_workspace(file_path)
+    validated_path = validate_path_in_workspace(file_path, workspace_root)
     if validated_path is None:
-        return error_response(f"File path is outside workspace: {file_path}")
+        return error_response(f"File path is outside workspace: {original_path_for_display}")
 
     target_file = Path(validated_path)
 
-    # Security checks for existing files
+    # Security checks for existing files (use dynamic workspace root for consistency)
     if target_file.exists():
-        if target_file.is_symlink() and not is_safe_symlink(target_file):
-            return error_response(f"Unsafe symlink detected: {file_path}")
+        if target_file.is_symlink() and not is_safe_symlink(target_file, workspace_root):
+            return error_response(f"Unsafe symlink detected: {original_path_for_display}")
 
-        if not check_parent_symlinks(target_file):
-            return error_response(f"Unsafe parent symlinks detected: {file_path}")
+        if not check_parent_symlinks(target_file, workspace_root):
+            return error_response(f"Unsafe parent symlinks detected: {original_path_for_display}")
 
     # ------------------------------------------------------------------
     # File validation and content analysis
