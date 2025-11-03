@@ -378,6 +378,27 @@ itasca.command(f'ball create position {position} radius 0.1')  # Python tuple â†
 
 ---
 
+## PFC Simulation Initialization Checklist
+
+Before running any PFC simulation, ensure these components are configured:
+
+1. **Domain extent**: Define simulation boundaries
+   - Query: `pfc_query_command("domain extent")`
+
+2. **Ball attributes**: Set ball density (mass calculation)
+   - Query: `pfc_query_python_api("Ball.density")`
+
+3. **Contact model**: Assign default contact model (linear, hertz, etc.)
+   - Query: `pfc_query_command("contact cmat default")`
+
+4. **Deterministic mode**: Ensure result repeatability
+   - Query: `pfc_query_command("model deterministic")`
+   - Note: Default is ON, but `model new` resets to default
+
+**Always query documentation before initialization** - correct syntax varies by configuration.
+
+---
+
 ## Complete Workflow Example
 
 **User request**: "Create a simulation with ball-ball contacts using linear model"
