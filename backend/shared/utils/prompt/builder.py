@@ -17,7 +17,7 @@ from backend.infrastructure.mcp.utils.path_normalization import normalize_path_s
 logger = logging.getLogger(__name__)
 
 
-def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) -> str:
+async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) -> str:
     """
     Determine workspace root based on agent profile and session context.
 
@@ -44,20 +44,12 @@ def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) ->
     if agent_profile == "pfc":
         # Try to get PFC server's actual working directory
         try:
-            import asyncio
             from backend.infrastructure.pfc.websocket_client import get_client
 
-            # Attempt to query PFC server's working directory
             try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                # No event loop in current thread, create new one
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            try:
-                client = loop.run_until_complete(get_client())
-                pfc_working_dir = loop.run_until_complete(client.get_working_directory())
+                # Use await instead of run_until_complete to work in async context
+                client = await get_client()
+                pfc_working_dir = await client.get_working_directory()
 
                 if pfc_working_dir:
                     logger.info(f"✓ Using PFC server's working directory: {pfc_working_dir}")
@@ -195,7 +187,7 @@ async def build_system_prompt(
         tool_schemas_section = "\n".join(sections)
 
     # 3. Get workspace root for path substitution (dynamic based on profile and session)
-    workspace_root = _get_workspace_root(agent_profile, session_id)
+    workspace_root = await _get_workspace_root(agent_profile, session_id)
 
     # Normalize workspace_root to forward slashes for LLM consistency
     # This ensures LLM always sees paths in the same format (like Claude Code)
