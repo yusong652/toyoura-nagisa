@@ -21,93 +21,34 @@ async def _get_workspace_root(agent_profile: str, session_id: Optional[str] = No
     """
     Determine workspace root based on agent profile and session context.
 
-    Workspace Strategy:
-        - PFC profile with PFC server connected: Use PFC server's actual working directory
-          → Ensures agent can access files saved by PFC (e.g., checkpoints, data)
-        - PFC profile without PFC server: Fallback to local workspace
-          → aiNagisa/pfc_workspace (standalone mode)
-        - Other profiles (coding, general, lifestyle, etc.): Unified workspace
-          → aiNagisa/workspace
+    DEPRECATED: This function now delegates to the unified workspace module.
+    New code should use backend.shared.utils.workspace.get_workspace_for_profile directly.
 
     Args:
         agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
-        session_id: Optional session ID (reserved for future use, currently unused)
+        session_id: Optional session ID (reserved for future use)
 
     Returns:
         Absolute workspace root path as string
-
-    Note:
-        For PFC profile, session_id is currently not used for workspace isolation
-        because PFC server's working directory is determined by the PFC project itself.
     """
-    # PFC-specific workspace logic
-    if agent_profile == "pfc":
-        # Try to get PFC server's actual working directory
-        try:
-            from backend.infrastructure.pfc.websocket_client import get_client
-
-            try:
-                # Use await instead of run_until_complete to work in async context
-                client = await get_client()
-                pfc_working_dir = await client.get_working_directory()
-
-                if pfc_working_dir:
-                    logger.info(f"✓ Using PFC server's working directory: {pfc_working_dir}")
-                    return pfc_working_dir
-                else:
-                    logger.warning("PFC server returned no working directory, using fallback")
-            except Exception as e:
-                logger.warning(f"Failed to connect to PFC server for workspace sync: {e}")
-
-        except Exception as e:
-            logger.warning(f"Failed to query PFC working directory: {e}")
-
-        # Fallback to local pfc_workspace
-        try:
-            from .config import BASE_DIR
-            pfc_workspace = BASE_DIR.parent / "pfc_workspace"
-            pfc_workspace.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✓ Using fallback PFC workspace: {pfc_workspace}")
-            return str(pfc_workspace)
-        except Exception as e:
-            logger.warning(f"Failed to determine fallback PFC workspace: {e}")
-            fallback = Path.cwd() / "pfc_workspace"
-            fallback.mkdir(parents=True, exist_ok=True)
-            return str(fallback)
-
-    # Non-PFC profiles: use aiNagisa/workspace
-    try:
-        from .config import BASE_DIR
-        workspace = BASE_DIR.parent / "workspace"
-        workspace.mkdir(parents=True, exist_ok=True)
-        return str(workspace)
-    except Exception as e:
-        logger.warning(f"Failed to determine workspace, using fallback: {e}")
-        # Fallback to project root workspace
-        fallback = Path.cwd() / "workspace"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return str(fallback)
+    from backend.shared.utils.workspace import get_workspace_for_profile
+    workspace_path = await get_workspace_for_profile(agent_profile, session_id)
+    return str(workspace_path)
 
 
-def _build_env_info(session_id: Optional[str] = None) -> str:
+def _build_env_info(workspace_root: str, session_id: Optional[str] = None) -> str:
     """
     Build environment information string similar to Claude Code.
 
     Args:
+        workspace_root: Workspace root path (already normalized)
         session_id: Optional session ID for task isolation context
 
     Returns:
         Formatted environment information block
     """
-    try:
-        from backend.infrastructure.mcp.tools.coding.utils.path_security import WORKSPACE_ROOT
-        working_dir = str(WORKSPACE_ROOT)
-    except ImportError:
-        working_dir = str(Path.cwd())
-
-    # Normalize path to forward slashes for cross-platform consistency
-    # This ensures LLM always sees paths in the same format regardless of OS
-    working_dir = normalize_path_separators(working_dir, target_platform='linux')
+    # Use the provided workspace root (already normalized to forward slashes)
+    working_dir = workspace_root
 
     # Check if directory is a git repository
     is_git_repo = (Path(working_dir) / ".git").exists()
@@ -193,8 +134,8 @@ async def build_system_prompt(
     # This ensures LLM always sees paths in the same format (like Claude Code)
     workspace_root = normalize_path_separators(workspace_root, target_platform='linux')
 
-    # 4. Build environment information with session context
-    env_info = _build_env_info(session_id=session_id)
+    # 4. Build environment information with session context and dynamic workspace
+    env_info = _build_env_info(workspace_root=workspace_root, session_id=session_id)
 
     # 5. Replace placeholders in base prompt
     base = base.replace("{tool_schemas}", tool_schemas_section)

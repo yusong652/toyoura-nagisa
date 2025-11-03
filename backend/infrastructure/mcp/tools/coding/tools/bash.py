@@ -14,7 +14,7 @@ from pydantic import Field
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
 
-from ..utils.path_security import validate_path_in_workspace, WORKSPACE_ROOT
+from ..utils.path_security import validate_path_in_workspace, get_workspace_root_async
 from backend.infrastructure.mcp.utils.path_normalization import normalize_windows_paths, normalize_output_paths_to_llm_format
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 
@@ -26,7 +26,7 @@ MAX_TIMEOUT_MS = 600000      # 10 minutes maximum
 MAX_OUTPUT_SIZE = 30000      # 30KB output limit (matching Claude Code)
 
 
-def bash(
+async def bash(
     context: Context,
     command: str = Field(
         ...,
@@ -101,12 +101,13 @@ Working directory:
 
     timeout_seconds = timeout_ms / 1000.0
 
-    # Validate workspace access
-    if not validate_path_in_workspace("."):
-        return error_response("Cannot access workspace directory")
+    # Get workspace root dynamically based on current session
+    # Pass context explicitly for better reliability
+    work_dir = await get_workspace_root_async(context)
 
-    # Set working directory to workspace root
-    work_dir = Path(str(WORKSPACE_ROOT))
+    # Validate workspace access
+    if not work_dir.exists():
+        return error_response(f"Workspace directory does not exist: {work_dir}")
 
     # Handle background execution
     if run_in_background:
