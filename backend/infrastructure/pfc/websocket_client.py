@@ -664,6 +664,101 @@ class PFCWebSocketClient:
 
         raise RuntimeError("Unexpected code path in list_tasks")
 
+    async def get_working_directory(
+        self,
+        timeout: float = 10.0,
+        max_retries: int = 2
+    ) -> Optional[str]:
+        """
+        Get PFC server's current working directory.
+
+        Args:
+            timeout: Query timeout in seconds (default: 10.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            str: PFC's current working directory path, or None if query fails
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If query times out
+
+        Note:
+            This is used to sync agent workspace with PFC's actual working directory.
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                request_id = str(uuid4())
+
+                # Create working directory query message
+                message = {
+                    "type": "get_working_directory",
+                    "request_id": request_id
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_requests[request_id] = future
+
+                try:
+                    # Send query
+                    await self.websocket.send(json.dumps(message))
+                    logger.debug(f"Working directory query sent: {request_id}")
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+
+                    # Extract working directory from result
+                    if result.get("status") == "success" and result.get("data"):
+                        working_dir = result["data"].get("working_directory")
+                        logger.info(f"✓ PFC working directory: {working_dir}")
+                        return working_dir
+                    else:
+                        logger.warning(f"Failed to get working directory: {result.get('message')}")
+                        return None
+
+                except asyncio.TimeoutError:
+                    self.pending_requests.pop(request_id, None)
+                    raise TimeoutError(f"Working directory query timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    logger.warning(
+                        "Failed to query working directory after retries. "
+                        "Will use fallback workspace."
+                    )
+                    return None
+
+            except Exception as e:
+                logger.error(f"Working directory query failed: {e}")
+                return None
+
+        return None
+
     async def ping(self) -> bool:
         """
         Send ping to check server connectivity.

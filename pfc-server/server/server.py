@@ -178,6 +178,39 @@ class PFCWebSocketServer:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
+                    elif msg_type == "get_working_directory":
+                        # Get PFC's current working directory
+                        request_id = data.get("request_id", "unknown")
+
+                        try:
+                            import os
+                            cwd = os.getcwd()
+
+                            response = {
+                                "type": "result",
+                                "request_id": request_id,
+                                "status": "success",
+                                "message": f"PFC working directory: {cwd}",
+                                "data": {
+                                    "working_directory": cwd
+                                }
+                            }
+                        except Exception as e:
+                            response = {
+                                "type": "result",
+                                "request_id": request_id,
+                                "status": "error",
+                                "message": f"Failed to get working directory: {e}",
+                                "data": None
+                            }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Request result sent: {request_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
+                            break  # Exit message loop
+
                     elif msg_type == "ping":
                         # Respond to ping
                         try:

@@ -22,46 +22,66 @@ def _get_workspace_root(agent_profile: str, session_id: Optional[str] = None) ->
     Determine workspace root based on agent profile and session context.
 
     Workspace Strategy:
-        - PFC profile with session_id: Session-isolated workspace
-          → backend/chat/data/sessions/{session_id}/pfc_workspace
-        - PFC profile without session_id (standalone): Global PFC workspace
-          → aiNagisa/pfc_workspace
+        - PFC profile with PFC server connected: Use PFC server's actual working directory
+          → Ensures agent can access files saved by PFC (e.g., checkpoints, data)
+        - PFC profile without PFC server: Fallback to local workspace
+          → aiNagisa/pfc_workspace (standalone mode)
         - Other profiles (coding, general, lifestyle, etc.): Unified workspace
           → aiNagisa/workspace
 
     Args:
         agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
-        session_id: Optional session ID for workspace isolation (only for PFC profile)
+        session_id: Optional session ID (reserved for future use, currently unused)
 
     Returns:
         Absolute workspace root path as string
+
+    Note:
+        For PFC profile, session_id is currently not used for workspace isolation
+        because PFC server's working directory is determined by the PFC project itself.
     """
     # PFC-specific workspace logic
     if agent_profile == "pfc":
+        # Try to get PFC server's actual working directory
+        try:
+            import asyncio
+            from backend.infrastructure.pfc.websocket_client import get_client
+
+            # Attempt to query PFC server's working directory
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                # No event loop in current thread, create new one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            try:
+                client = loop.run_until_complete(get_client())
+                pfc_working_dir = loop.run_until_complete(client.get_working_directory())
+
+                if pfc_working_dir:
+                    logger.info(f"✓ Using PFC server's working directory: {pfc_working_dir}")
+                    return pfc_working_dir
+                else:
+                    logger.warning("PFC server returned no working directory, using fallback")
+            except Exception as e:
+                logger.warning(f"Failed to connect to PFC server for workspace sync: {e}")
+
+        except Exception as e:
+            logger.warning(f"Failed to query PFC working directory: {e}")
+
+        # Fallback to local pfc_workspace
         try:
             from .config import BASE_DIR
-
-            if session_id:
-                # Session-isolated workspace: backend/chat/data/sessions/{session_id}/pfc_workspace
-                pfc_workspace = BASE_DIR / "chat" / "data" / "sessions" / session_id / "pfc_workspace"
-                # Ensure directory exists
-                pfc_workspace.mkdir(parents=True, exist_ok=True)
-                return str(pfc_workspace)
-            else:
-                # Standalone mode: global pfc_workspace at project root
-                pfc_workspace = BASE_DIR.parent / "pfc_workspace"
-                pfc_workspace.mkdir(parents=True, exist_ok=True)
-                return str(pfc_workspace)
+            pfc_workspace = BASE_DIR.parent / "pfc_workspace"
+            pfc_workspace.mkdir(parents=True, exist_ok=True)
+            logger.info(f"✓ Using fallback PFC workspace: {pfc_workspace}")
+            return str(pfc_workspace)
         except Exception as e:
-            logger.warning(f"Failed to determine PFC workspace, using fallback: {e}")
-            # Fallback to project root pfc_workspace
-            try:
-                from .config import BASE_DIR
-                fallback = BASE_DIR.parent / "pfc_workspace"
-                fallback.mkdir(parents=True, exist_ok=True)
-                return str(fallback)
-            except Exception:
-                return str(Path.cwd() / "pfc_workspace")
+            logger.warning(f"Failed to determine fallback PFC workspace: {e}")
+            fallback = Path.cwd() / "pfc_workspace"
+            fallback.mkdir(parents=True, exist_ok=True)
+            return str(fallback)
 
     # Non-PFC profiles: use aiNagisa/workspace
     try:
