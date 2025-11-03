@@ -374,7 +374,7 @@ itasca.command(f'ball create position {position} radius 0.1')  # Python tuple �
 
 **Reset timing**: After tests (clear artifacts), before production runs, when starting new scenarios
 
-**Usage**: `pfc_reset()` → clean state → run production script
+**Reset method**: Execute script with `itasca.command('model new')` → clean state → run production script
 
 ---
 
@@ -422,7 +422,7 @@ Before running any PFC simulation, ensure these components are configured:
    - Add monitoring loop with progress reporting
    - Include model save and data export
 
-5. Reset state: pfc_reset() to clear test artifacts
+5. Reset state: Execute script with `itasca.command('model new')` to clear test artifacts
 
 6. Execute production: pfc_execute_script(production_script, run_in_background=True)
    → Returns task_id for monitoring
@@ -473,7 +473,7 @@ Error: "unknown parameter 'count'"
 
 ```
 Current State:
-[Model] Clean (after pfc_reset)
+[Model] Clean (after model new)
 [Ready] Ready for: model new, initialization
 [Note] State will persist after script execution
 ```
