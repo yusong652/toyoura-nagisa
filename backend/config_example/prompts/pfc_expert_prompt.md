@@ -291,7 +291,8 @@ pfc_check_task_status(task_id)
 
 **Channel 1: Real-Time Monitoring (print() statements)**
 ```python
-print(f"Cycle {cycle}: avg_velocity={avg_vel:.3f} m/s")
+current_time = itasca.mech_age()  # Get simulation time
+print(f"Time {current_time:.3f}s: avg_velocity={avg_vel:.3f} m/s")
 print(f"Equilibrium ratio: {ratio:.2%}")
 print("[OK] Checkpoint saved")
 ```
@@ -300,8 +301,8 @@ print("[OK] Checkpoint saved")
 
 **Channel 2: Checkpoint Persistence (model save)**
 ```python
-itasca.command("model save 'workspace/checkpoints/initial.sav'")
-itasca.command(f"model save 'workspace/checkpoints/strain_{strain:.3f}.sav'")
+itasca.command("model save '{workspace_root}/checkpoints/initial.sav'")
+itasca.command(f"model save '{workspace_root}/checkpoints/strain_{strain:.3f}.sav'")
 ```
 - Preserves complete simulation state
 - Use for: resumption, critical stages
@@ -310,19 +311,33 @@ itasca.command(f"model save 'workspace/checkpoints/strain_{strain:.3f}.sav'")
 ```python
 import csv, json
 
-# Large datasets → CSV (process with analysis scripts)
-with open('workspace/results/positions.csv', 'w') as f:
+# Large datasets → CSV (export in PFC script, analyze with local Python)
+with open('{workspace_root}/results/positions.csv', 'w') as f:
     writer = csv.writer(f)
     writer.writerow(['id', 'pos_x', 'pos_y', 'pos_z'])
     for ball in itasca.ball.list():
         writer.writerow([ball.id(), ball.pos_x(), ball.pos_y(), ball.pos_z()])
 
 # Small metadata → JSON (direct reading OK)
-with open('workspace/results/summary.json', 'w') as f:
+with open('{workspace_root}/results/summary.json', 'w') as f:
     json.dump({'total_balls': itasca.ball.count()}, f)
 ```
 - Use for: post-simulation analysis
-- **Important**: Write analysis scripts for CSV, don't read directly
+- **CSV Analysis**: Write analysis scripts and execute with `bash` tool (local Python 3.11+ environment)
+
+**CSV Analysis Workflow**:
+```python
+# 1. Create analysis script: {workspace_root}/analysis/analyze_positions.py
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('{workspace_root}/results/positions.csv')
+# Perform analysis with modern libraries
+
+# 2. Execute via bash tool
+# bash: python {workspace_root}/analysis/analyze_positions.py
+```
 
 ### String Formatting for Dynamic Commands
 
