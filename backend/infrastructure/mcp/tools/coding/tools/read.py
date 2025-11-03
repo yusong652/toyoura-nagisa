@@ -107,7 +107,14 @@ class ProcessingResult:
 def _detect_file_type(file_path: Path) -> FileType:
     """Detect file type from extension and content."""
     ext = file_path.suffix.lower()
-    
+
+    # Special handling for dotfiles (e.g., .gitignore, .env)
+    # These files have no suffix, so check the full name
+    if not ext and file_path.name.startswith('.'):
+        full_name = file_path.name.lower()
+        if full_name in TEXT_EXTENSIONS:
+            return FileType.TEXT
+
     if ext in TEXT_EXTENSIONS:
         return FileType.TEXT
     elif ext in IMAGE_EXTENSIONS:
@@ -281,15 +288,18 @@ def _read_file_safely(
     """Read file with basic safety checks."""
     # Detect encoding for text files
     encoding, _ = _detect_encoding(file_path)
-    
+
     # Read content based on file type
     file_type = _detect_file_type(file_path)
-    
-    if file_type == FileType.TEXT and encoding:
+
+    if file_type == FileType.TEXT:
+        # For TEXT files, use detected encoding or fallback to UTF-8
+        # This ensures .gitignore and other text files are always read as text
+        encoding = encoding or 'utf-8'
         processing_result = _read_text_content(file_path, encoding, offset, limit)
     else:
         processing_result = _read_binary_content(file_path)
-    
+
     return processing_result, file_type, encoding
 
 # -----------------------------------------------------------------------------

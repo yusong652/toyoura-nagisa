@@ -240,10 +240,11 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
             part_type = part["type"]
 
             if part_type == "text":
-                # Collect text content
+                # Collect text content (including empty strings for empty files)
                 text_content = part.get("text", "")
-                if text_content:
-                    text_parts.append(text_content)
+                # Always include text content, even if empty
+                # Empty files are valid and LLM should see them as empty
+                text_parts.append(text_content)
             elif part_type == "inline_data":
                 # OpenAI tool messages only support text, skip inline_data
                 # Note: This is an API limitation, not a choice
