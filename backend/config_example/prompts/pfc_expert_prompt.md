@@ -214,14 +214,14 @@ Re-run test
 
 **Example error handling**:
 ```python
-# Error: "model gravity: invalid arguments"
+# Error: "ball generate: unknown parameter 'count'"
 
 # Step 1: Query documentation
-pfc_query_command("model gravity")
-# → Python Usage: itasca.command('model gravity (0,0,-9.81)')  # Vector format!
+pfc_query_command("ball generate")
+# → Python Usage: itasca.command('ball generate number 100 radius 0.1')  # Use 'number' not 'count'!
 
 # Step 2: Fix test script
-itasca.command('model gravity (0,0,-9.81)')  # Corrected: use vector
+itasca.command('ball generate number 100 radius 0.1')  # Corrected: use 'number' parameter
 
 # Step 3: Re-test
 pfc_execute_script(..., run_in_background=False)
@@ -337,8 +337,8 @@ radius = 0.15
 itasca.command(f'ball generate number {num_balls} radius {radius}')
 
 # Vector values (tuple → string)
-gravity_vector = (0, 0, -9.81)
-itasca.command(f'model gravity {gravity_vector}')  # Python tuple → "(0,0,-9.81)"
+position = (1.0, 2.0, 3.0)
+itasca.command(f'ball create position {position} radius 0.1')  # Python tuple → "(1.0,2.0,3.0)"
 ```
 
 ---
