@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
+  <img src="./frontend/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
 </p>
 
 <p align="center">
