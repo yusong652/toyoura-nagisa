@@ -30,10 +30,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const currentSessionIdRef = useRef<string | null>(null)
   const maxReconnectAttempts = 5
 
+  // Track if component is mounted to handle React StrictMode double-mounting
+  const isMountedRef = useRef<boolean>(true)
+  const isConnectingRef = useRef<boolean>(false)
+
   // Clean up WebSocket connections on component unmount
   useEffect(() => {
+    isMountedRef.current = true
+
     return () => {
       // Cleanup function: executed on component unmount or hot reload
+      isMountedRef.current = false
+      isConnectingRef.current = false
       console.log("[WebSocket] Component unmounting, cleaning up connections...")
       if (wsRef.current) {
         try {
@@ -142,6 +150,18 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const connectToSession = useCallback((sessionId: string) => {
     if (!sessionId) return
 
+    // Don't connect if component is not mounted (handles React StrictMode)
+    if (!isMountedRef.current) {
+      console.log(`[WebSocket] Component not mounted, skipping connection to ${sessionId}`)
+      return
+    }
+
+    // If we're already connecting, don't create another connection
+    if (isConnectingRef.current) {
+      console.log(`[WebSocket] Already connecting, skipping duplicate connection to ${sessionId}`)
+      return
+    }
+
     // If we're already connected to this session, don't create another connection
     if (currentSessionIdRef.current === sessionId &&
         wsRef.current &&
@@ -149,6 +169,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       console.log(`[WebSocket] Already connected to session ${sessionId}, skipping`)
       return
     }
+
+    // Mark as connecting
+    isConnectingRef.current = true
 
     // Clear any existing reconnect timeout
     if (reconnectTimeoutRef.current) {
@@ -175,9 +198,19 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
     ws.onopen = () => {
       try {
+        // Only update state if component is still mounted
+        if (!isMountedRef.current) {
+          console.log("[WebSocket] Component unmounted during connection, closing WebSocket")
+          ws.close(1000, "Component unmounted")
+          return
+        }
+
         console.log("[WebSocket] connected for session", sessionId)
         setConnectionStatus(() => ConnectionStatus.CONNECTED)
         setConnectionError(() => null)
+
+        // Clear connecting flag
+        isConnectingRef.current = false
 
         // Reset reconnect attempts on successful connection
         if (reconnectAttemptsRef.current !== undefined) {
@@ -188,33 +221,43 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         (window as any).__wsConnection = ws
       } catch (error) {
         console.error("[WebSocket] Error in onopen handler:", error)
+        isConnectingRef.current = false
       }
     }
 
     ws.onclose = (event) => {
       console.log("[WebSocket] closed for session", sessionId, "Code:", event.code, "Reason:", event.reason)
-      // Use more stable state update method
-      try {
-        setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
-      } catch (error) {
-        console.error("[WebSocket] Error updating connection status:", error)
+
+      // Clear connecting flag
+      isConnectingRef.current = false
+
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        try {
+          setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+        } catch (error) {
+          console.error("[WebSocket] Error updating connection status:", error)
+        }
       }
 
       // Clear global WebSocket reference
       (window as any).__wsConnection = null
 
       // Only attempt reconnect if:
-      // 1. It wasn't a clean close (code !== 1000)
-      // 2. This session is still the current session
-      // 3. We have a valid session ID
-      if (event.code !== 1000 && currentSessionIdRef.current === sessionId && sessionId) {
+      // 1. Component is still mounted
+      // 2. It wasn't a clean close (code !== 1000)
+      // 3. This session is still the current session
+      // 4. We have a valid session ID
+      if (isMountedRef.current && event.code !== 1000 && currentSessionIdRef.current === sessionId && sessionId) {
         console.log("[WebSocket] Connection lost for current session, attempting to reconnect...")
 
         // Inline reconnect logic to avoid circular dependency
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
           console.log("[WebSocket] Max reconnect attempts reached")
-          setConnectionStatus(() => ConnectionStatus.ERROR)
-          setConnectionError(() => "Maximum reconnection attempts reached")
+          if (isMountedRef.current) {
+            setConnectionStatus(() => ConnectionStatus.ERROR)
+            setConnectionError(() => "Maximum reconnection attempts reached")
+          }
           return
         }
 
@@ -224,9 +267,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         console.log(`[WebSocket] Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} after ${delay}ms`)
 
         reconnectTimeoutRef.current = setTimeout(async () => {
-          // Double check this is still the current session before reconnecting
-          if (currentSessionIdRef.current !== sessionId) {
-            console.log(`[WebSocket] Session changed during reconnect delay, aborting reconnect for ${sessionId}`)
+          // Triple check: component mounted, still current session
+          if (!isMountedRef.current || currentSessionIdRef.current !== sessionId) {
+            console.log(`[WebSocket] Component unmounted or session changed during reconnect delay, aborting reconnect for ${sessionId}`)
             return
           }
 
@@ -238,7 +281,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             } else {
               console.log(`[WebSocket] Session ${sessionId} no longer exists, stopping reconnection`)
               currentSessionIdRef.current = null
-              setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+              if (isMountedRef.current) {
+                setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+              }
             }
           } catch (error) {
             console.error(`[WebSocket] Error validating session ${sessionId}:`, error)
@@ -246,7 +291,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             if (reconnectAttemptsRef.current >= maxReconnectAttempts - 1) {
               console.log("[WebSocket] Cannot validate session, stopping reconnection")
               currentSessionIdRef.current = null
-              setConnectionStatus(() => ConnectionStatus.ERROR)
+              if (isMountedRef.current) {
+                setConnectionStatus(() => ConnectionStatus.ERROR)
+              }
             } else {
               connectToSession(sessionId)
             }
@@ -259,8 +306,15 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
     ws.onerror = (e) => {
       console.error("[WebSocket] error", e)
-      setConnectionStatus(() => ConnectionStatus.ERROR)
-      setConnectionError(() => "WebSocket connection error")
+
+      // Clear connecting flag
+      isConnectingRef.current = false
+
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setConnectionStatus(() => ConnectionStatus.ERROR)
+        setConnectionError(() => "WebSocket connection error")
+      }
     }
     
     // Handle incoming WebSocket messages
@@ -422,6 +476,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const disconnect = useCallback(() => {
     // Clear reconnection attempts when manually disconnecting
     currentSessionIdRef.current = null
+    isConnectingRef.current = false
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
       reconnectTimeoutRef.current = null
@@ -433,7 +489,10 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       } catch (_) {}
       wsRef.current = null
     }
-    setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+
+    if (isMountedRef.current) {
+      setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+    }
   }, [])
 
 
