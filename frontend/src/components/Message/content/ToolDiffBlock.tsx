@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { ToolUseBlock as ToolUseBlockType } from '../../../types/chat'
 import { useConnection } from '../../../contexts/connection/ConnectionContext'
 import ToolDiffViewer from './ToolDiffViewer'
+import ToolDiffViewerErrorBoundary from './ToolDiffViewerErrorBoundary'
 import './ToolDiffBlock.css'
 
 interface ToolDiffBlockProps {
@@ -167,13 +168,15 @@ const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block }) => {
   return (
     <div className="tool-diff-block">
       {/* Core diff visualization */}
-      <ToolDiffViewer
-        toolName={block.name as 'edit' | 'write'}
-        filePath={block.input?.file_path as string}
-        oldString={block.input?.old_string as string | undefined}
-        newString={block.input?.new_string as string | undefined}
-        content={block.input?.content as string | undefined}
-      />
+      <ToolDiffViewerErrorBoundary>
+        <ToolDiffViewer
+          toolName={block.name as 'edit' | 'write'}
+          filePath={block.input?.file_path as string}
+          oldString={block.input?.old_string as string | undefined}
+          newString={block.input?.new_string as string | undefined}
+          content={block.input?.content as string | undefined}
+        />
+      </ToolDiffViewerErrorBoundary>
 
       {/* Confirmation UI - matches bash tool style */}
       {confirmationStatus && (

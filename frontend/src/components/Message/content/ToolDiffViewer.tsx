@@ -50,6 +50,13 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
   const [isExpanded, setIsExpanded] = useState(true)
 
   /**
+   * Type guard to ensure value is a string.
+   */
+  const isString = (value: any): value is string => {
+    return typeof value === 'string'
+  }
+
+  /**
    * Generate diff lines from tool parameters.
    *
    * For 'write' tool: Shows entire content as additions (green)
@@ -60,7 +67,7 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
 
     if (toolName === 'write') {
       // For write tool, show entire content as additions
-      if (content) {
+      if (isString(content)) {
         const contentLines = content.split('\n')
         contentLines.forEach((line, idx) => {
           lines.push({
@@ -73,7 +80,7 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
     } else if (toolName === 'edit') {
       // For edit tool, show deletions and additions
       // Deletions start from line 1
-      if (oldString) {
+      if (isString(oldString)) {
         const oldLines = oldString.split('\n')
         oldLines.forEach((line, idx) => {
           lines.push({
@@ -85,7 +92,7 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
       }
 
       // Additions also start from line 1 (new content)
-      if (newString) {
+      if (isString(newString)) {
         const newLines = newString.split('\n')
         newLines.forEach((line, idx) => {
           lines.push({
@@ -107,15 +114,31 @@ const ToolDiffViewer: React.FC<ToolDiffViewerProps> = ({
     return { additions, deletions }
   }, [diffLines])
 
-  // Extract filename from path
-  const fileName = filePath.split(/[/\\]/).pop() || filePath
+  // Extract filename from path with null safety
+  const fileName = isString(filePath) ? (filePath.split(/[/\\]/).pop() || filePath) : 'Unknown file'
+  const safeFilePath = isString(filePath) ? filePath : ''
+
+  // Early return if no valid file path is provided
+  if (!isString(filePath)) {
+    return (
+      <div className="tool-diff-viewer">
+        <div className="diff-header">
+          <div className="diff-file-info">
+            <span className="diff-file-name" style={{ color: '#ef4444' }}>
+              Invalid file path data
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="tool-diff-viewer">
       <div className="diff-header">
         <div className="diff-file-info">
           <span className="diff-file-name">{fileName}</span>
-          <span className="diff-file-path">{filePath}</span>
+          <span className="diff-file-path">{safeFilePath}</span>
         </div>
 
         <div className="diff-stats">
