@@ -85,13 +85,16 @@ class CommandFormatter:
             parts.append("## Examples")
             for example in examples:
                 example_desc = example.get("description", "")
-                example_code = example.get("code", "")
+                example_command = example.get("command", "")
+
                 if example_desc:
                     parts.append(example_desc)
-                if example_code:
+
+                if example_command:
                     parts.append("```")
-                    parts.append(example_code)
+                    parts.append(example_command)
                     parts.append("```")
+                parts.append("")
             parts.append("")
 
         # Notes (moved before Python Usage for better visibility)
