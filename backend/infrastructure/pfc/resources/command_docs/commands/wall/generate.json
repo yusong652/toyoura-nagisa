@@ -118,6 +118,7 @@
     "workaround": "itasca.command('wall generate ...') - Python SDK does not provide wall geometry generation"
   },
   "notes": [
+    "IMPORTANT: The id, name, and group keywords must be given prior to any additional keywords (shape keywords like box, cylinder, etc.)",
     "This command is designed for generating complete geometric bodies composed of multiple wall elements (e.g., box creates 6 separate walls by default)",
     "For box shape: Each face gets auto-generated name suffix (Top/Bottom/Left/Right/Front/Back + ID)",
     "Python SDK access requires finding each face individually: itasca.wall.find('nameTopXX') where XX is wall ID",
