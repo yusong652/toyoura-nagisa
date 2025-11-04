@@ -94,6 +94,14 @@ class CommandFormatter:
                     parts.append("```")
             parts.append("")
 
+        # Notes (moved before Python Usage for better visibility)
+        notes = doc.get("notes", [])
+        if notes:
+            parts.append("## Important Notes")
+            for note in notes:
+                parts.append(f"- {note}")
+            parts.append("")
+
         # Python SDK Alternative (supports both old and new format)
         python_alt = doc.get("python_alternative", "")
         python_sdk_alt = doc.get("python_sdk_alternative", {})
@@ -110,14 +118,6 @@ class CommandFormatter:
             # Old format - keep for backward compatibility
             parts.append("## Python SDK Alternative")
             parts.append(python_alt)
-            parts.append("")
-
-        # Notes
-        notes = doc.get("notes", [])
-        if notes:
-            parts.append("## Notes")
-            for note in notes:
-                parts.append(f"- {note}")
             parts.append("")
 
         # Related Commands

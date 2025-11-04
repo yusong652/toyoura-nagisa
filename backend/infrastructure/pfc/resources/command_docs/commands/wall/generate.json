@@ -27,7 +27,7 @@
     {
       "name": "box",
       "syntax": "box <fxmin> <fxmax> <fymin> <fymax> <fzmin> <fzmax> one-wall expand <fe>",
-      "description": "Generate closed box (z-components 3D only). Default: separate walls for each side. Use one-wall for single wall. If only fxmin/fxmax given, creates cube. expand: expand each side by factor fe"
+      "description": "Generate closed box (z-components 3D only). Default: each side is a separate wall with auto-generated names. If name='mybox' is specified, PFC creates walls named 'myboxTopXX', 'myboxBottomXX', 'myboxLeftXX', 'myboxRightXX', 'myboxFrontXX', 'myboxBackXX' (3D) or 'myboxTopXX', 'myboxBottomXX', 'myboxLeftXX', 'myboxRightXX' (2D), where XX is the wall ID. **Python SDK Access**: Use itasca.wall.find('myboxTopXX') to get each face. **Alternative**: Use 'wall create' for independent control of each face without name concatenation. Use one-wall keyword for single wall. If only fxmin/fxmax given, creates cube. expand: expand each side by factor fe"
     },
     {
       "name": "circle",
@@ -116,5 +116,11 @@
   "python_sdk_alternative": {
     "available": false,
     "workaround": "itasca.command('wall generate ...') - Python SDK does not provide wall geometry generation"
-  }
+  },
+  "notes": [
+    "This command is designed for generating complete geometric bodies composed of multiple wall elements (e.g., box creates 6 separate walls by default)",
+    "For box shape: Each face gets auto-generated name suffix (Top/Bottom/Left/Right/Front/Back + ID)",
+    "Python SDK access requires finding each face individually: itasca.wall.find('nameTopXX') where XX is wall ID",
+    "For independent control of individual faces with custom names, use 'wall create' instead to avoid name concatenation"
+  ]
 }
