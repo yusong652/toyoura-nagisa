@@ -1,12 +1,6 @@
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/Nagisa.png?v=2" alt="aiNagisa Logo" width="200"/>
-</p>
-
-<h1 align="center">aiNagisa</h1>
-
-<p align="center">
-  <strong>An extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework.</strong>
+  <img src="https://raw.githubusercontent.com/yusong652/aiNagisa/main/frontend/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
 </p>
 
 <p align="center">
