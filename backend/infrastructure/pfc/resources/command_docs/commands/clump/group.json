@@ -5,23 +5,23 @@
     "group",
     "assign"
   ],
-  "description": "Specify clump or pebble group names. Groups are used to organize clumps and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'. Use the add keyword to assign the group name to the next available slot and the remove keyword to remove the group from all slots. The optional pebble keyword can be given before the optional range to specify that the group name will be applied to pebbles. In this case, the range is applied to pebbles and not to clumps.",
+  "description": "Specify clump or pebble group names. Groups are used to organize clumps and apply commands to specific subsets. By default, the group name is assigned to the slot 'Default'. The optional pebble keyword can be given before the optional range to specify that the group name will be applied to pebbles. In this case, the range is applied to pebbles and not to clumps. IMPORTANT: The 'add' and 'remove' keywords apply to ALL clumps/pebbles (or a previously active range), they cannot be combined with a 'range' keyword in the same command.",
   "syntax": "clump group <s> <keyword> ... <pebble> <range>",
   "keywords": [
     {
       "name": "slot",
       "syntax": "slot <slot>",
-      "description": "Assign group s to slot slot (default slot: 'Default')"
+      "description": "Assign group s to slot slot (default slot: 'Default'). Can be combined with range"
     },
     {
       "name": "add",
       "syntax": "add",
-      "description": "Assign group s to next available slot (preserves existing groups)"
+      "description": "Assign group s to next available slot for ALL clumps/pebbles (cannot be used with range in same command)"
     },
     {
       "name": "remove",
       "syntax": "remove",
-      "description": "Remove group s from all slots"
+      "description": "Remove group s from all slots for ALL clumps/pebbles (cannot be used with range in same command)"
     },
     {
       "name": "pebble",
@@ -53,8 +53,12 @@
       "description": "Assign clumps 1-100 to group 'aggregate' in slot 'material'"
     },
     {
-      "command": "clump group 'active' add range position-z 0 10",
-      "description": "Add group 'active' to next available slot for clumps in z-range"
+      "command": "clump group 'active' range position-z 0 10",
+      "description": "Assign clumps in z-range 0-10 to group 'active' in default slot"
+    },
+    {
+      "command": "clump group 'active' add",
+      "description": "Assign ALL clumps to group 'active' in next available slot"
     },
     {
       "command": "clump group 'pebble_group' pebble range id 1 50",

@@ -5,23 +5,23 @@
     "group",
     "assign"
   ],
-  "description": "Specify wall or facet group names. Use of the group logic is described in Groups documentation. By default, s is assigned to the group slot 'Default'. Use the 'add' keyword to assign the group name to the next available slot and the 'remove' keyword to remove s from all slots. The optional 'facet' keyword can be given before the optional range to specify that the group name will be applied to facets. In this case, the range is applied to facets and not to walls.",
+  "description": "Specify wall or facet group names. Use of the group logic is described in Groups documentation. By default, s is assigned to the group slot 'Default'. The optional 'facet' keyword can be given before the optional range to specify that the group name will be applied to facets. In this case, the range is applied to facets and not to walls. IMPORTANT: The 'add', 'remove', and 'slot' keywords apply to ALL walls/facets (or a previously active range), they cannot be combined with a 'range' keyword in the same command.",
   "syntax": "wall group <s> <keyword> ... <facet> <range>",
   "keywords": [
     {
       "name": "add",
       "syntax": "add",
-      "description": "Assign group name s to the next available slot"
+      "description": "Assign group name s to the next available slot for ALL walls/facets (cannot be used with range in same command)"
     },
     {
       "name": "remove",
       "syntax": "remove",
-      "description": "Remove group name s from all slots"
+      "description": "Remove group name s from all slots for ALL walls/facets (cannot be used with range in same command)"
     },
     {
       "name": "slot",
       "syntax": "slot <slot>",
-      "description": "Set group slot to s. Default slot: 'Default'"
+      "description": "Set group slot to s. Default slot: 'Default'. Can be combined with range"
     },
     {
       "name": "facet",
@@ -43,8 +43,8 @@
       "description": "Assign all walls to group 'container' in slot 'A'"
     },
     {
-      "command": "wall group 'walls' add range id 1 10",
-      "description": "Add walls with IDs 1-10 to group 'walls' in next available slot"
+      "command": "wall group 'walls' range id 1 10",
+      "description": "Assign walls with IDs 1-10 to group 'walls' in default slot"
     },
     {
       "command": "wall group 'oldgroup' remove",
@@ -52,11 +52,15 @@
     },
     {
       "command": "wall group 'top' facet range position-z 9 10",
-      "description": "Assign facets at z-position 9-10 to group 'top'"
+      "description": "Assign facets at z-position 9-10 to group 'top' in default slot"
     },
     {
       "command": "wall group 'layer1' slot 'layer' range name 'foundation'",
       "description": "Assign walls named 'foundation' to group 'layer1' in slot 'layer'"
+    },
+    {
+      "command": "wall group 'bot' range group 'top' not",
+      "description": "Assign walls NOT in group 'top' to group 'bot' (from official docs)"
     }
   ],
   "python_sdk_alternative": {

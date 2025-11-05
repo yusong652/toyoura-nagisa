@@ -5,13 +5,13 @@
     "group",
     "assign"
   ],
-  "description": "Assign group names to contacts for organization and range-based selection. Groups are a fundamental organizational tool in PFC, allowing contacts to be categorized, selected, and manipulated based on group membership. Contacts can belong to multiple groups via different slots. By default, the group name is assigned to the 'Default' slot. Use 'add' keyword to assign to next available slot, 'remove' keyword to remove from all slots, and 'slot' keyword to specify a particular slot. By default, only mechanical contacts are considered.",
+  "description": "Assign group names to contacts for organization and range-based selection. Groups are a fundamental organizational tool in PFC, allowing contacts to be categorized, selected, and manipulated based on group membership. Contacts can belong to multiple groups via different slots. By default, the group name is assigned to the 'Default' slot. Use 'slot' keyword to specify a particular slot. By default, only mechanical contacts are considered. IMPORTANT: The 'add' and 'remove' keywords apply to ALL contacts (or a previously active range), they cannot be combined with a 'range' keyword in the same command.",
   "syntax": "contact group <s> <keyword> ... <range>",
   "keywords": [
     {
       "name": "slot",
       "syntax": "slot <slot>",
-      "description": "Specify which group slot to use for assignment. By default, uses slot 'Default'",
+      "description": "Specify which group slot to use for assignment. By default, uses slot 'Default'. Can be combined with range",
       "parameters": [
         {
           "name": "slot",
@@ -23,12 +23,12 @@
     {
       "name": "add",
       "syntax": "add",
-      "description": "Assign group name to the next available slot. Allows contact to be in multiple groups simultaneously"
+      "description": "Assign group name to the next available slot for ALL contacts (cannot be used with range in same command)"
     },
     {
       "name": "remove",
       "syntax": "remove",
-      "description": "Remove group name from all slots. Contact will no longer be in this group"
+      "description": "Remove group name from all slots for ALL contacts (cannot be used with range in same command)"
     },
     {
       "name": "mechanical",
@@ -68,8 +68,13 @@
       "use_case": "Multiple classification schemes using different slots"
     },
     {
-      "command": "contact group 'bonded' add range model linearpbond contact bonded",
-      "description": "Add 'bonded' group to next available slot for bonded contacts",
+      "command": "contact group 'bonded' range model linearpbond contact bonded",
+      "description": "Assign 'bonded' group to bonded contacts in default slot",
+      "use_case": "Identify bonded contacts for analysis"
+    },
+    {
+      "command": "contact group 'bonded' add",
+      "description": "Assign ALL contacts to 'bonded' group in next available slot",
       "use_case": "Multiple group membership without overwriting existing groups"
     },
     {
@@ -154,8 +159,8 @@
     "Contacts can belong to multiple groups using different slots",
     "Default slot is 'Default' if not specified",
     "Groups enable range-based selection: 'range group <name>'",
-    "Use 'add' keyword to add to next available slot without overwriting",
-    "Use 'remove' keyword to remove group from all slots",
+    "Use 'add' keyword to add to next available slot for ALL contacts (cannot be combined with range)",
+    "Use 'remove' keyword to remove group from all slots for ALL contacts (cannot be combined with range)",
     "More efficient than Python iteration for bulk group assignment",
     "Groups are fundamental to PFC's organizational system",
     "Group membership persists until explicitly changed or contact deleted"
@@ -192,9 +197,9 @@
       "effect": "Assigns 'top' to 'region' slot, 'Default' slot unaffected"
     },
     "add_keyword": {
-      "command": "contact group 'bonded' add range ...",
+      "command": "contact group 'bonded' add",
       "slot_used": "Next available slot (automatically chosen)",
-      "effect": "Assigns 'bonded' to first empty slot, existing groups preserved"
+      "effect": "Assigns 'bonded' to first empty slot for ALL contacts, existing groups preserved. Cannot be combined with range"
     },
     "remove_keyword": {
       "command": "contact group 'temporary' remove range ...",
@@ -311,7 +316,7 @@
       "message": "Assigning to same slot overwrites previous group name in that slot",
       "severity": "LOW",
       "example": "contact group 'A' range ... then contact group 'B' range ... → second overwrites 'A' in Default slot",
-      "mitigation": "Use 'add' keyword or different slots to preserve multiple groups"
+      "mitigation": "Use different slots to preserve multiple groups with range: contact group <name> slot <slot> range ..."
     },
     {
       "type": "case_sensitive",
@@ -340,8 +345,8 @@
       "issue": "Group disappeared after reassignment",
       "solutions": [
         "Assigning to same slot overwrites previous group",
-        "Use 'add' keyword to preserve existing groups: contact group <name> add range ...",
-        "Or use different slots: contact group <name> slot <slot> range ...",
+        "Use 'add' keyword to preserve existing groups for ALL contacts: contact group <name> add (cannot be combined with range)",
+        "Or use different slots with range: contact group <name> slot <slot> range ...",
         "Check if using same slot unintentionally"
       ]
     },
@@ -437,7 +442,7 @@
     "Establish naming convention (e.g., lowercase, underscore-separated)",
     "Document group assignments in simulation scripts",
     "Use custom slots for multiple independent classification schemes",
-    "Use 'add' keyword when building up multiple group memberships",
+    "Use 'add' keyword when assigning ALL contacts to multiple group memberships (no range)",
     "Verify group assignments with 'contact list' before using",
     "Use group-based selection to simplify range specifications",
     "Clean up temporary groups with 'remove' keyword when done"
