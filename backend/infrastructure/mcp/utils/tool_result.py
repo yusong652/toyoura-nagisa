@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Unified Pydantic models for tool responses.
 
-All tools should return one of these models (converted to `dict` via 
+All tools should return one of these models (converted to `dict` via
 :pymeth:`pydantic.BaseModel.model_dump`) to ensure:
 
 1. **Explicit Schema**: Output structure is machine-readable for automatic docs
@@ -17,11 +17,100 @@ Each tool should:
 - Include relevant metadata in `data` for debugging
 """
 
+import re
 from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
 __all__ = ["ToolResult", "success_response", "error_response", "user_rejected_response"]
+
+
+# -----------------------------------------------------------------------------
+# ANSI Escape Sequence Cleaning
+# -----------------------------------------------------------------------------
+
+# Precompiled regex for ANSI escape sequences (color codes, cursor control, etc.)
+# Matches patterns like: \x1b[0m, \x1b[36m, \x1b[1;32m
+# This is safe because ANSI codes have a well-defined format and won't match user text
+ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-9;]*m')
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI escape sequences (color codes) from text.
+
+    Many CLI tools (uv, npm, pytest, etc.) output colored text using ANSI escape
+    sequences when they detect a TTY. These codes appear as "garbage" to LLMs
+    and users when captured via subprocess.
+
+    Args:
+        text: Input string that may contain ANSI escape sequences
+
+    Returns:
+        Clean string with all ANSI codes removed
+
+    Example:
+        >>> strip_ansi_codes("\x1b[36magent-20251104-beta\x1b[39m")
+        'agent-20251104-beta'
+
+        >>> strip_ansi_codes("[36magent-20251104-beta[39m")  # Partial ANSI codes (malformed)
+        '[36magent-20251104-beta[39m'  # Only removes complete sequences
+
+    Safety:
+        - Only matches standard ANSI escape sequences (\x1b[...m)
+        - Won't affect normal text that happens to contain brackets
+        - Based on industry-standard patterns (used by strip-ansi, etc.)
+    """
+    if not isinstance(text, str):
+        return text
+    return ANSI_ESCAPE_PATTERN.sub('', text)
+
+
+def clean_llm_content(content: Any) -> Any:
+    """Recursively clean ANSI codes from llm_content.
+
+    This function handles multiple llm_content formats:
+    - Simple string: "text with \x1b[36mcolor\x1b[39m"
+    - Parts structure: {"parts": [{"type": "text", "text": "..."}]}
+    - None or other types: passed through unchanged
+
+    Args:
+        content: llm_content value of any type
+
+    Returns:
+        Cleaned content with ANSI codes removed from all text fields
+
+    Example:
+        >>> clean_llm_content("\x1b[36mHello\x1b[39m")
+        'Hello'
+
+        >>> clean_llm_content({
+        ...     "parts": [{"type": "text", "text": "\x1b[36mHello\x1b[39m"}]
+        ... })
+        {'parts': [{'type': 'text', 'text': 'Hello'}]}
+    """
+    if content is None:
+        return None
+
+    # Handle simple string content
+    if isinstance(content, str):
+        return strip_ansi_codes(content)
+
+    # Handle parts-based structure (recommended format)
+    if isinstance(content, dict):
+        if 'parts' in content and isinstance(content['parts'], list):
+            cleaned_parts = []
+            for part in content['parts']:
+                if isinstance(part, dict) and 'text' in part:
+                    cleaned_part = part.copy()
+                    cleaned_part['text'] = strip_ansi_codes(part['text'])
+                    cleaned_parts.append(cleaned_part)
+                else:
+                    cleaned_parts.append(part)
+
+            content = content.copy()
+            content['parts'] = cleaned_parts
+
+    return content
 
 
 class ToolResult(BaseModel):
@@ -111,18 +200,22 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
     This function provides a unified way for all tools to return success responses,
     ensuring consistent structure across coding, lifestyle, communication, and other tool categories.
 
+    **Automatic ANSI Cleaning**: This function automatically removes ANSI escape sequences
+    (color codes) from llm_content to prevent "garbage" characters in LLM consumption.
+
     Args:
         message: Brief user-friendly success message for UI display
         llm_content: Content for LLM conversation context in parts format:
             - Recommended: {"parts": [{"type": "text", "text": "..."}]}
             - Also accepts: string (will be used as-is, auto-wrapped by LLM layer)
+            - ANSI codes will be automatically removed
         **data: Tool-specific data fields stored under the 'data' field
 
     Returns:
         Dict[str, Any]: ToolResult dictionary with four fields:
             - status: "success"
             - message: str (user-facing message)
-            - llm_content: Any (provided value or None)
+            - llm_content: Any (cleaned value or None)
             - data: Dict[str, Any] or None
 
     Example:
@@ -134,17 +227,20 @@ def success_response(message: str, llm_content: Any = None, **data: Any) -> Dict
             lines=10
         )
 
-        # Simple string llm_content (also valid)
+        # ANSI codes are automatically cleaned
         return success_response(
-            "Operation completed",
-            llm_content="Process finished with 3 items",
-            count=3
+            "Command executed",
+            llm_content={"parts": [{"type": "text", "text": "\x1b[36moutput\x1b[39m"}]}
         )
+        # Result: llm_content = {"parts": [{"type": "text", "text": "output"}]}
     """
+    # Automatically clean ANSI codes from llm_content
+    cleaned_content = clean_llm_content(llm_content)
+
     return ToolResult(
         status="success",
         message=message,
-        llm_content=llm_content,
+        llm_content=cleaned_content,
         data=data if data else None,
     ).model_dump()
 
@@ -155,17 +251,21 @@ def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, A
     This function provides a unified way for all tools to return error responses,
     ensuring consistent error handling across coding, lifestyle, communication, and other tool categories.
 
+    **Automatic ANSI Cleaning**: This function automatically removes ANSI escape sequences
+    (color codes) from llm_content to prevent "garbage" characters in LLM consumption.
+
     Args:
         message: Brief user-friendly error message with details (e.g., "File not found: example.txt")
         llm_content: Optional custom content for LLM in parts format. If not provided,
             automatically wraps message in <error> tags: {"parts": [{"type": "text", "text": "<error>...</error>"}]}
+            ANSI codes will be automatically removed from custom content.
         **data: Additional error context data (optional)
 
     Returns:
         Dict[str, Any]: ToolResult dictionary with four fields:
             - status: "error"
             - message: str (error description)
-            - llm_content: Any (custom or auto-generated with <error> tags)
+            - llm_content: Any (cleaned custom or auto-generated with <error> tags)
             - data: Dict[str, Any] or None
 
     Note:
@@ -198,10 +298,13 @@ def error_response(message: str, llm_content: Any = None, **data) -> Dict[str, A
             ]
         }
 
+    # Automatically clean ANSI codes from llm_content
+    cleaned_content = clean_llm_content(llm_content)
+
     return ToolResult(
         status="error",
         message=message,
-        llm_content=llm_content,
+        llm_content=cleaned_content,
         data=data if data else None,
     ).model_dump()
 
