@@ -164,6 +164,37 @@ async def glob(
         search_dir = workspace_root
 
     try:
+        # Normalize pattern: if it's an absolute path, convert to relative
+        # This handles cases where LLM generates absolute paths like "C:/workspace/src/*.py"
+        normalized_pattern = pattern
+        if Path(pattern.split('*')[0].rstrip('/')).is_absolute():
+            # Extract the path portion before wildcards
+            try:
+                # Try to make pattern relative to search_dir
+                pattern_base = pattern.split('*')[0].rstrip('/')
+                pattern_base_path = Path(normalize_path_separators(pattern_base))
+
+                # Check if pattern is under search_dir
+                try:
+                    rel_base = pattern_base_path.relative_to(search_dir)
+                    # Reconstruct pattern with relative path
+                    # Replace the absolute base with relative base
+                    normalized_pattern = pattern.replace(
+                        pattern_base,
+                        path_to_llm_format(rel_base) if str(rel_base) != '.' else ''
+                    )
+                    # Clean up leading slashes
+                    normalized_pattern = normalized_pattern.lstrip('/')
+                except ValueError:
+                    # Pattern is outside search_dir, return error
+                    return error_response(
+                        f"Pattern path is outside search directory. "
+                        f"Pattern: {pattern}, Search directory: {path_to_llm_format(search_dir)}"
+                    )
+            except Exception:
+                # If normalization fails, use original pattern
+                pass
+
         # Get git-visible files (respecting .gitignore)
         git_visible_files = _get_git_visible_files(search_dir)
 
@@ -176,7 +207,7 @@ async def glob(
             # Use pathspec for GitWildMatch pattern matching (handles **, *, etc. correctly)
             if PathSpec is not None and GitWildMatchPattern is not None:
                 # Create PathSpec with GitWildMatch pattern (like .gitignore)
-                spec = PathSpec.from_lines(GitWildMatchPattern, [pattern])
+                spec = PathSpec.from_lines(GitWildMatchPattern, [normalized_pattern])
 
                 for file_path in git_visible_files:
                     try:
@@ -210,7 +241,14 @@ async def glob(
                 # Fallback to Path.match if pathspec is not available
                 for file_path in git_visible_files:
                     try:
-                        if file_path.match(pattern):
+                        # Convert to relative path for matching consistency
+                        try:
+                            rel_path = file_path.relative_to(search_dir)
+                        except ValueError:
+                            continue
+
+                        # Match using relative path
+                        if Path(rel_path).match(normalized_pattern):
                             # Check symlink safety (use dynamic workspace root for consistency)
                             if file_path.is_symlink() and not is_safe_symlink(file_path, workspace_root):
                                 continue
