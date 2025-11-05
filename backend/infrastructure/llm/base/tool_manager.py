@@ -407,28 +407,70 @@ class BaseToolManager(ABC):
             # Step 0: Validate edit prerequisite (must read file before editing)
             if tool_name == "edit":
                 file_path = tool_args.get("file_path", "")
-                if file_path and not self._has_read_file(session_id, file_path):
+                if file_path:
+                    from backend.infrastructure.mcp.tools.coding.utils.path_security import validate_path_in_workspace
                     from backend.infrastructure.mcp.utils.tool_result import error_response
+                    from pathlib import Path
 
-                    error_message = (
-                        f"File has not been read yet. Read it first before writing to it.\n\n"
-                        f"You must use the Read tool to read {file_path} before editing it. "
-                        f"This ensures you have the current file content and correct line numbers."
-                    )
+                    # 1. Path security check (reuse existing validation logic)
+                    validated_path = validate_path_in_workspace(file_path)
+                    if validated_path is None:
+                        error_message = f"File path is outside workspace: {file_path}"
+                        llm_settings = get_llm_settings()
+                        if llm_settings.debug:
+                            print(f"[BaseToolManager] Edit blocked: Path outside workspace: {file_path}")
 
-                    llm_settings = get_llm_settings()
-                    if llm_settings.debug:
-                        print(f"[BaseToolManager] Edit blocked: {file_path} not read yet in session {session_id}")
+                        return error_response(
+                            error_message,
+                            llm_content={
+                                "parts": [{
+                                    "type": "text",
+                                    "text": error_message
+                                }]
+                            }
+                        )
 
-                    return error_response(
-                        error_message,
-                        llm_content={
-                            "parts": [{
-                                "type": "text",
-                                "text": error_message
-                            }]
-                        }
-                    )
+                    # 2. File existence check (prevents misleading "not read" errors)
+                    if not Path(validated_path).exists():
+                        error_message = (
+                            f"File not found: {file_path}\n\n"
+                            f"Cannot edit a file that does not exist. Please check the path and try again."
+                        )
+                        llm_settings = get_llm_settings()
+                        if llm_settings.debug:
+                            print(f"[BaseToolManager] Edit blocked: File does not exist: {validated_path}")
+
+                        return error_response(
+                            error_message,
+                            llm_content={
+                                "parts": [{
+                                    "type": "text",
+                                    "text": error_message
+                                }]
+                            }
+                        )
+
+                    # 3. Policy check: Has the file been read in this session?
+                    if not self._has_read_file(session_id, file_path):
+                        error_message = (
+                            f"File has not been read yet. Read it first before editing.\n\n"
+                            f"You must use the Read tool to read {file_path} before editing it. "
+                            f"This ensures you have the current file content and correct line numbers."
+                        )
+
+                        llm_settings = get_llm_settings()
+                        if llm_settings.debug:
+                            print(f"[BaseToolManager] Edit blocked: {file_path} not read yet in session {session_id}")
+
+                        return error_response(
+                            error_message,
+                            llm_content={
+                                "parts": [{
+                                    "type": "text",
+                                    "text": error_message
+                                }]
+                            }
+                        )
 
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
