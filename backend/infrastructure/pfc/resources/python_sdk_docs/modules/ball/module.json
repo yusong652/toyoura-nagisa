@@ -54,19 +54,30 @@
     {
       "name": "energy",
       "signature": "itasca.ball.energy(energy_name: str) -> float",
-      "description": "Get the ball total energy contribution. Sum of energy values across all balls.",
+      "description": "Get the ball total energy contribution. Sum of energy values across all balls. Energy tracking must be enabled with 'model energy' command before use.",
       "parameters": [
         {
           "name": "energy_name",
           "type": "str",
           "required": true,
-          "description": "Name of energy type (e.g., 'kinetic', 'strain')"
+          "description": "Name of energy partition. Valid values: 'energy-body' (body forces/gravity), 'energy-damp' (local damping dissipation), 'energy-kinetic' (kinetic energy)"
         }
       ],
       "returns": {
         "type": "float",
-        "description": "Total energy contribution"
-      }
+        "description": "Total energy contribution summed across all balls"
+      },
+      "notes": [
+        "Energy tracking must be enabled with 'itasca.command(\"model energy on\")' before calling this function",
+        "Energy values are accumulated each cycle for balls, clumps, walls, and contacts",
+        "Use 'energy-body' for energy from gravity/applied forces, 'energy-damp' for damping dissipation, 'energy-kinetic' for kinetic energy"
+      ],
+      "examples": [
+        {
+          "code": "# Enable energy tracking first\nitasca.command('model energy on')\n\n# Get total kinetic energy of all balls\nke = itasca.ball.energy('energy-kinetic')\nprint(f'Total kinetic energy: {ke}')\n\n# Get energy dissipated by damping\ndamp_energy = itasca.ball.energy('energy-damp')\n\n# Get energy from body forces\nbody_energy = itasca.ball.energy('energy-body')",
+          "description": "Query different energy types for all balls"
+        }
+      ]
     },
     {
       "name": "inbox",
