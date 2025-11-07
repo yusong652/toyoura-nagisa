@@ -123,8 +123,9 @@ async def process_chat_request(
                 )
 
             # ========== PHASE 4: Post-processing pipeline ==========
-            # Post-processing handled via WebSocket
-            await process_post_pipeline(session_id, request_id)
+            # Note: Title generation now happens during streaming (see _try_generate_title_async)
+            # No need to call process_post_pipeline here anymore
+            # await process_post_pipeline(session_id, request_id)  # REMOVED: now in-stream
 
             # ========== PHASE 5: Memory persistence ==========
             # Save conversation to memory after successful response
