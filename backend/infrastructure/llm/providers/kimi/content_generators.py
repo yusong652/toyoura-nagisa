@@ -277,50 +277,53 @@ class TitleGenerator(BaseTitleGenerator):
             if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
 
-            # Use base class method to prepare messages
-            messages = BaseTitleGenerator.prepare_title_generation_messages(
-                latest_messages,
-                "Please generate a title for the above conversation"
-            )
-
             # Get Kimi configuration
             llm_settings = get_llm_settings()
             kimi_config = llm_settings.get_kimi_config()
 
-            # Build messages for Chat Completions API
-            chat_messages = [
-                {"role": "system", "content": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT}
-            ]
+            # Use non-thinking model for title generation (fast and concise)
+            title_model = "kimi-k2-0905-preview"
 
-            for msg in messages:
-                # Get role - all message types should have this
+            # Extract text content from messages
+            conversation_parts = []
+            for msg in latest_messages:
                 role = getattr(msg, 'role', 'user')
                 content = getattr(msg, 'content', '')
 
                 # Handle content list or string
                 if isinstance(content, list):
-                    # Extract text from content blocks
+                    # Extract text from content blocks (skip thinking blocks)
                     text_parts = []
                     for block in content:
-                        if isinstance(block, dict) and block.get('type') == 'text':
-                            text_parts.append(block.get('text', ''))
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
                     content_str = '\n'.join(text_parts)
                 else:
                     content_str = str(content)
 
-                chat_messages.append({
-                    "role": role,
-                    "content": content_str
-                })
+                # Add to conversation with role label
+                role_label = "User" if role == "user" else "Assistant"
+                conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Combine conversation into single context
+            conversation_context = '\n'.join(conversation_parts)
+
+            # Build chat messages with conversation as context in user message
+            chat_messages = [
+                {"role": "system", "content": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Please generate a title based on the following conversation:\n\n{conversation_context}"}
+            ]
 
             # Call Kimi API using Chat Completions format
             # Use asyncio.to_thread to avoid blocking the event loop
             response: ChatCompletion = await asyncio.to_thread(
                 client.chat.completions.create,
-                model=kimi_config.model,
+                model=title_model,  # Use non-thinking model for fast title generation
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-                max_tokens=100
+                max_tokens=100  # Sufficient for title generation with non-thinking model
             )
 
             if not response.choices:
@@ -332,7 +335,7 @@ class TitleGenerator(BaseTitleGenerator):
             return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
 
         except Exception as e:
-            print(f"Kimi title generation error: {str(e)}")
+
             return None
 
 
@@ -388,11 +391,16 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
                 # Handle content list or string
                 if isinstance(content, list):
-                    # Extract text from content blocks
+                    # Extract text from content blocks (skip thinking blocks for prompt generation)
                     text_parts = []
                     for block in content:
-                        if isinstance(block, dict) and block.get('type') == 'text':
-                            text_parts.append(block.get('text', ''))
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                            # Skip thinking blocks - they contain reasoning, not conversation content
+                            # elif block_type == 'thinking':
+                            #     pass  # Intentionally skip thinking content
                     content_str = '\n'.join(text_parts)
                 else:
                     content_str = str(content)

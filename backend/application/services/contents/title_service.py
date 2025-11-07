@@ -46,33 +46,43 @@ class TitleService:
                 or 'New Conversation' in current_session.get('name', '')
             )
         )
-        has_pure_text_assistant = any(self._is_pure_text_assistant(msg) for msg in history_msgs)
-        return has_default_title and has_pure_text_assistant
+        has_text_assistant = any(self._has_text_content(msg) for msg in history_msgs)
+        return has_default_title and has_text_assistant
 
-    def _is_pure_text_assistant(self, msg) -> bool:
+    def _has_text_content(self, msg) -> bool:
         """
-        Determine if assistant message is pure text (non-tool message).
+        Check if assistant message has text content for title generation.
 
-        A pure text assistant message does not contain tool_use blocks in its content.
-        Tool use blocks indicate the assistant is calling tools rather than conversing.
+        For title generation, we only need the assistant message to contain
+        at least one text block with actual content. It can also have tool_use
+        blocks - we just need the text part for the title.
+
+        This allows title generation to happen immediately after the first
+        meaningful response, even if it also includes tool calls.
 
         Args:
             msg: Message object to check
 
         Returns:
-            bool: True if message is pure text assistant message, False otherwise
+            bool: True if message has text content, False otherwise
         """
         if getattr(msg, "role", None) != "assistant":
             return False
 
-        # Check content for tool_use blocks
+        # Check if content has at least one text block with actual text
         content = getattr(msg, "content", None)
+
         if isinstance(content, list):
             for block in content:
-                if isinstance(block, dict) and block.get('type') == 'tool_use':
-                    return False
+                if isinstance(block, dict):
+                    # Accept if has text block with non-empty content
+                    if block.get('type') == 'text' and block.get('text', '').strip():
+                        return True
+        elif isinstance(content, str) and content.strip():
+            # Handle string content (legacy format)
+            return True
 
-        return True
+        return False
 
     def _is_pure_text_user(self, msg) -> bool:
         """
@@ -125,12 +135,18 @@ class TitleService:
         latest_assistant_msg = None
 
         for msg in reversed(history_msgs):
+            role = getattr(msg, 'role', None)
+
             # Find latest pure text user message (not tool result)
-            if not latest_user_msg and self._is_pure_text_user(msg):
-                latest_user_msg = msg
-            # Find latest pure text assistant message (not tool use)
-            elif not latest_assistant_msg and self._is_pure_text_assistant(msg):
-                latest_assistant_msg = msg
+            if not latest_user_msg and role == 'user':
+                if self._is_pure_text_user(msg):
+                    latest_user_msg = msg
+
+            # Find latest assistant message with text content (can have tool calls)
+            # Changed from elif to if - both checks should be independent
+            if not latest_assistant_msg and role == 'assistant':
+                if self._has_text_content(msg):
+                    latest_assistant_msg = msg
 
             # Stop searching if found most recent pair of messages
             if latest_user_msg and latest_assistant_msg:
@@ -212,7 +228,10 @@ class TitleService:
                 "success": True
             }
         except Exception as e:
+            import traceback
             print(f"[ERROR] Title generation error: {e}")
+            print(f"[ERROR] Traceback:")
+            traceback.print_exc()
             return {
                 "error": str(e),
                 "success": False

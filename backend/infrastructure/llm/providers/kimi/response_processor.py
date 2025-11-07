@@ -44,6 +44,33 @@ class KimiResponseProcessor(BaseResponseProcessor):
         return message.content or ""
 
     @staticmethod
+    def extract_reasoning_content(response) -> Optional[str]:
+        """
+        Extract reasoning content from Kimi K2 Thinking ChatCompletion response.
+
+        K2 Thinking models expose an auxiliary field `reasoning_content` that contains
+        the model's intermediate reasoning/thinking process before the final answer.
+
+        Args:
+            response: ChatCompletion object from Kimi API
+
+        Returns:
+            Extracted reasoning content as a string, or None if not available.
+        """
+        if not isinstance(response, ChatCompletion):
+            return None
+
+        if not response.choices:
+            return None
+
+        message = response.choices[0].message
+
+        # Access reasoning_content attribute if it exists (K2 Thinking models)
+        reasoning_content = getattr(message, 'reasoning_content', None)
+
+        return reasoning_content if reasoning_content else None
+
+    @staticmethod
     def has_tool_calls(response) -> bool:
         """
         Check if response contains tool calls.
@@ -143,6 +170,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
         - Database storage efficiency
         - Frontend rendering consistency
         - Cross-LLM compatibility (following Gemini/Anthropic pattern)
+        - K2 Thinking model reasoning content support
 
         Args:
             response: ChatCompletion object from Kimi API
@@ -156,6 +184,11 @@ class KimiResponseProcessor(BaseResponseProcessor):
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
 
         content_blocks: List[Dict[str, Any]] = []
+
+        # Extract reasoning content first (K2 Thinking models)
+        reasoning_content = KimiResponseProcessor.extract_reasoning_content(response)
+        if reasoning_content:
+            content_blocks.append({"type": "thinking", "thinking": reasoning_content})
 
         # Extract text content
         text_content = KimiResponseProcessor.extract_text_content(response)

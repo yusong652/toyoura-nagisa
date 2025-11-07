@@ -331,6 +331,9 @@ class LLMClientBase(ABC):
                     streaming=False
                 )
 
+                # Trigger title generation after user interruption (if we have text content)
+                asyncio.create_task(self._try_generate_title_async(session_id))
+
                 # Return partial response (allows user to send next message)
                 return partial_response
 
@@ -386,6 +389,9 @@ class LLMClientBase(ABC):
                     streaming=False
                 )
 
+                # Trigger title generation after content is saved (normal completion without tool calls)
+                asyncio.create_task(self._try_generate_title_async(session_id))
+
             return current_response  # Normal completion
 
         # Process tool calls - add response to context manager
@@ -411,6 +417,11 @@ class LLMClientBase(ABC):
                     content=content,
                     streaming=False
                 )
+
+                # Trigger title generation after first text content is saved
+                # This runs in background without blocking tool execution
+                asyncio.create_task(self._try_generate_title_async(session_id))
+
             except Exception as e:
                 # Log error but don't fail the execution
                 print(f"[WARNING] Failed to update streaming message with tool call content: {e}")
@@ -521,6 +532,41 @@ class LLMClientBase(ABC):
 
         # Continue recursively
         return await self._recursive_tool_calling(session_id, iterations + 1)
+
+    async def _try_generate_title_async(self, session_id: str) -> None:
+        """
+        Asynchronously attempt to generate title when first text content is detected.
+
+        This method runs in the background without blocking the main streaming flow.
+        It checks if title generation is needed and triggers it if appropriate.
+
+        Args:
+            session_id: Session ID to generate title for
+        """
+        try:
+            # Import here to avoid circular dependency
+            from backend.application.services.contents import TitleService
+            from backend.infrastructure.storage.session_manager import load_all_message_history
+            from backend.domain.models.message_factory import message_factory
+            from backend.presentation.streaming.llm_response_handler import send_title_update_notification
+
+            # Load history and check if title generation is needed
+            title_service = TitleService()
+            loaded_history = load_all_message_history(session_id)
+            history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+
+            if title_service.should_generate_title(session_id, history_msgs):
+                # Generate title
+                result = await title_service.generate_title_for_session(session_id, self)
+
+                if result and result.get("success") and result.get("title"):
+                    # Send title update via WebSocket
+                    await send_title_update_notification(session_id, result["title"])
+                    print(f"[INFO] Title auto-generated during streaming for session {session_id}: {result['title']}")
+
+        except Exception as e:
+            # Title generation failure should not affect main flow
+            print(f"[WARNING] Background title generation failed for session {session_id}: {e}")
 
     @abstractmethod
     def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
