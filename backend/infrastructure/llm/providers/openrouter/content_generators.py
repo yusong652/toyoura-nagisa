@@ -9,9 +9,8 @@ For web search capabilities, use native provider implementations.
 """
 
 from typing import Dict, Any, List, Optional, cast
-import asyncio
 import json
-from openai import OpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
@@ -35,14 +34,14 @@ class TitleGenerator(BaseTitleGenerator):
 
     @staticmethod
     async def generate_title_from_messages(
-        client: OpenAI,  # OpenRouter uses sync OpenAI client
+        client: AsyncOpenAI,  # OpenRouter uses async OpenAI client
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: OpenAI client instance (OpenRouter client, sync)
+            client: Async OpenAI client instance (OpenRouter client)
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -90,9 +89,7 @@ class TitleGenerator(BaseTitleGenerator):
                 })
 
             # Call OpenRouter API using Chat Completions format
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response: ChatCompletion = await asyncio.to_thread(
-                client.chat.completions.create,
+            response: ChatCompletion = await client.chat.completions.create(
                 model=openrouter_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
@@ -122,7 +119,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
     @staticmethod
     async def generate_text_to_image_prompt(
-        client: OpenAI,
+        client: AsyncOpenAI,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -130,7 +127,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: OpenRouter OpenAI client instance (sync)
+            client: Async OpenRouter OpenAI client instance
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -182,9 +179,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
                 print(f"[OpenRouter ImagePrompt] Calling API with {len(chat_messages)} messages")
 
             # Call OpenRouter API
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response: ChatCompletion = await asyncio.to_thread(
-                client.chat.completions.create,
+            response: ChatCompletion = await client.chat.completions.create(
                 model=openrouter_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=context.get('temperature', 1.0),
