@@ -85,16 +85,23 @@ class KimiConfig(BaseSettings):
         description="OpenRouter X-Title header"
     )
     openrouter_model: str = Field(
-        default="moonshotai/kimi-k2-0905",
-        description="OpenRouter 模型名称"
+        default="moonshotai/kimi-k2-thinking",
+        description="OpenRouter 模型名称 (kimi-k2-thinking 支持 reasoning_content)"
     )
 
     # 有合理默认值的配置
-    model: str = Field(default="kimi-k2-0905-preview", description="模型名称 (直连 Moonshot API)")
-    # Direct API models: kimi-k2-0905-preview, moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
-    # OpenRouter models: moonshotai/kimi-k2-0905
+    model: str = Field(default="kimi-k2-thinking", description="模型名称 (直连 Moonshot API)")
+    # Direct API models:
+    #   - kimi-k2-thinking: K2 Thinking model with reasoning_content field (推荐 temperature=0.6)
+    #   - kimi-k2-0905-preview: Standard K2 model
+    #   - kimi-k2-turbo-preview: Faster K2 variant
+    #   - moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k: Legacy Moonshot models
+    # OpenRouter models:
+    #   - moonshotai/kimi-k2-thinking: K2 Thinking via OpenRouter
+    #   - moonshotai/kimi-k2-0905: Standard K2 via OpenRouter
+    # Note: K2 Thinking models expose reasoning_content field with intermediate thinking steps
     # Kimi excels at long-context understanding (up to 200K tokens)
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="采样温度")
+    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐 0.6)")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
 

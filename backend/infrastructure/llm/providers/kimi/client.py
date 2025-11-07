@@ -258,6 +258,8 @@ class KimiClient(LLMClientBase):
 
             # Track tool calls being built
             current_tool_calls: Dict[int, Dict[str, Any]] = {}
+            # Track reasoning content being built (K2 Thinking models)
+            reasoning_buffer = ""
 
             async for chunk in stream:
                 if not chunk.choices:
@@ -265,6 +267,17 @@ class KimiClient(LLMClientBase):
 
                 choice = chunk.choices[0]
                 delta = choice.delta
+
+                # Handle reasoning content (K2 Thinking models)
+                # Reasoning content is exposed through delta.reasoning_content in streaming mode
+                reasoning_delta = getattr(delta, 'reasoning_content', None)
+                if reasoning_delta:
+                    reasoning_buffer += reasoning_delta
+                    yield StreamingChunk(
+                        chunk_type="thinking",
+                        content=reasoning_delta,
+                        metadata={"index": choice.index, "is_reasoning": True}
+                    )
 
                 # Handle text content
                 if delta.content:
@@ -426,12 +439,16 @@ class KimiClient(LLMClientBase):
                 return final_response
 
         # If no final response found, construct from chunks
-        # Collect text content
+        # Collect thinking, text content, and tool calls
+        reasoning_content = ""
         text_content = ""
         tool_calls = []
 
         for chunk in chunks:
-            if chunk.chunk_type == "text" and chunk.content:
+            if chunk.chunk_type == "thinking" and chunk.content:
+                # Accumulate reasoning content (K2 Thinking models)
+                reasoning_content += chunk.content
+            elif chunk.chunk_type == "text" and chunk.content:
                 text_content += chunk.content
             elif chunk.chunk_type == "function_call" and chunk.function_call:
                 # Get tool_call_id from metadata if available
@@ -460,6 +477,11 @@ class KimiClient(LLMClientBase):
             content=text_content if text_content else None,
             tool_calls=tool_calls if tool_calls else None
         )
+
+        # Add reasoning_content to message object (K2 Thinking models)
+        # This is a dynamic attribute that will be extracted by response processor
+        if reasoning_content:
+            setattr(message, 'reasoning_content', reasoning_content)
 
         choice = Choice(
             index=0,

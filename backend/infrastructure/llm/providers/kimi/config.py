@@ -15,14 +15,16 @@ from backend.config import get_llm_settings
 @dataclass
 class KimiModelSettings:
     """Kimi model-specific settings"""
-    model: str = "moonshot-v1-32k"  # Default to 32k context model
-    temperature: float = 0.7
+    model: str = "kimi-k2-thinking"  # Default to K2 Thinking model with reasoning support
+    temperature: float = 0.6  # Recommended temperature for Kimi API (range: 0-1)
     max_tokens: Optional[int] = None
     top_p: float = 1.0
 
     # Kimi-specific features
-    # Models: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+    # Models: kimi-k2-thinking, kimi-k2-0905-preview, kimi-k2-turbo-preview,
+    #         moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
     # Note: Kimi excels at long-context understanding (up to 200K tokens)
+    # K2 Thinking models expose reasoning_content field with intermediate thinking steps
 
     def to_api_params(self) -> Dict[str, Any]:
         """Convert to Kimi API parameters (OpenAI-compatible format)"""
