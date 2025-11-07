@@ -299,11 +299,16 @@ class TitleGenerator(BaseTitleGenerator):
 
                 # Handle content list or string
                 if isinstance(content, list):
-                    # Extract text from content blocks
+                    # Extract text from content blocks (skip thinking blocks for title generation)
                     text_parts = []
                     for block in content:
-                        if isinstance(block, dict) and block.get('type') == 'text':
-                            text_parts.append(block.get('text', ''))
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                            # Skip thinking blocks - they contain reasoning, not conversation content
+                            # elif block_type == 'thinking':
+                            #     pass  # Intentionally skip thinking content for title generation
                     content_str = '\n'.join(text_parts)
                 else:
                     content_str = str(content)
@@ -388,11 +393,16 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
                 # Handle content list or string
                 if isinstance(content, list):
-                    # Extract text from content blocks
+                    # Extract text from content blocks (skip thinking blocks for prompt generation)
                     text_parts = []
                     for block in content:
-                        if isinstance(block, dict) and block.get('type') == 'text':
-                            text_parts.append(block.get('text', ''))
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                            # Skip thinking blocks - they contain reasoning, not conversation content
+                            # elif block_type == 'thinking':
+                            #     pass  # Intentionally skip thinking content
                     content_str = '\n'.join(text_parts)
                 else:
                     content_str = str(content)
