@@ -6,9 +6,8 @@ using Kimi's Chat Completions API.
 """
 
 from typing import Dict, Any, List, Optional, cast
-import asyncio
 import json
-from openai import OpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
@@ -34,7 +33,7 @@ class KimiWebSearchGenerator(BaseWebSearchGenerator):
 
     @staticmethod
     async def perform_web_search(
-        client: OpenAI,  # Kimi uses sync OpenAI client (via OpenRouter or direct)
+        client: AsyncOpenAI,  # Kimi uses async OpenAI client (via OpenRouter or direct)
         query: str,
         debug: bool = False,
         **kwargs  # Accept additional parameters for compatibility (e.g., max_uses)
@@ -108,9 +107,8 @@ class KimiWebSearchGenerator(BaseWebSearchGenerator):
                 iteration += 1
                 if debug:
                     print(f"[KimiWebSearch] API call iteration {iteration}")
-                # Use asyncio.to_thread to avoid blocking the event loop with sync API call
-                response: ChatCompletion = await asyncio.to_thread(
-                    client.chat.completions.create,
+                # Direct async API call (no thread wrapper needed)
+                response: ChatCompletion = await client.chat.completions.create(
                     model=model,
                     messages=cast(Any, messages),
                     tools=cast(Any, tools),
@@ -259,14 +257,14 @@ class TitleGenerator(BaseTitleGenerator):
 
     @staticmethod
     async def generate_title_from_messages(
-        client: OpenAI,
+        client: AsyncOpenAI,
         latest_messages: List[BaseMessage]
     ) -> Optional[str]:
         """
         Generate a concise conversation title based on recent messages.
 
         Args:
-            client: Kimi OpenAI client instance (sync)
+            client: Kimi AsyncOpenAI client instance
             latest_messages: Recent conversation messages to generate title from
 
         Returns:
@@ -316,10 +314,8 @@ class TitleGenerator(BaseTitleGenerator):
                 {"role": "user", "content": f"Please generate a title based on the following conversation:\n\n{conversation_context}"}
             ]
 
-            # Call Kimi API using Chat Completions format
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response: ChatCompletion = await asyncio.to_thread(
-                client.chat.completions.create,
+            # Call Kimi API using Chat Completions format (direct async call)
+            response: ChatCompletion = await client.chat.completions.create(
                 model=title_model,  # Use non-thinking model for fast title generation
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
@@ -349,7 +345,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
     @staticmethod
     async def generate_text_to_image_prompt(
-        client: OpenAI,
+        client: AsyncOpenAI,
         session_id: Optional[str] = None,
         debug: bool = False
     ) -> Optional[Dict[str, str]]:
@@ -357,7 +353,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
         Generate high-quality text-to-image prompts using recent conversation context.
 
         Args:
-            client: Kimi OpenAI client instance (sync)
+            client: Kimi AsyncOpenAI client instance
             session_id: Optional session ID for conversation context
             debug: Enable debug output
 
@@ -413,10 +409,8 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             if debug:
                 print(f"[Kimi ImagePrompt] Calling API with {len(chat_messages)} messages")
 
-            # Call Kimi API
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response: ChatCompletion = await asyncio.to_thread(
-                client.chat.completions.create,
+            # Call Kimi API (direct async call)
+            response: ChatCompletion = await client.chat.completions.create(
                 model=kimi_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=context.get('temperature', 1.0),

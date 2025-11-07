@@ -90,7 +90,8 @@ class GeminiTitleGenerator(BaseTitleGenerator):
                 print("[DEBUG] Gemini title generation:")
                 GeminiDebugger.print_debug_request(contents, title_config)
 
-            response = client.models.generate_content(
+            # Use async non-streaming for better performance
+            response = await client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=title_config
@@ -273,8 +274,8 @@ class GeminiImagePromptGenerator(BaseImagePromptGenerator):
                 print("[text_to_image] Gemini API call configuration:")
                 GeminiDebugger.print_debug_request(contents, prompt_config)
 
-            # Make API call
-            response = client.models.generate_content(
+            # Use async non-streaming for better performance
+            response = await client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=prompt_config
@@ -385,8 +386,8 @@ class GeminiVideoPromptGenerator(BaseVideoPromptGenerator):
                 print("[image_to_video] Gemini API call configuration:")
                 GeminiDebugger.print_debug_request(contents, prompt_config)
 
-            # Make API call
-            response = client.models.generate_content(
+            # Use async non-streaming for better performance
+            response = await client.aio.models.generate_content(
                 model=model,
                 contents=contents,
                 config=prompt_config

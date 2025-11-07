@@ -140,8 +140,8 @@ class GeminiClient(LLMClientBase):
             GeminiDebugger.print_debug_request(context_contents, config)
 
         try:
-            # Direct API call with preserved context
-            response = self.client.models.generate_content(
+            # Direct async API call with preserved context
+            response = await self.client.aio.models.generate_content(
                 model=self.gemini_config.model_settings.model,
                 contents=cast(Any, context_contents),
                 config=config,
@@ -318,18 +318,22 @@ class GeminiClient(LLMClientBase):
                         )
 
                     # Function call part
-                    elif part.function_call:
+                    elif part.function_call and part.function_call.name:
+                        # Skip if function name is None (invalid function call)
+                        # Extract args safely (convert to dict if needed, handle None)
+                        args = dict(part.function_call.args) if part.function_call.args else {}
+
                         yield StreamingChunk(
                             chunk_type="function_call",
                             content=part.function_call.name,
                             metadata={
-                                "args": dict(part.function_call.args),
+                                "args": args,
                                 "has_signature": bool(part.thought_signature)
                             },
                             thought_signature=part.thought_signature if part.thought_signature else None,
                             function_call={
                                 "name": part.function_call.name,
-                                "args": dict(part.function_call.args)
+                                "args": args
                             }
                         )
 
@@ -381,14 +385,20 @@ class GeminiClient(LLMClientBase):
             elif chunk.chunk_type == "text":
                 part_dict["text"] = chunk.content
 
-            elif chunk.chunk_type == "function_call":
+            elif chunk.chunk_type == "function_call" and chunk.function_call:
                 # Function call requires special handling
-                part_dict["function_call"] = types.FunctionCall(
-                    name=chunk.function_call["name"],
-                    args=chunk.function_call["args"]
-                )
-                if chunk.thought_signature:
-                    part_dict["thought_signature"] = chunk.thought_signature
+                # Skip if function_call is None (should not happen for function_call chunks)
+                # Extract name and args with explicit types
+                func_name = chunk.function_call.get("name")
+                func_args = chunk.function_call.get("args", {})
+
+                if func_name:  # Only create FunctionCall if name is present
+                    part_dict["function_call"] = types.FunctionCall(
+                        name=func_name,
+                        args=func_args
+                    )
+                    if chunk.thought_signature:
+                        part_dict["thought_signature"] = chunk.thought_signature
 
             if part_dict:
                 parts_data.append(part_dict)

@@ -150,8 +150,9 @@ class ContentGeneratorFactory:
             # Get the appropriate title generator
             TitleGenerator = ContentGeneratorFactory.get_title_generator(llm_type)
 
-            # Extract the raw client for generator
-            client = getattr(llm_client, 'client', llm_client)
+            # Extract the async client for generator (use async_client for OpenAI-compatible APIs)
+            # Fallback to 'client' for providers that don't have separate async/sync clients
+            client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
             # Call provider-specific generator
             title = await TitleGenerator.generate_title_from_messages(
@@ -191,8 +192,9 @@ class ContentGeneratorFactory:
             # Get the appropriate image prompt generator
             ImagePromptGenerator = ContentGeneratorFactory.get_image_prompt_generator(llm_type)
 
-            # Extract the raw client for generator
-            client = getattr(llm_client, 'client', llm_client)
+            # Extract the async client for generator (use async_client for OpenAI-compatible APIs)
+            # Fallback to 'client' for providers that don't have separate async/sync clients
+            client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
             # Call provider-specific generator
             prompt_result = await ImagePromptGenerator.generate_text_to_image_prompt(
