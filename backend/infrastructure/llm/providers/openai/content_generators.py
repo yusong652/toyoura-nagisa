@@ -7,7 +7,6 @@ maintaining compatibility with the unified content generation interface.
 """
 
 from typing import Optional, Dict, Any, List
-import asyncio
 from openai.types.responses import Response, ResponseOutputMessage
 from openai.types.responses.response_output_text import ResponseOutputText, AnnotationURLCitation
 from backend.domain.models.messages import BaseMessage
@@ -76,7 +75,7 @@ class TitleGenerator(BaseTitleGenerator):
                 "max_output_tokens": 100
             }
 
-            response: Response = client.responses.create(**api_kwargs)
+            response: Response = await client.responses.create(**api_kwargs)
 
             if not response.output:
                 return None
@@ -150,7 +149,7 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             if debug:
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
 
-            response: Response = client.responses.create(**api_kwargs)
+            response: Response = await client.responses.create(**api_kwargs)
 
             if debug:
                 OpenAIDebugger.log_raw_response(response)
@@ -228,12 +227,8 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             if debug:
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
 
-            # Perform the web search
-            # Use asyncio.to_thread to avoid blocking the event loop
-            response: Response = await asyncio.to_thread(
-                client.responses.create,
-                **api_kwargs
-            )
+            # Perform the web search using async API
+            response: Response = await client.responses.create(**api_kwargs)
 
             if debug:
                 OpenAIDebugger.log_raw_response(response)
