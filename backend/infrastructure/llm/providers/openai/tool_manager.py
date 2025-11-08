@@ -49,11 +49,6 @@ class OpenAIToolManager(BaseToolManager):
             if openai_tool:
                 openai_tools.append(openai_tool)
 
-        from backend.config.llm import get_llm_settings
-        llm_settings = get_llm_settings()
-        if llm_settings.debug:
-            print(f"[DEBUG] Final OpenAI tools count: {len(openai_tools)}")
-
         return openai_tools if openai_tools else None
     
     def _convert_tool_schema_to_openai_format(self, tool_schema) -> Dict[str, Any] | None:
@@ -102,10 +97,9 @@ class OpenAIToolManager(BaseToolManager):
             }
                    
             return openai_tool
-            
+
         except Exception as e:
             print(f"[WARNING] Failed to convert tool {tool_schema.name} to OpenAI format: {e}")
-            print(f"[DEBUG] Tool schema content: {tool_schema}")
             return None
 
     async def get_schemas_for_system_prompt(self, session_id: str, agent_profile: str = 'general') -> List[Dict[str, Any]]:
@@ -147,9 +141,6 @@ class OpenAIToolManager(BaseToolManager):
                 if llm_settings.debug:
                     print(f"[WARNING] Failed to convert tool {tool_name} for system prompt: {e}")
                 continue
-
-        if llm_settings.debug:
-            print(f"[DEBUG] OpenAI system prompt schemas count: {len(prompt_schemas)}")
 
         return prompt_schemas
     

@@ -79,9 +79,7 @@ class OpenAIClient(LLMClientBase):
             config_overrides['debug'] = self.extra_config['debug']
         
         self.openai_config = get_openai_client_config(**config_overrides)
-        
-        print(f"Enhanced OpenAI Client initialized with model: {self.openai_config.model_settings.model}")
-        
+
         # Initialize both sync and async API clients
         client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
         base_url = self.extra_config.get("base_url")
@@ -152,10 +150,8 @@ class OpenAIClient(LLMClientBase):
                 OpenAIDebugger.log_raw_response(response)
 
             return response
-        except Exception as exc:
+        except Exception:
             if debug:
-                print(f"[DEBUG] API call failed with error: {exc}")
-                print("[DEBUG] Failed request payload:")
                 OpenAIDebugger.print_debug_request_payload(kwargs_api)
             raise
 
@@ -396,10 +392,8 @@ class OpenAIClient(LLMClientBase):
                     if isinstance(event, ResponseCompletedEvent):
                         final_response = event.response
 
-        except Exception as exc:
+        except Exception:
             if debug:
-                print(f"[DEBUG] Streaming API call failed with error: {exc}")
-                print("[DEBUG] Failed request payload:")
                 OpenAIDebugger.print_debug_request_payload(kwargs_api)
             raise
 

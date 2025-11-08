@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List
 import asyncio
 from openai.types.responses import Response, ResponseOutputMessage
 from openai.types.responses.response_output_text import ResponseOutputText, AnnotationURLCitation
-from backend.domain.models.messages import BaseMessage, UserMessage
+from backend.domain.models.messages import BaseMessage
 from backend.config import get_llm_settings
 from backend.infrastructure.llm.base.content_generators.web_search import BaseWebSearchGenerator
 from backend.infrastructure.llm.base.content_generators.title import BaseTitleGenerator
@@ -152,11 +152,9 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
 
             response: Response = client.responses.create(**api_kwargs)
 
-            # Debug response printing (similar to Gemini)
             if debug:
-                print("[DEBUG] Image prompt generation response:")
                 OpenAIDebugger.log_raw_response(response)
-            
+
             prompt_text = OpenAIResponseProcessor.extract_text_content(response)
             
             if not prompt_text:
@@ -203,9 +201,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
         Returns:
             Dictionary containing search results with sources and metadata
         """
-        print(f"[WebSearchGenerator] perform_web_search called with query: {query}")
-        print(f"[WebSearchGenerator] Debug mode: {debug}")
-        print(f"[WebSearchGenerator] Client type: {type(client)}")
         if kwargs:
             print(f"[WebSearchGenerator] Additional params (ignored): {kwargs}")
         
@@ -229,26 +224,20 @@ class WebSearchGenerator(BaseWebSearchGenerator):
                 "tools": [{"type": "web_search"}],
                 "metadata": {"generator": "web_search"}
             }
-            
-            print(f"[WebSearchGenerator] About to call OpenAI API with model: {api_kwargs['model']}")
-            
-            # Debug request
+
             if debug:
-                print("[DEBUG] Web search API call:")
                 OpenAIDebugger.print_debug_request_payload(api_kwargs)
-            
+
             # Perform the web search
             # Use asyncio.to_thread to avoid blocking the event loop
-            print("[WebSearchGenerator] Making API call...")
             response: Response = await asyncio.to_thread(
                 client.responses.create,
                 **api_kwargs
             )
 
             if debug:
-                print("[DEBUG] Web search response:")
                 OpenAIDebugger.log_raw_response(response)
-            
+
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)
             

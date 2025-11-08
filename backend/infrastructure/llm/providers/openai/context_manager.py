@@ -53,12 +53,15 @@ class OpenAIContextManager(BaseContextManager):
             # This avoids double conversion (Response -> Chat Completions -> Response API)
             for item in response.output:
                 # Convert Pydantic models to dict for JSON serialization
-                if hasattr(item, 'model_dump'):
-                    item_dict = item.model_dump(mode='json', exclude_none=True)
-                    self.working_contents.append(item_dict)
-                else:
-                    # Fallback for items that are already dicts
-                    self.working_contents.append(item)
+                # All ResponseOutputItem types from OpenAI are Pydantic models
+                item_dict = item.model_dump(mode='json', exclude_none=False)
+
+                # For function_call items, ensure arguments field exists
+                if item_dict.get('type') == 'function_call':
+                    if 'arguments' not in item_dict or item_dict['arguments'] is None:
+                        item_dict['arguments'] = "{}"
+
+                self.working_contents.append(item_dict)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
@@ -66,14 +69,13 @@ class OpenAIContextManager(BaseContextManager):
 
         Args:
             tool_call_id: Tool call identifier
-            tool_name: Name of the executed tool
+            tool_name: Name of the executed tool (unused in OpenAI format)
             result: Tool execution result (can contain inline_data for images)
             inject_reminders: Whether to inject system reminders into this result
         """
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
             reminders = await self._get_background_task_reminders()
-            print(f"[DEBUG] OpenAIContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if reminders:
                 reminder_text = "\n\n" + "\n\n".join([
@@ -93,7 +95,6 @@ class OpenAIContextManager(BaseContextManager):
                             for part in reversed(parts):
                                 if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
                                     part['text'] += reminder_text
-                                    print(f"[DEBUG] Injected reminders to tool result parts")
                                     break
 
         # Format tool result content using message formatter

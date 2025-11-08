@@ -156,7 +156,4 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
 
         Note: OpenAI doesn't have built-in web search like Gemini. Placeholder for MCP-based sources.
         """
-        if debug:
-            print("[DEBUG] OpenAI doesn't support built-in web search - using MCP tools instead")
-
         return []
