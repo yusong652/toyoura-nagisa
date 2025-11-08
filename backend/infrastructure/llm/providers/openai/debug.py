@@ -198,18 +198,33 @@ class OpenAIDebugger:
                     simplified['input'].append(str(item))
                     continue
 
-                item_type = item.get('type', 'message')
-                summary = {'type': item_type}
+                # Only include type if it actually exists in the item
+                item_type = item.get('type')
+                if item_type:
+                    summary = {'type': item_type}
+                else:
+                    summary = {}
 
-                if item_type == 'message':
+                if item_type is None and 'role' in item:
+                    # Regular message without type field
                     summary['role'] = item.get('role')
-                    summary['content'] = OpenAIDebugger._summarize_input_content(
-                        item.get('content'),
-                        is_assistant=item.get('role') == 'assistant'
-                    )
+                    # Show actual content type and value, not misleading summary
+                    content = item.get('content')
+                    if isinstance(content, str):
+                        summary['content'] = f"(string) {OpenAIDebugger._truncate_text(content, 80, 'text')}"
+                    elif isinstance(content, list):
+                        summary['content'] = f"(array[{len(content)}]) {content}"
+                    else:
+                        summary['content'] = f"({type(content).__name__}) {content}"
                 elif item_type == 'function_call':
                     summary['name'] = item.get('name')
                     summary['call_id'] = item.get('call_id')
+                    # Show arguments to verify it exists
+                    if 'arguments' in item:
+                        args_preview = str(item['arguments'])[:100]
+                        summary['arguments'] = f"(present) {args_preview}..."
+                    else:
+                        summary['arguments'] = "❌ MISSING"
                 elif item_type == 'function_call_output':
                     summary['call_id'] = item.get('call_id')
                     summary['output_preview'] = OpenAIDebugger._truncate_text(

@@ -550,12 +550,31 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         Removes fields that are only valid in response.output:
         - id (only call_id is needed in input)
         - status (not needed in input)
+
+        Ensures required fields are present with defaults:
+        - arguments: Required by API, defaults to empty string
         """
+        import json
+
+        # Get arguments with fallback to empty dict
+        arguments = message.get("arguments")
+
+        # Convert arguments to string format if it's a dict
+        if isinstance(arguments, dict):
+            try:
+                arguments = json.dumps(arguments)
+            except (TypeError, ValueError):
+                arguments = "{}"
+        elif arguments is None:
+            arguments = "{}"
+        else:
+            arguments = str(arguments)
+
         return {
             "type": "function_call",
             "call_id": message.get("call_id"),
             "name": message.get("name"),
-            "arguments": message.get("arguments")
+            "arguments": arguments
         }
 
     @staticmethod
@@ -566,26 +585,31 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         response.output format:
         {
             "type": "reasoning",
+            "id": "reasoning_xxx",
             "summary": [{"type": "summary_text", "text": "..."}],
             "status": "completed",
-            "id": "reasoning_xxx"
+            "encrypted_content": null
         }
 
         Input format:
         {
             "type": "reasoning",
+            "id": "reasoning_xxx",
             "summary": [{"type": "summary_text", "text": "..."}]
         }
 
-        Keep as reasoning type, just remove output-only fields (id, status).
+        Note: 'id' field IS required in input (contrary to initial documentation).
+        Only remove output-only fields: status, encrypted_content.
         """
         summary = message.get("summary", [])
+        reasoning_id = message.get("id")
 
-        if not summary:
+        if not summary or not reasoning_id:
             return None
 
-        # Keep as reasoning type, only remove id and status
+        # Keep type, id, and summary - only remove status and encrypted_content
         return {
             "type": "reasoning",
+            "id": reasoning_id,
             "summary": summary
         }
