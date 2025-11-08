@@ -193,31 +193,13 @@ class LLMFactory:
         elif name in ["gpt", "openai"]:
             openai_config = llm_settings.get_openai_config()
 
-            # Determine which API key/base URL to use
-            use_openrouter = openai_config.use_openrouter
+            # Get API key (Responses API only, no OpenRouter support)
             api_key = openai_config.openai_api_key
 
-            # 如果未显式启用，也在官方 KEY 缺失时自动切换到 OpenRouter
-            if not api_key and openai_config.openrouter_api_key:
-                use_openrouter = True
-
-            if use_openrouter:
-                api_key = openai_config.openrouter_api_key
-
             if not api_key:
-                raise ValueError("OpenAI 或 OpenRouter API key 未配置")
+                raise ValueError("OpenAI API key 未配置")
 
             client_config["api_key"] = api_key
-
-            if use_openrouter:
-                client_config["extra_config"].update({
-                    "base_url": openai_config.openrouter_base_url,
-                    "default_headers": {
-                        "HTTP-Referer": openai_config.openrouter_http_referer,
-                        "X-Title": openai_config.openrouter_title,
-                    },
-                    "origin": "openrouter"
-                })
 
             client_config["extra_config"].update({
                 "model": openai_config.model,
