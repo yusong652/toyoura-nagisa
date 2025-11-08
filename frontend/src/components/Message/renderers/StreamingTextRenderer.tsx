@@ -29,10 +29,10 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
 }) => {
   // Clean text content - remove emotion keywords before display
   const textToDisplay = cleanTextForDisplay(displayText)
-    
+
   // Use non-streaming rendering when not streaming
   const shouldUseNonStreaming = !streaming
-  
+
   if (shouldUseNonStreaming) {
     if (textToDisplay) {
       return (
@@ -43,6 +43,14 @@ const StreamingTextRenderer: React.FC<StreamingTextRendererProps> = ({
     } else {
       return null
     }
+  }
+
+  // Show minimal placeholder for empty streaming text (e.g., tool calls without text)
+  // This ensures message container is rendered, but without visible content
+  if (!textToDisplay && (streaming || isLoading)) {
+    return (
+      <div className={`${className} streaming-placeholder`} style={{ minHeight: '1px' }} />
+    )
   }
   
   // Streaming animation rendering

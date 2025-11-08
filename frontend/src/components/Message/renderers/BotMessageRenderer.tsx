@@ -39,6 +39,18 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
       const displayText = text || ''
       const chunks: string[] = []
 
+      // Show streaming indicator even if text is empty (e.g., tool calls without text)
+      if (displayText.trim() === '' && (streaming || isLoading)) {
+        return (
+          <StreamingTextRenderer
+            displayText=""
+            chunks={chunks}
+            streaming={streaming || false}
+            isLoading={isLoading || false}
+          />
+        )
+      }
+
       if (displayText.trim() === '') return null
 
       return (
@@ -52,9 +64,14 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
     }
 
     // Render structured content blocks
-    return content.map((block, index) => {
+    const blocks = content.map((block, index) => {
       switch (block.type) {
         case 'text':
+          // Always render text blocks during streaming, even if empty
+          // This ensures message is visible while waiting for tool calls
+          if (!block.text && !streaming && !isLoading) {
+            return null
+          }
           return (
             <StreamingTextRenderer
               key={index}
@@ -76,6 +93,23 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
           return null
       }
     })
+
+    // Filter out null blocks
+    const validBlocks = blocks.filter(block => block !== null)
+
+    // If no valid blocks and streaming, show at least a placeholder
+    if (validBlocks.length === 0 && (streaming || isLoading)) {
+      return (
+        <StreamingTextRenderer
+          displayText=""
+          chunks={[]}
+          streaming={streaming || false}
+          isLoading={isLoading || false}
+        />
+      )
+    }
+
+    return validBlocks
   }
 
   const hasFiles = files && files.length > 0 && !isLoading

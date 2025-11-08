@@ -128,13 +128,24 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         if tool_calls is None:
             tool_calls = OpenAIResponseProcessor.extract_tool_calls(response)
 
+        # Add tool_use blocks to content array (following Gemini/Anthropic/Kimi pattern)
+        # This ensures frontend can render tool calls correctly
+        if tool_calls:
+            for tool_call in tool_calls:
+                content_blocks.append({
+                    "type": "tool_use",
+                    "id": tool_call['id'],
+                    "name": tool_call['name'],
+                    "input": tool_call['arguments']
+                })
+
         message = AssistantMessage(
             role="assistant",
             content=content_blocks if content_blocks else [{"type": "text", "text": ""}]
         )
 
-        if tool_calls:
-            message.tool_calls = tool_calls
+        # Note: tool_calls are already represented as tool_use blocks in content array
+        # No need to set message.tool_calls attribute (which doesn't exist in the model)
 
         return message
 

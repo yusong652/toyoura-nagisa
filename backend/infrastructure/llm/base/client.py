@@ -364,6 +364,16 @@ class LLMClientBase(ABC):
                     streaming=True
                 )
 
+        # Ensure at least one streaming update was sent
+        # If no text/thinking content was streamed (e.g., direct tool call), send initial empty update
+        if not text_buffer and not thinking_buffer:
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=[{"type": "text", "text": ""}],
+                streaming=True
+            )
+
         # Construct complete response from collected chunks
         current_response = self._construct_response_from_streaming_chunks(collected_chunks)
         context_manager = self.get_or_create_context_manager(session_id)
