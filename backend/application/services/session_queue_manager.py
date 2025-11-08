@@ -125,25 +125,45 @@ class SessionQueueManager:
                     logger.info(f"Queue empty for session {session_id}, stopping processing")
                     break
 
-                # Get first message (non-blocking check first to avoid hanging)
-                try:
-                    first_message = await asyncio.wait_for(queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
-                    logger.debug(f"Queue get timeout for session {session_id}, checking if empty")
-                    continue
+                # Strategy: Wait a bit to collect multiple messages before processing
+                # This allows rapid consecutive messages to be batched together
+                current_queue_size = queue.qsize()
+                print(f"[QueueManager] Queue has {current_queue_size} message(s), waiting {self._merge_window}s to collect more...", flush=True)
 
-                # Try to collect more messages if merging is enabled
-                messages_to_process = [first_message]
-                if self._merge_enabled:
-                    additional_messages = await self._try_collect_messages(session_id, queue)
-                    if additional_messages:
-                        messages_to_process.extend(additional_messages)
-                        logger.info(f"Merged {len(messages_to_process)} messages for session {session_id}")
+                if self._merge_enabled and current_queue_size > 0:
+                    # Wait for merge window to allow more messages to arrive
+                    await asyncio.sleep(self._merge_window)
+
+                    # Check queue size again after waiting
+                    final_queue_size = queue.qsize()
+                    print(f"[QueueManager] After waiting, queue has {final_queue_size} message(s)", flush=True)
+
+                # Collect all messages currently in queue (up to max_merge_count)
+                messages_to_process = []
+                max_to_collect = self._max_merge_count if self._merge_enabled else 1
+
+                for _ in range(min(max_to_collect, queue.qsize() if not queue.empty() else 0)):
+                    try:
+                        message = await asyncio.wait_for(queue.get(), timeout=0.5)
+                        messages_to_process.append(message)
+                    except asyncio.TimeoutError:
+                        break
+
+                # Fallback: if no messages collected, try with longer timeout
+                if not messages_to_process:
+                    try:
+                        message = await asyncio.wait_for(queue.get(), timeout=1.0)
+                        messages_to_process.append(message)
+                    except asyncio.TimeoutError:
+                        logger.debug(f"Queue get timeout for session {session_id}, checking if empty")
+                        continue
+
+                if len(messages_to_process) > 1:
+                    print(f"[QueueManager] Collected {len(messages_to_process)} messages for merging", flush=True)
 
                 # Mark all collected messages as retrieved from queue
                 for _ in messages_to_process:
-                    if _ != first_message:  # first_message already retrieved
-                        queue.task_done()
+                    queue.task_done()
 
                 # Send queue position update to frontend before processing
                 await self._notify_processing_start(session_id, queue.qsize())
@@ -163,9 +183,6 @@ class SessionQueueManager:
                     # Continue processing next message even if this one failed
                     # Send error notification to frontend
                     await self._notify_processing_error(session_id, str(e))
-
-                # Mark task as done for first message
-                queue.task_done()
 
                 # Send queue update to frontend
                 await self._notify_queue_update(session_id, queue.qsize())
