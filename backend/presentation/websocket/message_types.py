@@ -74,6 +74,11 @@ class MessageType(str, Enum):
     BACKGROUND_PROCESS_COMPLETED = "BACKGROUND_PROCESS_COMPLETED"
     BACKGROUND_PROCESS_KILLED = "BACKGROUND_PROCESS_KILLED"
 
+    # Message queue management
+    QUEUE_UPDATE = "QUEUE_UPDATE"
+    PROCESSING_START = "PROCESSING_START"
+    MESSAGE_QUEUED = "MESSAGE_QUEUED"
+
     # Future extensions
     VOICE_MESSAGE = "VOICE_MESSAGE"
     IMAGE_GENERATION = "IMAGE_GENERATION"
@@ -282,6 +287,56 @@ class StreamingUpdateMessage(BaseWebSocketMessage):
     streaming: bool = True
 
 
+class QueueUpdateMessage(BaseWebSocketMessage):
+    """
+    Queue update message for notifying frontend about message queue status.
+
+    Provides real-time updates about the session's message queue, including
+    number of pending messages and processing state.
+
+    Attributes:
+        payload: Queue status information
+            - queue_size: Number of messages waiting in queue
+            - is_processing: Whether session is currently processing
+            - timestamp: Update timestamp
+    """
+    type: MessageType = MessageType.QUEUE_UPDATE
+    payload: Dict[str, Any]
+
+
+class ProcessingStartMessage(BaseWebSocketMessage):
+    """
+    Processing start message for notifying frontend when message processing begins.
+
+    Sent when a message is taken from the queue and processing starts,
+    allowing frontend to show "processing" status.
+
+    Attributes:
+        payload: Processing information
+            - remaining_in_queue: Number of messages still waiting
+            - timestamp: Processing start timestamp
+    """
+    type: MessageType = MessageType.PROCESSING_START
+    payload: Dict[str, Any]
+
+
+class MessageQueuedMessage(BaseWebSocketMessage):
+    """
+    Message queued notification for frontend confirmation.
+
+    Sent immediately after a user message is successfully added to the queue,
+    providing feedback that the message was received and will be processed.
+
+    Attributes:
+        payload: Queue information
+            - position: Position in queue (0 = processing now, 1+ = waiting)
+            - queue_size: Total queue size
+            - timestamp: Queued timestamp
+    """
+    type: MessageType = MessageType.MESSAGE_QUEUED
+    payload: Dict[str, Any]
+
+
 # Incoming message schemas (messages that frontend sends to backend)
 INCOMING_MESSAGE_SCHEMAS = {
     MessageType.HEARTBEAT_ACK: HeartbeatMessage,
@@ -313,6 +368,10 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.BACKGROUND_PROCESS_OUTPUT_UPDATE: BackgroundProcessNotification,
     MessageType.BACKGROUND_PROCESS_COMPLETED: BackgroundProcessNotification,
     MessageType.BACKGROUND_PROCESS_KILLED: BackgroundProcessNotification,
+    # Message queue notifications
+    MessageType.QUEUE_UPDATE: QueueUpdateMessage,
+    MessageType.PROCESSING_START: ProcessingStartMessage,
+    MessageType.MESSAGE_QUEUED: MessageQueuedMessage,
 }
 
 

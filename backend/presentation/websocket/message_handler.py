@@ -177,13 +177,19 @@ class LocationHandler(MessageHandler):
     
 class ChatHandler(MessageHandler):
     """
-    Handle user chat messages and trigger LLM response generation.
+    Handle user chat messages with queue-based processing.
 
     Purpose: This is the main handler that processes user messages and:
     1. Parses user input from frontend CHAT_MESSAGE events
-    2. Saves user message to conversation history
-    3. Triggers LLM response generation via existing chat service
-    4. Initiates streaming response delivery to frontend
+    2. Adds messages to session queue (prevents message loss)
+    3. Processes messages sequentially via queue
+    4. Triggers LLM response generation for each message
+
+    Queue Behavior:
+    - Message arrives → Added to queue → Queue position returned
+    - If session idle → Start processing immediately
+    - If session busy → Wait in queue, process when ready
+    - Sequential processing ensures messages are never lost
 
     Note: The actual assistant message creation (MESSAGE_CREATE) and content
     streaming (TTS_CHUNK) happens in the content processing pipeline,
@@ -194,7 +200,9 @@ class ChatHandler(MessageHandler):
         super().__init__(connection_manager)
         # Import chat service for LLM processing
         from backend.application.services.chat_service import get_chat_service
+        from backend.application.services.session_queue_manager import get_queue_manager
         self.chat_service = get_chat_service()
+        self.queue_manager = get_queue_manager()
 
     async def handle(self, session_id: str, message: BaseWebSocketMessage) -> None:
         if message.type == MessageType.CHAT_MESSAGE:
@@ -202,24 +210,91 @@ class ChatHandler(MessageHandler):
                 # Convert WebSocket message to internal request format
                 from backend.presentation.websocket.utils import convert_websocket_message_to_request
                 request_data = convert_websocket_message_to_request(session_id, message)
-                # Process user message (all messages treated uniformly)
-                print(f"[ChatHandler] Processing CHAT_MESSAGE from session {session_id}", flush=True)
-                processing_result = await self.chat_service.process_user_message(request_data)
 
-                # Always generate streaming response for user messages
-                from backend.presentation.streaming.llm_response_handler import process_chat_request
-                asyncio.create_task(process_chat_request(
-                    session_id=processing_result['session_id'],
-                    user_message_id=processing_result['message_id']
-                ))
+                print(f"[ChatHandler] Received CHAT_MESSAGE from session {session_id}", flush=True)
+
+                # Add message to queue instead of processing immediately
+                queue_position = await self.queue_manager.enqueue_message(session_id, request_data)
+
+                # Send queue confirmation to frontend
+                await self._notify_message_queued(session_id, queue_position)
+
+                # Start processing if session is idle
+                if await self.queue_manager.start_processing(session_id):
+                    print(f"[ChatHandler] Starting queue processing for session {session_id}", flush=True)
+                    asyncio.create_task(
+                        self.queue_manager.process_queue(
+                            session_id,
+                            self._process_single_message
+                        )
+                    )
+                else:
+                    print(f"[ChatHandler] Message queued (position {queue_position}) for busy session {session_id}", flush=True)
 
             except Exception as e:
-                logger.error(f"Error processing chat message: {e}")
+                logger.error(f"Error handling chat message: {e}")
                 await self.send_error(
                     session_id,
-                    "CHAT_PROCESSING_ERROR",
-                    f"Failed to process chat message: {str(e)}"
+                    "CHAT_HANDLING_ERROR",
+                    f"Failed to handle chat message: {str(e)}"
                 )
+
+    async def _process_single_message(self, session_id: str, request_data: dict) -> None:
+        """
+        Process a single message from the queue.
+
+        This method is called by the queue manager for each message
+        in the queue, ensuring sequential processing.
+
+        Args:
+            session_id: Session identifier
+            request_data: Message data to process
+        """
+        try:
+            print(f"[ChatHandler] Processing message from queue for session {session_id}", flush=True)
+
+            # Process user message (save to history and add to LLM context)
+            processing_result = await self.chat_service.process_user_message(request_data)
+
+            # Generate streaming response for this message
+            from backend.presentation.streaming.llm_response_handler import process_chat_request
+            await process_chat_request(
+                session_id=processing_result['session_id'],
+                user_message_id=processing_result['message_id']
+            )
+
+            print(f"[ChatHandler] Completed processing message for session {session_id}", flush=True)
+
+        except Exception as e:
+            logger.error(f"Error processing message from queue: {e}")
+            await self.send_error(
+                session_id,
+                "CHAT_PROCESSING_ERROR",
+                f"Failed to process chat message: {str(e)}"
+            )
+            # Note: Queue processing continues even if this message fails
+
+    async def _notify_message_queued(self, session_id: str, queue_position: int) -> None:
+        """
+        Notify frontend that message was successfully queued.
+
+        Args:
+            session_id: Session identifier
+            queue_position: Position in queue (0 = processing now, 1+ = waiting)
+        """
+        try:
+            queue_msg = create_message(
+                MessageType.MESSAGE_QUEUED,
+                session_id=session_id,
+                payload={
+                    "position": queue_position,
+                    "queue_size": self.queue_manager.get_queue_size(session_id),
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            await self.connection_manager.send_json(session_id, queue_msg.model_dump())
+        except Exception as e:
+            logger.error(f"Failed to send queue notification: {e}")
 
 
 class UserInterruptHandler(MessageHandler):
