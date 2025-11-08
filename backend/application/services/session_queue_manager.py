@@ -23,7 +23,7 @@ Example Flow:
 
 import asyncio
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,11 @@ class SessionQueueManager:
         self._queues: Dict[str, asyncio.Queue] = {}  # session_id -> Queue of message_data
         self._processing: Dict[str, bool] = {}  # session_id -> is_processing flag
         self._lock = asyncio.Lock()  # Protect queue creation and state updates
+
+        # Message merging configuration (Claude Code style)
+        self._merge_enabled = True  # Enable message merging
+        self._merge_window = 0.8  # Wait 0.8s to collect messages
+        self._max_merge_count = 10  # Max 10 messages per merge
 
     async def enqueue_message(self, session_id: str, message_data: dict) -> int:
         """
@@ -96,10 +101,11 @@ class SessionQueueManager:
 
     async def process_queue(self, session_id: str, message_processor_callback):
         """
-        Process all messages in the queue sequentially.
+        Process all messages in the queue sequentially with Claude Code style merging.
 
-        This is the main processing loop. It processes messages one by one
-        until the queue is empty, then marks the session as idle.
+        This is the main processing loop. It intelligently merges rapid consecutive
+        messages into a single request (like Claude Code does), improving efficiency
+        and user experience.
 
         Args:
             session_id: Session identifier
@@ -119,27 +125,46 @@ class SessionQueueManager:
                     logger.info(f"Queue empty for session {session_id}, stopping processing")
                     break
 
-                # Get next message (non-blocking check first to avoid hanging)
+                # Get first message (non-blocking check first to avoid hanging)
                 try:
-                    message_data = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    first_message = await asyncio.wait_for(queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
                     logger.debug(f"Queue get timeout for session {session_id}, checking if empty")
                     continue
 
+                # Try to collect more messages if merging is enabled
+                messages_to_process = [first_message]
+                if self._merge_enabled:
+                    additional_messages = await self._try_collect_messages(session_id, queue)
+                    if additional_messages:
+                        messages_to_process.extend(additional_messages)
+                        logger.info(f"Merged {len(messages_to_process)} messages for session {session_id}")
+
+                # Mark all collected messages as retrieved from queue
+                for _ in messages_to_process:
+                    if _ != first_message:  # first_message already retrieved
+                        queue.task_done()
+
                 # Send queue position update to frontend before processing
                 await self._notify_processing_start(session_id, queue.qsize())
 
-                # Process the message
-                logger.info(f"Processing message for session {session_id}. Remaining in queue: {queue.qsize()}")
+                # Process the message(s) - merge if multiple
+                logger.info(f"Processing {len(messages_to_process)} message(s) for session {session_id}. Remaining in queue: {queue.qsize()}")
                 try:
-                    await message_processor_callback(session_id, message_data)
+                    if len(messages_to_process) == 1:
+                        # Single message - process normally
+                        await message_processor_callback(session_id, messages_to_process[0])
+                    else:
+                        # Multiple messages - merge and process
+                        merged_message = self._merge_messages(messages_to_process)
+                        await message_processor_callback(session_id, merged_message)
                 except Exception as e:
                     logger.error(f"Error processing message for session {session_id}: {e}")
                     # Continue processing next message even if this one failed
                     # Send error notification to frontend
                     await self._notify_processing_error(session_id, str(e))
 
-                # Mark task as done
+                # Mark task as done for first message
                 queue.task_done()
 
                 # Send queue update to frontend
@@ -150,6 +175,101 @@ class SessionQueueManager:
             async with self._lock:
                 self._processing[session_id] = False
                 logger.info(f"Finished processing queue for session {session_id}")
+
+    async def _try_collect_messages(self, session_id: str, queue: asyncio.Queue) -> List[dict]:
+        """
+        Try to collect additional messages from queue within merge window.
+
+        Implements Claude Code style message merging by waiting a short time
+        to see if more messages arrive, then collecting them for batch processing.
+
+        Args:
+            session_id: Session identifier
+            queue: Message queue for this session
+
+        Returns:
+            List[dict]: Additional messages collected (empty if none)
+        """
+        collected = []
+        merge_deadline = asyncio.get_event_loop().time() + self._merge_window
+
+        while len(collected) < self._max_merge_count - 1:  # -1 because first message already retrieved
+            # Calculate remaining time in merge window
+            remaining_time = merge_deadline - asyncio.get_event_loop().time()
+            if remaining_time <= 0:
+                break
+
+            try:
+                # Try to get message with remaining timeout
+                message = await asyncio.wait_for(
+                    queue.get(),
+                    timeout=min(remaining_time, 0.2)  # Check every 0.2s
+                )
+                collected.append(message)
+                logger.debug(f"Collected message {len(collected)} for merging in session {session_id}")
+
+            except asyncio.TimeoutError:
+                # No more messages within timeout
+                break
+            except Exception as e:
+                logger.warning(f"Error collecting messages for merge: {e}")
+                break
+
+        if collected:
+            logger.info(f"Collected {len(collected)} additional messages for merging in session {session_id}")
+
+        return collected
+
+    def _merge_messages(self, messages: List[dict]) -> dict:
+        """
+        Merge multiple messages into a single formatted message (Claude Code style).
+
+        Formats messages in a clear way that helps the LLM understand the user
+        sent multiple consecutive messages that should be processed together.
+
+        Args:
+            messages: List of message data dictionaries
+
+        Returns:
+            dict: Merged message data with formatted content
+
+        Example output:
+            "用户连续发送了 3 条消息：
+
+            [消息1]: 帮我写一个函数
+            [消息2]: 加上错误处理
+            [消息3]: 用TypeScript
+
+            请理解用户的完整意图并统一回答。"
+        """
+        if len(messages) == 1:
+            return messages[0]
+
+        # Extract message texts
+        message_texts = []
+        for msg in messages:
+            content = msg.get('content', '')
+            if isinstance(content, str):
+                message_texts.append(content)
+            elif isinstance(content, list):
+                # Handle multimodal messages (text + images)
+                text_parts = [item.get('text', '') for item in content if item.get('type') == 'text']
+                message_texts.append(' '.join(text_parts))
+
+        # Format merged message
+        formatted_content = f"用户连续发送了 {len(messages)} 条消息：\n\n"
+        for i, text in enumerate(message_texts, 1):
+            formatted_content += f"[消息{i}]: {text}\n"
+        formatted_content += "\n请理解用户的完整意图并统一回答。"
+
+        # Create merged message data (use first message as template)
+        merged = messages[0].copy()
+        merged['content'] = formatted_content
+        merged['_merged_count'] = len(messages)  # Metadata for debugging
+        merged['_original_messages'] = message_texts  # Keep originals for reference
+
+        logger.info(f"Merged {len(messages)} messages into single request")
+        return merged
 
     def is_processing(self, session_id: str) -> bool:
         """
