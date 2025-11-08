@@ -233,14 +233,21 @@ class SessionQueueManager:
         Returns:
             dict: Merged message data with formatted content
 
-        Example output:
-            "用户连续发送了 3 条消息：
+        Example output (Claude Code style - English):
+            "<system-reminder>
+            The user sent the following message:
+            1
 
-            [消息1]: 帮我写一个函数
-            [消息2]: 加上错误处理
-            [消息3]: 用TypeScript
+            Please address this message and continue with your tasks.
+            </system-reminder>
 
-            请理解用户的完整意图并统一回答。"
+            <system-reminder>
+            The user sent the following message:
+            2
+
+            Please address this message and continue with your tasks.
+            </system-reminder>
+            ..."
         """
         if len(messages) == 1:
             return messages[0]
@@ -256,11 +263,18 @@ class SessionQueueManager:
                 text_parts = [item.get('text', '') for item in content if item.get('type') == 'text']
                 message_texts.append(' '.join(text_parts))
 
-        # Format merged message
-        formatted_content = f"用户连续发送了 {len(messages)} 条消息：\n\n"
-        for i, text in enumerate(message_texts, 1):
-            formatted_content += f"[消息{i}]: {text}\n"
-        formatted_content += "\n请理解用户的完整意图并统一回答。"
+        # Format merged message in Claude Code style (system-reminder blocks)
+        formatted_parts = []
+        for text in message_texts:
+            reminder_block = f"""<system-reminder>
+The user sent the following message:
+{text}
+
+Please address this message and continue with your tasks.
+</system-reminder>"""
+            formatted_parts.append(reminder_block)
+
+        formatted_content = '\n\n'.join(formatted_parts)
 
         # Create merged message data (use first message as template)
         merged = messages[0].copy()
@@ -268,7 +282,7 @@ class SessionQueueManager:
         merged['_merged_count'] = len(messages)  # Metadata for debugging
         merged['_original_messages'] = message_texts  # Keep originals for reference
 
-        logger.info(f"Merged {len(messages)} messages into single request")
+        logger.info(f"Merged {len(messages)} messages into single request (Claude Code style)")
         return merged
 
     def is_processing(self, session_id: str) -> bool:
