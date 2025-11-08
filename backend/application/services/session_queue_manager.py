@@ -142,11 +142,20 @@ class SessionQueueManager:
                 messages_to_process = []
                 max_to_collect = self._max_merge_count if self._merge_enabled else 1
 
-                for _ in range(min(max_to_collect, queue.qsize() if not queue.empty() else 0)):
+                # Get current queue size before collecting
+                messages_available = queue.qsize()
+                print(f"[QueueManager] Attempting to collect {min(max_to_collect, messages_available)} messages from queue", flush=True)
+
+                for i in range(min(max_to_collect, messages_available)):
                     try:
                         message = await asyncio.wait_for(queue.get(), timeout=0.5)
                         messages_to_process.append(message)
+
+                        # Debug: show message content
+                        msg_preview = str(message.get('content', ''))[:50] if isinstance(message, dict) else str(message)[:50]
+                        print(f"[QueueManager] Collected message {i+1}: {msg_preview}", flush=True)
                     except asyncio.TimeoutError:
+                        print(f"[QueueManager] Timeout getting message {i+1}, stopping collection", flush=True)
                         break
 
                 # Fallback: if no messages collected, try with longer timeout
@@ -170,13 +179,18 @@ class SessionQueueManager:
 
                 # Process the message(s) - merge if multiple
                 logger.info(f"Processing {len(messages_to_process)} message(s) for session {session_id}. Remaining in queue: {queue.qsize()}")
+                print(f"[QueueManager] Processing {len(messages_to_process)} message(s)", flush=True)
+
                 try:
                     if len(messages_to_process) == 1:
                         # Single message - process normally
+                        print(f"[QueueManager] Single message mode - processing directly", flush=True)
                         await message_processor_callback(session_id, messages_to_process[0])
                     else:
                         # Multiple messages - merge and process
+                        print(f"[QueueManager] Merging {len(messages_to_process)} messages...", flush=True)
                         merged_message = self._merge_messages(messages_to_process)
+                        print(f"[QueueManager] Merged message preview: {str(merged_message.get('content', ''))[:200]}...", flush=True)
                         await message_processor_callback(session_id, merged_message)
                 except Exception as e:
                     logger.error(f"Error processing message for session {session_id}: {e}")
