@@ -68,9 +68,6 @@ from backend.presentation.websocket.messages.factory import (
     OUTGOING_MESSAGE_SCHEMAS,
     create_message,
     parse_incoming_websocket_message,
-    create_error_message,
-    create_tool_confirmation_request,
-    create_background_process_notification,
 )
 
 __all__ = [
@@ -109,7 +106,4 @@ __all__ = [
     "OUTGOING_MESSAGE_SCHEMAS",
     "create_message",
     "parse_incoming_websocket_message",
-    "create_error_message",
-    "create_tool_confirmation_request",
-    "create_background_process_notification",
 ]

@@ -14,10 +14,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, List
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
-from backend.presentation.websocket.message_types import (
-    MessageType,
-    create_background_process_notification
-)
+from backend.presentation.websocket.message_types import MessageType, create_message
 
 logger = logging.getLogger(__name__)
 
@@ -244,8 +241,8 @@ class BackgroundProcessNotificationService:
             has_more_output: Whether more output is available
             exit_code: Exit code if completed/killed
         """
-        notification = create_background_process_notification(
-            message_type=message_type,
+        notification = create_message(
+            message_type,
             process_id=process_id,
             command=command,
             status=status,
@@ -255,7 +252,7 @@ class BackgroundProcessNotificationService:
             has_more_output=has_more_output,
             exit_code=exit_code,
             session_id=session_id
-        )
+        ).model_dump(mode="json", exclude_none=True)
 
         # Send via WebSocket
         if await self.connection_manager.is_connected(session_id):

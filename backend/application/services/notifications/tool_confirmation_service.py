@@ -14,7 +14,7 @@ import logging
 import uuid
 from typing import Optional, Dict
 from backend.infrastructure.websocket.connection_manager import ConnectionManager
-from backend.presentation.websocket.message_types import create_tool_confirmation_request
+from backend.presentation.websocket.message_types import MessageType, create_message
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +74,14 @@ class ToolConfirmationService:
 
         try:
             # Send confirmation request to frontend
-            request_msg = create_tool_confirmation_request(
+            request_msg = create_message(
+                MessageType.TOOL_CONFIRMATION_REQUEST,
                 tool_call_id=tool_call_id,
                 tool_name=tool_name,
                 command=command,
                 description=description,
                 session_id=session_id
-            )
+            ).model_dump(mode="json", exclude_none=True)
 
             # Check if session is connected
             if await self.connection_manager.is_connected(session_id):
