@@ -24,6 +24,7 @@ from backend.presentation.websocket.messages.location import (
     LocationRequestMessage,
     LocationResponseMessage
 )
+from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -88,13 +89,6 @@ class MessageCreateMessage(BaseWebSocketMessage):
     role: str = "assistant"  # "user" | "assistant" | "system"
     initial_text: Optional[str] = None
     streaming: bool = True
-
-
-class EmotionKeywordMessage(BaseWebSocketMessage):
-    """Emotion keyword message schema for Live2D animation triggers"""
-    type: MessageType = MessageType.EMOTION_KEYWORD
-    keyword: str
-    message_id: Optional[str] = None
 
 
 class ToolConfirmationRequestMessage(BaseWebSocketMessage):

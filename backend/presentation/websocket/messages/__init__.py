@@ -25,6 +25,9 @@ from backend.presentation.websocket.messages.location import (
     LocationResponseMessage
 )
 
+# Emotion and animation
+from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
+
 __all__ = [
     # Core types
     "MessageType",
@@ -34,4 +37,6 @@ __all__ = [
     # Location services
     "LocationRequestMessage",
     "LocationResponseMessage",
+    # Emotion and animation
+    "EmotionKeywordMessage",
 ]
