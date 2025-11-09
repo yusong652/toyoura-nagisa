@@ -85,8 +85,9 @@ class WebSearchToolFactory:
                 debug = llm_settings.debug
             
             # Perform the search with appropriate parameters
-            # Extract the raw client for all providers
-            client = getattr(llm_client, 'client', llm_client)
+            # Extract the async client for providers that support it (Kimi, OpenAI)
+            # Fallback to 'client' for providers that don't have separate async/sync clients
+            client = getattr(llm_client, 'async_client', None) or getattr(llm_client, 'client', llm_client)
 
             if llm_type.lower() == 'gemini':
                 # Gemini web search is async
