@@ -35,24 +35,6 @@ class ChatMessageRequest(BaseWebSocketMessage):
     files: List[Dict[str, Any]] = []
 
 
-class ChatStreamChunk(BaseWebSocketMessage):
-    """
-    Chat stream chunk message schema.
-
-    Sent by backend during streaming response generation. Contains individual
-    chunks of the AI response as they are generated.
-
-    Attributes:
-        content: Text content of this chunk
-        chunk_type: Type of chunk (text, tool_call, status, etc.)
-        is_final: Whether this is the last chunk in the stream
-    """
-    type: MessageType = MessageType.CHAT_STREAM_CHUNK
-    content: str
-    chunk_type: str = "text"  # text, tool_call, status, etc.
-    is_final: bool = False
-
-
 class MessageCreateMessage(BaseWebSocketMessage):
     """
     Message creation message schema for dynamic bot message creation.
@@ -69,29 +51,6 @@ class MessageCreateMessage(BaseWebSocketMessage):
     role: str = "assistant"  # "user" | "assistant" | "system"
     initial_text: Optional[str] = None
     streaming: bool = True
-
-
-class StreamingChunkMessage(BaseWebSocketMessage):
-    """
-    Streaming chunk message for real-time thinking/text display (legacy).
-
-    Provides real-time streaming of LLM response chunks including thinking
-    content, text generation, and function calls. Enables progressive display
-    of AI reasoning and response generation.
-
-    Note: This is the legacy individual chunk format. Consider using
-    StreamingUpdateMessage for new implementations as it provides
-    accumulated content blocks.
-
-    Attributes:
-        chunk_type: Type of content ("thinking", "text", "function_call")
-        content: The actual text content of this chunk
-        metadata: Additional context (e.g., has_signature, args for function calls)
-    """
-    type: MessageType = MessageType.STREAMING_CHUNK
-    chunk_type: str  # "thinking" | "text" | "function_call"
-    content: str
-    metadata: Dict[str, Any] = {}
 
 
 class StreamingUpdateMessage(BaseWebSocketMessage):

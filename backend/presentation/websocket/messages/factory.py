@@ -36,9 +36,7 @@ from backend.presentation.websocket.messages.tool import (
 )
 from backend.presentation.websocket.messages.chat import (
     ChatMessageRequest,
-    ChatStreamChunk,
     MessageCreateMessage,
-    StreamingChunkMessage,
     StreamingUpdateMessage
 )
 
@@ -56,14 +54,12 @@ INCOMING_MESSAGE_SCHEMAS = {
 # Only includes message types that are actually used in the codebase
 OUTGOING_MESSAGE_SCHEMAS = {
     # Used via create_message()
-    MessageType.CHAT_STREAM_CHUNK: ChatStreamChunk,
     MessageType.EMOTION_KEYWORD: EmotionKeywordMessage,
     MessageType.ERROR: ErrorMessage,
     MessageType.MESSAGE_CREATE: MessageCreateMessage,
     MessageType.STATUS_UPDATE: StatusUpdate,
     MessageType.TITLE_UPDATE: TitleUpdateMessage,
     MessageType.TTS_CHUNK: TTSChunk,
-    MessageType.STREAMING_CHUNK: StreamingChunkMessage,  # Real-time thinking/text streaming (legacy)
     MessageType.STREAMING_UPDATE: StreamingUpdateMessage,  # Real-time content update (accumulated)
     # Used via specialized creation functions
     MessageType.TOOL_CONFIRMATION_REQUEST: ToolConfirmationRequestMessage,

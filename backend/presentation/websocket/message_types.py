@@ -46,9 +46,7 @@ from backend.presentation.websocket.messages import (
     UserInterruptMessage,
     # Chat and streaming
     ChatMessageRequest,
-    ChatStreamChunk,
     MessageCreateMessage,
-    StreamingChunkMessage,
     StreamingUpdateMessage,
 )
 
@@ -93,9 +91,7 @@ __all__ = [
     "UserInterruptMessage",
     # Chat and streaming
     "ChatMessageRequest",
-    "ChatStreamChunk",
     "MessageCreateMessage",
-    "StreamingChunkMessage",
     "StreamingUpdateMessage",
     # Factory functions and schemas
     "INCOMING_MESSAGE_SCHEMAS",

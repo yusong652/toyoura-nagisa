@@ -21,9 +21,7 @@ class MessageType(str, Enum):
     # Chat and streaming
     CHAT_MESSAGE = "CHAT_MESSAGE"
     CHAT_STREAM_START = "CHAT_STREAM_START"
-    CHAT_STREAM_CHUNK = "CHAT_STREAM_CHUNK"
     CHAT_STREAM_END = "CHAT_STREAM_END"
-    STREAMING_CHUNK = "STREAMING_CHUNK"  # Real-time thinking/text streaming (legacy, individual chunks)
     STREAMING_UPDATE = "STREAMING_UPDATE"  # Real-time content update (accumulated complete content)
 
     # Tool use notifications (for frontend display)
