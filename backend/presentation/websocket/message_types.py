@@ -4,6 +4,10 @@ WebSocket message type definitions and schemas.
 This module defines all supported WebSocket message types and their
 corresponding data structures for the aiNagisa real-time communication system.
 
+DEPRECATED: This module is being refactored. Please import from:
+- backend.presentation.websocket.messages for core types
+- Specific message schema modules will be added progressively
+
 Architecture Overview:
 - Frontend sends JSON strings via WebSocket: ws.send(JSON.stringify(message))
 - Backend receives as event.data (string) or pre-parsed dict (framework-dependent)
@@ -11,85 +15,10 @@ Architecture Overview:
 - Only specific message types are accepted from frontend (INCOMING_MESSAGE_SCHEMAS)
 - Backend-to-frontend messages use create_message() for consistent formatting
 """
-from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
-from datetime import datetime
 
-
-class MessageType(str, Enum):
-    """WebSocket message type enumeration"""
-    # Connection management
-    HEARTBEAT = "HEARTBEAT"
-    HEARTBEAT_ACK = "HEARTBEAT_ACK"
-    CONNECTION_ESTABLISHED = "CONNECTION_ESTABLISHED"
-    
-    # Location services
-    LOCATION_REQUEST = "LOCATION_REQUEST"
-    LOCATION_RESPONSE = "LOCATION_RESPONSE"
-    
-    # Chat and streaming
-    CHAT_MESSAGE = "CHAT_MESSAGE"
-    CHAT_STREAM_START = "CHAT_STREAM_START"
-    CHAT_STREAM_CHUNK = "CHAT_STREAM_CHUNK"
-    CHAT_STREAM_END = "CHAT_STREAM_END"
-    STREAMING_CHUNK = "STREAMING_CHUNK"  # Real-time thinking/text streaming (legacy, individual chunks)
-    STREAMING_UPDATE = "STREAMING_UPDATE"  # Real-time content update (accumulated complete content)
-
-    # Tool use notifications (for frontend display)
-    NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
-    NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED"
-    
-    # File operations
-    FILE_UPLOAD_START = "FILE_UPLOAD_START"
-    FILE_UPLOAD_CHUNK = "FILE_UPLOAD_CHUNK"
-    FILE_UPLOAD_COMPLETE = "FILE_UPLOAD_COMPLETE"
-    
-    # System messages
-    ERROR = "ERROR"
-    STATUS_UPDATE = "STATUS_UPDATE"
-    
-    # TTS streaming
-    TTS_CHUNK = "TTS_CHUNK"
-
-    # Message management
-    MESSAGE_CREATE = "MESSAGE_CREATE"
-
-    # Emotion and animation
-    EMOTION_KEYWORD = "EMOTION_KEYWORD"
-
-    # Session management
-    TITLE_UPDATE = "TITLE_UPDATE"
-
-    # Tool confirmation (bash, edit, write, etc.)
-    TOOL_CONFIRMATION_REQUEST = "TOOL_CONFIRMATION_REQUEST"
-    TOOL_CONFIRMATION_RESPONSE = "TOOL_CONFIRMATION_RESPONSE"
-
-    # User interrupt control
-    USER_INTERRUPT = "USER_INTERRUPT"
-
-    # Background process notifications
-    BACKGROUND_PROCESS_STARTED = "BACKGROUND_PROCESS_STARTED"
-    BACKGROUND_PROCESS_OUTPUT_UPDATE = "BACKGROUND_PROCESS_OUTPUT_UPDATE"
-    BACKGROUND_PROCESS_COMPLETED = "BACKGROUND_PROCESS_COMPLETED"
-    BACKGROUND_PROCESS_KILLED = "BACKGROUND_PROCESS_KILLED"
-
-    # Message queue management
-    QUEUE_UPDATE = "QUEUE_UPDATE"
-    PROCESSING_START = "PROCESSING_START"
-    MESSAGE_QUEUED = "MESSAGE_QUEUED"
-
-    # Future extensions
-    VOICE_MESSAGE = "VOICE_MESSAGE"
-    IMAGE_GENERATION = "IMAGE_GENERATION"
-
-
-class BaseWebSocketMessage(BaseModel):
-    """Base WebSocket message schema"""
-    type: MessageType
-    session_id: Optional[str] = None
-    timestamp: str = datetime.now().isoformat()
-    message_id: Optional[str] = None
+# Import core types from new modular structure
+from backend.presentation.websocket.messages import MessageType, BaseWebSocketMessage
 
 
 class HeartbeatMessage(BaseWebSocketMessage):
