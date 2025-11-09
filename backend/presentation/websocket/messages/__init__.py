@@ -16,7 +16,13 @@ Architecture Overview:
 from backend.presentation.websocket.messages.types import MessageType
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 
+# Connection management
+from backend.presentation.websocket.messages.connection import HeartbeatMessage
+
 __all__ = [
+    # Core types
     "MessageType",
     "BaseWebSocketMessage",
+    # Connection management
+    "HeartbeatMessage",
 ]

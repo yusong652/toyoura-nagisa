@@ -19,11 +19,7 @@ from typing import Any, Dict, List, Optional
 
 # Import core types from new modular structure
 from backend.presentation.websocket.messages import MessageType, BaseWebSocketMessage
-
-
-class HeartbeatMessage(BaseWebSocketMessage):
-    """Heartbeat message schema"""
-    type: MessageType = MessageType.HEARTBEAT
+from backend.presentation.websocket.messages.connection import HeartbeatMessage
 
 
 class LocationRequestMessage(BaseWebSocketMessage):
