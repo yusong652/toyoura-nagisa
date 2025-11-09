@@ -45,6 +45,9 @@ from backend.presentation.websocket.messages.queue import (
     MessageQueuedMessage
 )
 
+# Background process notifications
+from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
+
 __all__ = [
     # Core types
     "MessageType",
@@ -66,4 +69,6 @@ __all__ = [
     "QueueUpdateMessage",
     "ProcessingStartMessage",
     "MessageQueuedMessage",
+    # Background process notifications
+    "BackgroundProcessNotification",
 ]

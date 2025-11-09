@@ -36,6 +36,7 @@ from backend.presentation.websocket.messages.queue import (
     ProcessingStartMessage,
     MessageQueuedMessage
 )
+from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -95,29 +96,6 @@ class ToolConfirmationResponseMessage(BaseWebSocketMessage):
 class UserInterruptMessage(BaseWebSocketMessage):
     """User interrupt message schema (ESC key pressed)"""
     type: MessageType = MessageType.USER_INTERRUPT
-
-
-class BackgroundProcessNotification(BaseWebSocketMessage):
-    """
-    Background process notification message schema for frontend display.
-
-    Provides real-time updates about background bash processes with recent output
-    for user monitoring. Designed to show command name and last 5 lines of output
-    in a compact UI panel.
-    """
-    type: MessageType
-    process_id: str
-    command: str
-    description: Optional[str] = None
-    status: str  # "running", "completed", "killed"
-
-    # Recent output for display (last 5 lines)
-    recent_output: List[str] = []
-    has_more_output: bool = False
-
-    # Statistics
-    runtime_seconds: float = 0
-    exit_code: Optional[int] = None
 
 
 class StreamingChunkMessage(BaseWebSocketMessage):
