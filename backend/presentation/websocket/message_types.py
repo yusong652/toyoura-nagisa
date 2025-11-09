@@ -37,6 +37,12 @@ from backend.presentation.websocket.messages.queue import (
     MessageQueuedMessage
 )
 from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
+from backend.presentation.websocket.messages.tool import (
+    ToolUseNotification,
+    ToolConfirmationRequestMessage,
+    ToolConfirmationResponseMessage,
+    UserInterruptMessage
+)
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -59,43 +65,12 @@ class ChatStreamChunk(BaseWebSocketMessage):
     is_final: bool = False
 
 
-class ToolUseNotification(BaseWebSocketMessage):
-    """Tool use notification message schema"""
-    type: MessageType  # Will be NAGISA_IS_USING_TOOL or NAGISA_TOOL_USE_CONCLUDED
-    tool_names: Optional[List[str]] = None
-    action: Optional[str] = None
-    thinking: Optional[str] = None
-    results: Optional[Dict[str, Any]] = None
-
-
 class MessageCreateMessage(BaseWebSocketMessage):
     """Message creation message schema for dynamic bot message creation"""
     type: MessageType = MessageType.MESSAGE_CREATE
     role: str = "assistant"  # "user" | "assistant" | "system"
     initial_text: Optional[str] = None
     streaming: bool = True
-
-
-class ToolConfirmationRequestMessage(BaseWebSocketMessage):
-    """Tool confirmation request message schema (for bash, edit, write, etc.)"""
-    type: MessageType = MessageType.TOOL_CONFIRMATION_REQUEST
-    tool_call_id: str  # ID of the tool call to match with frontend ToolUseBlock
-    tool_name: str
-    command: str
-    description: Optional[str] = None
-
-
-class ToolConfirmationResponseMessage(BaseWebSocketMessage):
-    """Tool confirmation response message schema"""
-    type: MessageType = MessageType.TOOL_CONFIRMATION_RESPONSE
-    tool_call_id: str  # ID of the tool call to match the request
-    approved: bool
-    user_message: Optional[str] = None
-
-
-class UserInterruptMessage(BaseWebSocketMessage):
-    """User interrupt message schema (ESC key pressed)"""
-    type: MessageType = MessageType.USER_INTERRUPT
 
 
 class StreamingChunkMessage(BaseWebSocketMessage):

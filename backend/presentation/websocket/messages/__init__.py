@@ -48,6 +48,14 @@ from backend.presentation.websocket.messages.queue import (
 # Background process notifications
 from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
 
+# Tool execution and confirmation
+from backend.presentation.websocket.messages.tool import (
+    ToolUseNotification,
+    ToolConfirmationRequestMessage,
+    ToolConfirmationResponseMessage,
+    UserInterruptMessage
+)
+
 __all__ = [
     # Core types
     "MessageType",
@@ -71,4 +79,9 @@ __all__ = [
     "MessageQueuedMessage",
     # Background process notifications
     "BackgroundProcessNotification",
+    # Tool execution and confirmation
+    "ToolUseNotification",
+    "ToolConfirmationRequestMessage",
+    "ToolConfirmationResponseMessage",
+    "UserInterruptMessage",
 ]
