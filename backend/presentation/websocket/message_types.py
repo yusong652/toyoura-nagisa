@@ -26,6 +26,11 @@ from backend.presentation.websocket.messages.location import (
 )
 from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
 from backend.presentation.websocket.messages.tts import TTSChunk
+from backend.presentation.websocket.messages.system import (
+    ErrorMessage,
+    StatusUpdate,
+    TitleUpdateMessage
+)
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -57,21 +62,6 @@ class ToolUseNotification(BaseWebSocketMessage):
     results: Optional[Dict[str, Any]] = None
 
 
-class ErrorMessage(BaseWebSocketMessage):
-    """Error message schema"""
-    type: MessageType = MessageType.ERROR
-    error_code: str
-    error_message: str
-    details: Optional[Dict[str, Any]] = None
-
-
-class StatusUpdate(BaseWebSocketMessage):
-    """Status update message schema"""
-    type: MessageType = MessageType.STATUS_UPDATE
-    status: str
-    data: Optional[Dict[str, Any]] = None
-
-
 class MessageCreateMessage(BaseWebSocketMessage):
     """Message creation message schema for dynamic bot message creation"""
     type: MessageType = MessageType.MESSAGE_CREATE
@@ -100,12 +90,6 @@ class ToolConfirmationResponseMessage(BaseWebSocketMessage):
 class UserInterruptMessage(BaseWebSocketMessage):
     """User interrupt message schema (ESC key pressed)"""
     type: MessageType = MessageType.USER_INTERRUPT
-
-
-class TitleUpdateMessage(BaseWebSocketMessage):
-    """Title update message schema for session title changes"""
-    type: MessageType = MessageType.TITLE_UPDATE
-    payload: Dict[str, Any]  # Contains session_id and title
 
 
 class BackgroundProcessNotification(BaseWebSocketMessage):

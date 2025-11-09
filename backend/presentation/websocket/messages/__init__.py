@@ -31,6 +31,13 @@ from backend.presentation.websocket.messages.emotion import EmotionKeywordMessag
 # Text-to-Speech
 from backend.presentation.websocket.messages.tts import TTSChunk
 
+# System messages
+from backend.presentation.websocket.messages.system import (
+    ErrorMessage,
+    StatusUpdate,
+    TitleUpdateMessage
+)
+
 __all__ = [
     # Core types
     "MessageType",
@@ -44,4 +51,8 @@ __all__ = [
     "EmotionKeywordMessage",
     # Text-to-Speech
     "TTSChunk",
+    # System messages
+    "ErrorMessage",
+    "StatusUpdate",
+    "TitleUpdateMessage",
 ]
