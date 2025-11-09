@@ -28,6 +28,9 @@ from backend.presentation.websocket.messages.location import (
 # Emotion and animation
 from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
 
+# Text-to-Speech
+from backend.presentation.websocket.messages.tts import TTSChunk
+
 __all__ = [
     # Core types
     "MessageType",
@@ -39,4 +42,6 @@ __all__ = [
     "LocationResponseMessage",
     # Emotion and animation
     "EmotionKeywordMessage",
+    # Text-to-Speech
+    "TTSChunk",
 ]

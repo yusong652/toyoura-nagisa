@@ -25,6 +25,7 @@ from backend.presentation.websocket.messages.location import (
     LocationResponseMessage
 )
 from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
+from backend.presentation.websocket.messages.tts import TTSChunk
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -69,18 +70,6 @@ class StatusUpdate(BaseWebSocketMessage):
     type: MessageType = MessageType.STATUS_UPDATE
     status: str
     data: Optional[Dict[str, Any]] = None
-
-
-class TTSChunk(BaseWebSocketMessage):
-    """TTS chunk message schema for real-time audio streaming"""
-    type: MessageType = MessageType.TTS_CHUNK
-    text: str
-    audio: Optional[str] = None  # Base64 encoded audio data
-    index: int
-    processing_time: Optional[float] = None
-    engine_status: Optional[str] = None
-    error: Optional[str] = None
-    is_final: bool = False
 
 
 class MessageCreateMessage(BaseWebSocketMessage):
