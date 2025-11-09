@@ -60,7 +60,7 @@ class MessageType(str, Enum):
 
     # Message queue management
     QUEUE_UPDATE = "QUEUE_UPDATE"
-    PROCESSING_START = "PROCESSING_START"
+    MESSAGE_PROCESSING_START = "MESSAGE_PROCESSING_START"
     MESSAGE_QUEUED = "MESSAGE_QUEUED"
 
     # Future extensions

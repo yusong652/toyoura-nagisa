@@ -70,7 +70,7 @@ OUTGOING_MESSAGE_SCHEMAS = {
     MessageType.BACKGROUND_PROCESS_KILLED: BackgroundProcessNotification,
     # Message queue notifications
     MessageType.QUEUE_UPDATE: QueueUpdateMessage,
-    MessageType.PROCESSING_START: ProcessingStartMessage,
+    MessageType.MESSAGE_PROCESSING_START: ProcessingStartMessage,
     MessageType.MESSAGE_QUEUED: MessageQueuedMessage,
 }
 

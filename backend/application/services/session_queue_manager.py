@@ -420,7 +420,7 @@ Please address this message and continue with your tasks.
 
             # Create processing start message
             processing_msg = create_message(
-                MessageType.PROCESSING_START,
+                MessageType.MESSAGE_PROCESSING_START,
                 session_id=session_id,
                 payload={
                     "remaining_in_queue": remaining_in_queue,

@@ -39,7 +39,7 @@ class ProcessingStartMessage(BaseWebSocketMessage):
             - remaining_in_queue: Number of messages still waiting
             - timestamp: Processing start timestamp
     """
-    type: MessageType = MessageType.PROCESSING_START
+    type: MessageType = MessageType.MESSAGE_PROCESSING_START
     payload: Dict[str, Any]
 
 
