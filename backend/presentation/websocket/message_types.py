@@ -20,21 +20,10 @@ from typing import Any, Dict, List, Optional
 # Import core types from new modular structure
 from backend.presentation.websocket.messages import MessageType, BaseWebSocketMessage
 from backend.presentation.websocket.messages.connection import HeartbeatMessage
-
-
-class LocationRequestMessage(BaseWebSocketMessage):
-    """Location request message schema"""
-    type: MessageType = MessageType.LOCATION_REQUEST
-    request_id: str
-    accuracy_level: str = "high"  # high, medium, low
-
-
-class LocationResponseMessage(BaseWebSocketMessage):
-    """Location response message schema"""
-    type: MessageType = MessageType.LOCATION_RESPONSE
-    request_id: Optional[str] = None
-    location_data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+from backend.presentation.websocket.messages.location import (
+    LocationRequestMessage,
+    LocationResponseMessage
+)
 
 
 class ChatMessageRequest(BaseWebSocketMessage):

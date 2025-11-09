@@ -19,10 +19,19 @@ from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 # Connection management
 from backend.presentation.websocket.messages.connection import HeartbeatMessage
 
+# Location services
+from backend.presentation.websocket.messages.location import (
+    LocationRequestMessage,
+    LocationResponseMessage
+)
+
 __all__ = [
     # Core types
     "MessageType",
     "BaseWebSocketMessage",
     # Connection management
     "HeartbeatMessage",
+    # Location services
+    "LocationRequestMessage",
+    "LocationResponseMessage",
 ]
