@@ -31,6 +31,11 @@ from backend.presentation.websocket.messages.system import (
     StatusUpdate,
     TitleUpdateMessage
 )
+from backend.presentation.websocket.messages.queue import (
+    QueueUpdateMessage,
+    ProcessingStartMessage,
+    MessageQueuedMessage
+)
 
 
 class ChatMessageRequest(BaseWebSocketMessage):
@@ -166,56 +171,6 @@ class StreamingUpdateMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.STREAMING_UPDATE
     content: List[Dict[str, Any]]  # ContentBlock array: [{"type": "thinking", "thinking": "..."}, ...]
     streaming: bool = True
-
-
-class QueueUpdateMessage(BaseWebSocketMessage):
-    """
-    Queue update message for notifying frontend about message queue status.
-
-    Provides real-time updates about the session's message queue, including
-    number of pending messages and processing state.
-
-    Attributes:
-        payload: Queue status information
-            - queue_size: Number of messages waiting in queue
-            - is_processing: Whether session is currently processing
-            - timestamp: Update timestamp
-    """
-    type: MessageType = MessageType.QUEUE_UPDATE
-    payload: Dict[str, Any]
-
-
-class ProcessingStartMessage(BaseWebSocketMessage):
-    """
-    Processing start message for notifying frontend when message processing begins.
-
-    Sent when a message is taken from the queue and processing starts,
-    allowing frontend to show "processing" status.
-
-    Attributes:
-        payload: Processing information
-            - remaining_in_queue: Number of messages still waiting
-            - timestamp: Processing start timestamp
-    """
-    type: MessageType = MessageType.PROCESSING_START
-    payload: Dict[str, Any]
-
-
-class MessageQueuedMessage(BaseWebSocketMessage):
-    """
-    Message queued notification for frontend confirmation.
-
-    Sent immediately after a user message is successfully added to the queue,
-    providing feedback that the message was received and will be processed.
-
-    Attributes:
-        payload: Queue information
-            - position: Position in queue (0 = processing now, 1+ = waiting)
-            - queue_size: Total queue size
-            - timestamp: Queued timestamp
-    """
-    type: MessageType = MessageType.MESSAGE_QUEUED
-    payload: Dict[str, Any]
 
 
 # Incoming message schemas (messages that frontend sends to backend)

@@ -38,6 +38,13 @@ from backend.presentation.websocket.messages.system import (
     TitleUpdateMessage
 )
 
+# Message queue management
+from backend.presentation.websocket.messages.queue import (
+    QueueUpdateMessage,
+    ProcessingStartMessage,
+    MessageQueuedMessage
+)
+
 __all__ = [
     # Core types
     "MessageType",
@@ -55,4 +62,8 @@ __all__ = [
     "ErrorMessage",
     "StatusUpdate",
     "TitleUpdateMessage",
+    # Message queue management
+    "QueueUpdateMessage",
+    "ProcessingStartMessage",
+    "MessageQueuedMessage",
 ]
