@@ -24,10 +24,6 @@ class MessageType(str, Enum):
     CHAT_STREAM_END = "CHAT_STREAM_END"
     STREAMING_UPDATE = "STREAMING_UPDATE"  # Real-time content update (accumulated complete content)
 
-    # Tool use notifications (for frontend display)
-    NAGISA_IS_USING_TOOL = "NAGISA_IS_USING_TOOL"
-    NAGISA_TOOL_USE_CONCLUDED = "NAGISA_TOOL_USE_CONCLUDED"
-
     # File operations
     FILE_UPLOAD_START = "FILE_UPLOAD_START"
     FILE_UPLOAD_CHUNK = "FILE_UPLOAD_CHUNK"

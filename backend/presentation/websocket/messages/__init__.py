@@ -50,7 +50,6 @@ from backend.presentation.websocket.messages.background_process import Backgroun
 
 # Tool execution and confirmation
 from backend.presentation.websocket.messages.tool import (
-    ToolUseNotification,
     ToolConfirmationRequestMessage,
     ToolConfirmationResponseMessage,
     UserInterruptMessage
@@ -98,7 +97,6 @@ __all__ = [
     # Background process notifications
     "BackgroundProcessNotification",
     # Tool execution and confirmation
-    "ToolUseNotification",
     "ToolConfirmationRequestMessage",
     "ToolConfirmationResponseMessage",
     "UserInterruptMessage",

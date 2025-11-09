@@ -9,29 +9,6 @@ from backend.presentation.websocket.messages.base import BaseWebSocketMessage
 from backend.presentation.websocket.messages.types import MessageType
 
 
-class ToolUseNotification(BaseWebSocketMessage):
-    """
-    Tool use notification message schema for frontend display.
-
-    Sent by backend to notify frontend when tools are being used or completed.
-    Used with two different message types:
-    - NAGISA_IS_USING_TOOL: Tool execution started
-    - NAGISA_TOOL_USE_CONCLUDED: Tool execution completed
-
-    Attributes:
-        type: Notification type (NAGISA_IS_USING_TOOL or NAGISA_TOOL_USE_CONCLUDED)
-        tool_names: List of tool names being used/completed
-        action: Action description for the tool usage
-        thinking: LLM thinking content explaining tool usage
-        results: Tool execution results (for concluded notifications)
-    """
-    type: MessageType  # Will be NAGISA_IS_USING_TOOL or NAGISA_TOOL_USE_CONCLUDED
-    tool_names: Optional[List[str]] = None
-    action: Optional[str] = None
-    thinking: Optional[str] = None
-    results: Optional[Dict[str, Any]] = None
-
-
 class ToolConfirmationRequestMessage(BaseWebSocketMessage):
     """
     Tool confirmation request message schema (for bash, edit, write, etc.).
