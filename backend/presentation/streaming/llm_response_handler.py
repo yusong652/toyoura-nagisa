@@ -16,7 +16,7 @@ from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.application.services.contents import TitleService
 from backend.presentation.websocket.message_types import (
-    create_error_message, create_tool_use_message, create_message, MessageType
+    create_message, MessageType
 )
 from backend.presentation.streaming.content_processor import process_content_pipeline
 from backend.presentation.streaming.memory_injection_handler import save_session_conversation_memory

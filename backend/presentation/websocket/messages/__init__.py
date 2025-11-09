@@ -1,12 +1,8 @@
 """
-WebSocket message type definitions and schemas.
+WebSocket message type system for aiNagisa.
 
-DEPRECATED: This module is deprecated. Please import from the modular structure:
-- backend.presentation.websocket.messages for message classes
-- backend.presentation.websocket.messages.factory for factory functions
-
-This compatibility module re-exports everything from the new structure
-to maintain backward compatibility with existing code.
+This package provides a modular structure for WebSocket message definitions,
+organized by functional domain for better maintainability.
 
 Architecture Overview:
 - Frontend sends JSON strings via WebSocket: ws.send(JSON.stringify(message))
@@ -16,40 +12,57 @@ Architecture Overview:
 - Backend-to-frontend messages use create_message() for consistent formatting
 """
 
-# Re-export all message types and classes
-from backend.presentation.websocket.messages import (
-    MessageType,
-    BaseWebSocketMessage,
-    # Connection management
-    HeartbeatMessage,
-    # Location services
+# Core types and base classes
+from backend.presentation.websocket.messages.types import MessageType
+from backend.presentation.websocket.messages.base import BaseWebSocketMessage
+
+# Connection management
+from backend.presentation.websocket.messages.connection import HeartbeatMessage
+
+# Location services
+from backend.presentation.websocket.messages.location import (
     LocationRequestMessage,
-    LocationResponseMessage,
-    # Emotion and animation
-    EmotionKeywordMessage,
-    # Text-to-Speech
-    TTSChunk,
-    # System messages
-    ErrorMessage,
-    StatusUpdate,
-    TitleUpdateMessage,
-    # Message queue management
-    QueueUpdateMessage,
-    ProcessingStartMessage,
-    MessageQueuedMessage,
-    # Background process notifications
-    BackgroundProcessNotification,
-    # Tool execution and confirmation
-    ToolConfirmationRequestMessage,
-    ToolConfirmationResponseMessage,
-    UserInterruptMessage,
-    # Chat and streaming
-    ChatMessageRequest,
-    MessageCreateMessage,
-    StreamingUpdateMessage,
+    LocationResponseMessage
 )
 
-# Re-export factory functions and schemas
+# Emotion and animation
+from backend.presentation.websocket.messages.emotion import EmotionKeywordMessage
+
+# Text-to-Speech
+from backend.presentation.websocket.messages.tts import TTSChunk
+
+# System messages
+from backend.presentation.websocket.messages.system import (
+    ErrorMessage,
+    StatusUpdate,
+    TitleUpdateMessage
+)
+
+# Message queue management
+from backend.presentation.websocket.messages.queue import (
+    QueueUpdateMessage,
+    ProcessingStartMessage,
+    MessageQueuedMessage
+)
+
+# Background process notifications
+from backend.presentation.websocket.messages.background_process import BackgroundProcessNotification
+
+# Tool execution and confirmation
+from backend.presentation.websocket.messages.tool import (
+    ToolConfirmationRequestMessage,
+    ToolConfirmationResponseMessage,
+    UserInterruptMessage
+)
+
+# Chat and streaming
+from backend.presentation.websocket.messages.chat import (
+    ChatMessageRequest,
+    MessageCreateMessage,
+    StreamingUpdateMessage
+)
+
+# Factory functions and schemas (optional - can be imported from .factory directly)
 from backend.presentation.websocket.messages.factory import (
     INCOMING_MESSAGE_SCHEMAS,
     OUTGOING_MESSAGE_SCHEMAS,
