@@ -207,50 +207,6 @@ class SessionQueueManager:
                 self._processing[session_id] = False
                 logger.info(f"Finished processing queue for session {session_id}")
 
-    async def _try_collect_messages(self, session_id: str, queue: asyncio.Queue) -> List[dict]:
-        """
-        Try to collect additional messages from queue within merge window.
-
-        Implements Claude Code style message merging by waiting a short time
-        to see if more messages arrive, then collecting them for batch processing.
-
-        Args:
-            session_id: Session identifier
-            queue: Message queue for this session
-
-        Returns:
-            List[dict]: Additional messages collected (empty if none)
-        """
-        collected = []
-        merge_deadline = asyncio.get_event_loop().time() + self._merge_window
-
-        while len(collected) < self._max_merge_count - 1:  # -1 because first message already retrieved
-            # Calculate remaining time in merge window
-            remaining_time = merge_deadline - asyncio.get_event_loop().time()
-            if remaining_time <= 0:
-                break
-
-            try:
-                # Try to get message with remaining timeout
-                message = await asyncio.wait_for(
-                    queue.get(),
-                    timeout=min(remaining_time, 0.2)  # Check every 0.2s
-                )
-                collected.append(message)
-                logger.debug(f"Collected message {len(collected)} for merging in session {session_id}")
-
-            except asyncio.TimeoutError:
-                # No more messages within timeout
-                break
-            except Exception as e:
-                logger.warning(f"Error collecting messages for merge: {e}")
-                break
-
-        if collected:
-            logger.info(f"Collected {len(collected)} additional messages for merging in session {session_id}")
-
-        return collected
-
     def _merge_messages(self, messages: List[dict]) -> dict:
         """
         Merge multiple messages into a single formatted message (Claude Code style).
