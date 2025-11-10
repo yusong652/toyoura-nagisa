@@ -171,13 +171,13 @@ class LLMClientBase(ABC):
         # Initialize context manager if needed
         if not context_manager._initialized_from_history:
             from backend.infrastructure.storage.session_manager import load_history
-            from backend.domain.models.message_factory import message_factory_no_thinking
             recent_history = load_history(session_id)
             # Exclude the last message from history since we'll add the current user message separately
             # This prevents duplicate user messages when the current message was already saved to storage
             if recent_history:
                 recent_history = recent_history[:-1]
-            recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
+            # Use provider-specific message factory (can be overridden by subclasses)
+            recent_msgs = self._process_history_messages(recent_history)
             context_manager.initialize_session_from_history(recent_msgs)
         # Add user message and set configuration (now async)
         await context_manager.add_user_message_from_data(parsed_data)
@@ -682,6 +682,22 @@ class LLMClientBase(ABC):
         """Clear session context - shared implementation."""
         # Clear session-specific context manager
         self.cleanup_session_context(session_id)
+
+    def _process_history_messages(self, history: List[Dict[str, Any]]) -> List[BaseMessage]:
+        """
+        Process history messages for context initialization.
+
+        Default implementation filters out thinking content to reduce token usage.
+        Providers can override this method to customize history processing behavior.
+
+        Args:
+            history: Raw history messages from storage
+
+        Returns:
+            List[BaseMessage]: Processed message objects
+        """
+        from backend.domain.models.message_factory import message_factory_no_thinking
+        return [message_factory_no_thinking(msg) for msg in history]
 
     @abstractmethod
     def _get_context_manager_class(self) -> Type[BaseContextManager]:

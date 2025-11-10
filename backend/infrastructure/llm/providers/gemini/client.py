@@ -174,6 +174,35 @@ class GeminiClient(LLMClientBase):
         """Get Gemini-specific context manager class."""
         return GeminiContextManager
 
+    def _process_history_messages(self, history: List[Dict[str, Any]]) -> List[BaseMessage]:
+        """
+        Process history messages for Gemini context initialization.
+
+        Override base implementation to support optional thinking preservation
+        based on configuration. This enables:
+        1. Cross-turn reasoning continuity (future-proof)
+        2. "Reasoning resume" after backend restart
+        3. Thought signature preservation for tool calling chains
+
+        Args:
+            history: Raw history messages from storage
+
+        Returns:
+            List[BaseMessage]: Processed message objects
+        """
+        from backend.domain.models.message_factory import message_factory, message_factory_no_thinking
+
+        # Check if thinking preservation is enabled
+        config = get_gemini_client_config()
+        preserve_thinking = config.model_settings.preserve_thinking_in_history
+
+        if preserve_thinking:
+            # Use message_factory to preserve thinking content
+            return [message_factory(msg) for msg in history]
+        else:
+            # Use default behavior: filter out thinking content
+            return [message_factory_no_thinking(msg) for msg in history]
+
     async def _prepare_complete_context(
         self,
         session_id: str

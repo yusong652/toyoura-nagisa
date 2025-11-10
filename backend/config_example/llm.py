@@ -34,6 +34,12 @@ class GeminiConfig(BaseSettings):
     top_k: Optional[int] = Field(default=None, ge=1, description="Top-K sampling")
     max_output_tokens: int = Field(default=8192, alias="maxOutputTokens", ge=1, description="Max output tokens")
     web_search_max_uses: int = Field(default=5, ge=1, le=20, description="Web search max uses")
+
+    # Advanced Thinking Features (optional, uncomment to enable)
+    # preserve_thinking_in_history: bool = Field(default=False, description="Preserve thinking content across sessions")
+    # Benefits: (1) Cross-turn reasoning (2) Resume after restart (3) Tool call reasoning chains
+    # Recommended for: PFC agent, domain-specific sessions with reasoning continuity needs
+
     model_config = SettingsConfigDict(
         env_file='.env',
         env_nested_delimiter='__',
