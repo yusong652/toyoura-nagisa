@@ -10,7 +10,7 @@ Core design principles:
 2. Focus on context state management during tool calls
 """
 
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from backend.domain.models.messages import BaseMessage
 from .message_formatter import GeminiMessageFormatter
@@ -35,28 +35,6 @@ class GeminiContextManager(BaseContextManager):
         """Initialize context manager"""
         super().__init__(provider_name=provider_name, session_id=session_id)
         # working_contents already initialized in base class
-
-    def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
-        """
-        Initialize context manager from input message list (Gemini-specific override).
-
-        This override adds support for preserve_thinking configuration when
-        calling the message formatter, enabling cross-turn reasoning and reasoning resume.
-
-        Args:
-            messages: Input message history list
-        """
-        from .config import get_gemini_client_config
-
-        # Get Gemini-specific configuration
-        config = get_gemini_client_config()
-        preserve_thinking = config.model_settings.preserve_thinking_in_history
-
-        # Call Gemini formatter with preserve_thinking parameter
-        self.working_contents = GeminiMessageFormatter.format_messages(
-            messages,
-            preserve_thinking=preserve_thinking
-        )
 
     def add_response(self, response) -> None:
         """

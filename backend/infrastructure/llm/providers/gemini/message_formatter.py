@@ -4,7 +4,7 @@ Gemini-specific message formatter.
 Handles conversion from aiNagisa's internal message format to Gemini API format.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
 
@@ -12,15 +12,15 @@ from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatt
 class GeminiMessageFormatter(BaseMessageFormatter):
     """
     Gemini-specific message formatter.
-    
+
     Converts aiNagisa BaseMessage objects to Gemini API format with proper
     handling of multimodal content, roles, and metadata.
     """
-    
+
     @staticmethod
     def format_messages(
         messages: List[BaseMessage],
-        preserve_thinking: bool = False
+        preserve_thinking: Optional[bool] = None
     ) -> List[Dict[str, Any]]:
         """
         Convert aiNagisa BaseMessage objects to Gemini API format.
@@ -31,12 +31,17 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         Args:
             messages: List of BaseMessage objects from aiNagisa's internal format
             preserve_thinking: Whether to preserve thinking content with thought_signature.
-                             Default False (skip thinking for backward compatibility).
-                             Set True to enable cross-turn reasoning and reasoning resume.
+                             If None, automatically reads from Gemini client configuration.
+                             Explicit True/False values override the configuration.
 
         Returns:
             List[Dict[str, Any]]: Messages formatted for Gemini API
         """
+        # Auto-detect from config if not explicitly specified
+        if preserve_thinking is None:
+            from .config import get_gemini_client_config
+            config = get_gemini_client_config()
+            preserve_thinking = config.model_settings.preserve_thinking_in_history
         from google.genai import types
         import base64
         
