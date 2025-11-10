@@ -48,10 +48,40 @@ class KimiContextManager(BaseContextManager):
             choice = response.choices[0]
             message = choice.message
 
+            # Extract reasoning content (K2 Thinking models)
+            reasoning_content = getattr(message, 'reasoning_content', None)
+
+            # Build content - handle reasoning_content for proper context preservation
+            # Important: For multi-turn tool calling, we must preserve thinking in context
+            # so the model can maintain its reasoning chain across turns
+            content_value: Any = message.content
+
+            # If reasoning_content exists, format as multimodal content array
+            # This ensures thinking is preserved in conversation history
+            if reasoning_content:
+                # Convert to multimodal format following OpenAI's pattern
+                content_blocks = []
+
+                # Add thinking content wrapped in <thinking> tags
+                # This format is compatible with OpenAI's message formatter
+                content_blocks.append({
+                    "type": "text",
+                    "text": f"<thinking>{reasoning_content}</thinking>"
+                })
+
+                # Add regular content if present
+                if message.content:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": message.content
+                    })
+
+                content_value = content_blocks
+
             # Build message dict in Chat Completions format
             message_dict: Dict[str, Any] = {
                 "role": message.role,
-                "content": message.content
+                "content": content_value
             }
 
             # Add tool calls if present
