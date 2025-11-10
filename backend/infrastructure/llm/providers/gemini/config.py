@@ -93,7 +93,7 @@ class GeminiModelConfig(BaseModel):
         description="Whether to include thinking process in the response"
     )
     preserve_thinking_in_history: bool = Field(
-        default=False,
+        default=True,  # ✅ Changed from False to True for PFC agent use case
         description=(
             "Whether to preserve thinking content when loading conversation history. "
             "Benefits: "
