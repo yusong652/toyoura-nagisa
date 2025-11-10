@@ -118,6 +118,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         # Track tool call index to match with pre-extracted tool_calls
         tool_call_index = 0
 
+        # Track thought_signature for thinking content
+        thought_signature = None
+
         # Process all parts from the response
         if hasattr(candidate.content, 'parts'):
             for part in candidate.content.parts:
@@ -125,6 +128,9 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     # Categorize text content
                     if getattr(part, 'thought', False):
                         thinking_parts.append(part.text)
+                        # Capture thought_signature if present (for tool calling chains)
+                        if hasattr(part, 'thought_signature') and part.thought_signature:
+                            thought_signature = part.thought_signature
                     else:
                         # Collect ALL non-thinking text parts (preserves order)
                         text_parts.append(part.text)
@@ -144,10 +150,16 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         if thinking_parts:
             full_thinking_content = "\n".join(thinking_parts).strip()
             if full_thinking_content:
-                content.append({
+                thinking_block = {
                     "type": "thinking",
                     "thinking": full_thinking_content,
-                })
+                }
+                # Add thought_signature if present (for tool calling chain validation)
+                if thought_signature:
+                    # Convert bytes to base64 string for JSON serialization
+                    import base64
+                    thinking_block["thought_signature"] = base64.b64encode(thought_signature).decode('utf-8')
+                content.append(thinking_block)
 
         # Merge all text parts into single block for consistent rendering
         # Note: Multiple text blocks would render as separate lines in frontend
