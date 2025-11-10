@@ -44,7 +44,6 @@ class SessionQueueManager:
         self._lock = asyncio.Lock()  # Protect queue creation and state updates
 
         # Message merging configuration (Claude Code style)
-        self._merge_enabled = True  # Enable message merging
         self._merge_window = 0.8  # Wait 0.8s to collect messages
         self._max_merge_count = 10  # Max 10 messages per merge
 
@@ -114,23 +113,27 @@ class SessionQueueManager:
         """
         try:
             while True:
-                # Get queue for this session
-                queue = self._queues.get(session_id)
-                if not queue:
-                    logger.warning(f"No queue found for session {session_id}")
-                    break
+                # Atomic check: get queue and check if empty inside lock
+                # This prevents race condition where message arrives between check and flag clearing
+                async with self._lock:
+                    queue = self._queues.get(session_id)
+                    if not queue:
+                        logger.warning(f"No queue found for session {session_id}")
+                        self._processing[session_id] = False
+                        break
 
-                # Check if queue is empty
-                if queue.empty():
-                    logger.info(f"Queue empty for session {session_id}, stopping processing")
-                    break
+                    # Check if queue is empty - if so, clear flag atomically
+                    if queue.empty():
+                        self._processing[session_id] = False
+                        logger.info(f"Queue empty for session {session_id}, stopping processing")
+                        break
 
                 # Strategy: Wait a bit to collect multiple messages before processing
                 # This allows rapid consecutive messages to be batched together
                 current_queue_size = queue.qsize()
                 print(f"[QueueManager] Queue has {current_queue_size} message(s), waiting {self._merge_window}s to collect more...", flush=True)
 
-                if self._merge_enabled and current_queue_size > 0:
+                if current_queue_size > 0:
                     # Wait for merge window to allow more messages to arrive
                     await asyncio.sleep(self._merge_window)
 
@@ -140,7 +143,7 @@ class SessionQueueManager:
 
                 # Collect all messages currently in queue (up to max_merge_count)
                 messages_to_process = []
-                max_to_collect = self._max_merge_count if self._merge_enabled else 1
+                max_to_collect = self._max_merge_count
 
                 # Get current queue size before collecting
                 messages_available = queue.qsize()
@@ -201,11 +204,13 @@ class SessionQueueManager:
                 # Send queue update to frontend
                 await self._notify_queue_update(session_id, queue.qsize())
 
-        finally:
-            # Always mark processing as complete when loop exits
+        except Exception as e:
+            # Exception occurred - clear flag and re-raise
+            logger.error(f"Unexpected error in process_queue for session {session_id}: {e}")
             async with self._lock:
                 self._processing[session_id] = False
-                logger.info(f"Finished processing queue for session {session_id}")
+            raise
+        # Note: No finally block needed - normal exit clears flag inside lock (line 127)
 
     def _merge_messages(self, messages: List[dict]) -> dict:
         """
@@ -242,7 +247,7 @@ class SessionQueueManager:
         # Extract message texts
         message_texts = []
         for msg in messages:
-            content = msg.get('content', '')
+            content = msg.get('message', '')
             if isinstance(content, str):
                 message_texts.append(content)
             elif isinstance(content, list):
@@ -265,7 +270,7 @@ Please address this message and continue with your tasks.
 
         # Create merged message data (use first message as template)
         merged = messages[0].copy()
-        merged['content'] = formatted_content
+        merged['message'] = formatted_content
         merged['_merged_count'] = len(messages)  # Metadata for debugging
         merged['_original_messages'] = message_texts  # Keep originals for reference
 
