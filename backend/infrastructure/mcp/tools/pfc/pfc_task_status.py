@@ -62,7 +62,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
         from scripts executed earlier (even after running other tasks).
 
         Pagination helps manage long outputs efficiently. All scripts (foreground/background)
-        are tracked until server restart. Use pfc_list_tasks to find task IDs.
+        are tracked and persisted. Use pfc_list_tasks to find task IDs.
 
         Optional filtering allows focusing on specific output (e.g., errors, warnings).
 

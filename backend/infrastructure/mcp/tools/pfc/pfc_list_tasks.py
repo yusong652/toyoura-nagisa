@@ -56,7 +56,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
         Note:
             - Shows scripts submitted via pfc_execute_script
             - Tasks sorted by start time (newest first)
-            - Task list persists until server restart
+            - Tasks persisted across server restarts (historical tasks marked [Historical])
             - Use pfc_check_task_status for detailed output of specific scripts
         """
         try:
