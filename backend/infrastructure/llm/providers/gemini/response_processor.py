@@ -49,22 +49,22 @@ class GeminiResponseProcessor(BaseResponseProcessor):
     def extract_tool_calls(response) -> List[Dict[str, Any]]:
         """
         Extract tool call information from Gemini API response.
-        
+
         Args:
             response: Raw Gemini API response object
-            
+
         Returns:
-            List[Dict[str, Any]]: List of tool calls with id, name, arguments
+            List[Dict[str, Any]]: List of tool calls with id, name, arguments, thought_signature
         """
         tool_calls = []
-        
+
         if not hasattr(response, 'candidates') or not response.candidates:
             return tool_calls
-        
+
         candidate = response.candidates[0]
         if not hasattr(candidate, 'content') or not candidate.content:
             return tool_calls
-        
+
         if hasattr(candidate.content, 'parts'):
             import uuid
             for part in candidate.content.parts:
@@ -81,8 +81,14 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                         'name': func_call.name,
                         'arguments': dict(func_call.args) if hasattr(func_call, 'args') else {}
                     }
+
+                    # Extract thought_signature if present (for tool calling chain validation)
+                    if hasattr(part, 'thought_signature') and part.thought_signature:
+                        import base64
+                        tool_call['thought_signature'] = base64.b64encode(part.thought_signature).decode('utf-8')
+
                     tool_calls.append(tool_call)
-        
+
         return tool_calls
     @staticmethod
     def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> BaseMessage:
@@ -138,12 +144,16 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     # Use pre-extracted tool call with consistent ID
                     if tool_call_index < len(tool_calls):
                         tool_call = tool_calls[tool_call_index]
-                        content.append({
+                        tool_use_block = {
                             "type": "tool_use",
                             "id": tool_call['id'],  # Reuse ID from extract_tool_calls()
                             "name": tool_call['name'],
                             "input": tool_call['arguments']
-                        })
+                        }
+                        # Add thought_signature if present (for tool calling chain validation)
+                        if 'thought_signature' in tool_call:
+                            tool_use_block['thought_signature'] = tool_call['thought_signature']
+                        content.append(tool_use_block)
                         tool_call_index += 1
 
         # Build content list for storage

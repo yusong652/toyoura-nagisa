@@ -89,7 +89,21 @@ class GeminiMessageFormatter(BaseMessageFormatter):
                                 name=item.get("name"),
                                 args=item.get("input", {})
                             )
-                            parts.append(types.Part(function_call=function_call))
+                            part = types.Part(function_call=function_call)
+
+                            # Restore thought_signature if available (for tool calling chain validation)
+                            # Only when preserve_thinking is enabled
+                            if preserve_thinking:
+                                thought_sig_b64 = item.get("thought_signature")
+                                if thought_sig_b64:
+                                    try:
+                                        # Decode from base64 string back to bytes
+                                        thought_sig_bytes = base64.b64decode(thought_sig_b64)
+                                        part.thought_signature = thought_sig_bytes
+                                    except Exception as e:
+                                        print(f"[WARNING] Failed to decode thought_signature for tool_use: {e}")
+
+                            parts.append(part)
 
                         # Handle tool_result blocks (for user messages with tool results)
                         elif item.get("type") == "tool_result":
