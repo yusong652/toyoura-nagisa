@@ -200,7 +200,7 @@ class ChatHandler(MessageHandler):
         super().__init__(connection_manager)
         # Import chat service for LLM processing
         from backend.application.services.chat_service import get_chat_service
-        from backend.application.services.session_queue_manager import get_queue_manager
+        from backend.infrastructure.messaging import get_queue_manager
         self.chat_service = get_chat_service()
         self.queue_manager = get_queue_manager()
 
