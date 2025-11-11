@@ -137,8 +137,6 @@ class BaseContextManager(ABC):
         if last_role != 'user' or second_last_role != 'user':
             return
 
-        print(f"[DEBUG] Detected consecutive user messages after interrupt, auto-merging")
-
         # Extract content from last message (the "new" message)
         new_content = ""
         if isinstance(last_msg, dict):
@@ -176,7 +174,6 @@ class BaseContextManager(ABC):
 
         # Remove last message from working_contents
         self.working_contents.pop()
-        print(f"[DEBUG] Merged messages in working_contents")
 
         # Merge in database
         from backend.infrastructure.storage.session_manager import (
@@ -212,12 +209,10 @@ class BaseContextManager(ABC):
             # Delete second message
             del history_msgs[second_idx]
             save_history(self.session_id, history_msgs)
-            print(f"[DEBUG] Merged messages in database")
 
         # Clear interrupt flag
         self._last_response_interrupted = False
         update_runtime_state(self.session_id, "last_response_interrupted", False)
-        print(f"[DEBUG] Cleared interrupt flag")
 
 
     async def add_user_message(self, user_message: BaseMessage) -> None:
@@ -245,7 +240,6 @@ class BaseContextManager(ABC):
             # Clear persisted interrupt flag
             from backend.infrastructure.storage.session_manager import update_runtime_state
             update_runtime_state(self.session_id, "last_response_interrupted", False)
-            print(f"[DEBUG] Cleared interrupt flag (in-memory + persistent)")
 
             # Check if we need to merge with previous user message
             if self.working_contents:
@@ -259,21 +253,13 @@ class BaseContextManager(ABC):
 
                 if last_role == 'user':
                     needs_merge = True
-                    print(f"[DEBUG] add_user_message: Will merge with previous user message (consecutive user messages)")
-                else:
-                    print(f"[DEBUG] add_user_message: Adding interrupt notification to user message")
-            else:
-                print(f"[DEBUG] add_user_message: Adding interrupt notification to user message (empty context)")
 
         # Get background task reminders (bash processes and PFC tasks)
         background_reminders = await self._get_background_task_reminders()
         reminders.extend(background_reminders)
-        print(f"[DEBUG] add_user_message: Got {len(background_reminders)} background task reminders for session {self.session_id}")
 
         if needs_merge:
             # Merge with previous user message instead of creating new one
-            print(f"[DEBUG] Merging current message with previous user message")
-
             # Extract new message content
             new_content = ""
             if isinstance(user_message.content, str):
@@ -309,7 +295,6 @@ class BaseContextManager(ABC):
                         if isinstance(block, dict) and block.get('type') == 'text':
                             block['text'] += merge_text
                             break
-                print(f"[DEBUG] Merged into dict message (in-memory)")
             elif hasattr(last_msg, 'parts'):
                 # Gemini Content object with parts
                 # Find last text part
@@ -317,7 +302,6 @@ class BaseContextManager(ABC):
                     if hasattr(part, 'text'):
                         part.text += merge_text
                         break
-                print(f"[DEBUG] Merged into Gemini Content object (in-memory)")
 
             # Update database: merge messages persistently
             # 1. Load full history from database
@@ -355,7 +339,6 @@ class BaseContextManager(ABC):
 
                 # 5. Save updated history back to database
                 save_history(self.session_id, history_msgs)
-                print(f"[DEBUG] Updated database: merged user messages and deleted duplicate")
 
         else:
             # Normal flow: add reminders and create new message
@@ -368,13 +351,11 @@ class BaseContextManager(ABC):
                 # Modify user_message.content to inject reminders
                 if isinstance(user_message.content, str):
                     user_message.content += reminder_text
-                    print(f"[DEBUG] Injected {len(reminders)} reminder(s) to string content")
                 elif isinstance(user_message.content, list):
                     # Find last text item and append
                     for item in reversed(user_message.content):
                         if isinstance(item, dict) and 'text' in item:
                             item['text'] += reminder_text
-                            print(f"[DEBUG] Injected {len(reminders)} reminder(s) to list content")
                             break
 
             # Format and add to working contents
@@ -466,15 +447,12 @@ class BaseContextManager(ABC):
 
         # Count non-tool messages
         non_tool_count = sum(
-            1 for msg in messages 
+            1 for msg in messages
             if not self._is_tool_call(msg) and not self._is_tool_result(msg)
         )
-        
-        print(f"[DEBUG] Non-tool message count: {non_tool_count}")
-        
+
         # If we already have fewer non-tool messages than recent_messages_length, return all
         if non_tool_count <= recent_messages_length:
-            print(f"[DEBUG] Returning all messages (non_tool_count <= recent_messages_length)")
             return messages
         
         # Work backwards to collect the most recent non-tool messages
@@ -566,10 +544,9 @@ class BaseContextManager(ABC):
             process_manager = get_process_manager()
             bash_reminders = process_manager.get_system_reminders(self.session_id)
             reminders.extend(bash_reminders)
-            print(f"[DEBUG] Got {len(bash_reminders)} bash process reminders")
 
         except Exception as e:
-            print(f"[DEBUG] Failed to get bash process reminders: {e}")
+            pass  # PFC server may not be running - this is normal
 
         # Query PFC tasks (remote, may be slow)
         try:
@@ -616,7 +593,6 @@ class BaseContextManager(ABC):
 
                         # Mark as notified
                         self._notified_completions.add(task_id)
-                        print(f"[DEBUG] Task {task_id} transition detected: running → {current_status}")
 
                 # Step 2: Add completion notifications first (higher priority)
                 reminders.extend(completion_notifications)
@@ -656,11 +632,9 @@ class BaseContextManager(ABC):
                 # Step 4: Update state snapshot for next comparison
                 self._last_task_states = current_states
 
-                print(f"[DEBUG] Got {len(completion_notifications)} completion notifications, {len(running_tasks)} running task reminders")
-
         except Exception as e:
             # PFC server may not be running - this is normal, don't break the flow
-            print(f"[DEBUG] Failed to get PFC task reminders: {e}")
+            pass
 
         return reminders
 
