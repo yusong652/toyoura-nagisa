@@ -43,6 +43,7 @@ class ToolConfirmationService:
     async def request_confirmation(
         self,
         session_id: str,
+        message_id: str,
         tool_call_id: str,
         tool_name: str,
         command: str,
@@ -56,7 +57,8 @@ class ToolConfirmationService:
 
         Args:
             session_id: WebSocket session ID for the user
-            tool_call_id: ID of the tool call (used for both matching and tracking)
+            message_id: ID of the message containing this tool call (for unique identification)
+            tool_call_id: ID of the tool call (combined with message_id for matching)
             tool_name: Name of the tool requiring confirmation (bash, edit, write)
             command: The command/operation to execute
             description: Optional description of what the command does
@@ -73,9 +75,10 @@ class ToolConfirmationService:
         self.active_confirmations[tool_call_id] = confirmation_future
 
         try:
-            # Send confirmation request to frontend
+            # Send confirmation request to frontend (include message_id for unique identification)
             request_msg = create_message(
                 MessageType.TOOL_CONFIRMATION_REQUEST,
+                message_id=message_id,
                 tool_call_id=tool_call_id,
                 tool_name=tool_name,
                 command=command,

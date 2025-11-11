@@ -7,6 +7,7 @@ import './ToolDiffBlock.css'
 
 interface ToolDiffBlockProps {
   block: ToolUseBlockType
+  messageId: string
 }
 
 type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
@@ -26,11 +27,12 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  *
  * Args:
  *     block: ToolUseBlock object with tool name and file operation parameters
+ *     messageId: ID of the message containing this tool call
  *
  * Returns:
  *     JSX element with diff viewer and confirmation UI
  */
-const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block }) => {
+const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block, messageId }) => {
   const { pendingToolConfirmation, clearPendingToolConfirmation } = useConnection()
 
   const [confirmationStatus, setConfirmationStatus] = useState<ConfirmationStatus | null>(null)
@@ -97,7 +99,9 @@ const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block }) => {
    */
   useEffect(() => {
     // Check for existing pending confirmation
-    if (pendingToolConfirmation?.tool_call_id === block.id) {
+    // Match by BOTH message_id AND tool_call_id (prevents conflicts with repeated tool_call_ids across messages)
+    if (pendingToolConfirmation?.message_id === messageId &&
+        pendingToolConfirmation?.tool_call_id === block.id) {
       setConfirmationStatus('pending')
       clearPendingToolConfirmation()
     }
@@ -105,7 +109,9 @@ const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block }) => {
     // Listen for new confirmation requests
     const handleToolConfirmationRequest = (event: CustomEvent) => {
       const data = event.detail
-      if (data.tool_call_id === block.id) {
+      // Match by BOTH message_id AND tool_call_id
+      // This prevents conflicts when same tool_call_id appears in different messages (e.g., "bash:0")
+      if (data.message_id === messageId && data.tool_call_id === block.id) {
         setConfirmationStatus('pending')
         clearPendingToolConfirmation()
       }
@@ -116,7 +122,7 @@ const ToolDiffBlock: React.FC<ToolDiffBlockProps> = ({ block }) => {
     return () => {
       window.removeEventListener('toolConfirmationRequest', handleToolConfirmationRequest as EventListener)
     }
-  }, [block.id, pendingToolConfirmation, clearPendingToolConfirmation])
+  }, [messageId, block.id, pendingToolConfirmation, clearPendingToolConfirmation])
 
   /**
    * Keyboard navigation for confirmation UI.

@@ -4,6 +4,7 @@ import { useConnection } from '../../../contexts/connection/ConnectionContext'
 
 interface ToolUseBlockProps {
   block: ToolUseBlockType
+  messageId: string
 }
 
 type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
@@ -21,7 +22,7 @@ type ConfirmationStatus = 'pending' | 'approved' | 'rejected'
  * Returns:
  *     JSX element with tool call display
  */
-const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
+const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block, messageId }) => {
   // Use Connection Context for tool confirmation management
   const { pendingToolConfirmation, clearPendingToolConfirmation } = useConnection()
 
@@ -88,8 +89,9 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     // Check if there's a pending confirmation that matches this tool block
     // Using React Context instead of window global variables
     if (pendingToolConfirmation) {
-      // Match by tool_call_id (precise matching for multiple same-type tools)
-      if (pendingToolConfirmation.tool_call_id === block.id) {
+      // Match by BOTH message_id AND tool_call_id (prevents conflicts with repeated tool_call_ids across messages)
+      if (pendingToolConfirmation.message_id === messageId &&
+          pendingToolConfirmation.tool_call_id === block.id) {
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
         clearPendingToolConfirmation()
@@ -100,8 +102,9 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     const handleToolConfirmationRequest = (event: CustomEvent) => {
       const data = event.detail
 
-      // Match this confirmation request to this tool block by tool_call_id
-      if (data.tool_call_id === block.id) {
+      // Match this confirmation request to this tool block by BOTH message_id AND tool_call_id
+      // This prevents conflicts when same tool_call_id appears in different messages (e.g., "bash:0")
+      if (data.message_id === messageId && data.tool_call_id === block.id) {
         setConfirmationStatus('pending')
         // Clear the pending confirmation since we've consumed it
         clearPendingToolConfirmation()
@@ -113,7 +116,7 @@ const ToolUseBlock: React.FC<ToolUseBlockProps> = ({ block }) => {
     return () => {
       window.removeEventListener('toolConfirmationRequest', handleToolConfirmationRequest as EventListener)
     }
-  }, [block.id, pendingToolConfirmation, clearPendingToolConfirmation])
+  }, [messageId, block.id, pendingToolConfirmation, clearPendingToolConfirmation])
 
   // Keyboard navigation for pending confirmation
   useEffect(() => {

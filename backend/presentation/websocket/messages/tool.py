@@ -19,13 +19,15 @@ class ToolConfirmationRequestMessage(BaseWebSocketMessage):
     ToolConfirmationResponseMessage.
 
     Attributes:
-        tool_call_id: Unique ID to match request with response
+        message_id: ID of the message containing this tool call (for unique identification)
+        tool_call_id: Tool call ID (combined with message_id for matching)
         tool_name: Name of the tool requiring confirmation (bash, edit, write)
         command: Command/operation to be executed
         description: Optional human-readable description
     """
     type: MessageType = MessageType.TOOL_CONFIRMATION_REQUEST
-    tool_call_id: str  # ID of the tool call to match with frontend ToolUseBlock
+    message_id: str  # Message ID containing this tool call
+    tool_call_id: str  # Tool call ID (combined with message_id for matching)
     tool_name: str
     command: str
     description: Optional[str] = None

@@ -11,7 +11,8 @@ export enum ConnectionStatus {
  * Tool confirmation request data structure (bash, edit, write, etc.)
  */
 export interface ToolConfirmationData {
-  tool_call_id: string  // ID used for both matching and tracking
+  message_id: string    // Message ID containing this tool call (for unique identification)
+  tool_call_id: string  // Tool call ID (combined with message_id for matching)
   tool_name: string
   command: string
   description?: string

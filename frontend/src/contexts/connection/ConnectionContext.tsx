@@ -434,6 +434,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
         // Handle tool confirmation requests (bash, edit, write, etc.)
         if (data.type === 'TOOL_CONFIRMATION_REQUEST') {
           console.log('[ConnectionContext] Received TOOL_CONFIRMATION_REQUEST', {
+            message_id: data.message_id,
             tool_call_id: data.tool_call_id,
             tool_name: data.tool_name,
             command: data.command
@@ -441,6 +442,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
 
           // Store in state for late-mounting components (React-idiomatic approach)
           setPendingToolConfirmation({
+            message_id: data.message_id,
             tool_call_id: data.tool_call_id,
             tool_name: data.tool_name,
             command: data.command,

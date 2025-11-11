@@ -220,7 +220,8 @@ class BaseToolManager(ABC):
     async def handle_multiple_function_calls(
         self,
         function_calls: List[dict],
-        session_id: str
+        session_id: str,
+        message_id: str = ""
     ) -> List[Dict[str, Any]]:
         """
         Handle multiple function calls serially with intelligent cascade blocking.
@@ -240,6 +241,7 @@ class BaseToolManager(ABC):
                 - arguments: Dict[str, Any] - Tool arguments (optional)
                 - id: str - Tool call ID for tracking (optional)
             session_id: Session ID for context-aware tools and dependency injection
+            message_id: ID of the message containing these tool calls (for unique identification)
 
         Returns:
             List[Dict[str, Any]]: List of ToolResult dictionaries with structure:
@@ -343,7 +345,7 @@ class BaseToolManager(ABC):
                 continue
 
             # Execute tool normally
-            result = await self.handle_function_call(function_call, session_id)
+            result = await self.handle_function_call(function_call, session_id, message_id)
             results.append(result)
 
             # Check cascade triggers after execution
@@ -372,7 +374,7 @@ class BaseToolManager(ABC):
 
         return results
 
-    async def handle_function_call(self, function_call: dict, session_id: str) -> Dict[str, Any]:
+    async def handle_function_call(self, function_call: dict, session_id: str, message_id: str = "") -> Dict[str, Any]:
         """
         Handle LLM-generated function_call requests.
 
@@ -382,6 +384,7 @@ class BaseToolManager(ABC):
                 - arguments: Dict[str, Any] - Tool arguments (optional, defaults to {})
                 - id: str - Tool call ID for tracking (optional, defaults to "")
             session_id: Session ID for context-aware tools and dependency injection (required)
+            message_id: ID of the message containing this tool call (for unique identification)
 
         Returns:
             Dict[str, Any]: ToolResult dictionary with structure:
@@ -437,7 +440,7 @@ class BaseToolManager(ABC):
 
             # Step 1: Handle user confirmation if required
             if self._requires_user_confirmation(tool_name, tool_args):
-                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, tool_id, session_id)
+                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, tool_id, session_id, message_id)
                 if rejection_result is not None:
                     # User rejected - return rejection result (already in ToolResult format)
                     return rejection_result
@@ -523,7 +526,8 @@ class BaseToolManager(ABC):
         tool_name: str,
         tool_args: Dict[str, Any],
         tool_id: str,
-        session_id: str
+        session_id: str,
+        message_id: str
     ) -> Optional[Dict[str, Any]]:
         """
         Handle user confirmation for tool execution.
@@ -533,13 +537,14 @@ class BaseToolManager(ABC):
             tool_args: Tool arguments
             tool_id: Tool call ID for matching with frontend
             session_id: Session ID for confirmation (required)
+            message_id: ID of the message containing this tool call
 
         Returns:
             None if approved, rejection response dict if rejected
         """
 
         approved, user_message = await self._request_user_confirmation(
-            tool_name, tool_args, tool_id, session_id
+            tool_name, tool_args, tool_id, session_id, message_id
         )
 
         if not approved:
@@ -594,7 +599,7 @@ class BaseToolManager(ABC):
 
         return False
 
-    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, session_id: str) -> tuple[bool, Optional[str]]:
+    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, session_id: str, message_id: str) -> tuple[bool, Optional[str]]:
         """
         Request user confirmation for tool execution.
 
@@ -603,6 +608,7 @@ class BaseToolManager(ABC):
             tool_args: Arguments for the tool
             tool_id: Tool call ID for matching with frontend
             session_id: Session ID for the confirmation request
+            message_id: ID of the message containing this tool call
 
         Returns:
             tuple[bool, Optional[str]]: (approved, user_message) - True if user approved,
@@ -649,6 +655,7 @@ class BaseToolManager(ABC):
             # Request confirmation (no timeout - wait indefinitely)
             approved, user_message = await confirmation_service.request_confirmation(
                 session_id=session_id,
+                message_id=message_id,
                 tool_call_id=tool_id,
                 tool_name=tool_name,
                 command=command,

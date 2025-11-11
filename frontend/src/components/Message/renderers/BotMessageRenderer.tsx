@@ -84,9 +84,9 @@ const BotMessageRenderer: React.FC<BotMessageRendererProps> = ({
         case 'tool_use':
           // Route to specialized component based on tool type
           if (block.name === 'edit' || block.name === 'write') {
-            return <ToolDiffBlock key={index} block={block} />
+            return <ToolDiffBlock key={index} block={block} messageId={message.id} />
           }
-          return <ToolUseBlock key={index} block={block} />
+          return <ToolUseBlock key={index} block={block} messageId={message.id} />
         case 'thinking':
           return <ThinkingBlock key={index} block={block} streaming={streaming} />
         default:

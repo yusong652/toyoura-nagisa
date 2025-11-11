@@ -420,7 +420,8 @@ class ChatOrchestrator:
         # Execute tools
         results = await self.llm_client.tool_manager.handle_multiple_function_calls(
             tool_calls,
-            session_id or ""
+            session_id or "",
+            message_id
         )
 
         # Add results to context and check for rejections
