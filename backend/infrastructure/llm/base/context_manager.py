@@ -64,12 +64,12 @@ class BaseContextManager(ABC):
         # Cached system reminders (captured before tool execution)
         self._cached_system_reminders: List[str] = []
 
-        # PFC task status transition tracking (session-scoped, memory-only)
-        self._notified_completions: set = set()  # Task IDs that have been notified as completed/failed
-        self._last_task_states: Dict[str, str] = {}  # Last known status for each task_id
-
         # Streaming message tracking (set during streaming responses)
         self.streaming_message_id: Optional[str] = None  # Message ID for streaming response updates
+
+        # Status monitor for background tasks and system state
+        from backend.infrastructure.monitoring import get_status_monitor
+        self._status_monitor = get_status_monitor(session_id)
 
         # Load historical messages and initialize working contents
         from backend.infrastructure.storage.session_manager import (
@@ -254,9 +254,9 @@ class BaseContextManager(ABC):
                 if last_role == 'user':
                     needs_merge = True
 
-        # Get background task reminders (bash processes and PFC tasks)
-        background_reminders = await self._get_background_task_reminders()
-        reminders.extend(background_reminders)
+        # Get all system reminders (bash processes, PFC tasks, etc.)
+        system_reminders = await self._status_monitor.get_all_reminders()
+        reminders.extend(system_reminders)
 
         if needs_merge:
             # Merge with previous user message instead of creating new one
@@ -500,116 +500,8 @@ class BaseContextManager(ABC):
         """Clear runtime context for session cleanup."""
         self.working_contents.clear()
 
-    async def _get_background_task_reminders(self) -> List[str]:
-        """
-        Get background task status reminders (async).
-
-        Queries both local bash processes and remote PFC tasks concurrently.
-
-        Returns:
-            List[str]: List of reminder strings for active background tasks
-        """
-        reminders = []
-
-        # Query bash processes (local, fast)
-        try:
-            from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
-
-            process_manager = get_process_manager()
-            bash_reminders = process_manager.get_system_reminders(self.session_id)
-            reminders.extend(bash_reminders)
-
-        except Exception:
-            pass  # Bash process manager may not be available
-
-        # Query PFC tasks (remote, may be slow)
-        try:
-            from backend.infrastructure.pfc.websocket_client import get_client
-
-            # Get WebSocket client and query running tasks
-            client = await get_client()
-            result = await client.list_tasks(
-                session_id=self.session_id,
-                offset=0,
-                limit=5  # Only get recent tasks for reminders
-            )
-
-            if result.get("status") == "success":
-                tasks = result.get("data", [])
-                current_states = {}  # Snapshot of current task states
-
-                # Step 1: Detect status transitions (running → completed/failed)
-                completion_notifications = []
-                for task in tasks:
-                    task_id = task.get("task_id", "unknown")
-                    current_status = task.get("status", "unknown")
-                    current_states[task_id] = current_status
-
-                    # Check for transition: was running, now completed/failed
-                    last_status = self._last_task_states.get(task_id)
-                    if (last_status == "running" and
-                        current_status in ["completed", "failed"] and
-                        task_id not in self._notified_completions):
-
-                        # Generate completion notification
-                        description = task.get("description", "")
-                        script_path = task.get("script_path", task.get("name", "unknown"))
-                        elapsed_time = task.get("elapsed_time", 0)
-
-                        # Status icon
-                        status_icon = "✓" if current_status == "completed" else "✗"
-
-                        completion_notifications.append(
-                            f"{status_icon} PFC Task {task_id} {current_status}: "
-                            f"{script_path} (elapsed: {elapsed_time:.1f}s) - {description}. "
-                            f"Use pfc_check_task_status('{task_id}') to see results."
-                        )
-
-                        # Mark as notified
-                        self._notified_completions.add(task_id)
-
-                # Step 2: Add completion notifications first (higher priority)
-                reminders.extend(completion_notifications)
-
-                # Step 3: Add running tasks reminders (only tasks not notified as completed)
-                running_tasks = [
-                    task for task in tasks
-                    if task.get("status") == "running"
-                    and task.get("task_id") not in self._notified_completions
-                ]
-
-                # Limit to 3 tasks to avoid overwhelming LLM
-                for task in running_tasks[:3]:
-                    task_id = task.get("task_id", "unknown")
-                    description = task.get("description", "")
-                    script_path = task.get("script_path", task.get("name", "unknown"))
-                    status = task.get("status", "unknown")
-                    elapsed_time = task.get("elapsed_time", 0)
-
-                    reminder = (
-                        f"PFC Task {task_id} "
-                        f"(script: {script_path}) "
-                        f"(status: {status}) "
-                        f"(elapsed: {elapsed_time:.1f}s) "
-                        f"- {description}. "
-                        "You can check its status and output using the pfc_check_task_status tool."
-                    )
-                    reminders.append(reminder)
-
-                if len(running_tasks) > 3:
-                    additional_count = len(running_tasks) - 3
-                    reminders.append(
-                        f"Note: {additional_count} more PFC task(s) are running. "
-                        "Use pfc_list_tasks to see all tasks."
-                    )
-
-                # Step 4: Update state snapshot for next comparison
-                self._last_task_states = current_states
-
-        except Exception:
-            # PFC server may not be running - this is normal, don't break the flow
-            pass
-
-        return reminders
+        # Clear status monitor for this session
+        from backend.infrastructure.monitoring import clear_status_monitor
+        clear_status_monitor(self.session_id)
 
 
