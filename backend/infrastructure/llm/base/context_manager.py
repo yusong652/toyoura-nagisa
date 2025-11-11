@@ -363,32 +363,6 @@ class BaseContextManager(ABC):
             formatted_message = formatter_class.format_single_message(user_message)
             self.working_contents.append(formatted_message)
 
-    async def add_user_message_from_data(self, parsed_data: dict) -> None:
-        """
-        Create user message from parsed data and update configuration (async).
-
-        Args:
-            parsed_data: Parsed message data including agent_profile, enable_memory configuration
-        """
-        # Update configuration
-        self.agent_profile = parsed_data.get('agent_profile', 'general')
-        self.enable_memory = parsed_data.get('enable_memory', True)
-
-        # Create user message
-        from backend.domain.models.messages import UserMessage
-        from datetime import datetime
-
-        timestamp = parsed_data.get('timestamp')
-        user_message = UserMessage(
-            role="user",
-            content=parsed_data['content'],
-            timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
-            id=parsed_data.get('id')
-        )
-
-        # Add to context with async reminder injection
-        await self.add_user_message(user_message)
-
     @abstractmethod
     def add_response(self, response: Any) -> None:
         """
