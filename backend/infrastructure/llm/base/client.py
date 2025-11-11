@@ -273,6 +273,19 @@ class LLMClientBase(ABC):
 
         return self._session_context_managers[session_id]
 
+    def clear_context_manager(self, session_id: str) -> None:
+        """
+        Clear cached context manager for a session, forcing reload on next request.
+
+        This ensures the context manager is recreated with fresh data from storage,
+        preventing stale state issues.
+
+        Args:
+            session_id: Session identifier to clear
+        """
+        if session_id in self._session_context_managers:
+            del self._session_context_managers[session_id]
+
     def cleanup_session_context(self, session_id: str) -> None:
         """
         Clean up context manager for ended session.

@@ -161,31 +161,23 @@ class ChatService:
         self.save_user_message_to_session(parsed_data)
         print(f"[DEBUG] Saved user message {parsed_data.get('id')} to session {session_id}", flush=True)
 
-        # 4. Add message to LLM client's context manager
+        # 4. Force reload context manager from storage to get fresh state
         from backend.shared.utils.app_context import get_llm_client
         llm_client = get_llm_client()
+
+        # Clear cached context manager to force reload from database
+        # This ensures we always have the latest state including the newly saved message
+        llm_client.clear_context_manager(session_id)
+
+        # Get fresh context manager (will auto-load from database in __init__)
         context_manager = llm_client.get_or_create_context_manager(session_id)
+
+        # Update configuration from parsed_data
+        context_manager.agent_profile = parsed_data.get('agent_profile', 'general')
+        context_manager.enable_memory = parsed_data.get('enable_memory', True)
 
         # Reset interrupt flag for new conversation turn
         context_manager.user_interrupted = False
-
-        # Initialize context manager from history if needed
-        if not context_manager._initialized_from_history:
-            from backend.infrastructure.storage.session_manager import load_history
-            from backend.domain.models.message_factory import message_factory_no_thinking
-
-            recent_history = load_history(session_id)
-            # Exclude the last message from history since we'll add the current user message separately
-            # This prevents duplicate user messages when the current message was already saved to storage
-            if recent_history:
-                recent_history = recent_history[:-1]
-
-            # Process history messages (filter out thinking content to reduce token usage)
-            recent_msgs = [message_factory_no_thinking(msg) for msg in recent_history]
-            context_manager.initialize_session_from_history(recent_msgs)
-
-        # Add user message and set configuration (async for reminder injection)
-        await context_manager.add_user_message_from_data(parsed_data)
 
         return {
             'session_id': session_id,

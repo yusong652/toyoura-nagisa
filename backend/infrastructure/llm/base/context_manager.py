@@ -37,20 +37,18 @@ class BaseContextManager(ABC):
     
     def __init__(self, provider_name: str, session_id: str):
         """
-        Initialize context manager.
+        Initialize context manager and load historical messages.
+
+        Automatically loads conversation history from storage and initializes
+        the context manager with formatted messages, making it ready to use
+        immediately after construction.
 
         Args:
             provider_name: LLM provider name (e.g., 'gemini', 'anthropic', 'openai')
-            session_id: Optional session ID for runtime context
+            session_id: Session ID for loading history and runtime state
         """
         self._provider_name = provider_name
         self.session_id = session_id
-
-        # Working contents will be populated by initialize methods
-        self.working_contents: List[Dict[str, Any]] = []
-
-        # Track if we've initialized from history
-        self._initialized_from_history = False
 
         # Request configuration storage
         self.agent_profile = "general"
@@ -58,6 +56,7 @@ class BaseContextManager(ABC):
 
         # User interrupt control
         self.user_interrupted: bool = False  # User pressed ESC to interrupt
+        self._last_response_interrupted: bool = False  # Last response was interrupted (for next user message)
 
         # Tool call tracking
         self._has_tool_calls = False
@@ -71,6 +70,113 @@ class BaseContextManager(ABC):
 
         # Streaming message tracking (set during streaming responses)
         self.streaming_message_id: Optional[str] = None  # Message ID for streaming response updates
+
+        # Load historical messages and initialize working contents
+        from backend.infrastructure.storage.session_manager import (
+            load_and_restore_history,
+            load_runtime_state,
+            load_all_message_history,
+            save_history,
+            update_runtime_state
+        )
+
+        historical_messages = load_and_restore_history(session_id)
+        self.working_contents: List[Dict[str, Any]] = []
+
+        if historical_messages:
+            self.initialize_from_messages(historical_messages)
+
+        # Load persisted runtime state (e.g., interrupt flags)
+        runtime_state = load_runtime_state(session_id)
+        if runtime_state.get("last_response_interrupted", False):
+            self._last_response_interrupted = True
+
+            # Auto-merge consecutive user messages if last response was interrupted
+            if len(self.working_contents) >= 2:
+                # Check if last two messages are both user messages
+                last_msg = self.working_contents[-1]
+                second_last_msg = self.working_contents[-2]
+
+                # Extract roles (handle both dict and object types)
+                last_role = last_msg.get('role') if isinstance(last_msg, dict) else getattr(last_msg, 'role', None)
+                second_last_role = second_last_msg.get('role') if isinstance(second_last_msg, dict) else getattr(second_last_msg, 'role', None)
+
+                if last_role == 'user' and second_last_role == 'user':
+                    print(f"[DEBUG] __init__: Detected consecutive user messages, auto-merging")
+
+                    # Extract content from last message (the "new" message)
+                    new_content = ""
+                    if isinstance(last_msg, dict):
+                        content = last_msg.get('content', '')
+                        if isinstance(content, str):
+                            new_content = content
+                        elif isinstance(content, list):
+                            new_content = "".join([
+                                item.get('text', '')
+                                for item in content
+                                if isinstance(item, dict) and 'text' in item
+                            ])
+                    elif hasattr(last_msg, 'content'):
+                        new_content = str(last_msg.content)
+
+                    # Build merge text with system-reminder
+                    reminder = "Previous response interrupted by user."
+                    merge_text = f"\n\n<system-reminder>\n{reminder}\nUser sent another message:\n</system-reminder>\n\n{new_content}"
+
+                    # Merge in memory (working_contents)
+                    if isinstance(second_last_msg, dict):
+                        if isinstance(second_last_msg.get('content'), str):
+                            second_last_msg['content'] += merge_text
+                        elif isinstance(second_last_msg.get('content'), list):
+                            for block in reversed(second_last_msg['content']):
+                                if isinstance(block, dict) and block.get('type') == 'text':
+                                    block['text'] += merge_text
+                                    break
+                    elif hasattr(second_last_msg, 'parts'):
+                        # Gemini Content object
+                        for part in reversed(second_last_msg.parts):
+                            if hasattr(part, 'text'):
+                                part.text += merge_text
+                                break
+
+                    # Remove last message from working_contents
+                    self.working_contents.pop()
+                    print(f"[DEBUG] __init__: Merged in working_contents")
+
+                    # Merge in database
+                    from backend.domain.models.message_factory import message_factory
+                    history = load_all_message_history(session_id)
+                    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+                    # Find last two user messages
+                    user_messages_indices = [
+                        i for i, msg in enumerate(history_msgs)
+                        if hasattr(msg, 'role') and msg.role == 'user'
+                    ]
+
+                    if len(user_messages_indices) >= 2:
+                        first_idx = user_messages_indices[-2]
+                        second_idx = user_messages_indices[-1]
+                        first_msg = history_msgs[first_idx]
+
+                        # Merge content in first message
+                        if isinstance(first_msg.content, str):
+                            first_msg.content += merge_text
+                        elif isinstance(first_msg.content, list):
+                            for block in reversed(first_msg.content):
+                                if isinstance(block, dict) and block.get('type') == 'text':
+                                    block['text'] += merge_text
+                                    break
+
+                        # Delete second message
+                        del history_msgs[second_idx]
+                        save_history(session_id, history_msgs)
+                        print(f"[DEBUG] __init__: Merged in database")
+
+                    # Clear interrupt flag
+                    self._last_response_interrupted = False
+                    update_runtime_state(session_id, "last_response_interrupted", False)
+                    print(f"[DEBUG] __init__: Cleared interrupt flag")
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
@@ -94,21 +200,6 @@ class BaseContextManager(ABC):
         # Call the unified format_messages method
         self.working_contents = formatter_class.format_messages(messages)
     
-    def initialize_session_from_history(self, historical_messages: List[BaseMessage]) -> None:
-        """
-        Initialize context manager with historical messages at session start.
-
-        This should be called once when a session begins or switches,
-        loading all historical messages and setting up the base context.
-
-        Args:
-            historical_messages: All historical messages from storage
-        """
-        # Initialize working contents from history
-        self.initialize_from_messages(historical_messages)
-
-        # Mark as initialized
-        self._initialized_from_history = True
     
     async def add_user_message(self, user_message: BaseMessage) -> None:
         """
@@ -117,44 +208,160 @@ class BaseContextManager(ABC):
         This method is called for each new user input, adding it to the
         existing context without re-processing historical messages.
 
-        Now supports async reminder injection for both bash processes and PFC tasks.
+        Supports async reminder injection for both bash processes and PFC tasks.
+        Also handles interrupt notifications from previous response.
 
         Args:
             user_message: New user message to add
         """
-        if not self._initialized_from_history:
-            # Fallback to old behavior if not properly initialized
-            self.initialize_from_messages([user_message])
-            return
+        # Collect all reminders to inject (background tasks + interrupt notification)
+        reminders = []
 
-        # Inject system reminders to user message content BEFORE formatting and storing
-        # Now async to support both local bash processes and remote PFC task queries
-        reminders = await self._get_background_task_reminders()
-        print(f"[DEBUG] add_user_message: Got {len(reminders)} reminders for session {self.session_id}")
+        # Check if previous response was interrupted
+        needs_merge = False
+        if self._last_response_interrupted:
+            reminders.append("Previous response interrupted by user.")
+            self._last_response_interrupted = False  # Reset in-memory flag
 
-        if reminders:
-            reminder_text = "\n\n" + "\n\n".join([
-                f"<system-reminder>\n{reminder}\n</system-reminder>"
+            # Clear persisted interrupt flag
+            from backend.infrastructure.storage.session_manager import update_runtime_state
+            update_runtime_state(self.session_id, "last_response_interrupted", False)
+            print(f"[DEBUG] Cleared interrupt flag (in-memory + persistent)")
+
+            # Check if we need to merge with previous user message
+            if self.working_contents:
+                last_msg = self.working_contents[-1]
+                # Check role - handle both dict and object types
+                last_role = None
+                if isinstance(last_msg, dict):
+                    last_role = last_msg.get('role')
+                elif hasattr(last_msg, 'role'):
+                    last_role = last_msg.role
+
+                if last_role == 'user':
+                    needs_merge = True
+                    print(f"[DEBUG] add_user_message: Will merge with previous user message (consecutive user messages)")
+                else:
+                    print(f"[DEBUG] add_user_message: Adding interrupt notification to user message")
+            else:
+                print(f"[DEBUG] add_user_message: Adding interrupt notification to user message (empty context)")
+
+        # Get background task reminders (bash processes and PFC tasks)
+        background_reminders = await self._get_background_task_reminders()
+        reminders.extend(background_reminders)
+        print(f"[DEBUG] add_user_message: Got {len(background_reminders)} background task reminders for session {self.session_id}")
+
+        if needs_merge:
+            # Merge with previous user message instead of creating new one
+            print(f"[DEBUG] Merging current message with previous user message")
+
+            # Extract new message content
+            new_content = ""
+            if isinstance(user_message.content, str):
+                new_content = user_message.content
+            elif isinstance(user_message.content, list):
+                # Extract text from list
+                text_parts = []
+                for item in user_message.content:
+                    if isinstance(item, dict) and 'text' in item:
+                        text_parts.append(item['text'])
+                new_content = "".join(text_parts)
+
+            # Build merged content with LLM-friendly format:
+            # 1. System reminder about interruption
+            # 2. Natural transition: "User sent another message:"
+            # 3. New message content
+            reminder_header = "\n\n".join([
+                f"<system-reminder>\n{reminder}\nUser sent another message:\n</system-reminder>"
                 for reminder in reminders
             ])
 
-            # Modify user_message.content to inject reminders
-            if isinstance(user_message.content, str):
-                user_message.content += reminder_text
-                print(f"[DEBUG] Injected reminders to string content")
-            elif isinstance(user_message.content, list):
-                # Find last text item and append
-                for item in reversed(user_message.content):
-                    if isinstance(item, dict) and 'text' in item:
-                        item['text'] += reminder_text
-                        print(f"[DEBUG] Injected reminders to list content")
+            merge_text = f"\n\n{reminder_header}\n\n{new_content}"
+
+            # Merge into last message
+            last_msg = self.working_contents[-1]
+            if isinstance(last_msg, dict):
+                # Dict format (Kimi/OpenAI)
+                if isinstance(last_msg.get('content'), str):
+                    last_msg['content'] += merge_text
+                elif isinstance(last_msg.get('content'), list):
+                    # Find last text block
+                    for block in reversed(last_msg['content']):
+                        if isinstance(block, dict) and block.get('type') == 'text':
+                            block['text'] += merge_text
+                            break
+                print(f"[DEBUG] Merged into dict message (in-memory)")
+            elif hasattr(last_msg, 'parts'):
+                # Gemini Content object with parts
+                # Find last text part
+                for part in reversed(last_msg.parts):
+                    if hasattr(part, 'text'):
+                        part.text += merge_text
                         break
+                print(f"[DEBUG] Merged into Gemini Content object (in-memory)")
 
-        # Format and add to working contents
-        formatter_class = get_message_formatter_class(self._provider_name)
-        formatted_message = formatter_class.format_single_message(user_message)
+            # Update database: merge messages persistently
+            # 1. Load full history from database
+            from backend.infrastructure.storage.session_manager import load_all_message_history, save_history
+            from backend.domain.models.message_factory import message_factory
 
-        self.working_contents.append(formatted_message)
+            history = load_all_message_history(self.session_id)
+            history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+            # 2. Find the last two user messages
+            user_messages_indices = []
+            for i, msg in enumerate(history_msgs):
+                if hasattr(msg, 'role') and msg.role == 'user':
+                    user_messages_indices.append(i)
+
+            if len(user_messages_indices) >= 2:
+                # Get the last two user message indices
+                first_idx = user_messages_indices[-2]
+                second_idx = user_messages_indices[-1]
+
+                first_msg = history_msgs[first_idx]
+
+                # 3. Merge content: update first message with merged content
+                if isinstance(first_msg.content, str):
+                    first_msg.content += merge_text
+                elif isinstance(first_msg.content, list):
+                    # Find last text block in first message
+                    for block in reversed(first_msg.content):
+                        if isinstance(block, dict) and block.get('type') == 'text':
+                            block['text'] += merge_text
+                            break
+
+                # 4. Delete second message from history
+                del history_msgs[second_idx]
+
+                # 5. Save updated history back to database
+                save_history(self.session_id, history_msgs)
+                print(f"[DEBUG] Updated database: merged user messages and deleted duplicate")
+
+        else:
+            # Normal flow: add reminders and create new message
+            if reminders:
+                reminder_text = "\n\n" + "\n\n".join([
+                    f"<system-reminder>\n{reminder}\n</system-reminder>"
+                    for reminder in reminders
+                ])
+
+                # Modify user_message.content to inject reminders
+                if isinstance(user_message.content, str):
+                    user_message.content += reminder_text
+                    print(f"[DEBUG] Injected {len(reminders)} reminder(s) to string content")
+                elif isinstance(user_message.content, list):
+                    # Find last text item and append
+                    for item in reversed(user_message.content):
+                        if isinstance(item, dict) and 'text' in item:
+                            item['text'] += reminder_text
+                            print(f"[DEBUG] Injected {len(reminders)} reminder(s) to list content")
+                            break
+
+            # Format and add to working contents
+            formatter_class = get_message_formatter_class(self._provider_name)
+            formatted_message = formatter_class.format_single_message(user_message)
+            self.working_contents.append(formatted_message)
 
     async def add_user_message_from_data(self, parsed_data: dict) -> None:
         """
@@ -314,14 +521,12 @@ class BaseContextManager(ABC):
             'active': True,
             'session_id': self.session_id,
             'provider': self._provider_name,
-            'working_contents_count': len(self.working_contents),
-            'initialized': self._initialized_from_history
+            'working_contents_count': len(self.working_contents)
         }
     
     def clear_runtime_context(self) -> None:
         """Clear runtime context for session cleanup."""
         self.working_contents.clear()
-        self._initialized_from_history = False
 
     async def _get_background_task_reminders(self) -> List[str]:
         """
@@ -332,8 +537,6 @@ class BaseContextManager(ABC):
         Returns:
             List[str]: List of reminder strings for active background tasks
         """
-        import asyncio
-
         reminders = []
 
         # Query bash processes (local, fast)

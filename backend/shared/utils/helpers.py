@@ -162,6 +162,42 @@ def update_assistant_message(message_id: str, content: List[Dict[str, Any]], ses
     save_history(session_id, history_msgs)
 
 
+def delete_message(message_id: str, session_id: str) -> bool:
+    """
+    Delete a message from history by its ID.
+
+    Used for removing interrupted/incomplete messages that should not persist.
+
+    Args:
+        message_id: ID of the message to delete
+        session_id: Session ID
+
+    Returns:
+        bool: True if message was found and deleted, False otherwise
+
+    Example:
+        >>> # Delete an interrupted message
+        >>> delete_message(message_id="msg-123", session_id="session-456")
+        True
+    """
+    # Load complete history
+    from backend.infrastructure.storage.session_manager import load_all_message_history
+    history = load_all_message_history(session_id)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+    # Find and remove the message
+    original_length = len(history_msgs)
+    history_msgs = [msg for msg in history_msgs if not (hasattr(msg, 'id') and msg.id == message_id)]
+
+    # Check if message was found and deleted
+    if len(history_msgs) < original_length:
+        # Save updated history
+        save_history(session_id, history_msgs)
+        return True
+    else:
+        return False
+
+
 def save_tool_result_message(
     tool_call_id: str,
     tool_name: str,

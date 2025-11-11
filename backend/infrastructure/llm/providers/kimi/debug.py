@@ -28,8 +28,13 @@ class KimiDebugger:
         print(f"\n{'='*80}")
         print(f"[KIMI DEBUG] API Request Payload")
         print(f"{'='*80}")
+
+        # Print API configuration
         print(f"[KIMI] Model: {api_kwargs.get('model')}")
         print(f"[KIMI] Temperature: {api_kwargs.get('temperature')}")
+        print(f"[KIMI] Max tokens: {api_kwargs.get('max_tokens', 'N/A')}")
+        print(f"[KIMI] Top P: {api_kwargs.get('top_p', 'N/A')}")
+        print(f"[KIMI] Stream: {api_kwargs.get('stream', False)}")
         print(f"[KIMI] Messages count: {len(messages)}")
         print(f"[KIMI] Tools count: {len(tools)}")
 
@@ -52,25 +57,65 @@ class KimiDebugger:
                 if not properties or not required:
                     print(f"[KIMI]     Full schema: {json.dumps(params, indent=10)}")
 
-        # Print recent messages
-        print(f"\n[KIMI] Recent Messages (last 2):")
-        for msg in messages[-2:]:
+        # Print all messages with full content
+        print(f"\n[KIMI] All Messages (total: {len(messages)}):")
+        for i, msg in enumerate(messages):
             role = msg.get('role', 'unknown')
             content = msg.get('content', '')
 
+            print(f"\n[KIMI]   Message {i+1} [{role}]:")
+
+            # Print content based on type
             if isinstance(content, str):
-                content_preview = content[:150] + '...' if len(content) > 150 else content
+                print(f"[KIMI]     Content (string): {content}")
+            elif isinstance(content, list):
+                print(f"[KIMI]     Content (multimodal): {len(content)} blocks")
+                for j, block in enumerate(content):
+                    if isinstance(block, dict):
+                        block_type = block.get('type', 'unknown')
+                        print(f"[KIMI]       Block {j+1} [{block_type}]:")
+                        if block_type == 'text':
+                            print(f"[KIMI]         Text: {block.get('text', '')}")
+                        elif block_type == 'image_url':
+                            url = block.get('image_url', {}).get('url', '')
+                            url_preview = url[:80] + '...' if len(url) > 80 else url
+                            print(f"[KIMI]         URL: {url_preview}")
+                        else:
+                            print(f"[KIMI]         Data: {json.dumps(block, indent=12)}")
+                    else:
+                        print(f"[KIMI]       Block {j+1}: {str(block)[:100]}")
             else:
-                content_preview = str(content)[:150]
+                print(f"[KIMI]     Content (other): {str(content)[:200]}")
 
-            print(f"[KIMI]   [{role}]: {content_preview}")
-
+            # Print tool calls if present
             if 'tool_calls' in msg:
-                print(f"[KIMI]     Tool calls: {len(msg['tool_calls'])}")
-                for tc in msg['tool_calls']:
-                    print(f"[KIMI]       - {tc.get('function', {}).get('name', 'unknown')}")
+                tool_calls = msg['tool_calls']
+                print(f"[KIMI]     Tool calls: {len(tool_calls)}")
+                for j, tc in enumerate(tool_calls):
+                    function = tc.get('function', {})
+                    print(f"[KIMI]       Call {j+1}:")
+                    print(f"[KIMI]         ID: {tc.get('id', 'N/A')}")
+                    print(f"[KIMI]         Function: {function.get('name', 'unknown')}")
 
-        print(f"{'='*80}\n")
+                    args = function.get('arguments', '')
+                    if isinstance(args, str):
+                        try:
+                            parsed = json.loads(args) if args else {}
+                            print(f"[KIMI]         Arguments: {json.dumps(parsed, indent=14)}")
+                        except json.JSONDecodeError:
+                            print(f"[KIMI]         Arguments (raw): {args}")
+                    else:
+                        print(f"[KIMI]         Arguments: {json.dumps(args, indent=14)}")
+
+            # Print tool_call_id if present (for tool response messages)
+            if 'tool_call_id' in msg:
+                print(f"[KIMI]     Tool call ID: {msg.get('tool_call_id')}")
+
+            # Print name if present
+            if 'name' in msg:
+                print(f"[KIMI]     Name: {msg.get('name')}")
+
+        print(f"\n{'='*80}\n")
 
     @staticmethod
     def print_tool_call_received(tool_calls: List[Dict[str, Any]]):

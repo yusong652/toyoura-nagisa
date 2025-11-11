@@ -387,8 +387,9 @@ class KimiClient(LLMClientBase):
             - context_contents: Messages for Kimi API (without system prompt)
             - api_config: Dictionary with 'tools' and 'system_prompt' keys
         """
-        # Get context manager and extract its properties
+        # Get context manager (automatically initialized from history on creation)
         context_manager = self.get_or_create_context_manager(session_id)
+
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
         enable_memory = getattr(context_manager, 'enable_memory', True)
 

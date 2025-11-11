@@ -6,7 +6,6 @@ separating business logic from infrastructure concerns.
 """
 from typing import Any, List, Dict, Optional, Tuple
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.streaming import StreamingChunk
 from backend.shared.exceptions import UserRejectionInterruption
 from backend.application.services.conversation.models import (
     ConversationResult,
@@ -227,38 +226,48 @@ class ChatOrchestrator:
         """
         print(f"[INFO] Streaming interrupted by user at iteration {iterations}")
 
-        # Add interrupt marker to state
-        interrupt_chunk = StreamingChunk(
-            chunk_type="text",
-            content="\n\n[interrupted by user]",
-            metadata={"interrupted": True}
-        )
-        state.add_chunk(interrupt_chunk)
+        # Get context manager and set interrupt flag (both in-memory and persistent)
+        context_manager = self.llm_client.get_or_create_context_manager(session_id)
+        context_manager._last_response_interrupted = True
 
-        # Build final content blocks with interrupt marker
+        # Persist interrupt flag to session runtime state
+        from backend.infrastructure.storage.session_manager import update_runtime_state
+        update_runtime_state(session_id, "last_response_interrupted", True)
+        print(f"[DEBUG] Set interrupt flag (in-memory + persistent) - incomplete response will NOT be added to LLM context")
+
+        # Build final content blocks for frontend display only
         content_blocks = state.get_content_blocks()
+        print(f"[DEBUG] Content blocks (for frontend only): {content_blocks}")
 
-        # Construct partial response from chunks
+        # Construct partial response for database storage and frontend display
+        # This will NOT be added to LLM context to avoid misleading the model
         partial_response = self.llm_client._construct_response_from_streaming_chunks(
             state.collected_chunks
         )
 
-        # Add to context manager
-        context_manager = self.llm_client.get_or_create_context_manager(session_id)
-        context_manager.add_response(partial_response)
+        # Debug: Check the constructed response content
+        if hasattr(partial_response, 'choices') and partial_response.choices:
+            message = partial_response.choices[0].message
+            print(f"[DEBUG] Partial response content (not added to context): {repr(message.content)[:200]}")
+            if hasattr(message, 'reasoning_content'):
+                print(f"[DEBUG] Partial reasoning_content: {repr(message.reasoning_content)[:200]}")
 
-        # Format for storage and save to database
-        processor = self.llm_client._get_response_processor()
-        if processor:
-            final_message = processor.format_response_for_storage(partial_response)
-            if final_message:
-                from backend.shared.utils.helpers import update_assistant_message
-                storage_content = final_message.content if isinstance(
-                    final_message.content, list
-                ) else [{"type": "text", "text": str(final_message.content)}]
-                update_assistant_message(state.message_id, storage_content, session_id)
+        # DO NOT add to context manager - incomplete responses should not be in LLM context
+        # The next user message will be merged if there are consecutive user messages
+        print(f"[DEBUG] Skipping add_response() - keeping context clean for LLM")
+        print(f"[DEBUG] Working contents count (unchanged): {len(context_manager.working_contents)}")
 
-        # Send final update with streaming=False
+        # DO NOT save to database - incomplete responses should not persist
+        # User already saw the incomplete content in frontend (temporary display)
+        # After restart, we don't want to load this incomplete message
+        print(f"[DEBUG] Skipping database save - interrupted message won't persist in history")
+
+        # Delete the placeholder message from database (it was created at streaming start)
+        from backend.shared.utils.helpers import delete_message
+        delete_message(state.message_id, session_id)
+        print(f"[DEBUG] Deleted placeholder message {state.message_id} from database")
+
+        # Send final update with streaming=False (frontend will show interrupted state)
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         await WebSocketNotificationService.send_streaming_update(
             session_id=session_id,
@@ -477,7 +486,7 @@ class ChatOrchestrator:
 
         from backend.infrastructure.mcp.utils.tool_result import success_response
         stop_message = (
-            f"⚠️ Tool execution stopped: Reached iteration limit "
+            f"Tool execution stopped: Reached iteration limit "
             f"({self.MAX_ITERATIONS} iterations).\n\n"
             f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
             f"Note: This is a safety mechanism to prevent infinite loops."

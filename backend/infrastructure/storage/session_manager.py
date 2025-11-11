@@ -30,6 +30,11 @@ def _get_session_file(session_id: str) -> str:
     return os.path.join(_get_session_dir(session_id), "history.json")
 
 
+def _get_runtime_state_file(session_id: str) -> str:
+    """Get runtime state file path"""
+    return os.path.join(_get_session_dir(session_id), "runtime_state.json")
+
+
 # ========== Session CRUD Operations ==========
 
 def create_new_history(name: Optional[str] = None) -> str:
@@ -493,3 +498,87 @@ def _update_session_metadata_timestamp(session_id: str) -> None:
                         json.dump(metadata, f, indent=4, ensure_ascii=False)
         except (FileNotFoundError, json.JSONDecodeError):
             pass
+
+
+# ========== Session Runtime State Management ==========
+
+def save_runtime_state(session_id: str, state: Dict[str, Any]) -> None:
+    """
+    Save runtime state for a session.
+
+    Runtime state includes temporary flags like:
+    - last_response_interrupted: Whether the last response was interrupted by user
+    - Other runtime flags as needed
+
+    Args:
+        session_id: Session identifier
+        state: Dictionary containing runtime state
+    """
+    runtime_file = _get_runtime_state_file(session_id)
+
+    # Ensure session directory exists
+    session_dir = _get_session_dir(session_id)
+    os.makedirs(session_dir, exist_ok=True)
+
+    try:
+        with open(runtime_file, 'w', encoding='utf-8') as f:
+            json.dump(state, f, indent=4, ensure_ascii=False)
+        print(f"[DEBUG] Saved runtime state for session {session_id}: {state}")
+    except Exception as e:
+        print(f"[ERROR] Failed to save runtime state for session {session_id}: {e}")
+
+
+def load_runtime_state(session_id: str) -> Dict[str, Any]:
+    """
+    Load runtime state for a session.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        Dictionary containing runtime state, empty dict if file doesn't exist
+    """
+    runtime_file = _get_runtime_state_file(session_id)
+
+    if not os.path.exists(runtime_file):
+        return {}
+
+    try:
+        with open(runtime_file, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+        print(f"[DEBUG] Loaded runtime state for session {session_id}: {state}")
+        return state
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"[WARNING] Failed to load runtime state for session {session_id}: {e}")
+        return {}
+
+
+def update_runtime_state(session_id: str, key: str, value: Any) -> None:
+    """
+    Update a single key in runtime state.
+
+    Args:
+        session_id: Session identifier
+        key: State key to update
+        value: New value for the key
+    """
+    state = load_runtime_state(session_id)
+    state[key] = value
+    save_runtime_state(session_id, state)
+
+
+def clear_runtime_state(session_id: str) -> None:
+    """
+    Clear runtime state for a session.
+
+    Args:
+        session_id: Session identifier
+    """
+    runtime_file = _get_runtime_state_file(session_id)
+
+    if os.path.exists(runtime_file):
+        try:
+            os.remove(runtime_file)
+            print(f"[DEBUG] Cleared runtime state for session {session_id}")
+        except Exception as e:
+            print(f"[ERROR] Failed to clear runtime state for session {session_id}: {e}")
