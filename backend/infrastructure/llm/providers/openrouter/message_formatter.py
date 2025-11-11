@@ -2,15 +2,18 @@
 OpenRouter Message Formatter
 
 OpenRouter uses standard OpenAI Chat Completions API format.
-For simplicity and maintainability, we directly reuse OpenAI's formatter.
+We use the shared ChatCompletionsMessageFormatter which is designed for
+providers implementing the standard Chat Completions API.
 
-This alias improves code readability while avoiding duplication.
+Note: This is different from OpenAI's Responses API used by the OpenAI provider.
+- Chat Completions API: Standard role/content/tool_calls format (used by OpenRouter)
+- Responses API: Uses types like "message", "reasoning", "function_call" (used by OpenAI provider)
 """
 
-from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
+from backend.infrastructure.llm.shared.chat_completions_formatter import ChatCompletionsMessageFormatter
 
-# OpenRouter uses the exact same format as OpenAI Chat Completions API
-# This alias provides clear semantics without code duplication
-OpenRouterMessageFormatter = OpenAIMessageFormatter
+# OpenRouter uses the standard OpenAI Chat Completions API format
+# We alias ChatCompletionsMessageFormatter for clear semantics
+OpenRouterMessageFormatter = ChatCompletionsMessageFormatter
 
 __all__ = ['OpenRouterMessageFormatter']

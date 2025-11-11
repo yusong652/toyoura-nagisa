@@ -2,17 +2,18 @@
 Kimi (Moonshot) Message Formatter
 
 Kimi uses standard OpenAI Chat Completions API format.
-For simplicity and maintainability, we directly reuse OpenAI's formatter.
+We use the shared ChatCompletionsMessageFormatter which is designed for
+providers implementing the standard Chat Completions API.
 
-This alias improves code readability while avoiding duplication.
-If Kimi-specific formatting is needed in the future, this can be expanded
-into a full implementation.
+Note: This is different from OpenAI's Responses API used by the OpenAI provider.
+- Chat Completions API: Standard role/content/tool_calls format (used by Kimi)
+- Responses API: Uses types like "message", "reasoning", "function_call" (used by OpenAI provider)
 """
 
-from backend.infrastructure.llm.providers.openai.message_formatter import OpenAIMessageFormatter
+from backend.infrastructure.llm.shared.chat_completions_formatter import ChatCompletionsMessageFormatter
 
-# Kimi uses the exact same format as OpenAI Chat Completions API
-# This alias provides clear semantics without code duplication
-KimiMessageFormatter = OpenAIMessageFormatter
+# Kimi uses the standard OpenAI Chat Completions API format
+# We alias ChatCompletionsMessageFormatter for clear semantics
+KimiMessageFormatter = ChatCompletionsMessageFormatter
 
 __all__ = ['KimiMessageFormatter']
