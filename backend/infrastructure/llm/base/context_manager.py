@@ -74,10 +74,7 @@ class BaseContextManager(ABC):
         # Load historical messages and initialize working contents
         from backend.infrastructure.storage.session_manager import (
             load_and_restore_history,
-            load_runtime_state,
-            load_all_message_history,
-            save_history,
-            update_runtime_state
+            load_runtime_state
         )
 
         historical_messages = load_and_restore_history(session_id)
@@ -90,117 +87,139 @@ class BaseContextManager(ABC):
         runtime_state = load_runtime_state(session_id)
         if runtime_state.get("last_response_interrupted", False):
             self._last_response_interrupted = True
-
-            # Auto-merge consecutive user messages if last response was interrupted
-            if len(self.working_contents) >= 2:
-                # Check if last two messages are both user messages
-                last_msg = self.working_contents[-1]
-                second_last_msg = self.working_contents[-2]
-
-                # Extract roles (handle both dict and object types)
-                last_role = last_msg.get('role') if isinstance(last_msg, dict) else getattr(last_msg, 'role', None)
-                second_last_role = second_last_msg.get('role') if isinstance(second_last_msg, dict) else getattr(second_last_msg, 'role', None)
-
-                if last_role == 'user' and second_last_role == 'user':
-                    print(f"[DEBUG] __init__: Detected consecutive user messages, auto-merging")
-
-                    # Extract content from last message (the "new" message)
-                    new_content = ""
-                    if isinstance(last_msg, dict):
-                        content = last_msg.get('content', '')
-                        if isinstance(content, str):
-                            new_content = content
-                        elif isinstance(content, list):
-                            new_content = "".join([
-                                item.get('text', '')
-                                for item in content
-                                if isinstance(item, dict) and 'text' in item
-                            ])
-                    elif hasattr(last_msg, 'content'):
-                        new_content = str(last_msg.content)
-
-                    # Build merge text with system-reminder
-                    reminder = "Previous response interrupted by user."
-                    merge_text = f"\n\n<system-reminder>\n{reminder}\nUser sent another message:\n</system-reminder>\n\n{new_content}"
-
-                    # Merge in memory (working_contents)
-                    if isinstance(second_last_msg, dict):
-                        if isinstance(second_last_msg.get('content'), str):
-                            second_last_msg['content'] += merge_text
-                        elif isinstance(second_last_msg.get('content'), list):
-                            for block in reversed(second_last_msg['content']):
-                                if isinstance(block, dict) and block.get('type') == 'text':
-                                    block['text'] += merge_text
-                                    break
-                    elif hasattr(second_last_msg, 'parts'):
-                        # Gemini Content object
-                        for part in reversed(second_last_msg.parts):
-                            if hasattr(part, 'text'):
-                                part.text += merge_text
-                                break
-
-                    # Remove last message from working_contents
-                    self.working_contents.pop()
-                    print(f"[DEBUG] __init__: Merged in working_contents")
-
-                    # Merge in database
-                    from backend.domain.models.message_factory import message_factory
-                    history = load_all_message_history(session_id)
-                    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
-
-                    # Find last two user messages
-                    user_messages_indices = [
-                        i for i, msg in enumerate(history_msgs)
-                        if getattr(msg, 'role', None) == 'user'
-                    ]
-
-                    if len(user_messages_indices) >= 2:
-                        first_idx = user_messages_indices[-2]
-                        second_idx = user_messages_indices[-1]
-                        first_msg = history_msgs[first_idx]
-
-                        # Merge content in first message
-                        if isinstance(first_msg.content, str):
-                            first_msg.content += merge_text
-                        elif isinstance(first_msg.content, list):
-                            for block in reversed(first_msg.content):
-                                if isinstance(block, dict) and block.get('type') == 'text':
-                                    block['text'] += merge_text
-                                    break
-
-                        # Delete second message
-                        del history_msgs[second_idx]
-                        save_history(session_id, history_msgs)
-                        print(f"[DEBUG] __init__: Merged in database")
-
-                    # Clear interrupt flag
-                    self._last_response_interrupted = False
-                    update_runtime_state(session_id, "last_response_interrupted", False)
-                    print(f"[DEBUG] __init__: Cleared interrupt flag")
+            # Handle interrupted response by merging consecutive user messages
+            self._handle_interrupted_response_on_init()
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
         """
         Initialize context manager from input message list.
-        
+
         Uses provider-specific message formatter to convert messages
         to the appropriate format for the LLM API.
-        
+
         Args:
             messages: Input message history list
-            
+
         Raises:
             ValueError: If provider name is not set
         """
         if not self._provider_name:
             raise ValueError("Provider name not set in context manager")
-            
+
         # Get the appropriate message formatter
         formatter_class = get_message_formatter_class(self._provider_name)
-        
+
         # Call the unified format_messages method
         self.working_contents = formatter_class.format_messages(messages)
-    
-    
+
+    def _handle_interrupted_response_on_init(self) -> None:
+        """
+        Handle interrupted response by merging consecutive user messages.
+
+        When a response is interrupted and user sends another message, this method
+        merges the two consecutive user messages with an interrupt notification.
+        Updates both in-memory context (working_contents) and persistent storage.
+
+        This is called during __init__ when loading from history with interrupt flag set.
+        """
+        # Check if we have at least two messages to potentially merge
+        if len(self.working_contents) < 2:
+            return
+
+        # Check if last two messages are both user messages
+        last_msg = self.working_contents[-1]
+        second_last_msg = self.working_contents[-2]
+
+        # Extract roles (handle both dict and object types)
+        last_role = last_msg.get('role') if isinstance(last_msg, dict) else getattr(last_msg, 'role', None)
+        second_last_role = second_last_msg.get('role') if isinstance(second_last_msg, dict) else getattr(second_last_msg, 'role', None)
+
+        if last_role != 'user' or second_last_role != 'user':
+            return
+
+        print(f"[DEBUG] Detected consecutive user messages after interrupt, auto-merging")
+
+        # Extract content from last message (the "new" message)
+        new_content = ""
+        if isinstance(last_msg, dict):
+            content = last_msg.get('content', '')
+            if isinstance(content, str):
+                new_content = content
+            elif isinstance(content, list):
+                new_content = "".join([
+                    item.get('text', '')
+                    for item in content
+                    if isinstance(item, dict) and 'text' in item
+                ])
+        elif hasattr(last_msg, 'content'):
+            new_content = str(last_msg.content)
+
+        # Build merge text with system-reminder
+        reminder = "Previous response interrupted by user."
+        merge_text = f"\n\n<system-reminder>\n{reminder}\nUser sent another message:\n</system-reminder>\n\n{new_content}"
+
+        # Merge in memory (working_contents)
+        if isinstance(second_last_msg, dict):
+            if isinstance(second_last_msg.get('content'), str):
+                second_last_msg['content'] += merge_text
+            elif isinstance(second_last_msg.get('content'), list):
+                for block in reversed(second_last_msg['content']):
+                    if isinstance(block, dict) and block.get('type') == 'text':
+                        block['text'] += merge_text
+                        break
+        elif hasattr(second_last_msg, 'parts'):
+            # Gemini Content object
+            for part in reversed(second_last_msg.parts):
+                if hasattr(part, 'text'):
+                    part.text += merge_text
+                    break
+
+        # Remove last message from working_contents
+        self.working_contents.pop()
+        print(f"[DEBUG] Merged messages in working_contents")
+
+        # Merge in database
+        from backend.infrastructure.storage.session_manager import (
+            load_all_message_history,
+            save_history,
+            update_runtime_state
+        )
+        from backend.domain.models.message_factory import message_factory
+
+        history = load_all_message_history(self.session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+
+        # Find last two user messages
+        user_messages_indices = [
+            i for i, msg in enumerate(history_msgs)
+            if getattr(msg, 'role', None) == 'user'
+        ]
+
+        if len(user_messages_indices) >= 2:
+            first_idx = user_messages_indices[-2]
+            second_idx = user_messages_indices[-1]
+            first_msg = history_msgs[first_idx]
+
+            # Merge content in first message
+            if isinstance(first_msg.content, str):
+                first_msg.content += merge_text
+            elif isinstance(first_msg.content, list):
+                for block in reversed(first_msg.content):
+                    if isinstance(block, dict) and block.get('type') == 'text':
+                        block['text'] += merge_text
+                        break
+
+            # Delete second message
+            del history_msgs[second_idx]
+            save_history(self.session_id, history_msgs)
+            print(f"[DEBUG] Merged messages in database")
+
+        # Clear interrupt flag
+        self._last_response_interrupted = False
+        update_runtime_state(self.session_id, "last_response_interrupted", False)
+        print(f"[DEBUG] Cleared interrupt flag")
+
+
     async def add_user_message(self, user_message: BaseMessage) -> None:
         """
         Add a new user message to the context incrementally (async).
