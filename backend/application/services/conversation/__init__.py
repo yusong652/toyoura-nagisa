@@ -8,8 +8,10 @@ from backend.application.services.conversation.models import (
     ConversationResult,
     StreamingState
 )
+from backend.application.services.conversation.chat_orchestrator import ChatOrchestrator
 
 __all__ = [
+    "ChatOrchestrator",
     "ConversationResult",
     "StreamingState",
 ]

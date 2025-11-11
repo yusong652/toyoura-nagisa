@@ -103,15 +103,22 @@ async def process_chat_request(
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
-            # ========== PHASE 2: Get LLM response using session-based approach ==========
+            # ========== PHASE 2: Get LLM response using ChatOrchestrator ==========
             # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
+
+            # Create ChatOrchestrator with LLM client
+            from backend.application.services.conversation import ChatOrchestrator
+            orchestrator = ChatOrchestrator(llm_client)
+
             # Send WebSocket read status just before LLM processing starts
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
-            # Use simplified session-based response method - All configuration retrieved from context manager
-            final_message, streaming_message_id = await llm_client.get_response_from_session(session_id)
+
+            # Execute conversation turn via ChatOrchestrator (Application layer)
+            # Business logic now properly separated from infrastructure
+            final_message, streaming_message_id = await orchestrator.execute_conversation_turn(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
