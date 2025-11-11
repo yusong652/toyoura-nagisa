@@ -151,7 +151,7 @@ class BaseContextManager(ABC):
                     # Find last two user messages
                     user_messages_indices = [
                         i for i, msg in enumerate(history_msgs)
-                        if hasattr(msg, 'role') and msg.role == 'user'
+                        if getattr(msg, 'role', None) == 'user'
                     ]
 
                     if len(user_messages_indices) >= 2:
@@ -311,7 +311,7 @@ class BaseContextManager(ABC):
             # 2. Find the last two user messages
             user_messages_indices = []
             for i, msg in enumerate(history_msgs):
-                if hasattr(msg, 'role') and msg.role == 'user':
+                if getattr(msg, 'role', None) == 'user':
                     user_messages_indices.append(i)
 
             if len(user_messages_indices) >= 2:

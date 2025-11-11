@@ -110,13 +110,15 @@ class KimiResponseProcessor(BaseResponseProcessor):
         if get_llm_settings().debug:
             raw_tool_calls = []
             for tc in message.tool_calls:
-                raw_tool_calls.append({
-                    'id': tc.id,
-                    'function': {
-                        'name': tc.function.name,
-                        'arguments': tc.function.arguments
-                    }
-                })
+                function = getattr(tc, 'function', None)
+                if function:
+                    raw_tool_calls.append({
+                        'id': tc.id,
+                        'function': {
+                            'name': getattr(function, 'name', ''),
+                            'arguments': getattr(function, 'arguments', '')
+                        }
+                    })
             KimiDebugger.print_tool_call_received(raw_tool_calls)
 
         tool_calls: List[Dict[str, Any]] = []
@@ -125,7 +127,12 @@ class KimiResponseProcessor(BaseResponseProcessor):
             try:
                 # ChatCompletion tool_calls have: id, type, function
                 # function has: name, arguments (as string)
-                arguments = tool_call.function.arguments
+                function = getattr(tool_call, 'function', None)
+                if not function:
+                    continue
+
+                arguments = getattr(function, 'arguments', '')
+                function_name = getattr(function, 'name', '')
 
                 # Parse arguments string to dict if needed
                 if isinstance(arguments, str):
@@ -143,7 +150,7 @@ class KimiResponseProcessor(BaseResponseProcessor):
                     parsed_args = arguments if arguments else {}
 
                 tool_calls.append({
-                    "name": tool_call.function.name,
+                    "name": function_name,
                     "arguments": parsed_args,
                     "id": tool_call.id
                 })
@@ -237,7 +244,8 @@ class KimiResponseProcessor(BaseResponseProcessor):
         message = response.choices[0].message
         if message.tool_calls:
             for tool_call in message.tool_calls:
-                if hasattr(tool_call, 'function') and tool_call.function.name == '$web_search':
+                function = getattr(tool_call, 'function', None)
+                if function and getattr(function, 'name', '') == '$web_search':
                     # Web search was performed
                     # Kimi integrates results into text, so we mark it
                     sources.append({

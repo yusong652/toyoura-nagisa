@@ -37,28 +37,11 @@ class KimiContextManager(BaseContextManager):
         """
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
-            print(f"[DEBUG] KimiContextManager.add_response: Adding BaseMessage")
-            print(f"[DEBUG]   BaseMessage.content type: {type(response.content)}")
-            if isinstance(response.content, list):
-                print(f"[DEBUG]   BaseMessage.content blocks: {len(response.content)}")
-                for i, block in enumerate(response.content):
-                    if isinstance(block, dict):
-                        block_type = block.get('type', 'unknown')
-                        if block_type == 'text':
-                            print(f"[DEBUG]     Block {i}: type={block_type}, text={repr(block.get('text', ''))[:100]}")
-                        else:
-                            print(f"[DEBUG]     Block {i}: type={block_type}")
             formatted_response = KimiMessageFormatter.format_single_message(response)
-            print(f"[DEBUG]   Formatted response type: {type(formatted_response.get('content'))}")
-            if isinstance(formatted_response.get('content'), str):
-                print(f"[DEBUG]   Formatted content (string): {repr(formatted_response.get('content'))[:200]}")
-            elif isinstance(formatted_response.get('content'), list):
-                print(f"[DEBUG]   Formatted content (list): {len(formatted_response.get('content'))} blocks")
             self.working_contents.append(formatted_response)
 
         elif isinstance(response, ChatCompletion):
             # Handle ChatCompletion response
-            print(f"[DEBUG] KimiContextManager.add_response: Adding ChatCompletion")
             if not response.choices:
                 return
 
@@ -67,8 +50,6 @@ class KimiContextManager(BaseContextManager):
 
             # Extract reasoning content (K2 Thinking models)
             reasoning_content = getattr(message, 'reasoning_content', None)
-            print(f"[DEBUG]   message.content: {repr(message.content)[:200]}")
-            print(f"[DEBUG]   reasoning_content: {repr(reasoning_content)[:200] if reasoning_content else 'None'}")
 
             # Build content - handle reasoning_content for proper context preservation
             # Important: For multi-turn tool calling, we must preserve thinking in context
@@ -94,23 +75,14 @@ class KimiContextManager(BaseContextManager):
                         "type": "text",
                         "text": message.content
                     })
-                else:
-                    print(f"[DEBUG]   WARNING: reasoning_content exists but message.content is empty!")
 
                 content_value = content_blocks
-                print(f"[DEBUG]   Built content_blocks with {len(content_blocks)} blocks")
 
             # Build message dict in Chat Completions format
             message_dict: Dict[str, Any] = {
                 "role": message.role,
                 "content": content_value
             }
-            print(f"[DEBUG]   message_dict content type: {type(content_value)}")
-            if isinstance(content_value, list):
-                print(f"[DEBUG]   message_dict content blocks: {len(content_value)}")
-                for i, block in enumerate(content_value):
-                    if isinstance(block, dict) and block.get('type') == 'text':
-                        print(f"[DEBUG]     Block {i}: text={repr(block.get('text', ''))[:100]}")
 
             # Add tool calls if present
             if message.tool_calls:
@@ -150,7 +122,6 @@ class KimiContextManager(BaseContextManager):
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
             reminders = await self._get_background_task_reminders()
-            print(f"[DEBUG] KimiContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if reminders:
                 reminder_text = "\n\n" + "\n\n".join([
@@ -170,7 +141,6 @@ class KimiContextManager(BaseContextManager):
                             for part in reversed(parts):
                                 if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
                                     part['text'] += reminder_text
-                                    print(f"[DEBUG] Injected reminders to tool result parts")
                                     break
 
         # Format tool result content using message formatter
