@@ -16,9 +16,10 @@ from datetime import datetime
 class BaseMessage(BaseModel):
     """
     Base class for all message types.
-    
+
     This is the core entity in the domain layer, representing the basic message concept in chat.
     """
+    role: str
     content: Union[str, List[dict]]
     id: Optional[str] = None
     timestamp: Optional[datetime] = None
