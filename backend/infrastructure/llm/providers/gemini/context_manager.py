@@ -80,7 +80,7 @@ class GeminiContextManager(BaseContextManager):
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
             print(f"[DEBUG] GeminiContextManager.add_tool_result: inject_reminders=True for session {self.session_id}")
-            reminders = await self._get_background_task_reminders()
+            reminders = await self._status_monitor.get_all_reminders()
             print(f"[DEBUG] GeminiContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if len(reminders) == 0:
