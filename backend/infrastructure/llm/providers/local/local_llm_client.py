@@ -147,7 +147,7 @@ class LocalLLMClient(LLMClientBase):
                 cleaned_content = [{"type": "text", "text": processed_text}]
 
             # Create a message from the cleaned response
-            final_message = AssistantMessage(content=cleaned_content)
+            final_message = AssistantMessage(role="assistant", content=cleaned_content)
             
             # Create execution metadata
             execution_metadata = {
@@ -162,7 +162,7 @@ class LocalLLMClient(LLMClientBase):
         except Exception as e:
             logger.error(f"Local LLM get_response failed: {e}")
             # Yield error message
-            error_message = AssistantMessage(content=[{"type": "text", "text": f"Error: {str(e)}"}])
+            error_message = AssistantMessage(role="assistant", content=[{"type": "text", "text": f"Error: {str(e)}"}])
             yield (error_message, {"error": str(e)})
 
     async def check_health(self) -> bool:

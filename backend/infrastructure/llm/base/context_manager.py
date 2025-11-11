@@ -399,6 +399,7 @@ class BaseContextManager(ABC):
 
         timestamp = parsed_data.get('timestamp')
         user_message = UserMessage(
+            role="user",
             content=parsed_data['content'],
             timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
             id=parsed_data.get('id')

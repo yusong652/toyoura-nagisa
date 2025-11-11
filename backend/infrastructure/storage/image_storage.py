@@ -115,6 +115,7 @@ def _create_and_save_image_message(session_id: str, filename: str) -> None:
     relative_path = os.path.join(session_id, filename)
     print(f"[DEBUG] Creating image message with relative_path: {relative_path}")
     image_message = ImageMessage(
+        role="image",
         content="",
         image_path=relative_path,
         id=str(uuid.uuid4()),

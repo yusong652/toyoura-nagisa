@@ -81,6 +81,7 @@ def process_user_message(result: MessageParseResult, history_msgs: list) -> User
 
     timestamp = result.get('timestamp')
     user_msg = UserMessage(
+        role="user",
         content=result['content'],
         timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
         id=result.get('id')  # Use ID from frontend
@@ -111,6 +112,7 @@ def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> st
 
     # Create assistant message object - save content as-is
     assistant_message = AssistantMessage(
+        role="assistant",
         content=content,
         id=message_id
     )
@@ -252,6 +254,7 @@ def save_tool_result_message(
 
     # Create user message with tool result
     message = UserMessage(
+        role="user",
         content=[tool_result_content],
         id=message_id,
         timestamp=datetime.now()

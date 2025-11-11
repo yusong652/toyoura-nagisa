@@ -75,6 +75,7 @@ class ChatOrchestrator:
             else:
                 from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(
+                    role="assistant",
                     content=[{"type": "text", "text": "Response processing unavailable"}]
                 )
 
