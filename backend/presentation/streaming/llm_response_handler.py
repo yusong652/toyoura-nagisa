@@ -122,10 +122,12 @@ async def process_chat_request(
                     final_message, session_id, message_id=streaming_message_id
                 )
 
-            # ========== PHASE 4: Post-processing pipeline ==========
-            # Note: Title generation now happens during streaming (see _try_generate_title_async)
-            # No need to call process_post_pipeline here anymore
-            # await process_post_pipeline(session_id, request_id)  # REMOVED: now in-stream
+            # ========== PHASE 4: Title generation ==========
+            # Trigger title generation in background (non-blocking)
+            title_service = TitleService()
+            asyncio.create_task(
+                title_service.try_generate_title_if_needed_async(session_id, llm_client)
+            )
 
             # ========== PHASE 5: Memory persistence ==========
             # Save conversation to memory after successful response

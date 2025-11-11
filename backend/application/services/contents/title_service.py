@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional, List
 from backend.infrastructure.storage.session_manager import (
     get_all_sessions,
     update_session_title,
-    load_history
+    load_history,
+    load_all_message_history
 )
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
@@ -164,6 +165,40 @@ class TitleService:
             latest_messages
         )
         return title
+
+    async def try_generate_title_if_needed_async(
+        self,
+        session_id: str,
+        llm_client
+    ) -> None:
+        """
+        Asynchronously attempt to generate title when needed.
+
+        This method checks if title generation is needed and triggers it if appropriate.
+        Should be called after message completion in the presentation layer.
+
+        Args:
+            session_id: Session ID to generate title for
+            llm_client: LLM client instance for title generation
+        """
+        try:
+            # Load history and check if title generation is needed
+            loaded_history = load_all_message_history(session_id)
+            history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
+
+            if self.should_generate_title(session_id, history_msgs):
+                # Generate title
+                result = await self.generate_title_for_session(session_id, llm_client)
+
+                if result and result.get("success") and result.get("title"):
+                    # Send title update via WebSocket
+                    from backend.presentation.streaming.llm_response_handler import send_title_update_notification
+                    await send_title_update_notification(session_id, result["title"])
+                    print(f"[INFO] Title auto-generated for session {session_id}: {result['title']}")
+
+        except Exception as e:
+            # Title generation failure should not affect main flow
+            print(f"[WARNING] Background title generation failed for session {session_id}: {e}")
 
     async def generate_title_for_session(
         self,
