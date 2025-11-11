@@ -545,8 +545,8 @@ class BaseContextManager(ABC):
             bash_reminders = process_manager.get_system_reminders(self.session_id)
             reminders.extend(bash_reminders)
 
-        except Exception as e:
-            pass  # PFC server may not be running - this is normal
+        except Exception:
+            pass  # Bash process manager may not be available
 
         # Query PFC tasks (remote, may be slow)
         try:
@@ -632,7 +632,7 @@ class BaseContextManager(ABC):
                 # Step 4: Update state snapshot for next comparison
                 self._last_task_states = current_states
 
-        except Exception as e:
+        except Exception:
             # PFC server may not be running - this is normal, don't break the flow
             pass
 
