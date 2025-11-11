@@ -72,12 +72,15 @@ class BaseContextManager(ABC):
         self._status_monitor = get_status_monitor(session_id)
 
         # Load historical messages and initialize working contents
+        # Use load_history (not load_all_message_history) to exclude image/video messages
         from backend.infrastructure.storage.session_manager import (
-            load_and_restore_history,
+            load_history,
             load_runtime_state
         )
+        from backend.domain.models.message_factory import message_factory
 
-        historical_messages = load_and_restore_history(session_id)
+        history_dicts = load_history(session_id)
+        historical_messages = [message_factory(msg) for msg in history_dicts]
         self.working_contents: List[Dict[str, Any]] = []
 
         if historical_messages:

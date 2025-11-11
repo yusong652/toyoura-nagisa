@@ -253,7 +253,7 @@ def load_and_restore_history(session_id: str) -> List[BaseMessage]:
     """
     Load and restore chat history for specified session ID, return list of message objects
     """
-    
+
     history = load_all_message_history(session_id)
     # Ensure all messages are BaseMessage objects
     return [message_factory(msg) for msg in history]
