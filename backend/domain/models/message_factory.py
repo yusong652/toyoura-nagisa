@@ -34,6 +34,7 @@ def message_factory(data: dict) -> BaseMessage:
         if 'image_path' not in data:
             raise ValueError("Image message must have an image_path")
         return ImageMessage(
+            role='image',
             content=data.get('content', ''),
             image_path=data['image_path'],
             id=data.get('id'),
@@ -45,6 +46,7 @@ def message_factory(data: dict) -> BaseMessage:
         if 'video_path' not in data:
             raise ValueError("Video message must have a video_path")
         return VideoMessage(
+            role='video',
             content=data.get('content', ''),
             video_path=data['video_path'],
             id=data.get('id'),
@@ -53,12 +55,12 @@ def message_factory(data: dict) -> BaseMessage:
     
     # Handle regular messages
     filtered_data = {k: v for k, v in data.items() if k != 'role'}
-    
+
     if role == 'assistant':
-        return AssistantMessage(**filtered_data)
+        return AssistantMessage(role='assistant', **filtered_data)
     else:
         # User message or default case
-        return UserMessage(**filtered_data)
+        return UserMessage(role='user', **filtered_data)
 
 
 def message_factory_no_thinking(data: dict) -> BaseMessage:
@@ -94,9 +96,9 @@ def message_factory_no_thinking(data: dict) -> BaseMessage:
     
     # Create message object
     if role == 'assistant':
-        return AssistantMessage(**filtered_data)
+        return AssistantMessage(role='assistant', **filtered_data)
     else:
-        return UserMessage(**filtered_data)
+        return UserMessage(role='user', **filtered_data)
 
 
 def extract_text_from_message(message: BaseMessage) -> str:
