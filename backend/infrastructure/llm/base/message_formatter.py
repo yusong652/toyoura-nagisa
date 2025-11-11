@@ -6,7 +6,7 @@ ensuring consistent message processing across different LLM providers.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage
 
 
@@ -75,7 +75,7 @@ class BaseMessageFormatter(ABC):
         return False
     
     @staticmethod
-    def safe_json_serialize(data: Any, ensure_ascii: bool = False, indent: int = None) -> str:
+    def safe_json_serialize(data: Any, ensure_ascii: bool = False, indent: Optional[int] = None) -> str:
         """
         Safely serialize data to JSON string (shared utility).
         
