@@ -96,8 +96,10 @@ def _create_and_save_video_message(session_id: str, filename: str, format: str =
     
     # Add video message to history
     print("[DEBUG] Loading current history to append video message")
+    from backend.domain.models.message_factory import message_factory
     history = load_all_message_history(session_id)
-    history.append(video_message)
-    print(f"[DEBUG] Saving history with {len(history)} messages")
-    save_history(session_id, history)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    history_msgs.append(video_message)
+    print(f"[DEBUG] Saving history with {len(history_msgs)} messages")
+    save_history(session_id, history_msgs)
     print("[DEBUG] Video message successfully saved to history")

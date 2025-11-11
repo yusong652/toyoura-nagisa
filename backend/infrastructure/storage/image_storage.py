@@ -124,8 +124,10 @@ def _create_and_save_image_message(session_id: str, filename: str) -> None:
 
     # Add image message to history
     print("[DEBUG] Loading current history to append image message")
+    from backend.domain.models.message_factory import message_factory
     history = load_all_message_history(session_id)
-    history.append(image_message)
-    print(f"[DEBUG] Saving history with {len(history)} messages")
-    save_history(session_id, history)
+    history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+    history_msgs.append(image_message)
+    print(f"[DEBUG] Saving history with {len(history_msgs)} messages")
+    save_history(session_id, history_msgs)
     print("[DEBUG] Image message successfully saved to history")
