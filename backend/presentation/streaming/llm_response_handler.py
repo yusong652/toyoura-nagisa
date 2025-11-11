@@ -14,7 +14,6 @@ from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history
-from backend.application.services.contents import TitleService
 from backend.presentation.websocket.message_types import (
     create_message, MessageType
 )
@@ -103,15 +102,22 @@ async def process_chat_request(
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
-            # ========== PHASE 2: Get LLM response using session-based approach ==========
+            # ========== PHASE 2: Get LLM response using ChatOrchestrator ==========
             # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
+
+            # Create ChatOrchestrator with LLM client
+            from backend.application.services.conversation import ChatOrchestrator
+            orchestrator = ChatOrchestrator(llm_client)
+
             # Send WebSocket read status just before LLM processing starts
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
-            # Use simplified session-based response method - All configuration retrieved from context manager
-            final_message, streaming_message_id = await llm_client.get_response_from_session(session_id)
+
+            # Execute conversation turn via ChatOrchestrator (Application layer)
+            # Business logic now properly separated from infrastructure
+            final_message, streaming_message_id = await orchestrator.execute_conversation_turn(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:
@@ -122,14 +128,9 @@ async def process_chat_request(
                     final_message, session_id, message_id=streaming_message_id
                 )
 
-            # ========== PHASE 4: Title generation ==========
-            # Trigger title generation in background (non-blocking)
-            title_service = TitleService()
-            asyncio.create_task(
-                title_service.try_generate_title_if_needed_async(session_id, llm_client)
-            )
-
-            # ========== PHASE 5: Memory persistence ==========
+            # ========== PHASE 4: Memory persistence ==========
+            # Note: Title generation now happens in ChatOrchestrator (Application layer)
+            # This maintains proper architecture: Application layer services can call each other
             # Save conversation to memory after successful response
             # Get enable_memory from the session's context manager
             context_manager = llm_client.get_or_create_context_manager(session_id)

@@ -47,26 +47,27 @@ class TitleService:
                 or 'New Conversation' in current_session.get('name', '')
             )
         )
-        has_text_assistant = any(self._has_text_content(msg) for msg in history_msgs)
+        has_text_assistant = any(self._is_assistant_with_text_content(msg) for msg in history_msgs)
         return has_default_title and has_text_assistant
 
-    def _has_text_content(self, msg) -> bool:
+    def _is_assistant_with_text_content(self, msg) -> bool:
         """
-        Check if assistant message has text content for title generation.
+        Check if message is an assistant message with text content.
 
-        For title generation, we only need the assistant message to contain
-        at least one text block with actual content. It can also have tool_use
-        blocks - we just need the text part for the title.
+        This method filters for assistant messages (ignoring user messages)
+        and checks if they contain at least one text block with actual content.
+        Messages with tool_use blocks are accepted if they also have text.
 
         This allows title generation to happen immediately after the first
         meaningful response, even if it also includes tool calls.
 
         Args:
-            msg: Message object to check
+            msg: Message object to check (can be user or assistant)
 
         Returns:
-            bool: True if message has text content, False otherwise
+            bool: True if message is assistant with text content, False otherwise
         """
+        # Only check assistant messages, skip user messages
         if getattr(msg, "role", None) != "assistant":
             return False
 
@@ -146,7 +147,7 @@ class TitleService:
             # Find latest assistant message with text content (can have tool calls)
             # Changed from elif to if - both checks should be independent
             if not latest_assistant_msg and role == 'assistant':
-                if self._has_text_content(msg):
+                if self._is_assistant_with_text_content(msg):
                     latest_assistant_msg = msg
 
             # Stop searching if found most recent pair of messages
