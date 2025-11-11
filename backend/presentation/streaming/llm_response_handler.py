@@ -14,7 +14,6 @@ from backend.infrastructure.llm import LLMClientBase
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.storage.session_manager import load_all_message_history
-from backend.application.services.contents import TitleService
 from backend.presentation.websocket.message_types import (
     create_message, MessageType
 )
@@ -129,14 +128,9 @@ async def process_chat_request(
                     final_message, session_id, message_id=streaming_message_id
                 )
 
-            # ========== PHASE 4: Title generation ==========
-            # Trigger title generation in background (non-blocking)
-            title_service = TitleService()
-            asyncio.create_task(
-                title_service.try_generate_title_if_needed_async(session_id, llm_client)
-            )
-
-            # ========== PHASE 5: Memory persistence ==========
+            # ========== PHASE 4: Memory persistence ==========
+            # Note: Title generation now happens in ChatOrchestrator (Application layer)
+            # This maintains proper architecture: Application layer services can call each other
             # Save conversation to memory after successful response
             # Get enable_memory from the session's context manager
             context_manager = llm_client.get_or_create_context_manager(session_id)

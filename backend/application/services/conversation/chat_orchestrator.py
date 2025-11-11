@@ -39,6 +39,10 @@ class ChatOrchestrator:
         """
         self.llm_client = llm_client
 
+        # Initialize TitleService for automatic title generation
+        from backend.application.services.contents import TitleService
+        self.title_service = TitleService()
+
     async def execute_conversation_turn(
         self,
         session_id: str
@@ -263,6 +267,16 @@ class ChatOrchestrator:
             streaming=False
         )
 
+        # Trigger title generation after user interruption
+        # Note: Always attempted, TitleService checks history for suitable content
+        # Application layer service orchestration - proper architecture
+        import asyncio
+        asyncio.create_task(
+            self.title_service.try_generate_title_if_needed_async(
+                session_id, self.llm_client
+            )
+        )
+
         return partial_response
 
     async def _finalize_response(
@@ -306,6 +320,16 @@ class ChatOrchestrator:
                 message_id=message_id,
                 content=content,
                 streaming=False
+            )
+
+            # Trigger title generation after response is saved (normal completion)
+            # Note: Always attempted, TitleService searches history for text content
+            # Application layer calling Application layer - clean architecture!
+            import asyncio
+            asyncio.create_task(
+                self.title_service.try_generate_title_if_needed_async(
+                    session_id, self.llm_client
+                )
             )
 
         return response
@@ -359,6 +383,18 @@ class ChatOrchestrator:
                     message_id=message_id,
                     content=content,
                     streaming=False
+                )
+
+                # Trigger title generation after message is saved
+                # This runs in background without blocking tool execution
+                # Note: Triggered even if message has no text content (only tool calls)
+                # TitleService will search entire history for suitable text content
+                # Application layer service orchestration - clean architecture!
+                import asyncio
+                asyncio.create_task(
+                    self.title_service.try_generate_title_if_needed_async(
+                        session_id, self.llm_client
+                    )
                 )
             except Exception as e:
                 print(f"[WARNING] Failed to update streaming message: {e}")
