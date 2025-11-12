@@ -12,7 +12,10 @@ that need to be communicated to the LLM via system-reminders:
 The monitor is session-scoped and provides unified reminder API.
 """
 
-from typing import List, Dict, Set
+import logging
+from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 
 class StatusMonitor:
@@ -48,17 +51,25 @@ class StatusMonitor:
         # TODO: Queue status tracking (to be added later)
         # self._queue_stats: Dict[str, Any] = {}
 
-    async def get_all_reminders(self) -> List[str]:
+    async def get_all_reminders(self, check_queue: bool = False) -> List[str]:
         """
         Get all system reminders from monitored sources.
 
         This is the main entry point called by context managers to collect
         all reminders that should be injected into user messages.
 
+        Args:
+            check_queue: Whether to check and drain queue messages (during tool recursion)
+
         Returns:
             List[str]: Combined list of reminder strings from all sources
         """
         reminders = []
+
+        # Queue messages (user messages during tool recursion)
+        if check_queue:
+            queue_reminders = await self._get_queue_message_blocks()
+            reminders.extend(queue_reminders)
 
         # Bash background processes
         bash_reminders = await self._get_bash_reminders()
@@ -71,10 +82,6 @@ class StatusMonitor:
         # TODO: Add interrupt reminders
         # interrupt_reminders = self._get_interrupt_reminders()
         # reminders.extend(interrupt_reminders)
-
-        # TODO: Add queue status reminders
-        # queue_reminders = self._get_queue_reminders()
-        # reminders.extend(queue_reminders)
 
         return reminders
 
@@ -177,6 +184,51 @@ class StatusMonitor:
 
         except Exception:
             # PFC server may not be available or not running
+            return []
+
+    async def _get_queue_message_blocks(self) -> List[str]:
+        """
+        Get queue messages as reminder blocks.
+
+        This method is called when generating tool results (inject_reminders=True).
+        It extracts all waiting messages from the queue and formats them as
+        system-reminder blocks.
+
+        Extracted messages are removed from the queue, as they've been delivered
+        to the LLM via reminders and don't need to be processed as separate messages.
+
+        Returns:
+            List[str]: Formatted system-reminder blocks
+        """
+        try:
+            from backend.infrastructure.messaging.session_queue_manager import get_queue_manager
+
+            queue_manager = get_queue_manager()
+
+            # Drain queue and get all messages
+            messages = await queue_manager.drain_queue_for_reminders(self.session_id)
+
+            if not messages:
+                return []
+
+            # Format as reminder texts
+            reminder_texts = queue_manager.format_messages_for_reminder(messages)
+
+            # Wrap as system-reminder blocks
+            reminder_blocks = []
+            for text in reminder_texts:
+                block = f"<system-reminder>\n{text}\n</system-reminder>"
+                reminder_blocks.append(block)
+
+            logger.info(
+                f"Converted {len(messages)} queue message(s) to "
+                f"{len(reminder_blocks)} reminder block(s)"
+            )
+
+            return reminder_blocks
+
+        except Exception as e:
+            logger.error(f"Failed to get queue message blocks: {e}")
             return []
 
     # TODO: Implement interrupt monitoring

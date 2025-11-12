@@ -121,7 +121,7 @@ class KimiContextManager(BaseContextManager):
         """
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
-            reminders = await self._status_monitor.get_all_reminders()
+            reminders = await self._status_monitor.get_all_reminders(check_queue=True)
 
             if reminders:
                 reminder_text = "\n\n" + "\n\n".join([

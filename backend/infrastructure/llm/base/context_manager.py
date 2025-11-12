@@ -258,6 +258,9 @@ class BaseContextManager(ABC):
                     needs_merge = True
 
         # Get all system reminders (bash processes, PFC tasks, etc.)
+        # Note: check_queue=False (default) because user messages have already been
+        # processed from the queue at this point. Queue messages are only checked
+        # during tool result injection (when user sends new messages while tools are executing).
         system_reminders = await self._status_monitor.get_all_reminders()
         reminders.extend(system_reminders)
 
@@ -389,13 +392,18 @@ class BaseContextManager(ABC):
         appended after their corresponding tool calls.
 
         Provider implementations should inject system reminders to result content if inject_reminders=True.
-        Now async to support querying remote PFC task status.
+        When injecting reminders, implementations MUST call get_all_reminders(check_queue=True) to
+        capture user messages sent during tool execution. These messages are removed from the queue
+        and injected as system-reminder blocks, allowing the LLM to immediately respond to user's
+        updated instructions.
+
+        Now async to support querying remote PFC task status and queue messages.
 
         Args:
             tool_call_id: Unique identifier for tool call
             tool_name: Tool name
             result: Tool execution result
-            inject_reminders: Whether to inject system reminders into this result
+            inject_reminders: Whether to inject system reminders (including queue messages) into this result
         """
         pass
     
