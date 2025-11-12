@@ -4,12 +4,12 @@ Status Monitor - Unified system status tracking for reminders
 This module provides centralized monitoring for all background tasks and system states
 that need to be communicated to the LLM via system-reminders:
 
-1. Bash background processes
-2. PFC simulation tasks (TODO)
+1. Bash background processes - Local background shell tasks
+2. PFC simulation tasks - Remote PFC server tasks
 3. User interrupt status (TODO)
 4. Task queue status (TODO)
 
-The monitor is session-scoped and maintains state for status transition detection.
+The monitor is session-scoped and provides unified reminder API.
 """
 
 from typing import List, Dict, Set
@@ -38,11 +38,7 @@ class StatusMonitor:
         """
         self.session_id = session_id
 
-        # TODO: PFC task state tracking (to be added after bash testing)
-        # self._pfc_notified_completions: Set[str] = set()
-        # self._pfc_last_task_states: Dict[str, str] = {}
-
-        # TODO: User interrupt state (to be added after PFC)
+        # TODO: User interrupt state (to be added later)
         # self._last_response_interrupted: bool = False
 
         # TODO: Queue status tracking (to be added later)
@@ -64,9 +60,9 @@ class StatusMonitor:
         bash_reminders = await self._get_bash_reminders()
         reminders.extend(bash_reminders)
 
-        # TODO: Add PFC task reminders after bash testing
-        # pfc_reminders = await self._get_pfc_reminders()
-        # reminders.extend(pfc_reminders)
+        # PFC simulation tasks
+        pfc_reminders = await self._get_pfc_reminders()
+        reminders.extend(pfc_reminders)
 
         # TODO: Add interrupt reminders
         # interrupt_reminders = self._get_interrupt_reminders()
@@ -99,18 +95,75 @@ class StatusMonitor:
             # Process manager may not be available or no processes running
             return []
 
-    # TODO: Implement PFC monitoring after bash testing
-    # async def _get_pfc_reminders(self) -> List[str]:
-    #     """
-    #     Get reminders for PFC simulation tasks.
-    #
-    #     Queries the PFC WebSocket server for task status, detects
-    #     status transitions, and generates completion notifications.
-    #
-    #     Returns:
-    #         List[str]: PFC task reminders
-    #     """
-    #     pass
+    async def _get_pfc_reminders(self) -> List[str]:
+        """
+        Get reminders for PFC simulation tasks.
+
+        Queries the PFC WebSocket server for recent tasks and generates
+        status reminders showing task ID, description, status, and time range.
+
+        Shows up to 3 most recent tasks regardless of session ownership,
+        since PFC can only run one task at a time (useful to see if others
+        are using the server).
+
+        Returns:
+            List[str]: PFC task reminders
+        """
+        try:
+            from backend.infrastructure.pfc import get_client
+            from backend.infrastructure.mcp.utils.time_utils import format_time_range
+
+            # Get WebSocket client (auto-connects if needed)
+            client = await get_client()
+
+            # Query recent tasks (all sessions, limit=3)
+            result = await client.list_tasks(
+                session_id=None,  # No filter - see all tasks
+                offset=0,
+                limit=3
+            )
+
+            if result.get("status") != "success":
+                return []
+
+            tasks = result.get("data", [])
+            if not tasks:
+                return []
+
+            reminders = []
+            for task in tasks:
+                task_id = task.get("task_id", "unknown")
+                description = task.get("description", "No description")
+                script_path = task.get("script_path", task.get("name", "unknown"))
+                status = task.get("status", "unknown")
+                start_time = task.get("start_time")
+                end_time = task.get("end_time")
+                task_session_id = task.get("session_id", "unknown")
+
+                # Format time range
+                time_info = format_time_range(start_time, end_time)
+
+                # Build session marker
+                task_session_display = task_session_id[:8] if task_session_id != "unknown" else "unknown"
+                if task_session_id == self.session_id:
+                    session_marker = " (your task)"
+                else:
+                    session_marker = f" (session: {task_session_display})"
+
+                # Format reminder
+                reminder = (
+                    f"PFC Task {task_id}{session_marker}: "
+                    f"status={status}, script={script_path}, {time_info}. "
+                    f"Description: {description}. "
+                    "You can check detailed output using pfc_check_task_status tool."
+                )
+                reminders.append(reminder)
+
+            return reminders
+
+        except Exception:
+            # PFC server may not be available or not running
+            return []
 
     # TODO: Implement interrupt monitoring
     # def _get_interrupt_reminders(self) -> List[str]:
