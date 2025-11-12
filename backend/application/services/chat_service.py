@@ -155,8 +155,12 @@ class ChatService:
         session_id = parsed_data['session_id']
         if not session_id:
             raise ValueError("Session ID is required in the message data")
-        # 3. Save user message and add to LLM client context (always process user messages)
-        # Save to persistent storage first (for data safety)
+
+        # 3. Inject system status reminders BEFORE saving to database
+        # This ensures the database stores the complete message with context
+        await self._inject_status_reminders(session_id, parsed_data)
+
+        # 4. Save user message (with injected reminders) to persistent storage
         print(f"[DEBUG] Processing user message for session {session_id}", flush=True)
         self.save_user_message_to_session(parsed_data)
         print(f"[DEBUG] Saved user message {parsed_data.get('id')} to session {session_id}", flush=True)
@@ -183,4 +187,70 @@ class ChatService:
             'session_id': session_id,
             'message_id': parsed_data.get('id')
         }
+
+    async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
+        """
+        Inject system status reminders into user message content before saving.
+
+        This ensures that background task status (bash processes, PFC tasks, etc.)
+        is communicated to the LLM via the user message, maintaining consistency
+        with the existing tool result injection pattern.
+
+        Args:
+            session_id: Session ID for retrieving status monitor
+            parsed_data: Parsed message data (modified in-place)
+
+        Implementation notes:
+            - Retrieves reminders from StatusMonitor (same source as tool results)
+            - Injects into last text part of content list
+            - Creates new text part if no text exists (image-only messages)
+            - Format matches tool result injection: <system-reminder>...</system-reminder>
+        """
+        try:
+            # 1. Get status monitor for this session
+            from backend.infrastructure.monitoring import get_status_monitor
+            status_monitor = get_status_monitor(session_id)
+
+            # 2. Retrieve all system reminders (async)
+            reminders = await status_monitor.get_all_reminders()
+
+            if not reminders:
+                return
+
+            print(f"[DEBUG] Injecting {len(reminders)} status reminders into user message")
+
+            # 3. Format reminders (same format as tool result injection)
+            reminder_text = "\n\n" + "\n\n".join([
+                f"<system-reminder>\n{reminder}\n</system-reminder>"
+                for reminder in reminders
+            ])
+
+            # 4. Inject into content
+            content = parsed_data.get('content', [])
+            if not isinstance(content, list):
+                print(f"[WARNING] Unexpected content format: {type(content)}")
+                return
+
+            # Find last text part and append reminder
+            injected = False
+            for part in reversed(content):
+                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                    part['text'] += reminder_text
+                    injected = True
+                    print(f"[DEBUG] Injected reminders to existing text part")
+                    break
+
+            # If no text part exists (image-only message), create one
+            if not injected:
+                content.append({
+                    "type": "text",
+                    "text": reminder_text.lstrip()  # Remove leading newlines for first text
+                })
+                print(f"[DEBUG] Created new text part for reminders (no existing text)")
+
+        except Exception as e:
+            # Non-critical: Log and continue without reminders
+            print(f"[WARNING] Failed to inject status reminders: {e}")
+            import traceback
+            traceback.print_exc()
 

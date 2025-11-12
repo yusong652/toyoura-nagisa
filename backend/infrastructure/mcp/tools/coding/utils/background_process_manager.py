@@ -572,15 +572,12 @@ class BackgroundProcessManager:
         with self._lock:
             # Get active process IDs (inline to avoid nested lock)
             if session_id not in self.session_processes:
-                print(f"[DEBUG] get_system_reminders: No processes for session {session_id}")
                 return []
 
-            print(f"[DEBUG] get_system_reminders: Checking {len(self.session_processes[session_id])} processes for session {session_id}")
             reminders = []
             for process_id in self.session_processes[session_id]:
                 bg_process = self.processes.get(process_id)
                 if not bg_process:
-                    print(f"[DEBUG] get_system_reminders: Process {process_id} not found")
                     continue
 
                 # Update status if needed
@@ -590,24 +587,13 @@ class BackgroundProcessManager:
 
                 # Only check running processes
                 if bg_process.status != "running":
-                    print(f"[DEBUG] get_system_reminders: Process {process_id} not running (status: {bg_process.status})")
                     continue
 
                 # Check for new output
-                stdout_len = len(bg_process.stdout_buffer)
-                stderr_len = len(bg_process.stderr_buffer)
-                last_stdout_pos = bg_process.last_stdout_position
-                last_stderr_pos = bg_process.last_stderr_position
-
                 has_new_output = (
-                    stdout_len > last_stdout_pos or
-                    stderr_len > last_stderr_pos
+                    len(bg_process.stdout_buffer) > bg_process.last_stdout_position or
+                    len(bg_process.stderr_buffer) > bg_process.last_stderr_position
                 )
-
-                print(f"[DEBUG] get_system_reminders: Process {process_id}")
-                print(f"  stdout: {stdout_len} lines, last_pos: {last_stdout_pos}, new: {stdout_len - last_stdout_pos}")
-                print(f"  stderr: {stderr_len} lines, last_pos: {last_stderr_pos}, new: {stderr_len - last_stderr_pos}")
-                print(f"  has_new_output: {has_new_output}")
 
                 if has_new_output:
                     # Format reminder following Claude Code's format
@@ -618,9 +604,7 @@ class BackgroundProcessManager:
                         f"Has new output available. You can check its output using the BashOutput tool."
                     )
                     reminders.append(reminder)
-                    print(f"[DEBUG] get_system_reminders: Added reminder for process {process_id}")
 
-            print(f"[DEBUG] get_system_reminders: Returning {len(reminders)} reminders")
             return reminders
 
     def cleanup_session(self, session_id: str) -> None:
