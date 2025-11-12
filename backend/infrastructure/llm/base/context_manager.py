@@ -349,10 +349,9 @@ class BaseContextManager(ABC):
         else:
             # Normal flow: add reminders and create new message
             if reminders:
-                reminder_text = "\n\n" + "\n\n".join([
-                    f"<system-reminder>\n{reminder}\n</system-reminder>"
-                    for reminder in reminders
-                ])
+                # StatusMonitor now returns complete system-reminder blocks
+                # Just join them with newlines
+                reminder_text = "\n\n" + "\n\n".join(reminders)
 
                 # Modify user_message.content to inject reminders
                 if isinstance(user_message.content, str):

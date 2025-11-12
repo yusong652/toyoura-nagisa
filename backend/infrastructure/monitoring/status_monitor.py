@@ -90,17 +90,22 @@ class StatusMonitor:
         Get reminders for bash background processes.
 
         Queries the background process manager for running processes
-        in the current session.
+        in the current session and wraps them in system-reminder tags.
 
         Returns:
-            List[str]: Bash process reminders
+            List[str]: Bash process reminder blocks (with system-reminder tags)
         """
         try:
             from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
 
             process_manager = get_process_manager()
             bash_reminders = process_manager.get_system_reminders(self.session_id)
-            return bash_reminders
+
+            # Wrap each reminder in system-reminder tags
+            return [
+                f"<system-reminder>\n{reminder}\n</system-reminder>"
+                for reminder in bash_reminders
+            ]
 
         except Exception:
             # Process manager may not be available or no processes running
@@ -176,11 +181,18 @@ class StatusMonitor:
                 )
                 reminders.append(reminder)
 
-            # Add tool usage hint once at the end (not repeated for each task)
-            if reminders:
-                reminders.append("You can check detailed output using pfc_check_task_status tool.")
+            # Wrap all task reminders in system-reminder tags
+            wrapped_reminders = [
+                f"<system-reminder>\n{reminder}\n</system-reminder>"
+                for reminder in reminders
+            ]
 
-            return reminders
+            # Add tool usage hint once at the end (not repeated for each task)
+            if wrapped_reminders:
+                tool_hint = "<system-reminder>\nYou can check detailed output using pfc_check_task_status tool.\n</system-reminder>"
+                wrapped_reminders.append(tool_hint)
+
+            return wrapped_reminders
 
         except Exception:
             # PFC server may not be available or not running
@@ -191,8 +203,8 @@ class StatusMonitor:
         Get queue messages as reminder blocks.
 
         This method is called when generating tool results (inject_reminders=True).
-        It extracts all waiting messages from the queue and formats them as
-        system-reminder blocks.
+        It extracts all waiting messages from the queue, merges them using the
+        same strategy as external scenarios, and formats them as system-reminder blocks.
 
         Extracted messages are removed from the queue, as they've been delivered
         to the LLM via reminders and don't need to be processed as separate messages.
@@ -211,6 +223,12 @@ class StatusMonitor:
             if not messages:
                 return []
 
+            # Use the same merge strategy as external scenarios
+            # If multiple messages, merge them into one
+            if len(messages) > 1:
+                merged_message = queue_manager._merge_messages(messages)
+                messages = [merged_message]
+
             # Format as reminder texts
             reminder_texts = queue_manager.format_messages_for_reminder(messages)
 
@@ -221,8 +239,7 @@ class StatusMonitor:
                 reminder_blocks.append(block)
 
             logger.info(
-                f"Converted {len(messages)} queue message(s) to "
-                f"{len(reminder_blocks)} reminder block(s)"
+                f"Converted queue messages to {len(reminder_blocks)} reminder block(s)"
             )
 
             return reminder_blocks

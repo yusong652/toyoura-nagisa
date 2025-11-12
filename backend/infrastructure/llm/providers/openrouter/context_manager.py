@@ -94,10 +94,9 @@ class OpenRouterContextManager(BaseContextManager):
             print(f"[DEBUG] OpenRouterContextManager.add_tool_result: Got {len(reminders)} reminders")
 
             if reminders:
-                reminder_text = "\n\n" + "\n\n".join([
-                    f"<system-reminder>\n{reminder}\n</system-reminder>"
-                    for reminder in reminders
-                ])
+                # StatusMonitor now returns complete system-reminder blocks
+                # Just join them with newlines
+                reminder_text = "\n\n" + "\n\n".join(reminders)
 
                 # Modify result llm_content to inject reminders
                 if isinstance(result, dict) and 'llm_content' in result:
