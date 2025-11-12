@@ -117,7 +117,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-                max_output_tokens=200  # Sufficient for title generation
+                max_output_tokens=2048  # Large buffer for non-thinking models
             )
 
             # Get model from configuration
