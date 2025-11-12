@@ -161,14 +161,17 @@ class StatusMonitor:
                 else:
                     session_marker = f" (session: {task_session_display})"
 
-                # Format reminder
+                # Format reminder (without repeated tool hint)
                 reminder = (
                     f"PFC Task {task_id}{session_marker}: "
                     f"status={status}, script={script_path}, {time_info}. "
-                    f"Description: {description}. "
-                    "You can check detailed output using pfc_check_task_status tool."
+                    f"Description: {description}"
                 )
                 reminders.append(reminder)
+
+            # Add tool usage hint once at the end (not repeated for each task)
+            if reminders:
+                reminders.append("You can check detailed output using pfc_check_task_status tool.")
 
             return reminders
 
