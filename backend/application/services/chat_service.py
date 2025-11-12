@@ -211,7 +211,10 @@ class ChatService:
             from backend.infrastructure.monitoring import get_status_monitor
             status_monitor = get_status_monitor(session_id)
 
-            # 2. Retrieve all system reminders (async)
+            # 2. Set agent profile for optimized querying (skip PFC if not pfc profile)
+            status_monitor.agent_profile = parsed_data.get('agent_profile', 'general')
+
+            # 3. Retrieve all system reminders (async)
             reminders = await status_monitor.get_all_reminders()
 
             if not reminders:

@@ -38,6 +38,10 @@ class StatusMonitor:
         """
         self.session_id = session_id
 
+        # Agent profile (set dynamically before querying reminders)
+        # Used to optimize queries (e.g., skip PFC if not in PFC/general profile)
+        self.agent_profile: str = "general"
+
         # TODO: User interrupt state (to be added later)
         # self._last_response_interrupted: bool = False
 
@@ -106,9 +110,16 @@ class StatusMonitor:
         since PFC can only run one task at a time (useful to see if others
         are using the server).
 
+        Only queries PFC if agent_profile is 'pfc', to avoid unnecessary
+        connection attempts for other profiles.
+
         Returns:
             List[str]: PFC task reminders
         """
+        # Skip PFC query if not in PFC profile
+        if self.agent_profile != 'pfc':
+            return []
+
         try:
             from backend.infrastructure.pfc import get_client
             from backend.infrastructure.mcp.utils.time_utils import format_time_range
