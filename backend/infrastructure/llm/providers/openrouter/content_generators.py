@@ -90,23 +90,26 @@ class TitleGenerator(BaseTitleGenerator):
             ]
 
             # Call OpenRouter API using Chat Completions format
+            # Note: Set max_tokens to 1000 for thinking models (like GLM-4.6)
+            # Thinking models need extra tokens for reasoning process before outputting the final answer
             response: ChatCompletion = await client.chat.completions.create(
                 model=openrouter_config.model,
                 messages=cast(Any, chat_messages),
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-                max_tokens=100
+                max_tokens=1000
             )
 
             if not response.choices:
                 return None
 
+            # Extract title from response content
             title_response_text = response.choices[0].message.content or ""
 
             # Parse title using shared utility function
             return parse_title_response(title_response_text, max_length=DEFAULT_TITLE_MAX_LENGTH)
 
         except Exception as e:
-            print(f"OpenRouter title generation error: {str(e)}")
+            print(f"[ERROR] OpenRouter title generation failed: {str(e)}")
             return None
 
 

@@ -164,6 +164,8 @@ class ContentGeneratorFactory:
 
         except Exception as e:
             print(f"[ERROR] Title generation failed: {e}")
+            import traceback
+            traceback.print_exc()
             raise
 
     @staticmethod

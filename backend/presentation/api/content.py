@@ -111,8 +111,7 @@ async def generate_title(
         
         if result.get("error"):
             error_msg = result["error"]
-            print(f"[TitleGeneration ERROR] {error_msg}")
-            print(f"[TitleGeneration ERROR] Full result: {result}")
+            print(f"[ERROR] Title generation: {error_msg}")
             raise HTTPException(
                 status_code=400,
                 detail=error_msg
