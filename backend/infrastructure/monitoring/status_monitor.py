@@ -6,8 +6,8 @@ that need to be communicated to the LLM via system-reminders:
 
 1. Bash background processes - Local background shell tasks
 2. PFC simulation tasks - Remote PFC server tasks
-3. User interrupt status (TODO)
-4. Task queue status (TODO)
+3. User queue messages - Messages sent during tool execution
+4. User interrupt status (TODO)
 
 The monitor is session-scoped and provides unified reminder API.
 """
@@ -47,9 +47,6 @@ class StatusMonitor:
 
         # TODO: User interrupt state (to be added later)
         # self._last_response_interrupted: bool = False
-
-        # TODO: Queue status tracking (to be added later)
-        # self._queue_stats: Dict[str, Any] = {}
 
     async def get_all_reminders(self, check_queue: bool = False) -> List[str]:
         """
@@ -254,16 +251,6 @@ class StatusMonitor:
     #
     #     Returns:
     #         List[str]: Interrupt reminder if flag is set
-    #     """
-    #     pass
-
-    # TODO: Implement queue monitoring
-    # def _get_queue_reminders(self) -> List[str]:
-    #     """
-    #     Get reminders for task queue status.
-    #
-    #     Returns:
-    #         List[str]: Queue status reminders
     #     """
     #     pass
 
