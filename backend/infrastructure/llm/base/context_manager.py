@@ -54,10 +54,6 @@ class BaseContextManager(ABC):
         self.agent_profile = "general"
         self.enable_memory = True
 
-        # User interrupt control
-        self.user_interrupted: bool = False  # User pressed ESC to interrupt
-        self._last_response_interrupted: bool = False  # Last response was interrupted (for next user message)
-
         # Tool call tracking
         self._has_tool_calls = False
 
@@ -73,10 +69,7 @@ class BaseContextManager(ABC):
 
         # Load historical messages and initialize working contents
         # Use load_history (not load_all_message_history) to exclude image/video messages
-        from backend.infrastructure.storage.session_manager import (
-            load_history,
-            load_runtime_state
-        )
+        from backend.infrastructure.storage.session_manager import load_history
         from backend.domain.models.message_factory import message_factory
 
         history_dicts = load_history(session_id)
@@ -86,11 +79,9 @@ class BaseContextManager(ABC):
         if historical_messages:
             self.initialize_from_messages(historical_messages)
 
-        # Load persisted runtime state (e.g., interrupt flags)
-        runtime_state = load_runtime_state(session_id)
-        if runtime_state.get("last_response_interrupted", False):
-            self._last_response_interrupted = True
-            # Handle interrupted response by merging consecutive user messages
+        # Handle interrupted response if needed (StatusMonitor loaded the flag)
+        # This merges consecutive user messages in history when previous response was interrupted
+        if self._status_monitor.was_last_response_interrupted():
             self._handle_interrupted_response_on_init()
     
     def initialize_from_messages(self, messages: List[BaseMessage]) -> None:
@@ -181,8 +172,7 @@ class BaseContextManager(ABC):
         # Merge in database
         from backend.infrastructure.storage.session_manager import (
             load_all_message_history,
-            save_history,
-            update_runtime_state
+            save_history
         )
         from backend.domain.models.message_factory import message_factory
 
@@ -213,9 +203,8 @@ class BaseContextManager(ABC):
             del history_msgs[second_idx]
             save_history(self.session_id, history_msgs)
 
-        # Clear interrupt flag
-        self._last_response_interrupted = False
-        update_runtime_state(self.session_id, "last_response_interrupted", False)
+        # Clear interrupt flag via StatusMonitor
+        self._status_monitor.clear_interrupt_flag()
 
 
     async def add_user_message(self, user_message: BaseMessage) -> None:
@@ -225,25 +214,15 @@ class BaseContextManager(ABC):
         This method is called for each new user input, adding it to the
         existing context without re-processing historical messages.
 
-        Supports async reminder injection for both bash processes and PFC tasks.
-        Also handles interrupt notifications from previous response.
+        Supports async reminder injection for background tasks, interrupt status,
+        and queue messages (during tool recursion).
 
         Args:
             user_message: New user message to add
         """
-        # Collect all reminders to inject (background tasks + interrupt notification)
-        reminders = []
-
-        # Check if previous response was interrupted
+        # Check if previous response was interrupted (determines merge behavior)
         needs_merge = False
-        if self._last_response_interrupted:
-            reminders.append("Previous response interrupted by user.")
-            self._last_response_interrupted = False  # Reset in-memory flag
-
-            # Clear persisted interrupt flag
-            from backend.infrastructure.storage.session_manager import update_runtime_state
-            update_runtime_state(self.session_id, "last_response_interrupted", False)
-
+        if self._status_monitor.was_last_response_interrupted():
             # Check if we need to merge with previous user message
             if self.working_contents:
                 last_msg = self.working_contents[-1]
@@ -257,12 +236,12 @@ class BaseContextManager(ABC):
                 if last_role == 'user':
                     needs_merge = True
 
-        # Get all system reminders (bash processes, PFC tasks, etc.)
+        # Get all system reminders (interrupt, bash processes, PFC tasks, etc.)
+        # StatusMonitor automatically includes interrupt reminder and clears the flag
         # Note: check_queue=False (default) because user messages have already been
         # processed from the queue at this point. Queue messages are only checked
         # during tool result injection (when user sends new messages while tools are executing).
-        system_reminders = await self._status_monitor.get_all_reminders()
-        reminders.extend(system_reminders)
+        reminders = await self._status_monitor.get_all_reminders()
 
         if needs_merge:
             # Merge with previous user message instead of creating new one

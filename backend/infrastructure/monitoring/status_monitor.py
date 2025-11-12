@@ -7,7 +7,7 @@ that need to be communicated to the LLM via system-reminders:
 1. Bash background processes - Local background shell tasks
 2. PFC simulation tasks - Remote PFC server tasks
 3. User queue messages - Messages sent during tool execution
-4. User interrupt status (TODO)
+4. User interrupt status - Response interruption notifications
 
 The monitor is session-scoped and provides unified reminder API.
 """
@@ -36,6 +36,8 @@ class StatusMonitor:
         """
         Initialize status monitor for a session.
 
+        Loads interrupt state from runtime_state storage on initialization.
+
         Args:
             session_id: Session ID for scoped monitoring
         """
@@ -45,8 +47,119 @@ class StatusMonitor:
         # Used to optimize queries (e.g., skip PFC if not in PFC/general profile)
         self.agent_profile: str = "general"
 
-        # TODO: User interrupt state (to be added later)
-        # self._last_response_interrupted: bool = False
+        # User interrupt state management
+        # - user_interrupted: Immediate flag for stopping current streaming (in-memory only)
+        # - _last_response_interrupted: Persistent flag for message merging (loaded from runtime_state)
+        self.user_interrupted: bool = False  # Reset each conversation turn
+        self._last_response_interrupted: bool = False
+        self._load_interrupt_state()
+
+    def _load_interrupt_state(self) -> None:
+        """
+        Load interrupt state from runtime_state storage.
+
+        Called during initialization to restore interrupt flag from persistent storage.
+        """
+        try:
+            from backend.infrastructure.storage.session_manager import load_runtime_state
+
+            runtime_state = load_runtime_state(self.session_id)
+            self._last_response_interrupted = runtime_state.get("last_response_interrupted", False)
+
+            if self._last_response_interrupted:
+                logger.info(f"Loaded interrupt state for session {self.session_id[:8]}: interrupted=True")
+
+        except Exception as e:
+            logger.warning(f"Failed to load interrupt state: {e}")
+            self._last_response_interrupted = False
+
+    def was_last_response_interrupted(self) -> bool:
+        """
+        Check if the last response was interrupted by the user.
+
+        This method is used by ContextManager to determine if consecutive
+        user messages should be merged.
+
+        Returns:
+            bool: True if last response was interrupted
+        """
+        return self._last_response_interrupted
+
+    def set_user_interrupted(self) -> None:
+        """
+        Set the immediate user interrupt flag.
+
+        Called by UserInterruptHandler when user presses ESC.
+        This flag is checked in real-time by ChatOrchestrator to stop streaming.
+
+        Note: This only sets the in-memory flag. The persistent flag is set
+        by set_interrupt_flag() after the interrupted response is handled.
+        """
+        self.user_interrupted = True
+        logger.info(f"Set user_interrupted flag for session {self.session_id[:8]}")
+
+    def reset_user_interrupted(self) -> None:
+        """
+        Reset the immediate user interrupt flag.
+
+        Called at the start of each new conversation turn to prepare
+        for potential interruptions.
+        """
+        self.user_interrupted = False
+
+    def is_user_interrupted(self) -> bool:
+        """
+        Check if user has interrupted the current streaming response.
+
+        Used by ChatOrchestrator to detect interruptions in real-time.
+
+        Returns:
+            bool: True if user pressed ESC to interrupt current response
+        """
+        return self.user_interrupted
+
+    def set_interrupt_flag(self) -> None:
+        """
+        Set the persistent interrupt flag in both memory and storage.
+
+        Called by ChatOrchestrator after handling an interrupted response.
+        This flag will trigger message merging on the next user message.
+        """
+        try:
+            self._last_response_interrupted = True
+
+            from backend.infrastructure.storage.session_manager import update_runtime_state
+            update_runtime_state(self.session_id, "last_response_interrupted", True)
+
+            logger.info(f"Set last_response_interrupted flag for session {self.session_id[:8]}")
+
+        except Exception as e:
+            logger.warning(f"Failed to set interrupt flag: {e}")
+            # Still set memory flag
+            self._last_response_interrupted = True
+
+    def clear_interrupt_flag(self) -> None:
+        """
+        Clear the interrupt flag in both memory and persistent storage.
+
+        Called by ContextManager after handling interrupted response merge
+        during initialization (_handle_interrupted_response_on_init).
+
+        This prevents duplicate interrupt reminders when the interruption
+        has already been handled by merging messages in history.
+        """
+        try:
+            self._last_response_interrupted = False
+
+            from backend.infrastructure.storage.session_manager import update_runtime_state
+            update_runtime_state(self.session_id, "last_response_interrupted", False)
+
+            logger.debug(f"Cleared interrupt flag for session {self.session_id[:8]}")
+
+        except Exception as e:
+            logger.warning(f"Failed to clear interrupt flag: {e}")
+            # Still clear memory flag
+            self._last_response_interrupted = False
 
     async def get_all_reminders(self, check_queue: bool = False) -> List[str]:
         """
@@ -63,6 +176,10 @@ class StatusMonitor:
         """
         reminders = []
 
+        # Interrupt status (should be first for visibility)
+        interrupt_reminders = self._get_interrupt_reminders()
+        reminders.extend(interrupt_reminders)
+
         # Queue messages (user messages during tool recursion)
         if check_queue:
             queue_reminders = await self._get_queue_message_blocks()
@@ -75,10 +192,6 @@ class StatusMonitor:
         # PFC simulation tasks
         pfc_reminders = await self._get_pfc_reminders()
         reminders.extend(pfc_reminders)
-
-        # TODO: Add interrupt reminders
-        # interrupt_reminders = self._get_interrupt_reminders()
-        # reminders.extend(interrupt_reminders)
 
         return reminders
 
@@ -244,15 +357,44 @@ class StatusMonitor:
             logger.error(f"Failed to get queue message blocks: {e}")
             return []
 
-    # TODO: Implement interrupt monitoring
-    # def _get_interrupt_reminders(self) -> List[str]:
-    #     """
-    #     Get reminder for user interrupt status.
-    #
-    #     Returns:
-    #         List[str]: Interrupt reminder if flag is set
-    #     """
-    #     pass
+    def _get_interrupt_reminders(self) -> List[str]:
+        """
+        Get reminder for user interrupt status.
+
+        Checks if the last response was interrupted by the user (ESC key).
+        If so, generates a reminder and clears the interrupt flag in both
+        memory and persistent storage.
+
+        This reminder is typically shown when the user sends a new message
+        after interrupting the previous response.
+
+        Returns:
+            List[str]: Interrupt reminder block if flag is set, empty list otherwise
+        """
+        if not self._last_response_interrupted:
+            return []
+
+        try:
+            # Clear interrupt flag in memory
+            self._last_response_interrupted = False
+
+            # Clear interrupt flag in persistent storage
+            from backend.infrastructure.storage.session_manager import update_runtime_state
+            update_runtime_state(self.session_id, "last_response_interrupted", False)
+
+            # Generate reminder
+            reminder_text = "Previous response interrupted by user."
+            reminder_block = f"<system-reminder>\n{reminder_text}\n</system-reminder>"
+
+            logger.info(f"Generated interrupt reminder for session {self.session_id[:8]}")
+
+            return [reminder_block]
+
+        except Exception as e:
+            logger.error(f"Failed to generate interrupt reminder: {e}")
+            # Still clear memory flag to avoid infinite loop
+            self._last_response_interrupted = False
+            return []
 
 
 # Singleton registry for session-scoped monitors

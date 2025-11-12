@@ -180,8 +180,10 @@ class ChatService:
         context_manager.agent_profile = parsed_data.get('agent_profile', 'general')
         context_manager.enable_memory = parsed_data.get('enable_memory', True)
 
-        # Reset interrupt flag for new conversation turn
-        context_manager.user_interrupted = False
+        # Reset interrupt flag for new conversation turn via StatusMonitor
+        from backend.infrastructure.monitoring import get_status_monitor
+        status_monitor = get_status_monitor(session_id)
+        status_monitor.reset_user_interrupted()
 
         return {
             'session_id': session_id,

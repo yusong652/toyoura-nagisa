@@ -311,17 +311,11 @@ class UserInterruptHandler(MessageHandler):
             try:
                 print(f"[UserInterruptHandler] Processing USER_INTERRUPT from session {session_id}", flush=True)
 
-                # Get LLM client and context manager for this session
-                from backend.shared.utils.app_context import get_llm_client
-                llm_client = get_llm_client()
-                context_manager = llm_client.get_or_create_context_manager(session_id)
-
-                if context_manager:
-                    # Set interrupt flag
-                    context_manager.user_interrupted = True
-                    print(f"[UserInterruptHandler] Set user_interrupted flag for session {session_id}", flush=True)
-                else:
-                    logger.warning(f"No context manager found for session {session_id}")
+                # Set interrupt flag via StatusMonitor
+                from backend.infrastructure.monitoring import get_status_monitor
+                status_monitor = get_status_monitor(session_id)
+                status_monitor.set_user_interrupted()
+                print(f"[UserInterruptHandler] Set user_interrupted flag via StatusMonitor for session {session_id}", flush=True)
 
             except Exception as e:
                 logger.error(f"Error processing user interrupt: {e}")

@@ -162,8 +162,10 @@ class ChatOrchestrator:
         async for chunk in self.llm_client.call_api_with_context_streaming(
             complete_context, api_config
         ):
-            # Check for user interrupt
-            if context_manager.user_interrupted:
+            # Check for user interrupt via StatusMonitor
+            from backend.infrastructure.monitoring import get_status_monitor
+            status_monitor = get_status_monitor(session_id)
+            if status_monitor.is_user_interrupted():
                 return await self._handle_user_interruption(
                     session_id, state, iterations
                 )
@@ -227,14 +229,11 @@ class ChatOrchestrator:
         """
         print(f"[INFO] Streaming interrupted by user at iteration {iterations}")
 
-        # Get context manager and set interrupt flag (both in-memory and persistent)
-        context_manager = self.llm_client.get_or_create_context_manager(session_id)
-        context_manager._last_response_interrupted = True
-
-        # Persist interrupt flag to session runtime state
-        from backend.infrastructure.storage.session_manager import update_runtime_state
-        update_runtime_state(session_id, "last_response_interrupted", True)
-        print(f"[DEBUG] Set interrupt flag (in-memory + persistent) - incomplete response will NOT be added to LLM context")
+        # Set interrupt flag via StatusMonitor (handles both in-memory and persistent storage)
+        from backend.infrastructure.monitoring import get_status_monitor
+        status_monitor = get_status_monitor(session_id)
+        status_monitor.set_interrupt_flag()
+        print(f"[DEBUG] Set interrupt flag via StatusMonitor - incomplete response will NOT be added to LLM context")
 
         # Build final content blocks for frontend display only
         content_blocks = state.get_content_blocks()
@@ -256,8 +255,6 @@ class ChatOrchestrator:
         # DO NOT add to context manager - incomplete responses should not be in LLM context
         # The next user message will be merged if there are consecutive user messages
         print(f"[DEBUG] Skipping add_response() - keeping context clean for LLM")
-        print(f"[DEBUG] Working contents count (unchanged): {len(context_manager.working_contents)}")
-
         # DO NOT save to database - incomplete responses should not persist
         # User already saw the incomplete content in frontend (temporary display)
         # After restart, we don't want to load this incomplete message
@@ -463,7 +460,9 @@ class ChatOrchestrator:
             raise UserRejectionInterruption(session_id, rejected_tools)
 
         # Check for user interrupt before continuing recursion
-        if context_manager.user_interrupted:
+        from backend.infrastructure.monitoring import get_status_monitor
+        status_monitor = get_status_monitor(session_id)
+        if status_monitor.is_user_interrupted():
             print(f"[INFO] Tool calling interrupted by user at iteration {iterations}")
             return response
 
