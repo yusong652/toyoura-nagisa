@@ -279,15 +279,15 @@ class BaseContextManager(ABC):
                 new_content = "".join(text_parts)
 
             # Build merged content with LLM-friendly format:
-            # 1. System reminder about interruption
+            # 1. System reminders (already wrapped in system-reminder tags by StatusMonitor)
             # 2. Natural transition: "User sent another message:"
             # 3. New message content
-            reminder_header = "\n\n".join([
-                f"<system-reminder>\n{reminder}\nUser sent another message:\n</system-reminder>"
-                for reminder in reminders
-            ])
-
-            merge_text = f"\n\n{reminder_header}\n\n{new_content}"
+            if reminders:
+                reminder_text = "\n\n".join(reminders)  # Complete blocks from StatusMonitor
+                transition = "\n\nUser sent another message:"
+                merge_text = f"\n\n{reminder_text}{transition}\n\n{new_content}"
+            else:
+                merge_text = f"\n\nUser sent another message:\n\n{new_content}"
 
             # Merge into last message
             last_msg = self.working_contents[-1]

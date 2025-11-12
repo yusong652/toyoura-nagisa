@@ -222,11 +222,8 @@ class ChatService:
 
             print(f"[DEBUG] Injecting {len(reminders)} status reminders into user message")
 
-            # 3. Format reminders (same format as tool result injection)
-            reminder_text = "\n\n" + "\n\n".join([
-                f"<system-reminder>\n{reminder}\n</system-reminder>"
-                for reminder in reminders
-            ])
+            # 3. Format reminders (StatusMonitor returns complete system-reminder blocks)
+            reminder_text = "\n\n" + "\n\n".join(reminders)
 
             # 4. Inject into content
             content = parsed_data.get('content', [])
