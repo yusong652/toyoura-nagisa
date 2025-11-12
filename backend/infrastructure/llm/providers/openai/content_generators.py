@@ -44,7 +44,6 @@ class TitleGenerator(BaseTitleGenerator):
         Args:
             client: OpenAI client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            debug: Enable debug logging for API calls
 
         Returns:
             Generated title string, or None if generation fails
@@ -57,14 +56,42 @@ class TitleGenerator(BaseTitleGenerator):
             # Use shared system prompt for title generation
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
-            # Use base class method to prepare messages
-            messages = BaseTitleGenerator.prepare_title_generation_messages(
-                latest_messages,
-                "Please generate a title for the above conversation"
+            # Extract text content from messages and assemble into conversation context
+            # This approach avoids sending complex message structures
+            conversation_parts = []
+            for msg in latest_messages:
+                role = getattr(msg, 'role', 'user')
+                content = getattr(msg, 'content', '')
+
+                # Handle content list or string
+                if isinstance(content, list):
+                    # Extract text from content blocks
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                    content_str = '\n'.join(text_parts)
+                else:
+                    content_str = str(content)
+
+                # Add to conversation with role label
+                role_label = "User" if role == "user" else "Assistant"
+                conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Combine conversation into single context
+            conversation_context = '\n'.join(conversation_parts)
+
+            # Create simple message with conversation as context
+            from backend.domain.models.messages import UserMessage
+            simple_message = UserMessage(
+                role="user",
+                content=f"Please generate a concise title based on the following conversation:\n\n{conversation_context}"
             )
 
-            # Format messages and convert to Responses API input
-            formatted_messages = OpenAIMessageFormatter.format_messages(messages)
+            # Format message and convert to Responses API input
+            formatted_messages = OpenAIMessageFormatter.format_messages([simple_message])
             input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
 
             api_kwargs = {
@@ -79,7 +106,7 @@ class TitleGenerator(BaseTitleGenerator):
 
             if not response.output:
                 return None
-            
+
             title_response_text = OpenAIResponseProcessor.extract_text_content(response)
 
             # Parse title using shared utility function

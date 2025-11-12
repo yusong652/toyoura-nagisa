@@ -52,23 +52,14 @@ class TitleGenerator(BaseTitleGenerator):
             if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
 
-            # Use base class method to prepare messages
-            messages = BaseTitleGenerator.prepare_title_generation_messages(
-                latest_messages,
-                "Please generate a title for the above conversation"
-            )
-
             # Get OpenRouter configuration
             llm_settings = get_llm_settings()
             openrouter_config = llm_settings.get_openrouter_config()
 
-            # Build messages for Chat Completions API
-            chat_messages = [
-                {"role": "system", "content": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT}
-            ]
-
-            for msg in messages:
-                # Get role - all message types should have this
+            # Extract text content from messages and assemble into conversation context
+            # This approach avoids sending complex message structures
+            conversation_parts = []
+            for msg in latest_messages:
                 role = getattr(msg, 'role', 'user')
                 content = getattr(msg, 'content', '')
 
@@ -77,16 +68,26 @@ class TitleGenerator(BaseTitleGenerator):
                     # Extract text from content blocks
                     text_parts = []
                     for block in content:
-                        if isinstance(block, dict) and block.get('type') == 'text':
-                            text_parts.append(block.get('text', ''))
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
                     content_str = '\n'.join(text_parts)
                 else:
                     content_str = str(content)
 
-                chat_messages.append({
-                    "role": role,
-                    "content": content_str
-                })
+                # Add to conversation with role label
+                role_label = "User" if role == "user" else "Assistant"
+                conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Combine conversation into single context
+            conversation_context = '\n'.join(conversation_parts)
+
+            # Build chat messages with conversation as context in user message
+            chat_messages = [
+                {"role": "system", "content": DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Please generate a concise title based on the following conversation:\n\n{conversation_context}"}
+            ]
 
             # Call OpenRouter API using Chat Completions format
             response: ChatCompletion = await client.chat.completions.create(

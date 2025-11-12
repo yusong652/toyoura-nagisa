@@ -42,7 +42,6 @@ class TitleGenerator(BaseTitleGenerator):
         Args:
             client: Anthropic client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            debug: Enable debug output for troubleshooting
 
         Returns:
             Generated title string, or None if generation fails
@@ -55,32 +54,61 @@ class TitleGenerator(BaseTitleGenerator):
             # Get Anthropic configuration
             anthropic_config = get_anthropic_client_config()
 
+            # Extract text content from messages and assemble into conversation context
+            # This approach avoids sending complex message structures (thinking blocks, etc.)
+            conversation_parts = []
+            for msg in latest_messages:
+                role = getattr(msg, 'role', 'user')
+                content = getattr(msg, 'content', '')
+
+                # Handle content list or string
+                if isinstance(content, list):
+                    # Extract text from content blocks (skip thinking blocks)
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                    content_str = '\n'.join(text_parts)
+                else:
+                    content_str = str(content)
+
+                # Add to conversation with role label
+                role_label = "User" if role == "user" else "Assistant"
+                conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Combine conversation into single context
+            conversation_context = '\n'.join(conversation_parts)
+
+            # Build simple message structure with conversation as context
+            # This prevents issues with complex message structures (thinking blocks, etc.)
+            messages = [
+                {
+                    "role": "user",
+                    "content": f"Please generate a concise title based on the following conversation:\n\n{conversation_context}"
+                }
+            ]
+
             # Use shared system prompt for consistency
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
-
-            # Use base class method to prepare messages
-            messages = BaseTitleGenerator.prepare_title_generation_messages(
-                latest_messages,
-                "Please generate a title for the above conversation"
-            )
-
-            # Use MessageFormatter for message format conversion
-            formatted_messages = MessageFormatter.format_messages(messages)
 
             # Build API call parameters using the configuration system
             api_kwargs = anthropic_config.get_api_call_kwargs(
                 system_prompt=system_prompt,
-                messages=formatted_messages
+                messages=messages
             )
 
             # Override parameters specific to title generation
             api_kwargs.update({
-                "max_tokens": 2048,
+                "max_tokens": 100,  # Sufficient for title generation
                 "temperature": 1.0
             })
-            # Update thinking budget if thinking is enabled
+
+            # Disable thinking for title generation (simple task, no need for extended thinking)
             if "thinking" in api_kwargs:
-                api_kwargs["thinking"]["budget_tokens"] = 1024
+                del api_kwargs["thinking"]
+
             from backend.config import get_llm_settings
             llm_settings = get_llm_settings()
             debug = llm_settings.debug

@@ -22,7 +22,6 @@ from backend.infrastructure.llm.shared.constants.defaults import (
     DEFAULT_WEB_SEARCH_TEMPERATURE)
 from backend.infrastructure.llm.shared.constants.prompts import (
     DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT,
-    TITLE_GENERATION_REQUEST_TEXT,
     DEFAULT_WEB_SEARCH_SYSTEM_PROMPT,
     DEFAULT_VIDEO_PROMPT_SYSTEM_PROMPT
 )
@@ -66,20 +65,48 @@ class GeminiTitleGenerator(BaseTitleGenerator):
 
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
+            # Extract text content from messages and assemble into conversation context
+            # This approach avoids sending complex message structures
+            conversation_parts = []
+            for msg in latest_messages:
+                role = getattr(msg, 'role', 'user')
+                content = getattr(msg, 'content', '')
+
+                # Handle content list or string
+                if isinstance(content, list):
+                    # Extract text from content blocks
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict):
+                            block_type = block.get('type')
+                            if block_type == 'text':
+                                text_parts.append(block.get('text', ''))
+                    content_str = '\n'.join(text_parts)
+                else:
+                    content_str = str(content)
+
+                # Add to conversation with role label
+                role_label = "User" if role == "user" else "Assistant"
+                conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Combine conversation into single context
+            conversation_context = '\n'.join(conversation_parts)
+
+            # Build simple content with conversation as context
+            # This prevents issues with complex message structures
+            contents = [
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=f"Please generate a concise title based on the following conversation:\n\n{conversation_context}")]
+                )
+            ]
+
             # Configure title generation parameters
             title_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=DEFAULT_TITLE_GENERATION_TEMPERATURE,
-                max_output_tokens=gemini_config.model_settings.max_output_tokens
+                max_output_tokens=200  # Sufficient for title generation
             )
-
-            # Build message sequence using base class method
-            messages = BaseTitleGenerator.prepare_title_generation_messages(
-                latest_messages, TITLE_GENERATION_REQUEST_TEXT
-            )
-
-            # Use MessageFormatter for unified message format conversion
-            contents = GeminiMessageFormatter.format_messages(messages)
 
             # Get model from configuration
             llm_settings = get_llm_settings()
@@ -88,7 +115,9 @@ class GeminiTitleGenerator(BaseTitleGenerator):
 
             if debug:
                 print("[DEBUG] Gemini title generation:")
-                GeminiDebugger.print_debug_request(contents, title_config)
+                # Convert Content objects to dict for debug output
+                contents_dict = [content.model_dump() for content in contents]
+                GeminiDebugger.print_debug_request(contents_dict, title_config)
 
             # Use async non-streaming for better performance
             response = await client.aio.models.generate_content(
