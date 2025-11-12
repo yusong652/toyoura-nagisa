@@ -196,20 +196,23 @@ class SessionQueueManager:
 
     def _merge_messages(self, messages: List[dict]) -> dict:
         """
-        Merge multiple messages into a single message (natural format).
+        Merge messages into a single message (natural format).
+
+        Handles both single and multiple messages, ensuring the returned message
+        always has a string 'message' field for consistent access.
 
         When users send multiple messages in quick succession, these messages
         are naturally concatenated without any special formatting. The LLM will
         understand this as a continuous conversation flow.
 
         Args:
-            messages: List of message data dictionaries
+            messages: List of message data dictionaries (can be single or multiple)
 
         Returns:
-            dict: Merged message data with formatted content
+            dict: Merged message data with formatted content (always has 'message' as string)
         """
-        if len(messages) == 1:
-            return messages[0]
+        if not messages:
+            return {'message': ''}
 
         # Extract message texts
         message_texts = []
@@ -223,14 +226,16 @@ class SessionQueueManager:
                 message_texts.append(' '.join(text_parts))
 
         # Natural concatenation - like multi-paragraph conversation
-        formatted_content = '\n\n'.join(message_texts)
+        formatted_content = '\n\n'.join(message_texts) if len(message_texts) > 1 else (message_texts[0] if message_texts else '')
 
         # Use first message as template
         merged = messages[0].copy()
         merged['message'] = formatted_content
         merged['_merged_count'] = len(messages)  # Metadata for debugging
 
-        logger.info(f"Merged {len(messages)} messages (natural format)")
+        if len(messages) > 1:
+            logger.info(f"Merged {len(messages)} messages (natural format)")
+
         return merged
 
     def is_processing(self, session_id: str) -> bool:
@@ -325,50 +330,6 @@ class SessionQueueManager:
                 )
 
             return messages
-
-    def format_messages_for_reminder(self, messages: List[dict]) -> List[str]:
-        """
-        Format queue messages as reminder text list.
-
-        User messages during tool recursion should be formatted as clear reminders
-        to inform the LLM about new user instructions.
-
-        Args:
-            messages: Message list
-
-        Returns:
-            List[str]: Formatted reminder text list (one per message)
-        """
-        if not messages:
-            return []
-
-        reminders = []
-
-        for msg in messages:
-            # Extract message text
-            content = msg.get('message', '')
-            if isinstance(content, str):
-                text = content
-            elif isinstance(content, list):
-                # Handle multimodal messages
-                text_parts = [
-                    item.get('text', '')
-                    for item in content
-                    if item.get('type') == 'text'
-                ]
-                text = ' '.join(text_parts)
-            else:
-                text = str(content)
-
-            # Format as individual reminder (no numbering, keep concise)
-            reminder = (
-                f"The user sent the following message:\n{text}\n\n"
-                "Please address this message and continue with your tasks."
-            )
-            reminders.append(reminder)
-
-        logger.info(f"Formatted {len(reminders)} queue message(s) as reminders")
-        return reminders
 
     async def _notify_queue_update(self, session_id: str, queue_size: int):
         """

@@ -224,25 +224,24 @@ class StatusMonitor:
                 return []
 
             # Use the same merge strategy as external scenarios
-            # If multiple messages, merge them into one
-            if len(messages) > 1:
-                merged_message = queue_manager._merge_messages(messages)
-                messages = [merged_message]
+            # _merge_messages() handles both single and multiple messages
+            merged_message = queue_manager._merge_messages(messages)
+            merged_text = merged_message.get('message', '')
 
-            # Format as reminder texts
-            reminder_texts = queue_manager.format_messages_for_reminder(messages)
-
-            # Wrap as system-reminder blocks
-            reminder_blocks = []
-            for text in reminder_texts:
-                block = f"<system-reminder>\n{text}\n</system-reminder>"
-                reminder_blocks.append(block)
-
-            logger.info(
-                f"Converted queue messages to {len(reminder_blocks)} reminder block(s)"
+            # Format as reminder text
+            reminder_text = (
+                f"The user sent the following message:\n{merged_text}\n\n"
+                "Please address this message and continue with your tasks."
             )
 
-            return reminder_blocks
+            # Wrap in system-reminder block
+            reminder_block = f"<system-reminder>\n{reminder_text}\n</system-reminder>"
+
+            logger.info(
+                f"Converted {len(messages)} queue message(s) to 1 reminder block"
+            )
+
+            return [reminder_block]
 
         except Exception as e:
             logger.error(f"Failed to get queue message blocks: {e}")

@@ -79,12 +79,12 @@ class AnthropicContextManager(BaseContextManager):
 
                 # Modify result llm_content to inject reminders
                 if isinstance(result, dict) and 'llm_content' in result:
-                    llm_content = result['llm_content']
+                    llm_content = result.get('llm_content')
 
                     # Tool results use parts format: {"parts": [{"type": "text", "text": "..."}]}
                     if isinstance(llm_content, dict) and 'parts' in llm_content:
-                        parts = llm_content.get('parts', [])
-                        if isinstance(parts, list):
+                        parts = llm_content.get('parts')
+                        if isinstance(parts, list) and parts:
                             # Find last text part and append reminder
                             for part in reversed(parts):
                                 if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
