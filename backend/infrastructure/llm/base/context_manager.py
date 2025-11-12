@@ -258,7 +258,11 @@ class BaseContextManager(ABC):
                     needs_merge = True
 
         # Get all system reminders (bash processes, PFC tasks, etc.)
+        print(f"[DEBUG] BaseContextManager.add_user_message: Calling get_all_reminders for session {self.session_id}")
         system_reminders = await self._status_monitor.get_all_reminders()
+        print(f"[DEBUG] BaseContextManager.add_user_message: Got {len(system_reminders)} system reminders")
+        if system_reminders:
+            print(f"[DEBUG] System reminders: {system_reminders}")
         reminders.extend(system_reminders)
 
         if needs_merge:

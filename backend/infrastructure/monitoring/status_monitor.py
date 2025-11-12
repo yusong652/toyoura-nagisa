@@ -92,11 +92,18 @@ class StatusMonitor:
             from backend.infrastructure.mcp.tools.coding.utils.background_process_manager import get_process_manager
 
             process_manager = get_process_manager()
+            print(f"[DEBUG] StatusMonitor._get_bash_reminders: Calling get_system_reminders for session {self.session_id}")
             bash_reminders = process_manager.get_system_reminders(self.session_id)
+            print(f"[DEBUG] StatusMonitor._get_bash_reminders: Got {len(bash_reminders)} bash reminders")
+            if bash_reminders:
+                print(f"[DEBUG] Bash reminders: {bash_reminders}")
             return bash_reminders
 
-        except Exception:
+        except Exception as e:
             # Process manager may not be available or no processes running
+            print(f"[DEBUG] StatusMonitor._get_bash_reminders: Exception: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     # TODO: Implement PFC monitoring after bash testing
