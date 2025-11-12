@@ -45,6 +45,7 @@ class BackgroundProcess:
     last_accessed: datetime = field(default_factory=datetime.now)
     working_directory: str = ""
     is_python_script: bool = False  # Track if command is running Python
+    completion_notified: bool = False  # Track if completion/error has been notified
 
     # Output reading tracking
     _stdout_thread: Optional[Thread] = None
@@ -362,6 +363,11 @@ class BackgroundProcessManager:
                 bg_process.status = "completed"
                 bg_process.exit_code = bg_process.process.returncode
 
+            # Mark completion as notified when LLM actively checks the status
+            # This prevents duplicate reminders via get_system_reminders()
+            if bg_process.status in ["completed", "killed"]:
+                bg_process.completion_notified = True
+
             # Get INCREMENTAL output (efficient for long-running processes)
             with bg_process._output_lock:
                 # Get new lines since last position
@@ -558,10 +564,12 @@ class BackgroundProcessManager:
 
     def get_system_reminders(self, session_id: str) -> List[str]:
         """
-        Get system reminder messages for active background processes.
+        Get system reminder messages for background processes.
 
-        Returns formatted reminder strings for processes with new output,
-        following Claude Code's format.
+        Returns formatted reminder strings based on process state:
+        1. Running processes: Remind when new output is available
+        2. First-time completion: Remind when status changes to completed/killed
+        3. After notification: No more reminders
 
         Args:
             session_id: Session ID to get reminders for
@@ -585,25 +593,47 @@ class BackgroundProcessManager:
                     bg_process.status = "completed"
                     bg_process.exit_code = bg_process.process.returncode
 
-                # Only check running processes
-                if bg_process.status != "running":
-                    continue
+                # Use description if available, fallback to command
+                display_info = bg_process.description or bg_process.command
 
-                # Check for new output
-                has_new_output = (
-                    len(bg_process.stdout_buffer) > bg_process.last_stdout_position or
-                    len(bg_process.stderr_buffer) > bg_process.last_stderr_position
-                )
+                # Case 1: Running processes - always remind (with or without new output)
+                if bg_process.status == "running":
+                    has_new_output = (
+                        len(bg_process.stdout_buffer) > bg_process.last_stdout_position or
+                        len(bg_process.stderr_buffer) > bg_process.last_stderr_position
+                    )
 
-                if has_new_output:
-                    # Format reminder following Claude Code's format
+                    if has_new_output:
+                        reminder = (
+                            f"Background Bash {process_id} "
+                            f"(description: {display_info}) "
+                            f"(status: {bg_process.status}) "
+                            f"Has new output available. You can check its output using the BashOutput tool."
+                        )
+                    else:
+                        # No new output, but still remind about running process
+                        runtime = (datetime.now() - bg_process.start_time).total_seconds()
+                        reminder = (
+                            f"Background Bash {process_id} "
+                            f"(description: {display_info}) "
+                            f"(status: {bg_process.status}, runtime: {runtime:.1f}s) "
+                            f"Is running. You can check its output using the BashOutput tool."
+                        )
+                    reminders.append(reminder)
+
+                # Case 2: First-time completion/error - remind once about status change
+                elif bg_process.status in ["completed", "killed"] and not bg_process.completion_notified:
+                    bg_process.completion_notified = True
+                    exit_info = f"exit_code={bg_process.exit_code}" if bg_process.exit_code is not None else ""
                     reminder = (
                         f"Background Bash {process_id} "
-                        f"(command: {bg_process.command}) "
-                        f"(status: {bg_process.status}) "
-                        f"Has new output available. You can check its output using the BashOutput tool."
+                        f"(description: {display_info}) "
+                        f"Has finished with status: {bg_process.status} {exit_info}. "
+                        f"You can check its final output using the BashOutput tool."
                     )
                     reminders.append(reminder)
+
+                # Case 3: Already notified completion - no more reminders
 
             return reminders
 
