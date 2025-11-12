@@ -50,12 +50,16 @@ class GeminiTitleGenerator(BaseTitleGenerator):
         Args:
             client: Gemini client instance for API calls
             latest_messages: Recent conversation messages to generate title from
-            debug: Enable debug output for troubleshooting
+            debug: Enable debug output for troubleshooting (unused, kept for interface consistency)
 
         Returns:
             Generated title string, or None if generation fails
         """
         try:
+            # Explicit validation before base class validation
+            if latest_messages is None or not latest_messages:
+                return None
+
             # Use base class validation
             if not BaseTitleGenerator.validate_messages_for_title(latest_messages):
                 return None
@@ -66,7 +70,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             system_prompt = DEFAULT_TITLE_GENERATION_SYSTEM_PROMPT
 
             # Extract text content from messages and assemble into conversation context
-            # This approach avoids sending complex message structures
+            # This unified approach is consistent with other providers (Anthropic, OpenAI, Kimi, OpenRouter)
             conversation_parts = []
             for msg in latest_messages:
                 role = getattr(msg, 'role', 'user')
@@ -74,7 +78,7 @@ class GeminiTitleGenerator(BaseTitleGenerator):
 
                 # Handle content list or string
                 if isinstance(content, list):
-                    # Extract text from content blocks
+                    # Extract text from content blocks (skip thinking blocks, tool_use, tool_result)
                     text_parts = []
                     for block in content:
                         if isinstance(block, dict):
@@ -83,11 +87,19 @@ class GeminiTitleGenerator(BaseTitleGenerator):
                                 text_parts.append(block.get('text', ''))
                     content_str = '\n'.join(text_parts)
                 else:
-                    content_str = str(content)
+                    content_str = str(content) if content else ''
+
+                # Skip messages with no text content
+                if not content_str or not content_str.strip():
+                    continue
 
                 # Add to conversation with role label
                 role_label = "User" if role == "user" else "Assistant"
                 conversation_parts.append(f"{role_label}: {content_str}")
+
+            # Ensure we have at least some conversation content
+            if not conversation_parts:
+                return None
 
             # Combine conversation into single context
             conversation_context = '\n'.join(conversation_parts)
@@ -111,23 +123,18 @@ class GeminiTitleGenerator(BaseTitleGenerator):
             # Get model from configuration
             llm_settings = get_llm_settings()
             gemini_config = llm_settings.get_gemini_config()
-            model = gemini_config.model
 
-            if debug:
-                print("[DEBUG] Gemini title generation:")
-                # Convert Content objects to dict for debug output
-                contents_dict = [content.model_dump() for content in contents]
-                GeminiDebugger.print_debug_request(contents_dict, title_config)
+            # Use a reliable non-thinking model for title generation
+            # Thinking models (gemini-2.5-pro, gemini-exp-*) may refuse or return
+            # empty responses for simple tasks like title generation
+            title_generation_model = "gemini-2.0-flash"
 
             # Use async non-streaming for better performance
             response = await client.aio.models.generate_content(
-                model=model,
+                model=title_generation_model,
                 contents=contents,
                 config=title_config
             )
-
-            if debug:
-                GeminiDebugger.print_debug_response(response)
 
             # Extract response text using ResponseProcessor
             title_response_text = GeminiResponseProcessor.extract_text_content(response)

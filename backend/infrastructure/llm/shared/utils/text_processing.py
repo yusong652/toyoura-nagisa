@@ -161,16 +161,20 @@ def parse_title_response(
 ) -> Optional[str]:
     """
     Parse title generation response and extract clean title.
-    
+
     Args:
         response_text: The raw response text from the model
         max_length: Maximum allowed title length
         debug: Enable debug output
-        
+
     Returns:
         Cleaned title string, or None if parsing failed
     """
     try:
+        # Handle None or empty response
+        if not response_text:
+            return None
+
         # Clean up markdown code blocks if present
         cleaned_text = response_text
         if "```" in response_text:
