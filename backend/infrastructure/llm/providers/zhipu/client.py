@@ -252,7 +252,7 @@ class ZhipuClient(LLMClientBase):
         try:
             # Create streaming response (synchronous generator)
             # Type: StreamResponse[ChatCompletionChunk] when stream=True
-            # We need to wrap iteration in asyncio.to_thread
+            # zai SDK is synchronous, we need to iterate in a thread to avoid blocking
             stream = await asyncio.to_thread(
                 self.client.chat.completions.create,
                 **api_kwargs
@@ -261,8 +261,29 @@ class ZhipuClient(LLMClientBase):
             # Track tool calls being built
             current_tool_calls: Dict[int, Dict[str, Any]] = {}
 
-            # Iterate through stream chunks
-            for chunk in stream:
+            # Convert synchronous stream iterator to async
+            # zai SDK returns a sync iterator, we need to iterate in executor
+            # to avoid blocking the event loop
+            loop = asyncio.get_event_loop()
+
+            # Create iterator from stream
+            stream_iter = iter(stream)
+
+            # Helper function to get next chunk (will run in thread pool)
+            def get_next_chunk():
+                try:
+                    return next(stream_iter), False  # (chunk, is_done)
+                except StopIteration:
+                    return None, True  # (None, is_done)
+
+            # Iterate through chunks asynchronously
+            while True:
+                # Run next() in thread pool to avoid blocking
+                chunk, is_done = await loop.run_in_executor(None, get_next_chunk)
+
+                if is_done or chunk is None:
+                    break
+
                 if not hasattr(chunk, 'choices') or not chunk.choices:
                     continue
 
