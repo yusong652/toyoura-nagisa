@@ -37,7 +37,11 @@ class ZhipuContextManager(BaseContextManager):
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
             formatted_response = ZhipuMessageFormatter.format_single_message(response)
-            self.working_contents.append(formatted_response)
+            # format_single_message may return a list for tool_result blocks
+            if isinstance(formatted_response, list):
+                self.working_contents.extend(formatted_response)
+            else:
+                self.working_contents.append(formatted_response)
 
         elif hasattr(response, 'choices') and response.choices:
             # Handle ChatCompletion-like response from zai SDK
@@ -47,34 +51,15 @@ class ZhipuContextManager(BaseContextManager):
             # Extract reasoning content (GLM thinking models)
             reasoning_content = getattr(message, 'reasoning_content', None)
 
-            # Build content - handle reasoning_content for proper context preservation
-            content_value: Any = message.content
-
-            # If reasoning_content exists, format as multimodal content array
-            if reasoning_content:
-                # Convert to multimodal format
-                content_blocks = []
-
-                # Add thinking content directly without tags to prevent few-shot contamination
-                content_blocks.append({
-                    "type": "text",
-                    "text": reasoning_content
-                })
-
-                # Add regular content if present
-                if message.content:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": message.content
-                    })
-
-                content_value = content_blocks
-
             # Build message dict
             message_dict: Dict[str, Any] = {
                 "role": message.role,
-                "content": content_value
+                "content": message.content
             }
+
+            # Add reasoning_content as separate field if present (Zhipu API format)
+            if reasoning_content and reasoning_content.strip():
+                message_dict["reasoning_content"] = reasoning_content
 
             # Add tool calls if present
             if hasattr(message, 'tool_calls') and message.tool_calls:

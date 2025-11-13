@@ -12,6 +12,7 @@ a separate formatter to ensure:
 Supports multimodal content, tool calls, thinking content, and message history processing.
 """
 
+import json
 from typing import List, Dict, Any, Union, Optional
 from backend.domain.models.messages import BaseMessage
 from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatter
@@ -47,38 +48,15 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
         formatted_messages = []
 
         for msg in messages:
-            result: Dict[str, Any] = {"role": msg.role} # type: ignore
+            # format_single_message may return a dict or a list (for tool_result blocks)
+            formatted = ZhipuMessageFormatter.format_single_message(msg, preserve_thinking)
 
-            # Handle regular messages with multimodal content
-            if isinstance(msg.content, list):
-                # Extract thinking block separately (Zhipu API uses reasoning_content field)
-                thinking_text = None
-                other_blocks = []
-
-                for block in msg.content:
-                    if isinstance(block, dict) and block.get("type") == "thinking":
-                        # Extract thinking content to reasoning_content field
-                        if preserve_thinking:
-                            thinking_text = block.get("thinking", "")
-                    else:
-                        # Keep other blocks for content field
-                        other_blocks.append(block)
-
-                # Format non-thinking content
-                zhipu_content = ZhipuMessageFormatter._format_multimodal_content(
-                    other_blocks, preserve_thinking
-                )
-                result["content"] = zhipu_content
-
-                # Add reasoning_content if present
-                if thinking_text is not None and preserve_thinking:
-                    result["reasoning_content"] = thinking_text
-            else:
-                # Simple text content
-                text_content = str(msg.content) if msg.content else ""
-                result["content"] = text_content
-
-            formatted_messages.append(result)
+            if isinstance(formatted, list):
+                # Multiple messages (tool_result blocks converted to separate messages)
+                formatted_messages.extend(formatted)
+            elif formatted:  # Check if not empty dict
+                # Single message
+                formatted_messages.append(formatted)
 
         return formatted_messages
 
@@ -86,7 +64,7 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
     def format_single_message(
         message: BaseMessage,
         preserve_thinking: bool = True
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Format a single BaseMessage to Zhipu API format
 
@@ -95,116 +73,135 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
             preserve_thinking: Whether to preserve thinking content
 
         Returns:
-            Dict[str, Any]: Zhipu-formatted message with reasoning_content if present
+            Union[Dict[str, Any], List[Dict[str, Any]]]:
+                - Single message dict for regular messages
+                - List of messages for tool_result blocks (converted to role: "tool")
         """
         if message is None:
             return {}
 
-        result: Dict[str, Any] = {"role": message.role} # type: ignore
+        # Handle simple text content
+        if not isinstance(message.content, list):
+            return {
+                "role": message.role,  # type: ignore
+                "content": str(message.content) if message.content else ""
+            }
 
-        # Handle regular messages with multimodal content
-        if isinstance(message.content, list):
-            # Extract thinking block separately (Zhipu API uses reasoning_content field)
-            thinking_text = None
-            other_blocks = []
+        # Handle multimodal content - classify blocks by type
+        thinking_text = None
+        tool_use_blocks = []
+        tool_result_blocks = []
+        text_blocks = []
+        image_blocks = []
 
-            for block in message.content:
-                if isinstance(block, dict) and block.get("type") == "thinking":
-                    # Extract thinking content to reasoning_content field
-                    if preserve_thinking:
-                        thinking_text = block.get("thinking", "")
-                else:
-                    # Keep other blocks for content field
-                    other_blocks.append(block)
-
-            # Format non-thinking content
-            zhipu_content = ZhipuMessageFormatter._format_multimodal_content(
-                other_blocks, preserve_thinking
-            )
-            result["content"] = zhipu_content
-
-            # Add reasoning_content if present
-            if thinking_text is not None and preserve_thinking:
-                result["reasoning_content"] = thinking_text
-        else:
-            # Simple text content
-            text_content = str(message.content) if message.content else ""
-            result["content"] = text_content
-
-        return result
-
-    @staticmethod
-    def _format_multimodal_content(
-        content: List[Dict[str, Any]],
-        preserve_thinking: bool = True
-    ) -> Union[str, List[Dict[str, Any]]]:
-        """
-        Format multimodal content for Zhipu API
-
-        Args:
-            content: List of content blocks
-            preserve_thinking: Whether to preserve thinking content
-
-        Returns:
-            Zhipu-formatted content - either string for text-only or array for multimodal
-        """
-        formatted_content = []
-        has_non_text_content = False
-
-        for block in content:
+        for block in message.content:
             if not isinstance(block, dict):
-                formatted_content.append({
-                    "type": "text",
-                    "text": str(block)
-                })
+                # Non-dict blocks treated as text
+                text_blocks.append({"type": "text", "text": str(block)})
                 continue
 
-            # Handle text content
-            if block.get("type") == "text" and block.get("text"):
-                formatted_content.append({
-                    "type": "text",
-                    "text": block["text"]
-                })
-            elif "text" in block and block["text"] and "type" not in block:
-                formatted_content.append({
-                    "type": "text",
-                    "text": block["text"]
-                })
+            block_type = block.get("type")
 
-            # Handle image content
-            elif "inline_data" in block or block.get("type") == "image":
+            if block_type == "thinking":
+                if preserve_thinking:
+                    thinking_content = block.get("thinking", "")
+                    # Only keep thinking if it has non-whitespace content
+                    if thinking_content and thinking_content.strip():
+                        thinking_text = thinking_content
+
+            elif block_type == "tool_use":
+                tool_use_blocks.append(block)
+
+            elif block_type == "tool_result":
+                tool_result_blocks.append(block)
+
+            elif block_type == "text":
+                text_content = block.get("text", "")
+                # Only keep text if it has non-whitespace content
+                if text_content and text_content.strip():
+                    text_blocks.append(block)
+
+            elif block_type == "image" or "inline_data" in block:
+                # Format image block
                 inline_data = block.get("inline_data", block)
                 image_block = ZhipuMessageFormatter._format_image_block(inline_data)
                 if image_block:
-                    formatted_content.append(image_block)
-                    has_non_text_content = True
+                    image_blocks.append(image_block)
 
-            # Handle pre-formatted image_url content
-            elif block.get("type") == "image_url":
-                formatted_content.append(block)
-                has_non_text_content = True
+            elif block_type == "image_url":
+                # Pre-formatted image_url
+                image_blocks.append(block)
 
-            # Note: thinking blocks are handled at format_messages/format_single_message level
-            # and extracted to reasoning_content field, so they won't appear here
+        # Handle tool_result blocks as separate messages (role: "tool")
+        if tool_result_blocks:
+            tool_messages = []
+            for tool_result_block in tool_result_blocks:
+                tool_call_id = tool_result_block.get("tool_use_id", "")
+                nested_content = tool_result_block.get("content", {})
 
-            # Skip tool_use and tool_result blocks (cross-provider compatibility)
-            # These blocks are from Anthropic/Gemini format and should be ignored
-            # when loading history with Zhipu API
-            elif block.get("type") in ["tool_use", "tool_result"]:
-                continue
+                # Format tool result content
+                if isinstance(nested_content, dict) and "parts" in nested_content:
+                    formatted_content = ZhipuMessageFormatter._format_tool_result({
+                        "llm_content": nested_content
+                    })
+                else:
+                    formatted_content = nested_content
 
-        # Return optimization for text-only content
-        # IMPORTANT: Don't merge if we have thinking content, to keep thinking and text separate
-        if not has_non_text_content:
-            text_parts = [block.get("text", "") for block in formatted_content if block.get("type") == "text"]
-            combined_text = "".join(text_parts)
-            # If content only had tool_use/tool_result blocks (cross-provider format mismatch),
-            # return placeholder text to avoid empty assistant messages
-            if not combined_text:
-                return "[Tool execution completed]"
-            return combined_text
+                tool_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": formatted_content
+                })
+            return tool_messages if len(tool_messages) > 1 else tool_messages[0]
 
-        return formatted_content
+        # Build message result
+        result: Dict[str, Any] = {"role": message.role}  # type: ignore
+
+        # Add reasoning_content if present (separate field)
+        if thinking_text is not None:
+            result["reasoning_content"] = thinking_text
+
+        # Build content field
+        content_value: Union[str, List[Dict[str, Any]]]
+
+        # Determine content format
+        has_images = len(image_blocks) > 0
+        has_tool_calls = len(tool_use_blocks) > 0
+
+        if has_tool_calls or (not has_images and len(text_blocks) > 0):
+            # When tool_calls present OR text-only: content must be string
+            text_parts = [block.get("text", "") for block in text_blocks]
+            content_value = "".join(text_parts)
+        elif has_images:
+            # Multimodal content: return array
+            content_value = text_blocks + image_blocks
+        else:
+            # Empty content
+            content_value = ""
+
+        # Only add content field if it has value
+        # When tool_calls present with no text, omit content field entirely
+        if content_value or not has_tool_calls:
+            result["content"] = content_value
+
+        # Add tool_calls if present
+        if tool_use_blocks:
+            tool_calls = []
+            for tool_use in tool_use_blocks:
+                input_data = tool_use.get("input", {})
+                arguments_str = json.dumps(input_data, ensure_ascii=False) if isinstance(input_data, dict) else str(input_data)
+
+                tool_calls.append({
+                    "id": tool_use.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": tool_use.get("name", ""),
+                        "arguments": arguments_str
+                    }
+                })
+            result["tool_calls"] = tool_calls
+
+        return result
 
     @staticmethod
     def _format_image_block(inline_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
