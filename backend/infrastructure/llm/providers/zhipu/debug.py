@@ -34,28 +34,69 @@ class ZhipuDebugger:
         else:
             print("Thinking Mode: disabled")
 
-        # Tool choice
-        tool_choice = api_kwargs.get('tool_choice')
-        if tool_choice:
-            print(f"Tool Choice: {tool_choice}")
+        # Original API Request (with simplified system prompt and tool schemas)
+        print("\n" + "=" * 80)
+        print("--- API Request (Original Format, Simplified Verbose Fields) ---")
+        print("=" * 80)
 
-        # Messages
-        print(f"\nMessages count: {len(messages)}")
-        for i, msg in enumerate(messages):
-            role = msg.get('role', 'unknown')
-            content = msg.get('content', '')
-            content_preview = str(content)[:100] + "..." if len(str(content)) > 100 else str(content)
-            print(f"  [{i}] {role}: {content_preview}")
+        # Create a copy of api_kwargs with simplified verbose fields
+        simplified_request = api_kwargs.copy()
 
-        # Tools
-        print(f"\nTools count: {len(tools)}")
-        for i, tool in enumerate(tools):
-            tool_name = tool.get('function', {}).get('name', 'unknown')
-            print(f"  [{i}] {tool_name}")
+        # Simplify messages (only truncate system prompt, keep others full)
+        if 'messages' in simplified_request:
+            simplified_messages = []
+            for msg in simplified_request['messages']:
+                msg_copy = msg.copy()
+                role = msg_copy.get('role', '')
+                content = msg_copy.get('content', '')
 
-        # Complete API kwargs (for detailed inspection)
-        print("\n--- Complete API Configuration ---")
-        print(json.dumps(api_kwargs, indent=2, ensure_ascii=False, default=str))
+                # Only simplify system prompt
+                if role == 'system' and isinstance(content, str) and len(content) > 150:
+                    msg_copy['content'] = content[:150] + f"... (truncated, {len(content)} chars total)"
+
+                simplified_messages.append(msg_copy)
+            simplified_request['messages'] = simplified_messages
+
+        # Simplify tools (keep structure but remove verbose descriptions/parameters)
+        if 'tools' in simplified_request:
+            simplified_tools = []
+            for tool in simplified_request['tools']:
+                tool_copy = {}
+                tool_copy['type'] = tool.get('type', 'function')
+
+                if 'function' in tool:
+                    func = tool['function']
+                    tool_copy['function'] = {
+                        'name': func.get('name', 'unknown')
+                    }
+
+                    # Add description if short
+                    desc = func.get('description', '')
+                    if desc and len(desc) <= 100:
+                        tool_copy['function']['description'] = desc
+                    elif desc:
+                        tool_copy['function']['description'] = desc[:100] + "... (truncated)"
+
+                    # Simplify parameters
+                    if 'parameters' in func:
+                        params = func['parameters']
+                        if isinstance(params, dict):
+                            props = params.get('properties', {})
+                            required = params.get('required', [])
+                            tool_copy['function']['parameters'] = {
+                                'type': params.get('type', 'object'),
+                                'properties': f"<{len(props)} properties>",
+                                'required': required
+                            }
+
+                # Handle web_search type
+                if 'web_search' in tool:
+                    tool_copy['web_search'] = tool['web_search']
+
+                simplified_tools.append(tool_copy)
+            simplified_request['tools'] = simplified_tools
+
+        print(json.dumps(simplified_request, indent=2, ensure_ascii=False, default=str))
 
         print("=" * 80 + "\n")
 

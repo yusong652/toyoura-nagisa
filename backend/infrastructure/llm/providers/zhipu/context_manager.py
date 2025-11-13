@@ -82,12 +82,23 @@ class ZhipuContextManager(BaseContextManager):
                 tool_calls_list = []
                 for tool_call in message.tool_calls:
                     function_info = tool_call.function
+
+                    # Handle both object and dict formats
+                    # zai SDK might return either depending on the response structure
+                    if isinstance(function_info, dict):
+                        function_name = function_info.get('name', '')
+                        function_arguments = function_info.get('arguments', '')
+                    else:
+                        # Object with attributes
+                        function_name = getattr(function_info, 'name', '')
+                        function_arguments = getattr(function_info, 'arguments', '')
+
                     tool_calls_list.append({
                         "id": tool_call.id,
                         "type": tool_call.type,
                         "function": {
-                            "name": function_info.name,
-                            "arguments": function_info.arguments
+                            "name": function_name,
+                            "arguments": function_arguments
                         }
                     })
                 message_dict["tool_calls"] = tool_calls_list

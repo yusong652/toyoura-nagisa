@@ -328,10 +328,21 @@ class ZhipuClient(LLMClientBase):
                             current_tool_calls[idx]["id"] = tool_call_delta.id
 
                         if tool_call_delta.function:
-                            if tool_call_delta.function.name:
-                                current_tool_calls[idx]["function"]["name"] = tool_call_delta.function.name
-                            if tool_call_delta.function.arguments:
-                                current_tool_calls[idx]["function"]["arguments"] += tool_call_delta.function.arguments
+                            function_info = tool_call_delta.function
+
+                            # Handle both object and dict formats
+                            if isinstance(function_info, dict):
+                                func_name = function_info.get('name', '')
+                                func_args = function_info.get('arguments', '')
+                            else:
+                                # Object with attributes
+                                func_name = getattr(function_info, 'name', '')
+                                func_args = getattr(function_info, 'arguments', '')
+
+                            if func_name:
+                                current_tool_calls[idx]["function"]["name"] = func_name
+                            if func_args:
+                                current_tool_calls[idx]["function"]["arguments"] += func_args
 
                 # Check if tool call is complete
                 if hasattr(choice, 'finish_reason') and choice.finish_reason == "tool_calls" and current_tool_calls:

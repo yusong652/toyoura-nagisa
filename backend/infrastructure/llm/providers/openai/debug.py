@@ -77,15 +77,27 @@ class OpenAIDebugger:
     def print_debug_request_payload(kwargs: Dict[str, Any]) -> None:
         """
         Print formatted debug information for OpenAI API request payload
-        
+
         Args:
             kwargs: API call parameters
         """
-        print("\n📝 OpenAI API Request Payload (simplified):")
-        
+        print("\n" + "=" * 80)
+        print("[OPENAI DEBUG] API Request")
+        print("=" * 80)
+
+        # Basic parameters
+        print(f"\nModel: {kwargs.get('model', 'N/A')}")
+        print(f"Temperature: {kwargs.get('temperature', 'N/A')}")
+        print(f"Max Output Tokens: {kwargs.get('max_output_tokens', 'N/A')}")
+
+        # API Request (with simplified verbose fields)
+        print("\n" + "=" * 80)
+        print("--- API Request (Original Format, Simplified Verbose Fields) ---")
+        print("=" * 80)
+
         # Create simplified payload for better debugging
         simplified_payload = OpenAIDebugger._create_simplified_payload(kwargs)
-        
+
         try:
             import json
             json_output = json.dumps(simplified_payload, indent=2, ensure_ascii=False, default=str)
@@ -93,8 +105,8 @@ class OpenAIDebugger:
         except (TypeError, ValueError) as e:
             print(f"Debug payload (JSON serialization failed: {e}):")
             print(str(simplified_payload))
-        
-        print("========== END ==========")
+
+        print("=" * 80 + "\n")
     
     @staticmethod
     def _create_simplified_payload(kwargs: Dict[str, Any]) -> Dict[str, Any]:

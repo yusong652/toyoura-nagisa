@@ -26,49 +26,80 @@ class OpenRouterDebugger:
             tools: Tool schemas
         """
         print(f"\n{'='*80}")
-        print(f"[OPENROUTER DEBUG] API Request Payload")
+        print(f"[OPENROUTER DEBUG] API Request")
         print(f"{'='*80}")
-        print(f"[OPENROUTER] Model: {api_kwargs.get('model')}")
-        print(f"[OPENROUTER] Temperature: {api_kwargs.get('temperature')}")
-        print(f"[OPENROUTER] Messages count: {len(messages)}")
-        print(f"[OPENROUTER] Tools count: {len(tools)}")
 
-        # Print tool schemas with full details
-        if tools:
-            print(f"\n[OPENROUTER] Tool Schemas:")
-            for i, tool in enumerate(tools):
-                function = tool.get('function', {})
-                print(f"[OPENROUTER]   Tool {i+1}: {function.get('name', 'unknown')}")
-                print(f"[OPENROUTER]     Description: {function.get('description', 'N/A')[:80]}")
+        # Basic parameters
+        print(f"\nModel: {api_kwargs.get('model', 'N/A')}")
+        print(f"Temperature: {api_kwargs.get('temperature', 'N/A')}")
+        print(f"Max Tokens: {api_kwargs.get('max_tokens', 'N/A')}")
+        print(f"Top P: {api_kwargs.get('top_p', 'N/A')}")
+        print(f"Stream: {api_kwargs.get('stream', False)}")
 
-                params = function.get('parameters', {})
-                required = params.get('required', [])
-                properties = params.get('properties', {})
+        # Tool choice
+        tool_choice = api_kwargs.get('tool_choice')
+        if tool_choice:
+            print(f"Tool Choice: {tool_choice}")
 
-                print(f"[OPENROUTER]     Required params: {required if required else 'none'}")
-                print(f"[OPENROUTER]     Total params: {list(properties.keys())}")
+        # API Request (with simplified system prompt and tool schemas)
+        print(f"\n{'='*80}")
+        print("--- API Request (Original Format, Simplified Verbose Fields) ---")
+        print(f"{'='*80}")
 
-                # Print full schema for tools with no parameters
-                if not properties or not required:
-                    print(f"[OPENROUTER]     Full schema: {json.dumps(params, indent=10)}")
+        # Create a copy of api_kwargs with simplified verbose fields
+        simplified_request = api_kwargs.copy()
 
-        # Print recent messages
-        print(f"\n[OPENROUTER] Recent Messages (last 2):")
-        for msg in messages[-2:]:
-            role = msg.get('role', 'unknown')
-            content = msg.get('content', '')
+        # Simplify messages (only truncate system prompt, keep others full)
+        if 'messages' in simplified_request:
+            simplified_messages = []
+            for msg in simplified_request['messages']:
+                msg_copy = msg.copy()
+                role = msg_copy.get('role', '')
+                content = msg_copy.get('content', '')
 
-            if isinstance(content, str):
-                content_preview = content[:150] + '...' if len(content) > 150 else content
-            else:
-                content_preview = str(content)[:150]
+                # Only simplify system prompt
+                if role == 'system' and isinstance(content, str) and len(content) > 150:
+                    msg_copy['content'] = content[:150] + f"... (truncated, {len(content)} chars total)"
 
-            print(f"[OPENROUTER]   [{role}]: {content_preview}")
+                simplified_messages.append(msg_copy)
+            simplified_request['messages'] = simplified_messages
 
-            if 'tool_calls' in msg:
-                print(f"[OPENROUTER]     Tool calls: {len(msg['tool_calls'])}")
-                for tc in msg['tool_calls']:
-                    print(f"[OPENROUTER]       - {tc.get('function', {}).get('name', 'unknown')}")
+        # Simplify tools (keep structure but remove verbose descriptions/parameters)
+        if 'tools' in simplified_request:
+            simplified_tools = []
+            for tool in simplified_request['tools']:
+                tool_copy = {}
+                tool_copy['type'] = tool.get('type', 'function')
+
+                if 'function' in tool:
+                    func = tool['function']
+                    tool_copy['function'] = {
+                        'name': func.get('name', 'unknown')
+                    }
+
+                    # Add description if short
+                    desc = func.get('description', '')
+                    if desc and len(desc) <= 100:
+                        tool_copy['function']['description'] = desc
+                    elif desc:
+                        tool_copy['function']['description'] = desc[:100] + "... (truncated)"
+
+                    # Simplify parameters
+                    if 'parameters' in func:
+                        params = func['parameters']
+                        if isinstance(params, dict):
+                            props = params.get('properties', {})
+                            required = params.get('required', [])
+                            tool_copy['function']['parameters'] = {
+                                'type': params.get('type', 'object'),
+                                'properties': f"<{len(props)} properties>",
+                                'required': required
+                            }
+
+                simplified_tools.append(tool_copy)
+            simplified_request['tools'] = simplified_tools
+
+        print(json.dumps(simplified_request, indent=2, ensure_ascii=False, default=str))
 
         print(f"{'='*80}\n")
 

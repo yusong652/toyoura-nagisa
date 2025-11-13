@@ -97,11 +97,19 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
             for tc in message.tool_calls:
                 function = getattr(tc, 'function', None)
                 if function:
+                    # Handle both object and dict formats in debug output too
+                    if isinstance(function, dict):
+                        func_name = function.get('name', '')
+                        func_args = function.get('arguments', '')
+                    else:
+                        func_name = getattr(function, 'name', '')
+                        func_args = getattr(function, 'arguments', '')
+
                     raw_tool_calls.append({
                         'id': tc.id,
                         'function': {
-                            'name': getattr(function, 'name', ''),
-                            'arguments': getattr(function, 'arguments', '')
+                            'name': func_name,
+                            'arguments': func_args
                         }
                     })
             print(f"[DEBUG] Zhipu raw tool calls: {raw_tool_calls}")
@@ -116,8 +124,15 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
                 if not function:
                     continue
 
-                arguments = getattr(function, 'arguments', '')
-                function_name = getattr(function, 'name', '')
+                # Handle both object and dict formats
+                # zai SDK might return either depending on the response structure
+                if isinstance(function, dict):
+                    function_name = function.get('name', '')
+                    arguments = function.get('arguments', '')
+                else:
+                    # Object with attributes
+                    function_name = getattr(function, 'name', '')
+                    arguments = getattr(function, 'arguments', '')
 
                 # Parse arguments string to dict if needed
                 if isinstance(arguments, str):

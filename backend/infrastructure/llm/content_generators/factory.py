@@ -1,8 +1,8 @@
 """Content Generator Factory for Multi-LLM Support.
 
 This factory provides unified interfaces for content generation tasks across
-different LLM providers (Gemini, Anthropic, OpenAI), following the same
-architecture pattern as WebSearchToolFactory.
+different LLM providers (Gemini, Anthropic, OpenAI, Kimi, OpenRouter, Zhipu),
+following the same architecture pattern as WebSearchToolFactory.
 """
 
 from typing import Dict, Any, Optional, List
@@ -22,7 +22,7 @@ class ContentGeneratorFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', or 'kimi')
+            LLM type string ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
 
         Raises:
             ValueError: If LLM type cannot be detected
@@ -30,12 +30,14 @@ class ContentGeneratorFactory:
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        # Check specific providers FIRST (Kimi, OpenRouter) before OpenAI
+        # Check specific providers FIRST (Kimi, OpenRouter, Zhipu) before OpenAI
         # (since they use OpenAI-compatible API)
         if 'kimi' in client_type or 'kimi' in client_module:
             return 'kimi'
         elif 'openrouter' in client_type or 'openrouter' in client_module:
             return 'openrouter'
+        elif 'zhipu' in client_type or 'zhipu' in client_module:
+            return 'zhipu'
         elif 'gemini' in client_type or 'gemini' in client_module:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
@@ -62,7 +64,7 @@ class ContentGeneratorFactory:
         Get the appropriate title generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
 
         Returns:
             TitleGenerator class for the specified LLM type
@@ -87,6 +89,10 @@ class ContentGeneratorFactory:
             # OpenRouter uses Chat Completions API (similar to Kimi)
             from backend.infrastructure.llm.providers.openrouter.content_generators import TitleGenerator
             return TitleGenerator
+        elif llm_type.lower() == 'zhipu':
+            # Zhipu uses Chat Completions API via zai SDK
+            from backend.infrastructure.llm.providers.zhipu.content_generators import TitleGenerator
+            return TitleGenerator
         else:
             raise ValueError(f"Unsupported LLM type for title generation: {llm_type}")
 
@@ -96,7 +102,7 @@ class ContentGeneratorFactory:
         Get the appropriate image prompt generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', 'openrouter', or 'zhipu')
 
         Returns:
             ImagePromptGenerator class for the specified LLM type
@@ -120,6 +126,10 @@ class ContentGeneratorFactory:
         elif llm_type.lower() == 'openrouter':
             # OpenRouter uses Chat Completions API (similar to Kimi)
             from backend.infrastructure.llm.providers.openrouter.content_generators import ImagePromptGenerator
+            return ImagePromptGenerator
+        elif llm_type.lower() == 'zhipu':
+            # Zhipu uses Chat Completions API via zai SDK
+            from backend.infrastructure.llm.providers.zhipu.content_generators import ImagePromptGenerator
             return ImagePromptGenerator
         else:
             raise ValueError(f"Unsupported LLM type for image prompt generation: {llm_type}")
