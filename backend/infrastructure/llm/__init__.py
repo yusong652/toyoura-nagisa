@@ -15,6 +15,7 @@ from backend.infrastructure.llm.providers.gemini import GeminiClient
 from backend.infrastructure.llm.providers.anthropic import AnthropicClient
 from backend.infrastructure.llm.providers.openai import OpenAIClient
 from backend.infrastructure.llm.providers.kimi import KimiClient
+from backend.infrastructure.llm.providers.zhipu import ZhipuClient
 
 try:
     from backend.infrastructure.llm.providers.local import LocalLLMClient
@@ -41,5 +42,6 @@ __all__ = [
     "AnthropicClient",
     "OpenAIClient",
     "KimiClient",
+    "ZhipuClient",
     "LocalLLMClient",
 ] 
