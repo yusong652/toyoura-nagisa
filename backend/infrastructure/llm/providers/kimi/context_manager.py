@@ -62,11 +62,10 @@ class KimiContextManager(BaseContextManager):
                 # Convert to multimodal format following OpenAI's pattern
                 content_blocks = []
 
-                # Add thinking content wrapped in <thinking> tags
-                # This format is compatible with OpenAI's message formatter
+                # Add thinking content directly without tags to prevent few-shot contamination
                 content_blocks.append({
                     "type": "text",
-                    "text": f"<thinking>{reasoning_content}</thinking>"
+                    "text": reasoning_content
                 })
 
                 # Add regular content if present

@@ -155,12 +155,13 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
                 has_non_text_content = True
 
             # Handle thinking content
+            # Include thinking content directly without tags to prevent few-shot contamination
             elif block.get("type") == "thinking" and preserve_thinking:
                 thinking_text = block.get("thinking", "")
                 if thinking_text:
                     formatted_content.append({
                         "type": "text",
-                        "text": f"<thinking>{thinking_text}</thinking>"
+                        "text": thinking_text
                     })
 
             # Skip tool_use and tool_result blocks (cross-provider compatibility)
