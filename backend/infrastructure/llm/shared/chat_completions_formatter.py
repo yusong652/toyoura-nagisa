@@ -163,6 +163,8 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
                     "type": "text",
                     "text": thinking_text
                 })
+                # Mark that we have thinking content to prevent merging
+                has_non_text_content = True
 
             # Skip tool_use and tool_result blocks (cross-provider compatibility)
             # These blocks are from Anthropic/Gemini format and should be ignored
@@ -171,6 +173,7 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
                 continue
 
         # Return optimization for text-only content
+        # IMPORTANT: Don't merge if we have thinking content, to keep thinking and text separate
         if not has_non_text_content:
             text_parts = [block.get("text", "") for block in formatted_content if block.get("type") == "text"]
             combined_text = "".join(text_parts)
