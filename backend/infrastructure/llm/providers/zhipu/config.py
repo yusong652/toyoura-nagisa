@@ -105,7 +105,7 @@ def get_zhipu_client_config(**overrides) -> ZhipuClientConfig:
     except (AttributeError, KeyError):
         # Fallback to defaults if zhipu config not available
         model = "glm-4.6"
-        temperature = 0.95
+        temperature = 0.6
         max_tokens = None
         top_p = 0.7
         api_key = None
