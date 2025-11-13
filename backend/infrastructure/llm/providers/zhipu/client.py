@@ -250,11 +250,12 @@ class ZhipuClient(LLMClientBase):
 
         try:
             # Create streaming response (synchronous generator)
+            # Type: StreamResponse[ChatCompletionChunk] when stream=True
             # We need to wrap iteration in asyncio.to_thread
             stream = await asyncio.to_thread(
                 self.client.chat.completions.create,
                 **api_kwargs
-            )
+            )  # type: Any  # StreamResponse not publicly exported by zai SDK
 
             # Track tool calls being built
             current_tool_calls: Dict[int, Dict[str, Any]] = {}
