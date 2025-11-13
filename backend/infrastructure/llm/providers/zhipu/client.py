@@ -6,15 +6,13 @@ Since zai SDK is synchronous, we use asyncio.to_thread() for async compatibility
 """
 
 import json
-import time
 import asyncio
-from typing import List, Optional, Dict, Any, AsyncGenerator, Type
+from typing import List, Dict, Any, AsyncGenerator, cast
 from zai import ZhipuAiClient
+from zai.types.chat import Completion
 
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.context_manager import BaseContextManager
 
 # Import Zhipu-specific implementations
 from .config import get_zhipu_client_config
@@ -102,7 +100,7 @@ class ZhipuClient(LLMClientBase):
         context_contents: List[Dict[str, Any]],
         api_config: Dict[str, Any],
         **kwargs
-    ):
+    ) -> Completion:
         """
         Execute a stateless Zhipu API call with prepared context.
 
@@ -165,9 +163,13 @@ class ZhipuClient(LLMClientBase):
 
         try:
             # Wrap synchronous call with asyncio.to_thread
-            response = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                **api_kwargs
+            # Cast to Completion since stream=False guarantees this type
+            response = cast(
+                Completion,
+                await asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    **api_kwargs
+                )
             )
 
             if debug:
