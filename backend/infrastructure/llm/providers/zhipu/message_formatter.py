@@ -47,22 +47,38 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
         formatted_messages = []
 
         for msg in messages:
+            result: Dict[str, Any] = {"role": msg.role} # type: ignore
+
             # Handle regular messages with multimodal content
             if isinstance(msg.content, list):
+                # Extract thinking block separately (Zhipu API uses reasoning_content field)
+                thinking_text = None
+                other_blocks = []
+
+                for block in msg.content:
+                    if isinstance(block, dict) and block.get("type") == "thinking":
+                        # Extract thinking content to reasoning_content field
+                        if preserve_thinking:
+                            thinking_text = block.get("thinking", "")
+                    else:
+                        # Keep other blocks for content field
+                        other_blocks.append(block)
+
+                # Format non-thinking content
                 zhipu_content = ZhipuMessageFormatter._format_multimodal_content(
-                    msg.content, preserve_thinking
+                    other_blocks, preserve_thinking
                 )
-                formatted_messages.append({
-                    "role": msg.role, # type: ignore
-                    "content": zhipu_content
-                })
+                result["content"] = zhipu_content
+
+                # Add reasoning_content if present
+                if thinking_text is not None and preserve_thinking:
+                    result["reasoning_content"] = thinking_text
             else:
                 # Simple text content
                 text_content = str(msg.content) if msg.content else ""
-                formatted_messages.append({
-                    "role": msg.role, # type: ignore
-                    "content": text_content
-                })
+                result["content"] = text_content
+
+            formatted_messages.append(result)
 
         return formatted_messages
 
@@ -79,27 +95,43 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
             preserve_thinking: Whether to preserve thinking content
 
         Returns:
-            Dict[str, Any]: Zhipu-formatted message dictionary
+            Dict[str, Any]: Zhipu-formatted message with reasoning_content if present
         """
         if message is None:
             return {}
 
+        result: Dict[str, Any] = {"role": message.role} # type: ignore
+
         # Handle regular messages with multimodal content
         if isinstance(message.content, list):
+            # Extract thinking block separately (Zhipu API uses reasoning_content field)
+            thinking_text = None
+            other_blocks = []
+
+            for block in message.content:
+                if isinstance(block, dict) and block.get("type") == "thinking":
+                    # Extract thinking content to reasoning_content field
+                    if preserve_thinking:
+                        thinking_text = block.get("thinking", "")
+                else:
+                    # Keep other blocks for content field
+                    other_blocks.append(block)
+
+            # Format non-thinking content
             zhipu_content = ZhipuMessageFormatter._format_multimodal_content(
-                message.content, preserve_thinking
+                other_blocks, preserve_thinking
             )
-            return {
-                "role": message.role, # type: ignore
-                "content": zhipu_content
-            }
+            result["content"] = zhipu_content
+
+            # Add reasoning_content if present
+            if thinking_text is not None and preserve_thinking:
+                result["reasoning_content"] = thinking_text
         else:
             # Simple text content
             text_content = str(message.content) if message.content else ""
-            return {
-                "role": message.role, # type: ignore
-                "content": text_content
-            }
+            result["content"] = text_content
+
+        return result
 
     @staticmethod
     def _format_multimodal_content(
@@ -152,19 +184,8 @@ class ZhipuMessageFormatter(BaseMessageFormatter):
                 formatted_content.append(block)
                 has_non_text_content = True
 
-            # Handle thinking content
-            # Include thinking content directly without tags to prevent few-shot contamination
-            # GLM models regenerate reasoning_content natively on each turn
-            elif block.get("type") == "thinking" and preserve_thinking:
-                thinking_text = block.get("thinking", "")
-                # Always include thinking content, even if it's just "\n"
-                # This preserves the original API response format
-                formatted_content.append({
-                    "type": "text",
-                    "text": thinking_text
-                })
-                # Mark that we have thinking content to prevent merging
-                has_non_text_content = True
+            # Note: thinking blocks are handled at format_messages/format_single_message level
+            # and extracted to reasoning_content field, so they won't appear here
 
             # Skip tool_use and tool_result blocks (cross-provider compatibility)
             # These blocks are from Anthropic/Gemini format and should be ignored
