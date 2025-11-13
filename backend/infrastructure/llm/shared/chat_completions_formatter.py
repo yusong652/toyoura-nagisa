@@ -158,11 +158,11 @@ class ChatCompletionsMessageFormatter(BaseMessageFormatter):
             # Include thinking content directly without tags to prevent few-shot contamination
             elif block.get("type") == "thinking" and preserve_thinking:
                 thinking_text = block.get("thinking", "")
-                if thinking_text:
-                    formatted_content.append({
-                        "type": "text",
-                        "text": thinking_text
-                    })
+                # Always include thinking content, even if it's just "\n"
+                formatted_content.append({
+                    "type": "text",
+                    "text": thinking_text
+                })
 
             # Skip tool_use and tool_result blocks (cross-provider compatibility)
             # These blocks are from Anthropic/Gemini format and should be ignored
