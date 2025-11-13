@@ -37,6 +37,9 @@ def get_message_formatter_class(provider_name: str) -> Type[Any]:
     elif provider_name == "kimi":
         from backend.infrastructure.llm.providers.kimi.message_formatter import KimiMessageFormatter
         return KimiMessageFormatter
+    elif provider_name == "zhipu":
+        from backend.infrastructure.llm.providers.zhipu.message_formatter import ZhipuMessageFormatter
+        return ZhipuMessageFormatter
     elif provider_name == "openrouter":
         from backend.infrastructure.llm.providers.openrouter.message_formatter import OpenRouterMessageFormatter
         return OpenRouterMessageFormatter
@@ -69,6 +72,9 @@ def get_context_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "kimi":
         from backend.infrastructure.llm.providers.kimi.context_manager import KimiContextManager
         return KimiContextManager
+    elif provider_name == "zhipu":
+        from backend.infrastructure.llm.providers.zhipu.context_manager import ZhipuContextManager
+        return ZhipuContextManager
     elif provider_name == "openrouter":
         from backend.infrastructure.llm.providers.openrouter.context_manager import OpenRouterContextManager
         return OpenRouterContextManager
@@ -101,6 +107,9 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
     elif provider_name == "kimi":
         from backend.infrastructure.llm.providers.kimi.tool_manager import KimiToolManager
         return KimiToolManager
+    elif provider_name == "zhipu":
+        from backend.infrastructure.llm.providers.zhipu.tool_manager import ZhipuToolManager
+        return ZhipuToolManager
     elif provider_name == "openrouter":
         from backend.infrastructure.llm.providers.openrouter.tool_manager import OpenRouterToolManager
         return OpenRouterToolManager
@@ -109,7 +118,7 @@ def get_tool_manager_class(provider_name: str) -> Type[Any]:
 
 
 # Provider registry for future extensibility
-SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "kimi", "openrouter", "local"]
+SUPPORTED_PROVIDERS = ["gemini", "anthropic", "openai", "kimi", "zhipu", "openrouter", "local"]
 
 
 def is_provider_supported(provider_name: str) -> bool:
