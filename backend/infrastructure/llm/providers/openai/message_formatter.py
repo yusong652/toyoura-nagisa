@@ -158,9 +158,8 @@ class OpenAIMessageFormatter(ChatCompletionsMessageFormatter):
 
         if block_type == "thinking":
             thinking_text = block.get("thinking", "")
-            if thinking_text:
-                return {"type": "input_text", "text": f"<thinking>{thinking_text}</thinking>"}
-            return {"type": "input_text", "text": ""}
+            # Include thinking content directly without tags to prevent few-shot contamination
+            return {"type": "input_text", "text": thinking_text}
 
         if block_type == "image_url":
             image_url = block.get("image_url", {})
