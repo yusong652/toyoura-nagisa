@@ -146,8 +146,9 @@ class ZhipuClient(LLMClientBase):
             api_kwargs["tools"] = tools
             api_kwargs["tool_choice"] = "auto"
 
-        # Enable thinking mode if requested (GLM thinking models)
-        if kwargs.get('enable_thinking', False):
+        # Enable thinking mode by default (GLM thinking models)
+        # Users can disable by passing enable_thinking=False
+        if kwargs.get('enable_thinking', True):
             api_kwargs["thinking"] = {"type": "enabled"}
 
         # Apply runtime overrides
