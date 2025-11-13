@@ -187,15 +187,13 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
 
         # Extract reasoning content first (GLM Thinking models)
         reasoning_content = ZhipuResponseProcessor.extract_reasoning_content(response)
-        # Filter pure whitespace: use strip() to check, but keep original formatting
-        if reasoning_content and reasoning_content.strip():
-            content_blocks.append({"type": "thinking", "thinking": reasoning_content.strip()})
+        if reasoning_content:
+            content_blocks.append({"type": "thinking", "thinking": reasoning_content})
 
         # Extract text content
         text_content = ZhipuResponseProcessor.extract_text_content(response)
-        # Filter pure whitespace: use strip() to check, but keep original formatting
-        if text_content and text_content.strip():
-            content_blocks.append({"type": "text", "text": text_content.strip()})
+        if text_content:
+            content_blocks.append({"type": "text", "text": text_content})
 
         # Reuse pre-extracted tool calls if provided, otherwise extract now
         if tool_calls is None:
