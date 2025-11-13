@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class OpenAIConfig(BaseSettings):
     """OpenAI Configuration"""
-    openai_api_key: str = Field(description="OpenAI API Key")
+    openai_api_key: str = Field(default="", description="OpenAI API Key")
     model: str = Field(default="gpt-4o-2024-08-06", description="Model name")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
@@ -27,7 +27,7 @@ class OpenAIConfig(BaseSettings):
 
 class GeminiConfig(BaseSettings):
     """Gemini Configuration"""
-    google_api_key: str = Field(description="Google API Key")
+    google_api_key: str = Field(default="", description="Google API Key")
     model: str = Field(default="gemini-2.5-flash", description="Model name")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Nucleus sampling probability")
@@ -51,7 +51,7 @@ class GeminiConfig(BaseSettings):
 
 class AnthropicConfig(BaseSettings):
     """Anthropic Configuration"""
-    anthropic_api_key: str = Field(description="Anthropic API Key")
+    anthropic_api_key: str = Field(default="", description="Anthropic API Key")
     model: str = Field(default="claude-3-5-sonnet-20241022", description="模型名称")
     temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
     max_tokens: int = Field(default=4096, ge=1, description="最大输出token数")
@@ -70,9 +70,9 @@ class AnthropicConfig(BaseSettings):
 class KimiConfig(BaseSettings):
     """Kimi (Moonshot) Configuration"""
 
-    # API Keys - 支持直连或 OpenRouter
-    moonshot_api_key: Optional[str] = Field(default=None, description="Moonshot 官方 API 密钥")
-    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API 密钥")
+    # API Keys - 支持直连或 OpenRouter (至少需要配置一个)
+    moonshot_api_key: Optional[str] = Field(default="", description="Moonshot 官方 API 密钥")
+    openrouter_api_key: Optional[str] = Field(default="", description="OpenRouter API 密钥")
 
     # 使用哪个服务
     use_openrouter: bool = Field(default=False, description="是否使用 OpenRouter 中转")
@@ -120,9 +120,55 @@ class KimiConfig(BaseSettings):
     )
 
 
+class ZhipuConfig(BaseSettings):
+    """Zhipu (智谱) Configuration"""
+    zhipu_api_key: str = Field(default="", description="Zhipu API Key")
+    model: str = Field(default="glm-4.6", description="模型名称")
+    # Available models:
+    #   - glm-4.6: GLM-4 Plus model (推荐，支持 thinking mode)
+    #   - glm-4.5-air: GLM-4 Air model (fast and efficient)
+    #   - glm-4-flash: GLM-4 Flash model (fastest)
+    #   - glm-4-long: GLM-4 Long model (supports up to 1M tokens)
+    # Note: GLM models support thinking mode (reasoning_content field)
+    temperature: float = Field(default=0.6, ge=0.0, le=1.0, description="采样温度 (推荐，与 top_p 二选一)")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率 (与 temperature 二选一)")
+    max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
+
+
+class OpenRouterConfig(BaseSettings):
+    """OpenRouter Configuration"""
+    openrouter_api_key: str = Field(default="", description="OpenRouter API Key")
+    model: str = Field(default="anthropic/claude-3.5-sonnet", description="模型名称")
+    # Popular models on OpenRouter:
+    #   - anthropic/claude-3.5-sonnet: Claude 3.5 Sonnet
+    #   - openai/gpt-4-turbo: GPT-4 Turbo
+    #   - google/gemini-pro: Gemini Pro
+    #   - moonshotai/kimi-k2-thinking: Kimi K2 Thinking
+    temperature: float = Field(default=1.0, ge=0.0, le=2.0, description="采样温度")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="核采样概率")
+    max_tokens: Optional[int] = Field(default=None, ge=1, description="最大输出token数")
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        env_prefix='',
+        extra='ignore'
+    )
+
+
 class LLMSettings(BaseSettings):
     """LLM Configuration"""
-    type: Literal["gpt", "gemini", "anthropic", "kimi"] = Field(default="gemini", description="LLM type (gpt, gemini, anthropic, kimi)")
+    type: Literal["gpt", "gemini", "anthropic", "kimi", "zhipu", "openrouter"] = Field(
+        default="gemini",
+        description="LLM type (gpt, gemini, anthropic, kimi, zhipu, openrouter)"
+    )
     debug: bool = Field(default=False, description="Enable debug mode")
     recent_messages_length: int = Field(default=20, ge=1, le=100, description="Number of recent messages to use for context")
     max_tool_iterations: int = Field(default=10, ge=1, le=50, description="Maximum number of tool calling iterations per request")
@@ -133,7 +179,7 @@ class LLMSettings(BaseSettings):
         env_prefix='LLM__',
         extra='ignore'
     )
-    
+
     def get_openai_config(self) -> OpenAIConfig:
         """Retrieve OpenAI configuration"""
         return OpenAIConfig()
@@ -150,6 +196,14 @@ class LLMSettings(BaseSettings):
         """Retrieve Kimi configuration"""
         return KimiConfig()
 
+    def get_zhipu_config(self) -> ZhipuConfig:
+        """Retrieve Zhipu configuration"""
+        return ZhipuConfig()
+
+    def get_openrouter_config(self) -> OpenRouterConfig:
+        """Retrieve OpenRouter configuration"""
+        return OpenRouterConfig()
+
     def get_current_llm_config(self):
         """Retrieve current LLM configuration based on type"""
         if self.type == "gpt":
@@ -160,6 +214,10 @@ class LLMSettings(BaseSettings):
             return self.get_anthropic_config()
         elif self.type == "kimi":
             return self.get_kimi_config()
+        elif self.type == "zhipu":
+            return self.get_zhipu_config()
+        elif self.type == "openrouter":
+            return self.get_openrouter_config()
         else:
             raise ValueError(f"Unsupported llm provider: {self.type}")
     

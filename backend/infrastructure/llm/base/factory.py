@@ -39,6 +39,7 @@ class LLMFactory:
         from backend.infrastructure.llm.providers.anthropic import AnthropicClient
         from backend.infrastructure.llm.providers.openai import OpenAIClient
         from backend.infrastructure.llm.providers.kimi import KimiClient
+        from backend.infrastructure.llm.providers.zhipu import ZhipuClient
         from backend.infrastructure.llm.providers.openrouter import OpenRouterClient
         from backend.infrastructure.llm.providers.local.local_llm_client import LocalLLMClient
 
@@ -47,6 +48,7 @@ class LLMFactory:
         self.register_client("gpt", OpenAIClient)
         self.register_client("openai", OpenAIClient)  # Alias for GPT
         self.register_client("kimi", KimiClient)
+        self.register_client("zhipu", ZhipuClient)
         self.register_client("openrouter", OpenRouterClient)
         self.register_client("local_llm", LocalLLMClient)
     
@@ -223,6 +225,22 @@ class LLMFactory:
                 "temperature": kimi_config.temperature,
                 "top_p": kimi_config.top_p,
                 "max_tokens": kimi_config.max_tokens,
+                "debug": llm_settings.debug,
+            })
+        elif name == "zhipu":
+            zhipu_config = llm_settings.get_zhipu_config()
+
+            # Get Zhipu API key
+            api_key = zhipu_config.zhipu_api_key
+            if not api_key:
+                raise ValueError("Zhipu API key (ZHIPU_API_KEY) 未配置")
+
+            client_config["api_key"] = api_key
+            client_config["extra_config"].update({
+                "model": zhipu_config.model,
+                "temperature": zhipu_config.temperature,
+                "top_p": zhipu_config.top_p,
+                "max_tokens": zhipu_config.max_tokens,
                 "debug": llm_settings.debug,
             })
         elif name == "openrouter":

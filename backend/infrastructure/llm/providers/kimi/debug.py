@@ -26,96 +26,86 @@ class KimiDebugger:
             tools: Tool schemas
         """
         print(f"\n{'='*80}")
-        print(f"[KIMI DEBUG] API Request Payload")
+        print(f"[KIMI DEBUG] API Request")
         print(f"{'='*80}")
 
-        # Print API configuration
-        print(f"[KIMI] Model: {api_kwargs.get('model')}")
-        print(f"[KIMI] Temperature: {api_kwargs.get('temperature')}")
-        print(f"[KIMI] Max tokens: {api_kwargs.get('max_tokens', 'N/A')}")
-        print(f"[KIMI] Top P: {api_kwargs.get('top_p', 'N/A')}")
-        print(f"[KIMI] Stream: {api_kwargs.get('stream', False)}")
-        print(f"[KIMI] Messages count: {len(messages)}")
-        print(f"[KIMI] Tools count: {len(tools)}")
+        # Basic parameters
+        print(f"\nModel: {api_kwargs.get('model', 'N/A')}")
+        print(f"Temperature: {api_kwargs.get('temperature', 'N/A')}")
+        print(f"Max Tokens: {api_kwargs.get('max_tokens', 'N/A')}")
+        print(f"Top P: {api_kwargs.get('top_p', 'N/A')}")
+        print(f"Stream: {api_kwargs.get('stream', False)}")
 
-        # Print tool schemas with full details
-        if tools:
-            print(f"\n[KIMI] Tool Schemas:")
-            for i, tool in enumerate(tools):
-                function = tool.get('function', {})
-                print(f"[KIMI]   Tool {i+1}: {function.get('name', 'unknown')}")
-                print(f"[KIMI]     Description: {function.get('description', 'N/A')[:80]}")
+        # Tool choice
+        tool_choice = api_kwargs.get('tool_choice')
+        if tool_choice:
+            print(f"Tool Choice: {tool_choice}")
 
-                params = function.get('parameters', {})
-                required = params.get('required', [])
-                properties = params.get('properties', {})
+        # API Request (with simplified system prompt and tool schemas)
+        print(f"\n{'='*80}")
+        print("--- API Request (Original Format, Simplified Verbose Fields) ---")
+        print(f"{'='*80}")
 
-                print(f"[KIMI]     Required params: {required if required else 'none'}")
-                print(f"[KIMI]     Total params: {list(properties.keys())}")
+        # Create a copy of api_kwargs with simplified verbose fields
+        simplified_request = api_kwargs.copy()
 
-                # Print full schema for tools with no parameters
-                if not properties or not required:
-                    print(f"[KIMI]     Full schema: {json.dumps(params, indent=10)}")
+        # Simplify messages (only truncate system prompt, keep others full)
+        if 'messages' in simplified_request:
+            simplified_messages = []
+            for msg in simplified_request['messages']:
+                msg_copy = msg.copy()
+                role = msg_copy.get('role', '')
+                content = msg_copy.get('content', '')
 
-        # Print all messages with full content
-        print(f"\n[KIMI] All Messages (total: {len(messages)}):")
-        for i, msg in enumerate(messages):
-            role = msg.get('role', 'unknown')
-            content = msg.get('content', '')
+                # Only simplify system prompt
+                if role == 'system' and isinstance(content, str) and len(content) > 150:
+                    msg_copy['content'] = content[:150] + f"... (truncated, {len(content)} chars total)"
 
-            print(f"\n[KIMI]   Message {i+1} [{role}]:")
+                simplified_messages.append(msg_copy)
+            simplified_request['messages'] = simplified_messages
 
-            # Print content based on type
-            if isinstance(content, str):
-                print(f"[KIMI]     Content (string): {content}")
-            elif isinstance(content, list):
-                print(f"[KIMI]     Content (multimodal): {len(content)} blocks")
-                for j, block in enumerate(content):
-                    if isinstance(block, dict):
-                        block_type = block.get('type', 'unknown')
-                        print(f"[KIMI]       Block {j+1} [{block_type}]:")
-                        if block_type == 'text':
-                            print(f"[KIMI]         Text: {block.get('text', '')}")
-                        elif block_type == 'image_url':
-                            url = block.get('image_url', {}).get('url', '')
-                            url_preview = url[:80] + '...' if len(url) > 80 else url
-                            print(f"[KIMI]         URL: {url_preview}")
-                        else:
-                            print(f"[KIMI]         Data: {json.dumps(block, indent=12)}")
-                    else:
-                        print(f"[KIMI]       Block {j+1}: {str(block)[:100]}")
-            else:
-                print(f"[KIMI]     Content (other): {str(content)[:200]}")
+        # Simplify tools (keep structure but remove verbose descriptions/parameters)
+        if 'tools' in simplified_request:
+            simplified_tools = []
+            for tool in simplified_request['tools']:
+                tool_copy = {}
+                tool_type = tool.get('type', 'function')
+                tool_copy['type'] = tool_type
 
-            # Print tool calls if present
-            if 'tool_calls' in msg:
-                tool_calls = msg['tool_calls']
-                print(f"[KIMI]     Tool calls: {len(tool_calls)}")
-                for j, tc in enumerate(tool_calls):
-                    function = tc.get('function', {})
-                    print(f"[KIMI]       Call {j+1}:")
-                    print(f"[KIMI]         ID: {tc.get('id', 'N/A')}")
-                    print(f"[KIMI]         Function: {function.get('name', 'unknown')}")
+                if tool_type == 'builtin_function':
+                    # Kimi's builtin functions (like $web_search)
+                    tool_copy['function'] = tool.get('function', {})
+                elif 'function' in tool:
+                    func = tool['function']
+                    tool_copy['function'] = {
+                        'name': func.get('name', 'unknown')
+                    }
 
-                    args = function.get('arguments', '')
-                    if isinstance(args, str):
-                        try:
-                            parsed = json.loads(args) if args else {}
-                            print(f"[KIMI]         Arguments: {json.dumps(parsed, indent=14)}")
-                        except json.JSONDecodeError:
-                            print(f"[KIMI]         Arguments (raw): {args}")
-                    else:
-                        print(f"[KIMI]         Arguments: {json.dumps(args, indent=14)}")
+                    # Add description if short
+                    desc = func.get('description', '')
+                    if desc and len(desc) <= 100:
+                        tool_copy['function']['description'] = desc
+                    elif desc:
+                        tool_copy['function']['description'] = desc[:100] + "... (truncated)"
 
-            # Print tool_call_id if present (for tool response messages)
-            if 'tool_call_id' in msg:
-                print(f"[KIMI]     Tool call ID: {msg.get('tool_call_id')}")
+                    # Simplify parameters
+                    if 'parameters' in func:
+                        params = func['parameters']
+                        if isinstance(params, dict):
+                            props = params.get('properties', {})
+                            required = params.get('required', [])
+                            tool_copy['function']['parameters'] = {
+                                'type': params.get('type', 'object'),
+                                'properties': f"<{len(props)} properties>",
+                                'required': required
+                            }
 
-            # Print name if present
-            if 'name' in msg:
-                print(f"[KIMI]     Name: {msg.get('name')}")
+                simplified_tools.append(tool_copy)
+            simplified_request['tools'] = simplified_tools
 
-        print(f"\n{'='*80}\n")
+        print(json.dumps(simplified_request, indent=2, ensure_ascii=False, default=str))
+
+        print(f"{'='*80}\n")
 
     @staticmethod
     def print_tool_call_received(tool_calls: List[Dict[str, Any]]):

@@ -15,7 +15,7 @@ class WebSearchToolFactory:
         Get the appropriate web search generator based on LLM type.
 
         Args:
-            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', or 'kimi')
+            llm_type: Type of LLM client ('gemini', 'anthropic', 'openai', 'kimi', or 'zhipu')
 
         Returns:
             WebSearchGenerator class for the specified LLM type
@@ -31,6 +31,9 @@ class WebSearchToolFactory:
             return WebSearchGenerator
         elif llm_type.lower() == 'kimi':
             from backend.infrastructure.llm.providers.kimi.content_generators import KimiWebSearchGenerator as WebSearchGenerator
+            return WebSearchGenerator
+        elif llm_type.lower() == 'zhipu':
+            from backend.infrastructure.llm.providers.zhipu.content_generators import WebSearchGenerator
             return WebSearchGenerator
         else:
             raise ValueError(f"Unsupported LLM type: {llm_type}")
@@ -76,6 +79,9 @@ class WebSearchToolFactory:
                     max_uses = 5
                 elif llm_type.lower() == 'kimi':
                     # Kimi uses built-in $web_search tool, max_uses not applicable
+                    max_uses = 1
+                elif llm_type.lower() == 'zhipu':
+                    # Zhipu uses built-in web_search tool, max_uses not applicable
                     max_uses = 1
                 else:
                     max_uses = 5
@@ -137,6 +143,18 @@ class WebSearchToolFactory:
                 if asyncio.iscoroutine(result):
                     return await result
                 return result
+            elif llm_type.lower() == 'zhipu':
+                # Zhipu web search is async (uses asyncio.to_thread internally)
+                result = WebSearchGenerator.perform_web_search(
+                    client=cast(Any, client),  # Type cast for Zhipu client
+                    query=query,
+                    debug=debug,
+                    max_uses=max_uses  # Accepted for compatibility
+                )
+                # Handle async result
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
             else:
                 return {
                     "error": f"Unsupported LLM type: {llm_type}",
@@ -159,17 +177,19 @@ class WebSearchToolFactory:
             llm_client: The LLM client instance
 
         Returns:
-            LLM type string ('gemini', 'anthropic', 'openai', or 'kimi')
+            LLM type string ('gemini', 'anthropic', 'openai', 'kimi', or 'zhipu')
         """
         client_type = type(llm_client).__name__.lower()
         client_module = type(llm_client).__module__.lower()
 
-        # Check specific providers FIRST (Kimi, OpenRouter) before OpenAI
+        # Check specific providers FIRST (Kimi, OpenRouter, Zhipu) before OpenAI
         # (since they use OpenAI-compatible API)
         if 'kimi' in client_type or 'kimi' in client_module:
             return 'kimi'
         elif 'openrouter' in client_type or 'openrouter' in client_module:
             return 'openrouter'
+        elif 'zhipu' in client_type or 'zhipu' in client_module:
+            return 'zhipu'
         elif 'gemini' in client_type or 'gemini' in client_module:
             return 'gemini'
         elif 'anthropic' in client_type or 'anthropic' in client_module:
