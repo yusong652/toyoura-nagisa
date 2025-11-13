@@ -8,7 +8,6 @@ Handles ChatCompletion responses (unlike OpenAI's Responses API).
 from typing import Any, Dict
 from openai.types.chat import ChatCompletion
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 from .message_formatter import KimiMessageFormatter
 
 
@@ -26,67 +25,55 @@ class KimiContextManager(BaseContextManager):
 
     def add_response(self, response) -> None:
         """
-        Add Kimi API response to context.
-
-        Handles two types of responses:
-        1. ChatCompletion response (during tool calls)
-        2. BaseMessage response (final response storage)
+        Add Kimi ChatCompletion API response to context.
 
         Args:
-            response: ChatCompletion object or BaseMessage
+            response: ChatCompletion object from Kimi API
         """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            formatted_response = KimiMessageFormatter.format_single_message(response)
-            # format_single_message may return a list for tool_result blocks
-            if isinstance(formatted_response, list):
-                self.working_contents.extend(formatted_response)
-            else:
-                self.working_contents.append(formatted_response)
+        if not isinstance(response, ChatCompletion):
+            return
 
-        elif isinstance(response, ChatCompletion):
-            # Handle ChatCompletion response
-            if not response.choices:
-                return
+        if not response.choices:
+            return
 
-            choice = response.choices[0]
-            message = choice.message
+        choice = response.choices[0]
+        message = choice.message
 
-            # Extract reasoning content (K2 Thinking models)
-            reasoning_content = getattr(message, 'reasoning_content', None)
+        # Extract reasoning content (K2 Thinking models)
+        reasoning_content = getattr(message, 'reasoning_content', None)
 
-            # Build message dict in Chat Completions format
-            message_dict: Dict[str, Any] = {
-                "role": message.role
-            }
+        # Build message dict in Chat Completions format
+        message_dict: Dict[str, Any] = {
+            "role": message.role
+        }
 
-            # Add reasoning_content as separate field if present (Kimi k2-thinking format)
-            if reasoning_content and reasoning_content.strip():
-                message_dict["reasoning_content"] = reasoning_content
+        # Add reasoning_content as separate field if present (Kimi k2-thinking format)
+        if reasoning_content and reasoning_content.strip():
+            message_dict["reasoning_content"] = reasoning_content
 
-            # Add tool calls if present
-            has_tool_calls = bool(message.tool_calls)
-            if has_tool_calls:
-                # Convert tool calls to dict format
-                tool_calls_list = []
-                for tool_call in message.tool_calls:
-                    # tool_call is ChatCompletionMessageToolCall with id, type, function
-                    function_info = tool_call.function  # type: ignore
-                    tool_calls_list.append({
-                        "id": tool_call.id,
-                        "type": tool_call.type,
-                        "function": {
-                            "name": function_info.name,  # type: ignore
-                            "arguments": function_info.arguments  # type: ignore
-                        }
-                    })
-                message_dict["tool_calls"] = tool_calls_list
+        # Add tool calls if present
+        has_tool_calls = bool(message.tool_calls)
+        if has_tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                # tool_call is ChatCompletionMessageToolCall with id, type, function
+                function_info = tool_call.function  # type: ignore
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_info.name,  # type: ignore
+                        "arguments": function_info.arguments  # type: ignore
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
 
-            # Add content field - omit if empty and tool_calls present
-            if message.content or not has_tool_calls:
-                message_dict["content"] = message.content
+        # Add content field - omit if empty and tool_calls present
+        if message.content or not has_tool_calls:
+            message_dict["content"] = message.content
 
-            self.working_contents.append(message_dict)
+        self.working_contents.append(message_dict)
 
     async def add_tool_result(
         self,

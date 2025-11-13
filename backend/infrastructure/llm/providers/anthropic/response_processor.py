@@ -231,7 +231,12 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
                 content_list.append({"type": "text", "text": item.text})
                 text_content += item.text
             elif item.type == "thinking":
-                content_list.append({"type": "thinking", "thinking": item.thinking})
+                # Preserve signature field (required by Anthropic API)
+                content_list.append({
+                    "type": "thinking",
+                    "thinking": item.thinking,
+                    "signature": item.signature
+                })
             elif item.type == "tool_use":
                 # Reuse pre-extracted tool call if available (to preserve IDs)
                 if item.name in tool_calls_map:

@@ -8,7 +8,6 @@ Handles ChatCompletion responses (using OpenAI Chat Completions API format).
 from typing import Any, Dict
 from openai.types.chat import ChatCompletion
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 from .message_formatter import OpenRouterMessageFormatter
 
 
@@ -27,50 +26,42 @@ class OpenRouterContextManager(BaseContextManager):
         """
         Add OpenRouter API response to context.
 
-        Handles two types of responses:
-        1. ChatCompletion response (during tool calls)
-        2. BaseMessage response (final response storage)
-
         Args:
-            response: ChatCompletion object or BaseMessage
+            response: ChatCompletion object from OpenRouter API
         """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            formatted_response = OpenRouterMessageFormatter.format_single_message(response)
-            self.working_contents.append(formatted_response)
+        if not isinstance(response, ChatCompletion):
+            return
 
-        elif isinstance(response, ChatCompletion):
-            # Handle ChatCompletion response
-            if not response.choices:
-                return
+        if not response.choices:
+            return
 
-            choice = response.choices[0]
-            message = choice.message
+        choice = response.choices[0]
+        message = choice.message
 
-            # Build message dict in Chat Completions format
-            message_dict: Dict[str, Any] = {
-                "role": message.role,
-                "content": message.content
-            }
+        # Build message dict in Chat Completions format
+        message_dict: Dict[str, Any] = {
+            "role": message.role,
+            "content": message.content
+        }
 
-            # Add tool calls if present
-            if message.tool_calls:
-                # Convert tool calls to dict format
-                tool_calls_list = []
-                for tool_call in message.tool_calls:
-                    # tool_call is ChatCompletionMessageToolCall with id, type, function
-                    function_info = tool_call.function  # type: ignore
-                    tool_calls_list.append({
-                        "id": tool_call.id,
-                        "type": tool_call.type,
-                        "function": {
-                            "name": function_info.name,  # type: ignore
-                            "arguments": function_info.arguments  # type: ignore
-                        }
-                    })
-                message_dict["tool_calls"] = tool_calls_list
+        # Add tool calls if present
+        if message.tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                # tool_call is ChatCompletionMessageToolCall with id, type, function
+                function_info = tool_call.function  # type: ignore
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_info.name,  # type: ignore
+                        "arguments": function_info.arguments  # type: ignore
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
 
-            self.working_contents.append(message_dict)
+        self.working_contents.append(message_dict)
 
     async def add_tool_result(
         self,

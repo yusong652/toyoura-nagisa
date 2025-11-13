@@ -7,7 +7,6 @@ Handles ChatCompletion responses from zai SDK.
 
 from typing import Any, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 from .message_formatter import ZhipuMessageFormatter
 
 
@@ -27,72 +26,60 @@ class ZhipuContextManager(BaseContextManager):
         """
         Add Zhipu API response to context.
 
-        Handles two types of responses:
-        1. ChatCompletion-like response (during tool calls)
-        2. BaseMessage response (final response storage)
-
         Args:
-            response: ChatCompletion-like object or BaseMessage
+            response: ChatCompletion-like object from zai SDK
         """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            formatted_response = ZhipuMessageFormatter.format_single_message(response)
-            # format_single_message may return a list for tool_result blocks
-            if isinstance(formatted_response, list):
-                self.working_contents.extend(formatted_response)
-            else:
-                self.working_contents.append(formatted_response)
+        if not hasattr(response, 'choices') or not response.choices:
+            return
 
-        elif hasattr(response, 'choices') and response.choices:
-            # Handle ChatCompletion-like response from zai SDK
-            choice = response.choices[0]
-            message = choice.message
+        choice = response.choices[0]
+        message = choice.message
 
-            # Extract reasoning content (GLM thinking models)
-            reasoning_content = getattr(message, 'reasoning_content', None)
+        # Extract reasoning content (GLM thinking models)
+        reasoning_content = getattr(message, 'reasoning_content', None)
 
-            # Build message dict
-            message_dict: Dict[str, Any] = {
-                "role": message.role
-            }
+        # Build message dict
+        message_dict: Dict[str, Any] = {
+            "role": message.role
+        }
 
-            # Add reasoning_content as separate field if present (Zhipu API format)
-            if reasoning_content and reasoning_content.strip():
-                message_dict["reasoning_content"] = reasoning_content
+        # Add reasoning_content as separate field if present (Zhipu API format)
+        if reasoning_content and reasoning_content.strip():
+            message_dict["reasoning_content"] = reasoning_content
 
-            # Add tool calls if present
-            has_tool_calls = hasattr(message, 'tool_calls') and bool(message.tool_calls)
-            if has_tool_calls:
-                # Convert tool calls to dict format
-                tool_calls_list = []
-                for tool_call in message.tool_calls:
-                    function_info = tool_call.function
+        # Add tool calls if present
+        has_tool_calls = hasattr(message, 'tool_calls') and bool(message.tool_calls)
+        if has_tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                function_info = tool_call.function
 
-                    # Handle both object and dict formats
-                    # zai SDK might return either depending on the response structure
-                    if isinstance(function_info, dict):
-                        function_name = function_info.get('name', '')
-                        function_arguments = function_info.get('arguments', '')
-                    else:
-                        # Object with attributes
-                        function_name = getattr(function_info, 'name', '')
-                        function_arguments = getattr(function_info, 'arguments', '')
+                # Handle both object and dict formats
+                # zai SDK might return either depending on the response structure
+                if isinstance(function_info, dict):
+                    function_name = function_info.get('name', '')
+                    function_arguments = function_info.get('arguments', '')
+                else:
+                    # Object with attributes
+                    function_name = getattr(function_info, 'name', '')
+                    function_arguments = getattr(function_info, 'arguments', '')
 
-                    tool_calls_list.append({
-                        "id": tool_call.id,
-                        "type": tool_call.type,
-                        "function": {
-                            "name": function_name,
-                            "arguments": function_arguments
-                        }
-                    })
-                message_dict["tool_calls"] = tool_calls_list
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_name,
+                        "arguments": function_arguments
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
 
-            # Add content field - omit if empty and tool_calls present
-            if message.content or not has_tool_calls:
-                message_dict["content"] = message.content
+        # Add content field - omit if empty and tool_calls present
+        if message.content or not has_tool_calls:
+            message_dict["content"] = message.content
 
-            self.working_contents.append(message_dict)
+        self.working_contents.append(message_dict)
 
     async def add_tool_result(
         self,

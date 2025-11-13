@@ -12,7 +12,6 @@ Core design principles:
 
 from typing import Any, Optional, Dict
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 from .message_formatter import GeminiMessageFormatter
 
 
@@ -39,31 +38,17 @@ class GeminiContextManager(BaseContextManager):
     def add_response(self, response) -> None:
         """
         Add Gemini API response to working context
-        
-        Handles two types of responses:
-        1. Original Gemini API response object (during tool calls)
-        2. BaseMessage response (final response storage)
-        
-        Args:
-            response: Original Gemini API response object or BaseMessage
-        """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            # Format and add to working context
-            from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
-            formatter_class = get_message_formatter_class(self._provider_name)
-            formatted_response = formatter_class.format_single_message(response)
 
-            self.working_contents.append(formatted_response)
-        else:
-            # Handle original Gemini API response
-            try:
-                candidate = response.candidates[0]
-            except (AttributeError, IndexError):
-                raise ValueError("Invalid Gemini API response format")
-            raw_content = candidate.content
-            # Add to working context
-            self.working_contents.append(raw_content)
+        Args:
+            response: Original Gemini API response object
+        """
+        try:
+            candidate = response.candidates[0]
+        except (AttributeError, IndexError):
+            raise ValueError("Invalid Gemini API response format")
+        raw_content = candidate.content
+        # Add to working context
+        self.working_contents.append(raw_content)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """

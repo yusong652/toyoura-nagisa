@@ -199,11 +199,15 @@ class MessageFormatter(BaseMessageFormatter):
                         })
                     # Handle thinking type (from assistant history)
                     elif item.get("type") == "thinking":
-                        thinking_block = {"type": "thinking", "thinking": item.get("thinking", "")}
-                        # Only include signature if present
+                        # Only include thinking blocks with signature (from Anthropic)
+                        # Skip thinking blocks without signature (from other providers)
                         if "signature" in item and item["signature"]:
-                            thinking_block["signature"] = item["signature"]
-                        content.append(thinking_block)
+                            thinking_block = {
+                                "type": "thinking",
+                                "thinking": item.get("thinking", ""),
+                                "signature": item["signature"]
+                            }
+                            content.append(thinking_block)
                     elif "text" in item and item["text"]:
                         content.append({
                             "type": "text",

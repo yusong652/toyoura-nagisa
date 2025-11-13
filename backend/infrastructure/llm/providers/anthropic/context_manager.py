@@ -7,7 +7,6 @@ Adopts the same dual-track design as Gemini: maintain original API format for wo
 
 from typing import Any, Optional, Dict, List
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 
 
 class AnthropicContextManager(BaseContextManager):
@@ -26,32 +25,18 @@ class AnthropicContextManager(BaseContextManager):
     def add_response(self, response) -> None:
         """
         Add Anthropic API response to context
-        
-        Handles two types of responses:
-        1. Original Anthropic API response object (during tool calls)
-        2. BaseMessage response (final response storage)
-        
+
         Args:
-            response: Anthropic API response object or BaseMessage
+            response: Anthropic API response object
         """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            # Format and add to working context
-            from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
-            formatter_class = get_message_formatter_class(self._provider_name)
-            formatted_response = formatter_class.format_single_message(response)
+        if not hasattr(response, 'content') or not response.content:
+            raise ValueError("Invalid Anthropic API response format")
 
-            self.working_contents.append(formatted_response)
-        else:
-            # Handle original Anthropic API response
-            if not hasattr(response, 'content') or not response.content:
-                raise ValueError("Invalid Anthropic API response format")
-
-            filtered_message = {
-                "role": response.role,
-                "content": response.content
-            }
-            self.working_contents.append(filtered_message)
+        filtered_message = {
+            "role": response.role,
+            "content": response.content
+        }
+        self.working_contents.append(filtered_message)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """
