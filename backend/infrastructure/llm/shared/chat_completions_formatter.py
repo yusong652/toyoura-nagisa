@@ -1,15 +1,17 @@
 """
 Chat Completions Message Formatter
 
-Handles conversion of internal message formats to OpenAI Chat Completions API format.
-This formatter is used by providers that implement the standard OpenAI Chat Completions API,
-including Kimi (Moonshot), OpenAI, and other compatible providers.
+Handles conversion of internal message formats to standard OpenAI Chat Completions API format.
+This formatter is used by providers that implement the standard Chat Completions API,
+including OpenAI and OpenRouter.
 
 The Chat Completions API format differs from OpenAI's Responses API:
 - Chat Completions: Standard role/content/tool_calls format
 - Responses API: Uses types like "message", "reasoning", "function_call", etc.
 
 Supports multimodal content, tool calls, and message history processing.
+
+Note: Kimi uses a separate formatter (kimi/message_formatter.py) that supports reasoning_content.
 """
 
 import json
@@ -20,15 +22,18 @@ from backend.infrastructure.llm.base.message_formatter import BaseMessageFormatt
 
 class ChatCompletionsMessageFormatter(BaseMessageFormatter):
     """
-    Format messages for OpenAI Chat Completions API consumption
+    Format messages for standard Chat Completions API consumption
 
     Converts internal message objects to Chat Completions API format while preserving
     all content types including text, images, tool calls, and tool results.
 
     This formatter is suitable for:
     - OpenAI Chat Completions API
-    - Kimi (Moonshot) API
-    - Other OpenAI-compatible APIs using Chat Completions format
+    - OpenRouter API
+    - Other standard OpenAI-compatible APIs
+
+    Note: This formatter does NOT support reasoning_content field.
+    Kimi uses KimiMessageFormatter which supports reasoning_content for k2-thinking models.
     """
 
     @staticmethod

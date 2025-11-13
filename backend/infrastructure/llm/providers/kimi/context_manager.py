@@ -38,7 +38,11 @@ class KimiContextManager(BaseContextManager):
         if isinstance(response, BaseMessage):
             # Handle final BaseMessage response
             formatted_response = KimiMessageFormatter.format_single_message(response)
-            self.working_contents.append(formatted_response)
+            # format_single_message may return a list for tool_result blocks
+            if isinstance(formatted_response, list):
+                self.working_contents.extend(formatted_response)
+            else:
+                self.working_contents.append(formatted_response)
 
         elif isinstance(response, ChatCompletion):
             # Handle ChatCompletion response
@@ -51,40 +55,18 @@ class KimiContextManager(BaseContextManager):
             # Extract reasoning content (K2 Thinking models)
             reasoning_content = getattr(message, 'reasoning_content', None)
 
-            # Build content - handle reasoning_content for proper context preservation
-            # Important: For multi-turn tool calling, we must preserve thinking in context
-            # so the model can maintain its reasoning chain across turns
-            content_value: Any = message.content
-
-            # If reasoning_content exists, format as multimodal content array
-            # This ensures thinking is preserved in conversation history
-            if reasoning_content:
-                # Convert to multimodal format following OpenAI's pattern
-                content_blocks = []
-
-                # Add thinking content directly without tags to prevent few-shot contamination
-                content_blocks.append({
-                    "type": "text",
-                    "text": reasoning_content
-                })
-
-                # Add regular content if present
-                if message.content:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": message.content
-                    })
-
-                content_value = content_blocks
-
             # Build message dict in Chat Completions format
             message_dict: Dict[str, Any] = {
-                "role": message.role,
-                "content": content_value
+                "role": message.role
             }
 
+            # Add reasoning_content as separate field if present (Kimi k2-thinking format)
+            if reasoning_content and reasoning_content.strip():
+                message_dict["reasoning_content"] = reasoning_content
+
             # Add tool calls if present
-            if message.tool_calls:
+            has_tool_calls = bool(message.tool_calls)
+            if has_tool_calls:
                 # Convert tool calls to dict format
                 tool_calls_list = []
                 for tool_call in message.tool_calls:
@@ -99,6 +81,10 @@ class KimiContextManager(BaseContextManager):
                         }
                     })
                 message_dict["tool_calls"] = tool_calls_list
+
+            # Add content field - omit if empty and tool_calls present
+            if message.content or not has_tool_calls:
+                message_dict["content"] = message.content
 
             self.working_contents.append(message_dict)
 

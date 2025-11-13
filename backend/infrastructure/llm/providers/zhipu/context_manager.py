@@ -53,8 +53,7 @@ class ZhipuContextManager(BaseContextManager):
 
             # Build message dict
             message_dict: Dict[str, Any] = {
-                "role": message.role,
-                "content": message.content
+                "role": message.role
             }
 
             # Add reasoning_content as separate field if present (Zhipu API format)
@@ -62,7 +61,8 @@ class ZhipuContextManager(BaseContextManager):
                 message_dict["reasoning_content"] = reasoning_content
 
             # Add tool calls if present
-            if hasattr(message, 'tool_calls') and message.tool_calls:
+            has_tool_calls = hasattr(message, 'tool_calls') and bool(message.tool_calls)
+            if has_tool_calls:
                 # Convert tool calls to dict format
                 tool_calls_list = []
                 for tool_call in message.tool_calls:
@@ -87,6 +87,10 @@ class ZhipuContextManager(BaseContextManager):
                         }
                     })
                 message_dict["tool_calls"] = tool_calls_list
+
+            # Add content field - omit if empty and tool_calls present
+            if message.content or not has_tool_calls:
+                message_dict["content"] = message.content
 
             self.working_contents.append(message_dict)
 
