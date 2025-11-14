@@ -53,7 +53,7 @@ class KimiContextManager(BaseContextManager):
 
         # Add tool calls if present
         has_tool_calls = bool(message.tool_calls)
-        if has_tool_calls:
+        if has_tool_calls and message.tool_calls:
             # Convert tool calls to dict format
             tool_calls_list = []
             for tool_call in message.tool_calls:
