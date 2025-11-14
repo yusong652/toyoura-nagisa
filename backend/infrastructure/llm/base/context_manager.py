@@ -351,16 +351,48 @@ class BaseContextManager(ABC):
     def add_response(self, response: Any) -> None:
         """
         Add LLM response to context.
-        
+
         Provider-specific implementations must handle both:
         1. Raw provider API responses (during tool calling)
         2. Final BaseMessage responses (for storage)
-        
+
         Args:
             response: Provider-specific response object or BaseMessage
         """
         pass
-    
+
+    async def _inject_reminders_to_result(self, result: Any) -> None:
+        """
+        Inject system reminders into tool result content.
+
+        This is a common implementation used by all providers. It modifies
+        result['llm_content']['parts'] in-place to append reminders to the
+        last text part. Should be called when inject_reminders=True in add_tool_result.
+
+        The method assumes the standard ToolResult format with:
+        - result['llm_content']['parts'] as a list of parts
+        - Each part having {'type': 'text', 'text': '...'} structure
+
+        Args:
+            result: Tool result dict containing llm_content with parts format
+        """
+        reminders = await self._status_monitor.get_all_reminders(check_queue=True)
+
+        if reminders:
+            reminder_text = "\n\n" + "\n\n".join(reminders)
+
+            if isinstance(result, dict) and 'llm_content' in result:
+                llm_content = result.get('llm_content')
+
+                if isinstance(llm_content, dict) and 'parts' in llm_content:
+                    parts = llm_content.get('parts')
+                    if isinstance(parts, list) and parts:
+                        # Find last text part and append reminder
+                        for part in reversed(parts):
+                            if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                                part['text'] += reminder_text
+                                break
+
     @abstractmethod
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
         """

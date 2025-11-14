@@ -51,26 +51,7 @@ class OpenAIContextManager(BaseContextManager):
         """
         # Inject system reminders to result content if needed (async)
         if inject_reminders:
-            reminders = await self._status_monitor.get_all_reminders(check_queue=True)
-
-            if reminders:
-                # StatusMonitor now returns complete system-reminder blocks
-                # Just join them with newlines
-                reminder_text = "\n\n" + "\n\n".join(reminders)
-
-                # Modify result llm_content to inject reminders
-                if isinstance(result, dict) and 'llm_content' in result:
-                    llm_content = result.get('llm_content')
-
-                    # Tool results use parts format: {"parts": [{"type": "text", "text": "..."}]}
-                    if isinstance(llm_content, dict) and 'parts' in llm_content:
-                        parts = llm_content.get('parts')
-                        if isinstance(parts, list) and parts:
-                            # Find last text part and append reminder
-                            for part in reversed(parts):
-                                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
-                                    part['text'] += reminder_text
-                                    break
+            await self._inject_reminders_to_result(result)
 
         # Format tool result using message formatter
         tool_result_item = OpenAIMessageFormatter.format_tool_result_for_context(
