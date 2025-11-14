@@ -225,11 +225,84 @@ class KimiResponseProcessor(BaseResponseProcessor):
         return message
 
     @staticmethod
+    def format_response_for_context(response) -> Optional[Dict[str, Any]]:
+        """
+        Format Kimi ChatCompletion response for working context.
+
+        Extracts data from API response and builds message dict in Chat Completions
+        format for use in subsequent API calls.
+
+        This method handles the same logic previously in context_manager.add_response(),
+        now centralized in the response processor for better separation of concerns.
+
+        Args:
+            response: ChatCompletion object from Kimi API
+
+        Returns:
+            Message dict ready to append to working_contents, or None if invalid.
+
+            Message dict structure:
+                {
+                    "role": "assistant",
+                    "reasoning_content": "..." (optional - K2 Thinking models),
+                    "tool_calls": [...] (optional),
+                    "content": "..." (omitted if empty and tool_calls present)
+                }
+        """
+        # Validate response type
+        if not isinstance(response, ChatCompletion):
+            return None
+
+        # Validate choices exist
+        if not response.choices:
+            return None
+
+        # Extract message
+        choice = response.choices[0]
+        message = choice.message
+
+        # Extract reasoning content (K2 Thinking models)
+        reasoning_content = getattr(message, 'reasoning_content', None)
+
+        # Build message dict in Chat Completions format
+        message_dict: Dict[str, Any] = {
+            "role": message.role
+        }
+
+        # Add reasoning_content as separate field if present (Kimi k2-thinking format)
+        if reasoning_content and reasoning_content.strip():
+            message_dict["reasoning_content"] = reasoning_content
+
+        # Add tool calls if present
+        has_tool_calls = bool(message.tool_calls)
+        if has_tool_calls and message.tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                # tool_call is ChatCompletionMessageToolCall with id, type, function
+                function_info = tool_call.function  # type: ignore
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_info.name,  # type: ignore
+                        "arguments": function_info.arguments  # type: ignore
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
+
+        # Add content field - omit if empty and tool_calls present
+        if message.content or not has_tool_calls:
+            message_dict["content"] = message.content
+
+        return message_dict
+
+    @staticmethod
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
         Extract web search sources from Kimi response.
 
-        Kimi supports web search through the $web_search builtin_function tool.
+        Kimi supports web search through the $web_search builtin_tool.
         Search results are integrated directly into the response text.
         """
         sources = []
