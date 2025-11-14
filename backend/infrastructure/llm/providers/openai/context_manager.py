@@ -78,6 +78,9 @@ class OpenAIContextManager(BaseContextManager):
                 })
 
             # Handle reasoning items
+            # Note: Current request's reasoning MUST be kept for pairing with function_call
+            # Historical reasoning (from DB) is NOT loaded (format_single_message skips thinking)
+            # This dual approach works because API only requires pairing in current request
             elif item_type == "reasoning":
                 summary = item_dict.get("summary", [])
                 reasoning_id = item_dict.get("id")
