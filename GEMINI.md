@@ -36,11 +36,12 @@ To manage this stateful interaction, the agent must follow a structured, three-p
 
 ### 3.1. Backend: Clean Architecture
 
-The backend follows a strict dependency rule: `Presentation` → `Domain` ← `Infrastructure`.
+The backend follows a strict dependency rule where dependencies point inwards towards the `Domain`.
 
-- **`Presentation` (`/backend/presentation`)**: Handles HTTP requests and WebSocket connections.
-- **`Domain` (`/backend/domain`)**: Contains the core business models and logic. It is pure and has no external dependencies.
-- **`Infrastructure` (`/backend/infrastructure`)**: Implements logic for interacting with external systems (LLMs, databases, tool servers).
+- **`Presentation` (`/backend/presentation`)**: Handles HTTP requests and WebSocket connections. It calls services in the `Application` layer.
+- **`Application` (`/backend/application`)**: Contains the application-specific business logic (Services/Use Cases). It orchestrates the `Domain` models to perform tasks.
+- **`Domain` (`/backend/domain`)**: Contains the core, enterprise-wide business models (Entities). It is pure and has no dependencies on any other layer.
+- **`Infrastructure` (`/backend/infrastructure`)**: Implements logic for interacting with external systems (LLMs, databases, tool servers). It depends on the `Domain` and implements interfaces used by the `Application` layer.
 
 ### 3.2. The Unified LLM Abstraction
 
