@@ -29,13 +29,13 @@ class AnthropicContextManager(BaseContextManager):
         Args:
             response: Anthropic API response object
         """
-        if not hasattr(response, 'content') or not response.content:
+        from .response_processor import AnthropicResponseProcessor
+
+        # Delegate formatting to response processor for separation of concerns
+        filtered_message = AnthropicResponseProcessor.format_response_for_context(response)
+        if filtered_message is None:
             raise ValueError("Invalid Anthropic API response format")
 
-        filtered_message = {
-            "role": response.role,
-            "content": response.content
-        }
         self.working_contents.append(filtered_message)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:

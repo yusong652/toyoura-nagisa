@@ -42,11 +42,13 @@ class GeminiContextManager(BaseContextManager):
         Args:
             response: Original Gemini API response object
         """
-        try:
-            candidate = response.candidates[0]
-        except (AttributeError, IndexError):
+        from .response_processor import GeminiResponseProcessor
+
+        # Delegate formatting to response processor for separation of concerns
+        raw_content = GeminiResponseProcessor.format_response_for_context(response)
+        if raw_content is None:
             raise ValueError("Invalid Gemini API response format")
-        raw_content = candidate.content
+
         # Add to working context
         self.working_contents.append(raw_content)
     

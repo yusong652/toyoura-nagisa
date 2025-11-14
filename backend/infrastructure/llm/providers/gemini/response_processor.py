@@ -311,3 +311,30 @@ class GeminiResponseProcessor(BaseResponseProcessor):
             bool: True if response contains tool calls
         """
         return len(GeminiResponseProcessor.extract_tool_calls(response)) > 0
+
+    @staticmethod
+    def format_response_for_context(response) -> Optional[Any]:
+        """
+        Format Gemini API response for working context.
+
+        Extracts the raw Content object from Gemini API response for use in
+        subsequent API calls. This maintains the original Gemini format including
+        thinking chain, validation fields, and all metadata.
+
+        This method centralizes the formatting logic previously in
+        context_manager.add_response() for better separation of concerns.
+
+        Args:
+            response: Raw Gemini API response object
+
+        Returns:
+            Gemini Content object ready to append to working_contents, or None if invalid.
+        """
+        try:
+            candidate = response.candidates[0]
+        except (AttributeError, IndexError):
+            return None
+
+        # Return the raw Content object directly
+        # This preserves all Gemini-specific fields (parts, thinking, validation, etc.)
+        return candidate.content

@@ -264,3 +264,37 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
             role="assistant",
             content=content_list
         )
+
+    @staticmethod
+    def format_response_for_context(response: Any) -> Optional[Dict[str, Any]]:
+        """
+        Format Anthropic API response for working context.
+
+        Extracts data from API response and builds message dict in Anthropic API
+        format for use in subsequent API calls.
+
+        This method centralizes the formatting logic previously in
+        context_manager.add_response() for better separation of concerns.
+
+        Args:
+            response: Raw Anthropic API response object
+
+        Returns:
+            Message dict ready to append to working_contents, or None if invalid.
+
+            Message dict structure:
+                {
+                    "role": "assistant",
+                    "content": [...]  # Original Anthropic content blocks
+                }
+        """
+        if not hasattr(response, 'content') or not response.content:
+            return None
+
+        # Build message dict in Anthropic API format
+        filtered_message = {
+            "role": response.role,
+            "content": response.content
+        }
+
+        return filtered_message
