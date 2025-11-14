@@ -38,9 +38,11 @@ class ChatOrchestrator:
         """
         self.llm_client = llm_client
 
-        # Initialize TitleService for automatic title generation
+        # Initialize services for message and title management
         from backend.application.services.contents import TitleService
+        from backend.application.services.message_service import MessageService
         self.title_service = TitleService()
+        self.message_service = MessageService()
 
     async def execute_conversation_turn(
         self,
@@ -100,8 +102,7 @@ class ChatOrchestrator:
             streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
             if streaming_message_id:
                 try:
-                    from backend.infrastructure.storage.session_manager import delete_message
-                    delete_message(session_id, streaming_message_id)
+                    await self.message_service.delete_message_async(session_id, streaming_message_id)
                     print(f"[DEBUG] Cleaned up placeholder message {streaming_message_id}")
                 except Exception as cleanup_error:
                     print(f"[WARNING] Failed to clean up placeholder: {cleanup_error}")
@@ -143,8 +144,7 @@ class ChatOrchestrator:
         )
 
         # Create placeholder message before streaming starts
-        from backend.shared.utils.helpers import save_assistant_message
-        message_id = save_assistant_message([], session_id)
+        message_id = self.message_service.save_assistant_message([], session_id)
 
         # Send MESSAGE_CREATE notification
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -261,8 +261,7 @@ class ChatOrchestrator:
         print(f"[DEBUG] Skipping database save - interrupted message won't persist in history")
 
         # Delete the placeholder message from database (it was created at streaming start)
-        from backend.shared.utils.helpers import delete_message
-        delete_message(state.message_id, session_id)
+        await self.message_service.delete_message_async(session_id, state.message_id)
         print(f"[DEBUG] Deleted placeholder message {state.message_id} from database")
 
         # Send final update with streaming=False (frontend will show interrupted state)
@@ -314,11 +313,10 @@ class ChatOrchestrator:
         final_message = processor.format_response_for_storage(response) if processor else None
 
         if final_message:
-            from backend.shared.utils.helpers import update_assistant_message
             content = final_message.content if isinstance(
                 final_message.content, list
             ) else [{"type": "text", "text": str(final_message.content)}]
-            update_assistant_message(message_id, content, session_id)
+            self.message_service.update_assistant_message(message_id, content, session_id)
 
             # Send final streaming update with streaming=False
             from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -374,14 +372,13 @@ class ChatOrchestrator:
         # Update streaming message with complete content
         if processor:
             try:
-                from backend.shared.utils.helpers import update_assistant_message
                 tool_call_message = processor.format_response_for_storage(
                     response, tool_calls
                 )
                 content = tool_call_message.content if isinstance(
                     tool_call_message.content, list
                 ) else [{"type": "text", "text": str(tool_call_message.content)}]
-                update_assistant_message(message_id, content, session_id)
+                self.message_service.update_assistant_message(message_id, content, session_id)
 
                 # Send final streaming update
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -435,8 +432,7 @@ class ChatOrchestrator:
 
             # Save tool result to database
             try:
-                from backend.shared.utils.helpers import save_tool_result_message
-                result_message_id = save_tool_result_message(
+                result_message_id = self.message_service.save_tool_result_message(
                     tool_call_id=tool_call['id'],
                     tool_name=tool_call['name'],
                     tool_result=result,
@@ -514,8 +510,7 @@ class ChatOrchestrator:
 
             # Save to database
             try:
-                from backend.shared.utils.helpers import save_tool_result_message
-                message_id = save_tool_result_message(
+                message_id = self.message_service.save_tool_result_message(
                     tool_call_id=tool_call['id'],
                     tool_name=tool_call['name'],
                     tool_result=limit_result,

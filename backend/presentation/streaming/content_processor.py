@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any, AsyncGenerator, Optional, List, Union
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
-from backend.shared.utils.helpers import save_assistant_message
+from backend.application.services.message_service import MessageService
 from backend.presentation.websocket.message_types import MessageType, create_message
 # Import will be resolved at runtime - avoid circular import
 # from backend.presentation.streaming.tts_processor import process_tts_pipeline
@@ -38,11 +38,18 @@ async def process_content_pipeline(
         None: All processing is handled via WebSocket communication
     """
     # Type assertion: AssistantMessage always has List content at this point
-    content = final_message.content  # type: ignore
+    # after being formatted by response processor
+    content = final_message.content
+
+    # Ensure content is List[Dict[str, Any]] for type safety
+    if not isinstance(content, list):
+        raise TypeError(f"Expected List content, got {type(content)}")
+
+    content_list: List[Dict[str, Any]] = content  # Type-safe assignment
 
     # Extract text content for keyword parsing and TTS (excluding thinking blocks)
     text_content = ""
-    for item in content:
+    for item in content_list:
         if isinstance(item, dict) and item.get('type') == 'text':
             text_content += item.get('text', '')
 
@@ -54,13 +61,12 @@ async def process_content_pipeline(
     # Save or update message in conversation history
     if message_id:
         # Update existing message (created during streaming)
-        from backend.shared.utils.helpers import update_assistant_message
-        update_assistant_message(message_id, content, session_id)
+        MessageService.update_assistant_message(message_id, content_list, session_id)
         ai_msg_id = message_id
     else:
         # Create new message (non-streaming path)
-        ai_msg_id = save_assistant_message(
-            content,  # Content is guaranteed to be List[Dict[str, Any]]
+        ai_msg_id = MessageService.save_assistant_message(
+            content_list,  # Content is guaranteed to be List[Dict[str, Any]]
             session_id
         )
     

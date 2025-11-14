@@ -49,7 +49,7 @@ async def delete_message(
         HTTPException: 404 if session/message not found, 500 if deletion fails
     """
     try:
-        result = await service.delete_message(
+        result = await service.delete_message_async(
             session_id=request.session_id,
             message_id=request.message_id
         )
