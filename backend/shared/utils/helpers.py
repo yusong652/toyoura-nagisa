@@ -1,7 +1,5 @@
 import uuid
 from datetime import datetime
-from backend.infrastructure.storage.session_manager import save_history
-from backend.domain.models.messages import UserMessage
 from typing import Any, List, Dict, Optional, TypedDict
 
 # Memory manager initialization removed - preparing for memory system refactoring
@@ -63,21 +61,3 @@ def parse_message_data(data: dict) -> MessageParseResult:
         'request_id': str(uuid.uuid4()),  # Generate unique request ID
         'enable_memory': enable_memory  # Add memory setting
     }
-
-def process_user_message(result: MessageParseResult, history_msgs: list) -> UserMessage:
-    """Process user message, create and return message object, save to history and vector database"""
-    if not result['content']:
-        raise ValueError("Invalid message content")
-
-    timestamp = result.get('timestamp')
-    user_msg = UserMessage(
-        role="user",
-        content=result['content'],
-        timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
-        id=result.get('id')  # Use ID from frontend
-    )
-    # Save to history
-    history_msgs.append(user_msg)
-    save_history(result['session_id'], history_msgs)
-
-    return user_msg

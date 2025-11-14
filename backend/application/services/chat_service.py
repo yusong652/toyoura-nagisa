@@ -8,7 +8,7 @@ from typing import List, Any
 from fastapi import Request
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
-from backend.shared.utils.helpers import parse_message_data, process_user_message, MessageParseResult
+from backend.shared.utils.helpers import parse_message_data, MessageParseResult
 
 
 def get_chat_service() -> "ChatService":
@@ -102,21 +102,30 @@ class ChatService:
         """
         Save user message to session history.
 
-        Combines history loading and user message processing into a single operation,
-        eliminating the need for API layer to handle these separately.
+        Delegates to MessageService for consistent message handling across the application.
 
         Args:
             result: Unified MessageParseResult with complete message data including session_id
 
-        Note:
-            This function encapsulates the common pattern of loading history
-            and saving user messages, simplifying API layer code.
-        """
-        # Load current history
-        history_msgs = self.load_and_prepare_history(result['session_id'])
+        Raises:
+            ValueError: If message content is None or empty
 
-        # Process and save user message
-        process_user_message(result, history_msgs)
+        Note:
+            This function provides a convenient wrapper around MessageService.save_user_message
+            for use with parsed WebSocket data.
+        """
+        # Validate content
+        if not result['content']:
+            raise ValueError("Invalid message content")
+
+        # Delegate to MessageService for consistent message handling
+        from backend.application.services.message_service import MessageService
+        MessageService.save_user_message(
+            content=result['content'],
+            session_id=result['session_id'],
+            timestamp=result.get('timestamp'),
+            message_id=result.get('id')
+        )
 
 
     async def process_user_message(self, request_data: dict) -> dict:

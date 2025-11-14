@@ -26,6 +26,54 @@ class MessageService:
     """
 
     @staticmethod
+    def save_user_message(
+        content: List[Dict[str, Any]],
+        session_id: str,
+        timestamp: Optional[int] = None,
+        message_id: Optional[str] = None
+    ) -> UserMessage:
+        """
+        Save user message to history and return message object.
+
+        Args:
+            content: Structured content list from user input
+            session_id: Session ID
+            timestamp: Optional timestamp in milliseconds (Unix epoch)
+            message_id: Optional message ID (use frontend-provided ID if available)
+
+        Returns:
+            UserMessage: Created user message object
+
+        Example:
+            >>> user_msg = MessageService.save_user_message(
+            ...     content=[{"type": "text", "text": "Hello"}],
+            ...     session_id="session-123",
+            ...     timestamp=1699999999000,
+            ...     message_id="msg-456"
+            ... )
+        """
+        if not content:
+            raise ValueError("Invalid message content")
+
+        # Create user message object
+        user_msg = UserMessage(
+            role="user",
+            content=content,
+            timestamp=datetime.fromtimestamp(timestamp / 1000) if timestamp else datetime.now(),
+            id=message_id or str(uuid.uuid4())
+        )
+
+        # Load history and append message
+        history = load_all_message_history(session_id)
+        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in history]
+        history_msgs.append(user_msg)
+
+        # Save updated history
+        save_history(session_id, history_msgs)
+
+        return user_msg
+
+    @staticmethod
     def save_assistant_message(content: List[Dict[str, Any]], session_id: str) -> str:
         """
         Save AI assistant message to history and return message ID.
