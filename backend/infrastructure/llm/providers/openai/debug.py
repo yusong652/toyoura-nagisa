@@ -144,69 +144,6 @@ class OpenAIDebugger:
             else:
                 simplified['instructions'] = instructions
 
-        # Messages with content truncation (legacy chat API)
-        if 'messages' in kwargs:
-            simplified['messages'] = []
-            for i, msg in enumerate(kwargs['messages']):
-                simplified_msg = {
-                    'role': msg.get('role', 'unknown')
-                }
-                
-                content = msg.get('content', '')
-                if isinstance(content, str):
-                    # Truncate long text content
-                    if len(content) > 200:
-                        simplified_msg['content'] = content[:200] + "... [truncated]"
-                    else:
-                        simplified_msg['content'] = content
-                elif isinstance(content, list):
-                    # Handle multimodal content - show structure
-                    content_summary = []
-                    for block in content:
-                        if isinstance(block, dict):
-                            block_type = block.get('type', 'unknown')
-                            if block_type == 'text':
-                                text = block.get('text', '')
-                                if len(text) > 50:
-                                    content_summary.append(f"text: {text[:50]}...")
-                                else:
-                                    content_summary.append(f"text: {text}")
-                            elif block_type == 'image_url':
-                                url = block.get('image_url', {}).get('url', '')
-                                if url.startswith('data:'):
-                                    mime_type = url.split(';')[0].replace('data:', '')
-                                    content_summary.append(f"image: {mime_type}")
-                                else:
-                                    content_summary.append("image: external_url")
-                            else:
-                                content_summary.append(f"{block_type}: [data]")
-                        else:
-                            content_summary.append(f"raw: {str(block)[:30]}...")
-                    
-                    simplified_msg['content'] = content_summary
-                else:
-                    simplified_msg['content'] = str(content)[:100] + "..." if len(str(content)) > 100 else str(content)
-                
-                # Add tool calls if present
-                if 'tool_calls' in msg and msg['tool_calls']:
-                    simplified_msg['tool_calls'] = []
-                    for tool_call in msg['tool_calls']:
-                        simplified_tool = {
-                            'id': tool_call.get('id', 'unknown'),
-                            'type': tool_call.get('type', 'unknown'),
-                            'function': {
-                                'name': tool_call.get('function', {}).get('name', 'unknown'),
-                                'arguments': '... [truncated]'
-                            }
-                        }
-                        simplified_msg['tool_calls'].append(simplified_tool)
-                
-                # Add tool_call_id for tool messages
-                if 'tool_call_id' in msg:
-                    simplified_msg['tool_call_id'] = msg['tool_call_id']
-                
-                simplified['messages'].append(simplified_msg)
-
         # Responses API input items
         if 'input' in kwargs:
             simplified['input'] = []
@@ -410,55 +347,9 @@ class OpenAIDebugger:
             print("========== END ==========")
             return
 
-        # Legacy Chat Completions (fallback)
-        if hasattr(response, 'choices') and response.choices:
-            print(f"📋 Choices: {len(response.choices)}")
-            
-            for i, choice in enumerate(response.choices):
-                print(f"  Choice {i+1}:")
-                
-                # Finish reason
-                finish_reason = getattr(choice, 'finish_reason', 'unknown')
-                finish_emoji = "✅" if finish_reason == "stop" else "🔧" if finish_reason == "tool_calls" else "⚠️"
-                print(f"    {finish_emoji} Finish Reason: {finish_reason}")
-                
-                # Message content
-                if hasattr(choice, 'message'):
-                    message = choice.message
-                    
-                    # Content
-                    if hasattr(message, 'content') and message.content:
-                        content = message.content
-                        if len(content) > 300:
-                            content_preview = content[:300] + "... [truncated response content]"
-                        else:
-                            content_preview = content
-                        print(f"    💭 Content: {content_preview}")
-                    
-                    # Tool calls
-                    if hasattr(message, 'tool_calls') and message.tool_calls:
-                        print(f"    ⚡ Tool Calls: {len(message.tool_calls)}")
-                        for j, tool_call in enumerate(message.tool_calls):
-                            if hasattr(tool_call, 'function'):
-                                func_name = tool_call.function.name
-                                tool_id = getattr(tool_call, 'id', 'unknown')
-                                print(f"      {j+1}. {func_name} (id: {tool_id[:8]}...)")
-                            else:
-                                print(f"      {j+1}. Unknown tool call")
-        else:
-            print("❌ No choices in response")
-        
-        # Usage statistics
-        if hasattr(response, 'usage') and response.usage:
-            usage = response.usage
-            print(f"📊 Token Usage:")
-            if hasattr(usage, 'prompt_tokens'):
-                print(f"    📝 Prompt: {usage.prompt_tokens}")
-            if hasattr(usage, 'completion_tokens'):
-                print(f"    🤖 Completion: {usage.completion_tokens}")
-            if hasattr(usage, 'total_tokens'):
-                print(f"    📈 Total: {usage.total_tokens}")
-        
+        # Unexpected response format
+        print(f"⚠️  Unexpected response type: {type(response).__name__}")
+        print(f"Response: {response}")
         print("========== END ==========")
     
     @staticmethod
