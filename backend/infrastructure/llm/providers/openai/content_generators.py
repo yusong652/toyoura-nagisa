@@ -90,9 +90,8 @@ class TitleGenerator(BaseTitleGenerator):
                 content=f"Please generate a concise title based on the following conversation:\n\n{conversation_context}"
             )
 
-            # Format message and convert to Responses API input
-            formatted_messages = OpenAIMessageFormatter.format_messages([simple_message])
-            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
+            # Format message to Responses API input
+            input_items = OpenAIMessageFormatter.format_messages([simple_message])
 
             api_kwargs = {
                 "model": DEFAULT_TITLE_MODEL,
@@ -159,9 +158,8 @@ class ImagePromptGenerator(BaseImagePromptGenerator):
             # Build messages using inherited method
             messages = ImagePromptGenerator.build_messages_for_generation(context)
             
-            # Format messages using OpenAI formatter and convert to Responses input
-            formatted_messages = OpenAIMessageFormatter.format_messages(messages)
-            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
+            # Format messages to Responses API input
+            input_items = OpenAIMessageFormatter.format_messages(messages)
 
             model_for_text_to_image = context.get('model', llm_openai_config.model)
 
@@ -237,9 +235,8 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             # Create user message using base class method
             user_message = BaseWebSearchGenerator.create_search_user_message(query)
             
-            # Format message for OpenAI Responses API
-            formatted_messages = OpenAIMessageFormatter.format_messages([user_message])
-            input_items = OpenAIMessageFormatter.to_response_input(formatted_messages)
+            # Format message to Responses API input
+            input_items = OpenAIMessageFormatter.format_messages([user_message])
             
             # Prepare API kwargs for web search (Responses API)
             api_kwargs = {

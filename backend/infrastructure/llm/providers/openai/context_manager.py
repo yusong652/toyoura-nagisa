@@ -5,11 +5,9 @@ Manages conversation context and message history for OpenAI API calls.
 Handles message formatting, tool result integration, and state management.
 """
 
-from typing import Any, Optional, Dict, List
-from openai.types.responses import Response, ResponseFunctionToolCall, ResponseOutputMessage, ResponseReasoningItem
-from openai.types.responses.response_output_text import ResponseOutputText
+from typing import Any, Dict
+from openai.types.responses import Response
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
-from backend.domain.models.messages import BaseMessage
 from .message_formatter import OpenAIMessageFormatter
 
 
@@ -29,38 +27,103 @@ class OpenAIContextManager(BaseContextManager):
     def add_response(self, response) -> None:
         """
         Add OpenAI API response to context
-        
-        Handles two types of responses:
-        1. Original OpenAI API response object (during tool calls)
-        2. BaseMessage response (final response storage)
-        
+
+        Processes response.output items and converts them to Responses API input format
+        for use in subsequent API calls.
+
         Args:
-            response: OpenAI API response object or BaseMessage
+            response: OpenAI API Response object
         """
-        if isinstance(response, BaseMessage):
-            # Handle final BaseMessage response
-            # Format and add to working context
-            from backend.infrastructure.llm.shared.utils.provider_registry import get_message_formatter_class
-            formatter_class = get_message_formatter_class(self._provider_name)
-            formatted_response = formatter_class.format_single_message(response)
+        if not isinstance(response, Response):
+            return
 
-            self.working_contents.append(formatted_response)
-        elif isinstance(response, Response):
-            if not response.output:
-                return
+        if not response.output:
+            return
 
-            # Directly use response.output items as recommended by OpenAI docs
-            # This avoids double conversion (Response -> Chat Completions -> Response API)
-            for item in response.output:
-                # Convert Pydantic models to dict for JSON serialization
-                # All ResponseOutputItem types from OpenAI are Pydantic models
-                item_dict = item.model_dump(mode='json', exclude_none=False)
+        # Process each output item and convert to input format
+        for item in response.output:
+            # Convert Pydantic model to dict
+            item_dict = item.model_dump(mode='json', exclude_none=False)
+            item_type = item_dict.get("type")
 
-                # For function_call items, ensure arguments field exists
-                if item_dict.get('type') == 'function_call':
-                    if 'arguments' not in item_dict or item_dict['arguments'] is None:
-                        item_dict['arguments'] = "{}"
+            # Handle message items (assistant responses)
+            if item_type == "message":
+                role = item_dict.get("role")
+                if not role:
+                    continue
 
+                content = item_dict.get("content", [])
+
+                # Extract text content from response.output format
+                if isinstance(content, list):
+                    if not content:
+                        content_value = ""
+                    else:
+                        # Extract only text content (skip reasoning)
+                        text_parts = []
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "output_text":
+                                text_parts.append(block.get("text", ""))
+                            elif isinstance(block, str):
+                                text_parts.append(block)
+                        content_value = "".join(text_parts)
+                elif isinstance(content, str):
+                    content_value = content
+                else:
+                    content_value = str(content) if content else ""
+
+                self.working_contents.append({
+                    "role": role,
+                    "content": content_value
+                })
+
+            # Handle reasoning items
+            elif item_type == "reasoning":
+                summary = item_dict.get("summary", [])
+                reasoning_id = item_dict.get("id")
+
+                # Keep reasoning item if it has an ID (required for pairing with function_call)
+                # Note: Empty summary ([]) should still be kept to maintain pairing
+                if reasoning_id:
+                    # Keep type, id, and summary for input
+                    self.working_contents.append({
+                        "type": "reasoning",
+                        "id": reasoning_id,
+                        "summary": summary if summary else []
+                    })
+
+            # Handle function_call items
+            elif item_type == "function_call":
+                # Ensure arguments field exists
+                if 'arguments' not in item_dict or item_dict['arguments'] is None:
+                    item_dict['arguments'] = "{}"
+
+                # Convert arguments to string if needed
+                arguments = item_dict.get("arguments")
+                if isinstance(arguments, dict):
+                    import json
+                    try:
+                        arguments = json.dumps(arguments)
+                    except (TypeError, ValueError):
+                        arguments = "{}"
+                elif arguments is None:
+                    arguments = "{}"
+                else:
+                    arguments = str(arguments)
+
+                # Use correct IDs for input format:
+                # - id: fc_xxx (required for input[].id field)
+                # - call_id: call_xxx (used to match with function_call_output)
+                self.working_contents.append({
+                    "type": "function_call",
+                    "id": item_dict.get("id"),           # fc_xxx - required by API
+                    "call_id": item_dict.get("call_id"), # call_xxx - for matching results
+                    "name": item_dict.get("name"),
+                    "arguments": arguments
+                })
+
+            # Handle function_call_output items (pass through)
+            elif item_type == "function_call_output":
                 self.working_contents.append(item_dict)
     
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
@@ -69,7 +132,7 @@ class OpenAIContextManager(BaseContextManager):
 
         Args:
             tool_call_id: Tool call identifier
-            tool_name: Name of the executed tool (unused in OpenAI format)
+            tool_name: Name of the executed tool
             result: Tool execution result (can contain inline_data for images)
             inject_reminders: Whether to inject system reminders into this result
         """
@@ -96,17 +159,14 @@ class OpenAIContextManager(BaseContextManager):
                                     part['text'] += reminder_text
                                     break
 
-        # Format tool result content using message formatter
-        content = OpenAIMessageFormatter._format_tool_result(result)
+        # Format tool result using message formatter
+        tool_result_item = OpenAIMessageFormatter.format_tool_result_for_context(
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            result=result
+        )
 
-        # Add tool result message
-        tool_message = {
-            "role": "tool",
-            "content": content,
-            "tool_call_id": tool_call_id
-        }
-
-        self.working_contents.append(tool_message)
+        self.working_contents.append(tool_result_item)
     
     def _is_tool_call(self, msg: Dict[str, Any]) -> bool:
         """

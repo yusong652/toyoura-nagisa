@@ -121,7 +121,8 @@ class OpenAIClient(LLMClientBase):
         tools = api_config.get("tools", []) or []
         instructions = api_config.get("instructions")
 
-        input_items = OpenAIMessageFormatter.to_response_input(context_contents)
+        # context_contents is already in Responses API input format from context_manager
+        input_items = context_contents
 
         kwargs_api = self.openai_config.get_api_call_kwargs(
             instructions=instructions,
@@ -237,7 +238,8 @@ class OpenAIClient(LLMClientBase):
         tools = api_config.get("tools", []) or []
         instructions = api_config.get("instructions")
 
-        input_items = OpenAIMessageFormatter.to_response_input(context_contents)
+        # context_contents is already in Responses API input format from context_manager
+        input_items = context_contents
 
         kwargs_api = self.openai_config.get_api_call_kwargs(
             instructions=instructions,

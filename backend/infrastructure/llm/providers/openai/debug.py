@@ -78,17 +78,26 @@ class OpenAIDebugger:
         """
         Print formatted debug information for OpenAI API request payload
 
+        Similar to Zhipu debug output: displays request with simplified verbose fields
+        (system prompt and tool schemas are truncated for readability)
+
         Args:
             kwargs: API call parameters
         """
         print("\n" + "=" * 80)
-        print("[OPENAI DEBUG] API Request")
+        print("[DEBUG] OpenAI API Request")
         print("=" * 80)
 
         # Basic parameters
         print(f"\nModel: {kwargs.get('model', 'N/A')}")
         print(f"Temperature: {kwargs.get('temperature', 'N/A')}")
+        print(f"Top P: {kwargs.get('top_p', 'N/A')}")
         print(f"Max Output Tokens: {kwargs.get('max_output_tokens', 'N/A')}")
+
+        # Modalities (if present)
+        modalities = kwargs.get('modalities')
+        if modalities:
+            print(f"Modalities: {modalities}")
 
         # API Request (with simplified verbose fields)
         print("\n" + "=" * 80)
@@ -98,13 +107,7 @@ class OpenAIDebugger:
         # Create simplified payload for better debugging
         simplified_payload = OpenAIDebugger._create_simplified_payload(kwargs)
 
-        try:
-            import json
-            json_output = json.dumps(simplified_payload, indent=2, ensure_ascii=False, default=str)
-            print(json_output)
-        except (TypeError, ValueError) as e:
-            print(f"Debug payload (JSON serialization failed: {e}):")
-            print(str(simplified_payload))
+        print(json.dumps(simplified_payload, indent=2, ensure_ascii=False, default=str))
 
         print("=" * 80 + "\n")
     
@@ -133,11 +136,13 @@ class OpenAIDebugger:
         if 'top_p' in kwargs:
             simplified['top_p'] = kwargs['top_p']
         
-        # Instructions preview
+        # Instructions (system prompt) - truncate like Zhipu
         if kwargs.get('instructions'):
-            simplified['instructions_preview'] = OpenAIDebugger._truncate_text(
-                kwargs['instructions'], 160, 'instructions'
-            )
+            instructions = kwargs['instructions']
+            if len(instructions) > 150:
+                simplified['instructions'] = instructions[:150] + f"... (truncated, {len(instructions)} chars total)"
+            else:
+                simplified['instructions'] = instructions
 
         # Messages with content truncation (legacy chat API)
         if 'messages' in kwargs:
@@ -247,49 +252,44 @@ class OpenAIDebugger:
 
                 simplified['input'].append(summary)
         
-        # Tools with truncated descriptions
+        # Tools - simplified like Zhipu (keep structure but remove verbose details)
         if 'tools' in kwargs and kwargs['tools']:
             simplified['tools'] = []
             for tool in kwargs['tools']:
-                if isinstance(tool, dict):
-                    if 'function' in tool:
-                        func = tool['function']
-                        simplified_tool = {
-                            'type': tool.get('type', 'function'),
-                            'function': {
-                                'name': func.get('name', 'unknown'),
-                                'description': OpenAIDebugger._truncate_text(
-                                    func.get('description', ''), 100, 'tool description'
-                                )
+                if not isinstance(tool, dict):
+                    continue
+
+                tool_copy = {
+                    'type': tool.get('type', 'function')
+                }
+
+                # Handle function-based tools
+                if 'function' in tool:
+                    func = tool['function']
+                    tool_copy['function'] = {
+                        'name': func.get('name', 'unknown')
+                    }
+
+                    # Add description if short, truncate if long
+                    desc = func.get('description', '')
+                    if desc and len(desc) <= 100:
+                        tool_copy['function']['description'] = desc
+                    elif desc:
+                        tool_copy['function']['description'] = desc[:100] + "... (truncated)"
+
+                    # Simplify parameters - show count and required fields only
+                    if 'parameters' in func:
+                        params = func['parameters']
+                        if isinstance(params, dict):
+                            props = params.get('properties', {})
+                            required = params.get('required', [])
+                            tool_copy['function']['parameters'] = {
+                                'type': params.get('type', 'object'),
+                                'properties': f"<{len(props)} properties>",
+                                'required': required
                             }
-                        }
 
-                        params = func.get('parameters')
-                        if isinstance(params, dict) and 'properties' in params:
-                            prop_count = len(params['properties'])
-                            simplified_tool['function']['parameters'] = f"[{prop_count} parameters]"
-                        elif params is not None:
-                            simplified_tool['function']['parameters'] = str(params)[:50] + "..."
-
-                        simplified['tools'].append(simplified_tool)
-                    elif 'name' in tool:
-                        params = tool.get('parameters', {})
-                        if isinstance(params, dict) and 'properties' in params:
-                            prop_count = len(params['properties'])
-                            params_preview = f"[{prop_count} parameters]"
-                        elif params:
-                            params_preview = str(params)[:50] + "..."
-                        else:
-                            params_preview = "[]"
-
-                        simplified['tools'].append({
-                            'type': tool.get('type', 'function'),
-                            'name': tool.get('name', 'unknown'),
-                            'description': OpenAIDebugger._truncate_text(
-                                tool.get('description', ''), 100, 'tool description'
-                            ),
-                            'parameters': params_preview
-                        })
+                simplified['tools'].append(tool_copy)
         
         return simplified
     
