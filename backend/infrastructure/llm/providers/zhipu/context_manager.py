@@ -29,57 +29,12 @@ class ZhipuContextManager(BaseContextManager):
         Args:
             response: ChatCompletion-like object from zai SDK
         """
-        if not hasattr(response, 'choices') or not response.choices:
-            return
+        from .response_processor import ZhipuResponseProcessor
 
-        choice = response.choices[0]
-        message = choice.message
-
-        # Extract reasoning content (GLM thinking models)
-        reasoning_content = getattr(message, 'reasoning_content', None)
-
-        # Build message dict
-        message_dict: Dict[str, Any] = {
-            "role": message.role
-        }
-
-        # Add reasoning_content as separate field if present (Zhipu API format)
-        if reasoning_content and reasoning_content.strip():
-            message_dict["reasoning_content"] = reasoning_content
-
-        # Add tool calls if present
-        has_tool_calls = hasattr(message, 'tool_calls') and bool(message.tool_calls)
-        if has_tool_calls:
-            # Convert tool calls to dict format
-            tool_calls_list = []
-            for tool_call in message.tool_calls:
-                function_info = tool_call.function
-
-                # Handle both object and dict formats
-                # zai SDK might return either depending on the response structure
-                if isinstance(function_info, dict):
-                    function_name = function_info.get('name', '')
-                    function_arguments = function_info.get('arguments', '')
-                else:
-                    # Object with attributes
-                    function_name = getattr(function_info, 'name', '')
-                    function_arguments = getattr(function_info, 'arguments', '')
-
-                tool_calls_list.append({
-                    "id": tool_call.id,
-                    "type": tool_call.type,
-                    "function": {
-                        "name": function_name,
-                        "arguments": function_arguments
-                    }
-                })
-            message_dict["tool_calls"] = tool_calls_list
-
-        # Add content field - omit if empty and tool_calls present
-        if message.content or not has_tool_calls:
-            message_dict["content"] = message.content
-
-        self.working_contents.append(message_dict)
+        # Delegate formatting to response processor for separation of concerns
+        message_dict = ZhipuResponseProcessor.format_response_for_context(response)
+        if message_dict:
+            self.working_contents.append(message_dict)
 
     async def add_tool_result(
         self,

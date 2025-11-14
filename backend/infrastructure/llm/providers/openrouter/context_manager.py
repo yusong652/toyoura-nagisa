@@ -6,7 +6,6 @@ Handles ChatCompletion responses (using OpenAI Chat Completions API format).
 """
 
 from typing import Any, Dict
-from openai.types.chat import ChatCompletion
 from backend.infrastructure.llm.base.context_manager import BaseContextManager
 from .message_formatter import OpenRouterMessageFormatter
 
@@ -29,39 +28,12 @@ class OpenRouterContextManager(BaseContextManager):
         Args:
             response: ChatCompletion object from OpenRouter API
         """
-        if not isinstance(response, ChatCompletion):
-            return
+        from .response_processor import OpenRouterResponseProcessor
 
-        if not response.choices:
-            return
-
-        choice = response.choices[0]
-        message = choice.message
-
-        # Build message dict in Chat Completions format
-        message_dict: Dict[str, Any] = {
-            "role": message.role,
-            "content": message.content
-        }
-
-        # Add tool calls if present
-        if message.tool_calls:
-            # Convert tool calls to dict format
-            tool_calls_list = []
-            for tool_call in message.tool_calls:
-                # tool_call is ChatCompletionMessageToolCall with id, type, function
-                function_info = tool_call.function  # type: ignore
-                tool_calls_list.append({
-                    "id": tool_call.id,
-                    "type": tool_call.type,
-                    "function": {
-                        "name": function_info.name,  # type: ignore
-                        "arguments": function_info.arguments  # type: ignore
-                    }
-                })
-            message_dict["tool_calls"] = tool_calls_list
-
-        self.working_contents.append(message_dict)
+        # Delegate formatting to response processor for separation of concerns
+        message_dict = OpenRouterResponseProcessor.format_response_for_context(response)
+        if message_dict:
+            self.working_contents.append(message_dict)
 
     async def add_tool_result(
         self,

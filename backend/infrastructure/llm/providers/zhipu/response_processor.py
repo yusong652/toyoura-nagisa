@@ -248,5 +248,82 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
 
         return sources
 
+    @staticmethod
+    def format_response_for_context(response) -> Optional[Dict[str, Any]]:
+        """
+        Format Zhipu ChatCompletion response for working context.
+
+        Extracts data from API response and builds message dict for use in
+        subsequent API calls.
+
+        This method centralizes the formatting logic previously in
+        context_manager.add_response() for better separation of concerns.
+
+        Args:
+            response: ChatCompletion-like object from zai SDK
+
+        Returns:
+            Message dict ready to append to working_contents, or None if invalid.
+
+            Message dict structure:
+                {
+                    "role": "assistant",
+                    "reasoning_content": "..." (optional - GLM thinking models),
+                    "tool_calls": [...] (optional),
+                    "content": "..." (omitted if empty and tool_calls present)
+                }
+        """
+        if not hasattr(response, 'choices') or not response.choices:
+            return None
+
+        choice = response.choices[0]
+        message = choice.message
+
+        # Extract reasoning content (GLM thinking models)
+        reasoning_content = getattr(message, 'reasoning_content', None)
+
+        # Build message dict
+        message_dict: Dict[str, Any] = {
+            "role": message.role
+        }
+
+        # Add reasoning_content as separate field if present (Zhipu API format)
+        if reasoning_content and reasoning_content.strip():
+            message_dict["reasoning_content"] = reasoning_content
+
+        # Add tool calls if present
+        has_tool_calls = hasattr(message, 'tool_calls') and bool(message.tool_calls)
+        if has_tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                function_info = tool_call.function
+
+                # Handle both object and dict formats
+                # zai SDK might return either depending on the response structure
+                if isinstance(function_info, dict):
+                    function_name = function_info.get('name', '')
+                    function_arguments = function_info.get('arguments', '')
+                else:
+                    # Object with attributes
+                    function_name = getattr(function_info, 'name', '')
+                    function_arguments = getattr(function_info, 'arguments', '')
+
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_name,
+                        "arguments": function_arguments
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
+
+        # Add content field - omit if empty and tool_calls present
+        if message.content or not has_tool_calls:
+            message_dict["content"] = message.content
+
+        return message_dict
+
 
 __all__ = ['ZhipuResponseProcessor']

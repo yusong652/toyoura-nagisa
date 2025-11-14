@@ -183,5 +183,63 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
 
         return message
 
+    @staticmethod
+    def format_response_for_context(response) -> Optional[Dict[str, Any]]:
+        """
+        Format OpenRouter ChatCompletion response for working context.
+
+        Extracts data from API response and builds message dict in Chat Completions
+        format for use in subsequent API calls.
+
+        This method centralizes the formatting logic previously in
+        context_manager.add_response() for better separation of concerns.
+
+        Args:
+            response: ChatCompletion object from OpenRouter API
+
+        Returns:
+            Message dict ready to append to working_contents, or None if invalid.
+
+            Message dict structure:
+                {
+                    "role": "assistant",
+                    "tool_calls": [...] (optional),
+                    "content": "..."
+                }
+        """
+        if not isinstance(response, ChatCompletion):
+            return None
+
+        if not response.choices:
+            return None
+
+        choice = response.choices[0]
+        message = choice.message
+
+        # Build message dict in Chat Completions format
+        message_dict: Dict[str, Any] = {
+            "role": message.role,
+            "content": message.content
+        }
+
+        # Add tool calls if present
+        if message.tool_calls:
+            # Convert tool calls to dict format
+            tool_calls_list = []
+            for tool_call in message.tool_calls:
+                # tool_call is ChatCompletionMessageToolCall with id, type, function
+                function_info = tool_call.function  # type: ignore
+                tool_calls_list.append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": function_info.name,  # type: ignore
+                        "arguments": function_info.arguments  # type: ignore
+                    }
+                })
+            message_dict["tool_calls"] = tool_calls_list
+
+        return message_dict
+
 
 __all__ = ['OpenRouterResponseProcessor']
