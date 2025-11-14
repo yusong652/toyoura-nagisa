@@ -108,10 +108,13 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
 
         content_blocks: List[Dict[str, Any]] = []
 
-        # Include reasoning summary as thinking content if available
-        # Note: OpenAI reasoning is saved as "thinking" type for storage compatibility
+        # Extract reasoning and text content in a single pass (optimization)
+        # This avoids redundant iteration over response.output
         if response.output:
+            text_segments: List[str] = []
+
             for item in response.output:
+                # Extract reasoning content
                 if isinstance(item, ResponseReasoningItem):
                     # Extract all summary text parts
                     reasoning_texts = []
@@ -127,9 +130,17 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                             "thinking": "\n".join(reasoning_texts)
                         })
 
-        text_content = OpenAIResponseProcessor.extract_text_content(response)
-        if text_content:
-            content_blocks.append({"type": "text", "text": text_content})
+                # Extract text content
+                elif isinstance(item, ResponseOutputMessage):
+                    for part in item.content:
+                        if isinstance(part, ResponseOutputText):
+                            text_segments.append(part.text)
+
+            # Add combined text content if any
+            if text_segments:
+                combined_text = "".join(text_segments)
+                if combined_text:
+                    content_blocks.append({"type": "text", "text": combined_text})
 
         # Reuse pre-extracted tool calls if provided, otherwise extract now
         if tool_calls is None:
