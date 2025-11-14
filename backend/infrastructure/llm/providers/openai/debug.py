@@ -233,8 +233,28 @@ class OpenAIDebugger:
                         summary['content'] = f"(array[{len(content)}]) {content}"
                     else:
                         summary['content'] = f"({type(content).__name__}) {content}"
+                elif item_type == 'reasoning':
+                    # Show reasoning details
+                    summary['id'] = item.get('id')
+                    summary_content = item.get('summary', [])
+                    if summary_content:
+                        # Extract text from summary
+                        summary_texts = []
+                        for s in summary_content:
+                            if isinstance(s, dict) and s.get('type') == 'summary_text':
+                                summary_texts.append(s.get('text', ''))
+                        if summary_texts:
+                            combined = ' '.join(summary_texts)
+                            summary['summary'] = OpenAIDebugger._truncate_text(combined, 100, 'reasoning')
+                        else:
+                            summary['summary'] = f"(array[{len(summary_content)}])"
+                    else:
+                        summary['summary'] = "[]"
                 elif item_type == 'function_call':
                     summary['name'] = item.get('name')
+                    # Show both id and call_id if present
+                    if 'id' in item:
+                        summary['id'] = item.get('id')
                     summary['call_id'] = item.get('call_id')
                     # Show arguments to verify it exists
                     if 'arguments' in item:
@@ -248,6 +268,7 @@ class OpenAIDebugger:
                         item.get('output', ''), 120, 'tool output'
                     )
                 else:
+                    # Fallback for unknown types
                     summary['data'] = str(item)[:80] + ("..." if len(str(item)) > 80 else "")
 
                 simplified['input'].append(summary)

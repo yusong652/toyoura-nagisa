@@ -109,16 +109,23 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         content_blocks: List[Dict[str, Any]] = []
 
         # Include reasoning summary as thinking content if available
+        # Note: OpenAI reasoning is saved as "thinking" type for storage compatibility
         if response.output:
             for item in response.output:
                 if isinstance(item, ResponseReasoningItem):
+                    # Extract all summary text parts
+                    reasoning_texts = []
                     for summary in item.summary:
                         summary_text = getattr(summary, "text", "")
                         if summary_text:
-                            content_blocks.append({
-                                "type": "thinking",
-                                "thinking": summary_text
-                            })
+                            reasoning_texts.append(summary_text)
+
+                    # Combine all reasoning text into single thinking block
+                    if reasoning_texts:
+                        content_blocks.append({
+                            "type": "thinking",
+                            "thinking": "\n".join(reasoning_texts)
+                        })
 
         text_content = OpenAIResponseProcessor.extract_text_content(response)
         if text_content:
