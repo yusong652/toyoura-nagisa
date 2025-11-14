@@ -193,8 +193,8 @@ class TitleService:
 
                 if result and result.get("success") and result.get("title"):
                     # Send title update via WebSocket
-                    from backend.presentation.streaming.llm_response_handler import send_title_update_notification
-                    await send_title_update_notification(session_id, result["title"])
+                    from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+                    await WebSocketNotificationService.send_title_update(session_id, result["title"])
                     print(f"[INFO] Title auto-generated for session {session_id}: {result['title']}")
 
         except Exception as e:

@@ -12,12 +12,12 @@ import time
 from typing import Dict, Any, AsyncGenerator, Optional
 from backend.infrastructure.tts.base import BaseTTS
 from backend.infrastructure.tts.utils import (
-    split_text_by_punctuations, 
-    clean_text_for_tts, 
-    extract_and_replace_emoticons, 
+    split_text_by_punctuations,
+    clean_text_for_tts,
+    extract_and_replace_emoticons,
     restore_emoticons
 )
-from backend.shared.utils.helpers import process_tts_sentence
+from backend.application.services.contents import TTSService
 
 # TTS processing optimization
 TTS_PROCESSING_POOL = asyncio.BoundedSemaphore(5)  # Limit concurrent TTS processing
@@ -176,7 +176,7 @@ async def process_single_sentence_tts(
         # Process TTS with timeout protection
         try:
             tts_result = await asyncio.wait_for(
-                process_tts_sentence(tts_text, tts_engine),
+                TTSService.process_sentence(tts_text, tts_engine),
                 timeout=30.0  # Prevent stuck requests
             )
             

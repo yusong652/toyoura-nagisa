@@ -5,18 +5,9 @@ This module provides the main LLM response coordination,
 managing request lifecycle, client validation, and pipeline orchestration.
 """
 
-import json
 import uuid
-import asyncio
 import logging
-from typing import Dict, Optional
-from backend.infrastructure.llm import LLMClientBase
-from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory
-from backend.infrastructure.storage.session_manager import load_all_message_history
-from backend.presentation.websocket.message_types import (
-    create_message, MessageType
-)
+from typing import Optional
 from backend.presentation.streaming.content_processor import process_content_pipeline
 from backend.presentation.streaming.memory_injection_handler import save_session_conversation_memory
 from backend.application.services.notifications import get_message_status_service
@@ -24,46 +15,6 @@ from backend.application.services.request_manager import request_manager
 from backend.shared.exceptions import UserRejectionInterruption
 
 logger = logging.getLogger(__name__)
-
-
-async def send_title_update_notification(session_id: str, new_title: str) -> None:
-    """
-    Send title update notification via WebSocket.
-
-    Args:
-        session_id: Session ID for which the title was updated
-        new_title: The new title for the session
-    """
-    try:
-        # Get WebSocket connection manager directly
-        from backend.infrastructure.websocket.connection_manager import get_connection_manager
-
-        connection_manager = get_connection_manager()
-        if not connection_manager:
-            logger.warning(f"No connection manager available for title update notification")
-            return
-
-        # Create title update message
-        title_update_msg = create_message(
-            MessageType.TITLE_UPDATE,
-            session_id=session_id,
-            payload={
-                "session_id": session_id,
-                "title": new_title
-            }
-        )
-
-        # Send via WebSocket
-        await connection_manager.send_json(
-            session_id,
-            title_update_msg.model_dump()
-        )
-
-        logger.info(f"Title update notification sent for session {session_id}: {new_title}")
-
-    except Exception as e:
-        logger.error(f"Failed to send title update notification: {e}")
-        # Don't re-raise - this is a non-critical notification
 
 
 async def process_chat_request(
@@ -157,41 +108,3 @@ async def process_chat_request(
                     await status_service.notify_error(session_id, user_message_id, str(e))
 
         # Request cleanup automatically handled by request_manager context
-
-
-async def process_post_pipeline(
-    session_id: str,
-    request_id: str
-) -> None:
-    """
-    Post-processing pipeline - Handle title generation and other background tasks.
-
-    Non-blocking background processing that doesn't affect the main flow.
-
-    Args:
-        session_id: Current session ID
-        request_id: Request ID for debugging
-
-    Returns:
-        None - Title updates sent via WebSocket
-    """
-    try:
-        # Get LLM client from app state
-        from backend.shared.utils.app_context import get_llm_client
-        llm_client = get_llm_client()
-
-        # Use TitleService for title generation logic
-        title_service = TitleService()
-
-        loaded_history = load_all_message_history(session_id)
-        history_msgs = [message_factory(msg) if isinstance(msg, dict) else msg for msg in loaded_history]
-
-        if title_service.should_generate_title(session_id, history_msgs):
-            result = await title_service.generate_title_for_session(session_id, llm_client)
-            if result and result.get("success") and result.get("title"):
-                # Send title update via WebSocket
-                await send_title_update_notification(session_id, result["title"])
-                print(f"[INFO] Title updated for session {session_id}: {result['title']}")
-    except Exception as e:
-        # Post-processing failures should not affect the main flow, just log
-        print(f"[WARNING] Post-processing failed for request {request_id}: {e}")

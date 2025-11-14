@@ -189,3 +189,59 @@ class WebSocketNotificationService:
 
         except Exception as e:
             logger.debug(f"Failed to send message saved notification: {e}")
+
+    @staticmethod
+    async def send_title_update(
+        session_id: str,
+        new_title: str
+    ) -> None:
+        """
+        Send session title update notification to frontend.
+
+        This notification tells the frontend to update the session title
+        in the sidebar without requiring a full session list refresh.
+
+        Args:
+            session_id: Session ID for which the title was updated
+            new_title: The new title for the session
+
+        Example:
+            await WebSocketNotificationService.send_title_update(
+                session_id="session-123",
+                new_title="Discussion about Python"
+            )
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the process.
+        """
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                logger.warning("No connection manager available for title update notification")
+                return
+
+            # Create title update message
+            from backend.presentation.websocket.message_types import MessageType, create_message
+
+            title_update_msg = create_message(
+                MessageType.TITLE_UPDATE,
+                session_id=session_id,
+                payload={
+                    "session_id": session_id,
+                    "title": new_title
+                }
+            )
+
+            # Send via WebSocket
+            await connection_manager.send_json(
+                session_id,
+                title_update_msg.model_dump()
+            )
+
+            logger.info(f"Title update notification sent for session {session_id}: {new_title}")
+
+        except Exception as e:
+            logger.error(f"Failed to send title update notification: {e}")
+            # Don't re-raise - this is a non-critical notification

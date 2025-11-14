@@ -1,18 +1,9 @@
-import json
-import base64
-import asyncio
 import uuid
 from datetime import datetime
 from backend.infrastructure.storage.session_manager import save_history
-from backend.infrastructure.tts.base import BaseTTS
-# Removed legacy title_generator import - now using LLM client methods directly
-from backend.config import get_llm_settings
 from backend.domain.models.message_factory import message_factory
 from backend.domain.models.messages import AssistantMessage, UserMessage, BaseMessage
-# Memory imports removed - preparing for memory system refactoring
 from typing import Any, List, Dict, Optional, TypedDict
-import re
-from backend.shared.utils.text_clean import extract_response_without_think
 
 # Memory manager initialization removed - preparing for memory system refactoring
 # memory_manager = MemoryManager()
@@ -265,43 +256,3 @@ def save_tool_result_message(
     save_history(session_id, history_msgs)
 
     return message_id
-
-
-async def process_tts_sentence(sentence: str, tts_engine: BaseTTS) -> Optional[dict]:
-    """Process TTS synthesis for single sentence"""
-    if sentence is None or sentence == '':
-        return None
-    if sentence.strip() == '':
-        return {'text': sentence, 'audio': None}
-    try:
-        # If TTS engine is disabled, return text only
-        if not tts_engine.enabled:
-            return {'text': sentence, 'audio': None}
-            
-        audio_bytes = await tts_engine.synthesize(sentence)
-        
-        # Validate audio data
-        if not audio_bytes or len(audio_bytes) == 0:
-            return {'text': sentence, 'audio': None, 'error': 'Empty audio data from TTS engine'}
-        
-        # Validate if audio data is valid byte stream
-        if not isinstance(audio_bytes, bytes):
-            return {'text': sentence, 'audio': None, 'error': f'Invalid audio data type: {type(audio_bytes)}'}
-        
-        try:
-            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-            return {'text': sentence, 'audio': audio_b64}
-        except Exception as b64_error:
-            print(f"Base64 encoding failed: {b64_error}")
-            return {'text': sentence, 'audio': None, 'error': f'Base64 encoding failed: {str(b64_error)}'}
-    except Exception as e:
-        print(f"TTS synthesis failed: {e}")
-        return {'text': sentence, 'audio': None, 'error': str(e)}
-
-def extract_response_without_think(response_text: str) -> str:
-    """
-    Extract content outside <thinking> tags, return only final LLM response to user.
-    If no <thinking> tags, return original content.
-    """
-    # Remove <thinking>...</thinking> and its content
-    return re.sub(r'<thinking>[\s\S]*?</thinking>', '', response_text, flags=re.IGNORECASE).strip()
