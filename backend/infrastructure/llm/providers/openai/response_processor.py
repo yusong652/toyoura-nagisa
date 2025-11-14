@@ -157,6 +157,126 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         return message
 
     @staticmethod
+    def format_response_for_context(response) -> List[Dict[str, Any]]:
+        """
+        Format OpenAI Responses API output for working context.
+
+        Processes response.output items and converts them to Responses API input format
+        for use in subsequent API calls.
+
+        This method centralizes the formatting logic previously in
+        context_manager.add_response() for better separation of concerns.
+
+        Args:
+            response: OpenAI API Response object
+
+        Returns:
+            List of context items ready to append to working_contents.
+            Returns empty list if response is invalid.
+
+            Note: Unlike other providers, OpenAI returns a LIST because one response
+            can produce multiple context items (message, reasoning, function_call).
+        """
+        if not isinstance(response, Response):
+            return []
+
+        if not response.output:
+            return []
+
+        context_items: List[Dict[str, Any]] = []
+
+        # Process each output item and convert to input format
+        for item in response.output:
+            # Convert Pydantic model to dict
+            item_dict = item.model_dump(mode='json', exclude_none=False)
+            item_type = item_dict.get("type")
+
+            # Handle message items (assistant responses)
+            if item_type == "message":
+                role = item_dict.get("role")
+                if not role:
+                    continue
+
+                content = item_dict.get("content", [])
+
+                # Extract text content from response.output format
+                if isinstance(content, list):
+                    if not content:
+                        content_value = ""
+                    else:
+                        # Extract only text content (skip reasoning)
+                        text_parts = []
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "output_text":
+                                text_parts.append(block.get("text", ""))
+                            elif isinstance(block, str):
+                                text_parts.append(block)
+                        content_value = "".join(text_parts)
+                elif isinstance(content, str):
+                    content_value = content
+                else:
+                    content_value = str(content) if content else ""
+
+                context_items.append({
+                    "role": role,
+                    "content": content_value
+                })
+
+            # Handle reasoning items
+            # Note: Current request's reasoning MUST be kept for pairing with function_call
+            # Historical reasoning (from DB) is NOT loaded (format_single_message skips thinking)
+            # This dual approach works because API only requires pairing in current request
+            elif item_type == "reasoning":
+                summary = item_dict.get("summary", [])
+                reasoning_id = item_dict.get("id")
+
+                # Keep reasoning item if it has an ID (required for pairing with function_call)
+                # Note: Empty summary ([]) should still be kept to maintain pairing
+                if reasoning_id:
+                    # Keep type, id, and summary for input
+                    context_items.append({
+                        "type": "reasoning",
+                        "id": reasoning_id,
+                        "summary": summary if summary else []
+                    })
+
+            # Handle function_call items
+            elif item_type == "function_call":
+                # Ensure arguments field exists
+                if 'arguments' not in item_dict or item_dict['arguments'] is None:
+                    item_dict['arguments'] = "{}"
+
+                # Convert arguments to string if needed
+                arguments = item_dict.get("arguments")
+                if isinstance(arguments, dict):
+                    try:
+                        arguments = json.dumps(arguments)
+                    except (TypeError, ValueError):
+                        arguments = "{}"
+                elif arguments is None:
+                    arguments = "{}"
+                else:
+                    arguments = str(arguments)
+
+                # Use correct IDs for input format:
+                # - id: fc_xxx (required for input[].id field)
+                # - call_id: call_xxx (used to match with function_call_output)
+                context_items.append({
+                    "type": "function_call",
+                    "id": item_dict.get("id"),           # fc_xxx - required by API
+                    "call_id": item_dict.get("call_id"), # call_xxx - for matching results
+                    "name": item_dict.get("name"),
+                    "arguments": arguments
+                })
+
+            # Note: function_call_output branch intentionally removed
+            # - OpenAI API does not return function_call_output in response.output
+            # - Tool results are added via add_tool_result() → format_tool_result_for_context()
+            # - This prevents duplication and aligns with other providers' architecture
+
+        return context_items
+
+    @staticmethod
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
         Extract web search sources from OpenAI response.
