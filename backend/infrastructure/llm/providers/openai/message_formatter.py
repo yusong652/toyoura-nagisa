@@ -129,6 +129,9 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 # Check for image content
                 elif block_type in ("image", "image_url", "input_image"):
                     has_images = True
+                # Also check for Gemini native format (no type field)
+                elif "inline_data" in block:
+                    has_images = True
 
                 # Extract text content
                 elif block_type == "text" and "text" in block:
@@ -276,9 +279,10 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
         """
         Convert a single image block to Responses API input_image format.
 
-        Handles two image formats:
+        Handles three image formats:
         1. image_url: External image URL with optional detail level
-        2. image: Base64-encoded inline image data
+        2. image: Base64-encoded inline image data (with type field)
+        3. inline_data: Gemini native format (without type field)
 
         Args:
             block: Content block (dict with type and image data)
@@ -292,7 +296,7 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
 
         block_type = block.get("type")
 
-        # Handle image content
+        # Handle image_url format
         if block_type == "image_url":
             image_url = block.get("image_url", {})
             url = image_url.get("url")
@@ -304,7 +308,8 @@ class OpenAIMessageFormatter(BaseMessageFormatter):
                 image_part["detail"] = detail
             return image_part
 
-        if block_type == "image":
+        # Handle image format (with type field) or Gemini native inline_data (without type field)
+        if block_type == "image" or "inline_data" in block:
             inline_data = block.get("inline_data", {})
             data = inline_data.get("data")
             if not data:
