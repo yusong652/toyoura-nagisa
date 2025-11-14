@@ -170,41 +170,39 @@ class OpenAIContextManager(BaseContextManager):
     
     def _is_tool_call(self, msg: Dict[str, Any]) -> bool:
         """
-        Check if message contains tool calls (OpenAI format)
-        
-        OpenAI tool calls are included as tool_calls field in assistant messages
-        
+        Check if message contains tool calls (OpenAI Responses API format)
+
+        In Responses API, tool calls are:
+        - type="function_call" items
+        - type="reasoning" items (paired with function_call)
+
         Args:
             msg: Message to check
-            
+
         Returns:
-            bool: True if message contains tool calls
+            bool: True if message contains tool calls or reasoning
         """
         if not isinstance(msg, dict):
             return False
-            
-        # Check if it's an assistant role with tool_calls
-        return (msg.get('role') == 'assistant' and 
-                'tool_calls' in msg and 
-                msg['tool_calls'] and 
-                len(msg['tool_calls']) > 0)
-    
+
+        # Check for Responses API format
+        item_type = msg.get('type')
+        return item_type in ('function_call', 'reasoning')
+
     def _is_tool_result(self, msg: Dict[str, Any]) -> bool:
         """
-        Check if message is a tool result (OpenAI format)
-        
-        OpenAI tool results have role 'tool' and contain tool_call_id
-        
+        Check if message is a tool result (OpenAI Responses API format)
+
+        In Responses API, tool results are type="function_call_output" items
+
         Args:
             msg: Message to check
-            
+
         Returns:
             bool: True if message is a tool result
         """
         if not isinstance(msg, dict):
             return False
-            
-        # Check if it's a tool role with tool_call_id
-        return bool(msg.get('role') == 'tool' and
-                   'tool_call_id' in msg and
-                   msg.get('tool_call_id'))
+
+        # Check for Responses API format
+        return msg.get('type') == 'function_call_output'
