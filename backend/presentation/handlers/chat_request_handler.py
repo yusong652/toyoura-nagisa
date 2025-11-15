@@ -1,8 +1,15 @@
 """
-LLM response handler for coordinating streaming responses.
+Chat Request Handler - WebSocket entry point for chat request processing.
 
-This module provides the main LLM response coordination,
-managing request lifecycle, client validation, and pipeline orchestration.
+This handler serves as the primary entry point for WebSocket chat requests,
+coordinating the complete request lifecycle:
+- Request initialization and deduplication
+- WebSocket status notifications (sent/read/error)
+- Application service orchestration (ChatOrchestrator, ContentProcessor, Memory)
+- Error handling and user interruption management
+
+As a presentation layer component, it bridges WebSocket-specific concerns
+(status updates, error notifications) with application layer business logic.
 """
 
 import uuid

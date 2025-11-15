@@ -1,8 +1,15 @@
 """
-TTS (Text-to-Speech) processing pipeline.
+TTS Handler - Text-to-Speech processing pipeline.
 
-This module handles the sequential processing of text content into audio,
-optimized for first-chunk latency and robust error handling.
+This handler manages the sequential processing of text content into audio chunks,
+optimized for:
+- Low first-chunk latency for responsive audio playback
+- Concurrent TTS processing with bounded semaphore
+- Robust error handling and fallback mechanisms
+- SSE-formatted output for streaming delivery
+
+The handler coordinates between TTS engines and output formatting while
+maintaining performance through async processing pools.
 """
 
 import asyncio

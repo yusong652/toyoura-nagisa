@@ -93,7 +93,7 @@ async def process_content_pipeline(
         tts_engine = get_tts_engine()
 
         # Dynamic import to avoid circular dependency
-        from backend.presentation.streaming.tts_processor import process_tts_pipeline
+        from backend.presentation.handlers.tts_handler import process_tts_pipeline
         # Use cleaned text without keyword markers for TTS
         async for chunk in process_tts_pipeline(parsed_result['text'], tts_engine):
             # Send TTS chunks via WebSocket

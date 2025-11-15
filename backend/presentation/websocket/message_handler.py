@@ -257,7 +257,7 @@ class ChatHandler(MessageHandler):
             processing_result = await self.chat_service.process_user_message(request_data)
 
             # Generate streaming response for this message
-            from backend.presentation.streaming.llm_response_handler import process_chat_request
+            from backend.presentation.handlers.chat_request_handler import process_chat_request
             await process_chat_request(
                 session_id=processing_result['session_id'],
                 user_message_id=processing_result['message_id']
