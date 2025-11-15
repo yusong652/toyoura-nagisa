@@ -1,9 +1,14 @@
 """
-Memory injection handler for enhanced LLM context.
+Memory service for conversation memory management.
 
-This module provides clean, decoupled memory injection functionality
-that can be integrated into the main streaming pipeline using the
-new SessionMemoryContextManager approach.
+Application service layer providing memory operations including:
+- Saving conversation turns to long-term memory
+- Memory management (list, search, delete)
+- Session-based conversation extraction and persistence
+
+This service orchestrates between session storage (infrastructure)
+and memory middleware (infrastructure) to implement memory-related
+use cases.
 """
 
 import logging

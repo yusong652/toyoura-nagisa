@@ -9,7 +9,7 @@ import uuid
 import logging
 from typing import Optional
 from backend.presentation.streaming.content_processor import process_content_pipeline
-from backend.presentation.streaming.memory_injection_handler import save_session_conversation_memory
+from backend.application.services.memory_service import save_session_conversation_memory
 from backend.application.services.notifications import get_message_status_service
 from backend.application.services.request_manager import request_manager
 from backend.shared.exceptions import UserRejectionInterruption
