@@ -262,133 +262,17 @@ class OpenAIClient(LLMClientBase):
             OpenAIDebugger.print_debug_request_payload(kwargs_api)
 
         final_response: Optional[Response] = None
-        tool_call_index: Dict[str, Dict[str, Any]] = {}
 
         try:
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
+
             async with self.async_client.responses.stream(**kwargs_api) as stream:
                 async for event in stream:
-                    # Thinking / reasoning summary events
-                    if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
-                        if event.delta:
-                            yield StreamingChunk(
-                                chunk_type="thinking",
-                                content=event.delta,
-                                metadata={
-                                    "item_id": event.item_id,
-                                    "summary_index": event.summary_index
-                                }
-                            )
-                    elif isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
-                        delta = event.delta
-                        summary_text = ""
-                        if isinstance(delta, dict):
-                            summary_text = str(delta.get("text", ""))
-                        elif hasattr(delta, "text"):
-                            summary_text = str(getattr(delta, "text", ""))
-                        if summary_text:
-                            yield StreamingChunk(
-                                chunk_type="thinking",
-                                content=summary_text,
-                                metadata={
-                                    "item_id": event.item_id,
-                                    "summary_index": event.summary_index
-                                }
-                            )
-                    elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
-                        part_text = getattr(event.part, "text", "")
-                        if part_text:
-                            yield StreamingChunk(
-                                chunk_type="thinking",
-                                content=part_text,
-                                metadata={
-                                    "item_id": event.item_id,
-                                    "summary_index": event.summary_index
-                                }
-                            )
-                    elif isinstance(event, ResponseReasoningTextDeltaEvent):
-                        if event.delta:
-                            yield StreamingChunk(
-                                chunk_type="thinking",
-                                content=str(event.delta),
-                                metadata={"item_id": event.item_id}
-                            )
-
-                    # Text deltas
-                    if isinstance(event, ResponseTextDeltaEvent):
-                        if event.delta:
-                            yield StreamingChunk(
-                                chunk_type="text",
-                                content=event.delta,
-                                metadata={
-                                    "item_id": event.item_id,
-                                    "content_index": event.content_index
-                                }
-                            )
-
-                    # Function call lifecycle
-                    if isinstance(event, ResponseOutputItemAddedEvent):
-                        item = event.item
-                        if isinstance(item, ResponseFunctionToolCall):
-                            call_id = item.call_id or item.id or item.name
-                            info = {
-                                "call_id": call_id,
-                                "id": item.id or call_id,
-                                "name": item.name
-                            }
-                            # Map both id and call_id for lookup
-                            tool_call_index[call_id] = info
-                            if item.id:
-                                tool_call_index[item.id] = info
-
-                    elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
-                        info = tool_call_index.get(event.item_id, {})
-                        snapshot_text = getattr(event, "snapshot", "")
-                        if snapshot_text:
-                            try:
-                                args_snapshot = json.loads(snapshot_text)
-                            except Exception:
-                                args_snapshot = {}
-                        else:
-                            args_snapshot = {}
-
-                        yield StreamingChunk(
-                            chunk_type="function_call",
-                            content=info.get("name", ""),
-                            metadata={
-                                "tool_id": info.get("call_id"),
-                                "delta": event.delta
-                            },
-                            function_call={
-                                "id": info.get("call_id"),
-                                "name": info.get("name"),
-                                "args": args_snapshot
-                            }
-                        )
-
-                    elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
-                        info = tool_call_index.get(event.item_id, {})
-                        arguments_text = event.arguments or ""
-                        if arguments_text:
-                            try:
-                                parsed_args = json.loads(arguments_text)
-                            except Exception:
-                                parsed_args = arguments_text
-                        else:
-                            parsed_args = event.arguments
-
-                        yield StreamingChunk(
-                            chunk_type="function_call",
-                            content=info.get("name", ""),
-                            metadata={
-                                "tool_id": info.get("call_id"),
-                                "is_final": True
-                            },
-                            function_call={
-                                "id": info.get("call_id"),
-                                "name": info.get("name"),
-                                "args": parsed_args
-                            }
-                        )
+                    # Delegate event processing to streaming processor
+                    processed_chunks = streaming_processor.process_event(event)
+                    for chunk in processed_chunks:
+                        yield chunk
 
                     # Capture final response metadata
                     if isinstance(event, ResponseCompletedEvent):

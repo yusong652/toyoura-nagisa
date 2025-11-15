@@ -11,6 +11,40 @@ from backend.domain.models.messages import BaseMessage, AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
 
 
+class BaseStreamingProcessor(ABC):
+    """
+    Base class for stateful streaming processors.
+
+    Each provider implements a streaming processor that maintains state
+    across multiple streaming events/chunks and converts them to StreamingChunk objects.
+
+    This enables consistent handling of both simple chunk-based streaming (Gemini)
+    and complex event-based streaming with state management (Anthropic, OpenAI, etc.).
+    """
+
+    @abstractmethod
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process a single streaming event/chunk with state management.
+
+        This method is called for each event/chunk in the stream. The processor
+        maintains internal state across calls to properly handle multi-event
+        constructs like tool calls, thinking blocks, etc.
+
+        Args:
+            event: Provider-specific streaming event or chunk:
+                - Gemini: GenerateContentResponse chunk
+                - Anthropic: MessageStreamEvent
+                - OpenAI: Response event
+                - Kimi/Zhipu/OpenRouter: ChatCompletionChunk
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks to yield.
+                                 May be empty if event is state-only (no output yet).
+        """
+        pass
+
+
 class BaseResponseProcessor(ABC):
     """
     Abstract base class for response processors.
@@ -105,6 +139,27 @@ class BaseResponseProcessor(ABC):
         """
         # Default implementation - providers can override
         return []
+
+    @staticmethod
+    @abstractmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create a stateful streaming processor instance for this provider.
+
+        The streaming processor maintains state across multiple streaming events/chunks
+        and converts them into standardized StreamingChunk objects.
+
+        Returns:
+            BaseStreamingProcessor: Provider-specific streaming processor instance
+
+        Example:
+            processor = self._get_response_processor().create_streaming_processor()
+            async for event in stream:
+                chunks = processor.process_event(event)
+                for chunk in chunks:
+                    yield chunk
+        """
+        pass
 
     @staticmethod
     @abstractmethod

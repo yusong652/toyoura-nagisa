@@ -8,11 +8,185 @@ OpenRouter uses the traditional Chat Completions API which returns ChatCompletio
 
 import json
 from typing import List, Dict, Any, Optional
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
 from backend.domain.models.messages import AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
 from .debug import OpenRouterDebugger
+
+
+class OpenRouterStreamingProcessor(BaseStreamingProcessor):
+    """
+    Stateful streaming processor for OpenRouter API.
+
+    Processes OpenRouter ChatCompletionChunk events and converts them into
+    standardized StreamingChunk objects. Maintains state to track tool calls
+    and reasoning content across chunks.
+
+    OpenRouter supports reasoning tokens via delta.reasoning_details array.
+    """
+
+    def __init__(self):
+        """Initialize streaming processor with state tracking."""
+        # Track tool calls being built (indexed by index)
+        self.current_tool_calls: Dict[int, Dict[str, Any]] = {}
+        # Track reasoning content being built (thinking models)
+        self.reasoning_buffer: str = ""
+
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process OpenRouter streaming chunk into standardized StreamingChunk objects.
+
+        Args:
+            event: OpenRouter ChatCompletionChunk
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks to yield
+        """
+        result = []
+
+        # Validate chunk structure
+        if not isinstance(event, ChatCompletionChunk):
+            return result
+        if not hasattr(event, 'choices') or not event.choices:
+            return result
+
+        choice = event.choices[0]
+        if not hasattr(choice, 'delta'):
+            return result
+
+        delta = choice.delta
+
+        # Handle reasoning content (OpenRouter thinking models)
+        # OpenRouter sends reasoning via delta.reasoning_details array
+        reasoning_details = getattr(delta, 'reasoning_details', None)
+        if reasoning_details and isinstance(reasoning_details, list):
+            for detail in reasoning_details:
+                # detail is dict-like with type, text/summary fields
+                if isinstance(detail, dict):
+                    detail_type = detail.get('type', '')
+
+                    # Handle reasoning.text deltas
+                    if detail_type == 'reasoning.text':
+                        text = detail.get('text', '')
+                        if text:
+                            self.reasoning_buffer += text
+                            result.append(StreamingChunk(
+                                chunk_type="thinking",
+                                content=text,
+                                metadata={
+                                    "index": getattr(choice, 'index', 0),
+                                    "is_reasoning": True,
+                                    "detail_id": detail.get('id'),
+                                    "format": detail.get('format')
+                                }
+                            ))
+
+                    # Handle reasoning.summary deltas
+                    elif detail_type == 'reasoning.summary':
+                        summary = detail.get('summary', '')
+                        if summary:
+                            self.reasoning_buffer += summary
+                            result.append(StreamingChunk(
+                                chunk_type="thinking",
+                                content=summary,
+                                metadata={
+                                    "index": getattr(choice, 'index', 0),
+                                    "is_reasoning": True,
+                                    "detail_id": detail.get('id'),
+                                    "format": detail.get('format')
+                                }
+                            ))
+                # Handle object format (getattr-based access)
+                else:
+                    detail_type = getattr(detail, 'type', '')
+
+                    if detail_type == 'reasoning.text':
+                        text = getattr(detail, 'text', '')
+                        if text:
+                            self.reasoning_buffer += text
+                            result.append(StreamingChunk(
+                                chunk_type="thinking",
+                                content=text,
+                                metadata={
+                                    "index": getattr(choice, 'index', 0),
+                                    "is_reasoning": True
+                                }
+                            ))
+                    elif detail_type == 'reasoning.summary':
+                        summary = getattr(detail, 'summary', '')
+                        if summary:
+                            self.reasoning_buffer += summary
+                            result.append(StreamingChunk(
+                                chunk_type="thinking",
+                                content=summary,
+                                metadata={
+                                    "index": getattr(choice, 'index', 0),
+                                    "is_reasoning": True
+                                }
+                            ))
+
+        # Handle text content
+        if hasattr(delta, 'content') and delta.content:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content=delta.content,
+                metadata={"index": getattr(choice, 'index', 0)}
+            ))
+
+        # Handle tool calls
+        if hasattr(delta, 'tool_calls') and delta.tool_calls:
+            for tool_call_delta in delta.tool_calls:
+                idx = tool_call_delta.index
+
+                # Initialize tool call if not exists
+                if idx not in self.current_tool_calls:
+                    self.current_tool_calls[idx] = {
+                        "id": tool_call_delta.id or "",
+                        "type": getattr(tool_call_delta, 'type', "function"),
+                        "function": {
+                            "name": "",
+                            "arguments": ""
+                        }
+                    }
+
+                # Update tool call data
+                if hasattr(tool_call_delta, 'id') and tool_call_delta.id:
+                    self.current_tool_calls[idx]["id"] = tool_call_delta.id
+
+                if hasattr(tool_call_delta, 'function') and tool_call_delta.function:
+                    if hasattr(tool_call_delta.function, 'name') and tool_call_delta.function.name:
+                        self.current_tool_calls[idx]["function"]["name"] = tool_call_delta.function.name
+                    if hasattr(tool_call_delta.function, 'arguments') and tool_call_delta.function.arguments:
+                        self.current_tool_calls[idx]["function"]["arguments"] += tool_call_delta.function.arguments
+
+        # Check if tool call is complete
+        finish_reason = getattr(choice, 'finish_reason', None)
+        if finish_reason == "tool_calls" and self.current_tool_calls:
+            for tool_call in self.current_tool_calls.values():
+                # Parse arguments string to dict
+                arguments_str = tool_call["function"]["arguments"]
+                try:
+                    arguments_dict = json.loads(arguments_str) if arguments_str else {}
+                except json.JSONDecodeError:
+                    arguments_dict = {}
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=tool_call["function"]["name"],
+                    metadata={
+                        "tool_call_id": tool_call["id"],
+                        "args": arguments_dict
+                    },
+                    function_call={
+                        "name": tool_call["function"]["name"],
+                        "args": arguments_dict
+                    }
+                ))
+            # Clear tool calls after emitting
+            self.current_tool_calls.clear()
+
+        return result
 
 
 class OpenRouterResponseProcessor(BaseResponseProcessor):
@@ -42,6 +216,59 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
 
         message = response.choices[0].message
         return message.content or ""
+
+    @staticmethod
+    def extract_reasoning_content(response) -> Optional[str]:
+        """
+        Extract reasoning content from OpenRouter ChatCompletion response.
+
+        OpenRouter supports reasoning tokens for thinking models (DeepSeek R1, o1, etc.).
+        Reasoning appears in two forms:
+        - message.reasoning: Simple string field with reasoning text
+        - message.reasoning_details: Array of structured reasoning objects
+
+        Args:
+            response: ChatCompletion object from OpenRouter API
+
+        Returns:
+            Extracted reasoning content as a string, or None if not available.
+        """
+        if not isinstance(response, ChatCompletion):
+            return None
+
+        if not response.choices:
+            return None
+
+        message = response.choices[0].message
+
+        # Try simple reasoning field first
+        reasoning = getattr(message, 'reasoning', None)
+        if reasoning:
+            return reasoning
+
+        # Try reasoning_details array (structured format)
+        reasoning_details = getattr(message, 'reasoning_details', None)
+        if reasoning_details and isinstance(reasoning_details, list):
+            # Extract text from reasoning_details array
+            reasoning_texts = []
+            for detail in reasoning_details:
+                if isinstance(detail, dict):
+                    # Handle different reasoning detail types
+                    detail_type = detail.get('type', '')
+                    if detail_type == 'reasoning.text':
+                        text = detail.get('text', '')
+                        if text:
+                            reasoning_texts.append(text)
+                    elif detail_type == 'reasoning.summary':
+                        summary = detail.get('summary', '')
+                        if summary:
+                            reasoning_texts.append(summary)
+                    # Note: reasoning.encrypted is intentionally skipped
+
+            if reasoning_texts:
+                return '\n'.join(reasoning_texts)
+
+        return None
 
     @staticmethod
     def has_tool_calls(response) -> bool:
@@ -83,13 +310,15 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
         if get_llm_settings().debug:
             raw_tool_calls = []
             for tc in message.tool_calls:
-                raw_tool_calls.append({
-                    'id': tc.id,
-                    'function': {
-                        'name': tc.function.name,
-                        'arguments': tc.function.arguments
-                    }
-                })
+                function = getattr(tc, 'function', None)
+                if function:
+                    raw_tool_calls.append({
+                        'id': tc.id,
+                        'function': {
+                            'name': getattr(function, 'name', ''),
+                            'arguments': getattr(function, 'arguments', '')
+                        }
+                    })
             OpenRouterDebugger.print_tool_call_received(raw_tool_calls)
 
         tool_calls: List[Dict[str, Any]] = []
@@ -98,7 +327,12 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             try:
                 # ChatCompletion tool_calls have: id, type, function
                 # function has: name, arguments (as string)
-                arguments = tool_call.function.arguments
+                function = getattr(tool_call, 'function', None)
+                if not function:
+                    continue
+
+                arguments = getattr(function, 'arguments', '')
+                function_name = getattr(function, 'name', '')
 
                 # Parse arguments string to dict if needed
                 if isinstance(arguments, str):
@@ -116,7 +350,7 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
                     parsed_args = arguments if arguments else {}
 
                 tool_calls.append({
-                    "name": tool_call.function.name,
+                    "name": function_name,
                     "arguments": parsed_args,
                     "id": tool_call.id
                 })
@@ -143,6 +377,7 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
         - Database storage efficiency
         - Frontend rendering consistency
         - Cross-LLM compatibility (following Gemini/Anthropic pattern)
+        - Reasoning token support for thinking models
 
         Args:
             response: ChatCompletion object from OpenRouter API
@@ -156,6 +391,11 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             return AssistantMessage(role="assistant", content=[{"type": "text", "text": ""}])
 
         content_blocks: List[Dict[str, Any]] = []
+
+        # Extract reasoning content first (thinking models)
+        reasoning_content = OpenRouterResponseProcessor.extract_reasoning_content(response)
+        if reasoning_content:
+            content_blocks.append({"type": "thinking", "thinking": reasoning_content})
 
         # Extract text content
         text_content = OpenRouterResponseProcessor.extract_text_content(response)
@@ -204,9 +444,13 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             Message dict structure:
                 {
                     "role": "assistant",
-                    "tool_calls": [...] (optional),
-                    "content": "..."
+                    "content": "...",
+                    "reasoning": "..." (optional - thinking models),
+                    "tool_calls": [...] (optional)
                 }
+
+            Note: The reasoning field preserves OpenRouter's thinking content
+            for proper context handling in subsequent API calls.
         """
         if not isinstance(response, ChatCompletion):
             return None
@@ -223,21 +467,28 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             "content": message.content
         }
 
+        # Add reasoning field if present (OpenRouter thinking models)
+        # This preserves the reasoning field for subsequent API calls
+        reasoning = getattr(message, 'reasoning', None)
+        if reasoning:
+            message_dict["reasoning"] = reasoning
+
         # Add tool calls if present
         if message.tool_calls:
             # Convert tool calls to dict format
             tool_calls_list = []
             for tool_call in message.tool_calls:
                 # tool_call is ChatCompletionMessageToolCall with id, type, function
-                function_info = tool_call.function  # type: ignore
-                tool_calls_list.append({
-                    "id": tool_call.id,
-                    "type": tool_call.type,
-                    "function": {
-                        "name": function_info.name,  # type: ignore
-                        "arguments": function_info.arguments  # type: ignore
-                    }
-                })
+                function_info = getattr(tool_call, 'function', None)
+                if function_info:
+                    tool_calls_list.append({
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {
+                            "name": getattr(function_info, 'name', ''),
+                            "arguments": getattr(function_info, 'arguments', '')
+                        }
+                    })
             message_dict["tool_calls"] = tool_calls_list
 
         return message_dict
@@ -255,6 +506,7 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
 
         Note:
             This reconstruction preserves all essential fields including:
+            - Reasoning content (thinking models)
             - Text content
             - Tool calls with IDs and arguments
             - All metadata needed for tool calling logic
@@ -274,12 +526,16 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
                 return final_response
 
         # If no final response found, construct from chunks
-        # Collect text content
+        # Collect reasoning, text content, and tool calls
+        reasoning_content = ""
         text_content = ""
         tool_calls = []
 
         for chunk in chunks:
-            if chunk.chunk_type == "text" and chunk.content:
+            if chunk.chunk_type == "thinking" and chunk.content:
+                # Accumulate reasoning content (thinking models)
+                reasoning_content += chunk.content
+            elif chunk.chunk_type == "text" and chunk.content:
                 text_content += chunk.content
             elif chunk.chunk_type == "function_call" and chunk.function_call:
                 # Get tool_call_id from metadata if available
@@ -305,6 +561,11 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
             tool_calls=tool_calls if tool_calls else None
         )
 
+        # Add reasoning content to message object (thinking models)
+        # This is a dynamic attribute that will be extracted by response processor
+        if reasoning_content:
+            setattr(message, 'reasoning', reasoning_content)
+
         choice = Choice(
             index=0,
             message=message,
@@ -327,6 +588,16 @@ class OpenRouterResponseProcessor(BaseResponseProcessor):
                 total_tokens=0
             )
         )
+
+    @staticmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create OpenRouter streaming processor instance.
+
+        Returns:
+            OpenRouterStreamingProcessor: Stateful processor for OpenRouter streaming
+        """
+        return OpenRouterStreamingProcessor()
 
 
 __all__ = ['OpenRouterResponseProcessor']

@@ -10,8 +10,133 @@ import json
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
 from .debug import ZhipuDebugger
+
+
+class ZhipuStreamingProcessor(BaseStreamingProcessor):
+    """
+    Stateful streaming processor for Zhipu API.
+
+    Processes Zhipu ChatCompletionChunk-like events and converts them into
+    standardized StreamingChunk objects. Maintains state to track tool calls
+    and reasoning content across chunks.
+    """
+
+    def __init__(self):
+        """Initialize streaming processor with state tracking."""
+        # Track tool calls being built (indexed by index)
+        self.current_tool_calls: Dict[int, Dict[str, Any]] = {}
+        # Track reasoning content being built (GLM Thinking models)
+        self.reasoning_buffer: str = ""
+
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process Zhipu streaming chunk into standardized StreamingChunk objects.
+
+        Args:
+            event: Zhipu ChatCompletionChunk-like object from zai SDK
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks to yield
+        """
+        result = []
+
+        # Validate chunk structure
+        if not hasattr(event, 'choices') or not event.choices:
+            return result
+
+        choice = event.choices[0]
+        if not hasattr(choice, 'delta'):
+            return result
+
+        delta = choice.delta
+
+        # Handle reasoning content (GLM Thinking models)
+        reasoning_delta = getattr(delta, 'reasoning_content', None)
+        if reasoning_delta:
+            self.reasoning_buffer += reasoning_delta
+            result.append(StreamingChunk(
+                chunk_type="thinking",
+                content=reasoning_delta,
+                metadata={
+                    "index": getattr(choice, 'index', 0),
+                    "is_reasoning": True
+                }
+            ))
+
+        # Handle text content
+        if hasattr(delta, 'content') and delta.content:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content=delta.content,
+                metadata={"index": getattr(choice, 'index', 0)}
+            ))
+
+        # Handle tool calls
+        if hasattr(delta, 'tool_calls') and delta.tool_calls:
+            for tool_call_delta in delta.tool_calls:
+                idx = tool_call_delta.index
+
+                # Initialize tool call if not exists
+                if idx not in self.current_tool_calls:
+                    self.current_tool_calls[idx] = {
+                        "id": tool_call_delta.id or "",
+                        "type": getattr(tool_call_delta, 'type', "function"),
+                        "function": {
+                            "name": "",
+                            "arguments": ""
+                        }
+                    }
+
+                # Update tool call data
+                if hasattr(tool_call_delta, 'id') and tool_call_delta.id:
+                    self.current_tool_calls[idx]["id"] = tool_call_delta.id
+
+                if hasattr(tool_call_delta, 'function') and tool_call_delta.function:
+                    function_info = tool_call_delta.function
+
+                    # Handle both object and dict formats
+                    if isinstance(function_info, dict):
+                        func_name = function_info.get('name', '')
+                        func_args = function_info.get('arguments', '')
+                    else:
+                        # Object with attributes
+                        func_name = getattr(function_info, 'name', '')
+                        func_args = getattr(function_info, 'arguments', '')
+
+                    if func_name:
+                        self.current_tool_calls[idx]["function"]["name"] = func_name
+                    if func_args:
+                        self.current_tool_calls[idx]["function"]["arguments"] += func_args
+
+        # Check if tool call is complete
+        finish_reason = getattr(choice, 'finish_reason', None)
+        if finish_reason == "tool_calls" and self.current_tool_calls:
+            for tool_call in self.current_tool_calls.values():
+                # Parse arguments string to dict
+                arguments_str = tool_call["function"]["arguments"]
+                try:
+                    arguments_dict = json.loads(arguments_str) if arguments_str else {}
+                except json.JSONDecodeError:
+                    arguments_dict = {}
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=tool_call["function"]["name"],
+                    metadata={
+                        "tool_call_id": tool_call["id"],
+                        "args": arguments_dict
+                    },
+                    function_call={
+                        "name": tool_call["function"]["name"],
+                        "args": arguments_dict
+                    }
+                ))
+            # Clear tool calls after emitting
+            self.current_tool_calls.clear()
+
+        return result
 
 
 class ZhipuResponseProcessor(BaseResponseProcessor):
@@ -413,6 +538,16 @@ class ZhipuResponseProcessor(BaseResponseProcessor):
         )
 
         return MockResponse(choices=[choice])
+
+    @staticmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create Zhipu streaming processor instance.
+
+        Returns:
+            ZhipuStreamingProcessor: Stateful processor for Zhipu streaming
+        """
+        return ZhipuStreamingProcessor()
 
 
 __all__ = ['ZhipuResponseProcessor']

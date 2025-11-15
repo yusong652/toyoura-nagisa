@@ -289,53 +289,13 @@ class GeminiClient(LLMClientBase):
                 config=config,
             )
 
-            # Process streaming chunks and convert to standardized format
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
             async for chunk in await stream_generator:
-                if not chunk.candidates or not chunk.candidates[0].content:
-                    continue
-                if not chunk.candidates[0].content.parts:
-                    continue
-
-                for part in chunk.candidates[0].content.parts:
-                    # Thinking part (with thought flag)
-                    if part.thought and part.text:
-                        yield StreamingChunk(
-                            chunk_type="thinking",
-                            content=part.text,
-                            metadata={
-                                "thought": True,
-                                "has_signature": bool(part.thought_signature)
-                            },
-                            thought_signature=part.thought_signature if part.thought_signature else None
-                        )
-
-                    # Regular text part
-                    elif part.text and not part.thought:
-                        yield StreamingChunk(
-                            chunk_type="text",
-                            content=part.text,
-                            metadata={}
-                        )
-
-                    # Function call part
-                    elif part.function_call and part.function_call.name:
-                        # Skip if function name is None (invalid function call)
-                        # Extract args safely (convert to dict if needed, handle None)
-                        args = dict(part.function_call.args) if part.function_call.args else {}
-
-                        yield StreamingChunk(
-                            chunk_type="function_call",
-                            content=part.function_call.name,
-                            metadata={
-                                "args": args,
-                                "has_signature": bool(part.thought_signature)
-                            },
-                            thought_signature=part.thought_signature if part.thought_signature else None,
-                            function_call={
-                                "name": part.function_call.name,
-                                "args": args
-                            }
-                        )
+                # Delegate chunk processing to streaming processor
+                processed_chunks = streaming_processor.process_event(chunk)
+                for processed_chunk in processed_chunks:
+                    yield processed_chunk
 
             if debug:
                 print(f"[DEBUG] Streaming API call completed successfully")

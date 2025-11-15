@@ -7,8 +7,82 @@ Handles processing of Gemini API responses, extracting content, tool calls, and 
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage, AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
 from google.genai import types
+
+
+class GeminiStreamingProcessor(BaseStreamingProcessor):
+    """
+    Stateful streaming processor for Gemini API.
+
+    Processes Gemini GenerateContentResponse chunks and converts them
+    into standardized StreamingChunk objects. Gemini is stateless (each
+    chunk is independent), so this processor has no persistent state.
+    """
+
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process Gemini streaming chunk into standardized StreamingChunk objects.
+
+        Args:
+            event: Gemini GenerateContentResponse chunk
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks (one per part)
+        """
+        result = []
+
+        # Validate chunk structure
+        if not hasattr(event, 'candidates') or not event.candidates:
+            return result
+        if not event.candidates[0].content:
+            return result
+        # Check both existence AND non-None value
+        if not hasattr(event.candidates[0].content, 'parts') or not event.candidates[0].content.parts:
+            return result
+
+        # Process each part in the chunk
+        for part in event.candidates[0].content.parts:
+            # Thinking part (with thought flag)
+            if hasattr(part, 'thought') and part.thought and hasattr(part, 'text') and part.text:
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=part.text,
+                    metadata={
+                        "thought": True,
+                        "has_signature": bool(getattr(part, 'thought_signature', None))
+                    },
+                    thought_signature=part.thought_signature if hasattr(part, 'thought_signature') and part.thought_signature else None
+                ))
+
+            # Regular text part
+            elif hasattr(part, 'text') and part.text and not getattr(part, 'thought', False):
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content=part.text,
+                    metadata={}
+                ))
+
+            # Function call part
+            elif hasattr(part, 'function_call') and part.function_call and hasattr(part.function_call, 'name') and part.function_call.name:
+                # Extract args safely (convert to dict if needed, handle None)
+                args = dict(part.function_call.args) if hasattr(part.function_call, 'args') and part.function_call.args else {}
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=part.function_call.name,
+                    metadata={
+                        "args": args,
+                        "has_signature": bool(getattr(part, 'thought_signature', None))
+                    },
+                    thought_signature=part.thought_signature if hasattr(part, 'thought_signature') and part.thought_signature else None,
+                    function_call={
+                        "name": part.function_call.name,
+                        "args": args
+                    }
+                ))
+
+        return result
 
 
 class GeminiResponseProcessor(BaseResponseProcessor):
@@ -438,3 +512,13 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         response = types.GenerateContentResponse(candidates=[candidate])
 
         return response
+
+    @staticmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create Gemini streaming processor instance.
+
+        Returns:
+            GeminiStreamingProcessor: Stateful processor for Gemini streaming
+        """
+        return GeminiStreamingProcessor()

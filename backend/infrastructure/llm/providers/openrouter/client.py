@@ -7,7 +7,6 @@ since OpenRouter provides full OpenAI compatibility.
 Base URL: https://openrouter.ai/api/v1
 """
 
-import json
 import time
 from typing import List, Optional, Dict, Any, AsyncGenerator, Type
 from openai import OpenAI, AsyncOpenAI
@@ -254,73 +253,14 @@ class OpenRouterClient(LLMClientBase):
         try:
             stream = await self.async_client.chat.completions.create(**api_kwargs)
 
-            # Track tool calls being built
-            current_tool_calls: Dict[int, Dict[str, Any]] = {}
+            # Create stateful streaming processor
+            streaming_processor = self._get_response_processor().create_streaming_processor()
 
             async for chunk in stream:
-                if not chunk.choices:
-                    continue
-
-                choice = chunk.choices[0]
-                delta = choice.delta
-
-                # Handle text content
-                if delta.content:
-                    yield StreamingChunk(
-                        chunk_type="text",
-                        content=delta.content,
-                        metadata={"index": choice.index}
-                    )
-
-                # Handle tool calls
-                if delta.tool_calls:
-                    for tool_call_delta in delta.tool_calls:
-                        idx = tool_call_delta.index
-
-                        # Initialize tool call if not exists
-                        if idx not in current_tool_calls:
-                            current_tool_calls[idx] = {
-                                "id": tool_call_delta.id or "",
-                                "type": tool_call_delta.type or "function",
-                                "function": {
-                                    "name": "",
-                                    "arguments": ""
-                                }
-                            }
-
-                        # Update tool call data
-                        if tool_call_delta.id:
-                            current_tool_calls[idx]["id"] = tool_call_delta.id
-
-                        if tool_call_delta.function:
-                            if tool_call_delta.function.name:
-                                current_tool_calls[idx]["function"]["name"] = tool_call_delta.function.name
-                            if tool_call_delta.function.arguments:
-                                current_tool_calls[idx]["function"]["arguments"] += tool_call_delta.function.arguments
-
-                # Check if tool call is complete
-                if choice.finish_reason == "tool_calls" and current_tool_calls:
-                    for tool_call in current_tool_calls.values():
-                        # Parse arguments string to dict
-                        arguments_str = tool_call["function"]["arguments"]
-                        try:
-                            arguments_dict = json.loads(arguments_str) if arguments_str else {}
-                        except json.JSONDecodeError:
-                            arguments_dict = {}
-
-                        yield StreamingChunk(
-                            chunk_type="function_call",
-                            content=tool_call["function"]["name"],
-                            metadata={
-                                "tool_call_id": tool_call["id"],
-                                "args": arguments_dict
-                            },
-                            function_call={
-                                "name": tool_call["function"]["name"],
-                                "args": arguments_dict
-                            }
-                        )
-                    current_tool_calls.clear()
+                # Delegate chunk processing to streaming processor
+                processed_chunks = streaming_processor.process_event(chunk)
+                for processed_chunk in processed_chunks:
+                    yield processed_chunk
 
         except Exception as e:
             raise e

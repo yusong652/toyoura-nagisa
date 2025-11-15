@@ -12,11 +12,169 @@ from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseReasoningItem,
+    ResponseCompletedEvent,
+    ResponseFunctionCallArgumentsDeltaEvent,
+    ResponseFunctionCallArgumentsDoneEvent,
+    ResponseOutputItemAddedEvent,
+    ResponseReasoningTextDeltaEvent,
+    ResponseReasoningSummaryPartAddedEvent,
+    ResponseReasoningSummaryTextDeltaEvent,
+    ResponseTextDeltaEvent,
 )
 from openai.types.responses.response_output_text import ResponseOutputText
 from backend.domain.models.messages import AssistantMessage
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
+
+
+class OpenAIStreamingProcessor(BaseStreamingProcessor):
+    """
+    Stateful streaming processor for OpenAI Responses API.
+
+    Processes OpenAI Response events and converts them into standardized
+    StreamingChunk objects. Maintains state to track tool calls across events.
+    """
+
+    def __init__(self):
+        """Initialize streaming processor with state tracking."""
+        # Track tool calls being built (indexed by item_id)
+        self.tool_call_index: Dict[str, Dict[str, Any]] = {}
+
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process OpenAI streaming event into standardized StreamingChunk objects.
+
+        Args:
+            event: OpenAI Response event
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks to yield
+        """
+        result = []
+
+        # Thinking / reasoning summary events
+        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
+            if hasattr(event, 'delta') and event.delta:
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=event.delta,
+                    metadata={
+                        "item_id": getattr(event, 'item_id', None),
+                        "summary_index": getattr(event, 'summary_index', None)
+                    }
+                ))
+
+        elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
+            if hasattr(event, 'part'):
+                part_text = getattr(event.part, "text", "")
+                if part_text:
+                    result.append(StreamingChunk(
+                        chunk_type="thinking",
+                        content=part_text,
+                        metadata={
+                            "item_id": getattr(event, 'item_id', None),
+                            "summary_index": getattr(event, 'summary_index', None)
+                        }
+                    ))
+
+        elif isinstance(event, ResponseReasoningTextDeltaEvent):
+            if hasattr(event, 'delta') and event.delta:
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=str(event.delta),
+                    metadata={"item_id": getattr(event, 'item_id', None)}
+                ))
+
+        # Text deltas
+        if isinstance(event, ResponseTextDeltaEvent):
+            if hasattr(event, 'delta') and event.delta:
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content=event.delta,
+                    metadata={
+                        "item_id": getattr(event, 'item_id', None),
+                        "content_index": getattr(event, 'content_index', None)
+                    }
+                ))
+
+        # Function call lifecycle - item added
+        if isinstance(event, ResponseOutputItemAddedEvent):
+            if hasattr(event, 'item'):
+                item = event.item
+                if isinstance(item, ResponseFunctionToolCall):
+                    call_id = item.call_id or item.id or item.name
+                    info = {
+                        "call_id": call_id,
+                        "id": item.id or call_id,
+                        "name": item.name
+                    }
+                    # Map both id and call_id for lookup
+                    self.tool_call_index[call_id] = info
+                    if item.id:
+                        self.tool_call_index[item.id] = info
+
+        # Function call arguments delta
+        elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
+            item_id = getattr(event, 'item_id', None)
+            if item_id:
+                info = self.tool_call_index.get(item_id, {})
+                snapshot_text = getattr(event, "snapshot", "")
+
+                if snapshot_text:
+                    try:
+                        args_snapshot = json.loads(snapshot_text)
+                    except Exception:
+                        args_snapshot = {}
+                else:
+                    args_snapshot = {}
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=info.get("name", ""),
+                    metadata={
+                        "tool_id": info.get("call_id"),
+                        "delta": getattr(event, 'delta', None)
+                    },
+                    function_call={
+                        "id": info.get("call_id"),
+                        "name": info.get("name"),
+                        "args": args_snapshot
+                    }
+                ))
+
+        # Function call arguments done
+        elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
+            item_id = getattr(event, 'item_id', None)
+            if item_id:
+                info = self.tool_call_index.get(item_id, {})
+                arguments_text = getattr(event, 'arguments', None) or ""
+
+                if arguments_text:
+                    try:
+                        parsed_args = json.loads(arguments_text)
+                    except Exception:
+                        parsed_args = arguments_text
+                else:
+                    parsed_args = getattr(event, 'arguments', None)
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=info.get("name", ""),
+                    metadata={
+                        "tool_id": info.get("call_id"),
+                        "is_final": True
+                    },
+                    function_call={
+                        "id": info.get("call_id"),
+                        "name": info.get("name"),
+                        "args": parsed_args
+                    }
+                ))
+
+        # ResponseCompletedEvent - capture final response metadata
+        # (We don't emit a chunk for this, just track it if needed)
+
+        return result
 
 
 class OpenAIResponseProcessor(BaseResponseProcessor):
@@ -391,3 +549,13 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
             error=None,
             incomplete_details=None
         )
+
+    @staticmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create OpenAI streaming processor instance.
+
+        Returns:
+            OpenAIStreamingProcessor: Stateful processor for OpenAI streaming
+        """
+        return OpenAIStreamingProcessor()

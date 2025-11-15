@@ -10,7 +10,128 @@ from typing import Any, Dict, List, Optional, Tuple
 import anthropic
 from backend.domain.models.response_models import LLMResponse
 from backend.domain.models.streaming import StreamingChunk
-from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor, BaseStreamingProcessor
+
+
+class AnthropicStreamingProcessor(BaseStreamingProcessor):
+    """
+    Stateful streaming processor for Anthropic API.
+
+    Processes Anthropic MessageStreamEvent events and converts them
+    into standardized StreamingChunk objects. Maintains state across
+    events to properly handle multi-event constructs like tool calls.
+    """
+
+    def __init__(self):
+        """Initialize streaming processor with state tracking."""
+        # Track thinking signature for current thinking block
+        self.current_thinking_signature: Optional[str] = None
+        # Track current content block type
+        self.current_block_type: Optional[str] = None
+        # Track current tool call being streamed
+        self.current_tool_id: Optional[str] = None
+        self.current_tool_name: Optional[str] = None
+        self.accumulated_tool_json: str = ""
+
+    def process_event(self, event: Any) -> List[StreamingChunk]:
+        """
+        Process Anthropic streaming event into standardized StreamingChunk objects.
+
+        Args:
+            event: Anthropic MessageStreamEvent
+
+        Returns:
+            List[StreamingChunk]: List of standardized chunks to yield
+        """
+        result = []
+
+        # Track content block start to know what type we're in
+        if hasattr(event, 'type') and event.type == "content_block_start":
+            if hasattr(event, 'content_block') and hasattr(event.content_block, 'type'):
+                self.current_block_type = event.content_block.type
+                # Only ToolUseBlock has id and name attributes
+                if self.current_block_type == "tool_use" and hasattr(event.content_block, 'id') and hasattr(event.content_block, 'name'):
+                    self.current_tool_id = event.content_block.id
+                    self.current_tool_name = event.content_block.name
+                    self.accumulated_tool_json = ""
+
+        # Thinking content
+        elif hasattr(event, 'type') and event.type == "thinking":
+            if hasattr(event, 'thinking'):
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content=event.thinking,
+                    metadata={"snapshot": getattr(event, 'snapshot', None)}
+                ))
+
+        # Text content
+        elif hasattr(event, 'type') and event.type == "text":
+            if hasattr(event, 'text'):
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content=event.text,
+                    metadata={"snapshot": getattr(event, 'snapshot', None)}
+                ))
+
+        # Signature event (for thinking blocks)
+        elif hasattr(event, 'type') and event.type == "signature":
+            if hasattr(event, 'signature'):
+                self.current_thinking_signature = event.signature
+
+        # Tool parameters (partial JSON)
+        elif hasattr(event, 'type') and event.type == "input_json":
+            if self.current_tool_id and hasattr(event, 'partial_json'):
+                self.accumulated_tool_json += event.partial_json
+
+        # Content block complete
+        elif hasattr(event, 'type') and event.type == "content_block_stop":
+            # If this was a tool use block, emit the complete tool call
+            if self.current_tool_id and self.current_tool_name:
+                # Parse accumulated JSON
+                try:
+                    tool_input = json.loads(self.accumulated_tool_json) if self.accumulated_tool_json else {}
+                except json.JSONDecodeError:
+                    tool_input = {}
+
+                result.append(StreamingChunk(
+                    chunk_type="function_call",
+                    content=self.current_tool_name,
+                    metadata={
+                        "tool_id": self.current_tool_id,
+                        "tool_name": self.current_tool_name,
+                        "tool_input": tool_input
+                    },
+                    thought_signature=self.current_thinking_signature.encode() if self.current_thinking_signature else None,
+                    function_call={
+                        "name": self.current_tool_name,
+                        "args": tool_input,
+                        "id": self.current_tool_id
+                    }
+                ))
+
+                # Reset tool tracking
+                self.current_tool_id = None
+                self.current_tool_name = None
+                self.accumulated_tool_json = ""
+                self.current_thinking_signature = None
+                self.current_block_type = None
+
+            # If this was a thinking block and we have a signature, emit a marker chunk
+            elif self.current_block_type == "thinking" and self.current_thinking_signature:
+                # Emit a special chunk to mark the end of thinking with signature
+                result.append(StreamingChunk(
+                    chunk_type="thinking",
+                    content="",  # Empty content, just carrying the signature
+                    metadata={"is_signature_marker": True},
+                    thought_signature=self.current_thinking_signature.encode()
+                ))
+                self.current_thinking_signature = None
+                self.current_block_type = None
+            else:
+                # Reset for other block types
+                self.current_block_type = None
+
+        return result
 
 
 class AnthropicResponseProcessor(BaseResponseProcessor):
@@ -413,3 +534,13 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
                 output_tokens=0
             )
         )
+
+    @staticmethod
+    def create_streaming_processor() -> BaseStreamingProcessor:
+        """
+        Create Anthropic streaming processor instance.
+
+        Returns:
+            AnthropicStreamingProcessor: Stateful processor for Anthropic streaming
+        """
+        return AnthropicStreamingProcessor()
