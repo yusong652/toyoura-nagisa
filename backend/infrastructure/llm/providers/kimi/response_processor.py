@@ -11,6 +11,7 @@ import json
 from typing import List, Dict, Any, Optional
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from backend.domain.models.messages import AssistantMessage
+from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 from .debug import KimiDebugger
 
@@ -332,6 +333,102 @@ class KimiResponseProcessor(BaseResponseProcessor):
             print(f"[DEBUG] Extracted {len(sources)} web search sources from Kimi response")
 
         return sources
+
+    @staticmethod
+    def construct_response_from_chunks(chunks: List['StreamingChunk']) -> ChatCompletion:
+        """
+        Convert collected streaming chunks back into a complete ChatCompletion object.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            ChatCompletion object reconstructed from chunks
+
+        Note:
+            This reconstruction preserves all essential fields including:
+            - Reasoning content (K2 Thinking models)
+            - Text content
+            - Tool calls with IDs and arguments
+            - All metadata needed for tool calling logic
+        """
+        import json
+        import time
+        from openai.types.chat import ChatCompletion, ChatCompletionMessage
+        from openai.types.chat.chat_completion import Choice
+        from openai.types.completion_usage import CompletionUsage
+        from backend.domain.models.streaming import StreamingChunk
+
+        # Check if we have a final response stored in metadata
+        for chunk in reversed(chunks):
+            metadata = chunk.metadata or {}
+            final_response = metadata.get("__kimi_final_response")
+            if final_response:
+                return final_response
+
+        # If no final response found, construct from chunks
+        # Collect thinking, text content, and tool calls
+        reasoning_content = ""
+        text_content = ""
+        tool_calls = []
+
+        for chunk in chunks:
+            if chunk.chunk_type == "thinking" and chunk.content:
+                # Accumulate reasoning content (K2 Thinking models)
+                reasoning_content += chunk.content
+            elif chunk.chunk_type == "text" and chunk.content:
+                text_content += chunk.content
+            elif chunk.chunk_type == "function_call" and chunk.function_call:
+                # Get tool_call_id from metadata if available
+                tool_call_id = chunk.metadata.get("tool_call_id", "") if chunk.metadata else ""
+
+                # Convert args dict to JSON string for ChatCompletion format
+                args_dict = chunk.function_call.get("args", {})
+                arguments_str = json.dumps(args_dict) if args_dict else ""
+
+                tool_calls.append({
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": chunk.function_call.get("name", ""),
+                        "arguments": arguments_str
+                    }
+                })
+
+        # Construct a ChatCompletion object
+        message = ChatCompletionMessage(
+            role="assistant",
+            content=text_content if text_content else None,
+            tool_calls=tool_calls if tool_calls else None
+        )
+
+        # Add reasoning_content to message object (K2 Thinking models)
+        # This is a dynamic attribute that will be extracted by response processor
+        if reasoning_content:
+            setattr(message, 'reasoning_content', reasoning_content)
+
+        choice = Choice(
+            index=0,
+            message=message,
+            finish_reason="stop" if not tool_calls else "tool_calls"
+        )
+
+        # Get model name from config
+        from backend.config.llm import get_llm_settings
+        model_name = get_llm_settings().get_kimi_config().model
+
+        return ChatCompletion(
+            id="constructed_from_chunks",
+            model=model_name,
+            created=int(time.time()),
+            object="chat.completion",
+            choices=[choice],
+            usage=CompletionUsage(
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0
+            )
+        )
 
 
 __all__ = ['KimiResponseProcessor']

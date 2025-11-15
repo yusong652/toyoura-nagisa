@@ -193,12 +193,10 @@ class ChatOrchestrator:
             )
 
         # Construct complete response from collected chunks
-        current_response = self.llm_client._construct_response_from_streaming_chunks(
-            state.collected_chunks
-        )
+        processor = self.llm_client._get_response_processor()
+        current_response = processor.construct_response_from_chunks(state.collected_chunks)
 
         # Check if response contains tool calls
-        processor = self.llm_client._get_response_processor()
         if not (processor and processor.has_tool_calls(current_response)):
             # No tool calls - finalize and return
             return await self._finalize_response(
@@ -241,9 +239,8 @@ class ChatOrchestrator:
 
         # Construct partial response for database storage and frontend display
         # This will NOT be added to LLM context to avoid misleading the model
-        partial_response = self.llm_client._construct_response_from_streaming_chunks(
-            state.collected_chunks
-        )
+        processor = self.llm_client._get_response_processor()
+        partial_response = processor.construct_response_from_chunks(state.collected_chunks)
 
         # Debug: Check the constructed response content
         if hasattr(partial_response, 'choices') and partial_response.choices:

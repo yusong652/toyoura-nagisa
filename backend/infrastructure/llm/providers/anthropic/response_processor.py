@@ -7,7 +7,9 @@ multimodal content, and error handling.
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
+import anthropic
 from backend.domain.models.response_models import LLMResponse
+from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
@@ -298,3 +300,116 @@ class AnthropicResponseProcessor(BaseResponseProcessor):
         }
 
         return filtered_message
+
+    @staticmethod
+    def construct_response_from_chunks(chunks: List['StreamingChunk']) -> 'anthropic.types.Message':
+        """
+        Construct Anthropic Message object from collected streaming chunks.
+
+        Converts list of StreamingChunk objects back into Anthropic's native
+        Message format for tool call detection and context management.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            anthropic.types.Message: Complete Anthropic Message object with
+                                     all content blocks preserved for tool calling
+
+        Note:
+            This reconstruction preserves all essential fields including:
+            - Thinking content with signatures
+            - Text content
+            - Tool use blocks with IDs and inputs
+            - All metadata needed for tool calling logic
+        """
+        import anthropic
+        from backend.domain.models.streaming import StreamingChunk
+
+        content_blocks = []
+
+        # Track accumulated content for each type
+        accumulated_thinking = ""
+        accumulated_text = ""
+        current_thinking_signature: Optional[str] = None
+
+        for chunk in chunks:
+            if chunk.chunk_type == "thinking":
+                # Only accumulate non-empty content (skip signature markers)
+                if chunk.content or not chunk.metadata.get("is_signature_marker"):
+                    accumulated_thinking += chunk.content
+                # Store signature if present
+                if chunk.thought_signature:
+                    current_thinking_signature = chunk.thought_signature.decode()
+
+            elif chunk.chunk_type == "text":
+                # If we have accumulated thinking, add it as a block first
+                if accumulated_thinking:
+                    content_blocks.append({
+                        "type": "thinking",
+                        "thinking": accumulated_thinking,
+                        "signature": current_thinking_signature or ""
+                    })
+                    accumulated_thinking = ""
+                    current_thinking_signature = None
+
+                accumulated_text += chunk.content
+
+            elif chunk.chunk_type == "function_call":
+                # Add any accumulated thinking first
+                if accumulated_thinking:
+                    content_blocks.append({
+                        "type": "thinking",
+                        "thinking": accumulated_thinking,
+                        "signature": current_thinking_signature or ""
+                    })
+                    accumulated_thinking = ""
+                    current_thinking_signature = None
+
+                # Add any accumulated text
+                if accumulated_text:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": accumulated_text
+                    })
+                    accumulated_text = ""
+
+                # Add tool use block
+                content_blocks.append({
+                    "type": "tool_use",
+                    "id": chunk.metadata.get("tool_id", ""),
+                    "name": chunk.metadata.get("tool_name", ""),
+                    "input": chunk.metadata.get("tool_input", {})
+                })
+
+        # Add any remaining accumulated content
+        if accumulated_thinking:
+            content_blocks.append({
+                "type": "thinking",
+                "thinking": accumulated_thinking,
+                "signature": current_thinking_signature or ""
+            })
+        if accumulated_text:
+            content_blocks.append({
+                "type": "text",
+                "text": accumulated_text
+            })
+
+        # Construct Message object
+        # Note: We use minimal required fields for reconstruction
+        # Get the model name from config if available
+        from backend.config.llm import get_llm_settings
+        model_name = get_llm_settings().get_anthropic_config().model
+
+        return anthropic.types.Message(
+            id="reconstructed",
+            content=content_blocks,
+            model=model_name,
+            role="assistant",
+            stop_reason="end_turn",
+            type="message",
+            usage=anthropic.types.Usage(
+                input_tokens=0,
+                output_tokens=0
+            )
+        )

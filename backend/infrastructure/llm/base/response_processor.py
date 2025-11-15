@@ -8,6 +8,7 @@ ensuring consistent response handling across different LLM providers.
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage, AssistantMessage
+from backend.domain.models.streaming import StreamingChunk
 
 
 class BaseResponseProcessor(ABC):
@@ -94,13 +95,42 @@ class BaseResponseProcessor(ABC):
     def extract_web_search_sources(response, debug: bool = False) -> List[Dict[str, Any]]:
         """
         Extract web search sources from response (shared utility for providers that support it).
-        
+
         Args:
             response: Raw LLM API response object
             debug: Enable debug output
-            
+
         Returns:
             List[Dict[str, Any]]: List of web search sources
         """
         # Default implementation - providers can override
         return []
+
+    @staticmethod
+    @abstractmethod
+    def construct_response_from_chunks(chunks: List[StreamingChunk]) -> Any:
+        """
+        Construct complete response object from collected streaming chunks.
+
+        This method converts a list of StreamingChunk objects back into
+        the provider's native response format for tool call detection and context management.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            Any: Provider-specific complete response object:
+                - Gemini: types.GenerateContentResponse
+                - Anthropic: anthropic.types.Message
+                - OpenAI: openai.types.responses.Response
+                - Kimi: openai.types.chat.ChatCompletion
+                - Zhipu: ChatCompletion-like object
+                - OpenRouter: openai.types.chat.ChatCompletion
+                - Must contain all necessary data for tool call detection
+
+        Note:
+            This reconstruction is necessary because we need the complete response
+            for tool call detection and context management, while streaming provides
+            only incremental chunks.
+        """
+        pass

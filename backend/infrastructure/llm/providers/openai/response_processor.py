@@ -15,6 +15,7 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_output_text import ResponseOutputText
 from backend.domain.models.messages import AssistantMessage
+from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
 
 
@@ -295,3 +296,98 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
         Note: OpenAI doesn't have built-in web search like Gemini. Placeholder for MCP-based sources.
         """
         return []
+
+    @staticmethod
+    def construct_response_from_chunks(chunks: List['StreamingChunk']) -> Response:
+        """
+        Convert collected streaming chunks back into a complete Response object.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            Response: Complete OpenAI Response object
+
+        Note:
+            This method prefers the response captured during streaming if available,
+            otherwise reconstructs from streamed text/thinking content.
+        """
+        import time
+        from backend.domain.models.streaming import StreamingChunk
+
+        # Prefer the response captured during streaming if available
+        for chunk in reversed(chunks):
+            metadata = chunk.metadata or {}
+            final_response = metadata.get("__openai_final_response")
+            if isinstance(final_response, Response):
+                return final_response
+
+        # Fallback reconstruction from streamed text/thinking
+        text_output = "".join(
+            chunk.content for chunk in chunks if chunk.chunk_type == "text"
+        )
+        reasoning_output = "".join(
+            chunk.content for chunk in chunks if chunk.chunk_type == "thinking"
+        )
+
+        output_items: List[Any] = []
+
+        if reasoning_output:
+            output_items.append(
+                ResponseReasoningItem.model_construct(
+                    id="reasoning_stream",
+                    type="reasoning",
+                    summary=[{"type": "summary_text", "text": reasoning_output}],
+                    status="completed",
+                    encrypted_content=None
+                )
+            )
+
+        if text_output:
+            output_items.append(
+                ResponseOutputMessage.model_construct(
+                    id="msg_stream",
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                    content=[
+                        ResponseOutputText.model_construct(
+                            type="output_text",
+                            text=text_output,
+                            annotations=[]
+                        )
+                    ]
+                )
+            )
+
+        # Get model name from config
+        from backend.config.llm import get_llm_settings
+        model_name = get_llm_settings().get_openai_config().model
+
+        return Response.model_construct(
+            id="resp_stream",
+            object="response",
+            created_at=int(time.time()),
+            status="completed",
+            model=model_name,
+            output=output_items,
+            reasoning=None,
+            instructions=None,
+            metadata={},
+            parallel_tool_calls=True,
+            tools=[],
+            temperature=1.0,
+            top_p=1.0,
+            text=None,
+            usage=None,
+            tool_choice=None,
+            max_output_tokens=None,
+            previous_response_id=None,
+            prompt=None,
+            service_tier=None,
+            truncation="disabled",
+            background=None,
+            user=None,
+            error=None,
+            incomplete_details=None
+        )

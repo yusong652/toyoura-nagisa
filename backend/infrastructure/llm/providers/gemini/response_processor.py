@@ -6,7 +6,9 @@ Handles processing of Gemini API responses, extracting content, tool calls, and 
 
 from typing import List, Dict, Any, Optional
 from backend.domain.models.messages import BaseMessage, AssistantMessage
+from backend.domain.models.streaming import StreamingChunk
 from backend.infrastructure.llm.base.response_processor import BaseResponseProcessor
+from google.genai import types
 
 
 class GeminiResponseProcessor(BaseResponseProcessor):
@@ -338,3 +340,101 @@ class GeminiResponseProcessor(BaseResponseProcessor):
         # Return the raw Content object directly
         # This preserves all Gemini-specific fields (parts, thinking, validation, etc.)
         return candidate.content
+
+    @staticmethod
+    def construct_response_from_chunks(
+        chunks: List[StreamingChunk]
+    ) -> types.GenerateContentResponse:
+        """
+        Construct Gemini response object from collected streaming chunks.
+
+        Converts list of StreamingChunk objects back into Gemini's native
+        GenerateContentResponse format for tool call detection and context management.
+
+        Args:
+            chunks: List of StreamingChunk objects collected during streaming
+
+        Returns:
+            types.GenerateContentResponse: Complete Gemini response object with
+                                          all parts preserved for tool calling
+
+        Note:
+            This reconstruction preserves all essential fields including:
+            - Thinking content with thought flags
+            - Text content
+            - Function calls with thought_signature
+            - All metadata needed for tool calling logic
+        """
+        # Convert StreamingChunk objects to Gemini Part format
+        parts_data = []
+
+        for chunk in chunks:
+            part_dict = {}
+
+            if chunk.chunk_type == "thinking":
+                part_dict["text"] = chunk.content
+                part_dict["thought"] = True
+                if chunk.thought_signature:
+                    part_dict["thought_signature"] = chunk.thought_signature
+
+            elif chunk.chunk_type == "text":
+                part_dict["text"] = chunk.content
+
+            elif chunk.chunk_type == "function_call" and chunk.function_call:
+                # Function call requires special handling
+                # Skip if function_call is None (should not happen for function_call chunks)
+                # Extract name and args with explicit types
+                func_name = chunk.function_call.get("name")
+                func_args = chunk.function_call.get("args", {})
+
+                if func_name:  # Only create FunctionCall if name is present
+                    part_dict["function_call"] = types.FunctionCall(
+                        name=func_name,
+                        args=func_args
+                    )
+                    if chunk.thought_signature:
+                        part_dict["thought_signature"] = chunk.thought_signature
+
+            if part_dict:
+                parts_data.append(part_dict)
+
+        # Build Gemini response structure
+        # Create Part objects
+        parts = []
+        for part_data in parts_data:
+            # Handle different part types appropriately
+            if "function_call" in part_data:
+                # Function call part
+                part = types.Part(
+                    function_call=part_data["function_call"]
+                )
+                # Add thought_signature if present
+                if "thought_signature" in part_data:
+                    part.thought_signature = part_data["thought_signature"]
+            elif "thought" in part_data:
+                # Thinking part
+                part = types.Part(
+                    text=part_data["text"],
+                    thought=True
+                )
+                if "thought_signature" in part_data:
+                    part.thought_signature = part_data["thought_signature"]
+            else:
+                # Regular text part
+                part = types.Part(text=part_data["text"])
+
+            parts.append(part)
+
+        # Create Content with parts
+        content = types.Content(parts=parts, role="model")
+
+        # Create Candidate with content
+        candidate = types.Candidate(
+            content=content,
+            finish_reason=types.FinishReason.STOP
+        )
+
+        # Create complete GenerateContentResponse
+        response = types.GenerateContentResponse(candidates=[candidate])
+
+        return response

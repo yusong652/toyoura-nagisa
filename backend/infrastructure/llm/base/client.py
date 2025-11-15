@@ -207,35 +207,6 @@ class LLMClientBase(ABC):
         """
         pass
 
-    @abstractmethod
-    def _construct_response_from_streaming_chunks(
-        self,
-        chunks: List[StreamingChunk]
-    ) -> Any:
-        """
-        Construct complete response object from collected streaming chunks.
-
-        This method converts a list of StreamingChunk objects back into
-        the provider's native response format for tool call detection and context management.
-
-        Args:
-            chunks: List of StreamingChunk objects collected during streaming
-
-        Returns:
-            Any: Provider-specific complete response object:
-                - Gemini: types.GenerateContentResponse
-                - Anthropic: Message
-                - OpenAI: ChatCompletion
-                - Must contain all necessary data for tool call detection
-
-        Note:
-            This reconstruction is necessary because we need the complete response
-            for tool call detection and context management, while streaming provides
-            only incremental chunks.
-        """
-        pass
-
-
     async def _clear_session_context(self, session_id: str):
         """Clear session context - shared implementation."""
         # Clear session-specific context manager
