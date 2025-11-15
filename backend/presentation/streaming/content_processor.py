@@ -2,7 +2,10 @@
 Content processing pipeline for LLM responses.
 
 This module handles the processing of final LLM responses,
-including message saving, keyword extraction, and TTS preparation.
+including message saving, keyword extraction, and TTS coordination.
+
+WebSocket communication is delegated to message_sender module for
+proper separation of concerns.
 """
 
 import json
@@ -10,9 +13,7 @@ from typing import Dict, Any, AsyncGenerator, Optional, List, Union
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.message_factory import message_factory
 from backend.application.services.message_service import MessageService
-from backend.presentation.websocket.message_types import MessageType, create_message
-# Import will be resolved at runtime - avoid circular import
-# from backend.presentation.streaming.tts_processor import process_tts_pipeline
+from backend.presentation.websocket.message_sender import send_message_create, send_tts_chunk
 
 
 async def process_content_pipeline(
@@ -81,7 +82,7 @@ async def process_content_pipeline(
     if parsed_result['text'].strip():
         # Send MESSAGE_CREATE only if message was not created during streaming
         if not message_id:
-            await send_message_create_via_websocket(session_id, ai_msg_id)
+            await send_message_create(session_id, ai_msg_id)
 
         # Get TTS engine from app state
         from backend.shared.utils.app_context import get_tts_engine
@@ -95,118 +96,14 @@ async def process_content_pipeline(
             # For streaming messages: audio-only (text already displayed)
             # For non-streaming messages: text+audio (for incremental text display)
             is_streaming = bool(message_id)
-            await send_tts_chunk_via_websocket(session_id, chunk, ai_msg_id, is_streaming)
+            await send_tts_chunk(session_id, chunk, ai_msg_id, is_streaming)
     else:
         # Send MESSAGE_CREATE only if message was not created during streaming
         if not message_id:
-            await send_message_create_via_websocket(session_id, ai_msg_id)
+            await send_message_create(session_id, ai_msg_id)
 
         # Send empty text chunk for consistency when only keywords are present
         empty_chunk_data = {'text': '', 'audio': None, 'index': 0}
         empty_sse_chunk = f"data: {json.dumps(empty_chunk_data)}\n\n"
         is_streaming = bool(message_id)
-        await send_tts_chunk_via_websocket(session_id, empty_sse_chunk, ai_msg_id, is_streaming)
-
-
-async def send_message_create_via_websocket(session_id: str, message_id: str):
-    """
-    Send MESSAGE_CREATE event via WebSocket to create a new bot message.
-
-    Notifies frontend to create a new bot message with the specified ID
-    before TTS chunks are processed.
-
-    Args:
-        session_id: WebSocket session ID
-        message_id: ID for the new message to create
-    """
-    try:
-        # Get WebSocket connection manager
-        from backend.infrastructure.websocket.connection_manager import get_connection_manager
-        connection_manager = get_connection_manager()
-
-        if not connection_manager or not connection_manager.is_connected_sync(session_id):
-            return  # No WebSocket connection available
-
-        # Create MESSAGE_CREATE message
-        from backend.presentation.websocket.message_types import MessageType, create_message
-        create_message_msg = create_message(
-            MessageType.MESSAGE_CREATE,
-            session_id=session_id,
-            message_id=message_id,
-            role="assistant",
-            initial_text="",
-            streaming=True
-        )
-
-        # Send to WebSocket client
-        await connection_manager.send_json(session_id, create_message_msg.model_dump())
-
-    except Exception as e:
-        # Don't break the main flow if WebSocket sending fails
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to send MESSAGE_CREATE via WebSocket to session {session_id}: {e}")
-
-
-async def send_tts_chunk_via_websocket(
-    session_id: str,
-    sse_chunk: str,
-    message_id: Optional[str] = None,
-    is_streaming: bool = False
-):
-    """
-    Send TTS chunk data via WebSocket to frontend.
-
-    Parses SSE formatted chunk and sends as structured WebSocket TTS_CHUNK message
-    for frontend text-audio queue processing.
-
-    Args:
-        session_id: WebSocket session ID
-        sse_chunk: SSE formatted chunk from TTS processor
-        message_id: Optional message ID for association
-        is_streaming: If True, only send audio (text already displayed via streaming)
-    """
-    try:
-        # Get WebSocket connection manager
-        from backend.infrastructure.websocket.connection_manager import get_connection_manager
-        connection_manager = get_connection_manager()
-
-        if not connection_manager or not connection_manager.is_connected_sync(session_id):
-            return  # No WebSocket connection available
-
-        # Parse SSE chunk data
-        if not sse_chunk.startswith('data: '):
-            return
-
-        json_str = sse_chunk.replace('data: ', '').strip()
-        if not json_str or json_str == '\n\n':
-            return
-
-        chunk_data = json.loads(json_str)
-
-        # For streaming messages: clear text field (audio-only)
-        # For non-streaming messages: keep text field (incremental display)
-        text_content = '' if is_streaming else chunk_data.get('text', '')
-
-        # Create WebSocket TTS chunk message
-        tts_message = create_message(
-            MessageType.TTS_CHUNK,
-            session_id=session_id,
-            message_id=message_id,
-            text=text_content,
-            audio=chunk_data.get('audio'),
-            index=chunk_data.get('index', 0),
-            processing_time=chunk_data.get('processing_time'),
-            engine_status=chunk_data.get('engine_status', 'success'),
-            error=chunk_data.get('error'),
-            is_final=chunk_data.get('failed', False) or chunk_data.get('pipeline_failed', False)
-        )
-
-        # Send to WebSocket client
-        await connection_manager.send_json(session_id, tts_message.model_dump())
-
-    except Exception as e:
-        # Don't break the main flow if WebSocket sending fails
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to send TTS chunk via WebSocket to session {session_id}: {e}")
+        await send_tts_chunk(session_id, empty_sse_chunk, ai_msg_id, is_streaming)
