@@ -1,17 +1,21 @@
 """
-Content processing pipeline for LLM responses.
+Content Processing Service - Application layer use case for LLM response handling.
 
-This module handles the processing of final LLM responses,
-including message saving, keyword extraction, and TTS coordination.
+This service orchestrates the complete content processing pipeline for LLM responses:
+- Content extraction from structured messages
+- Message persistence to conversation history
+- Keyword extraction for emotional expressions
+- TTS processing coordination
 
-WebSocket communication is delegated to message_sender module for
-proper separation of concerns.
+As an application service, it coordinates multiple infrastructure components
+(MessageService, NotificationService, TTS) to implement the content processing
+use case. WebSocket communication is delegated to presentation layer for proper
+separation of concerns.
 """
 
 import json
-from typing import Dict, Any, AsyncGenerator, Optional, List, Union
+from typing import Dict, Any, Optional, List
 from backend.domain.models.messages import BaseMessage
-from backend.domain.models.message_factory import message_factory
 from backend.application.services.message_service import MessageService
 from backend.presentation.websocket.message_sender import send_message_create, send_tts_chunk
 

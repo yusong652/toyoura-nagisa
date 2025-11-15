@@ -1,15 +1,18 @@
 """
-Contents Services - Specialized content generation services.
+Contents Services - Content processing and generation services.
 
-This package provides domain-specific services for generating
-various types of content including titles, images, videos, and TTS.
+This package provides services for processing and generating various types of content:
+- Content processing: LLM response handling, keyword extraction, message persistence
+- Content generation: Titles, images, videos, TTS
 """
+from backend.application.services.contents.content_processor import process_content_pipeline
 from backend.application.services.contents.title_service import TitleService
 from backend.application.services.contents.image_service import ImageService
 from backend.application.services.contents.video_service import VideoService
 from backend.application.services.contents.tts_service import TTSService
 
 __all__ = [
+    'process_content_pipeline',
     'TitleService',
     'ImageService',
     'VideoService',

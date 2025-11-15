@@ -8,7 +8,7 @@ managing request lifecycle, client validation, and pipeline orchestration.
 import uuid
 import logging
 from typing import Optional
-from backend.presentation.streaming.content_processor import process_content_pipeline
+from backend.application.services.contents.content_processor import process_content_pipeline
 from backend.application.services.memory_service import save_session_conversation_memory
 from backend.application.services.notifications import get_message_status_service
 from backend.application.services.request_manager import request_manager
