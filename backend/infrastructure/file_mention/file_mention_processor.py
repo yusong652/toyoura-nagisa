@@ -89,9 +89,21 @@ class FileMentionProcessor:
             file_content = await self._read_file_safe(file_path)
 
             if file_content.success:
+                # 1. Format reminder for LLM injection
                 reminder = self._format_file_reminder(file_content)
                 reminders.append(reminder)
                 logger.info(f"Successfully read mentioned file: {file_path}")
+
+                # 2. Track read file in tool_manager (for edit prerequisite validation)
+                # This allows LLM to directly edit mentioned files without explicit Read tool call
+                try:
+                    from backend.shared.utils.app_context import get_llm_client
+                    llm_client = get_llm_client()
+                    llm_client.tool_manager._track_read_file(self.session_id, file_content.path)
+                    logger.debug(f"Tracked mentioned file as read: {file_content.path}")
+                except Exception as e:
+                    # Non-critical: Log warning but don't block file injection
+                    logger.warning(f"Failed to track read file '{file_path}': {e}")
             else:
                 # Skip failed files (just log, don't inject)
                 logger.warning(
