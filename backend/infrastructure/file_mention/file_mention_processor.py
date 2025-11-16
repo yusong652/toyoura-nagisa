@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from backend.infrastructure.mcp.tools.coding.utils.path_security import (
     validate_path_in_workspace,
     is_safe_symlink,
-    check_parent_symlinks,
-    get_workspace_root
+    check_parent_symlinks
 )
+from backend.shared.utils.workspace import get_workspace_for_profile
 from backend.infrastructure.mcp.utils.path_normalization import (
     normalize_path_separators,
     path_to_llm_format
@@ -52,14 +52,16 @@ class FileMentionProcessor:
     - Error handling (skip failed files)
     """
 
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, agent_profile: str = "general"):
         """
         Initialize processor for a session.
 
         Args:
             session_id: Session ID for workspace resolution
+            agent_profile: Agent profile for workspace determination (general, pfc, coding, etc.)
         """
         self.session_id = session_id
+        self.agent_profile = agent_profile
 
     async def process_mentioned_files(
         self,
@@ -138,8 +140,10 @@ class FileMentionProcessor:
             # Normalize path
             normalized_path = normalize_path_separators(file_path.strip())
 
-            # Get workspace root
-            workspace_root = get_workspace_root()
+            # Get workspace root based on agent profile
+            # For PFC profile: tries PFC server's working directory first, falls back to pfc_workspace
+            # For other profiles: uses unified workspace directory
+            workspace_root = await get_workspace_for_profile(self.agent_profile, self.session_id)
 
             # Validate path and get absolute path
             abs_file_path = validate_path_in_workspace(normalized_path, workspace_root)
