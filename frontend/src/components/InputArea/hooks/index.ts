@@ -26,6 +26,8 @@ export { default as useMessageSending } from './useMessageSending'
 export { default as useInputAutoResize } from './useInputAutoResize'
 export { default as useSlashCommandDetection, BUILTIN_COMMANDS } from './useSlashCommandDetection'
 export { useSlashCommandExecution } from './useSlashCommandExecution'
+export { default as useFileSearch } from './useFileSearch'
+export { default as useFileMentionDetection } from './useFileMentionDetection'
 
 // Re-export hook return types for convenience
 export type {
@@ -34,5 +36,7 @@ export type {
   MessageSendingHookReturn,
   InputAutoResizeHookReturn,
   SlashCommandDetectionHookReturn,
-  SlashCommandExecutionHookReturn
+  SlashCommandExecutionHookReturn,
+  FileSearchHookReturn,
+  FileMentionDetectionHookReturn
 } from '../types'

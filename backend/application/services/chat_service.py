@@ -165,7 +165,15 @@ class ChatService:
         if not session_id:
             raise ValueError("Session ID is required in the message data")
 
-        # 3. Inject system status reminders BEFORE saving to database
+        # 3. Extract file mentions from message text (@ mentions)
+        message_text = parsed_data.get('message', '')
+        if message_text:
+            mentioned_files = self._extract_file_mentions(message_text)
+            if mentioned_files:
+                parsed_data['mentioned_files'] = mentioned_files
+                print(f"[DEBUG] Extracted {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
+
+        # 4. Inject system status reminders BEFORE saving to database
         # This ensures the database stores the complete message with context
         await self._inject_status_reminders(session_id, parsed_data)
 
@@ -199,34 +207,101 @@ class ChatService:
             'message_id': parsed_data.get('id')
         }
 
+    def _extract_file_mentions(self, text: str) -> list[str]:
+        """
+        Extract file paths from @ mentions in message text.
+
+        Parses message content to find all @ file mention patterns and extracts
+        the file paths. Supports paths with directories, extensions, and special characters.
+
+        Pattern: @<filepath> where filepath contains:
+        - Alphanumeric characters (a-z, A-Z, 0-9)
+        - Dots (.)
+        - Hyphens (-)
+        - Underscores (_)
+        - Forward slashes (/)
+
+        Stops at:
+        - Whitespace (space, tab, newline)
+        - End of string
+
+        Args:
+            text: Message text content to parse
+
+        Returns:
+            List of unique file paths (relative to workspace)
+
+        Examples:
+            >>> _extract_file_mentions("Check @backend/app.py")
+            ['backend/app.py']
+
+            >>> _extract_file_mentions("Compare @src/a.py and @src/b.py")
+            ['src/a.py', 'src/b.py']
+
+            >>> _extract_file_mentions("Same @file.txt twice @file.txt")
+            ['file.txt']
+        """
+        import re
+
+        file_paths = []
+        seen = set()
+
+        # Regex to match @ followed by a file path
+        # Pattern: @<path> where path contains alphanumeric, dots, slashes, dashes, underscores
+        # Stops at whitespace, newline, or end of string
+        pattern = r'@([a-zA-Z0-9._\-/]+)'
+
+        for match in re.finditer(pattern, text):
+            file_path = match.group(1)
+
+            # Deduplicate
+            if file_path not in seen:
+                seen.add(file_path)
+                file_paths.append(file_path)
+
+        return file_paths
+
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
-        Inject system status reminders into user message content before saving.
+        Inject system status reminders and file mentions into user message content before saving.
 
-        This ensures that background task status (bash processes, PFC tasks, etc.)
-        is communicated to the LLM via the user message, maintaining consistency
-        with the existing tool result injection pattern.
+        This ensures that background task status (bash processes, PFC tasks, etc.) and
+        mentioned files are communicated to the LLM via the user message, maintaining
+        consistency with the existing tool result injection pattern.
 
         Args:
             session_id: Session ID for retrieving status monitor
             parsed_data: Parsed message data (modified in-place)
 
         Implementation notes:
+            - Processes file mentions first (from parsed_data['mentioned_files'])
             - Retrieves reminders from StatusMonitor (same source as tool results)
             - Injects into last text part of content list
             - Creates new text part if no text exists (image-only messages)
             - Format matches tool result injection: <system-reminder>...</system-reminder>
         """
         try:
-            # 1. Get status monitor for this session
+            reminders = []
+
+            # 1. Process file mentions (if present)
+            mentioned_files = parsed_data.get('mentioned_files', [])
+            if mentioned_files:
+                from backend.infrastructure.file_mention import FileMentionProcessor
+                agent_profile = parsed_data.get('agent_profile', 'general')
+                processor = FileMentionProcessor(session_id, agent_profile)
+                file_reminders = await processor.process_mentioned_files(mentioned_files)
+                reminders.extend(file_reminders)
+
+            # 2. Get status monitor for this session
             from backend.infrastructure.monitoring import get_status_monitor
             status_monitor = get_status_monitor(session_id)
 
-            # 2. Set agent profile for optimized querying (skip PFC if not pfc profile)
+            # 3. Set agent profile for optimized querying (skip PFC if not pfc profile)
             status_monitor.agent_profile = parsed_data.get('agent_profile', 'general')
 
-            # 3. Retrieve all system reminders (async)
-            reminders = await status_monitor.get_all_reminders()
+            # 4. Retrieve all system reminders (async)
+            status_reminders = await status_monitor.get_all_reminders()
+            reminders.extend(status_reminders)
 
             if not reminders:
                 return

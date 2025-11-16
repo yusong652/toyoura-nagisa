@@ -5,16 +5,20 @@ from typing import Any, List, Dict, Optional, TypedDict
 # Memory manager initialization removed - preparing for memory system refactoring
 # memory_manager = MemoryManager()
 
-class MessageParseResult(TypedDict):
-    """Type definition for message parsing result"""
-    content: Optional[List[Dict[str, Any]]]
-    timestamp: Optional[int]
-    id: Optional[str]
+class _MessageParseResultRequired(TypedDict):
+    """Required fields in message parsing result"""
+    content: List[Dict[str, Any]]
     session_id: str
     agent_profile: str
-    message: str  # Add text message field
-    request_id: str  # Add request ID field
-    enable_memory: bool  # Add memory setting field
+    message: str
+    request_id: str
+    enable_memory: bool
+
+class MessageParseResult(_MessageParseResultRequired, total=False):
+    """Type definition for message parsing result with optional fields"""
+    timestamp: Optional[int]
+    id: Optional[str]
+    mentioned_files: List[str]  # File paths from @ mentions
 
 def parse_message_data(data: dict) -> MessageParseResult:
     """Parse WebSocket message data in unified format"""

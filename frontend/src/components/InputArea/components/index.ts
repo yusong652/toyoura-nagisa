@@ -24,6 +24,7 @@ export { default as FilePreviewArea } from './FilePreviewArea'
 export { default as MessageInput } from './MessageInput'
 export { default as InputControls } from './InputControls'
 export { default as SlashCommandSuggestions } from './SlashCommandSuggestions'
+export { default as FileMentionSuggestions } from './FileMentionSuggestions'
 
 // Re-export component prop types for convenience
 export type {

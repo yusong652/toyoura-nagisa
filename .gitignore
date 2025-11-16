@@ -71,6 +71,7 @@ backend/config.py
 # Local model configurations with HPC SSH credentials
 backend/chat/local/config.py
 workspace/
+pfc_workspace/
 backend/location_data/
 
 # PFC server examples (user-specific test files)
