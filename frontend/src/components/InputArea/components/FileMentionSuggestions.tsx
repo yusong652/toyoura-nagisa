@@ -65,66 +65,48 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
     onSelectSuggestion(suggestion)
   }
 
-  // Get relevance badge color based on score
-  const getRelevanceBadgeColor = (score: number): string => {
-    if (score >= 90) return 'high-relevance'
-    if (score >= 70) return 'medium-relevance'
-    return 'low-relevance'
-  }
-
-  // Get file type icon based on extension
-  const getFileIcon = (filename: string): string => {
+  // Get file type indicator based on extension (bash style - text only)
+  const getFileTypeIndicator = (filename: string): string => {
     const extension = filename.split('.').pop()?.toLowerCase()
 
     switch (extension) {
-      case 'py': return '🐍'
+      case 'py': return 'py'
       case 'ts':
-      case 'tsx': return '📘'
+      case 'tsx': return 'ts'
       case 'js':
-      case 'jsx': return '📜'
-      case 'md': return '📝'
-      case 'json': return '📋'
-      case 'txt': return '📄'
+      case 'jsx': return 'js'
+      case 'md': return 'md'
+      case 'json': return 'json'
+      case 'txt': return 'txt'
       case 'css':
-      case 'scss': return '🎨'
-      case 'html': return '🌐'
+      case 'scss': return 'css'
+      case 'html': return 'html'
       case 'png':
       case 'jpg':
       case 'jpeg':
       case 'gif':
-      case 'svg': return '🖼️'
-      default: return '📁'
+      case 'svg': return 'img'
+      default: return 'file'
     }
   }
 
-  // Extract directory from path
-  const getDirectory = (path: string): string => {
-    const parts = path.split('/')
-    if (parts.length <= 1) return ''
-    return parts.slice(0, -1).join('/') + '/'
-  }
-
   return (
-    <div className={`file-mention-suggestions ${className}`.trim()}>
+    <div className={`file-mention-suggestions bash-style ${className}`.trim()}>
       <div className="suggestions-header">
-        <span className="suggestions-title">Files</span>
-        {isLoading ? (
-          <span className="suggestions-loading">Searching...</span>
-        ) : (
-          <span className="suggestions-count">{displaySuggestions.length}</span>
+        <span className="bash-prompt">$</span>
+        <span className="suggestions-title">files</span>
+        {!isLoading && (
+          <span className="suggestions-count">[{displaySuggestions.length}]</span>
         )}
       </div>
 
       <div className="suggestions-list">
         {isLoading && displaySuggestions.length === 0 ? (
           <div className="suggestion-loading-state">
-            <span className="loading-spinner">⏳</span>
-            <span className="loading-text">Searching files...</span>
+            <span className="loading-text">searching...</span>
           </div>
         ) : (
           displaySuggestions.map((suggestion, index) => {
-            const directory = getDirectory(suggestion.file.path)
-
             return (
               <div
                 key={suggestion.file.path}
@@ -137,38 +119,19 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
                 aria-selected={index === selectedIndex}
                 tabIndex={-1}
               >
-                {/* File icon and name */}
-                <div className="suggestion-main">
-                  <div className="suggestion-file">
-                    <span className="file-icon">
-                      {getFileIcon(suggestion.file.filename)}
-                    </span>
-                    <div className="file-info">
-                      <div className="file-path-container">
-                        {directory && (
-                          <span className="file-directory">{directory}</span>
-                        )}
-                        <span className="file-name">{suggestion.file.filename}</span>
-                      </div>
-                      <div className="file-full-path">
-                        {suggestion.file.path}
-                      </div>
-                    </div>
-                    <span className={`relevance-badge ${getRelevanceBadgeColor(suggestion.relevanceScore)}`}>
-                      {Math.round(suggestion.relevanceScore)}%
-                    </span>
-                  </div>
-                </div>
+                {/* Bash-style file listing: [type] path */}
+                <span className="file-type-badge">[{getFileTypeIndicator(suggestion.file.filename)}]</span>
+                <span className="file-path-text">{suggestion.file.path}</span>
               </div>
             )
           })
         )}
       </div>
 
-      {/* Footer with usage hint */}
+      {/* Footer with usage hint - bash style */}
       <div className="suggestions-footer">
         <span className="usage-hint">
-          ↑↓ to navigate • ⏎ to select • esc to cancel
+          ↑↓ navigate | ⏎ select | esc cancel
         </span>
       </div>
     </div>

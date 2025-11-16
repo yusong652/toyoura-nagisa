@@ -62,31 +62,14 @@ const SlashCommandSuggestions: React.FC<SlashCommandSuggestionsProps> = ({
     onSelectSuggestion(suggestion)
   }
   
-  // Get relevance badge color based on score
-  const getRelevanceBadgeColor = (score: number): string => {
-    if (score >= 90) return 'high-relevance'
-    if (score >= 70) return 'medium-relevance'
-    return 'low-relevance'
-  }
-  
-  // Get category icon for command
-  const getCategoryIcon = (category?: string): string => {
-    switch (category) {
-      case 'media': return '🎨'
-      case 'utility': return '🛠️'
-      case 'communication': return '💬'
-      case 'file': return '📁'
-      default: return '⚡'
-    }
-  }
-  
   return (
-    <div className={`slash-command-suggestions ${className}`.trim()}>
+    <div className={`slash-command-suggestions bash-style ${className}`.trim()}>
       <div className="suggestions-header">
-        <span className="suggestions-title">Commands</span>
-        <span className="suggestions-count">{displaySuggestions.length}</span>
+        <span className="bash-prompt">$</span>
+        <span className="suggestions-title">commands</span>
+        <span className="suggestions-count">[{displaySuggestions.length}]</span>
       </div>
-      
+
       <div className="suggestions-list">
         {displaySuggestions.map((suggestion, index) => (
           <div
@@ -100,35 +83,18 @@ const SlashCommandSuggestions: React.FC<SlashCommandSuggestionsProps> = ({
             aria-selected={index === selectedIndex}
             tabIndex={-1}
           >
-            {/* Command trigger and category */}
-            <div className="suggestion-main">
-              <div className="suggestion-trigger">
-                <span className="category-icon">
-                  {getCategoryIcon(suggestion.command.category)}
-                </span>
-                <span className="trigger-text">
-                  /{suggestion.command.trigger}
-                </span>
-                <span className={`relevance-badge ${getRelevanceBadgeColor(suggestion.relevanceScore)}`}>
-                  {Math.round(suggestion.relevanceScore)}%
-                </span>
-              </div>
-              
-              {/* Command description */}
-              <div className="suggestion-description">
-                {suggestion.command.description}
-              </div>
-            </div>
-            
-            {/* Selection indicator removed */}
+            {/* Bash-style command listing: /command - description */}
+            <span className="command-trigger">/{suggestion.command.trigger}</span>
+            <span className="command-separator">-</span>
+            <span className="command-description">{suggestion.command.description}</span>
           </div>
         ))}
       </div>
-      
-      {/* Footer with usage hint */}
+
+      {/* Footer with usage hint - bash style */}
       <div className="suggestions-footer">
         <span className="usage-hint">
-          ↑↓ to navigate • ⏎ to select • esc to cancel
+          ↑↓ navigate | ⏎ select | esc cancel
         </span>
       </div>
     </div>
