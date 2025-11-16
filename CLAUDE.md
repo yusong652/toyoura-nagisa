@@ -41,11 +41,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Clean Architecture Pattern
 
 ```
-Presentation Layer (FastAPI, WebSocket)
+Presentation Layer (API, WebSocket, Handlers)
     ↓ depends on
-Domain Layer (Business Logic, Models)
+Application Layer (Services, Orchestration)
     ↓ depends on
-Infrastructure Layer (LLM, MCP, Memory, PFC)
+Domain Layer (Models, Business Rules)
+    ↓ depends on
+Infrastructure Layer (LLM, MCP, Memory, PFC, Storage)
 ```
 
 **Key Principles**:
@@ -53,16 +55,29 @@ Infrastructure Layer (LLM, MCP, Memory, PFC)
 - **Single Responsibility**: Each layer has clear boundaries
 - **Testability**: Domain logic isolated from external systems
 
-**Example**: Swapping LLM providers requires zero domain layer changes (`backend/infrastructure/llm/base/llm_client.py`)
+**Layer Responsibilities**:
+- **Presentation**: API routes, WebSocket handlers, request/response formatting
+- **Application**: Business logic orchestration (ChatOrchestrator, content processing)
+- **Domain**: Core models and business rules (StreamingChunk, BaseMessage)
+- **Infrastructure**: External integrations (LLM providers, MCP tools, storage)
+
+**Example**: Swapping LLM providers requires zero application/domain layer changes (`backend/infrastructure/llm/base/client.py`)
 
 ### LLM Multi-Provider Architecture
 
-**Base Abstraction**: `backend/infrastructure/llm/base/llm_client.py`
+**Base Abstraction**: `backend/infrastructure/llm/base/client.py`
 ```python
-class LLMClient(ABC):
+class LLMClientBase(ABC):
     @abstractmethod
-    async def chat_stream(...) -> AsyncIterator[str]: ...
+    async def call_api_with_context_streaming(...) -> AsyncGenerator[StreamingChunk, None]:
+        """Streaming API call returning unified StreamingChunk format"""
+
+    @abstractmethod
+    async def call_api_with_context(...) -> Any:
+        """Non-streaming API call for tool execution"""
 ```
+
+**Unified Streaming Format**: All providers return standardized `StreamingChunk` objects (`backend/domain/models/streaming.py`) containing chunk type (thinking/text/function_call), content, and metadata.
 
 **Providers**: `backend/infrastructure/llm/providers/`
 - `gemini/`: Google Gemini (primary provider)
@@ -234,14 +249,32 @@ aiNagisa/
 │   ├── app.py                      # Main FastAPI application
 │   ├── presentation/               # API routes and WebSocket handlers
 │   │   ├── api/
-│   │   │   └── profiles.py        # Agent profile API
+│   │   │   ├── profiles.py        # Agent profile API
+│   │   │   └── file_search.py     # File mention search API
 │   │   ├── websocket/             # WebSocket connection management
+│   │   ├── handlers/              # Request handlers
+│   │   │   ├── chat_request_handler.py  # Chat request processing
+│   │   │   └── tts_handler.py     # TTS processing
 │   │   └── streaming/             # Response streaming handlers
+│   ├── application/                # Business logic orchestration
+│   │   └── services/              # Business services
+│   │       ├── chat_service.py    # Chat message processing
+│   │       ├── conversation/      # Conversation orchestration
+│   │       │   ├── chat_orchestrator.py  # Core conversation flow
+│   │       │   └── models.py      # StreamingState and models
+│   │       └── contents/          # Content processing
+│   │           ├── content_processor.py  # Content pipeline
+│   │           └── tts/           # TTS processing
 │   ├── domain/                     # Core business logic
-│   │   └── models/                # Domain models and message factory
+│   │   └── models/                # Domain models
+│   │       ├── streaming.py       # StreamingChunk unified format
+│   │       ├── messages.py        # BaseMessage, AssistantMessage
+│   │       └── message_factory.py # Message factory functions
 │   ├── infrastructure/             # External system integrations
 │   │   ├── llm/                   # LLM provider integrations
-│   │   │   ├── base/              # Common abstractions (LLMClient ABC)
+│   │   │   ├── base/              # Common abstractions
+│   │   │   │   ├── client.py      # LLMClientBase ABC
+│   │   │   │   └── response_processor.py  # BaseStreamingProcessor
 │   │   │   ├── providers/         # Provider implementations
 │   │   │   │   ├── gemini/
 │   │   │   │   ├── anthropic/
@@ -258,10 +291,15 @@ aiNagisa/
 │   │   │   │   └── pfc/           # PFC simulation tools
 │   │   │   └── utils/
 │   │   │       └── tool_result.py # Unified tool response format
+│   │   ├── file_mention/          # File mention processing
+│   │   │   └── file_mention_processor.py  # Safe file reading and injection
 │   │   ├── pfc/
 │   │   │   └── websocket_client.py # PFC WebSocket client
 │   │   ├── memory/                # ChromaDB memory system
 │   │   ├── storage/               # File and session storage
+│   │   ├── websocket/             # WebSocket infrastructure
+│   │   │   ├── connection_manager.py     # Connection management
+│   │   │   └── notification_service.py   # WebSocket notifications
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
 │   ├── shared/                     # Common utilities and exceptions
@@ -310,6 +348,8 @@ Many tools integrate with Google services via OAuth:
 - Messages use factory pattern with `message_factory()` and `message_factory_no_thinking()`
 - Support for text, image, and tool result messages
 - Real-time streaming with WebSocket support
+- Unified `StreamingChunk` format across all LLM providers (thinking/text/function_call types)
+- File mention support (`@file` syntax for automatic content injection)
 
 ### Tool Integration
 - Each tool category has its own registration function
