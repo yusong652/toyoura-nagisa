@@ -24,6 +24,7 @@ class ChatMessageRequest(BaseWebSocketMessage):
         enable_memory: Whether to use long-term memory for this message
         tts_enabled: Whether to enable text-to-speech for the response
         files: Attached files (images, documents, etc.)
+        mentioned_files: File paths mentioned via @ syntax (for content injection)
     """
     type: MessageType = MessageType.CHAT_MESSAGE
     message: str
@@ -33,6 +34,7 @@ class ChatMessageRequest(BaseWebSocketMessage):
     enable_memory: bool = True
     tts_enabled: bool = False
     files: List[Dict[str, Any]] = []
+    mentioned_files: List[str] = []
 
 
 class MessageCreateMessage(BaseWebSocketMessage):

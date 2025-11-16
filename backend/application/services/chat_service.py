@@ -201,32 +201,44 @@ class ChatService:
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
-        Inject system status reminders into user message content before saving.
+        Inject system status reminders and file mentions into user message content before saving.
 
-        This ensures that background task status (bash processes, PFC tasks, etc.)
-        is communicated to the LLM via the user message, maintaining consistency
-        with the existing tool result injection pattern.
+        This ensures that background task status (bash processes, PFC tasks, etc.) and
+        mentioned files are communicated to the LLM via the user message, maintaining
+        consistency with the existing tool result injection pattern.
 
         Args:
             session_id: Session ID for retrieving status monitor
             parsed_data: Parsed message data (modified in-place)
 
         Implementation notes:
+            - Processes file mentions first (from parsed_data['mentioned_files'])
             - Retrieves reminders from StatusMonitor (same source as tool results)
             - Injects into last text part of content list
             - Creates new text part if no text exists (image-only messages)
             - Format matches tool result injection: <system-reminder>...</system-reminder>
         """
         try:
-            # 1. Get status monitor for this session
+            reminders = []
+
+            # 1. Process file mentions (if present)
+            mentioned_files = parsed_data.get('mentioned_files', [])
+            if mentioned_files:
+                from backend.infrastructure.file_mention import FileMentionProcessor
+                processor = FileMentionProcessor(session_id)
+                file_reminders = await processor.process_mentioned_files(mentioned_files)
+                reminders.extend(file_reminders)
+
+            # 2. Get status monitor for this session
             from backend.infrastructure.monitoring import get_status_monitor
             status_monitor = get_status_monitor(session_id)
 
-            # 2. Set agent profile for optimized querying (skip PFC if not pfc profile)
+            # 3. Set agent profile for optimized querying (skip PFC if not pfc profile)
             status_monitor.agent_profile = parsed_data.get('agent_profile', 'general')
 
-            # 3. Retrieve all system reminders (async)
-            reminders = await status_monitor.get_all_reminders()
+            # 4. Retrieve all system reminders (async)
+            status_reminders = await status_monitor.get_all_reminders()
+            reminders.extend(status_reminders)
 
             if not reminders:
                 return
