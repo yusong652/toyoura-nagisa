@@ -188,11 +188,11 @@ const InputArea: React.FC<InputAreaProps> = ({
 
     if (atPosition === -1) return
 
-    // Replace @ and query with @filepath
+    // Replace @ and query with @filepath + space (space triggers dropdown dismiss)
     const before = currentText.substring(0, atPosition)
     const after = currentText.substring(cursor)
-    const newText = `${before}@${suggestion.file.path}${after}`
-    const newCursor = atPosition + 1 + suggestion.file.path.length
+    const newText = `${before}@${suggestion.file.path} ${after}`
+    const newCursor = atPosition + 1 + suggestion.file.path.length + 1
 
     // Update message
     setMessage(newText)
