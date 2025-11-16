@@ -427,7 +427,7 @@ export interface CommandExecutionTask {
  */
 export interface SlashCommandExecutionHookReturn {
   isGeneratingImage: boolean
-  isGeneratingVideo: boolean  
+  isGeneratingVideo: boolean
   executeSlashCommand: (
     command: SlashCommand,
     args: string[],
@@ -435,4 +435,85 @@ export interface SlashCommandExecutionHookReturn {
   ) => Promise<{ success: boolean; error?: string }>
   isExecuting: boolean
   executionQueue: CommandExecutionTask[]
+}
+
+// =============================================================================
+// File Mention Types (@ mention functionality)
+// =============================================================================
+
+/**
+ * File search result from backend API
+ */
+export interface FileSearchResult {
+  path: string           // Relative path from workspace
+  filename: string       // File name only
+  score: number          // Relevance score (0-100)
+}
+
+/**
+ * File search API response
+ */
+export interface FileSearchResponse {
+  status: 'success' | 'error'
+  query: string
+  workspace: string
+  results: FileSearchResult[]
+  total: number
+  error?: string
+}
+
+/**
+ * Matched file mention in the input text
+ */
+export interface FileMentionMatch {
+  file: FileSearchResult
+  fullMatch: string       // e.g., "@test_files/sample.py"
+  position: {
+    start: number         // Position of @ character
+    end: number           // Position after file path
+  }
+}
+
+/**
+ * File suggestion with relevance scoring
+ */
+export interface FileMentionSuggestion {
+  file: FileSearchResult
+  relevanceScore: number
+  matchedText: string
+}
+
+/**
+ * File mention detection context
+ */
+export interface FileMentionContext {
+  currentText: string
+  cursorPosition: number
+  isTriggered: boolean
+  query: string           // Search query after @
+  suggestions: FileMentionSuggestion[]
+}
+
+/**
+ * Hook return type for useFileMentionDetection
+ */
+export interface FileMentionDetectionHookReturn {
+  context: FileMentionContext
+  activeMention: FileMentionMatch | null
+  suggestions: FileMentionSuggestion[]
+  isMentionActive: boolean
+  selectSuggestion: (suggestion: FileMentionSuggestion) => void
+  clearMention: () => void
+  isSearching: boolean
+}
+
+/**
+ * Hook return type for useFileSearch
+ */
+export interface FileSearchHookReturn {
+  searchFiles: (query: string) => Promise<FileSearchResult[]>
+  results: FileSearchResult[]
+  isSearching: boolean
+  error: string | null
+  clearResults: () => void
 }
