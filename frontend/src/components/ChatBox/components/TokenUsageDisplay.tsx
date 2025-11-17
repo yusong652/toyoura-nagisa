@@ -14,10 +14,11 @@ interface TokenUsageDisplayProps {
 }
 
 /**
- * Format number with thousands separators for better readability
+ * Format tokens in K units (e.g., 128000 -> "128k")
  */
-const formatNumber = (num: number): string => {
-  return num.toLocaleString('en-US')
+const formatTokensK = (tokens: number): string => {
+  const k = Math.round(tokens / 1000)
+  return `${k}k`
 }
 
 const TokenUsageDisplay: React.FC<TokenUsageDisplayProps> = ({ messages }) => {
@@ -34,24 +35,25 @@ const TokenUsageDisplay: React.FC<TokenUsageDisplayProps> = ({ messages }) => {
   }, [messages])
 
   // Default values when no usage data available
-  const tokens_left = latestUsage?.tokens_left ?? 1048576  // 1M tokens for Gemini 2.0 Flash
+  const tokens_left = latestUsage?.tokens_left ?? 128000  // Default 128k tokens
   const prompt_tokens = latestUsage?.prompt_tokens ?? 0
+  const total_capacity = prompt_tokens + tokens_left
 
-  // Calculate percentage of context window used
-  const contextUsedPercent = prompt_tokens > 0
-    ? Math.min(100, Math.round((prompt_tokens / (prompt_tokens + tokens_left)) * 100))
-    : 0
+  // Calculate percentage remaining
+  const remainingPercent = total_capacity > 0
+    ? Math.round((tokens_left / total_capacity) * 100)
+    : 100
 
   return (
     <div className="token-usage-display">
       <div className="token-info">
         <span className="token-label">Context</span>
-        <span className="token-value">{formatNumber(tokens_left)}</span>
+        <span className="token-value">{remainingPercent}% ({formatTokensK(tokens_left)})</span>
       </div>
       <div className="context-bar">
         <div
           className="context-used"
-          style={{ width: `${contextUsedPercent}%` }}
+          style={{ width: `${100 - remainingPercent}%` }}
         />
       </div>
     </div>

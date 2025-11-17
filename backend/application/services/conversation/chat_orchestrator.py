@@ -321,8 +321,9 @@ class ChatOrchestrator:
                 # Get last chunk and extract usage from its metadata
                 last_chunk = state.collected_chunks[-1]
                 if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
-                    # Calculate tokens_left based on max context window (1M for Gemini 2.0 Flash)
-                    max_tokens = 1048576
+                    # Import max tokens constant
+                    from backend.shared.constants.model_limits import DEFAULT_MAX_TOKENS
+
                     prompt_tokens = last_chunk.metadata.get('prompt_token_count', 0)
                     completion_tokens = last_chunk.metadata.get('candidates_token_count', 0)
                     total_tokens = last_chunk.metadata.get('total_token_count', 0)
@@ -331,7 +332,7 @@ class ChatOrchestrator:
                         'prompt_tokens': prompt_tokens or 0,
                         'completion_tokens': completion_tokens or 0,
                         'total_tokens': total_tokens or 0,
-                        'tokens_left': max(0, max_tokens - (prompt_tokens or 0))
+                        'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                     }
                     print(f"[ChatOrchestrator] Extracted usage from streaming chunks: {usage}")
                 else:
@@ -410,8 +411,9 @@ class ChatOrchestrator:
                     # Get last chunk and extract usage from its metadata
                     last_chunk = state.collected_chunks[-1]
                     if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
-                        # Calculate tokens_left based on max context window (1M for Gemini 2.0 Flash)
-                        max_tokens = 1048576
+                        # Import max tokens constant
+                        from backend.shared.constants.model_limits import DEFAULT_MAX_TOKENS
+
                         prompt_tokens = last_chunk.metadata.get('prompt_token_count', 0)
                         completion_tokens = last_chunk.metadata.get('candidates_token_count', 0)
                         total_tokens = last_chunk.metadata.get('total_token_count', 0)
@@ -420,7 +422,7 @@ class ChatOrchestrator:
                             'prompt_tokens': prompt_tokens or 0,
                             'completion_tokens': completion_tokens or 0,
                             'total_tokens': total_tokens or 0,
-                            'tokens_left': max(0, max_tokens - (prompt_tokens or 0))
+                            'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                         }
                         print(f"[ChatOrchestrator] Extracted usage from streaming chunks (tool calls): {usage}")
                     else:
