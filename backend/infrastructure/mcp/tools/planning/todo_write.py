@@ -10,27 +10,50 @@ Inspired by PFC task tracking's notified flag pattern for cross-session notifica
 """
 
 import logging
-from typing import List, Dict, Any
-from pydantic import Field
+from typing import List, Dict, Any, Literal
+from pydantic import BaseModel, Field
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
 
-from backend.infrastructure.mcp.utils.tool_result import ToolResult
+from backend.infrastructure.mcp.utils.tool_result import ToolResult, success_response, error_response
 from backend.infrastructure.storage.todo_storage import get_todo_storage
 from backend.shared.utils.workspace import get_workspace_for_session_sync
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["todo_write", "register_todo_write_tool"]
+__all__ = ["todo_write", "register_todo_write_tool", "TodoItem"]
+
+
+# -----------------------------------------------------------------------------
+# TodoItem Model - Pydantic schema for JSON Schema generation
+# -----------------------------------------------------------------------------
+
+class TodoItem(BaseModel):
+    """Single todo item in a task list.
+
+    Defines the schema for individual todo items with strict validation,
+    ensuring LLMs receive clear parameter requirements via JSON Schema.
+    """
+    content: str = Field(
+        min_length=1,
+        description="Task description in imperative form (e.g., 'Run tests', 'Build the project')"
+    )
+    activeForm: str = Field(
+        min_length=1,
+        description="Task description in present continuous form (e.g., 'Running tests', 'Building the project')"
+    )
+    status: Literal["pending", "in_progress", "completed"] = Field(
+        description="Current task status: pending (not started), in_progress (currently working), completed (finished)"
+    )
 
 
 async def todo_write(
     context: Context,
-    todos: List[Dict[str, Any]] = Field(
+    todos: List[TodoItem] = Field(
         ...,
         description="The updated todo list"
     )
-) -> ToolResult:
+) -> Dict[str, Any]:
     """Use this tool to create and manage a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
 It also helps the user understand the progress of the task and overall progress of their requests.
 
@@ -196,59 +219,40 @@ The assistant did not use the todo list because this is a single command executi
 
 When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.
     """
+    # Extract session ID from context (client_id is the session ID in MCP)
+    session_id = context.client_id
+    if not session_id:
+        # Infrastructure error - raise exception for system-level handling
+        # This should never happen in normal operation (backend configuration issue)
+        raise RuntimeError("Session ID not found in context - backend configuration error")
+
     try:
-        # Extract session ID from context (client_id is the session ID in MCP)
-        session_id = context.client_id
-        if not session_id:
-            return ToolResult(
-                status="error",
-                message="Session ID not found in context",
-                llm_content=None,
-                data=None
-            )
 
         # Get workspace directory for this session
         workspace = get_workspace_for_session_sync(session_id)
 
-        # Validate todos format (exact same validation as Claude Code)
-        for i, todo in enumerate(todos):
-            if "content" not in todo:
-                return ToolResult(
-                    status="error",
-                    message=f"Todo at index {i} missing required field 'content'",
-                    llm_content=None,
-                    data=None
-                )
-            if "activeForm" not in todo:
-                return ToolResult(
-                    status="error",
-                    message=f"Todo at index {i} missing required field 'activeForm'",
-                    llm_content=None,
-                    data=None
-                )
-            if "status" not in todo:
-                return ToolResult(
-                    status="error",
-                    message=f"Todo at index {i} missing required field 'status'",
-                    llm_content=None,
-                    data=None
-                )
-            if todo["status"] not in ["pending", "in_progress", "completed"]:
-                return ToolResult(
-                    status="error",
-                    message=f"Todo at index {i} has invalid status '{todo['status']}' (must be pending/in_progress/completed)",
-                    llm_content=None,
-                    data=None
-                )
+        # Validate "only one in_progress" rule (enforced at runtime)
+        in_progress_count = sum(1 for todo in todos if todo.status == "in_progress")
+        if in_progress_count > 1:
+            return error_response(
+                f"Only ONE task can be in_progress at a time (found {in_progress_count}). Please ensure exactly one task is marked as in_progress.",
+                in_progress_count=in_progress_count
+            )
+
+        # Note: Pydantic automatically validates required fields (content, activeForm, status)
+        # and status enum values. No need for manual validation.
+
+        # Convert Pydantic models to dicts for storage (backward compatibility)
+        todos_dict = [todo.model_dump() for todo in todos]
 
         # Save todos (full replacement pattern - same as Claude Code)
         storage = get_todo_storage()
-        storage.save_todos(workspace, session_id, todos)
+        storage.save_todos(workspace, session_id, todos_dict)
 
         # Build summary
         status_counts = {}
         for todo in todos:
-            status = todo["status"]
+            status = todo.status
             status_counts[status] = status_counts.get(status, 0) + 1
 
         summary_parts = []
@@ -261,25 +265,22 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 
         summary = ", ".join(summary_parts) if summary_parts else "no todos"
 
-        return ToolResult(
-            status="success",
+        # Return success response (Claude Code compatible)
+        # Note: session_id and workspace are stored in data for debugging only,
+        # they are NOT included in llm_content (LLM doesn't need internal details)
+        return success_response(
             message=f"Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
-            llm_content=f"Todo list updated successfully. Current status: {summary}.",
-            data={
-                "todo_count": len(todos),
-                "session_id": session_id,
-                "status_breakdown": status_counts,
-                "workspace": str(workspace)
-            }
+            llm_content=f"Todo list updated successfully ({summary}). Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable.",
+            todo_count=len(todos),
+            status_breakdown=status_counts
         )
 
     except Exception as e:
         logger.error(f"Failed to save todos: {e}", exc_info=True)
-        return ToolResult(
-            status="error",
-            message=f"Failed to save todos: {str(e)}",
-            llm_content=None,
-            data=None
+        # Return generic error to LLM (detailed error logged for debugging)
+        # Don't expose internal paths, session IDs, or implementation details
+        return error_response(
+            "Failed to save todo list due to an internal error. Please try again or contact support if the issue persists."
         )
 
 
