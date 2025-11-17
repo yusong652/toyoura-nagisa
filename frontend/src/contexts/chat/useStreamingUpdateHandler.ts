@@ -55,11 +55,9 @@ export const useStreamingUpdateHandler = ({ setMessages, setIsLLMThinking }: Use
           // Stop thinking immediately when tools are detected
           // LLM has finished thinking and is about to execute tools
           setIsLLMThinking?.(false)
-          console.log('[StreamingUpdate] LLM finished thinking, tools will execute')
         } else if (!streaming) {
           // No tools and streaming finished: LLM completely done
           setIsLLMThinking?.(false)
-          console.log('[StreamingUpdate] LLM thinking complete (no tools)')
         }
       }
     }
