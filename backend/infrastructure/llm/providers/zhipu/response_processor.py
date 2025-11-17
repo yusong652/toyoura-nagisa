@@ -52,6 +52,23 @@ class ZhipuStreamingProcessor(BaseStreamingProcessor):
 
         delta = choice.delta
 
+        # Extract usage metadata if available (in final chunk with finish_reason)
+        usage_metadata = {}
+        if hasattr(event, 'usage') and event.usage:
+            usage = event.usage
+            usage_metadata = {
+                'prompt_token_count': getattr(usage, 'prompt_tokens', None),
+                'candidates_token_count': getattr(usage, 'completion_tokens', None),
+                'total_token_count': getattr(usage, 'total_tokens', None),
+            }
+            # Extract detailed token counts if available
+            if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
+                usage_metadata['reasoning_tokens'] = getattr(usage.completion_tokens_details, 'reasoning_tokens', None)
+            if hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
+                cached = getattr(usage.prompt_tokens_details, 'cached_tokens', None)
+                if cached:
+                    usage_metadata['cached_tokens'] = cached
+
         # Handle reasoning content (GLM Thinking models)
         reasoning_delta = getattr(delta, 'reasoning_content', None)
         if reasoning_delta:
@@ -61,7 +78,8 @@ class ZhipuStreamingProcessor(BaseStreamingProcessor):
                 content=reasoning_delta,
                 metadata={
                     "index": getattr(choice, 'index', 0),
-                    "is_reasoning": True
+                    "is_reasoning": True,
+                    **usage_metadata
                 }
             ))
 
@@ -70,7 +88,7 @@ class ZhipuStreamingProcessor(BaseStreamingProcessor):
             result.append(StreamingChunk(
                 chunk_type="text",
                 content=delta.content,
-                metadata={"index": getattr(choice, 'index', 0)}
+                metadata={"index": getattr(choice, 'index', 0), **usage_metadata}
             ))
 
         # Handle tool calls
@@ -135,6 +153,15 @@ class ZhipuStreamingProcessor(BaseStreamingProcessor):
                 ))
             # Clear tool calls after emitting
             self.current_tool_calls.clear()
+
+        # If we have usage metadata but didn't produce any chunks, create a metadata-only chunk
+        # This ensures usage information from the final chunk is not lost
+        if usage_metadata and not result:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content="",
+                metadata=usage_metadata
+            ))
 
         return result
 

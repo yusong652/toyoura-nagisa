@@ -223,6 +223,7 @@ class ZhipuClient(LLMClientBase):
             "temperature": self.zhipu_config.model_settings.temperature,
             "top_p": self.zhipu_config.model_settings.top_p,
             "stream": True,  # Enable streaming
+            # Note: Zhipu's zai SDK automatically includes usage in final chunk, no stream_options needed
         }
 
         if self.zhipu_config.model_settings.max_tokens:
