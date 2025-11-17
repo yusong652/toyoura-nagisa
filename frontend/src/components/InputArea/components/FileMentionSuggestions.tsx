@@ -56,12 +56,6 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
   // Refs for scroll management
   const selectedItemRef = useRef<HTMLDivElement>(null)
 
-  // Don't render if no suggestions and not loading
-  if (suggestions.length === 0 && !isLoading) return null
-
-  // Limit displayed suggestions
-  const displaySuggestions = suggestions.slice(0, maxDisplaySuggestions)
-
   // Auto-scroll selected item into view when selectedIndex changes
   useEffect(() => {
     if (selectedItemRef.current) {
@@ -71,6 +65,12 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
       })
     }
   }, [selectedIndex])
+
+  // Don't render if no suggestions and not loading (AFTER all hooks!)
+  if (suggestions.length === 0 && !isLoading) return null
+
+  // Limit displayed suggestions
+  const displaySuggestions = suggestions.slice(0, maxDisplaySuggestions)
 
   // Handle suggestion selection
   const handleSuggestionClick = (suggestion: FileMentionSuggestion) => {

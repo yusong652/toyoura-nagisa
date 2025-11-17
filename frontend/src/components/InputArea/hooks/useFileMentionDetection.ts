@@ -164,16 +164,26 @@ const useFileMentionDetection = (
     if (atPosition !== -1 && isActivated && !suppressSuggestions) {
       const query = extractQuery(message, cursorPosition, atPosition)
 
+      console.log('[FileMention] Search effect:', {
+        query,
+        queryLength: query.length,
+        isActivated,
+        suppressSuggestions
+      })
+
       // Only search when user has typed at least one character after @
       // This prevents showing empty results when user just types @
       if (query.length > 0) {
+        console.log('[FileMention] 🔍 Triggering search for:', query)
         searchFiles(query)
       } else {
         // Clear results when query is empty (just typed @)
         // User needs to type at least one character to see suggestions
+        console.log('[FileMention] Clearing results - empty query')
         clearResults()
       }
     } else {
+      console.log('[FileMention] Clearing results - conditions not met')
       clearResults()
     }
   }, [message, cursorPosition, isActivated, suppressSuggestions, findAtSignPosition, extractQuery, searchFiles, clearResults])
@@ -184,6 +194,14 @@ const useFileMentionDetection = (
   useEffect(() => {
     const atPosition = findAtSignPosition(message, cursorPosition)
 
+    console.log('[FileMention] Activation effect:', {
+      atPosition,
+      cursorPosition,
+      isActivated,
+      suppressSuggestions,
+      message: message.substring(0, 50)
+    })
+
     // Check if caret moved to just-after @ (re-arm condition)
     const movedToAfterAt = atPosition !== -1 && cursorPosition === atPosition + 1 && prevCursorPosition !== atPosition + 1
 
@@ -192,6 +210,7 @@ const useFileMentionDetection = (
     // - @ is no longer present before cursor
     if (suppressSuggestions) {
       if (movedToAfterAt || atPosition === -1) {
+        console.log('[FileMention] Clearing suppression')
         setSuppressSuggestions(false)
       }
     }
@@ -202,6 +221,7 @@ const useFileMentionDetection = (
       !suppressSuggestions
 
     if (shouldAutoActivate && !isActivated) {
+      console.log('[FileMention] ✅ Activating')
       setIsActivated(true)
     }
 
@@ -217,7 +237,14 @@ const useFileMentionDetection = (
   useEffect(() => {
     const atPosition = findAtSignPosition(message, cursorPosition)
 
+    console.log('[FileMention] Deactivation effect:', {
+      atPosition,
+      isActivated,
+      message: message.substring(0, 50)
+    })
+
     if (isActivated && atPosition === -1) {
+      console.log('[FileMention] ❌ Deactivating - @ not found')
       setIsActivated(false)
       clearResults()
     }
@@ -263,11 +290,28 @@ const useFileMentionDetection = (
     }
   }, [isActivated, clearResults])
 
+  // Show dropdown when:
+  // 1. User is actively typing after @ (isTriggered)
+  // 2. AND (has results OR currently searching OR query exists but no results yet)
+  const hasQuery = context.query.length > 0
+  const isMentionActive = context.isTriggered && (context.suggestions.length > 0 || isSearching || hasQuery)
+
+  console.log('[FileMention] Return state:', {
+    isTriggered: context.isTriggered,
+    suggestionsCount: context.suggestions.length,
+    isSearching,
+    hasQuery,
+    query: context.query,
+    isMentionActive,
+    isActivated,
+    suppressSuggestions
+  })
+
   return {
     context,
     activeMention,
     suggestions: context.suggestions,
-    isMentionActive: context.isTriggered && (context.suggestions.length > 0 || isSearching),
+    isMentionActive,
     selectSuggestion,
     clearMention,
     isSearching
