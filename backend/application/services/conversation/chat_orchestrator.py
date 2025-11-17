@@ -320,6 +320,7 @@ class ChatOrchestrator:
             if state.collected_chunks and len(state.collected_chunks) > 0:
                 # Get last chunk and extract usage from its metadata
                 last_chunk = state.collected_chunks[-1]
+
                 if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
                     # Import max tokens constant
                     from backend.shared.constants.model_limits import DEFAULT_MAX_TOKENS
@@ -334,11 +335,6 @@ class ChatOrchestrator:
                         'total_tokens': total_tokens or 0,
                         'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                     }
-                    print(f"[ChatOrchestrator] Extracted usage from streaming chunks: {usage}")
-                else:
-                    print(f"[ChatOrchestrator] No usage metadata in last chunk")
-            else:
-                print(f"[ChatOrchestrator] No chunks collected")
 
             # Send final streaming update with streaming=False
             from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -410,6 +406,7 @@ class ChatOrchestrator:
                 if state.collected_chunks and len(state.collected_chunks) > 0:
                     # Get last chunk and extract usage from its metadata
                     last_chunk = state.collected_chunks[-1]
+
                     if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
                         # Import max tokens constant
                         from backend.shared.constants.model_limits import DEFAULT_MAX_TOKENS
@@ -424,11 +421,6 @@ class ChatOrchestrator:
                             'total_tokens': total_tokens or 0,
                             'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                         }
-                        print(f"[ChatOrchestrator] Extracted usage from streaming chunks (tool calls): {usage}")
-                    else:
-                        print(f"[ChatOrchestrator] No usage metadata in last chunk (tool calls)")
-                else:
-                    print(f"[ChatOrchestrator] No chunks collected (tool calls)")
 
                 # Send final streaming update
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService

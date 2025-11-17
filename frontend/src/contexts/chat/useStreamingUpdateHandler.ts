@@ -34,11 +34,6 @@ export const useStreamingUpdateHandler = ({ setMessages, setIsLLMThinking }: Use
       const customEvent = event as CustomEvent<StreamingUpdateDetail>
       const { messageId, content, streaming, usage } = customEvent.detail
 
-      console.log(`[StreamingUpdate] Updating message ${messageId}, streaming: ${streaming}`, content)
-      if (usage) {
-        console.log(`[StreamingUpdate] Token usage:`, usage)
-      }
-
       setMessages(prev => prev.map(msg => {
         if (msg.id === messageId) {
           return {
@@ -46,7 +41,7 @@ export const useStreamingUpdateHandler = ({ setMessages, setIsLLMThinking }: Use
             content,           // Replace content array with accumulated blocks
             streaming,         // Update streaming flag
             text: '',          // Clear text field (content takes priority)
-            usage              // Add token usage statistics
+            usage              // Add token usage statistics (may be undefined)
           }
         }
         return msg
