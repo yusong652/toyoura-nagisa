@@ -132,7 +132,7 @@ const useFileMentionDetection = (
    */
   const generateSuggestions = useCallback((): FileMentionSuggestion[] => {
 
-    if (!isActivated || results.length === 0) {
+    if (!isActivated) {
       return []
     }
 
@@ -140,6 +140,11 @@ const useFileMentionDetection = (
     if (atPosition === -1) return []
 
     const query = extractQuery(message, cursorPosition, atPosition)
+
+    // Return empty array if no results yet (but show loading in UI)
+    if (results.length === 0) {
+      return []
+    }
 
     // Convert search results to suggestions
     return results.map(file => ({
@@ -159,10 +164,13 @@ const useFileMentionDetection = (
     if (atPosition !== -1 && isActivated && !suppressSuggestions) {
       const query = extractQuery(message, cursorPosition, atPosition)
 
-      // Search for files (debounced in practice via React rendering)
+      // Only search when user has typed at least one character after @
+      // This prevents showing empty results when user just types @
       if (query.length > 0) {
         searchFiles(query)
       } else {
+        // Clear results when query is empty (just typed @)
+        // User needs to type at least one character to see suggestions
         clearResults()
       }
     } else {
@@ -220,7 +228,8 @@ const useFileMentionDetection = (
     const atPosition = findAtSignPosition(message, cursorPosition)
     const isTriggered = isActivated &&
                        atPosition !== -1 &&
-                       cursorPosition > atPosition
+                       cursorPosition > atPosition &&
+                       !suppressSuggestions
 
     const query = atPosition !== -1 ? extractQuery(message, cursorPosition, atPosition) : ''
     const suggestions = generateSuggestions()
@@ -232,7 +241,7 @@ const useFileMentionDetection = (
       query,
       suggestions
     }
-  }, [message, cursorPosition, isActivated, findAtSignPosition, extractQuery, generateSuggestions])
+  }, [message, cursorPosition, isActivated, suppressSuggestions, findAtSignPosition, extractQuery, generateSuggestions])
 
   // Active file mention match
   const activeMention = useMemo(() => {
@@ -241,7 +250,7 @@ const useFileMentionDetection = (
   }, [context.isTriggered, message, cursorPosition, parseCurrentMention])
 
   // Select suggestion handler
-  const selectSuggestion = useCallback((suggestion: FileMentionSuggestion) => {
+  const selectSuggestion = useCallback((_suggestion: FileMentionSuggestion) => {
     // The parent component handles text replacement
   }, [])
 
@@ -258,7 +267,7 @@ const useFileMentionDetection = (
     context,
     activeMention,
     suggestions: context.suggestions,
-    isMentionActive: context.isTriggered && context.suggestions.length > 0,
+    isMentionActive: context.isTriggered && (context.suggestions.length > 0 || isSearching),
     selectSuggestion,
     clearMention,
     isSearching
