@@ -47,7 +47,29 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
         # Validate chunk structure
         if not isinstance(event, ChatCompletionChunk):
             return result
-        if not hasattr(event, 'choices') or not event.choices:
+
+        # Handle final usage-only chunk (has no choices but has chunk.usage)
+        if not event.choices:
+            if hasattr(event, 'usage') and event.usage:
+                usage = event.usage
+                usage_metadata = {
+                    'prompt_token_count': getattr(usage, 'prompt_tokens', None),
+                    'candidates_token_count': getattr(usage, 'completion_tokens', None),
+                    'total_token_count': getattr(usage, 'total_tokens', None),
+                }
+                # Extract cached tokens if available
+                if hasattr(usage, 'cached_tokens') and usage.cached_tokens:
+                    usage_metadata['cached_tokens'] = usage.cached_tokens
+                # Extract completion_tokens_details if available (for K2 Thinking models)
+                if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
+                    usage_metadata['reasoning_tokens'] = getattr(usage.completion_tokens_details, 'reasoning_tokens', None)
+
+                # Create metadata-only chunk with usage
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content="",
+                    metadata=usage_metadata
+                ))
             return result
 
         choice = event.choices[0]
@@ -55,6 +77,20 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
             return result
 
         delta = choice.delta
+
+        # Also check for usage in choice.usage (appears in finish_reason chunk)
+        usage_metadata = {}
+        if hasattr(choice, 'usage') and choice.usage:
+            usage = choice.usage
+            usage_metadata = {
+                'prompt_token_count': usage.get('prompt_tokens') if isinstance(usage, dict) else getattr(usage, 'prompt_tokens', None),
+                'candidates_token_count': usage.get('completion_tokens') if isinstance(usage, dict) else getattr(usage, 'completion_tokens', None),
+                'total_token_count': usage.get('total_tokens') if isinstance(usage, dict) else getattr(usage, 'total_tokens', None),
+            }
+            # Extract cached tokens
+            cached = usage.get('cached_tokens') if isinstance(usage, dict) else getattr(usage, 'cached_tokens', None)
+            if cached:
+                usage_metadata['cached_tokens'] = cached
 
         # Handle reasoning content (K2 Thinking models)
         reasoning_delta = getattr(delta, 'reasoning_content', None)
@@ -65,7 +101,8 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
                 content=reasoning_delta,
                 metadata={
                     "index": getattr(choice, 'index', 0),
-                    "is_reasoning": True
+                    "is_reasoning": True,
+                    **usage_metadata
                 }
             ))
 
@@ -74,7 +111,7 @@ class KimiStreamingProcessor(BaseStreamingProcessor):
             result.append(StreamingChunk(
                 chunk_type="text",
                 content=delta.content,
-                metadata={"index": getattr(choice, 'index', 0)}
+                metadata={"index": getattr(choice, 'index', 0), **usage_metadata}
             ))
 
         # Handle tool calls

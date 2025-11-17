@@ -232,6 +232,7 @@ class KimiClient(LLMClientBase):
             "temperature": self.kimi_config.model_settings.temperature,
             "top_p": self.kimi_config.model_settings.top_p,
             "stream": True,  # Enable streaming
+            "stream_options": {"include_usage": True},  # Request usage metadata in stream
         }
 
         if self.kimi_config.model_settings.max_tokens:
