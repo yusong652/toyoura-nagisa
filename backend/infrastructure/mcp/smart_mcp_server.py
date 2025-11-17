@@ -27,7 +27,7 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_query_python_api_tool,
     register_pfc_query_command_tool
 )
-from backend.infrastructure.mcp.tools.planning.register import register_planning_tools
+from backend.infrastructure.mcp.tools.planning import register_planning_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
