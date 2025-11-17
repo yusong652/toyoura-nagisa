@@ -66,11 +66,11 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
     }
   }, [selectedIndex])
 
-  // Don't render if no suggestions and not loading (AFTER all hooks!)
-  if (suggestions.length === 0 && !isLoading) return null
-
   // Limit displayed suggestions
   const displaySuggestions = suggestions.slice(0, maxDisplaySuggestions)
+
+  // Show "no results" state when search is complete but no results found
+  const showNoResults = suggestions.length === 0 && !isLoading
 
   // Handle suggestion selection
   const handleSuggestionClick = (suggestion: FileMentionSuggestion) => {
@@ -116,6 +116,10 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
         {isLoading && displaySuggestions.length === 0 ? (
           <div className="suggestion-loading-state">
             <span className="loading-text">searching...</span>
+          </div>
+        ) : showNoResults ? (
+          <div className="suggestion-loading-state">
+            <span className="loading-text">no results found</span>
           </div>
         ) : (
           displaySuggestions.map((suggestion, index) => {
