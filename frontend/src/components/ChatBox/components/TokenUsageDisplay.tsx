@@ -69,16 +69,7 @@ const TokenUsageDisplay: React.FC<TokenUsageDisplayProps> = ({ messages }) => {
 
   return (
     <div className="token-usage-display">
-      <div className="token-info">
-        <span className="token-label">Context</span>
-        <span className="token-value">{remainingPercent}% ({formatTokensK(tokens_left)})</span>
-      </div>
-      <div className="context-bar">
-        <div
-          className="context-used"
-          style={{ width: `${100 - remainingPercent}%` }}
-        />
-      </div>
+      usage: {remainingPercent}% ({formatTokensK(tokens_left)})
     </div>
   )
 }
