@@ -398,7 +398,7 @@ class StatusMonitor:
 
                 # Generate notification
                 notification = (
-                    f"Todo {todo_id}{session_marker} completed: "
+                    f"Todo{session_marker} completed: "
                     f"{content}, {time_info}."
                 )
 
