@@ -399,8 +399,7 @@ class StatusMonitor:
                 # Generate notification
                 notification = (
                     f"Todo {todo_id}{session_marker} completed: "
-                    f"{content}, {time_info}. "
-                    f"Use todo_list() to see all todos."
+                    f"{content}, {time_info}."
                 )
 
                 wrapped_reminders.append(f"<system-reminder>\n{notification}\n</system-reminder>")
