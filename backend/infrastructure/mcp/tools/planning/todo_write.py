@@ -341,7 +341,12 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # they are NOT included in llm_content (LLM doesn't need internal details)
         return success_response(
             message=f"Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable",
-            llm_content=f"Todo list updated successfully ({summary}). Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable.",
+            llm_content={
+                "parts": [{
+                    "type": "text",
+                    "text": f"Todo list updated successfully ({summary}). Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable."
+                }]
+            },
             todo_count=len(todos),
             status_breakdown=status_counts
         )
