@@ -52,6 +52,38 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
         """
         result = []
 
+        # Extract usage metadata from event
+        # Note: For Responses API, usage is in ResponseCompletedEvent.response.usage
+        # For Chat Completions API (if used), usage might be in event.usage
+        usage_info = {}
+        if hasattr(event, 'usage') and event.usage:
+            usage = event.usage
+            # Support both Responses API (input_tokens/output_tokens) and Chat API (prompt_tokens/completion_tokens)
+            usage_info = {
+                'prompt_token_count': getattr(usage, 'input_tokens', None) or getattr(usage, 'prompt_tokens', None),
+                'candidates_token_count': getattr(usage, 'output_tokens', None) or getattr(usage, 'completion_tokens', None),
+                'total_token_count': getattr(usage, 'total_tokens', None),
+            }
+
+            # Extract detailed token counts if available (both API formats)
+            if hasattr(usage, 'output_tokens_details'):
+                details = usage.output_tokens_details
+                if details:
+                    usage_info['reasoning_tokens'] = getattr(details, 'reasoning_tokens', None)
+            elif hasattr(usage, 'completion_tokens_details'):
+                details = usage.completion_tokens_details
+                if details:
+                    usage_info['reasoning_tokens'] = getattr(details, 'reasoning_tokens', None)
+
+            if hasattr(usage, 'input_tokens_details'):
+                details = usage.input_tokens_details
+                if details:
+                    usage_info['cached_tokens'] = getattr(details, 'cached_tokens', None)
+            elif hasattr(usage, 'prompt_tokens_details'):
+                details = usage.prompt_tokens_details
+                if details:
+                    usage_info['cached_tokens'] = getattr(details, 'cached_tokens', None)
+
         # Thinking / reasoning summary events
         if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
             if hasattr(event, 'delta') and event.delta:
@@ -60,7 +92,8 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     content=event.delta,
                     metadata={
                         "item_id": getattr(event, 'item_id', None),
-                        "summary_index": getattr(event, 'summary_index', None)
+                        "summary_index": getattr(event, 'summary_index', None),
+                        **usage_info
                     }
                 ))
 
@@ -73,7 +106,8 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                         content=part_text,
                         metadata={
                             "item_id": getattr(event, 'item_id', None),
-                            "summary_index": getattr(event, 'summary_index', None)
+                            "summary_index": getattr(event, 'summary_index', None),
+                            **usage_info
                         }
                     ))
 
@@ -82,7 +116,7 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                 result.append(StreamingChunk(
                     chunk_type="thinking",
                     content=str(event.delta),
-                    metadata={"item_id": getattr(event, 'item_id', None)}
+                    metadata={"item_id": getattr(event, 'item_id', None), **usage_info}
                 ))
 
         # Text deltas
@@ -93,7 +127,8 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     content=event.delta,
                     metadata={
                         "item_id": getattr(event, 'item_id', None),
-                        "content_index": getattr(event, 'content_index', None)
+                        "content_index": getattr(event, 'content_index', None),
+                        **usage_info
                     }
                 ))
 
@@ -133,7 +168,8 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     content=info.get("name", ""),
                     metadata={
                         "tool_id": info.get("call_id"),
-                        "delta": getattr(event, 'delta', None)
+                        "delta": getattr(event, 'delta', None),
+                        **usage_info
                     },
                     function_call={
                         "id": info.get("call_id"),
@@ -162,7 +198,8 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     content=info.get("name", ""),
                     metadata={
                         "tool_id": info.get("call_id"),
-                        "is_final": True
+                        "is_final": True,
+                        **usage_info
                     },
                     function_call={
                         "id": info.get("call_id"),
@@ -171,8 +208,25 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     }
                 ))
 
-        # ResponseCompletedEvent - capture final response metadata
-        # (We don't emit a chunk for this, just track it if needed)
+        # ResponseCompletedEvent - capture final response metadata and usage
+        if hasattr(event, 'response') and event.response:
+            response = event.response
+            if hasattr(response, 'usage') and response.usage:
+                usage = response.usage
+                usage_info = {
+                    'prompt_token_count': getattr(usage, 'input_tokens', None),
+                    'candidates_token_count': getattr(usage, 'output_tokens', None),
+                    'total_token_count': getattr(usage, 'total_tokens', None),
+                }
+
+        # If we extracted usage but didn't produce any chunks, create a metadata-only chunk
+        # This ensures usage information from the final chunk is not lost
+        if usage_info and not result:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content="",  # Empty content, only metadata
+                metadata=usage_info
+            ))
 
         return result
 
