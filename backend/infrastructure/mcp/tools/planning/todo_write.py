@@ -60,124 +60,195 @@ It also helps the user understand the progress of the task and overall progress 
 ## When to Use This Tool
 Use this tool proactively in these scenarios:
 
-1. Complex multi-step tasks - When a task requires 3 or more distinct steps or actions
-2. Non-trivial and complex tasks - Tasks that require careful planning or multiple operations
-3. User explicitly requests todo list - When the user directly asks you to use the todo list
-4. User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)
-5. After receiving new instructions - Immediately capture user requirements as todos
-6. When you start working on a task - Mark it as in_progress BEFORE beginning work. Ideally you should only have one todo as in_progress at a time
-7. After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation
+1. **PFC Simulation Workflows** - When executing the mandatory script-only workflow (Query → Test → Production → Monitor)
+2. **Multi-stage Simulations** - Tasks involving initialization, equilibration, loading, and analysis phases
+3. **Documentation-Driven Development** - When multiple documentation queries are needed before script writing
+4. **Error Debugging Workflows** - Following the error escalation strategy (Docs → API → Web → User)
+5. **Long-Running Tasks** - Simulations requiring background execution and periodic monitoring
+6. **Multi-File Operations** - Workflows spanning test scripts, production scripts, analysis scripts, and data files
+7. **Complex multi-step tasks** - When a task requires 3 or more distinct steps or actions
+8. **User provides multiple tasks** - When users provide a list of things to be done (numbered or comma-separated)
+9. **After receiving new instructions** - Immediately capture user requirements as todos
+10. **When you start working on a task** - Mark it as in_progress BEFORE beginning work. Ideally you should only have one todo as in_progress at a time
+11. **After completing a task** - Mark it as completed and add any new follow-up tasks discovered during implementation
 
 ## When NOT to Use This Tool
 
 Skip using this tool when:
-1. There is only a single, straightforward task
-2. The task is trivial and tracking it provides no organizational benefit
-3. The task can be completed in less than 3 trivial steps
-4. The task is purely conversational or informational
+1. **Single documentation queries** - Quick reference lookups with immediate answers
+2. **Simple status checks** - Monitoring running tasks with `pfc_check_task_status`
+3. **Trivial script edits** - Single syntax corrections or parameter adjustments
+4. **Informational questions** - Explaining PFC concepts or command differences
+5. **Single, straightforward tasks** - Operations that can be completed in 1-2 simple steps
+6. **Purely conversational interactions** - Answering questions without executing operations
 
 NOTE that you should not use this tool if there is only one trivial task to do. In this case you are better off just doing the task directly.
 
 ## Examples of When to Use the Todo List
 
 <example>
-User: I want to add a dark mode toggle to the application settings. Make sure you run the tests and build when you're done!
-Assistant: I'll help add a dark mode toggle to your application settings. Let me create a todo list to track this implementation.
+User: Create a ball settling simulation with 1000 balls and linear contact model
+Assistant: I'll help create a ball settling simulation. Let me create a todo list to track this PFC workflow.
 *Creates todo list with the following items:*
-1. Creating dark mode toggle component in Settings page
-2. Adding dark mode state management (context/store)
-3. Implementing CSS-in-JS styles for dark theme
-4. Updating existing components to support theme switching
-5. Running tests and build process, addressing any failures or errors that occur
+1. Querying PFC documentation for ball generation syntax
+2. Querying PFC documentation for linear contact model setup
+3. Writing test script with 10 balls for validation
+4. Executing test script to verify syntax correctness
+5. Writing production script with 1000 balls and monitoring loop
+6. Resetting PFC state before production run
+7. Executing production script in background mode
+8. Monitoring simulation progress with real-time output
 *Begins working on the first task*
 
 <reasoning>
 The assistant used the todo list because:
-1. Adding dark mode is a multi-step feature requiring UI, state management, and styling changes
-2. The user explicitly requested tests and build be run afterward
-3. The assistant inferred that tests and build need to pass by adding "Ensure tests and build succeed" as the final task
+1. PFC simulations require multi-stage workflow (query → test → production → monitor)
+2. Each stage has clear success criteria that need tracking
+3. Documentation queries must be completed before script writing
+4. Test validation prevents syntax errors in long-running production runs
+5. The mandatory workflow pattern requires systematic task tracking
 </reasoning>
 </example>
 
 <example>
-User: Help me rename the function getCwd to getCurrentWorkingDirectory across my project
-Assistant: Let me first search through your codebase to find all occurrences of 'getCwd'.
-*Uses grep or search tools to locate all instances of getCwd in the codebase*
-Assistant: I've found 15 instances of 'getCwd' across 8 different files. Let me create a todo list to track these changes.
-*Creates todo list with specific items for each file that needs updating*
+User: Run a triaxial compression test on a soil sample with strain-controlled loading
+Assistant: Let me first query the documentation to understand the required commands for triaxial testing.
+*Queries PFC documentation for domain creation, ball packing, wall confinement, servo control, and strain loading*
+Assistant: I've found the documentation for all required commands. This is a complex multi-stage simulation requiring careful initialization. Let me create a todo list to track these stages.
+*Creates todo list with specific items for each stage:*
+1. Querying documentation for domain extent and ball attributes
+2. Querying documentation for contact model and servo mechanism
+3. Writing test script for sample generation (100 balls)
+4. Validating test script execution
+5. Writing test script for confinement and servo control
+6. Validating servo convergence in test
+7. Writing production script for full sample (5000 balls)
+8. Executing sample generation in background
+9. Writing checkpoint save after equilibrium
+10. Writing strain loading loop with data export
+11. Executing loading phase with progress monitoring
+12. Writing CSV analysis script for stress-strain curve
 
 <reasoning>
 The assistant used the todo list because:
-1. First, the assistant searched to understand the scope of the task
-2. Upon finding multiple occurrences across different files, it determined this was a complex task with multiple steps
-3. The todo list helps ensure every instance is tracked and updated systematically
-4. This approach prevents missing any occurrences and maintains code consistency
+1. Triaxial test involves multiple initialization stages (generation → confinement → loading)
+2. Each stage requires separate documentation queries and validation
+3. Checkpoint management is critical (save after equilibrium before loading)
+4. Long-running task requires background execution and progress tracking
+5. Post-processing analysis requires separate script writing
+6. The workflow spans multiple scripts and data files requiring systematic organization
 </reasoning>
 </example>
 
-
 <example>
-User: I need to implement these features for my e-commerce site: user registration, product catalog, shopping cart, and checkout flow.
-Assistant: I'll help implement these features. First, let's add all the features to the todo list.
-*Creates a todo list breaking down each feature into specific tasks based on the project architecture*
-Assistant: Let's start with user registration. This will involve creating database models, API endpoints, and frontend forms that integrate with your existing authentication system.
+User: I need to implement these analysis tasks: extract particle positions, calculate fabric tensor, visualize contact networks, and export results to CSV
+Assistant: I'll help implement these analysis tasks. First, let's add all the tasks to the todo list.
+*Creates a todo list breaking down each analysis task:*
+1. Querying Python API documentation for Ball.pos() syntax
+2. Writing script to extract particle positions from PFC
+3. Querying documentation for contact iteration methods
+4. Writing fabric tensor calculation function
+5. Exporting contact network data to CSV
+6. Writing Python analysis script for fabric tensor computation
+7. Writing Python visualization script using matplotlib
+8. Executing analysis pipeline and generating plots
 
 <reasoning>
 The assistant used the todo list because:
-1. The user provided multiple complex features to implement in a comma separated list
-2. The todo list helps organize these large features into manageable tasks
-3. This approach allows for tracking progress across the entire implementation
+1. The user provided multiple analysis tasks in a comma-separated list
+2. Each task requires both PFC data extraction and local Python analysis
+3. Documentation queries needed for both PFC Python API and command syntax
+4. Analysis involves two separate environments (PFC Python vs workspace venv)
+5. Visualization requires separate script writing and package installation
+6. The todo list helps track both PFC operations and post-processing tasks
+</reasoning>
+</example>
+
+<example>
+User: My simulation is showing unexpected results. Help me debug the contact model setup
+Assistant: Let me first check the current simulation state and scripts to identify potential issues.
+*Uses read tool to examine existing scripts and grep to search for contact model commands*
+Assistant: I've found several potential issues in your contact model configuration. Let me create a todo list to systematically debug these issues.
+*Creates todo list with diagnostic and fix tasks:*
+1. Reading current production script to understand configuration
+2. Querying documentation for correct contact property syntax
+3. Identifying incorrect parameter usage (found: using 'friction' instead of 'fric')
+4. Writing corrected test script with proper contact property syntax
+5. Executing test script to verify contact model behavior
+6. Querying documentation for contact model validation methods
+7. Writing diagnostic script to print contact properties
+8. Comparing diagnostic output with expected values
+9. Updating production script with corrected parameters
+10. Re-executing production simulation with monitoring
+
+<reasoning>
+The assistant used the todo list because:
+1. Debugging requires systematic investigation of multiple potential issues
+2. Each fix must be validated with test scripts before updating production
+3. Documentation queries needed to verify correct syntax
+4. Diagnostic scripts must be written and executed to confirm issues
+5. The error escalation strategy (docs → API → web → user) requires tracking
+6. Multiple script modifications and validations need organized tracking
 </reasoning>
 </example>
 
 ## Examples of When NOT to Use the Todo List
 
 <example>
-User: How do I print 'Hello World' in Python?
-Assistant: In Python, you can print "Hello World" with this simple code:
+User: What is the difference between ball generate and ball create commands?
+Assistant: The `ball generate` command creates multiple balls at once with specified distributions (e.g., `ball generate number 100 radius 0.1`), while `ball create` creates a single ball at a specific position (e.g., `ball create position (1,2,3) radius 0.1`).
 
-python
-print("Hello World")
-
-This will output the text "Hello World" to the console when executed.</assistant>
+Use `ball generate` for bulk particle creation in random or regular patterns, and `ball create` when you need precise control over individual particle placement.
 
 <reasoning>
-The assistant did not use the todo list because this is a single, trivial task that can be completed in one step. There's no need to track multiple tasks or steps for such a straightforward request.
+The assistant did not use the todo list because this is a pure informational request explaining PFC command differences. No scripts need to be written, no documentation needs to be queried, and no simulation needs to be executed. This is a simple conceptual explanation.
 </reasoning>
 </example>
 
 <example>
-User: What does the git status command do?
-Assistant: The git status command shows the current state of your working directory and staging area. It displays which changes have been staged, which haven't, and which files aren't being tracked by Git. This is a fundamental command for understanding the current state of your repository before making commits.
+User: Check the status of my running simulation task
+Assistant: Let me check the task status for you.
+
+*Executes: pfc_check_task_status(task_id)*
+
+Your simulation is currently running at cycle 5000/10000 (50% complete). The average velocity is 0.023 m/s and the equilibrium ratio is 0.15. The simulation is progressing normally.
 
 <reasoning>
-The assistant did not use the todo list because this is an informational request with no actual coding task to complete. The user is simply asking for an explanation, not for the assistant to perform multiple steps or tasks.
+The assistant did not use the todo list because this is a single status query operation with immediate results. Task monitoring doesn't require multi-step planning or systematic organization - it's a simple query-and-report operation.
 </reasoning>
 </example>
 
 <example>
-User: Can you add a comment to the calculateTotal function to explain what it does?
-Assistant: Sure, let me add a comment to the calculateTotal function to explain what it does.
-* Uses the Edit tool to add a comment to the calculateTotal function *
+User: Show me the current ball count in the simulation
+Assistant: Let me query the PFC documentation for the ball count method.
+
+*Executes: pfc_query_python_api("ball count")*
+
+According to the documentation, you can get the ball count using `itasca.ball.count()`. Let me write a quick script to check your current simulation:
+
+*Writes and executes simple query script*
+
+Your simulation currently contains 1000 balls.
 
 <reasoning>
-The assistant did not use the todo list because this is a single, straightforward task confined to one location in the code. Adding a comment doesn't require tracking multiple steps or systematic organization.
+The assistant did not use the todo list because this is a straightforward query operation. Although it involves documentation lookup and script execution, these are single-purpose steps with immediate results. The workflow is linear (query → script → result) without branching or complex dependencies.
 </reasoning>
 </example>
 
 <example>
-User: Run npm install for me and tell me what happens.
-Assistant: I'll run the npm install command for you.
+User: Fix the syntax error in my test script - I'm getting "unknown parameter 'count'"
+Assistant: Let me read your test script first.
 
-*Executes: npm install*
+*Reads the test script*
 
-The command completed successfully. Here's the output:
-[Output of npm install command]
+I see the issue - you're using `ball generate count 100` but the correct parameter name is `number`. Let me fix this for you.
 
-All dependencies have been installed according to your package.json file.
+*Edits the script to replace 'count' with 'number'*
+
+Fixed! The corrected syntax is `ball generate number 100 radius 0.1`. This should resolve the error.
 
 <reasoning>
-The assistant did not use the todo list because this is a single command execution with immediate results. There are no multiple steps to track or organize, making the todo list unnecessary for this straightforward task.
+The assistant did not use the todo list because this is a single syntax correction task. The issue is already identified (wrong parameter name), the fix is straightforward (replace 'count' with 'number'), and no testing or validation workflow is required. This is a direct edit operation.
 </reasoning>
 </example>
 
