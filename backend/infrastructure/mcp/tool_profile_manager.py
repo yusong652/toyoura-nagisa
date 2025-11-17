@@ -32,7 +32,7 @@ class ToolProfile:
 class ToolProfileManager:
     """Tool collection manager"""
 
-    # Coding tools (including web_search)
+    # Coding tools (including web_search and planning)
     CODING_TOOLS = [
         "write",
         "read",
@@ -42,10 +42,11 @@ class ToolProfileManager:
         "kill_shell",   # Background bash process termination
         "glob",   # File pattern matching
         "grep",
-        "web_search"  # Web search for programming
+        "web_search",  # Web search for programming
+        "todo_write"   # Persistent todo tracking (Claude Code compatible)
     ]
 
-    # Lifestyle tools (all non-coding tools, including web_search)
+    # Lifestyle tools (all non-coding tools, including web_search and planning)
     LIFESTYLE_TOOLS = [
         "send_email",
         "check_emails",
@@ -60,7 +61,8 @@ class ToolProfileManager:
         "search_places",
         "get_location",
         "web_search",  # Web search for lifestyle
-        "get_current_time"
+        "get_current_time",
+        "todo_write"   # Persistent todo tracking (Claude Code compatible)
     ]
 
     # General tools (merged coding and lifestyle, deduplicated)
@@ -75,8 +77,9 @@ class ToolProfileManager:
         "list_contacts", "search_contacts",
         "generate_image", "search_places", "get_location",
         "get_current_time",
-        # Shared tool (only include once)
+        # Shared tools (only include once)
         "web_search",
+        "todo_write",  # Persistent todo tracking (Claude Code compatible)
         # PFC documentation query tools
         "pfc_query_python_api",      # Query Python SDK docs (try first)
         "pfc_query_command",          # Query command docs + model properties
@@ -86,7 +89,7 @@ class ToolProfileManager:
         "pfc_list_tasks"
     ]
 
-    # PFC simulation tools (coding tools + PFC-specific tools)
+    # PFC simulation tools (coding tools + PFC-specific tools + planning)
     PFC_TOOLS = [
         # File operation tools for PFC scripts and data files
         "write",
@@ -98,8 +101,9 @@ class ToolProfileManager:
         "kill_shell",   # Background bash process termination for PFC simulations
         "glob",  # File pattern matching for PFC data files
         "grep",
-        # Search tools for finding PFC documentation and examples
+        # Search and planning tools
         "web_search",
+        "todo_write",  # Persistent todo tracking (essential for PFC workflows, Claude Code compatible)
         # PFC documentation query tools (MANDATORY: use before writing scripts)
         "pfc_query_python_api",     # Query PFC Python SDK docs (try first for Python approach)
         "pfc_query_command",         # Query PFC command docs + model properties (use for itasca.command() syntax)
@@ -115,34 +119,34 @@ class ToolProfileManager:
             name="Coding",
             description="Specialized in code development, file operations and programming tasks",
             tools=CODING_TOOLS,
-            estimated_tokens=len(CODING_TOOLS) * 282,  # 10 tools
+            estimated_tokens=len(CODING_TOOLS) * 282,  # 10 tools (added todo_write)
             color="#4CAF50",  # Green
             icon="💻"
         ),
-        
+
         AgentProfile.LIFESTYLE: ToolProfile(
-            name="Lifestyle", 
+            name="Lifestyle",
             description="Focused on daily life, communication, entertainment and information services",
             tools=LIFESTYLE_TOOLS,
-            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 14 tools
+            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 15 tools (added todo_write)
             color="#FF9800",  # Orange
             icon="🌟"
         ),
-        
+
         AgentProfile.PFC: ToolProfile(
             name="PFC Expert",
             description="ITASCA PFC simulation specialist with script-based workflow (query docs → test → production)",
             tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # 14 tools: 10 basic + 4 PFC tools (2 query + 2 execution + 1 status)
+            estimated_tokens=len(PFC_TOOLS) * 282,  # 15 tools: 10 basic + 1 planning + 4 PFC tools
             color="#9C27B0",  # Purple
             icon="⚛️"
         ),
-        
+
         AgentProfile.GENERAL: ToolProfile(
             name="General",
             description="Full tool capabilities, suitable for complex tasks",
             tools=GENERAL_TOOLS,
-            estimated_tokens=len(GENERAL_TOOLS) * 282,  # Coding + Lifestyle + PFC (2 query + 3 execution)
+            estimated_tokens=len(GENERAL_TOOLS) * 282,  # All tools including planning
             color="#607D8B",  # Blue-grey
             icon="🤖"
         ),

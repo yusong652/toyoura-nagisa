@@ -27,6 +27,7 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_query_python_api_tool,
     register_pfc_query_command_tool
 )
+from backend.infrastructure.mcp.tools.planning.register import register_planning_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
@@ -55,6 +56,8 @@ register_pfc_task_status_tool(mcp)
 register_pfc_list_tasks_tool(mcp)
 register_pfc_query_python_api_tool(mcp)
 register_pfc_query_command_tool(mcp)
+# Planning tools - persistent todo tracking with cross-session awareness
+register_planning_tools(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

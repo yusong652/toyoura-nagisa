@@ -194,6 +194,10 @@ class StatusMonitor:
         pfc_reminders = await self._get_pfc_reminders()
         reminders.extend(pfc_reminders)
 
+        # Todo completion notifications
+        todo_reminders = await self._get_todo_reminders()
+        reminders.extend(todo_reminders)
+
         return reminders
 
     async def _get_bash_reminders(self) -> List[str]:
@@ -336,6 +340,84 @@ class StatusMonitor:
         except Exception as e:
             # PFC server may not be available or not running
             logger.debug(f"Failed to get PFC reminders: {e}")
+            return []
+
+    async def _get_todo_reminders(self) -> List[str]:
+        """
+        Get reminders for todo items with intelligent notification tracking.
+
+        Implements persistent notification tracking stored in workspace:
+        1. Unnotified completed todos → One-time completion notification + mark as notified
+        2. Pending/in-progress todos → No reminders (user uses todo_list to check)
+        3. Already notified completed todos → Excluded (no reminder)
+
+        The notified flag is persisted in workspace storage (similar to PFC pattern),
+        ensuring consistent behavior across sessions.
+
+        Returns:
+            List[str]: Todo completion reminders (one-time notifications only)
+        """
+        try:
+            from backend.infrastructure.storage.todo_storage import get_todo_storage
+            from backend.shared.utils.workspace import get_workspace_for_session_sync
+
+            # Get workspace directory for this session
+            workspace = get_workspace_for_session_sync(self.session_id)
+
+            # Get unnotified completed todos (limit=3, like PFC tasks)
+            storage = get_todo_storage()
+            unnotified_todos = storage.get_unnotified_completed_todos(workspace, limit=3)
+
+            if not unnotified_todos:
+                return []
+
+            wrapped_reminders = []
+            todos_to_mark = []
+
+            # Generate completion notifications
+            for todo in unnotified_todos:
+                todo_id = todo.get("todo_id", "unknown")
+                content = todo.get("content", "No description")
+                todo_session_id = todo.get("session_id", "unknown")
+                created_at = todo.get("created_at")
+                updated_at = todo.get("updated_at")
+
+                # Build session marker
+                todo_session_display = todo_session_id[:8] if todo_session_id != "unknown" else "unknown"
+                if todo_session_id == self.session_id:
+                    session_marker = " (your todo)"
+                else:
+                    session_marker = f" (session: {todo_session_display})"
+
+                # Format time info
+                if created_at and updated_at:
+                    from backend.infrastructure.mcp.utils.time_utils import format_time_range
+                    time_info = format_time_range(created_at, updated_at)
+                else:
+                    time_info = "time unknown"
+
+                # Generate notification
+                notification = (
+                    f"Todo {todo_id}{session_marker} completed: "
+                    f"{content}, {time_info}. "
+                    f"Use todo_list() to see all todos."
+                )
+
+                wrapped_reminders.append(f"<system-reminder>\n{notification}\n</system-reminder>")
+                todos_to_mark.append(todo_id)
+
+            # Mark todos as notified (synchronous for simplicity)
+            for todo_id in todos_to_mark:
+                try:
+                    storage.mark_todo_notified(workspace, todo_id)
+                except Exception as e:
+                    logger.warning(f"Failed to mark todo {todo_id} as notified: {e}")
+
+            return wrapped_reminders
+
+        except Exception as e:
+            # Todo storage may not be available
+            logger.debug(f"Failed to get todo reminders: {e}")
             return []
 
     async def _get_queue_message_blocks(self) -> List[str]:
