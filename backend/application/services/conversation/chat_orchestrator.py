@@ -205,7 +205,7 @@ class ChatOrchestrator:
 
         # Process tool calls
         return await self._handle_tool_calls(
-            session_id, current_response, message_id, iterations
+            session_id, current_response, message_id, iterations, state
         )
 
     async def _handle_user_interruption(
@@ -315,13 +315,38 @@ class ChatOrchestrator:
             ) else [{"type": "text", "text": str(final_message.content)}]
             self.message_service.update_assistant_message(message_id, content, session_id)
 
+            # Extract token usage information from last streaming chunk's metadata
+            usage = None
+            if state.collected_chunks and len(state.collected_chunks) > 0:
+                # Get last chunk and extract usage from its metadata
+                last_chunk = state.collected_chunks[-1]
+                if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
+                    # Calculate tokens_left based on max context window (1M for Gemini 2.0 Flash)
+                    max_tokens = 1048576
+                    prompt_tokens = last_chunk.metadata.get('prompt_token_count', 0)
+                    completion_tokens = last_chunk.metadata.get('candidates_token_count', 0)
+                    total_tokens = last_chunk.metadata.get('total_token_count', 0)
+
+                    usage = {
+                        'prompt_tokens': prompt_tokens or 0,
+                        'completion_tokens': completion_tokens or 0,
+                        'total_tokens': total_tokens or 0,
+                        'tokens_left': max(0, max_tokens - (prompt_tokens or 0))
+                    }
+                    print(f"[ChatOrchestrator] Extracted usage from streaming chunks: {usage}")
+                else:
+                    print(f"[ChatOrchestrator] No usage metadata in last chunk")
+            else:
+                print(f"[ChatOrchestrator] No chunks collected")
+
             # Send final streaming update with streaming=False
             from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
             await WebSocketNotificationService.send_streaming_update(
                 session_id=session_id,
                 message_id=message_id,
                 content=content,
-                streaming=False
+                streaming=False,
+                usage=usage
             )
 
             # Trigger title generation after response is saved (normal completion)
@@ -341,7 +366,8 @@ class ChatOrchestrator:
         session_id: str,
         response: Any,
         message_id: str,
-        iterations: int
+        iterations: int,
+        state: StreamingState
     ) -> Any:
         """
         Handle tool calls in LLM response.
@@ -351,6 +377,7 @@ class ChatOrchestrator:
             response: LLM response with tool calls
             message_id: Message ID
             iterations: Current iteration count
+            state: Streaming state containing collected chunks
 
         Returns:
             Any: Response after tool execution and recursion
@@ -377,13 +404,38 @@ class ChatOrchestrator:
                 ) else [{"type": "text", "text": str(tool_call_message.content)}]
                 self.message_service.update_assistant_message(message_id, content, session_id)
 
+                # Extract token usage information from last streaming chunk's metadata (tool calls path)
+                usage = None
+                if state.collected_chunks and len(state.collected_chunks) > 0:
+                    # Get last chunk and extract usage from its metadata
+                    last_chunk = state.collected_chunks[-1]
+                    if last_chunk.metadata and 'prompt_token_count' in last_chunk.metadata:
+                        # Calculate tokens_left based on max context window (1M for Gemini 2.0 Flash)
+                        max_tokens = 1048576
+                        prompt_tokens = last_chunk.metadata.get('prompt_token_count', 0)
+                        completion_tokens = last_chunk.metadata.get('candidates_token_count', 0)
+                        total_tokens = last_chunk.metadata.get('total_token_count', 0)
+
+                        usage = {
+                            'prompt_tokens': prompt_tokens or 0,
+                            'completion_tokens': completion_tokens or 0,
+                            'total_tokens': total_tokens or 0,
+                            'tokens_left': max(0, max_tokens - (prompt_tokens or 0))
+                        }
+                        print(f"[ChatOrchestrator] Extracted usage from streaming chunks (tool calls): {usage}")
+                    else:
+                        print(f"[ChatOrchestrator] No usage metadata in last chunk (tool calls)")
+                else:
+                    print(f"[ChatOrchestrator] No chunks collected (tool calls)")
+
                 # Send final streaming update
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
                 await WebSocketNotificationService.send_streaming_update(
                     session_id=session_id,
                     message_id=message_id,
                     content=content,
-                    streaming=False
+                    streaming=False,
+                    usage=usage
                 )
 
                 # Trigger title generation after message is saved

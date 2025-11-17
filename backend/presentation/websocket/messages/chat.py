@@ -71,6 +71,11 @@ class StreamingUpdateMessage(BaseWebSocketMessage):
     Attributes:
         content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
         streaming: Whether message is still streaming (true) or complete (false)
+        usage: Optional token usage statistics from LLM API response
+            - prompt_tokens: Input tokens (context window usage)
+            - completion_tokens: Output tokens (AI response)
+            - total_tokens: Total tokens used
+            - tokens_left: Remaining tokens in context window (calculated)
 
     Example:
         {
@@ -81,9 +86,16 @@ class StreamingUpdateMessage(BaseWebSocketMessage):
                 {"type": "thinking", "thinking": "Current complete thinking content..."},
                 {"type": "text", "text": "Current complete text content..."}
             ],
-            "streaming": true
+            "streaming": true,
+            "usage": {
+                "prompt_tokens": 15420,
+                "completion_tokens": 850,
+                "total_tokens": 16270,
+                "tokens_left": 112580
+            }
         }
     """
     type: MessageType = MessageType.STREAMING_UPDATE
     content: List[Dict[str, Any]]  # ContentBlock array: [{"type": "thinking", "thinking": "..."}, ...]
     streaming: bool = True
+    usage: Optional[Dict[str, int]] = None  # Token usage: {prompt_tokens, completion_tokens, total_tokens, tokens_left}

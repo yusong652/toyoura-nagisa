@@ -8,15 +8,16 @@
 
 import React from 'react'
 import { useChat } from '../../contexts/chat/ChatContext'
-import { 
-  useScrollBehavior, 
-  useTitleManagement, 
-  useMessageSelection 
+import {
+  useScrollBehavior,
+  useTitleManagement,
+  useMessageSelection
 } from './hooks'
 import ChatBoxTitleBar from './components/ChatBoxTitleBar'
 import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
+import TokenUsageDisplay from './components/TokenUsageDisplay'
 import './ChatBox.css'
 
 /**
@@ -98,6 +99,9 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
             <span className="thinking-label">thinking</span>
           </div>
         )}
+
+        {/* Token usage display - fixed at bottom right */}
+        <TokenUsageDisplay messages={messages} />
 
         {/* Control Buttons */}
         <ChatBoxControls />

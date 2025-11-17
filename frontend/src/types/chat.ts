@@ -86,6 +86,16 @@ export interface ThinkingBlock {
 // =====================
 
 /**
+ * Token usage statistics from LLM API.
+ */
+export interface TokenUsage {
+  prompt_tokens: number;          // Input tokens (context window usage)
+  completion_tokens: number;      // Output tokens (AI response)
+  total_tokens: number;           // Total tokens used
+  tokens_left: number;            // Remaining tokens in context window
+}
+
+/**
  * Core message interface.
  *
  * Represents a single message in the chat, supporting both simple text
@@ -109,6 +119,7 @@ export interface Message {
   isRead?: boolean;                // Marks if user message was read
   newText?: string;                // New text portion for streaming
   onRenderComplete?: () => void;   // Render completion callback
+  usage?: TokenUsage;              // Token usage statistics (for assistant messages)
 }
 
 // =====================

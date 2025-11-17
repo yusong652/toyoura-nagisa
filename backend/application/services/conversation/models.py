@@ -5,7 +5,7 @@ This module defines data structures used by the ChatOrchestrator
 for managing conversation state and results.
 """
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Any
 from backend.domain.models.messages import BaseMessage
 from backend.domain.models.streaming import StreamingChunk
 
@@ -40,11 +40,13 @@ class StreamingState:
         collected_chunks: All streaming chunks received from LLM
         thinking_buffer: Accumulated thinking content
         text_buffer: Accumulated text content
+        last_raw_response: Last raw response from LLM API (for usage metadata extraction)
     """
     message_id: str
     collected_chunks: List[StreamingChunk] = field(default_factory=list)
     thinking_buffer: str = ""
     text_buffer: str = ""
+    last_raw_response: Optional[Any] = None  # Store last chunk for usage extraction
 
     def add_chunk(self, chunk: StreamingChunk) -> None:
         """

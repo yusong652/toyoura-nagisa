@@ -410,7 +410,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
             detail: {
               messageId: data.message_id,
               content: data.content,
-              streaming: data.streaming
+              streaming: data.streaming,
+              usage: data.usage  // Include token usage statistics
             }
           }))
         }

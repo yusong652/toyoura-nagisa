@@ -6,7 +6,7 @@ Handles all message-related notifications including streaming updates, message c
 and message saved events.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,8 @@ class WebSocketNotificationService:
         session_id: str,
         message_id: str,
         content: List[Dict[str, Any]],
-        streaming: bool = True
+        streaming: bool = True,
+        usage: Optional[Dict[str, int]] = None
     ) -> None:
         """
         Send accumulated content update to WebSocket for real-time display.
@@ -42,6 +43,11 @@ class WebSocketNotificationService:
             message_id: Message ID to update
             content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
             streaming: Whether message is still streaming (True) or complete (False)
+            usage: Optional token usage statistics
+                - prompt_tokens: Input tokens (context window usage)
+                - completion_tokens: Output tokens (AI response)
+                - total_tokens: Total tokens used
+                - tokens_left: Remaining tokens in context window
 
         Example:
             await WebSocketNotificationService.send_streaming_update(
@@ -51,7 +57,13 @@ class WebSocketNotificationService:
                     {"type": "thinking", "thinking": "Complete thinking so far..."},
                     {"type": "text", "text": "Complete text so far..."}
                 ],
-                streaming=True
+                streaming=True,
+                usage={
+                    "prompt_tokens": 15420,
+                    "completion_tokens": 850,
+                    "total_tokens": 16270,
+                    "tokens_left": 112580
+                }
             )
 
         Note:
@@ -72,7 +84,8 @@ class WebSocketNotificationService:
                 session_id=session_id,
                 message_id=message_id,
                 content=content,
-                streaming=streaming
+                streaming=streaming,
+                usage=usage
             )
 
             await connection_manager.send_json(session_id, ws_message.model_dump())

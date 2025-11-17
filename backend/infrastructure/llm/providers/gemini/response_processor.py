@@ -41,6 +41,17 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
         if not hasattr(event.candidates[0].content, 'parts') or not event.candidates[0].content.parts:
             return result
 
+        # Extract usage metadata from this chunk (will be in last chunk for streaming)
+        usage_info = {}
+        if hasattr(event, 'usage_metadata') and event.usage_metadata:
+            usage = event.usage_metadata
+            usage_info = {
+                'prompt_token_count': getattr(usage, 'prompt_token_count', None),
+                'candidates_token_count': getattr(usage, 'candidates_token_count', None),
+                'total_token_count': getattr(usage, 'total_token_count', None),
+                'thoughts_token_count': getattr(usage, 'thoughts_token_count', None),
+            }
+
         # Process each part in the chunk
         for part in event.candidates[0].content.parts:
             # Thinking part (with thought flag)
@@ -50,7 +61,8 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
                     content=part.text,
                     metadata={
                         "thought": True,
-                        "has_signature": bool(getattr(part, 'thought_signature', None))
+                        "has_signature": bool(getattr(part, 'thought_signature', None)),
+                        **usage_info  # Include usage metadata
                     },
                     thought_signature=part.thought_signature if hasattr(part, 'thought_signature') and part.thought_signature else None
                 ))
@@ -60,7 +72,7 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
                 result.append(StreamingChunk(
                     chunk_type="text",
                     content=part.text,
-                    metadata={}
+                    metadata=usage_info  # Include usage metadata
                 ))
 
             # Function call part
@@ -73,7 +85,8 @@ class GeminiStreamingProcessor(BaseStreamingProcessor):
                     content=part.function_call.name,
                     metadata={
                         "args": args,
-                        "has_signature": bool(getattr(part, 'thought_signature', None))
+                        "has_signature": bool(getattr(part, 'thought_signature', None)),
+                        **usage_info  # Include usage metadata
                     },
                     thought_signature=part.thought_signature if hasattr(part, 'thought_signature') and part.thought_signature else None,
                     function_call={
@@ -166,6 +179,50 @@ class GeminiResponseProcessor(BaseResponseProcessor):
                     tool_calls.append(tool_call)
 
         return tool_calls
+
+    @staticmethod
+    def extract_usage_metadata(response, max_tokens: int = 1048576) -> Optional[Dict[str, int]]:
+        """
+        Extract token usage information from Gemini API response.
+
+        Args:
+            response: Raw Gemini API response object
+            max_tokens: Maximum context window size for the model (default: 1M for Gemini 2.0 Flash)
+
+        Returns:
+            Optional[Dict[str, int]]: Token usage statistics or None if not available
+                - prompt_tokens: Input tokens (context window usage)
+                - completion_tokens: Output tokens (AI response)
+                - total_tokens: Total tokens used
+                - tokens_left: Remaining tokens in context window
+        """
+        if not hasattr(response, 'usage_metadata') or not response.usage_metadata:
+            print("[GeminiResponseProcessor] No usage_metadata found in response")
+            return None
+
+        usage = response.usage_metadata
+        print(f"[GeminiResponseProcessor] Found usage_metadata: {usage}")
+
+        # Extract token counts from Gemini usage_metadata
+        prompt_tokens = getattr(usage, 'prompt_token_count', 0)
+        completion_tokens = getattr(usage, 'candidates_token_count', 0)
+        total_tokens = getattr(usage, 'total_token_count', 0)
+
+        print(f"[GeminiResponseProcessor] Extracted: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}")
+
+        # Calculate remaining tokens in context window
+        tokens_left = max_tokens - prompt_tokens
+
+        result = {
+            'prompt_tokens': prompt_tokens,
+            'completion_tokens': completion_tokens,
+            'total_tokens': total_tokens,
+            'tokens_left': max(0, tokens_left)  # Ensure non-negative
+        }
+
+        print(f"[GeminiResponseProcessor] Returning usage dict: {result}")
+        return result
+
     @staticmethod
     def format_response_for_storage(response, tool_calls: Optional[List[Dict[str, Any]]] = None) -> BaseMessage:
         """
