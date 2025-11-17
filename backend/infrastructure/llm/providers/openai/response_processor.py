@@ -208,25 +208,9 @@ class OpenAIStreamingProcessor(BaseStreamingProcessor):
                     }
                 ))
 
-        # ResponseCompletedEvent - capture final response metadata and usage
-        if hasattr(event, 'response') and event.response:
-            response = event.response
-            if hasattr(response, 'usage') and response.usage:
-                usage = response.usage
-                usage_info = {
-                    'prompt_token_count': getattr(usage, 'input_tokens', None),
-                    'candidates_token_count': getattr(usage, 'output_tokens', None),
-                    'total_token_count': getattr(usage, 'total_tokens', None),
-                }
-
-        # If we extracted usage but didn't produce any chunks, create a metadata-only chunk
-        # This ensures usage information from the final chunk is not lost
-        if usage_info and not result:
-            result.append(StreamingChunk(
-                chunk_type="text",
-                content="",  # Empty content, only metadata
-                metadata=usage_info
-            ))
+        # Note: Usage extraction is now handled in client.py by adding usage metadata
+        # to the final __openai_final_response chunk. This ensures usage is in the
+        # last chunk of collected_chunks for proper extraction by chat_orchestrator.
 
         return result
 

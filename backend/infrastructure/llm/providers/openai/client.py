@@ -284,10 +284,28 @@ class OpenAIClient(LLMClientBase):
             raise
 
         if final_response:
+            # Extract usage metadata from final response
+            final_metadata = {"__openai_final_response": final_response}
+
+            if hasattr(final_response, 'usage') and final_response.usage:
+                usage = final_response.usage
+                final_metadata.update({
+                    'prompt_token_count': getattr(usage, 'input_tokens', None),
+                    'candidates_token_count': getattr(usage, 'output_tokens', None),
+                    'total_token_count': getattr(usage, 'total_tokens', None),
+                })
+
+                # Extract detailed token counts
+                if hasattr(usage, 'output_tokens_details') and usage.output_tokens_details:
+                    final_metadata['reasoning_tokens'] = getattr(usage.output_tokens_details, 'reasoning_tokens', None)
+
+                if hasattr(usage, 'input_tokens_details') and usage.input_tokens_details:
+                    final_metadata['cached_tokens'] = getattr(usage.input_tokens_details, 'cached_tokens', None)
+
             yield StreamingChunk(
                 chunk_type="text",
                 content="",
-                metadata={"__openai_final_response": final_response}
+                metadata=final_metadata
             )
 
     # _construct_response_from_streaming_chunks is now handled by ResponseProcessor
