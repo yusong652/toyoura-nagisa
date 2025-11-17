@@ -378,16 +378,8 @@ class StatusMonitor:
             for todo in unnotified_todos:
                 todo_id = todo.get("todo_id", "unknown")
                 content = todo.get("content", "No description")
-                todo_session_id = todo.get("session_id", "unknown")
                 created_at = todo.get("created_at")
                 updated_at = todo.get("updated_at")
-
-                # Build session marker
-                todo_session_display = todo_session_id[:8] if todo_session_id != "unknown" else "unknown"
-                if todo_session_id == self.session_id:
-                    session_marker = " (your todo)"
-                else:
-                    session_marker = f" (session: {todo_session_display})"
 
                 # Format time info
                 if created_at and updated_at:
@@ -396,10 +388,9 @@ class StatusMonitor:
                 else:
                     time_info = "time unknown"
 
-                # Generate notification
+                # Generate notification (no session marker for cross-session awareness)
                 notification = (
-                    f"Todo{session_marker} completed: "
-                    f"{content}, {time_info}."
+                    f"Todo completed: {content}, {time_info}."
                 )
 
                 wrapped_reminders.append(f"<system-reminder>\n{notification}\n</system-reminder>")
