@@ -45,6 +45,7 @@ class Task(ABC):
         self.start_time = time.time()
         self.end_time = None  # type: Optional[float]
         self.status = "running"  # type: str
+        self.notified = False  # type: bool  # Whether completion has been notified to LLM
         self.on_status_change = on_status_change  # Callback for persistence
 
         # Register completion callback

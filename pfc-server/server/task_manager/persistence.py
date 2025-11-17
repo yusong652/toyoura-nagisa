@@ -87,7 +87,8 @@ class TaskPersistence:
             "description": task.description,
             "status": task.status,
             "start_time": task.start_time,
-            "end_time": task.end_time
+            "end_time": task.end_time,
+            "notified": getattr(task, "notified", False)  # Notification status (default: False)
         }
 
         # Type-specific fields
@@ -306,6 +307,7 @@ class HistoricalTask:
         self.status = task_data["status"]
         self.start_time = task_data["start_time"]
         self.end_time = task_data.get("end_time")  # Optional
+        self.notified = task_data.get("notified", False)  # Notification status (default: False)
 
         # Restore type-specific fields
         if self.task_type == "command":
@@ -438,6 +440,7 @@ class HistoricalTask:
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
             "start_time": self.start_time,
+            "notified": self.notified,  # Whether completion notification has been sent
             "historical": True  # Mark as historical
         }
 

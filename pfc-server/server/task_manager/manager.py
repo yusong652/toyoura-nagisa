@@ -240,6 +240,41 @@ class TaskManager:
 
         return len(tasks_to_remove)
 
+    def mark_task_notified(self, task_id):
+        # type: (str) -> Dict[str, Any]
+        """
+        Mark a task as notified (completion notification sent to LLM).
+
+        This prevents repeated notifications for the same task completion.
+        The notified flag is persisted across server restarts.
+
+        Args:
+            task_id: Task ID to mark as notified
+
+        Returns:
+            Dict with operation status:
+                - status: "success" or "not_found"
+                - message: Result message
+        """
+        task = self.tasks.get(task_id)
+
+        if not task:
+            return {
+                "status": "not_found",
+                "message": "Task ID not found: {}".format(task_id)
+            }
+
+        # Mark as notified
+        task.notified = True
+
+        # Save to disk
+        self._save_tasks()
+
+        return {
+            "status": "success",
+            "message": "Task {} marked as notified".format(task_id)
+        }
+
     def _save_tasks(self):
         # type: () -> None
         """Save current tasks to disk (if persistence enabled)."""

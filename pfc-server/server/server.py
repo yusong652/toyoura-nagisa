@@ -178,6 +178,27 @@ class PFCWebSocketServer:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
 
+                    elif msg_type == "mark_task_notified":
+                        # Mark task as notified (completion notification sent to LLM)
+                        request_id = data.get("request_id", "unknown")
+                        task_id = data.get("task_id", "")
+
+                        result = self.task_manager.mark_task_notified(task_id)
+
+                        # Send result back
+                        response = {
+                            "type": "result",
+                            "request_id": request_id,
+                            **result
+                        }
+
+                        try:
+                            await websocket.send(json.dumps(response))
+                            logger.info(f"✓ Request result sent: {request_id}")
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning(f"Cannot send result, connection closed: {request_id}")
+                            break  # Exit message loop
+
                     elif msg_type == "get_working_directory":
                         # Get PFC's current working directory
                         request_id = data.get("request_id", "unknown")

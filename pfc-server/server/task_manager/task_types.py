@@ -213,7 +213,8 @@ class ScriptTask(Task):
             "elapsed_time": self.get_elapsed_time(),
             "start_time": self.start_time,
             "name": self.script_name,  # Script file name (for backward compatibility)
-            "script_path": self.script_path  # Absolute path for LLM
+            "script_path": self.script_path,  # Absolute path for LLM
+            "notified": self.notified  # Whether completion notification has been sent
         }
         # Add end_time for completed/failed tasks
         if self.status in ["completed", "failed"] and self.end_time is not None:

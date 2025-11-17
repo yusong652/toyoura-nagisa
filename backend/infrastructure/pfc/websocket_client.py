@@ -664,6 +664,101 @@ class PFCWebSocketClient:
 
         raise RuntimeError("Unexpected code path in list_tasks")
 
+    async def mark_task_notified(
+        self,
+        task_id: str,
+        timeout: float = 5.0,
+        max_retries: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Mark a task as notified (completion notification sent to LLM).
+
+        This prevents repeated completion notifications for the same task.
+        The notified flag is persisted across PFC server restarts.
+
+        Args:
+            task_id: Task ID to mark as notified
+            timeout: Query timeout in seconds (default: 5.0)
+            max_retries: Maximum retry attempts on connection failure (default: 2)
+
+        Returns:
+            Result dictionary with structure:
+                - type: "result" - Message type identifier
+                - request_id: str - Unique request identifier
+                - status: "success" or "not_found"
+                - message: str - Result message
+
+        Raises:
+            ConnectionError: If connection to PFC server fails after retries
+            TimeoutError: If mark query times out
+
+        Note:
+            This is NOT a PFC command - it updates TaskManager state directly.
+        """
+        for attempt in range(max_retries):
+            try:
+                # Wait for reconnection if in progress
+                if self._reconnecting:
+                    logger.info("Waiting for auto-reconnect to complete...")
+                    for _ in range(60):
+                        if not self._reconnecting and self.connected:
+                            break
+                        await asyncio.sleep(0.5)
+
+                    if not self.connected:
+                        raise ConnectionError("Auto-reconnect did not complete in time")
+
+                # Ensure connected
+                if not self.connected:
+                    self._should_stop = False
+                    success = await self.connect()
+                    if not success:
+                        raise ConnectionError("Failed to connect to PFC server")
+
+                request_id = str(uuid4())
+
+                # Create mark task notified message
+                message = {
+                    "type": "mark_task_notified",
+                    "request_id": request_id,
+                    "task_id": task_id
+                }
+
+                # Create future for result
+                future = asyncio.get_event_loop().create_future()
+                self.pending_requests[request_id] = future
+
+                try:
+                    # Send command
+                    await self.websocket.send(json.dumps(message))
+
+                    # Wait for result with timeout
+                    result = await asyncio.wait_for(future, timeout=timeout)
+                    return result
+
+                except asyncio.TimeoutError:
+                    self.pending_requests.pop(request_id, None)
+                    raise TimeoutError(f"Mark task notified timed out after {timeout}s")
+
+            except (ConnectionClosed, ConnectionClosedError, ConnectionError) as e:
+                logger.warning(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                self.connected = False
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    raise ConnectionError(
+                        "Failed to mark task notified after retries. "
+                        "Please ensure PFC server is running."
+                    ) from e
+
+            except Exception as e:
+                logger.error(f"Mark task notified failed: {e}")
+                raise
+
+        raise RuntimeError("Unexpected code path in mark_task_notified")
+
     async def get_working_directory(
         self,
         timeout: float = 10.0,
