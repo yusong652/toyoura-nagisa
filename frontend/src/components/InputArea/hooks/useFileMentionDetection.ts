@@ -242,9 +242,7 @@ const useFileMentionDetection = (
 
   // Select suggestion handler
   const selectSuggestion = useCallback((suggestion: FileMentionSuggestion) => {
-    // This will be implemented when integrating with message input
-    // The parent component should handle text replacement
-    console.log('Selecting file suggestion:', suggestion.file.path)
+    // The parent component handles text replacement
   }, [])
 
   // Clear active mention - ESC handling
@@ -253,7 +251,6 @@ const useFileMentionDetection = (
       setIsActivated(false)
       setSuppressSuggestions(true) // Prevent re-activation until re-armed
       clearResults()
-      console.log('File mention suggestions deactivated via ESC')
     }
   }, [isActivated, clearResults])
 

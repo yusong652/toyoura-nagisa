@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { FileMentionSuggestion } from '../types'
 
 /**
@@ -53,12 +53,24 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
   maxDisplaySuggestions = 10,
   isLoading = false
 }) => {
+  // Refs for scroll management
+  const selectedItemRef = useRef<HTMLDivElement>(null)
 
   // Don't render if no suggestions and not loading
   if (suggestions.length === 0 && !isLoading) return null
 
   // Limit displayed suggestions
   const displaySuggestions = suggestions.slice(0, maxDisplaySuggestions)
+
+  // Auto-scroll selected item into view when selectedIndex changes
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      })
+    }
+  }, [selectedIndex])
 
   // Handle suggestion selection
   const handleSuggestionClick = (suggestion: FileMentionSuggestion) => {
@@ -110,6 +122,7 @@ const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
             return (
               <div
                 key={suggestion.file.path}
+                ref={index === selectedIndex ? selectedItemRef : null}
                 className={`suggestion-item ${index === selectedIndex ? 'selected' : ''}`.trim()}
                 onClick={() => handleSuggestionClick(suggestion)}
                 onMouseEnter={() => {
@@ -160,6 +173,15 @@ export default FileMentionSuggestions
  *      <div key={suggestion.file.path}>
  *    ```
  *    Type-safe array operations with proper React key props
+ *
+ * 2.5. **Automatic Scroll Management**:
+ *    ```typescript
+ *    const selectedItemRef = useRef<HTMLDivElement>(null)
+ *    useEffect(() => {
+ *      selectedItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+ *    }, [selectedIndex])
+ *    ```
+ *    Ensures selected item is always visible when navigating with keyboard
  *
  * 3. **Conditional Rendering Patterns**:
  *    ```typescript

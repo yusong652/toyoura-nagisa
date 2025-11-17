@@ -214,18 +214,22 @@ const InputArea: React.FC<InputAreaProps> = ({
   const handleKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Priority 1: File mention navigation (if active)
     if (isMentionActive && fileSuggestions.length > 0) {
+      // Limit navigation to displayed suggestions (max 10 items)
+      const maxDisplaySuggestions = 10
+      const displayCount = Math.min(fileSuggestions.length, maxDisplaySuggestions)
+
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
           setSelectedFileMentionIndex(prev =>
-            prev < fileSuggestions.length - 1 ? prev + 1 : 0
+            prev < displayCount - 1 ? prev + 1 : 0
           )
           break
 
         case 'ArrowUp':
           e.preventDefault()
           setSelectedFileMentionIndex(prev =>
-            prev > 0 ? prev - 1 : fileSuggestions.length - 1
+            prev > 0 ? prev - 1 : displayCount - 1
           )
           break
 
@@ -248,18 +252,22 @@ const InputArea: React.FC<InputAreaProps> = ({
 
     // Priority 2: Slash command navigation (if active and file mention is not)
     if (isCommandActive && suggestions.length > 0) {
+      // Limit navigation to displayed suggestions (max 5 items for slash commands)
+      const maxDisplaySuggestions = 5
+      const displayCount = Math.min(suggestions.length, maxDisplaySuggestions)
+
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
           setSelectedSuggestionIndex(prev =>
-            prev < suggestions.length - 1 ? prev + 1 : 0
+            prev < displayCount - 1 ? prev + 1 : 0
           )
           break
 
         case 'ArrowUp':
           e.preventDefault()
           setSelectedSuggestionIndex(prev =>
-            prev > 0 ? prev - 1 : suggestions.length - 1
+            prev > 0 ? prev - 1 : displayCount - 1
           )
           break
 

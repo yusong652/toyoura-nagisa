@@ -173,8 +173,6 @@ async def search_files(
         # Get workspace root based on agent profile
         workspace_root = await get_workspace_for_profile(agent_profile, session_id)
 
-        logger.info(f"Searching files in workspace: {workspace_root} (query: {query})")
-
         # Search files
         results = await _search_files_in_workspace(workspace_root, query, limit)
 

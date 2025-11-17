@@ -253,10 +253,7 @@ const useSlashCommandDetection = (
   
   // Select suggestion handler
   const selectSuggestion = useCallback((suggestion: SlashCommandSuggestion) => {
-    // This will be implemented when integrating with message input
-    console.log('Selecting suggestion:', suggestion.command.trigger)
-    // For now, we'll return the selected command trigger
-    // The actual text replacement should be handled by the parent component
+    // The parent component handles command execution
   }, [])
   
   // Clear active command - ESC handling: suppress re-activation until re-armed
@@ -264,7 +261,6 @@ const useSlashCommandDetection = (
     if (isActivated) {
       setIsActivated(false)
       setSuppressSuggestions(true) // Prevent re-activation until re-armed
-      console.log('Slash command suggestions deactivated via ESC')
     }
   }, [isActivated])
   
