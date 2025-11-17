@@ -45,19 +45,15 @@ const useFileSearch = (
    * Search files by query string
    */
   const searchFiles = useCallback(async (query: string): Promise<FileSearchResult[]> => {
-    console.log('[FileSearch] 🔍 searchFiles called with:', query)
-
     // Clear previous errors
     setError(null)
 
     // Don't search for empty queries
     if (!query || query.trim() === '') {
-      console.log('[FileSearch] Empty query, clearing results')
       setResults([])
       return []
     }
 
-    console.log('[FileSearch] Starting search...')
     setIsSearching(true)
 
     try {
@@ -88,7 +84,6 @@ const useFileSearch = (
       }
 
       // Update results
-      console.log('[FileSearch] ✅ Search completed, results:', data.results.length)
       setResults(data.results)
       return data.results
 
@@ -100,7 +95,6 @@ const useFileSearch = (
       return []
 
     } finally {
-      console.log('[FileSearch] Setting isSearching = false')
       setIsSearching(false)
     }
   }, [agentProfile, sessionId])
