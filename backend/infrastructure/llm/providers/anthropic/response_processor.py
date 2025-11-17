@@ -45,6 +45,18 @@ class AnthropicStreamingProcessor(BaseStreamingProcessor):
         """
         result = []
 
+        # Extract usage metadata from event (available in message_delta and message_stop events)
+        usage_info = {}
+        if hasattr(event, 'usage') and event.usage:
+            usage = event.usage
+            usage_info = {
+                'prompt_token_count': getattr(usage, 'input_tokens', None),
+                'candidates_token_count': getattr(usage, 'output_tokens', None),
+                'total_token_count': (getattr(usage, 'input_tokens', 0) or 0) + (getattr(usage, 'output_tokens', 0) or 0),
+                'cache_read_tokens': getattr(usage, 'cache_read_input_tokens', None),
+                'cache_creation_tokens': getattr(usage, 'cache_creation_input_tokens', None),
+            }
+
         # Track content block start to know what type we're in
         if hasattr(event, 'type') and event.type == "content_block_start":
             if hasattr(event, 'content_block') and hasattr(event.content_block, 'type'):
@@ -61,7 +73,7 @@ class AnthropicStreamingProcessor(BaseStreamingProcessor):
                 result.append(StreamingChunk(
                     chunk_type="thinking",
                     content=event.thinking,
-                    metadata={"snapshot": getattr(event, 'snapshot', None)}
+                    metadata={"snapshot": getattr(event, 'snapshot', None), **usage_info}
                 ))
 
         # Text content
@@ -70,7 +82,7 @@ class AnthropicStreamingProcessor(BaseStreamingProcessor):
                 result.append(StreamingChunk(
                     chunk_type="text",
                     content=event.text,
-                    metadata={"snapshot": getattr(event, 'snapshot', None)}
+                    metadata={**usage_info} if usage_info else {"snapshot": getattr(event, 'snapshot', None)}
                 ))
 
         # Signature event (for thinking blocks)
@@ -99,7 +111,8 @@ class AnthropicStreamingProcessor(BaseStreamingProcessor):
                     metadata={
                         "tool_id": self.current_tool_id,
                         "tool_name": self.current_tool_name,
-                        "tool_input": tool_input
+                        "tool_input": tool_input,
+                        **usage_info  # Include usage metadata
                     },
                     thought_signature=self.current_thinking_signature.encode() if self.current_thinking_signature else None,
                     function_call={
@@ -130,6 +143,15 @@ class AnthropicStreamingProcessor(BaseStreamingProcessor):
             else:
                 # Reset for other block types
                 self.current_block_type = None
+
+        # If we extracted usage but didn't produce any chunks, create a metadata-only chunk
+        # This ensures usage information from message_delta events is not lost
+        if usage_info and not result:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content="",  # Empty content, only metadata
+                metadata=usage_info
+            ))
 
         return result
 
