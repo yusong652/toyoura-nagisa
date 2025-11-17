@@ -229,6 +229,7 @@ class OpenRouterClient(LLMClientBase):
             "temperature": self.openrouter_config.model_settings.temperature,
             "top_p": self.openrouter_config.model_settings.top_p,
             "stream": True,  # Enable streaming
+            "stream_options": {"include_usage": True},  # Request detailed usage metadata in stream
         }
 
         if self.openrouter_config.model_settings.max_tokens:

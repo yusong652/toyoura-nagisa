@@ -48,7 +48,40 @@ class OpenRouterStreamingProcessor(BaseStreamingProcessor):
         # Validate chunk structure
         if not isinstance(event, ChatCompletionChunk):
             return result
+
+        # Handle final usage-only chunk (has no choices but has chunk.usage)
         if not hasattr(event, 'choices') or not event.choices:
+            if hasattr(event, 'usage') and event.usage:
+                usage = event.usage
+                usage_metadata = {
+                    'prompt_token_count': getattr(usage, 'prompt_tokens', None),
+                    'candidates_token_count': getattr(usage, 'completion_tokens', None),
+                    'total_token_count': getattr(usage, 'total_tokens', None),
+                }
+                # Extract cached tokens if available
+                if hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
+                    cached = getattr(usage.prompt_tokens_details, 'cached_tokens', None)
+                    if cached:
+                        usage_metadata['cached_tokens'] = cached
+
+                # Extract completion_tokens_details if available (for reasoning models)
+                if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
+                    reasoning = getattr(usage.completion_tokens_details, 'reasoning_tokens', None)
+                    if reasoning:
+                        usage_metadata['reasoning_tokens'] = reasoning
+
+                # OpenRouter-specific: Extract cost information
+                if hasattr(usage, 'cost'):
+                    usage_metadata['cost'] = getattr(usage, 'cost', None)
+                if hasattr(usage, 'cost_details'):
+                    usage_metadata['cost_details'] = getattr(usage, 'cost_details', None)
+
+                # Create metadata-only chunk with usage
+                result.append(StreamingChunk(
+                    chunk_type="text",
+                    content="",
+                    metadata=usage_metadata
+                ))
             return result
 
         choice = event.choices[0]
@@ -185,6 +218,45 @@ class OpenRouterStreamingProcessor(BaseStreamingProcessor):
                 ))
             # Clear tool calls after emitting
             self.current_tool_calls.clear()
+
+        # Extract usage metadata from chunk-level usage (OpenRouter includes this)
+        # This appears in the final chunk even when choices are present
+        usage_metadata = {}
+        if hasattr(event, 'usage') and event.usage:
+            usage = event.usage
+            usage_metadata = {
+                'prompt_token_count': getattr(usage, 'prompt_tokens', None),
+                'candidates_token_count': getattr(usage, 'completion_tokens', None),
+                'total_token_count': getattr(usage, 'total_tokens', None),
+            }
+            # Extract cached tokens if available
+            if hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
+                cached = getattr(usage.prompt_tokens_details, 'cached_tokens', None)
+                if cached:
+                    usage_metadata['cached_tokens'] = cached
+
+            # Extract completion_tokens_details if available (for reasoning models)
+            if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
+                reasoning = getattr(usage.completion_tokens_details, 'reasoning_tokens', None)
+                if reasoning:
+                    usage_metadata['reasoning_tokens'] = reasoning
+
+            # OpenRouter-specific: Extract cost information
+            if hasattr(usage, 'cost'):
+                usage_metadata['cost'] = getattr(usage, 'cost', None)
+            if hasattr(usage, 'cost_details'):
+                usage_metadata['cost_details'] = getattr(usage, 'cost_details', None)
+
+        # If we have usage metadata but didn't produce any chunks, create a metadata-only chunk
+        if usage_metadata and not result:
+            result.append(StreamingChunk(
+                chunk_type="text",
+                content="",
+                metadata=usage_metadata
+            ))
+        # If we have chunks and usage metadata, merge usage into the last chunk
+        elif usage_metadata and result:
+            result[-1].metadata.update(usage_metadata)
 
         return result
 
