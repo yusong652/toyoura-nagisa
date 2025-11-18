@@ -316,6 +316,12 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Convert Pydantic models to dicts for storage (backward compatibility)
         todos_dict = [todo.model_dump() for todo in todos]
 
+        # Auto-clear logic (Claude Code compatible):
+        # If all todos are completed, automatically clear the list
+        if todos_dict and all(todo.get("status") == "completed" for todo in todos_dict):
+            logger.info(f"All {len(todos_dict)} todos completed - auto-clearing list for session {session_id[:8]}")
+            todos_dict = []
+
         # Save todos (full replacement pattern - same as Claude Code)
         storage = get_todo_storage()
         storage.save_todos(workspace, session_id, todos_dict)

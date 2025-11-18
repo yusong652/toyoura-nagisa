@@ -1,14 +1,13 @@
 """
-Todo Storage - Persistent storage for todo items with cross-session tracking.
+Todo Storage - Persistent storage for todo items.
 
-Inspired by PFC task tracking's notified flag pattern, this module implements
-persistent todo storage in workspace directories for project-level tracking.
+Implements persistent todo storage in workspace directories for project-level tracking.
 
 Storage Strategy:
     - Session-isolated storage: workspace/sessions/{session_id}/todos.json
     - Cross-session querying: Load all session todos for global awareness
     - Workspace resolution: Uses workspace.py for profile-aware paths
-    - Notified flag: Prevents duplicate completion notifications (PFC pattern)
+    - Auto-clear on completion: Delete file when saving empty list
 
 Data Schema:
     {
@@ -21,7 +20,6 @@ Data Schema:
                 "content": "Todo description (imperative form)",
                 "activeForm": "Active description (present continuous)",
                 "status": "pending" | "in_progress" | "completed",
-                "notified": false,
                 "metadata": {}
             }
         ]
@@ -120,12 +118,25 @@ class TodoStorage:
         This implements the "full update" pattern similar to Claude Code's TodoWrite,
         where the entire todo list is replaced on each update.
 
+        Special behavior (Claude Code compatible):
+        - If todos list is empty, delete the todos.json file instead of saving empty file
+        - This ensures clean workspace without stale empty todo files
+
         Args:
             workspace: Workspace directory path
             session_id: Session identifier
             todos: Complete list of todos (replaces existing)
         """
         file_path = self._get_session_todos_path(workspace, session_id)
+
+        # Handle empty list: delete the file instead of saving empty JSON
+        if not todos:
+            if file_path.exists():
+                file_path.unlink()
+                self.logger.info(f"✓ Deleted todos file for session {session_id[:8]} (empty list)")
+            else:
+                self.logger.debug(f"No todos file to delete for session {session_id[:8]}")
+            return
 
         # Ensure all todos have required fields
         current_time = time.time()
@@ -137,8 +148,6 @@ class TodoStorage:
             if "created_at" not in todo:
                 todo["created_at"] = current_time
             todo["updated_at"] = current_time
-            if "notified" not in todo:
-                todo["notified"] = False
             if "metadata" not in todo:
                 todo["metadata"] = {}
 
@@ -195,78 +204,6 @@ class TodoStorage:
 
         self.logger.debug(f"Loaded {len(all_todos)} todo(s) across all sessions")
         return all_todos
-
-    def mark_todo_notified(
-        self,
-        workspace: Path,
-        todo_id: str
-    ) -> bool:
-        """
-        Mark a todo as notified (completion notification sent to LLM).
-
-        This implements the PFC task notified flag pattern, preventing
-        duplicate notifications across sessions.
-
-        Args:
-            workspace: Workspace directory path
-            todo_id: Todo ID to mark as notified
-
-        Returns:
-            True if todo was found and marked, False otherwise
-        """
-        sessions_dir = workspace / "sessions"
-        if not sessions_dir.exists():
-            return False
-
-        # Search across all sessions for the todo
-        for session_dir in sessions_dir.iterdir():
-            if not session_dir.is_dir():
-                continue
-
-            todos_file = session_dir / "todos.json"
-            if not todos_file.exists():
-                continue
-
-            todos = self._load_todos_from_file(todos_file)
-
-            # Find and mark the todo
-            for todo in todos:
-                if todo.get("todo_id") == todo_id:
-                    todo["notified"] = True
-                    todo["updated_at"] = time.time()
-                    self._save_todos_to_file(todos_file, todos)
-                    self.logger.info(f"✓ Marked todo {todo_id} as notified")
-                    return True
-
-        self.logger.warning(f"Todo {todo_id} not found for notification marking")
-        return False
-
-    def get_unnotified_completed_todos(
-        self,
-        workspace: Path,
-        limit: int = 3
-    ) -> List[Dict[str, Any]]:
-        """
-        Get completed todos that haven't been notified yet.
-
-        This is used by StatusMonitor to generate one-time completion notifications,
-        following the PFC task notification pattern.
-
-        Args:
-            workspace: Workspace directory path
-            limit: Maximum number of todos to return (default: 3)
-
-        Returns:
-            List of unnotified completed todos (most recent first)
-        """
-        all_todos = self.load_all_session_todos(workspace)
-
-        unnotified = [
-            todo for todo in all_todos
-            if todo.get("status") == "completed" and not todo.get("notified", False)
-        ]
-
-        return unnotified[:limit]
 
     def get_pending_todos(
         self,
