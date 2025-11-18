@@ -135,6 +135,13 @@ class ChatOrchestrator:
         Raises:
             UserRejectionInterruption: When user rejects any tool
         """
+        # Track each LLM interaction for periodic todo reminders (Claude Code style)
+        # This includes both initial user messages and tool calling rounds
+        from backend.infrastructure.monitoring import get_status_monitor
+        status_monitor = get_status_monitor(session_id)
+        if hasattr(status_monitor, 'todo_monitor'):
+            status_monitor.todo_monitor.track_conversation_turn()
+
         # Get context manager
         context_manager = self.llm_client.get_or_create_context_manager(session_id)
 
