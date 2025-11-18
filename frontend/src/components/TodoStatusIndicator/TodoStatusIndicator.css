@@ -54,38 +54,22 @@
   }
 }
 
-.todo-label {
+.todo-label-shimmer {
   font-weight: 400;
   white-space: nowrap;
   max-width: 400px;
   overflow: hidden;
   text-overflow: ellipsis;
-  position: relative;
-  background: linear-gradient(
-    110deg,
-    rgba(255, 255, 255, 0.6) 0%,
-    rgba(255, 255, 255, 0.6) 35%,
-    rgba(255, 255, 255, 0.8) 45%,
-    rgba(255, 255, 255, 1) 50%,
-    rgba(255, 255, 255, 0.8) 55%,
-    rgba(255, 255, 255, 0.6) 65%,
-    rgba(255, 255, 255, 0.6) 100%
-  );
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmer 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  animation-delay: calc(var(--shimmer-delay, 0) * 1s);
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Courier New', 'Consolas', monospace;
+  font-size: 12px;
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+.todo-label-shimmer span {
+  display: inline-block;
+  color: rgba(255, 255, 255, 1);
+  will-change: opacity;
 }
 
 /* Theme adaptations */
@@ -94,24 +78,15 @@
 }
 
 [data-theme="light"] .todo-status-indicator:hover {
-  color: rgba(0, 0, 0, 0.7);
+  color: rgba(0, 0, 0, 0.8);
 }
 
-[data-theme="light"] .todo-label {
-  background: linear-gradient(
-    110deg,
-    rgba(0, 0, 0, 0.25) 0%,
-    rgba(0, 0, 0, 0.25) 35%,
-    rgba(0, 0, 0, 0.4) 45%,
-    rgba(0, 0, 0, 0.85) 50%,
-    rgba(0, 0, 0, 0.4) 55%,
-    rgba(0, 0, 0, 0.25) 65%,
-    rgba(0, 0, 0, 0.25) 100%
-  );
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+[data-theme="light"] .todo-label-shimmer {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .todo-label-shimmer span {
+  color: rgba(0, 0, 0, 0.9);
 }
 
 [data-theme="light"] .todo-spinner {

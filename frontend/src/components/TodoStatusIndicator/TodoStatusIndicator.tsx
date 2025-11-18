@@ -35,9 +35,35 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   const [currentTodo, setCurrentTodo] = useState<TodoItem | null>(null)
   const { currentSessionId } = useSession()
   const { pendingToolConfirmation } = useConnection()
+  const [glowPosition, setGlowPosition] = useState(0)
 
-  // Generate random shimmer delay for natural animation variation (0-2 seconds)
-  const [shimmerDelay] = useState(() => Math.random() * 2)
+  // Random duration for speed variation (6-10 seconds)
+  const [duration] = useState(() => 6000 + Math.random() * 4000)
+
+  // Shimmer animation using requestAnimationFrame
+  useEffect(() => {
+    let animationFrameId: number
+    let startTime: number | null = null
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp
+      const elapsed = timestamp - startTime
+      const progress = (elapsed % duration) / duration
+
+      // Progress goes from 0 to 1, we map it to -1 to 2 (to cover full text width)
+      setGlowPosition(progress * 3 - 1)
+
+      animationFrameId = requestAnimationFrame(animate)
+    }
+
+    animationFrameId = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [duration])
 
   // Fetch current todo on mount and session change
   useEffect(() => {
@@ -93,14 +119,40 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   }
 
   // Show todo status if available, otherwise show thinking indicator
+  const text = currentTodo ? currentTodo.activeForm : 'thinking'
+
+  // Calculate glow for each character
+  const renderGlowText = () => {
+    return text.split('').map((char, index) => {
+      const charPosition = index / text.length
+      const distance = Math.abs(charPosition - glowPosition)
+
+      // Glow intensity: bright when distance is small, dim when far
+      // Use smooth falloff over 0.15 range (about 2-3 characters)
+      const glowIntensity = Math.max(0, 1 - distance / 0.15)
+
+      // Enhanced brightness: base 0.6, peak 1.0 (40% boost when glowing)
+      const opacity = 0.6 + glowIntensity * 0.4
+
+      return (
+        <span
+          key={index}
+          style={{
+            opacity,
+            transition: 'opacity 0.1s linear'
+          }}
+        >
+          {char}
+        </span>
+      )
+    })
+  }
+
   return (
     <div className="todo-status-indicator">
       <div className="todo-spinner" />
-      <span
-        className="todo-label"
-        style={{ '--shimmer-delay': shimmerDelay } as React.CSSProperties}
-      >
-        {currentTodo ? currentTodo.activeForm : 'thinking'}
+      <span className="todo-label-shimmer">
+        {renderGlowText()}
       </span>
     </div>
   )
