@@ -31,11 +31,46 @@ interface TodoStatusIndicatorProps {
   isLLMThinking: boolean  // Fallback to thinking indicator when no todo
 }
 
+// Advanced thinking verbs (AI, DEM simulation, geotechnical engineering, and playful ones)
+const THINKING_VERBS = [
+  'reasoning',      // AI
+  'analyzing',      // General
+  'computing',      // Numerical
+  'simulating',     // DEM
+  'synthesizing',   // AI
+  'calibrating',    // Engineering
+  'iterating',      // Numerical
+  'evaluating',     // Analysis
+  'optimizing',     // Optimization
+  'converging',     // Numerical
+  'processing',     // Data
+  'interpreting',   // Analysis
+  'formulating',    // Problem solving
+  'orchestrating',  // AI coordination
+  'consolidating',  // Geotechnical - soil consolidation
+  'saturating',     // Geotechnical - soil saturation
+  'compacting',     // Geotechnical - soil compaction
+  'deforming',      // Geotechnical - strain analysis
+  'liquefying',     // Geotechnical - soil liquefaction
+  'shearing',       // Geotechnical - shear stress
+  'bouncing',       // Playful - particle collision
+  'siliconizing',   // Playful - Toyoura sand reference (silicon dioxide)
+  'pondering',      // Playful - cute thinking
+  'tinkering',      // Playful - experimental
+  'daydreaming',    // Playful - very cute
+  'materializing',  // Playful - making things real
+  'crystallizing',  // Playful - forming structure (sand crystals)
+  'percolating'     // Playful - sand/fluid dynamics + coffee brewing
+]
+
 const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking }) => {
   const [currentTodo, setCurrentTodo] = useState<TodoItem | null>(null)
   const { currentSessionId } = useSession()
   const { pendingToolConfirmation } = useConnection()
   const [glowPosition, setGlowPosition] = useState(0)
+  const [thinkingVerb] = useState(() =>
+    THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]
+  )
 
   // Random duration for speed variation (6-10 seconds)
   const [duration] = useState(() => 6000 + Math.random() * 4000)
@@ -118,8 +153,8 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     return null
   }
 
-  // Show todo status if available, otherwise show thinking indicator
-  const text = currentTodo ? currentTodo.activeForm : 'thinking'
+  // Show todo status if available, otherwise show thinking verb
+  const text = currentTodo ? currentTodo.activeForm : thinkingVerb
 
   // Calculate glow for each character
   const renderGlowText = () => {
