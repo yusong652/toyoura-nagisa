@@ -478,6 +478,18 @@ class ChatOrchestrator:
             message_id
         )
 
+        # Send todo update notification if todo_write tool was called
+        # This happens AFTER tool execution to get the updated todo state
+        if any(tc['name'] == 'todo_write' for tc in tool_calls):
+            try:
+                from backend.application.services.todo_service import get_todo_service
+                from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+                todo_service = get_todo_service()
+                current_todo = await todo_service.get_current_todo(session_id)
+                await WebSocketNotificationService.send_todo_update(session_id, current_todo)
+            except Exception as e:
+                print(f"[WARNING] Failed to send todo update notification: {e}")
+
         # Add results to context and check for rejections
         rejected_tools = []
         for i, (tool_call, result) in enumerate(zip(tool_calls, results)):

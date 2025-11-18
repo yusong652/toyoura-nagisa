@@ -329,7 +329,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data)
-        console.log("[WebSocket] received message:", data)
 
         // Handle heartbeat messages
         if (data.type === 'HEARTBEAT') {
@@ -421,6 +420,16 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
           // Dispatch custom event for title updates
           window.dispatchEvent(new CustomEvent('titleUpdate', {
             detail: data
+          }))
+        }
+
+        // Handle todo update notifications
+        if (data.type === 'TODO_UPDATE') {
+          // Dispatch custom event for todo status updates
+          window.dispatchEvent(new CustomEvent('todoUpdate', {
+            detail: {
+              todo: data.todo
+            }
           }))
         }
 

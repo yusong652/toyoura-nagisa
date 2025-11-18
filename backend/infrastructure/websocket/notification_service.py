@@ -258,3 +258,69 @@ class WebSocketNotificationService:
         except Exception as e:
             logger.error(f"Failed to send title update notification: {e}")
             # Don't re-raise - this is a non-critical notification
+
+    @staticmethod
+    async def send_todo_update(
+        session_id: str,
+        todo: Optional[Dict[str, Any]]
+    ) -> None:
+        """
+        Send todo status update notification to frontend.
+
+        This notification tells the frontend about the current in_progress todo
+        for real-time status display. Sent whenever the todo list is modified.
+
+        Args:
+            session_id: Session ID for which the todo was updated
+            todo: Current in_progress todo item, or None if no in_progress todo
+                Expected fields:
+                - todo_id: str
+                - content: str (imperative form)
+                - activeForm: str (present continuous form)
+                - status: str
+                - session_id: str
+                - created_at: float
+                - updated_at: float
+                - metadata: dict
+
+        Example:
+            await WebSocketNotificationService.send_todo_update(
+                session_id="session-123",
+                todo={
+                    "todo_id": "a1b2c3d4",
+                    "content": "Run tests",
+                    "activeForm": "Running tests",
+                    "status": "in_progress",
+                    ...
+                }
+            )
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the process.
+        """
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+            connection_manager = get_connection_manager()
+
+            if not connection_manager:
+                logger.debug("No connection manager available for todo update notification")
+                return
+
+            # Create todo update notification
+            todo_update_msg = {
+                "type": "TODO_UPDATE",
+                "session_id": session_id,
+                "todo": todo
+            }
+
+            # Send via WebSocket
+            await connection_manager.send_json(session_id, todo_update_msg)
+
+            if todo:
+                logger.debug(f"Todo update notification sent for session {session_id}: {todo.get('activeForm')}")
+            else:
+                logger.debug(f"Todo cleared notification sent for session {session_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to send todo update notification: {e}")
+            # Don't re-raise - this is a non-critical notification
