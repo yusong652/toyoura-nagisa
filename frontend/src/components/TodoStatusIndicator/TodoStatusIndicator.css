@@ -1,26 +1,31 @@
 /**
  * TodoStatusIndicator styles - Displays current task status.
  *
- * Replaces thinking indicator with actual todo status.
- * Fixed at bottom left of chat container.
+ * Positioned at bottom left of chatbox container, mirroring TokenUsageDisplay on the right.
+ * Uses absolute positioning relative to .chatbox-container parent.
  */
 
 .todo-status-indicator {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  color: #fff;
-  font-size: 14px;
-  z-index: 100;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-family: 'Courier New', 'Consolas', monospace;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
   animation: fadeIn 0.3s ease-in-out;
+}
+
+.todo-status-indicator:hover {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 @keyframes fadeIn {
@@ -35,10 +40,10 @@
 }
 
 .todo-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.6);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -50,28 +55,56 @@
 }
 
 .todo-label {
-  font-weight: 500;
+  font-weight: 400;
   white-space: nowrap;
   max-width: 400px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Theme adaptations */
+[data-theme="light"] .todo-status-indicator {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .todo-status-indicator:hover {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .todo-spinner {
+  border-color: rgba(0, 0, 0, 0.2);
+  border-top-color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .todo-status-indicator {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .todo-status-indicator:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .todo-spinner {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.6);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .todo-status-indicator {
-    bottom: 80px;  /* Above mobile controls */
-    left: 10px;
-    padding: 6px 12px;
-    font-size: 12px;
+    /* Keep same position as desktop - always bottom-left of chatbox */
+    bottom: 8px;
+    left: 12px;
+    padding: 4px 8px;
+    font-size: 11px;
   }
 
   .todo-label {
-    max-width: 250px;
+    max-width: 200px;
   }
 
   .todo-spinner {
-    width: 14px;
-    height: 14px;
+    width: 10px;
+    height: 10px;
   }
 }
