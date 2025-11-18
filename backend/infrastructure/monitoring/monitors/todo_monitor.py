@@ -114,16 +114,20 @@ class TodoMonitor(BaseMonitor):
 
         # Show appropriate reminder based on todo state
         if todos:
-            # Format existing todos
+            # Format existing todos (Claude Code exact format)
             lines = ["Here are the existing contents of your todo list:", ""]
+
+            # Build the todo list with surrounding brackets
+            todo_lines = []
             for i, todo in enumerate(todos, 1):
                 status = todo.get("status", "pending")
                 content = todo.get("content", "Todo item")
-
-                # Claude Code format: "1. [status] content"
+                # Claude Code format: "N. [status] content"
                 line = f"{i}. [{status}] {content}"
-                lines.append(line)
+                todo_lines.append(line)
 
+            # Join with newlines and wrap in brackets
+            lines.append("[" + "\n".join(todo_lines) + "]")
             reminder_text = "\n".join(lines)
         else:
             # Empty list reminder (Claude Code style)
