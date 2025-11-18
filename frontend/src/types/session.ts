@@ -5,11 +5,19 @@ export interface ChatSession {
   updated_at: string;
 }
 
+export interface TokenUsage {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  tokens_left?: number
+}
+
 export interface SessionContextType {
   // Session state
   sessions: ChatSession[]
   currentSessionId: string | null
   sessionLoadAttempted: boolean
+  sessionTokenUsage: TokenUsage | null
 
   // Session operations
   refreshSessions: () => Promise<ChatSession[]>

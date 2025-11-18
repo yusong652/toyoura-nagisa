@@ -196,22 +196,22 @@ async def delete_session(
 ) -> dict:
     """
     Delete a chat session and all associated data.
-    
+
     This endpoint:
     1. Validates session exists
     2. Deletes session history and metadata
     3. Clears tool cache
     4. Removes related memories from vector DB
-    
+
     Args:
         session_id: Session UUID to delete
-        
+
     Returns:
         dict: Deletion result with structure:
             - session_id: str - Deleted session ID
             - success: bool - Operation success flag
             - message: str - User-friendly status message
-    
+
     Raises:
         HTTPException: 404 if session not found, 500 if deletion fails
     """
@@ -232,4 +232,39 @@ async def delete_session(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to delete session: {str(e)}"
+        )
+
+
+@router.get("/history/{session_id}/token-usage", response_model=dict)
+async def get_token_usage(
+    session_id: str,
+    service: SessionService = Depends(get_session_service)
+) -> dict:
+    """
+    Get token usage information for a session.
+
+    Returns the latest token usage statistics from the last LLM interaction.
+    This data is persisted in runtime_state.json and survives session switches.
+
+    Args:
+        session_id: Session UUID
+
+    Returns:
+        dict: Token usage information with structure:
+            - prompt_tokens: int - Input tokens (context window usage)
+            - completion_tokens: int - Output tokens (AI response)
+            - total_tokens: int - Total tokens used in last turn
+            - tokens_left: int - Remaining tokens in context window
+            Or empty dict if no token usage data available
+
+    Raises:
+        HTTPException: 500 if retrieval fails
+    """
+    try:
+        usage = await service.get_token_usage(session_id)
+        return usage if usage else {}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve token usage: {str(e)}"
         )

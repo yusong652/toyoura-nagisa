@@ -43,6 +43,13 @@ export interface GenerateTitleResponse {
   title: string
 }
 
+export interface TokenUsageResponse {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  tokens_left?: number
+}
+
 export class SessionService {
   /**
    * Retrieve all available chat sessions for the current user.
@@ -97,13 +104,26 @@ export class SessionService {
 
   /**
    * Generate an AI-powered title for a chat session based on its content.
-   * 
+   *
    * @param sessionId - ID of session to generate title for
    * @returns Promise resolving to title generation result
    */
   async generateTitle(sessionId: string): Promise<GenerateTitleResponse> {
     const request: GenerateTitleRequest = { session_id: sessionId }
     return await apiClient.post<GenerateTitleResponse>('/api/history/generate-title', request)
+  }
+
+  /**
+   * Get token usage information for a specific session.
+   *
+   * Returns the latest token usage statistics from the last LLM interaction.
+   * This data is persisted in runtime_state.json and survives session switches.
+   *
+   * @param sessionId - ID of session to get token usage for
+   * @returns Promise resolving to token usage statistics or empty object
+   */
+  async getTokenUsage(sessionId: string): Promise<TokenUsageResponse> {
+    return await apiClient.get<TokenUsageResponse>(`/api/history/${sessionId}/token-usage`)
   }
 }
 

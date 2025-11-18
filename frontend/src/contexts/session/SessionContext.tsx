@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { ConnectionStatus } from '../../types/connection'
-import { ChatSession, SessionContextType } from '../../types/session'
+import { ChatSession, SessionContextType, TokenUsage } from '../../types/session'
 import { sessionService } from '../../services/api'
 import { useConnection } from '../connection/ConnectionContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
@@ -19,18 +19,19 @@ interface SessionProviderProps {
   children: ReactNode
 }
 
-export const SessionProvider: React.FC<SessionProviderProps> = ({ 
+export const SessionProvider: React.FC<SessionProviderProps> = ({
   children
 }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false)
-  
-  const { 
-    connectionStatus, 
-    connectionError, 
-    connectToSession, 
-    checkConnection 
+  const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null)
+
+  const {
+    connectionStatus,
+    connectionError,
+    connectToSession,
+    checkConnection
   } = useConnection()
   const { ttsEnabled, updateTTSEnabled } = useTtsEnable()
 
@@ -62,9 +63,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       const data = await sessionService.createSession(name)
       console.log('Create session response:', data)
       const newSessionId = data.session_id
-      
+
       localStorage.setItem('session_id', newSessionId)
       setCurrentSessionId(newSessionId)
+
+      // New session has no token usage yet
+      setSessionTokenUsage(null)
 
       // 同步 TTS 状态到后端
       try {
@@ -74,7 +78,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
 
       await refreshSessions()
-      
+
       return newSessionId
     } catch (error) {
       console.error('Error in createNewSession:', error)
@@ -92,16 +96,26 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
     try {
       await sessionService.switchSession(sessionId)
-      
+
       localStorage.setItem('session_id', sessionId)
       setCurrentSessionId(sessionId)
+
+      // Load token usage for this session
+      try {
+        const usage = await sessionService.getTokenUsage(sessionId)
+        setSessionTokenUsage(usage)
+        console.log('[SessionContext] Loaded token usage for session:', sessionId, usage)
+      } catch (error) {
+        console.error('Failed to load token usage:', error)
+        setSessionTokenUsage(null)
+      }
 
       try {
         await updateTTSEnabled(ttsEnabled)
       } catch (error) {
         console.error('同步 TTS 状态失败:', error)
       }
-      
+
     } catch (error) {
       console.error('切换会话失败:', error)
       throw error
@@ -266,11 +280,29 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     loadSessionOnReconnect()
   }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession])
 
+  // Listen for WebSocket streaming updates to update token usage in real-time
+  useEffect(() => {
+    const handleStreamingUpdate = (event: CustomEvent) => {
+      const { usage } = event.detail
+      if (usage) {
+        setSessionTokenUsage(usage)
+        console.log('[SessionContext] Updated token usage from streaming:', usage)
+      }
+    }
+
+    window.addEventListener('streamingUpdate', handleStreamingUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener('streamingUpdate', handleStreamingUpdate as EventListener)
+    }
+  }, [])
+
   return (
     <SessionContext.Provider value={{
       sessions,
       currentSessionId,
       sessionLoadAttempted,
+      sessionTokenUsage,
       refreshSessions,
       createNewSession,
       switchSession,

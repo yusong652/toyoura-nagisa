@@ -11,7 +11,8 @@ from backend.infrastructure.storage.session_manager import (
     delete_session_data,
     load_all_message_history,
     load_history,
-    create_new_history
+    create_new_history,
+    load_token_usage
 )
 from backend.domain.models.message_factory import message_factory
 from backend.config import get_llm_settings
@@ -210,3 +211,21 @@ class SessionService:
             "success": True,
             "message": f"Session '{session.get('name', session_id)}' successfully deleted"
         }
+
+    async def get_token_usage(self, session_id: str) -> Optional[Dict[str, int]]:
+        """
+        Get token usage information for a session.
+
+        Token usage includes:
+        - prompt_tokens: Input tokens (context window usage)
+        - completion_tokens: Output tokens (AI response)
+        - total_tokens: Total tokens used in last turn
+        - tokens_left: Remaining tokens in context window
+
+        Args:
+            session_id: Session UUID
+
+        Returns:
+            Optional[Dict[str, int]]: Token usage statistics or None if not available
+        """
+        return load_token_usage(session_id)

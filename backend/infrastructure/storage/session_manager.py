@@ -582,3 +582,40 @@ def clear_runtime_state(session_id: str) -> None:
             print(f"[DEBUG] Cleared runtime state for session {session_id}")
         except Exception as e:
             print(f"[ERROR] Failed to clear runtime state for session {session_id}: {e}")
+
+
+# ========== Token Usage Management ==========
+
+def save_token_usage(session_id: str, usage: Dict[str, int]) -> None:
+    """
+    Save token usage information to runtime state.
+
+    Token usage is stored in runtime_state.json and includes:
+    - prompt_tokens: Input tokens (context window usage)
+    - completion_tokens: Output tokens (AI response)
+    - total_tokens: Total tokens used in this turn
+    - tokens_left: Remaining tokens in context window
+
+    Args:
+        session_id: Session identifier
+        usage: Dictionary containing token usage statistics
+    """
+    update_runtime_state(session_id, 'token_usage', usage)
+    print(f"[DEBUG] Saved token usage for session {session_id}: {usage}")
+
+
+def load_token_usage(session_id: str) -> Optional[Dict[str, int]]:
+    """
+    Load token usage information from runtime state.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        Optional[Dict[str, int]]: Token usage statistics or None if not available
+    """
+    state = load_runtime_state(session_id)
+    usage = state.get('token_usage')
+    if usage:
+        print(f"[DEBUG] Loaded token usage for session {session_id}: {usage}")
+    return usage

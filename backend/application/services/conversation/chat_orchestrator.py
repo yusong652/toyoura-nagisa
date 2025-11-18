@@ -353,6 +353,11 @@ class ChatOrchestrator:
                 usage=usage
             )
 
+            # Save token usage to persistent storage
+            if usage:
+                from backend.infrastructure.storage.session_manager import save_token_usage
+                save_token_usage(session_id, usage)
+
             # Trigger title generation after response is saved (normal completion)
             # Note: Always attempted, TitleService searches history for text content
             # Application layer calling Application layer - clean architecture!
@@ -438,6 +443,11 @@ class ChatOrchestrator:
                     streaming=False,
                     usage=usage
                 )
+
+                # Save token usage to persistent storage
+                if usage:
+                    from backend.infrastructure.storage.session_manager import save_token_usage
+                    save_token_usage(session_id, usage)
 
                 # Trigger title generation after message is saved
                 # This runs in background without blocking tool execution
