@@ -33,34 +33,32 @@ interface TodoStatusIndicatorProps {
 
 // Advanced thinking verbs (AI, DEM simulation, geotechnical engineering, and playful ones)
 const THINKING_VERBS = [
-  'reasoning',      // AI
-  'analyzing',      // General
-  'computing',      // Numerical
-  'simulating',     // DEM
-  'synthesizing',   // AI
-  'calibrating',    // Engineering
-  'iterating',      // Numerical
-  'evaluating',     // Analysis
-  'optimizing',     // Optimization
-  'converging',     // Numerical
-  'processing',     // Data
-  'interpreting',   // Analysis
-  'formulating',    // Problem solving
-  'orchestrating',  // AI coordination
-  'consolidating',  // Geotechnical - soil consolidation
-  'saturating',     // Geotechnical - soil saturation
-  'compacting',     // Geotechnical - soil compaction
-  'deforming',      // Geotechnical - strain analysis
-  'liquefying',     // Geotechnical - soil liquefaction
-  'shearing',       // Geotechnical - shear stress
-  'bouncing',       // Playful - particle collision
-  'siliconizing',   // Playful - Toyoura sand reference (silicon dioxide)
-  'pondering',      // Playful - cute thinking
-  'tinkering',      // Playful - experimental
-  'daydreaming',    // Playful - very cute
-  'materializing',  // Playful - making things real
-  'crystallizing',  // Playful - forming structure (sand crystals)
-  'percolating'     // Playful - sand/fluid dynamics + coffee brewing
+  'Reasoning',      // AI
+  'Analyzing',      // General
+  'Computing',      // Numerical
+  'Simulating',     // DEM
+  'Synthesizing',   // AI
+  'Calibrating',    // Engineering
+  'Iterating',      // Numerical
+  'Evaluating',     // Analysis
+  'Optimizing',     // Optimization
+  'Converging',     // Numerical
+  'Processing',     // Data
+  'Interpreting',   // Analysis
+  'Formulating',    // Problem solving
+  'Orchestrating',  // AI coordination
+  'Consolidating',  // Geotechnical - soil consolidation
+  'Saturating',     // Geotechnical - soil saturation
+  'Compacting',     // Geotechnical - soil compaction
+  'Liquefying',     // Geotechnical - soil liquefaction
+  'Bouncing',       // Playful - particle collision
+  'Siliconizing',   // Playful - Toyoura sand reference (silicon dioxide)
+  'Pondering',      // Playful - cute thinking
+  'Tinkering',      // Playful - experimental
+  'Daydreaming',    // Playful - very cute
+  'Materializing',  // Playful - making things real
+  'Crystallizing',  // Playful - forming structure (sand crystals)
+  'Percolating'     // Playful - sand/fluid dynamics + coffee brewing
 ]
 
 const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking }) => {
