@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useSession } from '../../contexts/session/SessionContext'
+import { useConnection } from '../../contexts/connection/ConnectionContext'
 import './TodoStatusIndicator.css'
 
 interface TodoItem {
@@ -33,6 +34,10 @@ interface TodoStatusIndicatorProps {
 const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking }) => {
   const [currentTodo, setCurrentTodo] = useState<TodoItem | null>(null)
   const { currentSessionId } = useSession()
+  const { pendingToolConfirmation } = useConnection()
+
+  // Generate random shimmer delay for natural animation variation (0-2 seconds)
+  const [shimmerDelay] = useState(() => Math.random() * 2)
 
   // Fetch current todo on mount and session change
   useEffect(() => {
@@ -81,8 +86,9 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     }
   }, [])
 
-  // Don't show anything if no todo and not thinking
-  if (!currentTodo && !isLLMThinking) {
+  // Only show when LLM is actively working (thinking or waiting for confirmation)
+  // Don't show idle todos - indicator's purpose is to show LLM is working
+  if (!isLLMThinking && !pendingToolConfirmation) {
     return null
   }
 
@@ -90,7 +96,10 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   return (
     <div className="todo-status-indicator">
       <div className="todo-spinner" />
-      <span className="todo-label">
+      <span
+        className="todo-label"
+        style={{ '--shimmer-delay': shimmerDelay } as React.CSSProperties}
+      >
         {currentTodo ? currentTodo.activeForm : 'thinking'}
       </span>
     </div>
