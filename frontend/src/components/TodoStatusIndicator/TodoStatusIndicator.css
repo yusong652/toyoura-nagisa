@@ -8,11 +8,11 @@
 .todo-status-indicator {
   position: absolute;
   bottom: 8px;
-  left: 12px;
+  left: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 4px;
+  padding: 4px 6px;
   color: rgba(255, 255, 255, 0.6);
   font-size: 12px;
   font-family: 'Courier New', 'Consolas', monospace;
@@ -39,19 +39,11 @@
   }
 }
 
-.todo-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.nagisa-avatar {
+  display: block;
+  image-rendering: pixelated; /* Pixel-perfect rendering for pixel art */
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
 .todo-label-shimmer {
@@ -63,7 +55,7 @@
   display: inline-block;
   color: rgba(255, 255, 255, 0.6);
   font-family: 'Courier New', 'Consolas', monospace;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .todo-label-shimmer span {
@@ -89,11 +81,6 @@
   color: rgba(0, 0, 0, 0.9);
 }
 
-[data-theme="light"] .todo-spinner {
-  border-color: rgba(0, 0, 0, 0.2);
-  border-top-color: rgba(0, 0, 0, 0.5);
-}
-
 [data-theme="dark"] .todo-status-indicator {
   color: rgba(255, 255, 255, 0.6);
 }
@@ -102,27 +89,17 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-[data-theme="dark"] .todo-spinner {
-  border-color: rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.6);
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .todo-status-indicator {
     /* Keep same position as desktop - always bottom-left of chatbox */
     bottom: 8px;
-    left: 12px;
-    padding: 4px 8px;
+    left: 8px;
+    padding: 4px 6px;
     font-size: 11px;
   }
 
-  .todo-label {
+  .todo-label-shimmer {
     max-width: 200px;
-  }
-
-  .todo-spinner {
-    width: 10px;
-    height: 10px;
   }
 }

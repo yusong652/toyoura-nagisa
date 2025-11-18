@@ -66,12 +66,332 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   const { currentSessionId } = useSession()
   const { pendingToolConfirmation } = useConnection()
   const [glowPosition, setGlowPosition] = useState(0)
-  const [thinkingVerb] = useState(() =>
+  const [thinkingVerb, setThinkingVerb] = useState(() =>
     THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]
   )
 
   // Random duration for speed variation (6-10 seconds)
   const [duration] = useState(() => 6000 + Math.random() * 4000)
+
+  // Particle collision animation state
+  const canvasRef = React.useRef<HTMLCanvasElement>(null)
+
+  // Determine if indicator should be visible
+  // Only show when LLM is actively working (thinking or waiting for confirmation)
+  const shouldShow = isLLMThinking || pendingToolConfirmation
+
+  // Update thinking verb when LLM starts thinking (new conversation turn)
+  useEffect(() => {
+    if (isLLMThinking) {
+      setThinkingVerb(THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)])
+    }
+  }, [isLLMThinking])
+
+  // Nagisa avatar animation (blinking eyes + moving ears + breathing)
+  // Note: This useEffect runs after component mounts AND whenever shouldShow changes
+  // This ensures canvas animation starts when component becomes visible
+  useEffect(() => {
+    if (!shouldShow) return // Don't start animation if component is hidden
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d', {
+      alpha: true,
+      desynchronized: false,
+      willReadFrequently: false
+    })
+    if (!ctx) return
+
+    // Disable image smoothing for pixel-perfect rendering
+    ctx.imageSmoothingEnabled = false
+
+    // Canvas size (match avatar resolution)
+    const width = 32
+    const height = 32
+    canvas.width = width
+    canvas.height = height
+
+    const center = width / 2
+
+    // Animation state
+    let frameCount = 0
+    let isBlinking = false
+    let blinkFrame = 0
+    // Random interval: 2-6 seconds at 30fps = 60-180 frames
+    let nextBlinkTime = Math.random() * 120 + 60
+
+    // Bouncing state
+    let isBouncing = false
+    let bounceFrame = 0
+    // Random interval: 1-16 seconds at 30fps = 30-480 frames
+    let nextBounceTime = Math.random() * 450 + 30
+
+    // Frame rate control (30fps instead of 60fps)
+    const targetFPS = 30
+    const frameInterval = 1000 / targetFPS
+    let lastFrameTime = performance.now()
+
+    let animationFrameId: number
+
+    const drawPixel = (x: number, y: number, color: string, scaleX: number = 1, scaleY: number = 1) => {
+      ctx.fillStyle = color
+      // Round to nearest pixel for cleaner rendering
+      const px = Math.round(x)
+      const py = Math.round(y)
+
+      // When scaling, draw slightly larger rectangles to avoid gaps
+      // Use ceil to ensure coverage when stretched
+      const w = Math.max(1, Math.ceil(Math.abs(scaleX)))
+      const h = Math.max(1, Math.ceil(Math.abs(scaleY)))
+
+      ctx.fillRect(px, py, w, h)
+    }
+
+    const drawNagisa = (earOffset: number, eyeState: 'open' | 'closed', bounceY: number, squashStretch: { scaleX: number, scaleY: number }) => {
+      ctx.clearRect(0, 0, width, height)
+
+      // For pixel-perfect rendering, we'll apply transformations manually to coordinates
+      // instead of using ctx.scale which causes anti-aliasing
+      const applyTransform = (x: number, y: number): { x: number, y: number } => {
+        // Apply squash/stretch around bottom center anchor point
+        const bottomY = center + 9
+        const dx = x - center
+        const dy = y - bottomY
+
+        const transformedX = center + dx * squashStretch.scaleX
+        const transformedY = bottomY + dy * squashStretch.scaleY
+
+        // Apply bounce offset
+        return {
+          x: transformedX,
+          y: transformedY + bounceY
+        }
+      }
+
+      const pink = '#FFB6C1'
+      const white = '#FFFFFF'
+
+      const earOffsetY = Math.round(earOffset)
+
+      // Particle cluster ears (pixel style)
+      // Left ear - main particle cluster (3x3 pixels)
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          const pos = applyTransform(center - 7 + j, 6 + earOffsetY + i)
+          drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+        }
+      }
+      // Left ear - satellite particles
+      let pos = applyTransform(center - 8, 7 + earOffsetY)
+      drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center - 4, 7 + earOffsetY)
+      drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+
+      // Right ear - main particle cluster (3x3 pixels)
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          const pos = applyTransform(center + 5 + j, 6 + earOffsetY + i)
+          drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+        }
+      }
+      // Right ear - satellite particles
+      pos = applyTransform(center + 4, 7 + earOffsetY)
+      drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center + 8, 7 + earOffsetY)
+      drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+
+      // Main ball body (circle using pixel approximation)
+      for (let i = 0; i < height; i++) {
+        for (let j = 0; j < width; j++) {
+          const dist = Math.sqrt((i - center) ** 2 + (j - center) ** 2)
+          if (dist < 9) {
+            const pos = applyTransform(j, i)
+            drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
+          }
+        }
+      }
+
+      // Eyes
+      if (eyeState === 'open') {
+        // Left eye - open (◕) - 3 pixels vertical
+        pos = applyTransform(center - 3, center - 3)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center - 3, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center - 3, center - 1)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center - 3, center - 4)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+
+        // Right eye - open (◕)
+        pos = applyTransform(center + 3, center - 3)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center + 3, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center + 3, center - 1)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center + 3, center - 4)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      } else {
+        // Both eyes closed (-) - horizontal lines
+        pos = applyTransform(center - 4, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center - 3, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center - 2, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+
+        pos = applyTransform(center + 2, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center + 3, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+        pos = applyTransform(center + 4, center - 2)
+        drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      }
+
+      // Mouth (ω)
+      pos = applyTransform(center - 1, center + 1)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center, center + 1)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center + 1, center + 1)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center, center + 2)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+
+      // Blush (2 pixels each side)
+      pos = applyTransform(center - 7, center - 1)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center - 7, center)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center + 7, center - 1)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+      pos = applyTransform(center + 7, center)
+      drawPixel(pos.x, pos.y, white, squashStretch.scaleX, squashStretch.scaleY)
+    }
+
+    const animate = (currentTime: number) => {
+      // Frame rate limiting (30fps)
+      const elapsed = currentTime - lastFrameTime
+      if (elapsed < frameInterval) {
+        animationFrameId = requestAnimationFrame(animate)
+        return
+      }
+      lastFrameTime = currentTime - (elapsed % frameInterval)
+
+      frameCount++
+
+      // Ear movement (gentle up-down when not bouncing)
+      const earOffset = isBouncing ? 0 : Math.sin(frameCount * 0.05) * 0.5
+
+      // Blinking logic
+      let eyeState: 'open' | 'closed' = 'open'
+
+      if (frameCount >= nextBlinkTime && !isBlinking) {
+        isBlinking = true
+        blinkFrame = 0
+      }
+
+      if (isBlinking) {
+        blinkFrame++
+        // Blink lasts 8 frames (closed for 4 frames)
+        if (blinkFrame >= 2 && blinkFrame <= 5) {
+          eyeState = 'closed'
+        }
+        if (blinkFrame >= 8) {
+          isBlinking = false
+          // Random interval: 2-6 seconds at 30fps = 60-180 frames
+          nextBlinkTime = frameCount + Math.random() * 120 + 60
+        }
+      }
+
+      // Bouncing logic (random bounces with squash & stretch)
+      let bounceY = 0
+      let squashStretch = { scaleX: 1.0, scaleY: 1.0 }
+
+      if (frameCount >= nextBounceTime && !isBouncing) {
+        isBouncing = true
+        bounceFrame = 0
+      }
+
+      if (isBouncing) {
+        bounceFrame++
+        const bounceDuration = 60 // Total bounce duration in frames (1 second at 60fps)
+
+        if (bounceFrame <= bounceDuration) {
+          // Bounce phases:
+          // 0-20%: Squash down (anticipation/windup)
+          // 20-70%: Jump up (parabolic arc)
+          // 70-100%: Land and settle
+          const t = bounceFrame / bounceDuration
+
+          if (t < 0.2) {
+            // Phase 1: Squash down for anticipation (0-20%)
+            const windupProgress = t / 0.2 // 0 to 1
+            const windupAmount = Math.sin(windupProgress * Math.PI / 2) // Ease in
+
+            // Squash down (wider and shorter)
+            squashStretch.scaleX = 1.0 + windupAmount * 0.2
+            squashStretch.scaleY = 1.0 - windupAmount * 0.2
+            // bounceY stays 0 - bottom anchor handles this
+
+          } else if (t < 0.7) {
+            // Phase 2: Jump up (20-70%)
+            const jumpProgress = (t - 0.2) / 0.5 // 0 to 1
+            const maxHeight = 8
+
+            // Parabolic trajectory: positive Y = upward (after transform order fix)
+            bounceY = maxHeight * 4 * jumpProgress * (jumpProgress - 1)
+
+            // Stretch at peak, normal at takeoff/landing
+            if (jumpProgress < 0.3) {
+              // Takeoff: slight stretch
+              const stretchAmount = jumpProgress / 0.3
+              squashStretch.scaleX = 1.0 - stretchAmount * 0.1
+              squashStretch.scaleY = 1.0 + stretchAmount * 0.1
+            } else if (jumpProgress > 0.7) {
+              // Prepare for landing: slight squash
+              const landingPrep = (jumpProgress - 0.7) / 0.3
+              squashStretch.scaleX = 1.0 + landingPrep * 0.15
+              squashStretch.scaleY = 1.0 - landingPrep * 0.15
+            } else {
+              // Peak: maximum stretch
+              squashStretch.scaleX = 0.9
+              squashStretch.scaleY = 1.1
+            }
+
+          } else {
+            // Phase 3: Land and settle (70-100%)
+            const settleProgress = (t - 0.7) / 0.3 // 0 to 1
+
+            // Squash on landing, then bounce back to normal
+            const settleAmount = Math.cos(settleProgress * Math.PI / 2) // Ease out
+
+            squashStretch.scaleX = 1.0 + settleAmount * 0.12
+            squashStretch.scaleY = 1.0 - settleAmount * 0.12
+            // bounceY stays 0 - bottom anchor handles this
+          }
+        } else {
+          isBouncing = false
+          // Random interval: 1-16 seconds at 30fps = 30-480 frames
+          nextBounceTime = frameCount + Math.random() * 450 + 30
+        }
+      }
+
+      drawNagisa(earOffset, eyeState, bounceY, squashStretch)
+
+      animationFrameId = requestAnimationFrame(animate)
+    }
+
+    animationFrameId = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [shouldShow])
 
   // Shimmer animation using requestAnimationFrame
   useEffect(() => {
@@ -145,12 +465,6 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     }
   }, [])
 
-  // Only show when LLM is actively working (thinking or waiting for confirmation)
-  // Don't show idle todos - indicator's purpose is to show LLM is working
-  if (!isLLMThinking && !pendingToolConfirmation) {
-    return null
-  }
-
   // Show todo status if available, otherwise show thinking verb
   const text = currentTodo ? currentTodo.activeForm : thinkingVerb
 
@@ -181,9 +495,17 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     })
   }
 
+  if (!shouldShow) {
+    return null
+  }
+
   return (
     <div className="todo-status-indicator">
-      <div className="todo-spinner" />
+      <canvas
+        ref={canvasRef}
+        className="nagisa-avatar"
+        style={{ width: '24px', height: '24px' }}
+      />
       <span className="todo-label-shimmer">
         {renderGlowText()}
       </span>
