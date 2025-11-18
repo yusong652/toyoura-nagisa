@@ -47,18 +47,10 @@ export const useStreamingUpdateHandler = ({ setMessages, setIsLLMThinking }: Use
         return msg
       }))
 
-      // Check if content contains tool_use blocks
-      if (content) {
-        const hasToolUse = content.some((block: any) => block.type === 'tool_use')
-
-        if (hasToolUse) {
-          // Stop thinking immediately when tools are detected
-          // LLM has finished thinking and is about to execute tools
-          setIsLLMThinking?.(false)
-        } else if (!streaming) {
-          // No tools and streaming finished: LLM completely done
-          setIsLLMThinking?.(false)
-        }
+      // Update thinking status based on backend's streaming flag
+      // Backend sends streaming=false only when all work (including tool execution) is complete
+      if (!streaming) {
+        setIsLLMThinking?.(false)
       }
     }
 

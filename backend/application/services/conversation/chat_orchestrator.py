@@ -434,13 +434,15 @@ class ChatOrchestrator:
                             'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                         }
 
-                # Send final streaming update
+                # Send streaming update with tool_use blocks (before tool execution)
+                # This ensures frontend renders ToolUseBlock components BEFORE confirmation requests arrive
+                # Note: streaming=True because tool execution is about to start
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
                 await WebSocketNotificationService.send_streaming_update(
                     session_id=session_id,
                     message_id=message_id,
                     content=content,
-                    streaming=False,
+                    streaming=True,  # Tools are about to execute
                     usage=usage
                 )
 
@@ -477,6 +479,18 @@ class ChatOrchestrator:
             session_id or "",
             message_id
         )
+
+        # Send todo update notification if todo_write tool was called
+        # This happens AFTER tool execution to get the updated todo state
+        if any(tc['name'] == 'todo_write' for tc in tool_calls):
+            try:
+                from backend.application.services.todo_service import get_todo_service
+                from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+                todo_service = get_todo_service()
+                current_todo = await todo_service.get_current_todo(session_id)
+                await WebSocketNotificationService.send_todo_update(session_id, current_todo)
+            except Exception as e:
+                print(f"[WARNING] Failed to send todo update notification: {e}")
 
         # Add results to context and check for rejections
         rejected_tools = []

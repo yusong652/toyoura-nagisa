@@ -18,6 +18,7 @@ import MessageList from './components/MessageList'
 import ChatBoxControls from './components/ChatBoxControls'
 import ShadowOverlay from './components/ShadowOverlay'
 import TokenUsageDisplay from './components/TokenUsageDisplay'
+import TodoStatusIndicator from '../TodoStatusIndicator'
 import './ChatBox.css'
 
 /**
@@ -92,13 +93,8 @@ const ChatBox: React.FC<ChatBoxProps> = ({ statusPanel }) => {
           <div className="scroll-anchor" />
         </div>
 
-        {/* Global LLM thinking/status indicator - fixed at bottom left */}
-        {isLLMThinking && (
-          <div className="llm-thinking-indicator">
-            <div className="thinking-spinner" />
-            <span className="thinking-label">thinking</span>
-          </div>
-        )}
+        {/* Global todo/thinking status indicator - fixed at bottom left */}
+        <TodoStatusIndicator isLLMThinking={isLLMThinking} />
 
         {/* Token usage display - fixed at bottom right */}
         <TokenUsageDisplay messages={messages} />

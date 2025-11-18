@@ -1,0 +1,105 @@
+/**
+ * TodoStatusIndicator styles - Displays current task status.
+ *
+ * Positioned at bottom left of chatbox container, mirroring TokenUsageDisplay on the right.
+ * Uses absolute positioning relative to .chatbox-container parent.
+ */
+
+.todo-status-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-family: 'Courier New', 'Consolas', monospace;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.todo-status-indicator:hover {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nagisa-avatar {
+  display: block;
+  image-rendering: pixelated; /* Pixel-perfect rendering for pixel art */
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+.todo-label-shimmer {
+  font-weight: 400;
+  white-space: nowrap;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Courier New', 'Consolas', monospace;
+  font-size: 13px;
+}
+
+.todo-label-shimmer span {
+  display: inline-block;
+  color: rgba(255, 255, 255, 1);
+  will-change: opacity;
+}
+
+/* Theme adaptations */
+[data-theme="light"] .todo-status-indicator {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .todo-status-indicator:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="light"] .todo-label-shimmer {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .todo-label-shimmer span {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="dark"] .todo-status-indicator {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .todo-status-indicator:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .todo-status-indicator {
+    /* Keep same position as desktop - always bottom-left of chatbox */
+    bottom: 8px;
+    left: 8px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .todo-label-shimmer {
+    max-width: 200px;
+  }
+}
