@@ -434,17 +434,9 @@ class ChatOrchestrator:
                             'tokens_left': max(0, DEFAULT_MAX_TOKENS - (prompt_tokens or 0))
                         }
 
-                # Send final streaming update
-                from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-                await WebSocketNotificationService.send_streaming_update(
-                    session_id=session_id,
-                    message_id=message_id,
-                    content=content,
-                    streaming=False,
-                    usage=usage
-                )
-
-                # Save token usage to persistent storage
+                # Save token usage to persistent storage (without sending streaming update)
+                # Note: We don't send streaming=False here because tools are about to execute.
+                # The final streaming update will be sent after all recursive tool execution completes.
                 if usage:
                     from backend.infrastructure.storage.session_manager import save_token_usage
                     save_token_usage(session_id, usage)
