@@ -601,7 +601,6 @@ def save_token_usage(session_id: str, usage: Dict[str, int]) -> None:
         usage: Dictionary containing token usage statistics
     """
     update_runtime_state(session_id, 'token_usage', usage)
-    print(f"[DEBUG] Saved token usage for session {session_id}: {usage}")
 
 
 def load_token_usage(session_id: str) -> Optional[Dict[str, int]]:
@@ -615,7 +614,4 @@ def load_token_usage(session_id: str) -> Optional[Dict[str, int]]:
         Optional[Dict[str, int]]: Token usage statistics or None if not available
     """
     state = load_runtime_state(session_id)
-    usage = state.get('token_usage')
-    if usage:
-        print(f"[DEBUG] Loaded token usage for session {session_id}: {usage}")
-    return usage
+    return state.get('token_usage')

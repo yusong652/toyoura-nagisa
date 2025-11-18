@@ -104,7 +104,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       try {
         const usage = await sessionService.getTokenUsage(sessionId)
         setSessionTokenUsage(usage)
-        console.log('[SessionContext] Loaded token usage for session:', sessionId, usage)
       } catch (error) {
         console.error('Failed to load token usage:', error)
         setSessionTokenUsage(null)
@@ -286,7 +285,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       const { usage } = event.detail
       if (usage) {
         setSessionTokenUsage(usage)
-        console.log('[SessionContext] Updated token usage from streaming:', usage)
       }
     }
 
