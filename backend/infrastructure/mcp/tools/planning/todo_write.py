@@ -1,12 +1,12 @@
-"""todo_write tool - persistent task tracking with cross-session awareness.
+"""todo_write tool - persistent task tracking with cross-session sharing.
 
 This tool implements Claude Code-compatible TodoWrite functionality, enabling LLMs to:
 - Plan and track multi-step workflows
-- Maintain task continuity across sessions
-- Provide visibility into current progress
+- Share todo lists across all sessions in the workspace
+- Provide visibility into current progress across sessions
 - Demonstrate thoroughness to users
 
-Inspired by PFC task tracking's notified flag pattern for cross-session notifications.
+All sessions in the same workspace share the same todo list for better continuity.
 """
 
 import logging
@@ -319,10 +319,11 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
         # Auto-clear logic (Claude Code compatible):
         # If all todos are completed, automatically clear the list
         if todos_dict and all(todo.get("status") == "completed" for todo in todos_dict):
-            logger.info(f"All {len(todos_dict)} todos completed - auto-clearing list for session {session_id[:8]}")
+            logger.info(f"All {len(todos_dict)} todos completed - auto-clearing shared workspace list")
             todos_dict = []
 
-        # Save todos (full replacement pattern - same as Claude Code)
+        # Save todos to workspace-level shared file (cross-session persistence)
+        # Note: session_id is still passed for tracking which session made the update
         storage = get_todo_storage()
         storage.save_todos(workspace, session_id, todos_dict)
 

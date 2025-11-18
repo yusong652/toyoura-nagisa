@@ -4,8 +4,8 @@ Todo Storage - Persistent storage for todo items.
 Implements persistent todo storage in workspace directories for project-level tracking.
 
 Storage Strategy:
-    - Session-isolated storage: workspace/sessions/{session_id}/todos.json
-    - Cross-session querying: Load all session todos for global awareness
+    - Workspace-level storage: workspace/todos.json (shared across all sessions)
+    - Cross-session persistence: All sessions share the same todo list
     - Workspace resolution: Uses workspace.py for profile-aware paths
     - Auto-clear on completion: Delete file when saving empty list
 
@@ -48,20 +48,18 @@ class TodoStorage:
         """Initialize todo storage manager."""
         self.logger = logger
 
-    def _get_session_todos_path(self, workspace: Path, session_id: str) -> Path:
+    def _get_todos_path(self, workspace: Path) -> Path:
         """
-        Get path to session's todos.json file.
+        Get path to workspace's shared todos.json file.
 
         Args:
             workspace: Workspace directory (from workspace.py)
-            session_id: Session identifier
 
         Returns:
             Path to todos.json file
         """
-        session_dir = workspace / "sessions" / session_id
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir / "todos.json"
+        workspace.mkdir(parents=True, exist_ok=True)
+        return workspace / "todos.json"
 
     def _load_todos_from_file(self, file_path: Path) -> List[Dict[str, Any]]:
         """
@@ -113,7 +111,7 @@ class TodoStorage:
         todos: List[Dict[str, Any]]
     ) -> None:
         """
-        Save todos for a session (full replacement).
+        Save todos for workspace (cross-session shared list).
 
         This implements the "full update" pattern similar to Claude Code's TodoWrite,
         where the entire todo list is replaced on each update.
@@ -124,18 +122,18 @@ class TodoStorage:
 
         Args:
             workspace: Workspace directory path
-            session_id: Session identifier
+            session_id: Session identifier (for tracking which session created/updated the todo)
             todos: Complete list of todos (replaces existing)
         """
-        file_path = self._get_session_todos_path(workspace, session_id)
+        file_path = self._get_todos_path(workspace)
 
         # Handle empty list: delete the file instead of saving empty JSON
         if not todos:
             if file_path.exists():
                 file_path.unlink()
-                self.logger.info(f"✓ Deleted todos file for session {session_id[:8]} (empty list)")
+                self.logger.info(f"✓ Deleted todos file for workspace (empty list)")
             else:
-                self.logger.debug(f"No todos file to delete for session {session_id[:8]}")
+                self.logger.debug(f"No todos file to delete for workspace")
             return
 
         # Ensure all todos have required fields
@@ -152,58 +150,45 @@ class TodoStorage:
                 todo["metadata"] = {}
 
         self._save_todos_to_file(file_path, todos)
-        self.logger.info(f"✓ Saved {len(todos)} todo(s) for session {session_id[:8]}")
+        self.logger.info(f"✓ Saved {len(todos)} todo(s) to workspace (from session {session_id[:8]})")
 
-    def load_todos(self, workspace: Path, session_id: str) -> List[Dict[str, Any]]:
+    def load_todos(self, workspace: Path, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Load todos for a specific session.
+        Load todos from workspace (shared across all sessions).
 
         Args:
             workspace: Workspace directory path
-            session_id: Session identifier
+            session_id: Optional session identifier (unused, kept for compatibility)
 
         Returns:
-            List of todo dictionaries for the session
+            List of todo dictionaries from the workspace
         """
-        file_path = self._get_session_todos_path(workspace, session_id)
+        file_path = self._get_todos_path(workspace)
         todos = self._load_todos_from_file(file_path)
-        self.logger.debug(f"Loaded {len(todos)} todo(s) for session {session_id[:8]}")
+        self.logger.debug(f"Loaded {len(todos)} todo(s) from workspace")
         return todos
 
     def load_all_session_todos(self, workspace: Path) -> List[Dict[str, Any]]:
         """
-        Load todos from all sessions in the workspace (cross-session querying).
+        Load todos from the workspace (now shared across all sessions).
 
-        This enables cross-session awareness similar to PFC task tracking,
-        where new sessions can see todos from previous sessions.
+        This method now simply returns the shared workspace todos,
+        as all sessions share the same todo list.
 
         Args:
             workspace: Workspace directory path
 
         Returns:
-            List of all todos across all sessions, sorted by update time (desc)
+            List of all todos, sorted by update time (desc)
         """
-        sessions_dir = workspace / "sessions"
-        if not sessions_dir.exists():
-            return []
-
-        all_todos = []
-
-        # Iterate through all session directories
-        for session_dir in sessions_dir.iterdir():
-            if not session_dir.is_dir():
-                continue
-
-            todos_file = session_dir / "todos.json"
-            if todos_file.exists():
-                session_todos = self._load_todos_from_file(todos_file)
-                all_todos.extend(session_todos)
+        # Since we now use a single shared file, just load it
+        todos = self.load_todos(workspace)
 
         # Sort by updated_at descending (most recent first)
-        all_todos.sort(key=lambda t: t.get("updated_at", 0), reverse=True)
+        todos.sort(key=lambda t: t.get("updated_at", 0), reverse=True)
 
-        self.logger.debug(f"Loaded {len(all_todos)} todo(s) across all sessions")
-        return all_todos
+        self.logger.debug(f"Loaded {len(todos)} todo(s) from workspace")
+        return todos
 
     def get_pending_todos(
         self,

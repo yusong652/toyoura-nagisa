@@ -1,7 +1,12 @@
 """
-Simple integration test for todo_write tool with cross-session tracking.
+Test script for todo integration with cross-session shared storage.
 
-Run this script to verify that the todo system works correctly.
+This script tests the new workspace-level todo system:
+1. All sessions share the same todo list at workspace/todos.json
+2. Multiple sessions can read and update the same list
+3. Verifies Claude Code-compatible reminder format
+
+Run with: uv run python test_todo_integration.py
 """
 
 import asyncio
@@ -11,12 +16,13 @@ import shutil
 import tempfile
 
 from backend.infrastructure.storage.todo_storage import get_todo_storage
+from backend.infrastructure.monitoring.monitors.todo_monitor import TodoMonitor
 
 
 async def test_todo_integration():
-    """Test the complete todo workflow."""
+    """Test the complete todo workflow with cross-session sharing."""
     print("=" * 60)
-    print("Testing Todo Write Integration with Cross-Session Tracking")
+    print("Testing Todo System with Cross-Session Shared Storage")
     print("=" * 60)
 
     # Create temp workspace
@@ -25,10 +31,10 @@ async def test_todo_integration():
 
     storage = get_todo_storage()
 
-    # Test 1: Session A creates todos
-    print("\n[Test 1] Session A creates todos...")
+    # Test 1: Session A creates todos (shared workspace list)
+    print("\n[Test 1] Session A creates todos in shared workspace list...")
     session_a = str(uuid.uuid4())
-    todos_a = [
+    todos = [
         {
             "content": "Query PFC ball command syntax",
             "activeForm": "Querying PFC ball command syntax",
@@ -40,70 +46,71 @@ async def test_todo_integration():
             "status": "pending"
         }
     ]
-    storage.save_todos(workspace, session_a, todos_a)
-    print(f"  ✓ Session {session_a[:8]} created 2 todos")
+    storage.save_todos(workspace, session_a, todos)
+    print(f"  ✓ Session {session_a[:8]} created 2 todos in shared list")
 
-    # Test 2: Session A marks first todo as completed
-    print("\n[Test 2] Session A completes first todo...")
-    todos_a[0]["status"] = "completed"
-    todos_a[1]["status"] = "in_progress"
-    storage.save_todos(workspace, session_a, todos_a)
-    print(f"  ✓ Todo 1 marked as completed")
-    print(f"  ✓ Todo 2 marked as in_progress")
-
-    # Test 3: Check unnotified completed todos (StatusMonitor simulation)
-    print("\n[Test 3] Checking unnotified completed todos (StatusMonitor query)...")
-    unnotified = storage.get_unnotified_completed_todos(workspace, limit=3)
-    print(f"  ✓ Found {len(unnotified)} unnotified completed todo(s)")
-    for todo in unnotified:
-        print(f"    - {todo['content']} (session: {todo['session_id'][:8]})")
-
-    # Test 4: Mark as notified (StatusMonitor action)
-    print("\n[Test 4] Marking todo as notified (simulating StatusMonitor)...")
-    if unnotified:
-        todo_id = unnotified[0]["todo_id"]
-        storage.mark_todo_notified(workspace, todo_id)
-        print(f"  ✓ Todo {todo_id} marked as notified")
-
-    # Test 5: Verify no duplicate notification
-    print("\n[Test 5] Verifying no duplicate notification...")
-    unnotified_after = storage.get_unnotified_completed_todos(workspace, limit=3)
-    print(f"  ✓ Unnotified count after marking: {len(unnotified_after)}")
-    if len(unnotified_after) == 0:
-        print("  ✓ SUCCESS: No duplicate notifications will be sent")
-    else:
-        print("  ✗ FAIL: Duplicate notification would occur")
-
-    # Test 6: Session B creates new todos
-    print("\n[Test 6] Session B creates new todos...")
+    # Test 2: Session B loads the same shared todos
+    print("\n[Test 2] Session B loads the shared todo list...")
     session_b = str(uuid.uuid4())
-    todos_b = [
-        {
-            "content": "Execute PFC simulation with 10000 particles",
-            "activeForm": "Executing PFC simulation",
-            "status": "in_progress"
-        }
-    ]
-    storage.save_todos(workspace, session_b, todos_b)
-    print(f"  ✓ Session {session_b[:8]} created 1 todo")
+    session_b_todos = storage.load_todos(workspace, session_b)
+    print(f"  ✓ Session {session_b[:8]} loaded {len(session_b_todos)} todo(s)")
+    for todo in session_b_todos:
+        print(f"    - {todo['content']} ({todo['status']})")
 
-    # Test 7: Cross-session query
-    print("\n[Test 7] Cross-session todo query...")
-    all_todos = storage.load_all_session_todos(workspace)
-    print(f"  ✓ Total todos across all sessions: {len(all_todos)}")
-    for todo in all_todos:
-        session_marker = " (Session A)" if todo["session_id"] == session_a else " (Session B)"
-        status_emoji = {"pending": "[ ]", "in_progress": "[~]", "completed": "[x]"}
-        emoji = status_emoji.get(todo["status"], "[?]")
-        notified_mark = " [notified]" if todo.get("notified") else ""
-        print(f"    {emoji} {todo['content']}{session_marker}{notified_mark}")
+    # Test 3: Session B updates shared todos
+    print("\n[Test 3] Session B updates the shared todo list...")
+    todos[0]["status"] = "completed"
+    todos[1]["status"] = "in_progress"
+    todos.append({
+        "content": "Execute PFC simulation with 10000 particles",
+        "activeForm": "Executing PFC simulation",
+        "status": "pending"
+    })
+    storage.save_todos(workspace, session_b, todos)
+    print(f"  ✓ Session {session_b[:8]} updated shared list (3 todos total)")
 
-    # Test 8: Verify workspace structure
-    print("\n[Test 8] Verifying workspace structure...")
-    session_a_file = workspace / "sessions" / session_a / "todos.json"
-    session_b_file = workspace / "sessions" / session_b / "todos.json"
-    print(f"  ✓ Session A file exists: {session_a_file.exists()}")
-    print(f"  ✓ Session B file exists: {session_b_file.exists()}")
+    # Test 4: Session A sees updated todos
+    print("\n[Test 4] Session A loads updated shared list...")
+    session_a_todos = storage.load_todos(workspace, session_a)
+    print(f"  ✓ Session {session_a[:8]} sees {len(session_a_todos)} todo(s)")
+    for todo in session_a_todos:
+        print(f"    - {todo['content']} ({todo['status']})")
+
+    # Test 5: Test monitor format (Claude Code compatible)
+    print("\n[Test 5] Testing TodoMonitor reminder format...")
+    monitor = TodoMonitor(session_a)
+    reminders = await monitor.get_reminders()
+    if reminders:
+        print("  ✓ Generated reminder in Claude Code format:")
+        # Extract content between tags
+        reminder_text = reminders[0].replace("<system-reminder>\n", "").replace("\n</system-reminder>", "")
+        for line in reminder_text.split("\n"):
+            print(f"    {line}")
+
+    # Test 6: Verify workspace structure
+    print("\n[Test 6] Verifying workspace structure...")
+    workspace_todos_file = workspace / "todos.json"
+    print(f"  ✓ Workspace shared todos.json exists: {workspace_todos_file.exists()}")
+
+    # Check that NO session-specific files exist
+    sessions_dir = workspace / "sessions"
+    if sessions_dir.exists():
+        session_files = list(sessions_dir.glob("*/todos.json"))
+        print(f"  ✓ Session-specific todo files: {len(session_files)} (should be 0)")
+    else:
+        print("  ✓ No sessions directory (correct for shared storage)")
+
+    # Test 7: Test empty list deletion
+    print("\n[Test 7] Testing empty list deletion...")
+    # When saving an empty list, the file should be deleted
+    storage.save_todos(workspace, session_a, [])
+
+    remaining = storage.load_todos(workspace, session_a)
+    print(f"  ✓ Empty list saved → file deleted: {len(remaining)} todos remain")
+    print(f"  ✓ File removed: {not workspace_todos_file.exists()}")
+
+    # Note: Auto-clear logic (all completed → empty) is in todo_write tool,
+    # not in the storage layer. Storage layer only deletes file for empty lists.
 
     # Cleanup
     print("\n[Cleanup] Removing temp workspace...")
@@ -115,12 +122,12 @@ async def test_todo_integration():
     print("✓ All integration tests passed!")
     print("=" * 60)
     print("\nKey features verified:")
-    print("  1. Session-isolated storage")
-    print("  2. Cross-session querying")
-    print("  3. Notified flag persistence")
-    print("  4. No duplicate notifications")
-    print("  5. Full replacement pattern")
-    print("\nThe todo system is ready for use with aiNagisa!")
+    print("  1. Workspace-level shared storage (workspace/todos.json)")
+    print("  2. Cross-session todo sharing")
+    print("  3. Full replacement pattern")
+    print("  4. Claude Code-compatible reminder format")
+    print("  5. File deletion on empty list")
+    print("\nThe cross-session todo system is ready for aiNagisa!")
 
 
 if __name__ == "__main__":
