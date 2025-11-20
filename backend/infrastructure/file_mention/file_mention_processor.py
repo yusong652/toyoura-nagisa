@@ -3,11 +3,16 @@ File Mention Processor - Extract and inject mentioned file contents.
 
 This module processes @file mentions in user messages, reading files and
 formatting them as system-reminder blocks for LLM consumption.
+
+Supports:
+- Text files: formatted with line numbers
+- Binary/Image files: base64-encoded for multimodal LLM consumption
 """
 
 import logging
+import json
 from pathlib import Path
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict, Any, Union
 from dataclasses import dataclass
 
 from backend.infrastructure.mcp.tools.coding.utils.path_security import (
@@ -21,8 +26,10 @@ from backend.infrastructure.mcp.utils.path_normalization import (
     path_to_llm_format
 )
 from backend.infrastructure.mcp.tools.coding.utils.file_reader import (
-    detect_encoding,
-    read_text_file_with_line_numbers,
+    read_file_safely,
+    ProcessingResult,
+    ContentFormat,
+    FileType,
     MAX_FILE_SIZE_BYTES
 )
 
@@ -33,9 +40,7 @@ logger = logging.getLogger(__name__)
 class FileContent:
     """File content with metadata."""
     path: str
-    content: str
-    total_lines: int
-    encoding: str
+    processing_result: Optional[ProcessingResult]
     success: bool
     error_message: Optional[str] = None
 
@@ -47,7 +52,7 @@ class FileMentionProcessor:
     Responsibilities:
     - Deduplicate file paths (single message level)
     - Validate file paths against workspace
-    - Read file contents safely
+    - Read file contents safely (text and binary/multimodal)
     - Format as system-reminder blocks
     - Error handling (skip failed files)
     """
@@ -66,7 +71,7 @@ class FileMentionProcessor:
     async def process_mentioned_files(
         self,
         file_paths: List[str]
-    ) -> List[str]:
+    ) -> List[Union[str, Dict[str, Any]]]:
         """
         Process mentioned files and return system-reminder blocks.
 
@@ -74,7 +79,8 @@ class FileMentionProcessor:
             file_paths: List of file paths (relative or absolute)
 
         Returns:
-            List of formatted system-reminder blocks (only successful reads)
+            List of formatted system-reminder blocks or structured multimodal parts
+            (only successful reads)
         """
         if not file_paths:
             return []
@@ -87,13 +93,12 @@ class FileMentionProcessor:
         for file_path in unique_paths:
             file_content = await self._read_file_safe(file_path)
 
-            if file_content.success:
-                # 1. Format reminder for LLM injection
+            if file_content.success and file_content.processing_result:
+                # Format reminder for LLM injection
                 reminder = self._format_file_reminder(file_content)
                 reminders.append(reminder)
 
-                # 2. Track read file in tool_manager (for edit prerequisite validation)
-                # This allows LLM to directly edit mentioned files without explicit Read tool call
+                # Track read file in tool_manager (for edit prerequisite validation)
                 try:
                     from backend.shared.utils.app_context import get_llm_client
                     llm_client = get_llm_client()
@@ -150,18 +155,14 @@ class FileMentionProcessor:
             normalized_path = normalize_path_separators(file_path.strip())
 
             # Get workspace root based on agent profile
-            # For PFC profile: tries PFC server's working directory first, falls back to pfc_workspace
-            # For other profiles: uses unified workspace directory
             workspace_root = await get_workspace_for_profile(self.agent_profile, self.session_id)
 
             # Validate path and get absolute path
             abs_file_path = validate_path_in_workspace(normalized_path, workspace_root)
             if abs_file_path is None:
                 return FileContent(
-                    path=file_path,  # Keep original for error message
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    path=file_path,
+                    processing_result=None,
                     success=False,
                     error_message=f"Path outside workspace: {file_path}"
                 )
@@ -175,9 +176,7 @@ class FileMentionProcessor:
             if not file_path_obj.exists():
                 return FileContent(
                     path=abs_display,
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    processing_result=None,
                     success=False,
                     error_message=f"File not found: {abs_display}"
                 )
@@ -186,9 +185,7 @@ class FileMentionProcessor:
             if not file_path_obj.is_file():
                 return FileContent(
                     path=abs_display,
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    processing_result=None,
                     success=False,
                     error_message=f"Not a file: {abs_display}"
                 )
@@ -198,9 +195,7 @@ class FileMentionProcessor:
             if file_size > MAX_FILE_SIZE_BYTES:
                 return FileContent(
                     path=abs_display,
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    processing_result=None,
                     success=False,
                     error_message=f"File too large: {file_size // 1024 // 1024}MB"
                 )
@@ -209,9 +204,7 @@ class FileMentionProcessor:
             if file_path_obj.is_symlink() and not is_safe_symlink(file_path_obj, workspace_root):
                 return FileContent(
                     path=abs_display,
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    processing_result=None,
                     success=False,
                     error_message="Unsafe symlink"
                 )
@@ -219,26 +212,17 @@ class FileMentionProcessor:
             if not check_parent_symlinks(file_path_obj, workspace_root):
                 return FileContent(
                     path=abs_display,
-                    content="",
-                    total_lines=0,
-                    encoding="",
+                    processing_result=None,
                     success=False,
                     error_message="Unsafe parent symlinks"
                 )
 
-            # Detect encoding (use shared utility)
-            encoding = detect_encoding(file_path_obj)
-            if encoding is None:
-                encoding = 'utf-8'  # Fallback
-
-            # Read content with line numbers (use shared utility)
-            content = read_text_file_with_line_numbers(file_path_obj, encoding)
+            # Read content with automatic type detection (text vs binary/image)
+            processing_result = read_file_safely(file_path_obj)
 
             return FileContent(
                 path=abs_display,  # Return absolute path
-                content=content,
-                total_lines=len(content.splitlines()),
-                encoding=encoding,
+                processing_result=processing_result,
                 success=True
             )
 
@@ -246,44 +230,79 @@ class FileMentionProcessor:
             logger.error(f"Unexpected error reading file '{file_path}': {e}")
             return FileContent(
                 path=file_path,
-                content="",
-                total_lines=0,
-                encoding="",
+                processing_result=None,
                 success=False,
                 error_message=f"Unexpected error: {str(e)}"
             )
 
-    def _format_file_reminder(self, file_content: FileContent) -> str:
+    def _format_file_reminder(self, file_content: FileContent) -> Union[str, Dict[str, Any]]:
         """
-        Format file content as system-reminder block.
+        Format file content as system-reminder block or multimodal part.
 
-        Matches Claude Code format:
-        <system-reminder>
-        Called the Read tool with the following input: {"file_path":"..."}
-        </system-reminder>
+        For text files:
+        - Returns string with two system-reminder blocks (tool call + result)
 
-        <system-reminder>
-        Result of calling the Read tool: "...file content..."
-        </system-reminder>
+        For binary/image files:
+        - Returns dict with multimodal parts structure for LLM APIs
 
         Args:
             file_content: FileContent object
 
         Returns:
-            Formatted system-reminder block
+            Formatted system-reminder string or multimodal parts dict
         """
-        # First reminder: tool call record
+        if not file_content.processing_result:
+            return ""
+
+        result = file_content.processing_result
+
+        # First reminder: tool call record (always included)
         tool_call_reminder = (
             f"<system-reminder>\n"
             f"Called the Read tool with the following input: "
-            f'{{\"file_path\":\"{file_content.path}\"}}\n'
+            f'{{"file_path":"{file_content.path}"}}\n'
             f"</system-reminder>"
         )
 
+        # Handle different content formats
+        if result.content_format == ContentFormat.INLINE_DATA:
+            # Binary/Image files: return structured parts for multimodal LLM
+            if isinstance(result.content, dict) and "inline_data" in result.content:
+                inline_data = result.content["inline_data"]
+
+                # Build multimodal parts array
+                parts = [
+                    {
+                        "type": "text",
+                        "text": tool_call_reminder
+                    },
+                    {
+                        "type": "text",
+                        "text": "<system-reminder>\nResult of calling the Read tool:\n</system-reminder>"
+                    },
+                    {
+                        "type": "inline_data",
+                        "mime_type": inline_data["mime_type"],
+                        "data": inline_data["data"]
+                    }
+                ]
+
+                # Return structured format that will be properly injected
+                return {
+                    "type": "multimodal_file_mention",
+                    "parts": parts
+                }
+
+        # Text files or metadata: return standard system-reminder format
         # Second reminder: file content
+        content_str = result.content if isinstance(result.content, str) else str(result.content)
+
+        # Escape double quotes in content for JSON embedding
+        escaped_content = content_str.replace('\\', '\\\\').replace('"', '\\"')
+
         content_reminder = (
             f"<system-reminder>\n"
-            f"Result of calling the Read tool: \"{file_content.content}\"\n"
+            f'Result of calling the Read tool: "{escaped_content}"\n'
             f"</system-reminder>"
         )
 

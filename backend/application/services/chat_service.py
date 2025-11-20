@@ -308,31 +308,53 @@ class ChatService:
 
             print(f"[DEBUG] Injecting {len(reminders)} status reminders into user message")
 
-            # 3. Format reminders (StatusMonitor returns complete system-reminder blocks)
-            reminder_text = "\n\n" + "\n\n".join(reminders)
-
-            # 4. Inject into content
+            # 5. Get content array
             content = parsed_data.get('content', [])
             if not isinstance(content, list):
                 print(f"[WARNING] Unexpected content format: {type(content)}")
                 return
 
-            # Find last text part and append reminder
-            injected = False
-            for part in reversed(content):
-                if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
-                    part['text'] += reminder_text
-                    injected = True
-                    print(f"[DEBUG] Injected reminders to existing text part")
-                    break
+            # 6. Process and inject reminders
+            # Reminders can be:
+            # - String: text-based reminders (status, text files)
+            # - Dict with "type": "multimodal_file_mention": image/binary files
+            text_reminders = []
+            multimodal_parts = []
 
-            # If no text part exists (image-only message), create one
-            if not injected:
-                content.append({
-                    "type": "text",
-                    "text": reminder_text.lstrip()  # Remove leading newlines for first text
-                })
-                print(f"[DEBUG] Created new text part for reminders (no existing text)")
+            for reminder in reminders:
+                if isinstance(reminder, dict) and reminder.get("type") == "multimodal_file_mention":
+                    # Multimodal file mention (image, binary)
+                    # Extract parts array and add to multimodal_parts
+                    multimodal_parts.extend(reminder.get("parts", []))
+                elif isinstance(reminder, str):
+                    # Text reminder (status or text file)
+                    text_reminders.append(reminder)
+
+            # 7. Inject text reminders into last text part
+            if text_reminders:
+                reminder_text = "\n\n" + "\n\n".join(text_reminders)
+
+                # Find last text part and append
+                injected = False
+                for part in reversed(content):
+                    if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
+                        part['text'] += reminder_text
+                        injected = True
+                        print(f"[DEBUG] Injected {len(text_reminders)} text reminders to existing text part")
+                        break
+
+                # If no text part exists (image-only message), create one
+                if not injected:
+                    content.append({
+                        "type": "text",
+                        "text": reminder_text.lstrip()  # Remove leading newlines
+                    })
+                    print(f"[DEBUG] Created new text part for {len(text_reminders)} text reminders")
+
+            # 8. Inject multimodal parts directly into content array
+            if multimodal_parts:
+                content.extend(multimodal_parts)
+                print(f"[DEBUG] Injected {len(multimodal_parts)} multimodal parts (images/binary files)")
 
         except Exception as e:
             # Non-critical: Log and continue without reminders
