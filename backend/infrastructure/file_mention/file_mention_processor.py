@@ -271,19 +271,21 @@ class FileMentionProcessor:
                 inline_data = result.content["inline_data"]
 
                 # Build multimodal parts array
+                # Combine text parts into one for better efficiency
+                combined_text = (
+                    f"{tool_call_reminder}\n\n"
+                    f"<system-reminder>\n"
+                    f"Result of calling the Read tool:\n"
+                    f"</system-reminder>"
+                )
+
                 parts = [
                     {
                         "type": "text",
-                        "text": tool_call_reminder
+                        "text": combined_text
                     },
                     {
-                        "type": "text",
-                        "text": "<system-reminder>\nResult of calling the Read tool:\n</system-reminder>"
-                    },
-                    {
-                        "type": "inline_data",
-                        "mime_type": inline_data["mime_type"],
-                        "data": inline_data["data"]
+                        "inline_data": inline_data  # Direct inline_data format for LLM APIs
                     }
                 ]
 
