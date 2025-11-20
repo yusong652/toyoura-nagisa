@@ -302,22 +302,20 @@ class FileMentionProcessor:
                 supports_multimodal = _check_multimodal_support()
 
                 if not supports_multimodal:
-                    # Graceful degradation: return text-only message
+                    # Graceful degradation: return simple text message for LLM
                     file_type = result.file_type.value if result.file_type else "binary"
                     file_size_kb = result.original_size / 1024
 
+                    # Simple message for LLM (no backend implementation details)
                     fallback_message = (
                         f"{tool_call_reminder}\n\n"
                         f"<system-reminder>\n"
                         f"Result of calling the Read tool:\n"
-                        f"[{file_type.upper()} FILE: {file_content.path}]\n"
+                        f"Cannot read {file_type} file: {file_content.path}\n"
                         f"File type: {inline_data.get('mime_type', 'unknown')}\n"
                         f"File size: {file_size_kb:.2f} KB\n\n"
-                        f"Note: The current LLM provider does not support multimodal content (images/binary files).\n"
-                        f"Only text files can be read and processed.\n"
-                        f"To view this file, please:\n"
-                        f"  1. Use a multimodal LLM provider (Gemini, Anthropic Claude, OpenAI GPT-4V, OpenRouter)\n"
-                        f"  2. Or manually describe the file content in your message\n"
+                        f"User attempted to mention a {file_type} file, but multimodal content is not supported.\n"
+                        f"Only text files can be read.\n"
                         f"</system-reminder>"
                     )
 

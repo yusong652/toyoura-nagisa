@@ -205,22 +205,16 @@ Usage:
                 supports_multimodal = _check_multimodal_support()
 
                 if not supports_multimodal:
-                    # Graceful degradation: return text-only error message
+                    # Graceful degradation: return simple error for LLM
                     file_size_kb = processing_result.original_size / 1024
 
+                    # Simple error message for LLM (no backend implementation details)
                     error_message = (
-                        f"[{file_type.value.upper()} FILE: {file_path.name}]\n"
+                        f"Cannot read {file_type.value} file: {file_path.name}\n"
                         f"File type: {inline_data.get('mime_type', 'unknown')}\n"
                         f"File size: {file_size_kb:.2f} KB\n\n"
-                        f"ERROR: The current LLM provider does not support multimodal content (images/binary files).\n"
-                        f"Only text files can be read and processed.\n\n"
-                        f"To view this file, please:\n"
-                        f"  1. Switch to a multimodal LLM provider:\n"
-                        f"     - Gemini (recommended)\n"
-                        f"     - Anthropic Claude\n"
-                        f"     - OpenAI GPT-4V\n"
-                        f"     - OpenRouter\n"
-                        f"  2. Or manually describe the file content in your message\n"
+                        f"This file type requires multimodal support, which is not currently available.\n"
+                        f"Only text files can be read."
                     )
 
                     logger.info(f"Multimodal not supported - returning error for {abs_display}")
