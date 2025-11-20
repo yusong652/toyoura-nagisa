@@ -319,18 +319,25 @@ class ChatService:
             # - String: text-based reminders (status, text files)
             # - Dict with "type": "multimodal_file_mention": image/binary files
             text_reminders = []
-            multimodal_parts = []
+            inline_data_parts = []
 
             for reminder in reminders:
                 if isinstance(reminder, dict) and reminder.get("type") == "multimodal_file_mention":
                     # Multimodal file mention (image, binary)
-                    # Extract parts array and add to multimodal_parts
-                    multimodal_parts.extend(reminder.get("parts", []))
+                    # Extract parts: separate text content from inline_data
+                    for part in reminder.get("parts", []):
+                        if isinstance(part, dict):
+                            if part.get("type") == "text" and "text" in part:
+                                # Collect text content to merge with other text reminders
+                                text_reminders.append(part["text"])
+                            elif "inline_data" in part:
+                                # Keep inline_data parts separate for later injection
+                                inline_data_parts.append(part)
                 elif isinstance(reminder, str):
                     # Text reminder (status or text file)
                     text_reminders.append(reminder)
 
-            # 7. Inject text reminders into last text part
+            # 7. Inject all text reminders into last text part (merged)
             if text_reminders:
                 reminder_text = "\n\n" + "\n\n".join(text_reminders)
 
@@ -340,7 +347,7 @@ class ChatService:
                     if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
                         part['text'] += reminder_text
                         injected = True
-                        print(f"[DEBUG] Injected {len(text_reminders)} text reminders to existing text part")
+                        print(f"[DEBUG] Injected {len(text_reminders)} text reminders (merged) to existing text part")
                         break
 
                 # If no text part exists (image-only message), create one
@@ -349,12 +356,12 @@ class ChatService:
                         "type": "text",
                         "text": reminder_text.lstrip()  # Remove leading newlines
                     })
-                    print(f"[DEBUG] Created new text part for {len(text_reminders)} text reminders")
+                    print(f"[DEBUG] Created new text part for {len(text_reminders)} text reminders (merged)")
 
-            # 8. Inject multimodal parts directly into content array
-            if multimodal_parts:
-                content.extend(multimodal_parts)
-                print(f"[DEBUG] Injected {len(multimodal_parts)} multimodal parts (images/binary files)")
+            # 8. Inject inline_data parts (images, binary) directly into content array
+            if inline_data_parts:
+                content.extend(inline_data_parts)
+                print(f"[DEBUG] Injected {len(inline_data_parts)} inline_data parts (images/binary files)")
 
         except Exception as e:
             # Non-critical: Log and continue without reminders
