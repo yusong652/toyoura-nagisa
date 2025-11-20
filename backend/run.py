@@ -27,33 +27,17 @@ if __name__ == "__main__":
     # Configure reload behavior
     reload_kwargs = {}
     if dev_config.enable_reload:
-        # Option 1: Exclude data directories (recommended for flexibility)
-        # This allows monitoring all code while excluding data/cache directories
-        reload_kwargs["reload_excludes"] = [
-            "**/workspace/**",          # User workspace files
-            "**/pfc_workspace/**",      # PFC workspace files
-            "**/memory_db/**",          # ChromaDB vector database
-            "**/chat/data/**",          # Session data
-            "**/__pycache__/**",        # Python cache
-            "**/*.pyc",                 # Compiled Python files
-            "**/.pytest_cache/**",      # Pytest cache
-            "**/.git/**",               # Git directory
-            "**/node_modules/**",       # Node modules (if any)
-            "**/*.log",                 # Log files
-            "**/.DS_Store",             # macOS metadata
+        # Use reload_dirs instead of reload_excludes for better compatibility
+        # Only watch specific code directories to avoid scanning data directories
+        reload_kwargs["reload_dirs"] = [
+            str(_BACKEND_DIR / "application"),
+            str(_BACKEND_DIR / "domain"),
+            str(_BACKEND_DIR / "infrastructure"),
+            str(_BACKEND_DIR / "presentation"),
+            str(_BACKEND_DIR / "config"),
+            str(_BACKEND_DIR / "shared"),
+            str(_BACKEND_DIR / "app.py"),
         ]
-
-        # Option 2: Only watch specific directories (more restrictive, commented out)
-        # Uncomment this and comment out reload_excludes above for stricter control
-        # reload_kwargs["reload_dirs"] = [
-        #     str(_BACKEND_DIR / "application"),
-        #     str(_BACKEND_DIR / "domain"),
-        #     str(_BACKEND_DIR / "infrastructure"),
-        #     str(_BACKEND_DIR / "presentation"),
-        #     str(_BACKEND_DIR / "config"),
-        #     str(_BACKEND_DIR / "shared"),
-        #     str(_BACKEND_DIR / "app.py"),
-        # ]
 
     uvicorn.run(
         "backend.app:app",
