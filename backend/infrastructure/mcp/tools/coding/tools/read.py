@@ -3,10 +3,12 @@
 Supports:
 - Text files: automatic encoding detection, line-based reading
 - Binary files: images/docs/media returned as base64 for multimodal LLMs
+  (with graceful degradation for non-multimodal LLMs)
 - Security: path validation, size limits (50MB max)
 - Reading modes: full, preview (100 lines), paginated
 """
 
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -14,6 +16,8 @@ from pydantic import Field
 from pydantic.fields import FieldInfo
 from fastmcp import FastMCP  # type: ignore
 from fastmcp.server.context import Context  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 from ..utils.path_security import (
     validate_path_in_workspace,
@@ -30,6 +34,34 @@ from backend.infrastructure.mcp.utils.tool_result import success_response, error
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators, path_to_llm_format
 
 __all__ = ["read", "register_read_tool"]
+
+# -----------------------------------------------------------------------------
+# Multimodal support checking
+# -----------------------------------------------------------------------------
+
+# LLM providers that support multimodal content (images, binary files)
+MULTIMODAL_PROVIDERS = {"gemini", "anthropic", "openai", "openrouter"}
+
+
+def _check_multimodal_support() -> bool:
+    """
+    Check if current LLM provider supports multimodal content.
+
+    Returns:
+        bool: True if provider supports multimodal, False otherwise
+    """
+    try:
+        from backend.config.llm import get_llm_settings
+        settings = get_llm_settings()
+        provider = settings.provider
+
+        # Check if provider supports multimodal
+        return provider in MULTIMODAL_PROVIDERS
+    except Exception as e:
+        logger.warning(f"Failed to check multimodal support: {e}")
+        # Default to True to maintain backward compatibility
+        return True
+
 
 # -----------------------------------------------------------------------------
 # Main implementation
@@ -168,7 +200,39 @@ Usage:
             # For binary/multimodal files (images, etc.)
             if isinstance(processing_result.content, dict) and "inline_data" in processing_result.content:
                 inline_data = processing_result.content["inline_data"]
-                # Add inline_data part
+
+                # Check if current LLM provider supports multimodal
+                supports_multimodal = _check_multimodal_support()
+
+                if not supports_multimodal:
+                    # Graceful degradation: return text-only error message
+                    file_size_kb = processing_result.original_size / 1024
+
+                    error_message = (
+                        f"[{file_type.value.upper()} FILE: {file_path.name}]\n"
+                        f"File type: {inline_data.get('mime_type', 'unknown')}\n"
+                        f"File size: {file_size_kb:.2f} KB\n\n"
+                        f"ERROR: The current LLM provider does not support multimodal content (images/binary files).\n"
+                        f"Only text files can be read and processed.\n\n"
+                        f"To view this file, please:\n"
+                        f"  1. Switch to a multimodal LLM provider:\n"
+                        f"     - Gemini (recommended)\n"
+                        f"     - Anthropic Claude\n"
+                        f"     - OpenAI GPT-4V\n"
+                        f"     - OpenRouter\n"
+                        f"  2. Or manually describe the file content in your message\n"
+                    )
+
+                    logger.info(f"Multimodal not supported - returning error for {abs_display}")
+
+                    return error_response(
+                        error_message,
+                        file_path=abs_display,
+                        file_type=file_type.value,
+                        multimodal_required=True
+                    )
+
+                # Multimodal supported: add inline_data part
                 parts.append({
                     "type": "inline_data",
                     "mime_type": inline_data["mime_type"],

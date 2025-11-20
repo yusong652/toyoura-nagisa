@@ -7,6 +7,7 @@ formatting them as system-reminder blocks for LLM consumption.
 Supports:
 - Text files: formatted with line numbers
 - Binary/Image files: base64-encoded for multimodal LLM consumption
+  (with graceful degradation for non-multimodal LLMs)
 """
 
 import logging
@@ -34,6 +35,33 @@ from backend.infrastructure.mcp.tools.coding.utils.file_reader import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# LLM providers that support multimodal content (images, binary files)
+MULTIMODAL_PROVIDERS = {"gemini", "anthropic", "openai", "openrouter"}
+
+# LLM providers that do NOT support multimodal content
+NON_MULTIMODAL_PROVIDERS = {"local_llm", "kimi", "zhipu"}
+
+
+def _check_multimodal_support() -> bool:
+    """
+    Check if current LLM provider supports multimodal content.
+
+    Returns:
+        bool: True if provider supports multimodal, False otherwise
+    """
+    try:
+        from backend.config.llm import get_llm_settings
+        settings = get_llm_settings()
+        provider = settings.provider
+
+        # Check if provider supports multimodal
+        return provider in MULTIMODAL_PROVIDERS
+    except Exception as e:
+        logger.warning(f"Failed to check multimodal support: {e}")
+        # Default to True to maintain backward compatibility
+        return True
 
 
 @dataclass
@@ -266,12 +294,37 @@ class FileMentionProcessor:
 
         # Handle different content formats
         if result.content_format == ContentFormat.INLINE_DATA:
-            # Binary/Image files: return structured parts for multimodal LLM
+            # Binary/Image files: check multimodal support
             if isinstance(result.content, dict) and "inline_data" in result.content:
                 inline_data = result.content["inline_data"]
 
-                # Build multimodal parts array
-                # Combine text parts into one for better efficiency
+                # Check if current LLM provider supports multimodal
+                supports_multimodal = _check_multimodal_support()
+
+                if not supports_multimodal:
+                    # Graceful degradation: return text-only message
+                    file_type = result.file_type.value if result.file_type else "binary"
+                    file_size_kb = result.original_size / 1024
+
+                    fallback_message = (
+                        f"{tool_call_reminder}\n\n"
+                        f"<system-reminder>\n"
+                        f"Result of calling the Read tool:\n"
+                        f"[{file_type.upper()} FILE: {file_content.path}]\n"
+                        f"File type: {inline_data.get('mime_type', 'unknown')}\n"
+                        f"File size: {file_size_kb:.2f} KB\n\n"
+                        f"Note: The current LLM provider does not support multimodal content (images/binary files).\n"
+                        f"Only text files can be read and processed.\n"
+                        f"To view this file, please:\n"
+                        f"  1. Use a multimodal LLM provider (Gemini, Anthropic Claude, OpenAI GPT-4V, OpenRouter)\n"
+                        f"  2. Or manually describe the file content in your message\n"
+                        f"</system-reminder>"
+                    )
+
+                    logger.info(f"Multimodal not supported - returning text fallback for {file_content.path}")
+                    return fallback_message
+
+                # Multimodal supported: return structured parts
                 combined_text = (
                     f"{tool_call_reminder}\n\n"
                     f"<system-reminder>\n"
