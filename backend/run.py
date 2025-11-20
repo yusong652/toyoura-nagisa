@@ -24,9 +24,41 @@ if __name__ == "__main__":
 
     dev_config = get_dev_config()
 
+    # Configure reload behavior
+    reload_kwargs = {}
+    if dev_config.enable_reload:
+        # Option 1: Exclude data directories (recommended for flexibility)
+        # This allows monitoring all code while excluding data/cache directories
+        reload_kwargs["reload_excludes"] = [
+            "**/workspace/**",          # User workspace files
+            "**/pfc_workspace/**",      # PFC workspace files
+            "**/memory_db/**",          # ChromaDB vector database
+            "**/chat/data/**",          # Session data
+            "**/__pycache__/**",        # Python cache
+            "**/*.pyc",                 # Compiled Python files
+            "**/.pytest_cache/**",      # Pytest cache
+            "**/.git/**",               # Git directory
+            "**/node_modules/**",       # Node modules (if any)
+            "**/*.log",                 # Log files
+            "**/.DS_Store",             # macOS metadata
+        ]
+
+        # Option 2: Only watch specific directories (more restrictive, commented out)
+        # Uncomment this and comment out reload_excludes above for stricter control
+        # reload_kwargs["reload_dirs"] = [
+        #     str(_BACKEND_DIR / "application"),
+        #     str(_BACKEND_DIR / "domain"),
+        #     str(_BACKEND_DIR / "infrastructure"),
+        #     str(_BACKEND_DIR / "presentation"),
+        #     str(_BACKEND_DIR / "config"),
+        #     str(_BACKEND_DIR / "shared"),
+        #     str(_BACKEND_DIR / "app.py"),
+        # ]
+
     uvicorn.run(
         "backend.app:app",
         host=dev_config.host,
         port=dev_config.port,
-        reload=dev_config.enable_reload
+        reload=dev_config.enable_reload,
+        **reload_kwargs
     ) 
