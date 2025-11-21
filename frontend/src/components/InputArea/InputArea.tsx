@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   useInputState,
   useFileHandling,
@@ -116,6 +116,23 @@ const InputArea: React.FC<InputAreaProps> = ({
 
   // Mentioned files tracking - collect file paths from @ mentions for backend processing
   const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
+
+  // Sync mentioned files with message text - remove files that are no longer in the message
+  useEffect(() => {
+    if (mentionedFiles.length === 0) return
+
+    // Find which mentioned files are still present in the message
+    const stillPresent = mentionedFiles.filter(filepath => {
+      // Check if @filepath exists in the message
+      const pattern = `@${filepath}`
+      return message.includes(pattern)
+    })
+
+    // Update mentioned files if any were removed
+    if (stillPresent.length !== mentionedFiles.length) {
+      setMentionedFiles(stillPresent)
+    }
+  }, [message, mentionedFiles])
 
 
   // Slash command functionality
