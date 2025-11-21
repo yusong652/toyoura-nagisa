@@ -170,7 +170,7 @@ export interface ChatState {
  * Defines the complete chat context API available to components.
  */
 export interface ChatContextType extends ChatState {
-  sendMessage: (text: string, files?: FileData[]) => Promise<void>;
+  sendMessage: (text: string, files?: FileData[], mentionedFiles?: string[]) => Promise<void>;
   clearChat: () => void;
   deleteMessage: (messageId: string) => Promise<void>;
   generateImage: (sessionId: string) => Promise<{ success: boolean; image_path?: string; error?: string }>;

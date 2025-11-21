@@ -116,7 +116,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   })
 
   // Main message sending function - now coordinates message sending and both SSE/WebSocket processing
-  const sendMessage = useCallback(async (text: string, files: FileData[] = []) => {
+  const sendMessage = useCallback(async (text: string, files: FileData[] = [], mentionedFiles: string[] = []) => {
     if (text.trim() === '' && files.length === 0) return
 
     // Reset audio state - ensure cleanup of residual state from previous requests
@@ -127,7 +127,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     try {
       // Use basic message creation and sending functionality from useChatMessage
-      const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files)
+      const { userMessageId, botMessageId, response } = await createAndSendMessage(text, files, mentionedFiles)
 
       // Handle streaming response (SSE metadata events)
       await handleStreamResponse(response, { userMessageId, botMessageId })

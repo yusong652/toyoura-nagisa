@@ -28,6 +28,7 @@ def parse_message_data(data: dict) -> MessageParseResult:
     files = data.get('files', [])
     msg_id = data.get('message_id')
     enable_memory = data.get('enable_memory', True)  # Default to True, simplified
+    mentioned_files = data.get('mentioned_files', [])  # File mentions from frontend
 
     # Convert ISO timestamp to milliseconds if present
     timestamp = None
@@ -55,7 +56,7 @@ def parse_message_data(data: dict) -> MessageParseResult:
                 }
             })
 
-    return {
+    result: MessageParseResult = {
         'content': content,
         'timestamp': timestamp,
         'id': msg_id,
@@ -65,3 +66,9 @@ def parse_message_data(data: dict) -> MessageParseResult:
         'request_id': str(uuid.uuid4()),  # Generate unique request ID
         'enable_memory': enable_memory  # Add memory setting
     }
+
+    # Add mentioned_files only if non-empty (optional field)
+    if mentioned_files:
+        result['mentioned_files'] = mentioned_files
+
+    return result

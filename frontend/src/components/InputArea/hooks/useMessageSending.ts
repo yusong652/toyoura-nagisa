@@ -48,7 +48,8 @@ import {
 const useMessageSending = (
   messageInfo: MessageInputInfo,
   clearInput: () => void,
-  textareaRef?: React.RefObject<HTMLTextAreaElement>
+  textareaRef?: React.RefObject<HTMLTextAreaElement>,
+  mentionedFiles: string[] = []
 ): MessageSendingHookReturn => {
   // Internal sending state
   const [sendingStatus, setSendingStatus] = useState<SendingStatus>({
@@ -93,7 +94,7 @@ const useMessageSending = (
       // Prepare message data
       const currentMessage = messageInfo.content
       const currentFiles = [...messageInfo.files]
-      
+
       // Clear input immediately for better UX
       clearInput()
       
@@ -102,8 +103,8 @@ const useMessageSending = (
         textareaRef.current.style.height = 'auto'
       }
       
-      // Send message through chat context
-      await sendMessage(currentMessage, currentFiles)
+      // Send message through chat context (with mentioned files)
+      await sendMessage(currentMessage, currentFiles, mentionedFiles)
       
       // Success state
       setSendingStatus({ status: 'success' })
@@ -127,7 +128,7 @@ const useMessageSending = (
         setSendingStatus({ status: 'idle' })
       }, 3000)
     }
-  }, [canSendMessage, messageInfo, clearInput, sendMessage, textareaRef])
+  }, [canSendMessage, messageInfo, clearInput, sendMessage, textareaRef, mentionedFiles])
   
   // Keyboard event handler
   const handleKeyPress = useCallback(async (e: React.KeyboardEvent): Promise<void> => {

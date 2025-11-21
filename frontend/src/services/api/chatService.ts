@@ -28,6 +28,7 @@ export interface ChatStreamRequest {
   agent_profile: string
   tts_enabled: boolean
   enable_memory?: boolean
+  mentioned_files?: string[]  // File paths from @ mentions (frontend-confirmed)
 }
 
 export interface MessageDeleteRequest {
@@ -51,6 +52,7 @@ export class ChatService {
    * @param agentProfile - Agent profile for tool selection
    * @param ttsEnabled - Whether TTS is enabled for response
    * @param memoryEnabled - Whether memory injection is enabled (default: true)
+   * @param mentionedFiles - Optional file paths from @ mentions (frontend-confirmed)
    * @returns Promise resolving to mock Response for compatibility (WebSocket doesn't return Response)
    */
   async sendMessage(
@@ -60,7 +62,8 @@ export class ChatService {
     userMessageId: string,
     agentProfile: string,
     ttsEnabled: boolean,
-    memoryEnabled: boolean = true
+    memoryEnabled: boolean = true,
+    mentionedFiles: string[] = []
   ): Promise<Response> {
     // Get WebSocket connection from connection context
     let wsRef = this.getWebSocketConnection()
@@ -89,7 +92,7 @@ export class ChatService {
     }
 
     // Create WebSocket message format
-    const websocketMessage = {
+    const websocketMessage: any = {
       type: 'CHAT_MESSAGE',
       session_id: sessionId,
       message_id: userMessageId,
@@ -104,6 +107,11 @@ export class ChatService {
       })),
       stream_response: true,
       timestamp: new Date().toISOString()
+    }
+
+    // Add mentioned_files only if non-empty (optional field)
+    if (mentionedFiles.length > 0) {
+      websocketMessage.mentioned_files = mentionedFiles
     }
 
     // Send via WebSocket - serialize to JSON here for consistency

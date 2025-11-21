@@ -114,6 +114,9 @@ const InputArea: React.FC<InputAreaProps> = ({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0)
   const [selectedFileMentionIndex, setSelectedFileMentionIndex] = useState<number>(0)
 
+  // Mentioned files tracking - collect file paths from @ mentions for backend processing
+  const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
+
 
   // Slash command functionality
   const {
@@ -148,7 +151,9 @@ const InputArea: React.FC<InputAreaProps> = ({
   } = useMessageSending(messageInfo, () => {
     clearInput()
     resetTextareaHeight()
-  }, textareaRef)
+    // Clear mentioned files after sending
+    setMentionedFiles([])
+  }, textareaRef, mentionedFiles)
   
   // Handle suggestion selection - execute command immediately
   const handleSelectSuggestion = useCallback(async (suggestion: any) => {
@@ -197,6 +202,15 @@ const InputArea: React.FC<InputAreaProps> = ({
     // Update message
     setMessage(newText)
     setCursorPosition(newCursor)
+
+    // Collect mentioned file path for backend processing (supports spaces, unicode, special chars)
+    setMentionedFiles(prev => {
+      // Avoid duplicates
+      if (prev.includes(suggestion.file.path)) {
+        return prev
+      }
+      return [...prev, suggestion.file.path]
+    })
 
     // Reset state
     selectFileSuggestion(suggestion)

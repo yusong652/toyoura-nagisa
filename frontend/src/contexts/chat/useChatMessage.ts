@@ -32,7 +32,7 @@ export interface UseChatMessageReturn {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   deleteMessage: (messageId: string) => Promise<void>
   clearChat: () => void
-  sendMessage: (text: string, files?: FileData[]) => Promise<{
+  sendMessage: (text: string, files?: FileData[], mentionedFiles?: string[]) => Promise<{
     userMessageId: string
     botMessageId: string
     response: Response
@@ -318,7 +318,8 @@ export const useChatMessage = ({
   // Does not include: Audio processing, streaming response handling, Live2D actions, etc.
   const sendMessage = useCallback(async (
     text: string,
-    files: FileData[] = []
+    files: FileData[] = [],
+    mentionedFiles: string[] = []
   ): Promise<{
     userMessageId: string
     botMessageId: string
@@ -334,7 +335,7 @@ export const useChatMessage = ({
     try {
       // Create API request
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
-      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled)
+      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled, mentionedFiles)
 
       return {
         userMessageId,

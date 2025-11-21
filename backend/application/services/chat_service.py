@@ -165,13 +165,20 @@ class ChatService:
         if not session_id:
             raise ValueError("Session ID is required in the message data")
 
-        # 3. Extract file mentions from message text (@ mentions)
-        message_text = parsed_data.get('message', '')
-        if message_text:
-            mentioned_files = self._extract_file_mentions(message_text)
-            if mentioned_files:
-                parsed_data['mentioned_files'] = mentioned_files
-                print(f"[DEBUG] Extracted {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
+        # 3. Extract file mentions from frontend or fallback to backend parsing
+        # Priority: Use frontend-provided mentioned_files if available (supports spaces, unicode, etc.)
+        # Fallback: Parse from message text using regex (legacy support, limited to ASCII)
+        mentioned_files = parsed_data.get('mentioned_files', [])
+
+        if not mentioned_files:
+            # Fallback: Backend regex parsing (limited support for special characters)
+            message_text = parsed_data.get('message', '')
+            if message_text:
+                mentioned_files = self._extract_file_mentions(message_text)
+
+        if mentioned_files:
+            parsed_data['mentioned_files'] = mentioned_files
+            print(f"[DEBUG] Processing {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
 
         # 4. Inject system status reminders BEFORE saving to database
         # This ensures the database stores the complete message with context
