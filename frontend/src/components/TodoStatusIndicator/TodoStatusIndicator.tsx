@@ -70,8 +70,8 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]
   )
 
-  // Random duration for speed variation (6-10 seconds)
-  const [duration] = useState(() => 6000 + Math.random() * 4000)
+  // Random duration for speed variation (2-10 seconds)
+  const [duration] = useState(() => 2000 + Math.random() * 8000)
 
   // Particle collision animation state
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
@@ -113,6 +113,18 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     canvas.height = height
 
     const center = width / 2
+
+    // Pre-compute circle pixels to avoid expensive sqrt calculations every frame
+    // This optimization reduces 1024 iterations + sqrt calls to ~254 pixel lookups
+    const circlePixels: Array<{x: number, y: number}> = []
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        const dist = Math.sqrt((i - center) ** 2 + (j - center) ** 2)
+        if (dist < 9) {
+          circlePixels.push({x: j, y: i})
+        }
+      }
+    }
 
     // Animation state
     let frameCount = 0
@@ -162,10 +174,13 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
         const transformedX = center + dx * squashStretch.scaleX
         const transformedY = bottomY + dy * squashStretch.scaleY
 
-        // Apply bounce offset
+        // Apply bounce offset AFTER squash/stretch
+        // Clamp to ensure pixels stay within canvas bounds [0, height-1]
+        const finalY = Math.max(0, Math.min(height - 1, transformedY + bounceY))
+
         return {
           x: transformedX,
-          y: transformedY + bounceY
+          y: finalY
         }
       }
 
@@ -201,15 +216,11 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
       pos = applyTransform(center + 8, 7 + earOffsetY)
       drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
 
-      // Main ball body (circle using pixel approximation)
-      for (let i = 0; i < height; i++) {
-        for (let j = 0; j < width; j++) {
-          const dist = Math.sqrt((i - center) ** 2 + (j - center) ** 2)
-          if (dist < 9) {
-            const pos = applyTransform(j, i)
-            drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
-          }
-        }
+      // Main ball body (using pre-computed circle pixels)
+      // Performance: ~254 iterations instead of 1024, no sqrt calculations
+      for (const pixel of circlePixels) {
+        const pos = applyTransform(pixel.x, pixel.y)
+        drawPixel(pos.x, pos.y, pink, squashStretch.scaleX, squashStretch.scaleY)
       }
 
       // Eyes
@@ -317,7 +328,7 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
 
       if (isBouncing) {
         bounceFrame++
-        const bounceDuration = 60 // Total bounce duration in frames (1 second at 60fps)
+        const bounceDuration = 30 // Total bounce duration in frames (1 second at 30fps)
 
         if (bounceFrame <= bounceDuration) {
           // Bounce phases:
