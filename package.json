@@ -10,7 +10,7 @@
     "packages/cli"
   ],
   "scripts": {
-    "dev:backend": "uv run python packages/backend/app.py",
+    "dev:backend": "cd packages/backend && uv run python run.py",
     "dev:web": "npm -w @aiNagisa/web run dev",
     "dev:cli": "npm -w @aiNagisa/cli run dev",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
