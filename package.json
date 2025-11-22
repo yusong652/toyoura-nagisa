@@ -17,6 +17,7 @@
     "start:backend": "PYTHONUNBUFFERED=1 uv run python backend/run.py",
     "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
     "dev:cli": "concurrently --handle-input --default-input-target 1 \"npm run start:backend\" \"sleep 8 && cd packages/cli && npm run dev\"",
+    "start:cli": "cd packages/cli && npm run dev:auto",
     "build:core": "cd packages/core && npm run build",
     "build:cli": "cd packages/core && npm run build && cd ../cli && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
