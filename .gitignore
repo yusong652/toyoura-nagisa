@@ -65,6 +65,7 @@ backend/prompts/
 backend/memory_db/
 frontend/node_modules/
 # Configuration files with sensitive information
+packages/backend/config/
 backend/config/
 backend/config.py
 
