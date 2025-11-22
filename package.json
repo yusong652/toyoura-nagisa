@@ -2,6 +2,11 @@
   "name": "ainagisa",
   "version": "1.0.0",
   "description": "An AI-powered chat assistant with multi-turn conversation memory and voice output capabilities",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "packages/*"
+  ],
   "main": "index.js",
   "scripts": {
     "install:frontend": "cd frontend && npm install",
@@ -11,6 +16,9 @@
     "format:backend": "cd backend && ruff format .",
     "start:backend": "PYTHONUNBUFFERED=1 uv run python backend/run.py",
     "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "dev:cli": "concurrently \"npm run start:backend\" \"sleep 8 && cd packages/cli && npm run dev\"",
+    "build:core": "cd packages/core && npm run build",
+    "build:cli": "cd packages/core && npm run build && cd ../cli && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

@@ -1,0 +1,23 @@
+{
+  "name": "@aiNagisa/core",
+  "version": "0.1.0",
+  "description": "Shared core library for aiNagisa (WebSocket, messaging, sessions)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["aiNagisa", "websocket", "chat"],
+  "author": "aiNagisa Team",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.3"
+  }
+}
