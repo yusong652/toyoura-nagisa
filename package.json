@@ -24,8 +24,8 @@
     "test:web": "npm -w @aiNagisa/web run test",
     "lint:web": "npm -w @aiNagisa/web run lint",
     "test": "npm run test:backend && npm run test:web",
-    "kill:backend": "lsof -ti:9000 | xargs kill -9 2>/dev/null || echo 'Port 9000 is free'",
-    "kill:web": "lsof -ti:5173 | xargs kill -9 2>/dev/null || echo 'Port 5173 is free'",
+    "kill:backend": "pkill -9 -f 'python.*run.py' 2>/dev/null; pkill -9 -f 'uvicorn' 2>/dev/null; lsof -ti:9000 | xargs kill -9 2>/dev/null; echo '✅ Backend processes killed'",
+    "kill:web": "lsof -ti:5173 | xargs kill -9 2>/dev/null; echo '✅ Web processes killed'",
     "kill:all": "npm run kill:backend && npm run kill:web"
   },
   "repository": {
