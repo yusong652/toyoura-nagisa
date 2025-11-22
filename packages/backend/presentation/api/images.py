@@ -5,8 +5,9 @@ from pathlib import Path
 router = APIRouter()
 
 # Get absolute path to project root chat/data directory
-# Navigate from backend/presentation/api/ to project root
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "chat" / "data"
+# Navigate from packages/backend/presentation/api/ to project root
+# packages/backend/presentation/api/images.py -> packages/backend/presentation/api -> packages/backend/presentation -> packages/backend -> packages -> project_root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "chat" / "data"
 
 @router.get("/images/{image_path:path}")
 async def get_image(image_path: str):

@@ -66,7 +66,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         # Fallback to local pfc_workspace
         try:
             from backend.shared.utils.prompt.config import BASE_DIR
-            pfc_workspace = BASE_DIR.parent / "pfc_workspace"
+            pfc_workspace = BASE_DIR / "pfc_workspace"
             pfc_workspace.mkdir(parents=True, exist_ok=True)
             logger.info(f"✓ Using fallback PFC workspace: {pfc_workspace}")
             return pfc_workspace
@@ -79,7 +79,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
     # Non-PFC profiles: use aiNagisa/workspace
     try:
         from backend.shared.utils.prompt.config import BASE_DIR
-        workspace = BASE_DIR.parent / "workspace"
+        workspace = BASE_DIR / "workspace"
         workspace.mkdir(parents=True, exist_ok=True)
         return workspace
     except Exception as e:
@@ -151,6 +151,6 @@ def get_workspace_for_session_sync(session_id: str) -> Path:
         logger.error(f"Failed to get workspace for session {session_id}: {e}")
         # Fallback to general workspace
         from backend.shared.utils.prompt.config import BASE_DIR
-        workspace = BASE_DIR.parent / "workspace"
+        workspace = BASE_DIR / "workspace"
         workspace.mkdir(parents=True, exist_ok=True)
         return workspace
