@@ -1,7 +1,7 @@
 {
-  "name": "frontend",
+  "name": "@aiNagisa/web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "node -e \"console.log('[Frontend] Waiting 5 seconds for backend...'); setTimeout(() => process.exit(0), 5000)\" && vite",
@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aiNagisa/core": "*",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.18.0",

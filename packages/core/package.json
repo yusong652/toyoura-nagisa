@@ -1,23 +1,51 @@
 {
   "name": "@aiNagisa/core",
   "version": "0.1.0",
-  "description": "Shared core library for aiNagisa (WebSocket, messaging, sessions)",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Shared core logic for aiNagisa web and CLI",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./connection": {
+      "types": "./dist/connection/index.d.ts",
+      "import": "./dist/connection/index.js"
+    },
+    "./messaging": {
+      "types": "./dist/messaging/index.d.ts",
+      "import": "./dist/messaging/index.js"
+    },
+    "./session": {
+      "types": "./dist/session/index.d.ts",
+      "import": "./dist/session/index.js"
+    },
+    "./services": {
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "test": "vitest"
   },
-  "keywords": ["aiNagisa", "websocket", "chat"],
+  "keywords": ["aiNagisa", "core", "shared"],
   "author": "aiNagisa Team",
   "license": "MIT",
   "dependencies": {
-    "ws": "^8.16.0"
+    "eventemitter3": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.5",
-    "@types/ws": "^8.5.10",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.0.0"
   }
 }
