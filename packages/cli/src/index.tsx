@@ -5,39 +5,33 @@
  *
  * Usage:
  *   ainagisa                    # Start interactive chat
- *   ainagisa chat               # Start interactive chat
  *   ainagisa --session <id>     # Connect to existing session
+ *   ainagisa --host <host>      # Custom backend host
+ *   ainagisa --port <port>      # Custom backend port
  */
 
 import React from 'react'
 import { render } from 'ink'
-import { Command } from 'commander'
-import ChatApp from './components/ChatApp'
+import ChatApp from './components/ChatApp.js'
 
-const program = new Command()
+// Simple argument parsing (aligned with Gemini CLI / Claude Code approach)
+const args = process.argv.slice(2)
+const getArg = (name: string, defaultValue?: string): string | undefined => {
+  const index = args.findIndex(arg => arg === `--${name}`)
+  return index !== -1 && args[index + 1] ? args[index + 1] : defaultValue
+}
 
-program
-  .name('ainagisa')
-  .description('Command-line interface for aiNagisa AI assistant')
-  .version('0.1.0')
+const sessionId = getArg('session')
+const host = getArg('host', 'localhost')
+const port = parseInt(getArg('port', '8000') || '8000')
 
-program
-  .command('chat', { isDefault: true })
-  .description('Start interactive chat session')
-  .option('-s, --session <id>', 'Connect to existing session ID')
-  .option('-h, --host <host>', 'Backend server host', 'localhost')
-  .option('-p, --port <port>', 'Backend server port', '8000')
-  .action((options) => {
-    console.log('🤖 aiNagisa CLI - Starting...\n')
+console.log('🤖 aiNagisa CLI - Starting...\n')
 
-    // Render Ink app
-    render(
-      <ChatApp
-        sessionId={options.session}
-        host={options.host}
-        port={parseInt(options.port)}
-      />
-    )
-  })
-
-program.parse()
+// Render Ink app
+render(
+  <ChatApp
+    sessionId={sessionId}
+    host={host}
+    port={port}
+  />
+)
