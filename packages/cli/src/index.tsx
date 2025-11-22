@@ -27,6 +27,14 @@ const port = parseInt(getArg('port', '8000') || '8000')
 
 console.log('🤖 aiNagisa CLI - Starting...\n')
 
+// Check if TTY is available (required for Ink)
+if (!process.stdin.isTTY) {
+  console.error('❌ Error: Interactive terminal (TTY) required')
+  console.error('   Please run this CLI directly in a terminal, not in background mode.')
+  console.error('   Example: cd packages/cli && npm run dev')
+  process.exit(1)
+}
+
 // Render Ink app
 render(
   <ChatApp
