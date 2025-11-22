@@ -4,7 +4,12 @@
  */
 
 import { spawn, ChildProcess } from 'child_process'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export class BackendManager {
   private process: ChildProcess | null = null
@@ -29,14 +34,14 @@ export class BackendManager {
       return
     }
 
-    // Find backend directory (assuming CLI is in packages/cli)
-    const backendPath = resolve(__dirname, '../../../backend')
+    // Find project root (packages/cli/src/utils -> ../../../..)
+    const projectRoot = resolve(__dirname, '../../../..')
 
     console.log(`🚀 Starting backend server...`)
 
     // Start backend process
     this.process = spawn('uv', ['run', 'python', 'backend/run.py'], {
-      cwd: resolve(__dirname, '../../..'), // Project root
+      cwd: projectRoot,
       env: {
         ...process.env,
         PYTHONUNBUFFERED: '1'
