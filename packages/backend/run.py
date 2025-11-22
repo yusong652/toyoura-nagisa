@@ -14,10 +14,14 @@ if sys.platform == "win32":
 
 _CURRENT_FILE = Path(__file__)
 _BACKEND_DIR = _CURRENT_FILE.parent
-_PROJECT_ROOT = _BACKEND_DIR.parent
+_PACKAGES_DIR = _BACKEND_DIR.parent
+_PROJECT_ROOT = _PACKAGES_DIR.parent
 
-# Add parent directory to path so that backend module can be found
-sys.path.insert(0, str(_PROJECT_ROOT))
+# Add packages directory to path so that backend module can be found
+sys.path.insert(0, str(_PACKAGES_DIR))
+
+# Change working directory to project root for relative paths (chat/data, memory_db, etc.)
+os.chdir(_PROJECT_ROOT)
 
 if __name__ == "__main__":
     from backend.config import get_dev_config
