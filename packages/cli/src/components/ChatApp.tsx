@@ -129,14 +129,18 @@ const ChatApp: React.FC<ChatAppProps> = ({
     const userMessageId = `user-${Date.now()}`
     messageManager.createMessage(userMessageId, 'user', [{ type: 'text', text }])
 
-    // Send to backend via WebSocket
+    // Send to backend via WebSocket (using same protocol as Web frontend)
     wsManager.send({
-      type: 'USER_MESSAGE',
+      type: 'CHAT_MESSAGE',           // ← Changed from USER_MESSAGE
       session_id: sessionId,
       message_id: userMessageId,
-      text: text,
+      message: text,                  // ← Changed from 'text' to 'message'
+      agent_profile: 'general',       // ← Added
+      enable_memory: true,            // ← Added
+      tts_enabled: false,             // ← Added (CLI doesn't support TTS yet)
       files: [],
       mentioned_files: [],
+      stream_response: true,          // ← Added
       timestamp: new Date().toISOString()
     })
   }
