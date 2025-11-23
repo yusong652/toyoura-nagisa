@@ -1,5 +1,5 @@
 import React from 'react'
-import { MessageStatus } from '../../../types/chat'
+import { MessageStatus } from '@aiNagisa/core'
 import { MessageStatusProps } from '../types'
 
 /**

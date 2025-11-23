@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ThinkingBlock as ThinkingBlockType } from '../../../types/chat'
+import { ThinkingBlock as ThinkingBlockType } from '@aiNagisa/core'
 import ReactMarkdown from 'react-markdown'
 
 interface ThinkingBlockProps {

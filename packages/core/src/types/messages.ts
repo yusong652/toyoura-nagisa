@@ -5,6 +5,8 @@
  * now unified with backend role naming conventions.
  */
 
+import type { TokenUsage } from './session';
+
 // =====================
 // Message Role Types
 // =====================
@@ -84,16 +86,6 @@ export interface ThinkingBlock {
 // =====================
 // Message Interface
 // =====================
-
-/**
- * Token usage statistics from LLM API.
- */
-export interface TokenUsage {
-  prompt_tokens: number;          // Input tokens (context window usage)
-  completion_tokens: number;      // Output tokens (AI response)
-  total_tokens: number;           // Total tokens used
-  tokens_left: number;            // Remaining tokens in context window
-}
 
 /**
  * Core message interface.

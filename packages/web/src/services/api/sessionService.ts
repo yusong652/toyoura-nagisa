@@ -6,7 +6,7 @@
  */
 
 import { apiClient } from './httpClient'
-import { ChatSession } from '../../types/session'
+import { ChatSession } from '@aiNagisa/core'
 
 export interface CreateSessionRequest {
   name?: string

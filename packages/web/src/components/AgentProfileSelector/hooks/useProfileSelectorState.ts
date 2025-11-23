@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useAgent } from '../../../contexts/agent/AgentContext'
-import { AgentProfileType, AgentProfileInfo } from '../../../types/agent'
+import { AgentProfileType, AgentProfileInfo } from '@aiNagisa/core'
 import { ProfileSelectorStateHookReturn } from '../types'
 
 /**

@@ -9,7 +9,7 @@
  */
 
 import { useRef, useEffect } from 'react'
-import { Message } from '../../../types/chat'
+import { Message } from '@aiNagisa/core'
 import { UseScrollBehaviorReturn } from '../types'
 
 /**

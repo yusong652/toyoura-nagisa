@@ -12,7 +12,7 @@
  * - Consistent with other aiNagisa component patterns
  */
 
-import { FileData } from '../../types/chat'
+import { FileData } from '@aiNagisa/core'
 
 // =============================================================================
 // Core Component Types

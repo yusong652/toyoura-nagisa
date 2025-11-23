@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { ToolUseBlock as ToolUseBlockType } from '../../../types/chat'
+import { ToolUseBlock as ToolUseBlockType } from '@aiNagisa/core'
 import { useConnection } from '../../../contexts/connection/ConnectionContext'
 import ToolDiffViewer from './ToolDiffViewer'
 import ToolDiffViewerErrorBoundary from './ToolDiffViewerErrorBoundary'

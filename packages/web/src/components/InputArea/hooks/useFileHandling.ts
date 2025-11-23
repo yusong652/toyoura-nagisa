@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react'
-import { FileData } from '../../../types/chat'
+import { FileData } from '@aiNagisa/core'
 import { 
   FileHandlingHookReturn, 
   validateFileSize, 

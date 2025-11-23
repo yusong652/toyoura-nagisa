@@ -1,5 +1,5 @@
 import React from 'react'
-import { MessageRole } from '../../../types/chat'
+import { MessageRole } from '@aiNagisa/core'
 
 interface ImageFileProps {
   file: {

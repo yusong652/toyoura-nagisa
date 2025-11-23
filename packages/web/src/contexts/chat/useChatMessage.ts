@@ -12,7 +12,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, MessageStatus, FileData } from '../../types/chat'
+import { Message, MessageStatus, FileData } from '@aiNagisa/core'
 import { sessionService, chatService } from '../../services/api'
 import { useWebSocketMessageStatus } from '../../hooks/useWebSocketMessageStatus'
 import { messageConverterManager, BackendMessage } from './messageConverters'

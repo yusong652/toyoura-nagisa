@@ -1,4 +1,4 @@
-import { Message, MessageStatus, MessageRole } from '../../types/chat'
+import { Message, MessageStatus, MessageRole } from '@aiNagisa/core'
 import { VideoFormat } from '../VideoPlayer/types'
 
 // 基础消息属性

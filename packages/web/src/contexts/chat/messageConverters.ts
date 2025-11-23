@@ -6,7 +6,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { Message, MessageStatus, ContentBlock } from '../../types/chat'
+import { Message, MessageStatus, ContentBlock } from '@aiNagisa/core'
 
 // =====================
 // Backend Message Types

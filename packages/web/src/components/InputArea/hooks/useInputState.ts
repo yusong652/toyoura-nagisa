@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useChat } from '../../../contexts/chat/ChatContext'
-import { FileData } from '../../../types/chat'
+import { FileData } from '@aiNagisa/core'
 import { 
   InputStateHookReturn, 
   MessageInputInfo, 

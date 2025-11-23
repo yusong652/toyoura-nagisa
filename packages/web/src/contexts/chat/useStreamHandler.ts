@@ -17,7 +17,7 @@ interface StreamHandlerOptions {
 }
 
 // Import Message type
-import { Message } from '../../types/chat'
+import { Message } from '@aiNagisa/core'
 
 /**
  * Refactored stream handler using modular hooks.

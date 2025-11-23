@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { ConnectionStatus } from '../../types/connection'
-import { ChatSession, SessionContextType, TokenUsage } from '../../types/session'
+import { ChatSession, SessionContextType, TokenUsage } from '@aiNagisa/core'
 import { sessionService } from '../../services/api'
 import { useConnection } from '../connection/ConnectionContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'

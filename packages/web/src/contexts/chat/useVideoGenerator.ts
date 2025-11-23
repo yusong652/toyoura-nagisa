@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message } from '../../types/chat'
+import { Message } from '@aiNagisa/core'
 import { chatService, sessionService } from '../../services/api'
 
 interface UseVideoGeneratorProps {

@@ -9,7 +9,7 @@
  */
 
 import { apiClient } from './httpClient'
-import { FileData } from '../../types/chat'
+import { FileData } from '@aiNagisa/core'
 
 export interface MessageRequest {
   id: string

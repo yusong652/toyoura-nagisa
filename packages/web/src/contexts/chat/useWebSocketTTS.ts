@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { MessageType, TTSChunkMessage } from '../../types/websocket'
+import { MessageType, TTSChunkMessage } from '@aiNagisa/core'
 import WebSocketManager from '../../utils/websocket-manager'
 
 interface WebSocketTTSProps {

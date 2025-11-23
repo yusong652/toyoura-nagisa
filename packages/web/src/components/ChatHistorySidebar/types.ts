@@ -6,7 +6,7 @@
  * clear component contracts.
  */
 
-import { ChatSession } from '../../types/session'
+import { ChatSession } from '@aiNagisa/core'
 
 /**
  * Props for the main ChatHistorySidebar component.

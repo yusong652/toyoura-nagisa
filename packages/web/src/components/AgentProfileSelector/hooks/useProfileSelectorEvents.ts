@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useAgent } from '../../../contexts/agent/AgentContext'
-import { AgentProfileType } from '../../../types/agent'
+import { AgentProfileType } from '@aiNagisa/core'
 import { useErrorDisplay } from '../../../hooks/useErrorDisplay'
 import { ProfileSelectorEventHandlers, ProfileChangeHandler } from '../types'
 
