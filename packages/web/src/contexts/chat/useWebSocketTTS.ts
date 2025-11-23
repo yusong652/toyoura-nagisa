@@ -1,13 +1,11 @@
 import { useCallback, useRef } from 'react'
 import { MessageType, TTSChunkMessage } from '@aiNagisa/core'
-import WebSocketManager from '../../utils/websocket-manager'
 
 interface WebSocketTTSProps {
   ttsEnabled: boolean
   processAudioData: (audioData: string, count: number) => Promise<boolean>
   updateMessageText: (messageId: string, text: string, options?: any) => void
   finalizeMessage: (messageId: string) => void
-  websocketManager?: WebSocketManager
 }
 
 interface ChunkData {
@@ -34,7 +32,7 @@ export const useWebSocketTTS = ({
   processAudioData,
   updateMessageText,
   finalizeMessage
-}: Omit<WebSocketTTSProps, 'websocketManager'>): WebSocketTTSHandler => {
+}: WebSocketTTSProps): WebSocketTTSHandler => {
 
   // Processing state
   const isProcessingRef = useRef(false)
