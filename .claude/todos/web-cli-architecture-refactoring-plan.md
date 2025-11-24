@@ -1,8 +1,22 @@
 # Web-CLI Architecture Refactoring Plan
 
 **Date**: 2025-11-23
-**Status**: Planning Phase
+**Status**: Phase 2 Completed ✅ | Phase 3 In Progress 🚧
 **Goal**: Achieve maximum code reuse between Web frontend and CLI frontend through elegant architecture refactoring
+
+## 🎯 Current Progress
+
+| Phase | Status | Completion |
+|-------|--------|------------|
+| Phase 1: Setup Core Package | ✅ Completed | 100% |
+| Phase 2: Extract WebSocket Layer | ✅ Completed | 100% |
+| Phase 3: Extract Services | 🚧 Pending | 0% |
+| Phase 4: Extract Message Processing | ⏳ Not Started | 0% |
+| Phase 5: Extract Business Logic Managers | ⏳ Not Started | 0% |
+| Phase 6: Build CLI Package | ⏳ Not Started | 0% |
+| Phase 7: Polish & Documentation | ⏳ Not Started | 0% |
+
+**Overall Progress**: 28% (2/7 phases completed)
 
 ---
 
@@ -1254,7 +1268,7 @@ export class MessageRenderer {
 
 ## 6. Migration Plan
 
-### Phase 1: Setup Core Package (Week 1)
+### Phase 1: Setup Core Package (Week 1) ✅ COMPLETED
 **Goal**: Create package structure and extract types
 
 **Tasks**:
@@ -1265,31 +1279,64 @@ export class MessageRenderer {
    - Move `types/websocket.ts` → `@aiNagisa/core/types/websocket.ts`
    - Move `types/chat.ts` → `@aiNagisa/core/types/messages.ts`
    - Move `types/session.ts` → `@aiNagisa/core/types/session.ts`
-5. ✅ Update imports in web frontend
+   - Fix TokenUsage type duplication (use session.ts as single source)
+5. ✅ Update imports in web frontend (41+ files updated)
 6. ✅ Test type compilation
 
-**Success Criteria**: Types compile without errors, web frontend uses `@aiNagisa/core` types
+**Success Criteria**: ✅ Types compile without errors, web frontend uses `@aiNagisa/core` types
+
+**Commits**:
+- `8d726ac` - refactor: extract WebSocket connection layer to @aiNagisa/core
+- `2253959` - refactor: extract type definitions to @aiNagisa/core package
+
+**Achievements**:
+- ✅ Zero-cost abstraction - types are 100% reusable
+- ✅ All web frontend imports updated to use `@aiNagisa/core`
+- ✅ Build and compilation verified
 
 ---
 
-### Phase 2: Extract WebSocket Layer (Week 1)
+### Phase 2: Extract WebSocket Layer (Week 1) ✅ COMPLETED
 **Goal**: Move WebSocket management to core with adapters
 
 **Tasks**:
 1. ✅ Create adapter interfaces:
    - `@aiNagisa/core/connection/adapters/WebSocketAdapter.ts`
 2. ✅ Implement adapters:
-   - `BrowserWebSocketAdapter.ts`
+   - `BrowserWebSocketAdapter.ts` (with `getNativeWebSocket()` method)
    - `NodeWebSocketAdapter.ts`
 3. ✅ Extract `WebSocketManager.ts` to core:
    - Replace `new WebSocket()` with `adapter.connect()`
    - Update event handlers to use adapter callbacks
-4. ✅ Update web frontend `ConnectionContext.tsx`:
-   - Import `WebSocketManager` from `@aiNagisa/core`
+   - Implement passive heartbeat response (backend-initiated)
+4. ✅ Create `ConnectionManager.ts` extending `WebSocketManager`:
+   - Add aiNagisa-specific message routing (TTS, tool confirmations, location)
+   - Implement location request handler
+   - Emit typed events for frontend consumption
+5. ✅ Update web frontend `ConnectionContext.tsx`:
+   - Import `ConnectionManager` from `@aiNagisa/core`
    - Inject `BrowserWebSocketAdapter`
-5. ✅ Test WebSocket connection in web frontend
+   - Reduce from 628 lines to 362 lines (42% reduction)
+   - Convert to thin React wrapper over core business logic
+6. ✅ Fix WebSocket compatibility issues:
+   - Expose native WebSocket via `getNativeWebSocket()` for ChatService
+   - Fix heartbeat protocol (disable active heartbeat, use passive response)
+   - Maintain backward compatibility with `window.__wsConnection`
+7. ✅ Test WebSocket connection in web frontend
 
-**Success Criteria**: Web frontend connects to backend via core WebSocketManager
+**Success Criteria**: ✅ Web frontend connects to backend via core ConnectionManager, all features working
+
+**Commits**:
+- `5fe2ad5` - refactor: implement ConnectionManager in core and refactor ConnectionContext
+- `c0f5a1d` - fix: expose native WebSocket for ChatService compatibility
+- `be59af1` - fix: disable active heartbeat to match backend protocol
+
+**Achievements**:
+- ✅ 42% code reduction in ConnectionContext (628 → 362 lines)
+- ✅ ~790 lines of reusable WebSocket logic extracted to core
+- ✅ Zero regression - all web frontend features tested and working
+- ✅ Backend heartbeat protocol correctly implemented
+- ✅ ChatService compatibility maintained
 
 ---
 
