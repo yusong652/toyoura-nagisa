@@ -14,6 +14,14 @@ export class BrowserWebSocketAdapter implements WebSocketAdapter {
     this.ws = new WebSocket(url, protocols);
   }
 
+  /**
+   * Get native WebSocket instance (browser-specific)
+   * Used for compatibility with existing code that needs direct WebSocket access
+   */
+  getNativeWebSocket(): WebSocket | null {
+    return this.ws;
+  }
+
   send(data: string): void {
     if (!this.ws) {
       throw new Error('WebSocket not connected');

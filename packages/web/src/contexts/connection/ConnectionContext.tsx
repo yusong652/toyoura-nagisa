@@ -138,6 +138,13 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       console.log("[ConnectionContext] Connected to session")
       setConnectionStatus(ConnectionStatus.CONNECTED)
       setConnectionError(null)
+
+      // Expose native WebSocket for ChatService compatibility
+      const nativeWs = manager.getNativeWebSocket()
+      if (nativeWs) {
+        wsRef.current = nativeWs
+        ;(window as any).__wsConnection = nativeWs
+      }
     })
 
     manager.on('disconnected', ({ code, reason }: { code: number; reason: string }) => {
@@ -327,16 +334,19 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     setPendingToolConfirmation(null)
   }, [])
 
-  // Expose ConnectionManager's native WebSocket for compatibility
+  // Expose WebSocket and utilities for compatibility
   useEffect(() => {
     const manager = connectionManagerRef.current
     if (manager && manager.isConnected()) {
-      // Access the internal adapter's WebSocket if needed
-      // For now, we expose the manager itself via window global
-      ;(window as any).__connectionManager = manager
+      // Expose native WebSocket for ChatService
+      const nativeWs = manager.getNativeWebSocket()
+      if (nativeWs) {
+        wsRef.current = nativeWs
+        ;(window as any).__wsConnection = nativeWs
+      }
       ;(window as any).__waitForConnection = waitForConnection
     } else {
-      ;(window as any).__connectionManager = null
+      ;(window as any).__wsConnection = null
     }
   }, [connectionStatus, waitForConnection])
 

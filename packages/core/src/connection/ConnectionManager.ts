@@ -257,6 +257,26 @@ export class ConnectionManager extends WebSocketManager {
   }
 
   /**
+   * Get native WebSocket instance (browser only)
+   * Used for compatibility with existing code
+   */
+  public getNativeWebSocket(): WebSocket | null {
+    // Check if adapter has getNativeWebSocket method (BrowserWebSocketAdapter)
+    const adapter = this.getAdapter();
+    if ('getNativeWebSocket' in adapter && typeof adapter.getNativeWebSocket === 'function') {
+      return (adapter as any).getNativeWebSocket();
+    }
+    return null;
+  }
+
+  /**
+   * Get adapter instance
+   */
+  private getAdapter(): WebSocketAdapter {
+    return (this as any).adapter;
+  }
+
+  /**
    * Disconnect and clear session
    */
   public override disconnect(code?: number, reason?: string): void {
