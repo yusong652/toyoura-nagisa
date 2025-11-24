@@ -90,7 +90,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     const manager = new ConnectionManager(adapter, baseUrl, {
       maxReconnectAttempts: 5,
       reconnectInterval: 2000,
-      enableHeartbeat: true,
+      enableHeartbeat: false,  // Disable active heartbeat - backend initiates, frontend responds
       enableAutoReconnect: true
     })
 
