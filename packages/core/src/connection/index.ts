@@ -13,6 +13,14 @@ export type {
   ConnectionStats
 } from './WebSocketManager';
 
+// Connection Manager (aiNagisa-specific)
+export { ConnectionManager } from './ConnectionManager';
+export type {
+  ToolConfirmationData,
+  LocationData,
+  ConnectionManagerOptions
+} from './ConnectionManager';
+
 // Adapters
 export { WebSocketAdapter, ReadyState } from './adapters/WebSocketAdapter';
 export { BrowserWebSocketAdapter } from './adapters/BrowserWebSocketAdapter';

@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react'
 import { ConnectionStatus, ConnectionContextType, ToolConfirmationData } from '../../types/connection'
 import GeolocationService from '../../utils/geolocation'
+import {
+  ConnectionManager,
+  BrowserWebSocketAdapter,
+  ConnectionState,
+  type LocationData
+} from '@aiNagisa/core'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
 
@@ -12,9 +18,28 @@ export const useConnection = (): ConnectionContextType => {
   return context
 }
 
-
 interface ConnectionProviderProps {
   children: ReactNode
+}
+
+/**
+ * Map core ConnectionState to web ConnectionStatus
+ */
+const mapConnectionState = (state: ConnectionState): ConnectionStatus => {
+  switch (state) {
+    case ConnectionState.CONNECTED:
+      return ConnectionStatus.CONNECTED
+    case ConnectionState.CONNECTING:
+    case ConnectionState.RECONNECTING:
+      return ConnectionStatus.CONNECTING
+    case ConnectionState.DISCONNECTED:
+    case ConnectionState.DISCONNECTING:
+      return ConnectionStatus.DISCONNECTED
+    case ConnectionState.ERROR:
+      return ConnectionStatus.ERROR
+    default:
+      return ConnectionStatus.DISCONNECTED
+  }
 }
 
 export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children }) => {
@@ -22,519 +47,260 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [pendingToolConfirmation, setPendingToolConfirmation] = useState<ToolConfirmationData | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  // Use ref for ConnectionManager instance
+  const connectionManagerRef = useRef<ConnectionManager | null>(null)
+
+  // WebSocket ref for compatibility (components may still access wsRef.current)
   const wsRef = useRef<WebSocket | null>(null)
-  const locationRequestHandler = useRef<((data: any) => void) | null>(null)
-
-  // Reconnection management
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reconnectAttemptsRef = useRef<number>(0)
-  const maxReconnectAttempts = 5
-
-  // Use ref for internal logic to avoid stale closure issues
-  // State is only for triggering re-renders in consumers
-  const currentSessionIdRef = useRef<string | null>(null)
-
-  // Helper function to update both ref and state
-  const updateSessionId = useCallback((sessionId: string | null) => {
-    currentSessionIdRef.current = sessionId
-    setCurrentSessionId(sessionId)
-  }, [])
 
   // Track if component is mounted to handle React StrictMode double-mounting
   const isMountedRef = useRef<boolean>(true)
-  const isConnectingRef = useRef<boolean>(false)
 
-  // Clean up WebSocket connections on component unmount
+  // Clean up on component unmount
   useEffect(() => {
     isMountedRef.current = true
 
     return () => {
-      // Cleanup function: executed on component unmount or hot reload
       isMountedRef.current = false
-      isConnectingRef.current = false
-      console.log("[WebSocket] Component unmounting, cleaning up connections...")
-      if (wsRef.current) {
-        try {
-          wsRef.current.close(1000, "Component unmount")
-        } catch (error) {
-          console.error("[WebSocket] Error closing connection on unmount:", error)
-        }
-        wsRef.current = null
+      console.log("[ConnectionContext] Component unmounting, cleaning up...")
+
+      if (connectionManagerRef.current) {
+        connectionManagerRef.current.disconnect(1000, "Component unmount")
+        connectionManagerRef.current = null
       }
+
       // Clear global references
       (window as any).__wsConnection = null
-      // Clear reconnection timers
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-        reconnectTimeoutRef.current = null
-      }
+      wsRef.current = null
     }
   }, [])
-  const baseReconnectDelay = 2000
 
-  // Function to handle location requests
-  const handleLocationRequest = useCallback(async (data: any, currentSessionId: string | null) => {
-    console.log('Received location request:', data)
-
-    try {
-      // Get geolocation service instance
-      const geolocationService = GeolocationService.getInstance()
-      
-      // Ensure service is initialized
-      if (!geolocationService.isServiceInitialized()) {
-        await geolocationService.initialize()
-      }
-
-      // Get location information
-      const locationData = await geolocationService.requestLocation()
-
-      if (locationData) {
-        // Reply location data directly via WebSocket - align with HEARTBEAT_ACK pattern
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          const locationResponse = {
-            type: 'LOCATION_RESPONSE',
-            session_id: currentSessionId,
-            request_id: data.request_id, // Include request_id for Future correlation
-            location_data: locationData,
-            timestamp: new Date().toISOString()
-          }
-
-          wsRef.current.send(JSON.stringify(locationResponse))
-          console.log('[LOCATION] Location response sent via wsRef.current:', locationData)
-        } else {
-          console.warn('[LOCATION] wsRef.current is not available or not open, cannot send location response')
-        }
-      } else {
-        console.warn('[LOCATION] Unable to get location information')
-
-        // Send location acquisition failure response - align with HEARTBEAT_ACK pattern
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          const errorResponse = {
-            type: 'LOCATION_RESPONSE',
-            session_id: currentSessionId,
-            request_id: data.request_id, // Include request_id for Future correlation
-            error: 'Failed to get location',
-            timestamp: new Date().toISOString()
-          }
-
-          wsRef.current.send(JSON.stringify(errorResponse))
-          console.log('[LOCATION] Location error response sent via wsRef.current')
-        } else {
-          console.warn('[LOCATION] wsRef.current is not available or not open, cannot send error response')
-        }
-      }
-    } catch (error) {
-      console.error('Error handling location request:', error)
+  // Initialize ConnectionManager
+  const initializeConnectionManager = useCallback(() => {
+    if (connectionManagerRef.current) {
+      return connectionManagerRef.current
     }
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
+    const wsHost = window.location.hostname
+    const baseUrl = `${protocol}://${wsHost}:8000/ws/placeholder`
+
+    const adapter = new BrowserWebSocketAdapter()
+    const manager = new ConnectionManager(adapter, baseUrl, {
+      maxReconnectAttempts: 5,
+      reconnectInterval: 2000,
+      enableHeartbeat: true,
+      enableAutoReconnect: true
+    })
+
+    // Setup location request handler
+    manager.setLocationRequestHandler(async (data: any): Promise<LocationData | null> => {
+      console.log('[ConnectionContext] Received location request:', data)
+
+      try {
+        const geolocationService = GeolocationService.getInstance()
+
+        if (!geolocationService.isServiceInitialized()) {
+          await geolocationService.initialize()
+        }
+
+        const locationData = await geolocationService.requestLocation()
+
+        if (locationData) {
+          console.log('[ConnectionContext] Location data obtained:', locationData)
+          return locationData
+        } else {
+          console.warn('[ConnectionContext] Unable to get location information')
+          return null
+        }
+      } catch (error) {
+        console.error('[ConnectionContext] Error handling location request:', error)
+        return null
+      }
+    })
+
+    // Setup event handlers
+    manager.on('stateChanged', ({ newState }: { newState: ConnectionState }) => {
+      if (!isMountedRef.current) return
+
+      const status = mapConnectionState(newState)
+      console.log(`[ConnectionContext] State changed: ${newState} -> ${status}`)
+      setConnectionStatus(status)
+
+      if (newState === ConnectionState.CONNECTED) {
+        setConnectionError(null)
+      }
+    })
+
+    manager.on('connected', () => {
+      if (!isMountedRef.current) return
+      console.log("[ConnectionContext] Connected to session")
+      setConnectionStatus(ConnectionStatus.CONNECTED)
+      setConnectionError(null)
+    })
+
+    manager.on('disconnected', ({ code, reason }: { code: number; reason: string }) => {
+      if (!isMountedRef.current) return
+      console.log(`[ConnectionContext] Disconnected: ${code} - ${reason}`)
+      setConnectionStatus(ConnectionStatus.DISCONNECTED)
+      wsRef.current = null
+      ;(window as any).__wsConnection = null
+    })
+
+    manager.on('error', (error: Error) => {
+      if (!isMountedRef.current) return
+      console.error("[ConnectionContext] Connection error:", error)
+      setConnectionStatus(ConnectionStatus.ERROR)
+      setConnectionError(error.message)
+    })
+
+    manager.on('maxReconnectAttemptsReached', () => {
+      if (!isMountedRef.current) return
+      console.log("[ConnectionContext] Max reconnect attempts reached")
+      setConnectionStatus(ConnectionStatus.ERROR)
+      setConnectionError("Maximum reconnection attempts reached")
+    })
+
+    // Setup message handlers - dispatch CustomEvents for React components
+    manager.on('tts_chunk', (data) => {
+      window.dispatchEvent(new CustomEvent('websocket-tts-chunk', { detail: data }))
+    })
+
+    manager.on('status_update', (data) => {
+      window.dispatchEvent(new CustomEvent('messageStatusUpdate', { detail: data }))
+    })
+
+    manager.on('message_create', (data) => {
+      window.dispatchEvent(new CustomEvent('messageCreate', { detail: data }))
+    })
+
+    manager.on('streaming_update', (data) => {
+      window.dispatchEvent(new CustomEvent('streamingUpdate', { detail: data }))
+    })
+
+    manager.on('title_update', (data) => {
+      window.dispatchEvent(new CustomEvent('titleUpdate', { detail: data }))
+    })
+
+    manager.on('todo_update', (data) => {
+      window.dispatchEvent(new CustomEvent('todoUpdate', { detail: data }))
+    })
+
+    manager.on('emotion_keyword', (data) => {
+      window.dispatchEvent(new CustomEvent('emotionKeyword', { detail: data }))
+    })
+
+    manager.on('tool_confirmation_request', (data: ToolConfirmationData) => {
+      console.log('[ConnectionContext] Received TOOL_CONFIRMATION_REQUEST', data)
+      setPendingToolConfirmation(data)
+      window.dispatchEvent(new CustomEvent('toolConfirmationRequest', { detail: data }))
+    })
+
+    manager.on('background_process_notification', (data) => {
+      console.log('[ConnectionContext] Dispatching backgroundProcessNotification event:', data)
+      window.dispatchEvent(new CustomEvent('backgroundProcessNotification', { detail: data }))
+    })
+
+    manager.on('message_saved', (data) => {
+      console.log('[ConnectionContext] Dispatching messageSaved event:', data)
+      window.dispatchEvent(new CustomEvent('messageSaved', { detail: data }))
+    })
+
+    connectionManagerRef.current = manager
+    return manager
   }, [])
 
   // Check connection to backend
   const checkConnection = useCallback(async (): Promise<boolean> => {
     try {
-      setConnectionStatus(() => ConnectionStatus.CONNECTING)
-      setConnectionError(() => null)
+      setConnectionStatus(ConnectionStatus.CONNECTING)
+      setConnectionError(null)
 
       const response = await fetch('/api/history/sessions', {
         signal: AbortSignal.timeout(5000) // 5 second timeout
       })
-      
+
       if (response.ok) {
-        setConnectionStatus(() => ConnectionStatus.CONNECTED)
+        setConnectionStatus(ConnectionStatus.CONNECTED)
         return true
       } else {
-        setConnectionStatus(() => ConnectionStatus.ERROR)
-        setConnectionError(() => `Server returned error: ${response.status}`)
+        setConnectionStatus(ConnectionStatus.ERROR)
+        setConnectionError(`Server returned error: ${response.status}`)
         return false
       }
     } catch (error) {
       console.error('Connection check failed:', error)
-      setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
-      setConnectionError(() => error instanceof Error ? error.message : 'Unable to connect to server')
+      setConnectionStatus(ConnectionStatus.DISCONNECTED)
+      setConnectionError(error instanceof Error ? error.message : 'Unable to connect to server')
       return false
     }
   }, [])
-
-  // Reconnect logic is now inline in onclose to avoid circular dependencies
 
   // Connect to specified session WebSocket
   const connectToSession = useCallback((sessionId: string) => {
     if (!sessionId) return
 
-    // Don't connect if component is not mounted (handles React StrictMode)
     if (!isMountedRef.current) {
-      console.log(`[WebSocket] Component not mounted, skipping connection to ${sessionId}`)
+      console.log(`[ConnectionContext] Component not mounted, skipping connection to ${sessionId}`)
       return
     }
 
-    // If we're already connecting, don't create another connection
-    if (isConnectingRef.current) {
-      console.log(`[WebSocket] Already connecting, skipping duplicate connection to ${sessionId}`)
-      return
-    }
+    console.log(`[ConnectionContext] Connecting to session ${sessionId}`)
+    setCurrentSessionId(sessionId)
 
-    // If we're already connected to this session, don't create another connection
-    if (currentSessionIdRef.current === sessionId &&
-        wsRef.current &&
-        wsRef.current.readyState === WebSocket.OPEN) {
-      console.log(`[WebSocket] Already connected to session ${sessionId}, skipping`)
-      return
-    }
+    const manager = initializeConnectionManager()
 
-    // Mark as connecting
-    isConnectingRef.current = true
-
-    // Clear any existing reconnect timeout
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
-
-    // Store current session ID for reconnection
-    updateSessionId(sessionId)
-
-    // Close previous ws if any
-    if (wsRef.current) {
-      try {
-        wsRef.current.close(1000, "Switching session")
-      } catch (_) {}
-      wsRef.current = null
-    }
-
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
-    // WebSocket connection should point to backend server port 8000, not frontend Vite port 5173
-    const wsHost = window.location.hostname
-    const ws = new WebSocket(`${protocol}://${wsHost}:8000/ws/${sessionId}`)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      try {
-        // Only update state if component is still mounted
-        if (!isMountedRef.current) {
-          console.log("[WebSocket] Component unmounted during connection, closing WebSocket")
-          ws.close(1000, "Component unmounted")
-          return
-        }
-
-        console.log("[WebSocket] connected for session", sessionId)
-        setConnectionStatus(() => ConnectionStatus.CONNECTED)
-        setConnectionError(() => null)
-
-        // Clear connecting flag
-        isConnectingRef.current = false
-
-        // Reset reconnect attempts on successful connection
-        if (reconnectAttemptsRef.current !== undefined) {
-          reconnectAttemptsRef.current = 0
-        }
-
-        // Expose WebSocket connection globally for services
-        (window as any).__wsConnection = ws
-      } catch (error) {
-        console.error("[WebSocket] Error in onopen handler:", error)
-        isConnectingRef.current = false
-      }
-    }
-
-    ws.onclose = (event) => {
-      console.log("[WebSocket] closed for session", sessionId, "Code:", event.code, "Reason:", event.reason)
-
-      // Clear connecting flag
-      isConnectingRef.current = false
-
-      // Only update state if component is still mounted
+    manager.connectToSession(sessionId).catch((error) => {
+      console.error(`[ConnectionContext] Failed to connect to session ${sessionId}:`, error)
       if (isMountedRef.current) {
-        try {
-          setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
-        } catch (error) {
-          console.error("[WebSocket] Error updating connection status:", error)
-        }
+        setConnectionStatus(ConnectionStatus.ERROR)
+        setConnectionError(error.message)
       }
-
-      // Clear global WebSocket reference
-      (window as any).__wsConnection = null
-
-      // Only attempt reconnect if:
-      // 1. Component is still mounted
-      // 2. It wasn't a clean close (code !== 1000)
-      // 3. This session is still the current session
-      // 4. We have a valid session ID
-      if (isMountedRef.current && event.code !== 1000 && currentSessionIdRef.current === sessionId && sessionId) {
-        console.log("[WebSocket] Connection lost for current session, attempting to reconnect...")
-
-        // Inline reconnect logic to avoid circular dependency
-        if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          console.log("[WebSocket] Max reconnect attempts reached")
-          if (isMountedRef.current) {
-            setConnectionStatus(() => ConnectionStatus.ERROR)
-            setConnectionError(() => "Maximum reconnection attempts reached")
-          }
-          return
-        }
-
-        reconnectAttemptsRef.current++
-        const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1), 30000)
-
-        console.log(`[WebSocket] Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} after ${delay}ms`)
-
-        reconnectTimeoutRef.current = setTimeout(async () => {
-          // Triple check: component mounted, still current session
-          if (!isMountedRef.current || currentSessionIdRef.current !== sessionId) {
-            console.log(`[WebSocket] Component unmounted or session changed during reconnect delay, aborting reconnect for ${sessionId}`)
-            return
-          }
-
-          // Validate session still exists before reconnecting
-          // Don't clear sessionId on fetch error - backend might still be starting up
-          try {
-            const response = await fetch(`/api/history/${sessionId}`)
-            if (response.ok) {
-              connectToSession(sessionId)
-            } else if (response.status === 404) {
-              // Session definitely doesn't exist
-              console.log(`[WebSocket] Session ${sessionId} no longer exists (404), stopping reconnection`)
-              updateSessionId(null)
-              if (isMountedRef.current) {
-                setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
-              }
-            } else {
-              // Server error - keep trying
-              console.log(`[WebSocket] Server returned ${response.status}, will retry`)
-              connectToSession(sessionId)
-            }
-          } catch (error) {
-            // Network error - backend might be restarting, keep trying
-            console.error(`[WebSocket] Network error validating session ${sessionId}, will retry:`, error)
-            connectToSession(sessionId)
-          }
-        }, delay)
-      } else if (currentSessionIdRef.current !== sessionId) {
-        console.log(`[WebSocket] Connection closed for old session ${sessionId}, not reconnecting (current: ${currentSessionIdRef.current})`)
-      }
-    }
-
-    ws.onerror = (e) => {
-      console.error("[WebSocket] error", e)
-
-      // Clear connecting flag
-      isConnectingRef.current = false
-
-      // Only update state if component is still mounted
-      if (isMountedRef.current) {
-        setConnectionStatus(() => ConnectionStatus.ERROR)
-        setConnectionError(() => "WebSocket connection error")
-      }
-    }
-    
-    // Handle incoming WebSocket messages
-    ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data)
-
-        // Handle heartbeat messages
-        if (data.type === 'HEARTBEAT') {
-          console.log('WebSocket received heartbeat, sending ACK')
-          const heartbeatAck = {
-            type: 'HEARTBEAT_ACK',
-            timestamp: new Date().toISOString()
-          }
-          // Use wsRef.current instead of ws to ensure we're using the correct WebSocket instance
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify(heartbeatAck))
-            console.log('HEARTBEAT_ACK sent via wsRef.current')
-          } else {
-            console.warn('wsRef.current is not available or not open, cannot send HEARTBEAT_ACK')
-          }
-        }
-
-        
-        // Handle TTS chunks - dispatch custom events for TTS processors
-        if (data.type === 'TTS_CHUNK') {
-          // Dispatch custom event for existing TTS processors to handle
-          const ttsEvent = new CustomEvent('websocket-tts-chunk', {
-            detail: {
-              text: data.text,
-              audio: data.audio,
-              index: data.index,
-              is_final: data.is_final,
-              message_id: data.message_id,
-              engine_status: data.engine_status,
-              error: data.error,
-              processing_time: data.processing_time
-            }
-          })
-
-          window.dispatchEvent(ttsEvent)
-        }
-
-        // Handle location requests
-        if (data.type === 'LOCATION_REQUEST') {
-          console.log('[LOCATION] WebSocket received location request:', data)
-          await handleLocationRequest(data, sessionId)
-        }
-
-        // Call external location request handler if registered
-        if (locationRequestHandler.current && data.type === 'LOCATION_REQUEST') {
-          locationRequestHandler.current(data)
-        }
-        
-        // Handle message status updates
-        if (data.type === 'STATUS_UPDATE') {
-          // Dispatch custom event for message status updates
-          window.dispatchEvent(new CustomEvent('messageStatusUpdate', {
-            detail: {
-              messageId: data.message_id,
-              status: data.status,
-              errorMessage: data.error_message
-            }
-          }))
-        }
-
-        // Handle message creation requests
-        if (data.type === 'MESSAGE_CREATE') {
-          // Dispatch custom event for message creation
-          window.dispatchEvent(new CustomEvent('messageCreate', {
-            detail: {
-              messageId: data.message_id,
-              role: data.role,
-              initialText: data.initial_text || '',
-              streaming: data.streaming || true
-            }
-          }))
-        }
-
-        // Handle streaming content updates
-        if (data.type === 'STREAMING_UPDATE') {
-          // Dispatch custom event for streaming content updates
-          window.dispatchEvent(new CustomEvent('streamingUpdate', {
-            detail: {
-              messageId: data.message_id,
-              content: data.content,
-              streaming: data.streaming,
-              usage: data.usage  // Include token usage statistics
-            }
-          }))
-        }
-
-        // Handle title update notifications
-        if (data.type === 'TITLE_UPDATE') {
-          // Dispatch custom event for title updates
-          window.dispatchEvent(new CustomEvent('titleUpdate', {
-            detail: data
-          }))
-        }
-
-        // Handle todo update notifications
-        if (data.type === 'TODO_UPDATE') {
-          // Dispatch custom event for todo status updates
-          window.dispatchEvent(new CustomEvent('todoUpdate', {
-            detail: {
-              todo: data.todo
-            }
-          }))
-        }
-
-        // Handle emotion keyword notifications
-        if (data.type === 'EMOTION_KEYWORD') {
-          // Dispatch custom event for keyword handling (Live2D animations)
-          window.dispatchEvent(new CustomEvent('emotionKeyword', {
-            detail: data
-          }))
-        }
-
-        // Handle tool confirmation requests (bash, edit, write, etc.)
-        if (data.type === 'TOOL_CONFIRMATION_REQUEST') {
-          console.log('[ConnectionContext] Received TOOL_CONFIRMATION_REQUEST', {
-            message_id: data.message_id,
-            tool_call_id: data.tool_call_id,
-            tool_name: data.tool_name,
-            command: data.command
-          })
-
-          // Store in state for late-mounting components (React-idiomatic approach)
-          setPendingToolConfirmation({
-            message_id: data.message_id,
-            tool_call_id: data.tool_call_id,
-            tool_name: data.tool_name,
-            command: data.command,
-            description: data.description,
-            timestamp: data.timestamp
-          })
-
-          // Also dispatch custom event for immediate notification
-          window.dispatchEvent(new CustomEvent('toolConfirmationRequest', {
-            detail: data
-          }))
-        }
-
-        // Handle background process notifications
-        if (data.type === 'BACKGROUND_PROCESS_STARTED' ||
-            data.type === 'BACKGROUND_PROCESS_OUTPUT_UPDATE' ||
-            data.type === 'BACKGROUND_PROCESS_COMPLETED' ||
-            data.type === 'BACKGROUND_PROCESS_KILLED') {
-          console.log('[ConnectionContext] Dispatching backgroundProcessNotification event:', data)
-          // Dispatch custom event for background process monitoring
-          window.dispatchEvent(new CustomEvent('backgroundProcessNotification', {
-            detail: data
-          }))
-        }
-
-        // Handle message saved notifications (for tool messages auto-refresh)
-        if (data.type === 'MESSAGE_SAVED') {
-          console.log('[ConnectionContext] Dispatching messageSaved event:', data)
-          // Dispatch custom event to trigger message list refresh
-          window.dispatchEvent(new CustomEvent('messageSaved', {
-            detail: data
-          }))
-        }
-      } catch (error) {
-        console.error("[WebSocket] failed to parse message:", error)
-      }
-    }
-  }, [handleLocationRequest, updateSessionId])
+    })
+  }, [initializeConnectionManager])
 
   // Disconnect WebSocket connection
   const disconnect = useCallback(() => {
-    // Clear reconnection attempts when manually disconnecting
-    updateSessionId(null)
-    isConnectingRef.current = false
+    console.log("[ConnectionContext] Manually disconnecting")
+    setCurrentSessionId(null)
 
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
-
-    if (wsRef.current) {
-      try {
-        wsRef.current.close(1000, "Manual disconnect") // Clean close
-      } catch (_) {}
-      wsRef.current = null
+    if (connectionManagerRef.current) {
+      connectionManagerRef.current.disconnect(1000, "Manual disconnect")
     }
 
     if (isMountedRef.current) {
-      setConnectionStatus(() => ConnectionStatus.DISCONNECTED)
+      setConnectionStatus(ConnectionStatus.DISCONNECTED)
     }
-  }, [updateSessionId])
-
+  }, [])
 
   // Send WebSocket message
   const sendWebSocketMessage = useCallback((message: any) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message))
-    } else {
-      console.warn('WebSocket not connected, cannot send message')
+    if (!connectionManagerRef.current) {
+      console.warn('[ConnectionContext] ConnectionManager not initialized')
+      return
     }
+
+    if (!connectionManagerRef.current.isConnected()) {
+      console.warn('[ConnectionContext] Not connected, cannot send message')
+      return
+    }
+
+    connectionManagerRef.current.sendMessage(message).catch((error) => {
+      console.error('[ConnectionContext] Failed to send message:', error)
+    })
   }, [])
 
   // Wait for WebSocket connection to establish
   const waitForConnection = useCallback((timeout: number = 10000): Promise<boolean> => {
     return new Promise((resolve) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      if (connectionManagerRef.current?.isConnected()) {
         resolve(true)
         return
       }
 
       const checkConnection = () => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        if (connectionManagerRef.current?.isConnected()) {
           resolve(true)
         } else if (connectionStatus === ConnectionStatus.ERROR ||
                    connectionStatus === ConnectionStatus.DISCONNECTED) {
@@ -549,9 +315,11 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     })
   }, [connectionStatus])
 
-  // Register location request handler
-  const onLocationRequest = useCallback((handler: (data: any) => void) => {
-    locationRequestHandler.current = handler
+  // Register location request handler (legacy compatibility)
+  const onLocationRequest = useCallback((_handler: (data: any) => void) => {
+    console.warn('[ConnectionContext] onLocationRequest is deprecated, location handling is built-in')
+    // Location handling is now built into ConnectionManager
+    // This function is kept for compatibility but does nothing
   }, [])
 
   // Clear pending tool confirmation
@@ -559,60 +327,25 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
     setPendingToolConfirmation(null)
   }, [])
 
-  // No longer need to expose pending confirmation via window global
-  // Using React Context pattern instead for better type safety and maintainability
-
-  // Expose WebSocket connection globally for services
+  // Expose ConnectionManager's native WebSocket for compatibility
   useEffect(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      // Expose WebSocket connection for ChatService
-      (window as any).__wsConnection = wsRef.current
+    const manager = connectionManagerRef.current
+    if (manager && manager.isConnected()) {
+      // Access the internal adapter's WebSocket if needed
+      // For now, we expose the manager itself via window global
+      ;(window as any).__connectionManager = manager
+      ;(window as any).__waitForConnection = waitForConnection
     } else {
-      (window as any).__wsConnection = null
+      ;(window as any).__connectionManager = null
     }
-
-    // Expose waitForConnection method
-    (window as any).__waitForConnection = waitForConnection
   }, [connectionStatus, waitForConnection])
-
-  // Handle requests for WebSocket connection
-  useEffect(() => {
-    const handleConnectionRequest = () => {
-      return wsRef.current
-    }
-
-    window.addEventListener('getWebSocketConnection', handleConnectionRequest)
-
-    return () => {
-      window.removeEventListener('getWebSocketConnection', handleConnectionRequest)
-    }
-  }, [])
-
-  // Clean up WebSocket connections
-  useEffect(() => {
-    return () => {
-      // Clear any pending reconnect timeouts
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
-
-      if (wsRef.current) {
-        try {
-          wsRef.current.close()
-        } catch (_) {}
-      }
-
-      // Clean up global reference
-      (window as any).__wsConnection = null
-    }
-  }, [])
 
   return (
     <ConnectionContext.Provider value={{
       connectionStatus,
       connectionError,
       sessionId: currentSessionId,
-      wsRef,
+      wsRef, // Keep for compatibility, though deprecated
       connectToSession,
       disconnect,
       sendWebSocketMessage,
