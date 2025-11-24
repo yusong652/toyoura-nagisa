@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
 import { ConnectionStatus } from '../../types/connection'
-import { ChatSession, SessionContextType, TokenUsage } from '@aiNagisa/core'
-import { sessionService } from '@aiNagisa/core'
+import {
+  ChatSession,
+  SessionContextType,
+  TokenUsage,
+  SessionManager,
+  SessionEvent,
+  LocalStorageAdapter,
+  sessionService
+} from '@aiNagisa/core'
 import { useConnection } from '../connection/ConnectionContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
 
@@ -22,6 +29,7 @@ interface SessionProviderProps {
 export const SessionProvider: React.FC<SessionProviderProps> = ({
   children
 }) => {
+  // React state
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [sessionLoadAttempted, setSessionLoadAttempted] = useState(false)
@@ -35,17 +43,59 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
   } = useConnection()
   const { ttsEnabled, updateTTSEnabled } = useTtsEnable()
 
+  // Create SessionManager instance
+  const sessionManagerRef = useRef<SessionManager>()
+  if (!sessionManagerRef.current) {
+    sessionManagerRef.current = new SessionManager(
+      sessionService,
+      new LocalStorageAdapter()
+    )
+  }
+  const sessionManager = sessionManagerRef.current
+
+  // Subscribe to SessionManager events
+  useEffect(() => {
+    // Session created event
+    sessionManager.on(SessionEvent.SESSION_CREATED, ({ sessionId }) => {
+      setCurrentSessionId(sessionId)
+      setSessionTokenUsage(null) // New session has no token usage
+    })
+
+    // Session switched event
+    sessionManager.on(SessionEvent.SESSION_SWITCHED, ({ sessionId }) => {
+      setCurrentSessionId(sessionId)
+    })
+
+    // Sessions loaded event
+    sessionManager.on(SessionEvent.SESSIONS_LOADED, ({ sessions: loadedSessions }) => {
+      setSessions(loadedSessions)
+    })
+
+    // Token usage updated event
+    sessionManager.on(SessionEvent.TOKEN_USAGE_UPDATED, ({ usage }) => {
+      setSessionTokenUsage(usage)
+    })
+
+    // Session deleted event
+    sessionManager.on(SessionEvent.SESSION_DELETED, ({ sessionId }) => {
+      // SessionManager will handle switching to another session
+      console.log(`Session ${sessionId} deleted`)
+    })
+
+    return () => {
+      sessionManager.removeAllListeners()
+    }
+  }, [sessionManager])
+
   // 刷新会话列表
   const refreshSessions = useCallback(async (): Promise<ChatSession[]> => {
     try {
-      const data = await sessionService.getSessions()
-      setSessions(data)
-      return data
+      return await sessionManager.loadSessions()
     } catch (error) {
       console.error('获取会话列表失败:', error)
       throw error
     }
-  }, [])
+  }, [sessionManager])
 
   // 创建新会话
   const createNewSession = useCallback(async (name?: string): Promise<string> => {
@@ -59,16 +109,9 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
     }
     try {
-      console.log('Sending create session request...')
-      const data = await sessionService.createSession(name)
-      console.log('Create session response:', data)
-      const newSessionId = data.session_id
-
-      localStorage.setItem('session_id', newSessionId)
-      setCurrentSessionId(newSessionId)
-
-      // New session has no token usage yet
-      setSessionTokenUsage(null)
+      console.log('Creating session via SessionManager...')
+      const newSessionId = await sessionManager.createSession(name)
+      console.log('Session created:', newSessionId)
 
       // 同步 TTS 状态到后端
       try {
@@ -77,14 +120,12 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
         console.error('同步 TTS 状态失败:', error)
       }
 
-      await refreshSessions()
-
       return newSessionId
     } catch (error) {
       console.error('Error in createNewSession:', error)
       throw error
     }
-  }, [refreshSessions, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
+  }, [sessionManager, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
 
   const switchSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -95,20 +136,9 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
     }
     try {
-      await sessionService.switchSession(sessionId)
+      await sessionManager.switchSession(sessionId)
 
-      localStorage.setItem('session_id', sessionId)
-      setCurrentSessionId(sessionId)
-
-      // Load token usage for this session
-      try {
-        const usage = await sessionService.getTokenUsage(sessionId)
-        setSessionTokenUsage(usage)
-      } catch (error) {
-        console.error('Failed to load token usage:', error)
-        setSessionTokenUsage(null)
-      }
-
+      // 同步 TTS 状态到后端
       try {
         await updateTTSEnabled(ttsEnabled)
       } catch (error) {
@@ -119,7 +149,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       console.error('切换会话失败:', error)
       throw error
     }
-  }, [connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
+  }, [sessionManager, connectionStatus, checkConnection, connectionError, ttsEnabled, updateTTSEnabled])
 
 
   const deleteSession = useCallback(async (sessionId: string): Promise<void> => {
@@ -130,24 +160,13 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
     }
     try {
-      await sessionService.deleteSession(sessionId)
-
-      // 用最新的 sessions 判断
-      const latestSessions = await refreshSessions()
-
-      if (sessionId === currentSessionId) {
-        if (latestSessions.length > 0) {
-          await switchSession(latestSessions[0].id)
-        } else {
-          await createNewSession()
-        }
-      }
-
+      // SessionManager will handle automatic session switching
+      await sessionManager.deleteSession(sessionId)
     } catch (error) {
       console.error('删除会话失败:', error)
       throw error
     }
-  }, [currentSessionId, createNewSession, refreshSessions, switchSession, connectionStatus, checkConnection, connectionError])
+  }, [sessionManager, connectionStatus, checkConnection, connectionError])
 
 
   const refreshTitle = useCallback(async (sessionId: string): Promise<void> => {
@@ -156,69 +175,61 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
         throw new Error('会话ID不能为空')
       }
 
-      const data = await sessionService.generateTitle(sessionId)
-
-      if (data.success && data.title) {
-        setSessions(prevSessions => 
-          prevSessions.map(session => 
-            session.id === sessionId 
-              ? { ...session, name: data.title }
-              : session
-          )
-        )
-      }
+      await sessionManager.refreshTitle(sessionId)
     } catch (error) {
       console.error('刷新标题失败:', error)
       throw error
     }
-  }, [])
+  }, [sessionManager])
 
+  // Initialize SessionManager and load sessions
   useEffect(() => {
     const initLoad = async () => {
-      // Attempt to establish connection and load initial data
+      // Attempt to establish connection
       const connected = await checkConnection()
       if (!connected) {
-        setSessionLoadAttempted(true) // Mark that an initial load attempt failed due to connection
+        setSessionLoadAttempted(true)
         return
       }
 
-      // Connection successful, now try to load session list and then the active session
       try {
-        await refreshSessions() // Load all session details first
+        // Initialize SessionManager (loads current session ID from storage)
+        await sessionManager.initialize()
 
-        const storedSessionId = localStorage.getItem('session_id')
+        // Get stored session ID from SessionManager
+        const storedSessionId = sessionManager.getCurrentSessionId()
+
         if (storedSessionId) {
           try {
-            await switchSession(storedSessionId) // This loads messages for the session
-            setSessionLoadAttempted(false) // Successfully loaded a session
+            await switchSession(storedSessionId)
+            setSessionLoadAttempted(false)
           } catch (switchError) {
             console.error('初始化时无法切换到已存储会话，尝试创建新会话:', switchError)
             if (connectionStatus === ConnectionStatus.CONNECTED) {
               try {
-                await createNewSession() // This loads messages for new session & refreshes list
-                setSessionLoadAttempted(false) // Successfully created a new session
+                await createNewSession()
+                setSessionLoadAttempted(false)
               } catch (createError) {
-                console.error('初始化时创建新会话失败（切换会话后）:', createError)
-                setSessionLoadAttempted(true) // Failed to establish a session
+                console.error('初始化时创建新会话失败:', createError)
+                setSessionLoadAttempted(true)
               }
             } else {
-              setSessionLoadAttempted(true) // Connection lost during switchSession attempt
+              setSessionLoadAttempted(true)
             }
           }
         } else {
           // No stored session, create a new one
           try {
             await createNewSession()
-            setSessionLoadAttempted(false) // Successfully created a new session
+            setSessionLoadAttempted(false)
           } catch (createError) {
-            console.error('初始化时创建新会话失败（无存储ID）:', createError)
-            setSessionLoadAttempted(true) // Failed to establish a session
+            console.error('初始化时创建新会话失败:', createError)
+            setSessionLoadAttempted(true)
           }
         }
-      } catch (refreshError) {
-        // Error from refreshSessions()
-        console.error('初始化时加载会话列表失败:', refreshError)
-        setSessionLoadAttempted(true) // Mark that the load was attempted and failed
+      } catch (error) {
+        console.error('初始化SessionManager失败:', error)
+        setSessionLoadAttempted(true)
       }
     }
 
@@ -233,58 +244,57 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   }, [currentSessionId]) // Remove connectToSession from dependencies to prevent unnecessary reconnects
 
+  // Reload sessions on reconnect
   useEffect(() => {
     const loadSessionOnReconnect = async () => {
       if (connectionStatus === ConnectionStatus.CONNECTED && sessionLoadAttempted && !currentSessionId) {
-        setSessionLoadAttempted(false) // We are attempting to load now
+        setSessionLoadAttempted(false)
 
         try {
-          await refreshSessions() // Load all session details first
+          await refreshSessions()
 
-          const storedSessionId = localStorage.getItem('session_id')
+          const storedSessionId = sessionManager.getCurrentSessionId()
           if (storedSessionId) {
             try {
               await switchSession(storedSessionId)
-              // Successfully loaded session on reconnect
             } catch (switchError) {
               console.error('重新连接后无法切换到已存储会话，尝试创建新会话:', switchError)
               if (connectionStatus === ConnectionStatus.CONNECTED) {
                 try {
                   await createNewSession()
                 } catch (createError) {
-                  console.error('重新连接后创建新会话也失败（切换会话后）:', createError)
-                  setSessionLoadAttempted(true) // Mark failed attempt
+                  console.error('重新连接后创建新会话失败:', createError)
+                  setSessionLoadAttempted(true)
                 }
               } else {
-                 setSessionLoadAttempted(true) // Connection lost during switch
+                setSessionLoadAttempted(true)
               }
             }
           } else {
-            // No stored session, create a new one
             try {
               await createNewSession()
             } catch (createError) {
-              console.error('重新连接后创建新会话失败（无存储ID）:', createError)
-              setSessionLoadAttempted(true) // Mark failed attempt
+              console.error('重新连接后创建新会话失败:', createError)
+              setSessionLoadAttempted(true)
             }
           }
         } catch (refreshError) {
-          // Error from refreshSessions() during reconnect
           console.error('重新连接后加载会话列表失败:', refreshError)
-          setSessionLoadAttempted(true) // Mark failed attempt so it can retry if connection cycles
+          setSessionLoadAttempted(true)
         }
       }
     }
 
     loadSessionOnReconnect()
-  }, [connectionStatus, sessionLoadAttempted, currentSessionId, refreshSessions, switchSession, createNewSession])
+  }, [connectionStatus, sessionLoadAttempted, currentSessionId, sessionManager, refreshSessions, switchSession, createNewSession])
 
   // Listen for WebSocket streaming updates to update token usage in real-time
   useEffect(() => {
     const handleStreamingUpdate = (event: CustomEvent) => {
       const { usage } = event.detail
       if (usage) {
-        setSessionTokenUsage(usage)
+        // Update token usage via SessionManager
+        sessionManager.updateTokenUsage(usage)
       }
     }
 
@@ -293,7 +303,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     return () => {
       window.removeEventListener('streamingUpdate', handleStreamingUpdate as EventListener)
     }
-  }, [])
+  }, [sessionManager])
 
   return (
     <SessionContext.Provider value={{

@@ -1,21 +1,27 @@
 /**
  * useChatMessage Hook
  *
- * Manages complete chat message functionality
+ * React wrapper for ChatManager - manages message operations
  * - Message state management (messages, setMessages)
- * - Send messages (including creating user and bot messages)
- * - Session history loading and conversion
- * - Delete messages
+ * - Send messages via ChatManager
+ * - Load history via ChatManager
+ * - Delete messages via ChatManager
  * - Clear chat
  * - Message status updates
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { Message, MessageStatus, FileData } from '@aiNagisa/core'
-import { sessionService, chatService } from '@aiNagisa/core'
+import {
+  Message,
+  MessageStatus,
+  FileData,
+  ChatManager,
+  ChatEvent,
+  sessionService,
+  chatService
+} from '@aiNagisa/core'
 import { useWebSocketMessageStatus } from '../../hooks/useWebSocketMessageStatus'
-import { messageConverterManager, BackendMessage } from './messageConverters'
 
 export interface UseChatMessageOptions {
   currentSessionId: string | null
@@ -54,31 +60,48 @@ export const useChatMessage = ({
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
-  // Reload messages when session changes
+  // Create ChatManager instance
+  const chatManagerRef = useRef<ChatManager>()
+  if (!chatManagerRef.current) {
+    chatManagerRef.current = new ChatManager(chatService, sessionService)
+  }
+  const chatManager = chatManagerRef.current
+
+  // Subscribe to ChatManager events
+  useEffect(() => {
+    // Message created event
+    chatManager.on(ChatEvent.MESSAGE_CREATED, ({ message }) => {
+      setMessages(prev => [...prev, message])
+    })
+
+    // Message updated event
+    chatManager.on(ChatEvent.MESSAGE_UPDATED, ({ messageId, updates }) => {
+      setMessages(prev =>
+        prev.map(msg => (msg.id === messageId ? { ...msg, ...updates } : msg))
+      )
+    })
+
+    // Message deleted event
+    chatManager.on(ChatEvent.MESSAGE_DELETED, ({ messageId }) => {
+      setMessages(prev => prev.filter(msg => msg.id !== messageId))
+    })
+
+    // History loaded event
+    chatManager.on(ChatEvent.HISTORY_LOADED, ({ messages: loadedMessages }) => {
+      setMessages(loadedMessages)
+    })
+
+    return () => {
+      chatManager.removeAllListeners()
+    }
+  }, [chatManager])
+
+  // Reload messages when session changes using ChatManager
   useEffect(() => {
     if (currentSessionId) {
-      // Load session history and convert messages using strategy pattern
       const loadMessages = async () => {
         try {
-          const historyData = await sessionService.getSessionHistory(currentSessionId)
-
-          if (historyData.history && Array.isArray(historyData.history)) {
-            // Filter valid message roles and convert using MessageConverterManager
-            const backendMessages = historyData.history.filter((msg: any) => {
-              // Include all user, assistant, image, and video messages
-              // Tool results within user messages will be rendered as content blocks
-              return msg.role === 'user' ||
-                     msg.role === 'assistant' ||
-                     msg.role === 'image' ||
-                     msg.role === 'video'
-            }) as BackendMessage[]
-
-            // Convert all messages using the converter manager
-            const convertedMessages = messageConverterManager.convertMany(backendMessages)
-            setMessages(convertedMessages)
-          } else {
-            setMessages([])
-          }
+          await chatManager.loadHistory(currentSessionId)
         } catch (error) {
           console.error('Failed to load session messages:', error)
           setMessages([])
@@ -88,44 +111,34 @@ export const useChatMessage = ({
     } else {
       setMessages([])
     }
-  }, [currentSessionId])
+  }, [currentSessionId, chatManager])
 
-  // Delete message
+  // Delete message via ChatManager
   const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
-    // Ensure there is a current session ID
     if (!currentSessionId) {
-      throw new Error("No active session");
+      throw new Error("No active session")
     }
 
     try {
-      // First check if message exists in current message list
-      const messageExists = messages.some(msg => msg.id === messageId);
+      // Check if message exists
+      const messageExists = messages.some(msg => msg.id === messageId)
       if (!messageExists) {
-        console.error(`Message ${messageId} does not exist in current session`);
-        throw new Error("Message does not exist in current session");
+        console.error(`Message ${messageId} does not exist in current session`)
+        throw new Error("Message does not exist in current session")
       }
 
-      // First update message list in frontend, removing specified message
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
-
-      // Call backend API to delete message
-      const responseData = await chatService.deleteMessage(currentSessionId, messageId);
-
-      if (!responseData.success) {
-        console.error('Failed to delete message:', responseData);
-
-        // If backend deletion failed but frontend removed it, restore the deleted message
-        await sessionSwitchSession(currentSessionId);
-        throw new Error(`Failed to delete message: ${responseData.detail}`);
-      }
+      // Delete via ChatManager (will emit MESSAGE_DELETED event)
+      await chatManager.deleteMessage(messageId, currentSessionId)
 
       // Refresh session list after successful deletion
-      await sessionRefreshSessions();
+      await sessionRefreshSessions()
     } catch (error) {
-      console.error('Failed to delete message:', error);
-      throw error;
+      console.error('Failed to delete message:', error)
+      // Restore messages by reloading from backend
+      await sessionSwitchSession(currentSessionId)
+      throw error
     }
-  }, [currentSessionId, sessionRefreshSessions, messages, sessionSwitchSession]);
+  }, [currentSessionId, chatManager, messages, sessionRefreshSessions, sessionSwitchSession])
 
   // Clear chat
   const clearChat = useCallback(() => {
@@ -236,42 +249,30 @@ export const useChatMessage = ({
       const { message_id, role } = customEvent.detail
       console.log(`[useChatMessage] Message saved (${role}), refreshing to show new message: ${message_id}`)
 
-      // Reload messages after each tool message is saved
+      // Reload messages after each tool message is saved via ChatManager
       if (currentSessionId) {
         try {
-          const historyData = await sessionService.getSessionHistory(currentSessionId)
+          // Load history via ChatManager
+          const loadedMessages = await chatManager.loadHistory(currentSessionId)
 
-          if (historyData.history && Array.isArray(historyData.history)) {
-            // Filter valid message roles
-            const backendMessages = historyData.history.filter((msg: any) => {
-              return msg.role === 'user' ||
-                     msg.role === 'assistant' ||
-                     msg.role === 'image' ||
-                     msg.role === 'video'
-            }) as BackendMessage[]
+          // Preserve unsaved streaming messages (created via MESSAGE_CREATE but not yet saved to DB)
+          setMessages(prev => {
+            // Find unsaved streaming messages (not in loaded messages)
+            const unsavedStreamingMessages = prev.filter(msg =>
+              msg.streaming && !loadedMessages.some((loaded: Message) => loaded.id === msg.id)
+            )
 
-            // Convert all messages using the converter manager
-            const convertedMessages = messageConverterManager.convertMany(backendMessages)
+            // Merge: loaded messages from DB + unsaved streaming messages
+            const mergedMessages = [...loadedMessages, ...unsavedStreamingMessages]
 
-            // Preserve unsaved streaming messages (created via MESSAGE_CREATE but not yet saved to DB)
-            setMessages(prev => {
-              // Find unsaved streaming messages (not in converted messages)
-              const unsavedStreamingMessages = prev.filter(msg =>
-                msg.streaming && !convertedMessages.some(converted => converted.id === msg.id)
-              )
+            if (unsavedStreamingMessages.length > 0) {
+              console.log(`[useChatMessage] Preserved ${unsavedStreamingMessages.length} unsaved streaming message(s)`)
+            }
 
-              // Merge: converted messages from DB + unsaved streaming messages
-              const mergedMessages = [...convertedMessages, ...unsavedStreamingMessages]
+            return mergedMessages
+          })
 
-              if (unsavedStreamingMessages.length > 0) {
-                console.log(`[useChatMessage] Preserved ${unsavedStreamingMessages.length} unsaved streaming message(s)`)
-              }
-
-              return mergedMessages
-            })
-
-            console.log('[useChatMessage] Messages refreshed successfully after message save')
-          }
+          console.log('[useChatMessage] Messages refreshed successfully after message save')
         } catch (error) {
           console.error('[useChatMessage] Failed to refresh messages after message saved:', error)
         }
@@ -283,7 +284,7 @@ export const useChatMessage = ({
     return () => {
       window.removeEventListener('messageSaved', handleMessageSaved)
     }
-  }, [currentSessionId])
+  }, [currentSessionId, chatManager])
 
   // Update bot message
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
@@ -313,9 +314,8 @@ export const useChatMessage = ({
   }, [])
 
 
-  // Base function for creating and sending messages
-  // Responsibilities: Create user message -> Call backend API -> Create bot message placeholder
-  // Does not include: Audio processing, streaming response handling, Live2D actions, etc.
+  // Send message via ChatManager
+  // Returns response stream for further processing (SSE metadata, TTS, etc.)
   const sendMessage = useCallback(async (
     text: string,
     files: FileData[] = [],
@@ -325,29 +325,24 @@ export const useChatMessage = ({
     botMessageId: string
     response: Response
   }> => {
-    if (text.trim() === '' && files.length === 0) {
-      throw new Error('Message content cannot be empty')
-    }
-
-    // Create user message
-    const userMessageId = addUserMessage(text, files)
-
     try {
-      // Create API request
       const sessionId = currentSessionId || localStorage.getItem('session_id') || "default_session"
-      const response = await chatService.sendMessage(text, files, sessionId, userMessageId, currentProfile, ttsEnabled, memoryEnabled, mentionedFiles)
 
-      return {
-        userMessageId,
-        botMessageId: '', 
-        response
-      }
+      // Send message via ChatManager
+      const result = await chatManager.sendMessage(text, files, {
+        sessionId,
+        profile: currentProfile,
+        ttsEnabled,
+        memoryEnabled,
+        mentionedFiles
+      })
+
+      return result
     } catch (error) {
-      // Update message to error status
-      updateMessageStatus(userMessageId, MessageStatus.ERROR)
+      console.error('Failed to send message:', error)
       throw error
     }
-  }, [currentSessionId, currentProfile, ttsEnabled, memoryEnabled, addUserMessage, updateMessageStatus])
+  }, [currentSessionId, currentProfile, ttsEnabled, memoryEnabled, chatManager])
 
   return {
     messages,

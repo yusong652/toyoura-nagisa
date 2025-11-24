@@ -1,0 +1,50 @@
+/**
+ * Messaging module - Message processing and conversion utilities
+ *
+ * This module provides utilities for converting backend message formats
+ * to frontend Message types using the Strategy pattern, as well as
+ * stream and chunk processing for real-time message handling.
+ */
+
+// Message converters
+export {
+  MessageConverter,
+  BackendMessage,
+  ImageMessageConverter,
+  VideoMessageConverter,
+  UserMessageConverter,
+  AssistantMessageConverter,
+  MessageConverterManager,
+  messageConverterManager
+} from './MessageConverters';
+
+// Stream processor
+export {
+  StreamProcessor,
+  StreamEvent,
+  StreamEventHandlers,
+  StreamProcessorOptions
+} from './StreamProcessor';
+
+// Chunk processor
+export {
+  ChunkProcessor,
+  ChunkData,
+  MessageUpdateOptions,
+  ChunkEventHandlers
+} from './ChunkProcessor';
+
+// Chat manager
+export {
+  ChatManager,
+  ChatEvent,
+  MessageCreatedPayload,
+  MessageUpdatedPayload,
+  MessageDeletedPayload,
+  HistoryLoadedPayload,
+  StreamStartedPayload,
+  StreamCompletePayload,
+  ErrorPayload,
+  SendMessageOptions,
+  SendMessageResult
+} from './managers/ChatManager';

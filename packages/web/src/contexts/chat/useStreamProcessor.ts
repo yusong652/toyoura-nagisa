@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
+import { StreamProcessor, StreamEventHandlers } from '@aiNagisa/core'
 
 interface UseStreamProcessorProps {
   handleTitleUpdate: (data: any) => void
@@ -8,7 +9,7 @@ interface UseStreamProcessorProps {
   sessionRefreshSessions: () => Promise<any>
 }
 
-interface StreamProcessor {
+interface UseStreamProcessorReturn {
   processStream: (response: Response, options: {
     userMessageId: string
     botMessageId: string
@@ -16,10 +17,10 @@ interface StreamProcessor {
 }
 
 /**
- * Hook for processing SSE stream responses.
- * 
- * Handles stream reading, line parsing, and event dispatching.
- * Core stream processing logic extracted from useStreamHandler.
+ * React hook wrapper for core StreamProcessor.
+ *
+ * Provides React-specific lifecycle management and event handler binding
+ * while delegating core stream processing logic to @aiNagisa/core.
  */
 export const useStreamProcessor = ({
   handleTitleUpdate,
@@ -27,70 +28,30 @@ export const useStreamProcessor = ({
   handleKeyword,
   handleContentUpdate,
   sessionRefreshSessions
-}: UseStreamProcessorProps): StreamProcessor => {
-  
-  
-  /**
-   * Process a single line from the SSE stream.
-   * 
-   * Parses JSON data and routes to appropriate handlers.
-   */
-  const processLine = useCallback((
-    line: string,
-    userMessageId: string,
-    botMessageId: string
-  ) => {
-    if (line.trim() === '') return
-    
-    if (line.startsWith('data: ')) {
-      const jsonData = line.slice(6)
-      
-      try {
-        const data = JSON.parse(jsonData)
+}: UseStreamProcessorProps): UseStreamProcessorReturn => {
 
-        // Route to specific handlers based on event type
-        if (data.type === 'TITLE_UPDATE') {
-          handleTitleUpdate(data)
-          return
-        }
-        
-        if (data.type === 'SESSION_REFRESH') {
-          handleSessionRefresh(data)
-          return
-        }
-        
-        // Status updates now handled via WebSocket, skip SSE status events
-        if (data.status) {
-          return
-        }
-        
-        
-        // Handle keyword/motion (doesn't need content processing)
-        if (data.keyword) {
-          handleKeyword(data)
-          // Skip content update if this is only a keyword
-          if (!data.text && !data.audio) {
-            return
-          }
-        }
-        
-        // All content updates now handled via WebSocket
-        // SSE no longer carries text or TTS content in the new architecture
-      } catch (e) {
-        console.error('[StreamProcessor] Error parsing response:', e)
-      }
-    }
-  }, [
+  // Create event handlers object for core processor
+  const handlers = useMemo<StreamEventHandlers>(() => ({
+    onTitleUpdate: handleTitleUpdate,
+    onSessionRefresh: handleSessionRefresh,
+    onKeyword: handleKeyword,
+    onContentUpdate: handleContentUpdate,
+    onStreamComplete: sessionRefreshSessions
+  }), [
     handleTitleUpdate,
     handleSessionRefresh,
     handleKeyword,
-    handleContentUpdate
+    handleContentUpdate,
+    sessionRefreshSessions
   ])
-  
+
+  // Create core processor instance (recreate when handlers change)
+  const processor = useMemo(() => new StreamProcessor(handlers), [handlers])
+
   /**
    * Process the entire SSE stream.
    *
-   * Reads stream, parses lines, and coordinates metadata event handling.
+   * Thin wrapper that delegates to core StreamProcessor.
    */
   const processStream = useCallback(async (
     response: Response,
@@ -99,55 +60,9 @@ export const useStreamProcessor = ({
       botMessageId: string
     }
   ) => {
-    const { userMessageId, botMessageId } = options
+    await processor.processStream(response, options)
+  }, [processor])
 
-    const reader = response.body?.getReader()
-    if (!reader) {
-      throw new Error('Unable to read response stream')
-    }
-    
-    const decoder = new TextDecoder()
-    let buffer = ''
-    
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) {
-          // Wait for any pending chunk processing
-          await new Promise(resolve => setTimeout(resolve, 100))
-
-          // No longer need to finalize placeholder messages since real messages are created via WebSocket
-          
-          // Refresh sessions
-          sessionRefreshSessions()
-          
-          break
-        }
-        
-        // Decode and buffer
-        buffer += decoder.decode(value, { stream: true })
-        
-        // Split by double newline (SSE format)
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-        
-        // Process each complete line
-        for (const line of lines) {
-          processLine(line, userMessageId, botMessageId)
-        }
-      }
-    } catch (error) {
-      console.error('[StreamProcessor] Stream processing error:', error)
-      throw error
-    } finally {
-      reader.releaseLock()
-    }
-  }, [
-    processLine,
-    sessionRefreshSessions
-  ])
-  
   return {
     processStream
   }

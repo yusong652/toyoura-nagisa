@@ -1,12 +1,9 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
+import { ChunkProcessor, ChunkEventHandlers, ChunkData as CoreChunkData } from '@aiNagisa/core'
 import { useWebSocketTTS } from './useWebSocketTTS'
 
-interface ChunkData {
-  text?: string | string[]
-  audio?: string
-  index?: number
-  next?: any
-}
+// Re-export ChunkData from core for backward compatibility
+export type ChunkData = CoreChunkData
 
 interface UseChunkProcessorProps {
   ttsEnabled: boolean
@@ -15,8 +12,8 @@ interface UseChunkProcessorProps {
   finalizeMessage: (messageId: string) => void
 }
 
-interface ChunkProcessor {
-  processChunk: (chunk: ChunkData, messageId: string) => Promise<void>
+interface UseChunkProcessorReturn {
+  processChunk: (chunk: CoreChunkData, messageId: string) => Promise<void>
   resetProcessor: () => void
   setupTTSHandler?: (messageId: string) => void
   cleanupTTSHandler?: () => void
@@ -24,27 +21,21 @@ interface ChunkProcessor {
 }
 
 /**
- * Hook for processing text and audio chunks from stream.
- * 
- * Manages chunk ordering, buffering, and sequential processing.
- * Extracted from useStreamHandler for better testability and reusability.
+ * React hook wrapper for core ChunkProcessor.
+ *
+ * Provides React-specific lifecycle management and event handler binding
+ * while delegating core chunk processing logic to @aiNagisa/core.
+ *
+ * Also integrates WebSocket TTS functionality for real-time audio streaming.
  */
 export const useChunkProcessor = ({
   ttsEnabled,
   processAudioData,
   updateMessageText,
   finalizeMessage
-}: UseChunkProcessorProps): ChunkProcessor => {
-  
-  // Processing state
-  const isProcessingRef = useRef(false)
-  const chunkQueueRef = useRef<ChunkData[]>([])
-  const chunkBufferRef = useRef<Map<number, ChunkData>>(new Map())
-  const expectedIndexRef = useRef(0)
-  const audioCountRef = useRef(0)
-  const currentMessageRef = useRef<string>('')
+}: UseChunkProcessorProps): UseChunkProcessorReturn => {
 
-  // WebSocket TTS processor - restore full TTS processing functionality
+  // WebSocket TTS processor - handles real-time TTS via WebSocket events
   const webSocketTTS = useWebSocketTTS({
     ttsEnabled,
     processAudioData,
@@ -52,153 +43,37 @@ export const useChunkProcessor = ({
     finalizeMessage
   })
 
-  /**
-   * Process a single chunk of text and/or audio.
-   * 
-   * Handles text accumulation and audio playback sequentially.
-   */
-  const processSingleChunk = useCallback(async (
-    chunk: ChunkData,
-    messageId: string
-  ): Promise<void> => {
+  // Create event handlers object for core processor
+  const handlers = useMemo<ChunkEventHandlers>(() => ({
+    onTextUpdate: updateMessageText,
+    onAudioChunk: processAudioData,
+    onMessageFinalize: finalizeMessage
+  }), [updateMessageText, processAudioData, finalizeMessage])
 
-    // Process text if present
-    if (chunk.text !== undefined && chunk.text !== null) {
-      let newText = ''
-      if (typeof chunk.text === 'string') {
-        newText = chunk.text
-      } else if (Array.isArray(chunk.text)) {
-        newText = chunk.text.filter((t) => typeof t === 'string').join('')
-      }
-
-      if (newText.length > 0) {
-        currentMessageRef.current += newText
-        
-        // Update message text immediately
-        // When TTS is disabled, we pass the full text without newText to avoid duplication
-        if (!ttsEnabled) {
-          updateMessageText(messageId, currentMessageRef.current, {
-            streaming: true,
-            isLoading: false
-          })
-        } else {
-          updateMessageText(messageId, currentMessageRef.current, {
-            newText,
-            streaming: true,
-            isLoading: false
-          })
-        }
-        
-        // Small delay for smooth rendering
-        await new Promise(resolve => setTimeout(resolve, 10))
-      }
-    }
-
-    // Process audio if TTS is enabled
-    if (ttsEnabled && chunk.audio && typeof chunk.audio === 'string' && chunk.audio.length > 0) {
-      try {
-        await processAudioData(chunk.audio, audioCountRef.current++)
-      } catch (error) {
-      }
-    }
-  }, [ttsEnabled, processAudioData, updateMessageText])
-
-  /**
-   * Process chunks from queue sequentially.
-   * 
-   * Ensures chunks are processed in order when ordering is required.
-   */
-  const processQueuedChunks = useCallback(async (messageId: string): Promise<void> => {
-    while (chunkQueueRef.current.length > 0) {
-      const chunk = chunkQueueRef.current.shift()
-      if (!chunk) break
-      
-      await processSingleChunk(chunk, messageId)
-      
-      // Process nested chunks if present
-      if (chunk.next) {
-        await processSingleChunk(chunk.next, messageId)
-      }
-    }
-    
-    isProcessingRef.current = false
-  }, [processSingleChunk])
-
-  /**
-   * Handle ordered chunk with index.
-   * 
-   * Buffers out-of-order chunks and processes them sequentially.
-   */
-  const handleOrderedChunk = useCallback(async (
-    chunk: ChunkData,
-    messageId: string
-  ): Promise<void> => {
-    if (chunk.index === undefined) return
-    
-    const chunkIndex = chunk.index
-    
-    // Buffer the chunk
-    chunkBufferRef.current.set(chunkIndex, chunk)
-    
-    // Process all sequential chunks available
-    while (chunkBufferRef.current.has(expectedIndexRef.current)) {
-      const bufferedChunk = chunkBufferRef.current.get(expectedIndexRef.current)!
-      chunkBufferRef.current.delete(expectedIndexRef.current)
-      
-      chunkQueueRef.current.push(bufferedChunk)
-      expectedIndexRef.current++
-      
-      if (!isProcessingRef.current) {
-        isProcessingRef.current = true
-        await processQueuedChunks(messageId)
-      }
-    }
-  }, [processQueuedChunks])
-
+  // Create core processor instance (recreate when handlers or ttsEnabled change)
+  const processor = useMemo(
+    () => new ChunkProcessor(handlers, ttsEnabled),
+    [handlers, ttsEnabled]
+  )
 
   /**
    * Main chunk processing entry point.
-   * 
-   * All text/audio chunks should have an index for ordered processing.
-   * Chunks without index and without content are ignored.
+   *
+   * Thin wrapper that delegates to core ChunkProcessor.
    */
   const processChunk = useCallback(async (
-    chunk: ChunkData,
+    chunk: CoreChunkData,
     messageId: string
   ): Promise<void> => {
-    if (!chunk) return
-    
-    
-    // All content chunks should be ordered (have index)
-    if (chunk.index !== undefined && typeof chunk.index === 'number') {
-      await handleOrderedChunk(chunk, messageId)
-    } else if (chunk.text !== undefined || chunk.audio !== undefined) {
-      // Log warning if we receive content without index (shouldn't happen)
-      chunk.index = 0
-      await handleOrderedChunk(chunk, messageId)
-    } else {
-      // Ignore chunks without content or index (e.g., keyword-only chunks)
-    }
-    
-    // Check if processing is complete
-    if (!isProcessingRef.current && chunkQueueRef.current.length === 0) {
-      finalizeMessage(messageId)
-    }
-  }, [handleOrderedChunk, finalizeMessage, ttsEnabled])
+    await processor.processChunk(chunk, messageId)
+  }, [processor])
 
   /**
    * Reset processor state for new stream.
-   * 
-   * Clears all buffers and resets counters.
    */
   const resetProcessor = useCallback(() => {
-    isProcessingRef.current = false
-    chunkQueueRef.current = []
-    chunkBufferRef.current.clear()
-    expectedIndexRef.current = 0
-    audioCountRef.current = 0
-    currentMessageRef.current = ''
-  }, [])
+    processor.reset()
+  }, [processor])
 
   return {
     processChunk,

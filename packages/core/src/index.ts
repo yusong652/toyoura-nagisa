@@ -17,3 +17,12 @@ export * from './connection';
 
 // Export services
 export * from './services';
+
+// Export messaging utilities
+export * from './messaging';
+
+// Export session management
+export * from './session';
+
+// Export utilities
+export * from './utils';
