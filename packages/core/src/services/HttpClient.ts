@@ -97,8 +97,8 @@ export class HttpClient {
       if (!contentType || !contentType.includes('application/json')) {
         return {} as T
       }
-      
-      return await response.json()
+
+      return (await response.json()) as T
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('fetch')) {
         // Network error

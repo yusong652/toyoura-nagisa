@@ -14,3 +14,6 @@ export * from './types';
 
 // Export connection management
 export * from './connection';
+
+// Export services
+export * from './services';

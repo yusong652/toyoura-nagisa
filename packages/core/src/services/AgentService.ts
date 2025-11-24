@@ -1,4 +1,4 @@
-import { apiClient } from './httpClient'
+import { apiClient } from './HttpClient'
 
 interface ProfileInfo {
   profile_type: string

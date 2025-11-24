@@ -8,8 +8,8 @@
  * better real-time performance and unified architecture.
  */
 
-import { apiClient } from './httpClient'
-import { FileData } from '@aiNagisa/core'
+import { apiClient } from './HttpClient'
+import type { FileData } from '../types'
 
 export interface MessageRequest {
   id: string
@@ -45,6 +45,9 @@ export class ChatService {
   /**
    * Send a chat message via WebSocket connection.
    *
+   * Note: This method requires a WebSocket connection to be provided via setWebSocketConnection().
+   * Platform-specific frontends should inject the WebSocket connection before calling this method.
+   *
    * @param text - Message text content
    * @param files - Optional file attachments
    * @param sessionId - Current session identifier
@@ -65,30 +68,16 @@ export class ChatService {
     memoryEnabled: boolean = true,
     mentionedFiles: string[] = []
   ): Promise<Response> {
-    // Get WebSocket connection from connection context
-    let wsRef = this.getWebSocketConnection()
+    // Get WebSocket connection
+    const wsRef = this.getWebSocketConnection()
 
-    // If WebSocket is not ready, try to wait for connection
-    if (!wsRef || wsRef.readyState !== WebSocket.OPEN) {
-      console.log('[ChatService] WebSocket not ready, attempting to wait for connection...')
+    // Validate WebSocket connection
+    if (!wsRef) {
+      throw new Error('WebSocket connection not established. Call setWebSocketConnection() first.')
+    }
 
-      // Try to get connection via context (if available)
-      const waitForConnection = (window as any).__waitForConnection
-      if (waitForConnection) {
-        const connected = await waitForConnection(5000) // 5 second timeout
-        if (connected) {
-          wsRef = this.getWebSocketConnection()
-        }
-      }
-
-      // Final check
-      if (!wsRef) {
-        throw new Error('WebSocket connection not established. Please check your connection and try again.')
-      }
-
-      if (wsRef.readyState !== WebSocket.OPEN) {
-        throw new Error(`WebSocket connection not ready (${this.getReadyStateText(wsRef.readyState)}). Please wait for connection to establish.`)
-      }
+    if (wsRef.readyState !== 1 /* OPEN */) {
+      throw new Error(`WebSocket connection not ready (state: ${wsRef.readyState}). Please wait for connection to establish.`)
     }
 
     // Create WebSocket message format
@@ -125,40 +114,26 @@ export class ChatService {
     })
   }
 
+  // WebSocket connection (injected by platform-specific frontend)
+  private ws: any | null = null
+
   /**
-   * Get WebSocket connection from global context.
+   * Set WebSocket connection for sending messages.
+   * Platform-specific frontends should call this method to inject the WebSocket connection.
    *
-   * @returns WebSocket connection or null if not available
+   * @param ws - WebSocket connection instance
    */
-  private getWebSocketConnection(): WebSocket | null {
-    // First try to get from window global (set by ConnectionContext)
-    const wsConnection = (window as any).__wsConnection
-
-    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-      return wsConnection
-    }
-
-    // If not available, log debug info
-    console.debug('[ChatService] WebSocket connection status:', {
-      exists: !!wsConnection,
-      readyState: wsConnection?.readyState,
-      readyStateText: this.getReadyStateText(wsConnection?.readyState)
-    })
-
-    return null
+  public setWebSocketConnection(ws: any): void {
+    this.ws = ws
   }
 
   /**
-   * Get human-readable WebSocket ready state text.
+   * Get WebSocket connection.
+   *
+   * @returns WebSocket connection or null if not set
    */
-  private getReadyStateText(readyState: number | undefined): string {
-    switch (readyState) {
-      case WebSocket.CONNECTING: return 'CONNECTING'
-      case WebSocket.OPEN: return 'OPEN'
-      case WebSocket.CLOSING: return 'CLOSING'
-      case WebSocket.CLOSED: return 'CLOSED'
-      default: return 'UNKNOWN'
-    }
+  private getWebSocketConnection(): any | null {
+    return this.ws
   }
 
   /**

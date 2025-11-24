@@ -5,7 +5,7 @@
  * in the aiNagisa application.
  */
 
-import { apiClient } from './httpClient'
+import { apiClient } from './HttpClient'
 
 export interface UpdateToolsEnabledRequest {
   enabled: boolean

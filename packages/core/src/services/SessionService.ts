@@ -5,8 +5,8 @@
  * session-related functionality in the aiNagisa application.
  */
 
-import { apiClient } from './httpClient'
-import { ChatSession } from '@aiNagisa/core'
+import { apiClient } from './HttpClient'
+import type { ChatSession } from '../types'
 
 export interface CreateSessionRequest {
   name?: string

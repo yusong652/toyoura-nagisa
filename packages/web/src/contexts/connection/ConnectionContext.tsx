@@ -5,7 +5,8 @@ import {
   ConnectionManager,
   BrowserWebSocketAdapter,
   ConnectionState,
-  type LocationData
+  type LocationData,
+  chatService
 } from '@aiNagisa/core'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
@@ -144,6 +145,9 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       if (nativeWs) {
         wsRef.current = nativeWs
         ;(window as any).__wsConnection = nativeWs
+
+        // Inject WebSocket connection into chatService
+        chatService.setWebSocketConnection(nativeWs)
       }
     })
 
@@ -343,6 +347,8 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       if (nativeWs) {
         wsRef.current = nativeWs
         ;(window as any).__wsConnection = nativeWs
+        // Inject WebSocket connection into chatService
+        chatService.setWebSocketConnection(nativeWs)
       }
       ;(window as any).__waitForConnection = waitForConnection
     } else {
