@@ -518,10 +518,15 @@ class ChatOrchestrator:
                     session_id=session_id
                 )
 
-                # Send WebSocket notification
+                # Send TOOL_RESULT_UPDATE for real-time display (CLI and Web)
+                # This sends the complete tool result content so frontends don't need API refresh
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-                await WebSocketNotificationService.send_message_saved(
-                    session_id, result_message_id, 'user'
+                await WebSocketNotificationService.send_tool_result_update(
+                    session_id=session_id,
+                    message_id=result_message_id,
+                    tool_call_id=tool_call['id'],
+                    tool_name=tool_call['name'],
+                    tool_result=result
                 )
             except Exception as e:
                 print(f"[WARNING] Failed to save tool result: {e}")

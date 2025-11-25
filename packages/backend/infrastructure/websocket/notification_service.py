@@ -324,3 +324,83 @@ class WebSocketNotificationService:
         except Exception as e:
             logger.warning(f"Failed to send todo update notification: {e}")
             # Don't re-raise - this is a non-critical notification
+
+    @staticmethod
+    async def send_tool_result_update(
+        session_id: str,
+        message_id: str,
+        tool_call_id: str,
+        tool_name: str,
+        tool_result: Dict[str, Any]
+    ) -> None:
+        """
+        Send tool result update notification to frontend for real-time display.
+
+        This notification sends the complete tool result content so frontends
+        can display it immediately without needing to refresh from API.
+        The format matches the database storage format for consistency.
+
+        Args:
+            session_id: Target session ID
+            message_id: ID of the saved tool result message
+            tool_call_id: ID of the tool call this result corresponds to
+            tool_name: Name of the executed tool
+            tool_result: Tool execution result (ToolResult format with llm_content)
+
+        Example:
+            await WebSocketNotificationService.send_tool_result_update(
+                session_id="session-123",
+                message_id="msg-456",
+                tool_call_id="call_789",
+                tool_name="read_file",
+                tool_result={
+                    "status": "success",
+                    "message": "File read successfully",
+                    "llm_content": {"parts": [{"type": "text", "text": "..."}]}
+                }
+            )
+
+        Note:
+            Failures in WebSocket sending are logged but do not interrupt the process.
+        """
+        if not session_id:
+            return
+
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+
+            connection_manager = get_connection_manager()
+            if not connection_manager:
+                logger.debug("Connection manager not available for TOOL_RESULT_UPDATE")
+                return
+
+            # Extract content from tool result (same format as database storage)
+            llm_content = tool_result.get("llm_content", {})
+
+            # Build tool_result content block matching database format
+            tool_result_content = {
+                "type": "tool_result",
+                "tool_use_id": tool_call_id,
+                "tool_name": tool_name,
+                "content": llm_content,
+                "is_error": tool_result.get("status") == "error"
+            }
+
+            # Send TOOL_RESULT_UPDATE notification
+            notification = {
+                'type': 'TOOL_RESULT_UPDATE',
+                'message_id': message_id,
+                'session_id': session_id,
+                'content': [tool_result_content]  # Array format matching Message.content
+            }
+
+            success = await connection_manager.send_json(session_id, notification)
+
+            if success:
+                logger.debug(f"Sent TOOL_RESULT_UPDATE for tool {tool_name} in session {session_id}")
+            else:
+                logger.debug(f"Failed to send TOOL_RESULT_UPDATE (no connection for session {session_id})")
+
+        except Exception as e:
+            logger.warning(f"Failed to send tool result update notification: {e}")
+            # Don't re-raise - this is a non-critical notification

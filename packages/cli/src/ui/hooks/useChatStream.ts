@@ -55,6 +55,19 @@ interface ToolConfirmationEvent {
   description?: string;
 }
 
+// Type for tool result update events
+interface ToolResultUpdateEvent {
+  message_id: string;
+  session_id: string;
+  content: Array<{
+    type: 'tool_result';
+    tool_use_id: string;
+    tool_name: string;
+    content: any;  // llm_content format from backend
+    is_error: boolean;
+  }>;
+}
+
 export interface UseChatStreamOptions {
   connectionManager: ConnectionManager;
   historyManager: UseHistoryManagerReturn;
@@ -261,6 +274,22 @@ export function useChatStream({
 
   // Handle TOOL_CONFIRMATION_REQUEST event from ConnectionManager
   const handleToolConfirmationRequest = useCallback((event: ToolConfirmationEvent) => {
+    // First, commit any pending assistant message to history
+    // This ensures the assistant message appears before the tool confirmation
+    if (pendingAssistantItem) {
+      historyManager.addItem({
+        ...pendingAssistantItem,
+        isStreaming: false,
+      } as HistoryItemWithoutId);
+      setPendingAssistantItem(null);
+    }
+
+    // Commit any pending tool items to history
+    for (const toolItem of pendingToolItems) {
+      historyManager.addItem(toolItem);
+    }
+    setPendingToolItems([]);
+
     setPendingConfirmation({
       tool_call_id: event.tool_call_id,
       tool_name: event.tool_name,
@@ -273,7 +302,7 @@ export function useChatStream({
     });
     setStreamingState(StreamingState.WaitingForConfirmation);
     setIsStreaming(false);
-  }, []);
+  }, [pendingAssistantItem, pendingToolItems, historyManager]);
 
   // Handle ERROR event from ConnectionManager
   const handleError = useCallback((err: Error) => {
@@ -291,6 +320,37 @@ export function useChatStream({
     setPendingToolItems([]);
   }, [historyManager]);
 
+  // Handle TOOL_RESULT_UPDATE event from ConnectionManager
+  // This provides real-time tool result display without API refresh
+  const handleToolResultUpdate = useCallback((event: ToolResultUpdateEvent) => {
+    // Process each tool result in the content array
+    for (const block of event.content) {
+      if (block.type !== 'tool_result') continue;
+
+      // Extract text content from llm_content
+      let contentText = '';
+      const llmContent = block.content;
+      if (typeof llmContent === 'string') {
+        contentText = llmContent;
+      } else if (llmContent && typeof llmContent === 'object') {
+        if ('parts' in llmContent && Array.isArray(llmContent.parts)) {
+          contentText = llmContent.parts
+            .filter((part: any) => part.type === 'text')
+            .map((part: any) => part.text || '')
+            .join('\n');
+        }
+      }
+
+      // Add tool result to history (committed immediately)
+      historyManager.addItem({
+        type: MessageType.TOOL_RESULT,
+        toolCallId: block.tool_use_id,
+        content: contentText,
+        isError: block.is_error,
+      } as HistoryItemWithoutId);
+    }
+  }, [historyManager]);
+
   // Set up WebSocket event handlers
   // ConnectionManager emits specific events after processing raw WebSocket messages
   useEffect(() => {
@@ -298,15 +358,17 @@ export function useChatStream({
     connectionManager.on('message_create', handleMessageCreate);
     connectionManager.on('streaming_update', handleStreamingUpdate);
     connectionManager.on('tool_confirmation_request', handleToolConfirmationRequest);
+    connectionManager.on('tool_result_update', handleToolResultUpdate);
     connectionManager.on('error', handleError);
 
     return () => {
       connectionManager.off('message_create', handleMessageCreate);
       connectionManager.off('streaming_update', handleStreamingUpdate);
       connectionManager.off('tool_confirmation_request', handleToolConfirmationRequest);
+      connectionManager.off('tool_result_update', handleToolResultUpdate);
       connectionManager.off('error', handleError);
     };
-  }, [connectionManager, handleMessageCreate, handleStreamingUpdate, handleToolConfirmationRequest, handleError]);
+  }, [connectionManager, handleMessageCreate, handleStreamingUpdate, handleToolConfirmationRequest, handleToolResultUpdate, handleError]);
 
   // Submit a query
   const submitQuery = useCallback(async (text: string) => {
@@ -363,6 +425,14 @@ export function useChatStream({
   const confirmTool = useCallback((approved: boolean, message?: string) => {
     if (!pendingConfirmation) return;
 
+    // Add an info message about the confirmation result
+    if (!approved) {
+      historyManager.addItem({
+        type: MessageType.INFO,
+        message: `Tool "${pendingConfirmation.tool_name}" was rejected.`,
+      } as HistoryItemWithoutId);
+    }
+
     connectionManager.send({
       type: 'TOOL_CONFIRMATION_RESPONSE',
       tool_call_id: pendingConfirmation.tool_call_id,
@@ -378,7 +448,7 @@ export function useChatStream({
     } else {
       setStreamingState(StreamingState.Idle);
     }
-  }, [pendingConfirmation, connectionManager]);
+  }, [pendingConfirmation, connectionManager, historyManager]);
 
   // Compute pending history items for rendering outside <Static>
   const pendingHistoryItems: HistoryItemWithoutId[] = useMemo(() => {

@@ -192,6 +192,14 @@ export class ConnectionManager extends WebSocketManager {
         this.emit('message_saved', message);
         break;
 
+      case 'TOOL_RESULT_UPDATE':
+        this.emit('tool_result_update', {
+          message_id: message.message_id,
+          session_id: message.session_id,
+          content: message.content
+        });
+        break;
+
       default:
         // Emit generic message for unhandled types
         this.emit('unhandled_message', message);

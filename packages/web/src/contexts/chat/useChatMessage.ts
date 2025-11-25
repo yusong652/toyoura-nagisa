@@ -286,6 +286,43 @@ export const useChatMessage = ({
     }
   }, [currentSessionId, chatManager])
 
+  // Subscribe to tool result update events for real-time display
+  useEffect(() => {
+    const handleToolResultUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { message_id, content } = customEvent.detail
+      console.log(`[useChatMessage] Tool result update received: ${message_id}`)
+
+      if (!content || !Array.isArray(content)) return
+
+      // Create a new message for the tool result
+      // Format matches database storage for consistency
+      const newMessage: Message = {
+        id: message_id,
+        role: 'user',  // tool_result is stored as user message
+        text: '',
+        content: content,
+        timestamp: Date.now(),
+        streaming: false
+      }
+
+      setMessages(prev => {
+        // Check if message already exists (avoid duplicates from MESSAGE_SAVED)
+        if (prev.some(msg => msg.id === message_id)) {
+          console.log(`[useChatMessage] Tool result message ${message_id} already exists, skipping`)
+          return prev
+        }
+        return [...prev, newMessage]
+      })
+    }
+
+    window.addEventListener('toolResultUpdate', handleToolResultUpdate)
+
+    return () => {
+      window.removeEventListener('toolResultUpdate', handleToolResultUpdate)
+    }
+  }, [])
+
   // Update bot message
   const updateBotMessage = useCallback((messageId: string, updates: Partial<Message>) => {
     setMessages(prev => {

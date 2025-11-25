@@ -218,6 +218,11 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       window.dispatchEvent(new CustomEvent('messageSaved', { detail: data }))
     })
 
+    manager.on('tool_result_update', (data) => {
+      console.log('[ConnectionContext] Dispatching toolResultUpdate event:', data)
+      window.dispatchEvent(new CustomEvent('toolResultUpdate', { detail: data }))
+    })
+
     connectionManagerRef.current = manager
     return manager
   }, [])
