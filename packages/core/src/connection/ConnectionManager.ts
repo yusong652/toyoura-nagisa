@@ -188,10 +188,6 @@ export class ConnectionManager extends WebSocketManager {
         this.emit('background_process_notification', message);
         break;
 
-      case 'MESSAGE_SAVED':
-        this.emit('message_saved', message);
-        break;
-
       case 'TOOL_RESULT_UPDATE':
         this.emit('tool_result_update', {
           message_id: message.message_id,

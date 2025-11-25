@@ -148,62 +148,6 @@ class WebSocketNotificationService:
             logger.warning(f"Failed to send message create notification: {e}")
 
     @staticmethod
-    async def send_message_saved(
-        session_id: str,
-        message_id: str,
-        role: str
-    ) -> None:
-        """
-        Send notification that a message was saved to database.
-
-        This triggers frontend to refresh and display the new message immediately.
-
-        Args:
-            session_id: Target session ID
-            message_id: ID of the saved message
-            role: Message role ('user' for tool_result, 'assistant' for tool_use)
-
-        Example:
-            await WebSocketNotificationService.send_message_saved(
-                session_id="session-123",
-                message_id="msg-456",
-                role="user"
-            )
-
-        Note:
-            Failures in WebSocket sending are logged but do not interrupt the process.
-        """
-        if not session_id:
-            return
-
-        try:
-            from backend.infrastructure.websocket.connection_manager import get_connection_manager
-
-            connection_manager = get_connection_manager()
-            if not connection_manager:
-                logger.debug("Connection manager not available for MESSAGE_SAVED")
-                return
-
-            # Send custom event to trigger message refresh
-            notification = {
-                'type': 'MESSAGE_SAVED',
-                'message_id': message_id,
-                'role': role,
-                'session_id': session_id
-            }
-
-            # Send via WebSocket to trigger frontend message refresh
-            success = await connection_manager.send_json(session_id, notification)
-
-            if success:
-                logger.debug(f"Sent MESSAGE_SAVED notification for {role} message {message_id}")
-            else:
-                logger.debug(f"Failed to send MESSAGE_SAVED notification (no connection for session {session_id})")
-
-        except Exception as e:
-            logger.debug(f"Failed to send message saved notification: {e}")
-
-    @staticmethod
     async def send_title_update(
         session_id: str,
         new_title: str

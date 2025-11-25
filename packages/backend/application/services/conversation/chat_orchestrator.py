@@ -601,9 +601,14 @@ class ChatOrchestrator:
                     session_id=session_id
                 )
 
+                # Send TOOL_RESULT_UPDATE for real-time display
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-                await WebSocketNotificationService.send_message_saved(
-                    session_id, message_id, 'user'
+                await WebSocketNotificationService.send_tool_result_update(
+                    session_id=session_id,
+                    message_id=message_id,
+                    tool_call_id=tool_call['id'],
+                    tool_name=tool_call['name'],
+                    tool_result=limit_result
                 )
             except Exception as e:
                 print(f"[WARNING] Failed to save iteration limit result: {e}")

@@ -213,11 +213,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children
       window.dispatchEvent(new CustomEvent('backgroundProcessNotification', { detail: data }))
     })
 
-    manager.on('message_saved', (data) => {
-      console.log('[ConnectionContext] Dispatching messageSaved event:', data)
-      window.dispatchEvent(new CustomEvent('messageSaved', { detail: data }))
-    })
-
     manager.on('tool_result_update', (data) => {
       console.log('[ConnectionContext] Dispatching toolResultUpdate event:', data)
       window.dispatchEvent(new CustomEvent('toolResultUpdate', { detail: data }))

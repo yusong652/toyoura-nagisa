@@ -242,50 +242,6 @@ export const useChatMessage = ({
     }
   }, [setIsLLMThinking])
 
-  // Subscribe to message saved events to refresh messages immediately
-  useEffect(() => {
-    const handleMessageSaved = async (event: Event) => {
-      const customEvent = event as CustomEvent
-      const { message_id, role } = customEvent.detail
-      console.log(`[useChatMessage] Message saved (${role}), refreshing to show new message: ${message_id}`)
-
-      // Reload messages after each tool message is saved via ChatManager
-      if (currentSessionId) {
-        try {
-          // Load history via ChatManager
-          const loadedMessages = await chatManager.loadHistory(currentSessionId)
-
-          // Preserve unsaved streaming messages (created via MESSAGE_CREATE but not yet saved to DB)
-          setMessages(prev => {
-            // Find unsaved streaming messages (not in loaded messages)
-            const unsavedStreamingMessages = prev.filter(msg =>
-              msg.streaming && !loadedMessages.some((loaded: Message) => loaded.id === msg.id)
-            )
-
-            // Merge: loaded messages from DB + unsaved streaming messages
-            const mergedMessages = [...loadedMessages, ...unsavedStreamingMessages]
-
-            if (unsavedStreamingMessages.length > 0) {
-              console.log(`[useChatMessage] Preserved ${unsavedStreamingMessages.length} unsaved streaming message(s)`)
-            }
-
-            return mergedMessages
-          })
-
-          console.log('[useChatMessage] Messages refreshed successfully after message save')
-        } catch (error) {
-          console.error('[useChatMessage] Failed to refresh messages after message saved:', error)
-        }
-      }
-    }
-
-    window.addEventListener('messageSaved', handleMessageSaved)
-
-    return () => {
-      window.removeEventListener('messageSaved', handleMessageSaved)
-    }
-  }, [currentSessionId, chatManager])
-
   // Subscribe to tool result update events for real-time display
   useEffect(() => {
     const handleToolResultUpdate = (event: Event) => {
@@ -307,7 +263,7 @@ export const useChatMessage = ({
       }
 
       setMessages(prev => {
-        // Check if message already exists (avoid duplicates from MESSAGE_SAVED)
+        // Check if message already exists (avoid duplicates)
         if (prev.some(msg => msg.id === message_id)) {
           console.log(`[useChatMessage] Tool result message ${message_id} already exists, skipping`)
           return prev
