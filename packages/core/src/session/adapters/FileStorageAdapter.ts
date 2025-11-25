@@ -10,18 +10,31 @@
 
 import { StorageAdapter } from '../SessionManager'
 
-// Import will be resolved at runtime in Node.js environment
-// Browser builds should not include this file
-let fs: any
-let path: any
+// Module-level cache for Node.js modules
+let fs: typeof import('fs/promises') | null = null
+let path: typeof import('path') | null = null
+let modulesLoadPromise: Promise<void> | null = null
 
-try {
-  // Dynamic import for Node.js modules (will fail in browser)
-  fs = require('fs/promises')
-  path = require('path')
-} catch (error) {
-  // Browser environment - fs and path will remain undefined
-  console.warn('[FileStorageAdapter] Node.js modules not available (browser environment)')
+async function loadNodeModules(): Promise<void> {
+  if (fs && path) return
+  if (modulesLoadPromise) return modulesLoadPromise
+
+  modulesLoadPromise = (async () => {
+    try {
+      // Dynamic import for ESM compatibility
+      const [fsModule, pathModule] = await Promise.all([
+        import('fs/promises'),
+        import('path')
+      ])
+      fs = fsModule
+      path = pathModule
+    } catch (error) {
+      console.warn('[FileStorageAdapter] Node.js modules not available (browser environment)')
+      throw new Error('FileStorageAdapter requires Node.js environment')
+    }
+  })()
+
+  return modulesLoadPromise
 }
 
 /**
@@ -33,6 +46,7 @@ try {
 export class FileStorageAdapter implements StorageAdapter {
   private storageDir: string
   private initialized: boolean = false
+  private modulesReady: Promise<void>
 
   /**
    * Create a new FileStorageAdapter
@@ -40,20 +54,30 @@ export class FileStorageAdapter implements StorageAdapter {
    * @param storageDir - Directory path for storage files
    */
   constructor(storageDir: string) {
+    this.storageDir = storageDir
+    // Start loading modules immediately (non-blocking)
+    this.modulesReady = loadNodeModules()
+  }
+
+  /**
+   * Ensure Node modules are loaded
+   */
+  private async ensureModules(): Promise<void> {
+    await this.modulesReady
     if (!fs || !path) {
       throw new Error('FileStorageAdapter requires Node.js environment')
     }
-    this.storageDir = storageDir
   }
 
   /**
    * Ensure storage directory exists
    */
   private async ensureDir(): Promise<void> {
+    await this.ensureModules()
     if (this.initialized) return
 
     try {
-      await fs.mkdir(this.storageDir, { recursive: true })
+      await fs!.mkdir(this.storageDir, { recursive: true })
       this.initialized = true
     } catch (error) {
       console.error('[FileStorageAdapter] Failed to create storage directory:', error)
@@ -68,7 +92,7 @@ export class FileStorageAdapter implements StorageAdapter {
    * @returns Full file path
    */
   private getFilePath(key: string): string {
-    return path.join(this.storageDir, `${key}.json`)
+    return path!.join(this.storageDir, `${key}.json`)
   }
 
   /**
@@ -82,7 +106,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const filePath = this.getFilePath(key)
     try {
-      const data = await fs.readFile(filePath, 'utf-8')
+      const data = await fs!.readFile(filePath, 'utf-8')
       return data
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -105,7 +129,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const filePath = this.getFilePath(key)
     try {
-      await fs.writeFile(filePath, value, 'utf-8')
+      await fs!.writeFile(filePath, value, 'utf-8')
     } catch (error) {
       console.error('[FileStorageAdapter] Failed to write file:', error)
       throw error
@@ -122,7 +146,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const filePath = this.getFilePath(key)
     try {
-      await fs.unlink(filePath)
+      await fs!.unlink(filePath)
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         // File doesn't exist - no error
@@ -140,11 +164,11 @@ export class FileStorageAdapter implements StorageAdapter {
     await this.ensureDir()
 
     try {
-      const files = await fs.readdir(this.storageDir)
+      const files = await fs!.readdir(this.storageDir)
       await Promise.all(
         files
           .filter((f: string) => f.endsWith('.json'))
-          .map((f: string) => fs.unlink(path.join(this.storageDir, f)))
+          .map((f: string) => fs!.unlink(path!.join(this.storageDir, f)))
       )
     } catch (error) {
       console.error('[FileStorageAdapter] Failed to clear storage:', error)

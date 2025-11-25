@@ -18,6 +18,24 @@ export class HttpClient {
   }
 
   /**
+   * Set the base URL for all requests.
+   *
+   * @param baseURL - The base URL to use
+   */
+  setBaseURL(baseURL: string): void {
+    this.baseURL = baseURL
+  }
+
+  /**
+   * Get the current base URL.
+   *
+   * @returns The current base URL
+   */
+  getBaseURL(): string {
+    return this.baseURL
+  }
+
+  /**
    * Make a GET request to the specified endpoint.
    * 
    * @param url - The endpoint URL

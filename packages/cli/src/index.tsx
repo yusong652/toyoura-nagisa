@@ -12,28 +12,35 @@
  * Note: Start backend separately with: npm run start:backend
  */
 
-import React from 'react'
-import { render } from 'ink'
-import ChatApp from './components/ChatApp.js'
+import React from 'react';
+import { render } from 'ink';
+import { AppContainer } from './ui/AppContainer.js';
+import { defaultConfig, type Config } from './config/settings.js';
 
-// Simple argument parsing (aligned with Gemini CLI / Claude Code approach)
-const args = process.argv.slice(2)
+// Simple argument parsing
+const args = process.argv.slice(2);
 const getArg = (name: string, defaultValue?: string): string | undefined => {
-  const index = args.findIndex(arg => arg === `--${name}`)
-  return index !== -1 && args[index + 1] ? args[index + 1] : defaultValue
-}
+  const index = args.findIndex((arg) => arg === `--${name}`);
+  return index !== -1 && args[index + 1] ? args[index + 1] : defaultValue;
+};
 
-const sessionId = getArg('session')
-const host = getArg('host', 'localhost')
-const port = parseInt(getArg('port', '8000') || '8000')
+const sessionId = getArg('session');
+const host = getArg('host', 'localhost');
+const port = parseInt(getArg('port', '8000') || '8000', 10);
 
-console.log('🤖 aiNagisa CLI - Starting...\n')
+// Build config from arguments
+const config: Config = {
+  ...defaultConfig,
+  server: {
+    ...defaultConfig.server,
+    host: host || defaultConfig.server.host,
+    port: port || defaultConfig.server.port,
+  },
+};
+
+// Clear screen and show startup message
+console.clear();
+console.log('aiNagisa CLI - Starting...\n');
 
 // Render Ink app
-render(
-  <ChatApp
-    sessionId={sessionId}
-    host={host}
-    port={port}
-  />
-)
+render(<AppContainer config={config} initialSessionId={sessionId} />);

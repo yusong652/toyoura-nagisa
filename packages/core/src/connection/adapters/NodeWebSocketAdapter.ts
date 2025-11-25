@@ -11,32 +11,55 @@
 import { WebSocketAdapter, ReadyState } from './WebSocketAdapter';
 
 // Import WebSocket from 'ws' package (will be available in Node.js environment)
-// This is a type-only import - actual import happens at runtime
-type WebSocketConstructor = any;
-type WebSocketInstance = any;
+type WebSocketConstructor = new (
+  url: string,
+  protocols?: string | string[]
+) => WebSocketInstance;
+type WebSocketInstance = {
+  readyState: number;
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  on(event: string, listener: (...args: any[]) => void): void;
+};
 
-export class NodeWebSocketAdapter implements WebSocketAdapter {
-  private ws: WebSocketInstance | null = null;
-  private WebSocketClass: WebSocketConstructor | null = null;
+// Module-level cache for WebSocket class
+let WebSocketClass: WebSocketConstructor | null = null;
+let wsLoadPromise: Promise<void> | null = null;
 
-  constructor() {
-    // Dynamically import 'ws' package (only available in Node.js)
+async function loadWebSocketClass(): Promise<void> {
+  if (WebSocketClass) return;
+  if (wsLoadPromise) return wsLoadPromise;
+
+  wsLoadPromise = (async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const wsModule = require('ws');
-      this.WebSocketClass = wsModule.default || wsModule;
+      // Use dynamic import for ESM compatibility
+      const wsModule = await import('ws');
+      WebSocketClass = (wsModule.default || wsModule) as WebSocketConstructor;
     } catch (error) {
       throw new Error(
         "NodeWebSocketAdapter requires 'ws' package. Install with: npm install ws"
       );
     }
+  })();
+
+  return wsLoadPromise;
+}
+
+export class NodeWebSocketAdapter implements WebSocketAdapter {
+  private ws: WebSocketInstance | null = null;
+
+  constructor() {
+    // Start loading ws module (non-blocking)
+    loadWebSocketClass();
   }
 
-  connect(url: string, protocols?: string | string[]): void {
-    if (!this.WebSocketClass) {
+  async connect(url: string, protocols?: string | string[]): Promise<void> {
+    // Ensure ws module is loaded
+    await loadWebSocketClass();
+    if (!WebSocketClass) {
       throw new Error('WebSocket class not initialized');
     }
-    this.ws = new this.WebSocketClass(url, protocols);
+    this.ws = new WebSocketClass(url, protocols);
   }
 
   send(data: string): void {

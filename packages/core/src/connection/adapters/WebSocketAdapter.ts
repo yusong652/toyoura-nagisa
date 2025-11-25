@@ -11,7 +11,7 @@ export interface WebSocketAdapter {
    * @param url - WebSocket server URL
    * @param protocols - Optional subprotocols
    */
-  connect(url: string, protocols?: string | string[]): void;
+  connect(url: string, protocols?: string | string[]): void | Promise<void>;
 
   /**
    * Send data through the WebSocket

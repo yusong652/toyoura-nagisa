@@ -98,7 +98,7 @@ export class WebSocketManager extends EventEmitter {
     this.setState(ConnectionState.CONNECTING);
 
     try {
-      this.adapter.connect(this.url);
+      await this.adapter.connect(this.url);
       this.setupAdapterEventHandlers();
 
       // Wait for connection to establish or fail
