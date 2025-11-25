@@ -60,8 +60,8 @@ export const useChatMessage = ({
 }: UseChatMessageOptions): UseChatMessageReturn => {
   const [messages, setMessages] = useState<Message[]>([])
 
-  // Create ChatManager instance
-  const chatManagerRef = useRef<ChatManager>()
+  // Create ChatManager instance (lazy initialization)
+  const chatManagerRef = useRef<ChatManager | null>(null)
   if (!chatManagerRef.current) {
     chatManagerRef.current = new ChatManager(chatService, sessionService)
   }
