@@ -66,52 +66,41 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       borderStyle="round"
       borderColor={theme.status.warning}
       paddingX={1}
-      marginY={1}
     >
       {/* Header */}
-      <Box marginBottom={1}>
-        <Text bold color={theme.status.warning}>
-          ? Tool Confirmation Required
+      <Text bold color={theme.status.warning}>
+        ? Tool Confirmation Required
+      </Text>
+
+      {/* Tool Info */}
+      <Box>
+        <Text color={theme.text.secondary}>Tool: </Text>
+        <Text bold color={theme.text.primary}>
+          {data.tool_name}
         </Text>
       </Box>
 
-      {/* Tool Info */}
-      <Box flexDirection="column" marginBottom={1}>
+      {data.description && (
         <Box>
-          <Text color={theme.text.secondary}>Tool: </Text>
-          <Text bold color={theme.text.primary}>
-            {data.tool_name}
-          </Text>
+          <Text color={theme.text.secondary}>Description: </Text>
+          <Text color={theme.text.muted}>{data.description}</Text>
         </Box>
+      )}
 
-        {data.description && (
-          <Box>
-            <Text color={theme.text.secondary}>Description: </Text>
-            <Text color={theme.text.muted}>{data.description}</Text>
-          </Box>
-        )}
-
-        {data.command && (
-          <Box marginTop={1}>
-            <Text color={theme.text.accent}>{data.command}</Text>
-          </Box>
-        )}
-      </Box>
+      {data.command && (
+        <Text color={theme.text.accent}>{data.command}</Text>
+      )}
 
       {/* Question */}
-      <Box marginBottom={1}>
-        <Text color={theme.text.primary}>Allow execution?</Text>
-      </Box>
+      <Text color={theme.text.primary}>Allow execution?</Text>
 
       {/* Radio Button Select */}
-      <Box>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-          showNumbers={true}
-        />
-      </Box>
+      <RadioButtonSelect
+        items={options}
+        onSelect={handleSelect}
+        isFocused={isFocused}
+        showNumbers={true}
+      />
     </Box>
   );
 };

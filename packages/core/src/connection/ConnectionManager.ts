@@ -207,11 +207,8 @@ export class ConnectionManager extends WebSocketManager {
    * Handle location request from backend
    */
   private async handleLocationRequest(data: any): Promise<void> {
-    console.log('[ConnectionManager] Received location request:', data);
-
     try {
       if (!this.locationRequestHandler) {
-        console.warn('[ConnectionManager] No location request handler registered');
         await this.sendLocationError(data.request_id, 'No location handler available');
         return;
       }
@@ -224,7 +221,6 @@ export class ConnectionManager extends WebSocketManager {
         await this.sendLocationError(data.request_id, 'Failed to get location');
       }
     } catch (error) {
-      console.error('[ConnectionManager] Error handling location request:', error);
       await this.sendLocationError(
         data.request_id,
         error instanceof Error ? error.message : 'Unknown error'
@@ -243,7 +239,6 @@ export class ConnectionManager extends WebSocketManager {
       location_data: locationData,
       timestamp: new Date().toISOString()
     });
-    console.log('[ConnectionManager] Location response sent:', locationData);
   }
 
   /**
@@ -257,7 +252,6 @@ export class ConnectionManager extends WebSocketManager {
       error: error,
       timestamp: new Date().toISOString()
     });
-    console.log('[ConnectionManager] Location error response sent');
   }
 
   /**

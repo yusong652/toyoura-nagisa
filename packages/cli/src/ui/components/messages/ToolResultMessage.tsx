@@ -44,19 +44,17 @@ export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item }) =>
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
-      marginY={0}
-      marginTop={-1} // Merge with tool call box above
     >
       <Box flexDirection="row">
         <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
           <Text color={statusColor}>{statusSymbol}</Text>
         </Box>
         <Box flexGrow={1} flexDirection="column">
-          <Text wrap="wrap" color={theme.text.secondary} dimColor>
+          <Text wrap="wrap" color={theme.text.secondary}>
             {text}
           </Text>
           {truncated && (
-            <Text color={theme.text.muted} dimColor>
+            <Text color={theme.text.muted}>
               ... (output truncated)
             </Text>
           )}

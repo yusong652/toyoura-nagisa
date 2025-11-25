@@ -171,7 +171,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   };
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={disabled ? theme.border.default : theme.border.focused}
+      paddingX={1}
+    >
       {disabled ? (
         <Box flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>

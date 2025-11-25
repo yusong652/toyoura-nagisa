@@ -152,6 +152,17 @@ export function useChatStream({
       // User message echoed back from server (usually we add it locally first)
       // Skip if we already added it
     } else {
+      // New assistant message starting - commit any pending items from previous round
+      // This happens when tool calling triggers a new LLM round
+      if (pendingToolItems.length > 0) {
+        for (const toolItem of pendingToolItems) {
+          historyManager.addItem(toolItem);
+        }
+        setPendingToolItems([]);
+        seenToolCallIdsRef.current.clear();
+        seenToolResultIdsRef.current.clear();
+      }
+
       // Assistant message - create pending item (not in history yet)
       setPendingAssistantItem({
         type: MessageType.ASSISTANT,
@@ -161,7 +172,7 @@ export function useChatStream({
       setStreamingState(StreamingState.Responding);
       setIsStreaming(true);
     }
-  }, []);
+  }, [pendingToolItems, historyManager]);
 
   // Handle STREAMING_UPDATE event from ConnectionManager
   const handleStreamingUpdate = useCallback((event: StreamingUpdateEvent) => {
@@ -324,8 +335,14 @@ export function useChatStream({
   // This provides real-time tool result display without API refresh
   const handleToolResultUpdate = useCallback((event: ToolResultUpdateEvent) => {
     // Process each tool result in the content array
+    const newToolResults: HistoryItemWithoutId[] = [];
+
     for (const block of event.content) {
       if (block.type !== 'tool_result') continue;
+
+      // Skip if already seen
+      if (seenToolResultIdsRef.current.has(block.tool_use_id)) continue;
+      seenToolResultIdsRef.current.add(block.tool_use_id);
 
       // Extract text content from llm_content
       let contentText = '';
@@ -341,15 +358,19 @@ export function useChatStream({
         }
       }
 
-      // Add tool result to history (committed immediately)
-      historyManager.addItem({
+      newToolResults.push({
         type: MessageType.TOOL_RESULT,
         toolCallId: block.tool_use_id,
         content: contentText,
         isError: block.is_error,
       } as HistoryItemWithoutId);
     }
-  }, [historyManager]);
+
+    // Add to pending tool items (will be committed when streaming ends)
+    if (newToolResults.length > 0) {
+      setPendingToolItems((prev) => [...prev, ...newToolResults]);
+    }
+  }, []);
 
   // Set up WebSocket event handlers
   // ConnectionManager emits specific events after processing raw WebSocket messages

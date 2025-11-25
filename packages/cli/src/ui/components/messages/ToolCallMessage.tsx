@@ -90,7 +90,6 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
-      marginY={1}
     >
       <Box flexDirection="row" height={1}>
         <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>

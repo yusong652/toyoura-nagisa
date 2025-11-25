@@ -31,9 +31,6 @@ export const MainLayout: React.FC = () => {
 
   return (
     <Box flexDirection="column" width="100%">
-      {/* Header */}
-      <Header />
-
       {/* History - committed items in <Static> for performance */}
       <Static items={appState.history}>
         {(item) => <HistoryItemDisplay key={item.id} item={item} />}
@@ -70,6 +67,9 @@ export const MainLayout: React.FC = () => {
           disabled={appState.isStreaming}
         />
       )}
+
+      {/* Status bar - below input */}
+      <Header />
 
       {/* Footer */}
       <Footer />
