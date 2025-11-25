@@ -1,9 +1,10 @@
 /**
  * Streaming Context
  * Provides streaming state to child components
+ * Reference: Gemini CLI ui/contexts/StreamingContext.tsx
  */
 
-import { createContext, useContext } from 'react';
+import React, { createContext } from 'react';
 
 export enum StreamingState {
   Idle = 'idle',
@@ -13,20 +14,16 @@ export enum StreamingState {
   Error = 'error',
 }
 
-export interface StreamingContextValue {
-  state: StreamingState;
-  currentMessageId: string | null;
-  thinkingContent: string | null;
-}
+export const StreamingContext = createContext<StreamingState | undefined>(
+  undefined,
+);
 
-const defaultValue: StreamingContextValue = {
-  state: StreamingState.Idle,
-  currentMessageId: null,
-  thinkingContent: null,
+export const useStreamingContext = (): StreamingState => {
+  const context = React.useContext(StreamingContext);
+  if (context === undefined) {
+    throw new Error(
+      'useStreamingContext must be used within a StreamingContext.Provider',
+    );
+  }
+  return context;
 };
-
-export const StreamingContext = createContext<StreamingContextValue>(defaultValue);
-
-export function useStreamingState(): StreamingContextValue {
-  return useContext(StreamingContext);
-}

@@ -92,7 +92,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const {
     streamingState,
     isStreaming,
-    thinkingContent,
     pendingConfirmation,
     error,
     submitQuery,
@@ -211,11 +210,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     error,
     currentSessionId,
     history: historyManager.history,
-    streamingState: {
-      state: streamingState,
-      currentMessageId: null,
-      thinkingContent,
-    },
+    streamingState,
     isStreaming,
     pendingConfirmation,
     isQuitting,
@@ -227,7 +222,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     currentSessionId,
     historyManager.history,
     streamingState,
-    thinkingContent,
     isStreaming,
     pendingConfirmation,
     isQuitting,

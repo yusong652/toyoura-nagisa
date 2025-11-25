@@ -5,7 +5,6 @@
 
 import { createContext, useContext } from 'react';
 import type { HistoryItem, ToolConfirmationData, ConnectionStatus } from '../types.js';
-import type { StreamingContextValue } from './StreamingContext.js';
 import { StreamingState } from './StreamingContext.js';
 
 export interface AppState {
@@ -20,7 +19,7 @@ export interface AppState {
   history: HistoryItem[];
 
   // Streaming
-  streamingState: StreamingContextValue;
+  streamingState: StreamingState;
   isStreaming: boolean;
 
   // Tool confirmation
@@ -64,11 +63,7 @@ const defaultState: AppState = {
   error: null,
   currentSessionId: null,
   history: [],
-  streamingState: {
-    state: StreamingState.Idle,
-    currentMessageId: null,
-    thinkingContent: null,
-  },
+  streamingState: StreamingState.Idle,
   isStreaming: false,
   pendingConfirmation: null,
   isQuitting: false,
