@@ -22,6 +22,7 @@ import {
   type HistoryItemWithoutId,
   type AssistantHistoryItemWithoutId,
   type ContentBlock,
+  type AgentProfileType,
 } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -72,6 +73,8 @@ export interface UseChatStreamOptions {
   connectionManager: ConnectionManager;
   historyManager: UseHistoryManagerReturn;
   currentSessionId: string | null;
+  currentProfile: AgentProfileType;
+  memoryEnabled: boolean;
 }
 
 export interface UseChatStreamReturn {
@@ -102,6 +105,8 @@ export function useChatStream({
   connectionManager,
   historyManager,
   currentSessionId,
+  currentProfile,
+  memoryEnabled,
 }: UseChatStreamOptions): UseChatStreamReturn {
   // State
   const [streamingState, setStreamingState] = useState<StreamingState>(StreamingState.Idle);
@@ -408,8 +413,8 @@ export function useChatStream({
       session_id: currentSessionId,
       timestamp: new Date().toISOString(),
       stream_response: true,
-      agent_profile: 'general',
-      enable_memory: true,
+      agent_profile: currentProfile,
+      enable_memory: memoryEnabled,
       tts_enabled: false,
       files: [],
       mentioned_files: [],
@@ -426,7 +431,7 @@ export function useChatStream({
 
     setIsStreaming(true);
     setStreamingState(StreamingState.Responding);
-  }, [currentSessionId, historyManager, isStreaming, connectionManager]);
+  }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager]);
 
   // Cancel current request
   const cancelRequest = useCallback(() => {

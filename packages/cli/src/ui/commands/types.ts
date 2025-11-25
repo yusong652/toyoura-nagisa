@@ -95,6 +95,22 @@ export interface OpenDialogActionReturn {
 }
 
 /**
+ * Return type for profile switch action
+ */
+export interface ProfileSwitchActionReturn {
+  type: 'profile_switch';
+  profile: string;
+}
+
+/**
+ * Return type for memory toggle action
+ */
+export interface MemoryToggleActionReturn {
+  type: 'memory_toggle';
+  enabled: boolean;
+}
+
+/**
  * Return type for load history action
  */
 export interface LoadHistoryActionReturn {
@@ -125,6 +141,8 @@ export type SlashCommandActionReturn =
   | MessageActionReturn
   | QuitActionReturn
   | OpenDialogActionReturn
+  | ProfileSwitchActionReturn
+  | MemoryToggleActionReturn
   | LoadHistoryActionReturn
   | SubmitPromptActionReturn
   | OpenCustomDialogActionReturn;

@@ -194,6 +194,20 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 // Dialog types
 export type DialogType = 'help' | 'profile' | 'session' | 'settings';
 
+// Agent profile types (matches backend AgentProfile enum)
+export type AgentProfileType = 'lifestyle' | 'coding' | 'pfc' | 'general' | 'disabled';
+
+// Agent profile info from backend API
+export interface AgentProfileInfo {
+  profile_type: AgentProfileType;
+  name: string;
+  description: string;
+  tool_count: number;
+  estimated_tokens: number;
+  color: string;
+  icon: string;
+}
+
 // App state
 export interface AppState {
   isStreaming: boolean;

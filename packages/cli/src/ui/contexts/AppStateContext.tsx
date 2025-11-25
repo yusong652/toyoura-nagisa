@@ -8,7 +8,7 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus } from '../types.js';
+import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
 import { StreamingState } from './StreamingContext.js';
 
 /**
@@ -26,6 +26,14 @@ export interface AppState {
 
   // Session
   currentSessionId: string | null;
+
+  // Agent profile
+  currentProfile: AgentProfileType;
+  availableProfiles: AgentProfileInfo[];
+  isProfileLoading: boolean;
+
+  // Memory
+  memoryEnabled: boolean;
 
   // History (committed items - rendered in <Static>)
   history: HistoryItem[];
@@ -58,6 +66,13 @@ export interface AppActions {
   switchSession: (sessionId: string) => Promise<void>;
   createSession: (name?: string) => Promise<string>;
 
+  // Agent profile
+  setProfile: (profile: AgentProfileType) => void;
+  refreshProfiles: () => Promise<void>;
+
+  // Memory
+  setMemoryEnabled: (enabled: boolean) => void;
+
   // Messages
   sendMessage: (text: string) => void;
   cancelRequest: () => void;
@@ -77,6 +92,10 @@ const defaultState: AppState = {
   connectionStatus: 'disconnected',
   error: null,
   currentSessionId: null,
+  currentProfile: 'general',
+  availableProfiles: [],
+  isProfileLoading: false,
+  memoryEnabled: false,
   history: [],
   pendingHistoryItems: [],
   streamingState: {
@@ -96,6 +115,9 @@ const defaultActions: AppActions = {
   clearHistory: () => {},
   switchSession: async () => {},
   createSession: async () => '',
+  setProfile: () => {},
+  refreshProfiles: async () => {},
+  setMemoryEnabled: () => {},
   sendMessage: () => {},
   cancelRequest: () => {},
   confirmTool: () => {},

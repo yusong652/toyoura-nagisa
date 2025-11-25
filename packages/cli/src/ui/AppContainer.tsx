@@ -29,8 +29,10 @@ import { StreamingState } from './contexts/StreamingContext.js';
 import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { type ConnectionStatus } from './types.js';
+import { MessageType, type ConnectionStatus, type AgentProfileType, type AgentProfileInfo } from './types.js';
 import { type Config } from '../config/settings.js';
+import { profileCommand } from './commands/profileCommand.js';
+import { memoryCommand } from './commands/memoryCommand.js';
 
 interface AppContainerProps {
   config: Config;
@@ -83,6 +85,14 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [isQuitting, setIsQuitting] = useState(false);
 
+  // Agent profile state
+  const [currentProfile, setCurrentProfile] = useState<AgentProfileType>('general');
+  const [availableProfiles, setAvailableProfiles] = useState<AgentProfileInfo[]>([]);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+
+  // Memory state (disabled by default)
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
+
   // ========== Hooks ==========
 
   // History management
@@ -104,6 +114,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionManager,
     historyManager,
     currentSessionId,
+    currentProfile,
+    memoryEnabled,
   });
 
   // Message queue (queue messages during streaming)
@@ -152,6 +164,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
         // Connect WebSocket
         await connectionManager.connectToSession(sessionId);
+
+        // Fetch available profiles
+        refreshProfiles();
       } catch (err) {
         console.error('[AppContainer] Session initialization error:', err);
       }
@@ -166,9 +181,83 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Actions ==========
 
+  // Process slash commands
+  const handleSlashCommand = useCallback((text: string): boolean => {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('/')) return false;
+
+    // Parse command and args
+    const spaceIndex = trimmed.indexOf(' ');
+    const commandName = spaceIndex === -1
+      ? trimmed.slice(1).toLowerCase()
+      : trimmed.slice(1, spaceIndex).toLowerCase();
+    const args = spaceIndex === -1 ? '' : trimmed.slice(spaceIndex + 1);
+
+    // Add user message to history
+    historyManager.addItem({
+      type: MessageType.USER,
+      text: trimmed,
+    });
+
+    // Handle built-in commands
+    if (commandName === 'profile' || commandName === 'p') {
+      const result = profileCommand.action?.({} as any, args);
+      if (result && typeof result === 'object' && 'type' in result) {
+        if (result.type === 'message') {
+          historyManager.addItem({
+            type: result.messageType === 'error' ? MessageType.ERROR : MessageType.INFO,
+            message: result.content,
+          });
+        } else if (result.type === 'profile_switch') {
+          const newProfile = result.profile as AgentProfileType;
+          setCurrentProfile(newProfile);
+          historyManager.addItem({
+            type: MessageType.INFO,
+            message: `Profile switched to: ${newProfile}`,
+          });
+        }
+      }
+      return true;
+    }
+
+    // Handle memory command
+    if (commandName === 'memory' || commandName === 'm') {
+      const result = memoryCommand.action?.({} as any, args);
+      if (result && typeof result === 'object' && 'type' in result) {
+        if (result.type === 'message') {
+          historyManager.addItem({
+            type: result.messageType === 'error' ? MessageType.ERROR : MessageType.INFO,
+            message: result.content,
+          });
+        } else if (result.type === 'memory_toggle') {
+          const enabled = (result as any).enabled as boolean;
+          setMemoryEnabled(enabled);
+          historyManager.addItem({
+            type: MessageType.INFO,
+            message: `Memory ${enabled ? 'enabled' : 'disabled'}`,
+          });
+        }
+      }
+      return true;
+    }
+
+    // Unknown command
+    historyManager.addItem({
+      type: MessageType.ERROR,
+      message: `Unknown command: /${commandName}\n\nAvailable commands:\n  /profile, /p - View or switch agent profile\n  /memory, /m  - Toggle long-term memory`,
+    });
+    return true;
+  }, [historyManager, setCurrentProfile, setMemoryEnabled]);
+
   // Send message (uses queue if streaming, otherwise direct submit)
   const sendMessage = useCallback((text: string) => {
     if (!text.trim()) return;
+
+    // Check for slash commands first
+    if (text.trim().startsWith('/')) {
+      handleSlashCommand(text);
+      return;
+    }
 
     if (isStreaming || streamingStateEnum !== StreamingState.Idle) {
       // Queue message if currently streaming
@@ -177,7 +266,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       // Direct submit
       submitQuery(text);
     }
-  }, [isStreaming, streamingStateEnum, addMessage, submitQuery]);
+  }, [isStreaming, streamingStateEnum, addMessage, submitQuery, handleSlashCommand]);
 
   const switchSession = useCallback(async (sessionId: string) => {
     connectionManager.disconnect();
@@ -192,6 +281,29 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     await switchSession(sessionId);
     return sessionId;
   }, [sessionManager, switchSession]);
+
+  // Fetch available profiles from backend
+  const refreshProfiles = useCallback(async () => {
+    setIsProfileLoading(true);
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        profiles: AgentProfileInfo[];
+      }>('/api/profiles');
+      if (response.success && response.profiles) {
+        setAvailableProfiles(response.profiles);
+      }
+    } catch (err) {
+      console.error('[AppContainer] Failed to fetch profiles:', err);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  }, []);
+
+  // Set current profile
+  const setProfile = useCallback((profile: AgentProfileType) => {
+    setCurrentProfile(profile);
+  }, []);
 
   const quit = useCallback(() => {
     setIsQuitting(true);
@@ -211,6 +323,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionStatus,
     error,
     currentSessionId,
+    currentProfile,
+    availableProfiles,
+    isProfileLoading,
+    memoryEnabled,
     history: historyManager.history,
     pendingHistoryItems,
     streamingState: {
@@ -226,6 +342,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionStatus,
     error,
     currentSessionId,
+    currentProfile,
+    availableProfiles,
+    isProfileLoading,
+    memoryEnabled,
     historyManager.history,
     pendingHistoryItems,
     streamingStateEnum,
@@ -242,6 +362,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     clearHistory: historyManager.clearItems,
     switchSession,
     createSession,
+    setProfile,
+    refreshProfiles,
+    setMemoryEnabled,
     sendMessage,
     cancelRequest,
     confirmTool,
@@ -254,6 +377,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     historyManager.clearItems,
     switchSession,
     createSession,
+    setProfile,
+    refreshProfiles,
+    setMemoryEnabled,
     sendMessage,
     cancelRequest,
     confirmTool,
