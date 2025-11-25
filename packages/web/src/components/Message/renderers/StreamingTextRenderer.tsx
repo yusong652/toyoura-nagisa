@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import { StreamingTextRendererProps } from '../types'
-import { cleanTextForDisplay } from '../../../utils/textFilters'
+import { cleanTextForDisplay } from '@aiNagisa/core/utils'
 
 /**
  * Streaming text renderer component.

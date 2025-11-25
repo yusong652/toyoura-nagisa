@@ -1,6 +1,11 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import useFileSearch from './useFileSearch'
 import {
+  findAtSignPosition,
+  extractQuery,
+  parseCurrentMention as parseCurrentMentionCore
+} from '@aiNagisa/core/utils'
+import {
   FileMentionMatch,
   FileMentionSuggestion,
   FileMentionContext,
@@ -59,73 +64,31 @@ const useFileMentionDetection = (
   const [prevCursorPosition, setPrevCursorPosition] = useState<number>(cursorPosition)
 
   /**
-   * Find @ character position before cursor
-   */
-  const findAtSignPosition = useCallback((text: string, cursor: number): number => {
-    // Search backwards from cursor for @ character
-    for (let i = cursor - 1; i >= 0; i--) {
-      const char = text[i]
-
-      // Found @ character
-      if (char === '@') {
-        return i
-      }
-
-      // Stop at whitespace or newline (@ mention boundary)
-      if (char === ' ' || char === '\n' || char === '\t') {
-        return -1
-      }
-    }
-
-    return -1
-  }, [])
-
-  /**
-   * Extract query string after @ character
-   */
-  const extractQuery = useCallback((
-    text: string,
-    cursor: number,
-    atPosition: number
-  ): string => {
-    if (atPosition === -1) return ''
-
-    // Extract text from @ to cursor
-    const queryText = text.substring(atPosition + 1, cursor)
-
-    return queryText
-  }, [])
-
-  /**
    * Parse current file mention from message and cursor position
+   * Adapts core parsing logic to include file lookup from results
    */
   const parseCurrentMention = useCallback((
     text: string,
     cursor: number
   ): FileMentionMatch | null => {
 
-    const atPosition = findAtSignPosition(text, cursor)
-    if (atPosition === -1) return null
-
-    const query = extractQuery(text, cursor, atPosition)
-
-    // No match if query is empty (just typed @)
-    if (query === '') return null
+    const coreMention = parseCurrentMentionCore(text, cursor)
+    if (!coreMention) return null
 
     // Find exact match in results
-    const exactMatch = results.find(file => file.path === query)
+    const exactMatch = results.find(file => file.path === coreMention.query)
     if (!exactMatch) return null
 
     return {
       file: exactMatch,
-      fullMatch: `@${query}`,
+      fullMatch: `@${coreMention.query}`,
       position: {
-        start: atPosition,
+        start: coreMention.atPosition,
         end: cursor
       }
     }
 
-  }, [findAtSignPosition, extractQuery, results])
+  }, [results])
 
   /**
    * Generate file suggestions based on search results
@@ -153,7 +116,7 @@ const useFileMentionDetection = (
       matchedText: query
     }))
 
-  }, [isActivated, results, message, cursorPosition, findAtSignPosition, extractQuery])
+  }, [isActivated, results, message, cursorPosition])
 
   /**
    * Trigger file search when query changes
@@ -176,7 +139,7 @@ const useFileMentionDetection = (
     } else {
       clearResults()
     }
-  }, [message, cursorPosition, isActivated, suppressSuggestions, findAtSignPosition, extractQuery, searchFiles, clearResults])
+  }, [message, cursorPosition, isActivated, suppressSuggestions, searchFiles, clearResults])
 
   /**
    * Auto-activation logic: activate when user types @ followed by characters
@@ -209,7 +172,7 @@ const useFileMentionDetection = (
     if (prevCursorPosition !== cursorPosition) {
       setPrevCursorPosition(cursorPosition)
     }
-  }, [message, cursorPosition, isActivated, suppressSuggestions, prevCursorPosition, findAtSignPosition])
+  }, [message, cursorPosition, isActivated, suppressSuggestions, prevCursorPosition])
 
   /**
    * Auto-deactivation: deactivate when @ is removed
@@ -221,7 +184,7 @@ const useFileMentionDetection = (
       setIsActivated(false)
       clearResults()
     }
-  }, [message, cursorPosition, isActivated, findAtSignPosition, clearResults])
+  }, [message, cursorPosition, isActivated, clearResults])
 
   // Current mention context
   const context: FileMentionContext = useMemo(() => {
@@ -241,7 +204,7 @@ const useFileMentionDetection = (
       query,
       suggestions
     }
-  }, [message, cursorPosition, isActivated, suppressSuggestions, findAtSignPosition, extractQuery, generateSuggestions])
+  }, [message, cursorPosition, isActivated, suppressSuggestions, generateSuggestions])
 
   // Active file mention match
   const activeMention = useMemo(() => {

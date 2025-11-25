@@ -1,7 +1,7 @@
 # Web-CLI Architecture Refactoring Plan
 
-**Date**: 2025-11-23
-**Status**: Phase 4 Completed ✅ | Phase 5 Pending ⏳
+**Date**: 2025-11-25
+**Status**: Phase 5 Completed ✅ | Phase 6 Pending ⏳
 **Goal**: Achieve maximum code reuse between Web frontend and CLI frontend through elegant architecture refactoring
 
 ## 🎯 Current Progress
@@ -12,11 +12,11 @@
 | Phase 2: Extract WebSocket Layer | ✅ Completed | 100% |
 | Phase 3: Extract Services | ✅ Completed | 100% |
 | Phase 4: Extract Message Processing | ✅ Completed | 100% |
-| Phase 5: Extract Business Logic Managers | ⏳ Not Started | 0% |
+| Phase 5: Extract Business Logic Managers & Utilities | ✅ Completed | 100% |
 | Phase 6: Build CLI Package | ⏳ Not Started | 0% |
 | Phase 7: Polish & Documentation | ⏳ Not Started | 0% |
 
-**Overall Progress**: 57% (4/7 phases completed)
+**Overall Progress**: 71% (5/7 phases completed)
 
 ---
 
@@ -1400,8 +1400,8 @@ export class MessageRenderer {
 
 ---
 
-### Phase 5: Extract Business Logic Managers (Week 3)
-**Goal**: Create ChatManager and SessionManager in core
+### Phase 5: Extract Business Logic Managers & Utilities ✅ COMPLETED (2025-11-25)
+**Goal**: Create ChatManager, SessionManager, and extract utility functions to core
 
 **Tasks**:
 1. ✅ Create `ChatManager`:
@@ -1418,10 +1418,29 @@ export class MessageRenderer {
 4. ✅ Refactor web contexts to thin wrappers:
    - `ChatContext.tsx` uses `ChatManager`
    - `SessionContext.tsx` uses `SessionManager`
-5. ✅ Test full chat flow (send message, load history, delete)
-6. ✅ Test session management (create, switch, delete)
+5. ✅ Extract utility functions to core:
+   - `TextFilters.ts` - Remove emotion keywords, clean text display
+   - `TimeFormatter.ts` - Relative/absolute time formatting
+   - `FileMentionParser.ts` - @ mention detection and parsing logic
+6. ✅ Update web package imports:
+   - Replaced local utils with `@aiNagisa/core/utils` imports
+   - Removed duplicate parsing logic from `useFileMentionDetection`
+7. ✅ Test full chat flow (send message, load history, delete)
+8. ✅ Test session management (create, switch, delete)
+9. ✅ Test utility functions (text filters, time formatting, file mention parsing)
 
-**Success Criteria**: Web frontend works with core managers, zero regression
+**Success Criteria**: ✅ Web frontend works with core managers and utilities, zero regression
+
+**Commits**:
+- (Pending) - feat: extract utility functions to @aiNagisa/core
+
+**Achievements**:
+- ✅ ~200 lines of reusable utility functions extracted to core
+- ✅ Web package successfully imports and uses core utilities
+- ✅ All builds pass (core TypeScript, web Vite build)
+- ✅ Runtime tests confirm all utility functions work correctly
+- ✅ ChatManager and SessionManager fully functional in web context
+- ✅ Phase 5 complete - Ready for Phase 6 (CLI implementation)
 
 ---
 
