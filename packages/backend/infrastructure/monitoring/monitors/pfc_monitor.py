@@ -20,31 +20,25 @@ class PfcMonitor(BaseMonitor):
     1. Unnotified completed/failed tasks → One-time completion notification + mark as notified
     2. Running tasks → Continuous status reminders
     3. Already notified completed/failed tasks → Excluded (no reminder)
+
+    Note: This monitor requires agent_profile for profile-based filtering.
     """
 
-    def __init__(self, session_id: str):
-        """
-        Initialize PFC monitor.
-
-        Args:
-            session_id: Session ID for scoped monitoring
-        """
-        super().__init__(session_id)
-        # Agent profile (set dynamically before querying reminders)
-        self.agent_profile: str = "general"
-
-    async def get_reminders(self) -> List[str]:
+    async def get_reminders(self, agent_profile: str = "general") -> List[str]:
         """
         Get reminders for PFC simulation tasks.
 
         Only queries PFC if agent_profile is 'pfc', to avoid unnecessary
         connection attempts for other profiles.
 
+        Args:
+            agent_profile: Agent profile type. Only 'pfc' profile will query PFC server.
+
         Returns:
             List[str]: PFC task reminders (completion alerts + running task status)
         """
         # Skip PFC query if not in PFC profile
-        if self.agent_profile != 'pfc':
+        if agent_profile != 'pfc':
             return []
 
         try:

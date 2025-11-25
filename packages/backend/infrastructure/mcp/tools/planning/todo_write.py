@@ -17,7 +17,7 @@ from fastmcp.server.context import Context
 
 from backend.infrastructure.mcp.utils.tool_result import ToolResult, success_response, error_response
 from backend.infrastructure.storage.todo_storage import get_todo_storage
-from backend.shared.utils.workspace import get_workspace_for_session_sync
+from backend.shared.utils.workspace import get_workspace_for_profile
 
 logger = logging.getLogger(__name__)
 
@@ -294,13 +294,18 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
     session_id = context.client_id
     if not session_id:
         # Infrastructure error - raise exception for system-level handling
-        # This should never happen in normal operation (backend configuration issue)
+        # This should never happen in normal operation (backend configuration error)
         raise RuntimeError("Session ID not found in context - backend configuration error")
 
     try:
+        # Get agent_profile from context_manager (set by chat_service before tool execution)
+        from backend.shared.utils.app_context import get_llm_client
+        llm_client = get_llm_client()
+        context_manager = llm_client.get_or_create_context_manager(session_id)
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
 
-        # Get workspace directory for this session
-        workspace = get_workspace_for_session_sync(session_id)
+        # Get workspace directory based on agent profile
+        workspace = await get_workspace_for_profile(agent_profile, session_id)
 
         # Validate "only one in_progress" rule (enforced at runtime)
         in_progress_count = sum(1 for todo in todos if todo.status == "in_progress")

@@ -41,6 +41,7 @@ class StatusMonitor:
     - Modular architecture: Each component has its own monitor
     - Unified API: Single entry point for all reminders
     - Async-first: All monitoring methods are async for network calls
+    - Explicit parameters: agent_profile passed as method argument, not instance state
     """
 
     def __init__(self, session_id: str):
@@ -60,10 +61,6 @@ class StatusMonitor:
         self.bash_monitor = BashMonitor(session_id)
         self.pfc_monitor = PfcMonitor(session_id)
         self.todo_monitor = TodoMonitor(session_id)
-
-        # Agent profile (set dynamically before querying reminders)
-        # Used to optimize queries (e.g., skip PFC if not in PFC/general profile)
-        self.agent_profile: str = "general"
 
     # -------------------------------------------------------------------------
     # Interrupt Monitor Delegation
@@ -127,7 +124,11 @@ class StatusMonitor:
     # Main Coordination Method
     # -------------------------------------------------------------------------
 
-    async def get_all_reminders(self, check_queue: bool = False) -> List[str]:
+    async def get_all_reminders(
+        self,
+        agent_profile: str = "general",
+        check_queue: bool = False
+    ) -> List[str]:
         """
         Get all system reminders from monitored sources.
 
@@ -135,15 +136,13 @@ class StatusMonitor:
         all reminders that should be injected into user messages.
 
         Args:
+            agent_profile: Agent profile type for workspace-dependent monitors.
             check_queue: Whether to check and drain queue messages (during tool recursion)
 
         Returns:
             List[str]: Combined list of reminder strings from all sources
         """
         reminders = []
-
-        # Set agent profile for PFC monitor
-        self.pfc_monitor.agent_profile = self.agent_profile
 
         # Set queue checking flag
         self.queue_monitor.check_queue = check_queue
@@ -160,12 +159,12 @@ class StatusMonitor:
         bash_reminders = await self.bash_monitor.get_reminders()
         reminders.extend(bash_reminders)
 
-        # PFC simulation tasks
-        pfc_reminders = await self.pfc_monitor.get_reminders()
+        # PFC simulation tasks (requires agent_profile)
+        pfc_reminders = await self.pfc_monitor.get_reminders(agent_profile)
         reminders.extend(pfc_reminders)
 
-        # Todo completion notifications
-        todo_reminders = await self.todo_monitor.get_reminders()
+        # Todo reminders (requires agent_profile for workspace resolution)
+        todo_reminders = await self.todo_monitor.get_reminders(agent_profile)
         reminders.extend(todo_reminders)
 
         return reminders

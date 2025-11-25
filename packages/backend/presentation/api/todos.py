@@ -2,6 +2,7 @@
 Todo API - Endpoints for todo status retrieval.
 
 Provides read-only access to todo status for frontend display.
+All endpoints require explicit agent_profile parameter for workspace resolution.
 """
 
 from fastapi import APIRouter, Query
@@ -14,17 +15,20 @@ router = APIRouter(prefix="/api/todos", tags=["todos"])
 
 @router.get("/current")
 async def get_current_todo(
-    session_id: str = Query(..., description="Session identifier")
+    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)")
 ) -> Dict[str, Any]:
     """
     Get the currently in-progress todo for display.
 
     This endpoint retrieves the first todo with status="in_progress" from
-    the session's workspace, which is displayed in the frontend to show
-    what the agent is currently working on.
+    the workspace, which is displayed in the frontend to show what the
+    agent is currently working on.
 
     Args:
-        session_id: Session identifier
+        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+                      Determines which workspace to use.
+        session_id: Optional session identifier (for PFC profile workspace sync).
 
     Returns:
         {
@@ -44,7 +48,7 @@ async def get_current_todo(
     """
     try:
         service = get_todo_service()
-        todo = await service.get_current_todo(session_id)
+        todo = await service.get_current_todo(agent_profile, session_id)
 
         return {
             "success": True,
@@ -62,13 +66,15 @@ async def get_current_todo(
 
 @router.get("/all")
 async def get_all_todos(
-    session_id: str = Query(..., description="Session identifier")
+    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)")
 ) -> Dict[str, Any]:
     """
-    Get all todos for the session's workspace.
+    Get all todos for the workspace.
 
     Args:
-        session_id: Session identifier
+        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+        session_id: Optional session identifier (for PFC profile workspace sync).
 
     Returns:
         {
@@ -80,7 +86,7 @@ async def get_all_todos(
     """
     try:
         service = get_todo_service()
-        todos = await service.get_all_todos(session_id)
+        todos = await service.get_all_todos(agent_profile, session_id)
 
         return {
             "success": True,
@@ -100,14 +106,16 @@ async def get_all_todos(
 
 @router.get("/pending")
 async def get_pending_todos(
-    session_id: str = Query(..., description="Session identifier"),
+    agent_profile: str = Query(..., description="Agent profile for workspace resolution"),
+    session_id: Optional[str] = Query(None, description="Session identifier (for PFC workspace sync)"),
     limit: Optional[int] = Query(None, description="Maximum number of todos to return")
 ) -> Dict[str, Any]:
     """
     Get pending and in_progress todos.
 
     Args:
-        session_id: Session identifier
+        agent_profile: Agent profile type (e.g., "pfc", "coding", "general").
+        session_id: Optional session identifier (for PFC profile workspace sync).
         limit: Maximum number of todos to return
 
     Returns:
@@ -120,7 +128,7 @@ async def get_pending_todos(
     """
     try:
         service = get_todo_service()
-        todos = await service.get_pending_todos(session_id, limit)
+        todos = await service.get_pending_todos(agent_profile, session_id, limit)
 
         return {
             "success": True,

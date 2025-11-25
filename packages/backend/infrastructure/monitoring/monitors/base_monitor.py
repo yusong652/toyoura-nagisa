@@ -14,6 +14,9 @@ class BaseMonitor(ABC):
 
     Each monitor is responsible for tracking a specific type of system state
     and generating system-reminder blocks for LLM context injection.
+
+    Note: Monitors that need workspace access (e.g., TodoMonitor, PfcMonitor)
+    should override get_reminders() to accept agent_profile parameter.
     """
 
     def __init__(self, session_id: str):

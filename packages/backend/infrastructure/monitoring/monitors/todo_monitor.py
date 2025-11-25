@@ -9,11 +9,12 @@ Implements Claude Code-style periodic reminders: injects todo list every N tool 
 even when todo list is empty, to prompt the LLM to consider using the TodoWrite tool.
 """
 
+import asyncio
 import logging
 from typing import List
 
 from backend.infrastructure.storage.todo_storage import get_todo_storage
-from backend.shared.utils.workspace import get_workspace_for_session_sync
+from backend.shared.utils.workspace import get_workspace_for_profile
 
 from .base_monitor import BaseMonitor
 
@@ -32,6 +33,8 @@ class TodoMonitor(BaseMonitor):
     - Injects reminder every N conversation turns
     - Shows actual todos when present, empty reminder otherwise
     - Helps save context by not injecting todos on every turn
+
+    Note: This monitor requires agent_profile for workspace resolution.
     """
 
     # Class-level storage for conversation turn counts per session
@@ -78,7 +81,7 @@ class TodoMonitor(BaseMonitor):
 
         return False
 
-    async def get_reminders(self) -> List[str]:
+    async def get_reminders(self, agent_profile: str = "general") -> List[str]:
         """
         Get reminders for the full todo list.
 
@@ -88,11 +91,14 @@ class TodoMonitor(BaseMonitor):
         - Shows empty list prompt when no todos
         - Helps save context by periodic injection
 
+        Args:
+            agent_profile: Agent profile type for workspace resolution.
+
         Returns:
             List[str]: Todo list reminder blocks
         """
         try:
-            workspace = get_workspace_for_session_sync(self.session_id)
+            workspace = await get_workspace_for_profile(agent_profile, self.session_id)
         except Exception as e:
             logger.debug(f"Unable to resolve workspace for todo reminders: {e}")
             return []

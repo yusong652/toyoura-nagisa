@@ -14,6 +14,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSession } from '../../contexts/session/SessionContext'
 import { useConnection } from '../../contexts/connection/ConnectionContext'
+import { useAgent } from '../../contexts/agent/AgentContext'
 import './TodoStatusIndicator.css'
 
 interface TodoItem {
@@ -65,6 +66,7 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
   const [currentTodo, setCurrentTodo] = useState<TodoItem | null>(null)
   const { currentSessionId } = useSession()
   const { pendingToolConfirmation } = useConnection()
+  const { currentProfile } = useAgent()
   const [glowPosition, setGlowPosition] = useState(0)
   const [thinkingVerb, setThinkingVerb] = useState(() =>
     THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]
@@ -429,16 +431,18 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     }
   }, [duration])
 
-  // Fetch current todo on mount and session change
+  // Fetch current todo on mount and profile change
   useEffect(() => {
     const fetchCurrentTodo = async () => {
-      if (!currentSessionId) {
-        return
-      }
-
       try {
+        // agent_profile is required, session_id is optional (for PFC workspace sync)
+        const params = new URLSearchParams({ agent_profile: currentProfile })
+        if (currentSessionId) {
+          params.append('session_id', currentSessionId)
+        }
+
         const response = await fetch(
-          `http://localhost:8000/api/todos/current?session_id=${currentSessionId}`,
+          `http://localhost:8000/api/todos/current?${params}`,
           {
             cache: 'no-cache',
             headers: {
@@ -460,7 +464,7 @@ const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({ isLLMThinking
     }
 
     fetchCurrentTodo()
-  }, [currentSessionId])
+  }, [currentSessionId, currentProfile])
 
   // Listen for todo update events from WebSocket
   useEffect(() => {

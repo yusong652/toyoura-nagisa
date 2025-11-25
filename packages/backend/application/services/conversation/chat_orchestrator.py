@@ -486,8 +486,13 @@ class ChatOrchestrator:
             try:
                 from backend.application.services.todo_service import get_todo_service
                 from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+                # Get agent_profile from context_manager for correct workspace resolution
+                context_manager = self.llm_client.get_or_create_context_manager(session_id)
+                agent_profile = getattr(context_manager, 'agent_profile', 'general')
+
                 todo_service = get_todo_service()
-                current_todo = await todo_service.get_current_todo(session_id)
+                current_todo = await todo_service.get_current_todo(agent_profile, session_id)
                 await WebSocketNotificationService.send_todo_update(session_id, current_todo)
             except Exception as e:
                 print(f"[WARNING] Failed to send todo update notification: {e}")

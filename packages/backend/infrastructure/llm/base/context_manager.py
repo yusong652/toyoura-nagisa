@@ -241,7 +241,9 @@ class BaseContextManager(ABC):
         # Note: check_queue=False (default) because user messages have already been
         # processed from the queue at this point. Queue messages are only checked
         # during tool result injection (when user sends new messages while tools are executing).
-        reminders = await self._status_monitor.get_all_reminders()
+        reminders = await self._status_monitor.get_all_reminders(
+            agent_profile=self.agent_profile
+        )
 
         if needs_merge:
             # Merge with previous user message instead of creating new one
@@ -376,7 +378,10 @@ class BaseContextManager(ABC):
         Args:
             result: Tool result dict containing llm_content with parts format
         """
-        reminders = await self._status_monitor.get_all_reminders(check_queue=True)
+        reminders = await self._status_monitor.get_all_reminders(
+            agent_profile=self.agent_profile,
+            check_queue=True
+        )
 
         if reminders:
             reminder_text = "\n\n" + "\n\n".join(reminders)

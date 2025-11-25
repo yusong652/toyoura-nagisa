@@ -4,9 +4,11 @@ Unified workspace resolution for aiNagisa.
 This module provides a single source of truth for determining workspace directories
 based on agent profiles. Both system prompt construction and tool execution use
 the same logic to ensure consistency.
+
+Design principle: agent_profile is always passed explicitly as a parameter,
+never retrieved implicitly from context_manager state.
 """
 
-import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
@@ -88,69 +90,3 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         fallback = Path.cwd() / "workspace"
         fallback.mkdir(parents=True, exist_ok=True)
         return fallback
-
-
-async def get_workspace_for_session(session_id: str) -> Path:
-    """
-    Get workspace directory for a specific session.
-
-    Retrieves the agent profile from the session's context manager,
-    then returns the appropriate workspace directory.
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        Path object for the workspace directory
-    """
-    try:
-        # Get agent profile from session's context manager
-        from backend.shared.utils.app_context import get_llm_client
-        llm_client = get_llm_client()
-        context_manager = llm_client.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
-        return await get_workspace_for_profile(agent_profile, session_id)
-
-    except Exception as e:
-        logger.warning(f"Failed to get workspace for session {session_id}: {e}")
-        # Fallback to general workspace
-        return await get_workspace_for_profile('general', session_id)
-
-
-def get_workspace_for_session_sync(session_id: str) -> Path:
-    """
-    Get workspace directory for a specific session (synchronous version).
-
-    This is a synchronous wrapper for tools that cannot use async/await.
-    It runs the async function in the current event loop or creates a new one.
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        Path object for the workspace directory
-    """
-    try:
-        # Try to get the current running event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're already in an async context - use asyncio.create_task approach
-            # Create a new event loop in a thread-safe way
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, get_workspace_for_session(session_id))
-                return future.result(timeout=10)
-        else:
-            # Safe to run coroutine
-            return loop.run_until_complete(get_workspace_for_session(session_id))
-    except RuntimeError:
-        # No event loop in current thread, create a new one
-        return asyncio.run(get_workspace_for_session(session_id))
-    except Exception as e:
-        logger.error(f"Failed to get workspace for session {session_id}: {e}")
-        # Fallback to general workspace
-        from backend.shared.utils.prompt.config import BASE_DIR
-        workspace = BASE_DIR / "workspace"
-        workspace.mkdir(parents=True, exist_ok=True)
-        return workspace
