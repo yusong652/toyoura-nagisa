@@ -290,11 +290,13 @@ class ChatService:
         try:
             reminders = []
 
+            # Get agent profile (used for both file mentions and status reminders)
+            agent_profile = parsed_data.get('agent_profile', 'general')
+
             # 1. Process file mentions (if present)
             mentioned_files = parsed_data.get('mentioned_files', [])
             if mentioned_files:
                 from backend.infrastructure.file_mention import FileMentionProcessor
-                agent_profile = parsed_data.get('agent_profile', 'general')
                 processor = FileMentionProcessor(session_id, agent_profile)
                 file_reminders = await processor.process_mentioned_files(mentioned_files)
                 reminders.extend(file_reminders)

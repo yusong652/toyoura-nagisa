@@ -90,10 +90,12 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // Chat stream (message handling, streaming state)
   const {
-    streamingState,
+    streamingState: streamingStateEnum,
     isStreaming,
+    thinkingContent,
     pendingConfirmation,
     error,
+    pendingHistoryItems,
     submitQuery,
     cancelRequest,
     confirmTool,
@@ -111,7 +113,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     clearQueue,
   } = useMessageQueue({
     isConnected: connectionStatus === 'connected',
-    streamingState,
+    streamingState: streamingStateEnum,
     submitQuery,
   });
 
@@ -168,14 +170,14 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const sendMessage = useCallback((text: string) => {
     if (!text.trim()) return;
 
-    if (isStreaming || streamingState !== StreamingState.Idle) {
+    if (isStreaming || streamingStateEnum !== StreamingState.Idle) {
       // Queue message if currently streaming
       addMessage(text);
     } else {
       // Direct submit
       submitQuery(text);
     }
-  }, [isStreaming, streamingState, addMessage, submitQuery]);
+  }, [isStreaming, streamingStateEnum, addMessage, submitQuery]);
 
   const switchSession = useCallback(async (sessionId: string) => {
     connectionManager.disconnect();
@@ -210,7 +212,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     error,
     currentSessionId,
     history: historyManager.history,
-    streamingState,
+    pendingHistoryItems,
+    streamingState: {
+      state: streamingStateEnum,
+      thinkingContent,
+    },
     isStreaming,
     pendingConfirmation,
     isQuitting,
@@ -221,7 +227,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     error,
     currentSessionId,
     historyManager.history,
-    streamingState,
+    pendingHistoryItems,
+    streamingStateEnum,
+    thinkingContent,
     isStreaming,
     pendingConfirmation,
     isQuitting,

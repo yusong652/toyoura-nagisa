@@ -87,8 +87,21 @@ export class NodeWebSocketAdapter implements WebSocketAdapter {
 
   onMessage(callback: (data: string) => void): void {
     if (this.ws) {
-      this.ws.on('message', (data: Buffer | string) => {
-        const message = typeof data === 'string' ? data : data.toString();
+      // ws library 'message' event: (data: RawData, isBinary: boolean)
+      // RawData = Buffer | ArrayBuffer | Buffer[]
+      this.ws.on('message', (data: Buffer | ArrayBuffer | Buffer[], _isBinary: boolean) => {
+        let message: string;
+        if (Buffer.isBuffer(data)) {
+          message = data.toString('utf-8');
+        } else if (Array.isArray(data)) {
+          // Buffer[] - concatenate all buffers
+          message = Buffer.concat(data).toString('utf-8');
+        } else if (data instanceof ArrayBuffer) {
+          message = Buffer.from(data).toString('utf-8');
+        } else {
+          // Fallback for any other type
+          message = String(data);
+        }
         callback(message);
       });
     }

@@ -237,7 +237,7 @@ export class WebSocketManager extends EventEmitter {
         this.handleSystemMessage(message);
         this.emit('message', message);
       } catch (error) {
-        this.handleError(new Error('Failed to parse message'));
+        this.handleError(new Error('Failed to parse WebSocket message'));
       }
     });
   }

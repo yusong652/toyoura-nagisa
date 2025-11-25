@@ -36,7 +36,7 @@ export const App = () => {
   }
 
   return (
-    <StreamingContext.Provider value={appState.streamingState}>
+    <StreamingContext.Provider value={appState.streamingState.state}>
       <MainLayout />
     </StreamingContext.Provider>
   );

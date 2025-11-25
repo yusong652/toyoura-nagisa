@@ -1,11 +1,23 @@
 /**
  * App State Context
  * Provides global app state to all components
+ *
+ * Key Architecture (following Gemini CLI pattern):
+ * - history: Committed items that won't change (rendered in <Static>)
+ * - pendingHistoryItems: Items currently being streamed (rendered outside <Static>)
  */
 
 import { createContext, useContext } from 'react';
-import type { HistoryItem, ToolConfirmationData, ConnectionStatus } from '../types.js';
+import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus } from '../types.js';
 import { StreamingState } from './StreamingContext.js';
+
+/**
+ * Extended streaming state with content
+ */
+export interface StreamingStateData {
+  state: StreamingState;
+  thinkingContent: string | null;
+}
 
 export interface AppState {
   // Connection
@@ -15,11 +27,14 @@ export interface AppState {
   // Session
   currentSessionId: string | null;
 
-  // History
+  // History (committed items - rendered in <Static>)
   history: HistoryItem[];
 
+  // Pending history items (currently streaming - rendered outside <Static>)
+  pendingHistoryItems: HistoryItemWithoutId[];
+
   // Streaming
-  streamingState: StreamingState;
+  streamingState: StreamingStateData;
   isStreaming: boolean;
 
   // Tool confirmation
@@ -35,7 +50,7 @@ export interface AppState {
 
 export interface AppActions {
   // History
-  addHistoryItem: (item: Omit<HistoryItem, 'id'>, timestamp?: number) => string;
+  addHistoryItem: (item: HistoryItemWithoutId, timestamp?: number) => string;
   updateHistoryItem: (id: string, updates: Record<string, any>) => void;
   clearHistory: () => void;
 
@@ -63,7 +78,11 @@ const defaultState: AppState = {
   error: null,
   currentSessionId: null,
   history: [],
-  streamingState: StreamingState.Idle,
+  pendingHistoryItems: [],
+  streamingState: {
+    state: StreamingState.Idle,
+    thinkingContent: null,
+  },
   isStreaming: false,
   pendingConfirmation: null,
   isQuitting: false,

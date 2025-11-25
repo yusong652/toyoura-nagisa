@@ -100,10 +100,64 @@ export type HistoryItem =
   | ErrorHistoryItem
   | InfoHistoryItem;
 
-// HistoryItemWithoutId omits both 'id' and 'timestamp' as they are auto-generated
-export type HistoryItemWithoutId = Omit<HistoryItem, 'id' | 'timestamp'> & {
+// Separate types without id/timestamp for pending items
+export interface UserHistoryItemWithoutId {
+  type: MessageType.USER;
+  text: string;
   timestamp?: number;
-};
+}
+
+export interface AssistantHistoryItemWithoutId {
+  type: MessageType.ASSISTANT;
+  content: ContentBlock[];
+  isStreaming?: boolean;
+  timestamp?: number;
+}
+
+export interface ThinkingHistoryItemWithoutId {
+  type: MessageType.THINKING;
+  thinking: string;
+  isExpanded?: boolean;
+  timestamp?: number;
+}
+
+export interface ToolCallHistoryItemWithoutId {
+  type: MessageType.TOOL_CALL;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  toolCallId: string;
+  timestamp?: number;
+}
+
+export interface ToolResultHistoryItemWithoutId {
+  type: MessageType.TOOL_RESULT;
+  toolCallId: string;
+  content: string;
+  isError?: boolean;
+  timestamp?: number;
+}
+
+export interface ErrorHistoryItemWithoutId {
+  type: MessageType.ERROR;
+  message: string;
+  timestamp?: number;
+}
+
+export interface InfoHistoryItemWithoutId {
+  type: MessageType.INFO;
+  message: string;
+  timestamp?: number;
+}
+
+// HistoryItemWithoutId is a union of all item types without id
+export type HistoryItemWithoutId =
+  | UserHistoryItemWithoutId
+  | AssistantHistoryItemWithoutId
+  | ThinkingHistoryItemWithoutId
+  | ToolCallHistoryItemWithoutId
+  | ToolResultHistoryItemWithoutId
+  | ErrorHistoryItemWithoutId
+  | InfoHistoryItemWithoutId;
 
 // Tool confirmation types
 export interface ToolConfirmationData {

@@ -1,66 +1,84 @@
 /**
  * CLI Color Definitions
- * Reference: Gemini CLI semantic-colors.ts
+ * Reference: Gemini CLI semantic-colors.ts and themes/semantic-tokens.ts
  */
 
-// Base color palette
+// Base ANSI-friendly color palette (works better in terminals)
 export const colors = {
-  // Primary colors
-  primary: '#7C3AED',      // Purple
-  secondary: '#06B6D4',    // Cyan
-  accent: '#F59E0B',       // Amber
+  // Primary colors (using ANSI-friendly values)
+  primary: 'magenta',      // Purple equivalent
+  secondary: 'cyan',       // Cyan
+  accent: 'yellow',        // Accent
 
   // Status colors
-  success: '#10B981',      // Green
-  error: '#EF4444',        // Red
-  warning: '#F59E0B',      // Amber
-  info: '#3B82F6',         // Blue
+  success: 'green',
+  error: 'red',
+  warning: 'yellow',
+  info: 'blue',
 
   // Text colors
-  text: '#E5E7EB',         // Light gray
-  textDim: '#9CA3AF',      // Gray
-  textMuted: '#6B7280',    // Dark gray
+  text: 'white',
+  textDim: 'gray',
+  textMuted: 'gray',
 
   // Background colors
-  bg: '#1F2937',           // Dark
-  bgLight: '#374151',      // Lighter dark
+  bg: 'black',
+  bgLight: 'gray',
 
-  // Role colors
-  user: '#3B82F6',         // Blue
-  assistant: '#10B981',    // Green
-  system: '#9CA3AF',       // Gray
-  tool: '#F59E0B',         // Amber
-  thinking: '#8B5CF6',     // Purple
+  // Role colors (matching Gemini CLI style)
+  user: 'cyan',            // User messages
+  assistant: 'white',      // Assistant messages (Gemini uses white)
+  system: 'gray',
+  tool: 'yellow',
+  thinking: 'magenta',
 } as const;
 
-// Semantic theme
+// Semantic theme matching Gemini CLI SemanticColors interface
 export const theme = {
   text: {
-    primary: colors.text,
-    secondary: colors.textDim,
-    muted: colors.textMuted,
-    accent: colors.accent,
-    link: colors.secondary,
+    primary: colors.text,          // Main text color
+    secondary: colors.textDim,     // Dimmed text
+    muted: colors.textMuted,       // Very dim text
+    accent: colors.accent,         // Highlights (yellow like Gemini)
+    link: colors.secondary,        // Links (cyan)
+    response: colors.text,         // AI response text
   },
 
   status: {
-    success: colors.success,
-    error: colors.error,
-    warning: colors.warning,
+    success: colors.success,       // ✓ checkmarks
+    error: colors.error,           // ✕ errors
+    warning: colors.warning,       // Tool confirmations
     info: colors.info,
   },
 
   message: {
-    user: colors.user,
-    assistant: colors.assistant,
+    user: colors.user,             // User input prefix
+    assistant: colors.text,        // AI response (white text)
     system: colors.system,
-    tool: colors.tool,
-    thinking: colors.thinking,
+    tool: colors.tool,             // Tool names
+    thinking: colors.thinking,     // Thinking content
   },
 
   ui: {
-    border: colors.textMuted,
+    border: 'gray',
     borderFocus: colors.primary,
     spinner: colors.secondary,
+    symbol: 'gray',                // Like Gemini's ui.symbol
   },
+
+  // Border colors matching Gemini CLI
+  border: {
+    default: 'gray',
+    focused: colors.secondary,
+  },
+} as const;
+
+// Tool status symbols (matching Gemini CLI TOOL_STATUS constants)
+export const TOOL_STATUS = {
+  PENDING: 'o',
+  EXECUTING: '*',
+  SUCCESS: '✓',
+  CONFIRMING: '?',
+  CANCELED: '✕',
+  ERROR: '✕',
 } as const;
