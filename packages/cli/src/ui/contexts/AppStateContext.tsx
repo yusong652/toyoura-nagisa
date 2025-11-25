@@ -29,12 +29,15 @@ export interface AppState {
   // UI state
   isQuitting: boolean;
   isInputActive: boolean;
+
+  // Message queue (messages queued during streaming)
+  messageQueue: string[];
 }
 
 export interface AppActions {
   // History
   addHistoryItem: (item: Omit<HistoryItem, 'id'>, timestamp?: number) => string;
-  updateHistoryItem: (id: string, updates: Partial<HistoryItem>) => void;
+  updateHistoryItem: (id: string, updates: Record<string, any>) => void;
   clearHistory: () => void;
 
   // Session
@@ -42,7 +45,7 @@ export interface AppActions {
   createSession: (name?: string) => Promise<string>;
 
   // Messages
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string) => void;
   cancelRequest: () => void;
 
   // Tool confirmation
@@ -51,6 +54,9 @@ export interface AppActions {
   // UI
   quit: () => void;
   clearScreen: () => void;
+
+  // Error
+  clearError: () => void;
 }
 
 const defaultState: AppState = {
@@ -67,6 +73,7 @@ const defaultState: AppState = {
   pendingConfirmation: null,
   isQuitting: false,
   isInputActive: true,
+  messageQueue: [],
 };
 
 const defaultActions: AppActions = {
@@ -75,11 +82,12 @@ const defaultActions: AppActions = {
   clearHistory: () => {},
   switchSession: async () => {},
   createSession: async () => '',
-  sendMessage: async () => {},
+  sendMessage: () => {},
   cancelRequest: () => {},
   confirmTool: () => {},
   quit: () => {},
   clearScreen: () => {},
+  clearError: () => {},
 };
 
 export const AppStateContext = createContext<AppState>(defaultState);
