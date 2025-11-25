@@ -245,10 +245,18 @@ export class WebSocketManager extends EventEmitter {
   private handleSystemMessage(message: WebSocketManagerMessage): void {
     switch (message.type) {
       case 'HEARTBEAT':
+        // Server sent heartbeat - respond with ACK and reset our timeout
         this.sendMessage({ type: 'HEARTBEAT_ACK', timestamp: new Date().toISOString() });
+        this.stats.lastHeartbeat = new Date();
+        // Reset timeout since we received a heartbeat from server
+        if (this.options.enableHeartbeat) {
+          this.resetHeartbeatTimeout();
+        }
         break;
 
       case 'HEARTBEAT_ACK':
+        // This is for scenarios where client sends heartbeat and server responds
+        // In aiNagisa, server initiates heartbeat, so this is less common
         this.stats.lastHeartbeat = new Date();
         this.clearHeartbeatTimeout();
         break;
@@ -263,20 +271,24 @@ export class WebSocketManager extends EventEmitter {
   }
 
   private startHeartbeat(): void {
+    // Note: In aiNagisa architecture, the server sends HEARTBEAT and client responds with HEARTBEAT_ACK.
+    // The client does NOT need to proactively send heartbeats.
+    // This method is kept for potential future use with servers that expect client-initiated heartbeats.
+    // For aiNagisa backend, heartbeat response is handled in handleSystemMessage().
     this.clearHeartbeatTimers();
 
-    this.heartbeatTimer = setInterval(() => {
-      if (this.isConnected()) {
-        this.sendHeartbeat();
-      }
-    }, this.options.heartbeatInterval!);
+    // Set up a timeout to detect if server stops sending heartbeats
+    // This helps detect connection staleness from the client side
+    this.resetHeartbeatTimeout();
   }
 
-  private sendHeartbeat(): void {
-    this.sendMessage({ type: 'HEARTBEAT', timestamp: new Date().toISOString() });
+  private resetHeartbeatTimeout(): void {
+    this.clearHeartbeatTimeout();
 
+    // If server doesn't send heartbeat within timeout period, connection may be stale
+    // Server sends heartbeat every 20s, so we use a longer timeout (e.g., 60s)
     this.heartbeatTimeoutTimer = setTimeout(() => {
-      this.handleError(new Error('Heartbeat timeout - connection may be stale'));
+      this.handleError(new Error('Heartbeat timeout - no heartbeat from server'));
     }, this.options.heartbeatTimeout!);
   }
 

@@ -15,6 +15,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
+import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { defaultConfig, type Config } from './config/settings.js';
 
 // Simple argument parsing
@@ -42,5 +43,9 @@ const config: Config = {
 console.clear();
 console.log('aiNagisa CLI - Starting...\n');
 
-// Render Ink app
-render(<AppContainer config={config} initialSessionId={sessionId} />);
+// Render Ink app with KeypressProvider for proper key handling
+render(
+  <KeypressProvider>
+    <AppContainer config={config} initialSessionId={sessionId} />
+  </KeypressProvider>
+);
