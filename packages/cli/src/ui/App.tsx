@@ -8,14 +8,13 @@
  * - Streaming context provision
  */
 
-import React from 'react';
 import { Box, Text } from 'ink';
 import { useAppState } from './contexts/AppStateContext.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { MainLayout } from './layouts/MainLayout.js';
 import { theme } from './colors.js';
 
-export const App: React.FC = () => {
+export const App = () => {
   const appState = useAppState();
 
   // Show quitting message
