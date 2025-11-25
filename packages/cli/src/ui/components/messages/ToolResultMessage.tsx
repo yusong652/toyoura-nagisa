@@ -40,25 +40,22 @@ export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item }) =>
 
   return (
     <Box
-      flexDirection="column"
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
     >
-      <Box flexDirection="row">
-        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-          <Text color={statusColor}>{statusSymbol}</Text>
-        </Box>
-        <Box flexGrow={1} flexDirection="column">
-          <Text wrap="wrap" color={theme.text.secondary}>
-            {text}
+      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+        <Text color={statusColor}>{statusSymbol}</Text>
+      </Box>
+      <Box flexDirection="column">
+        <Text wrap="wrap" color={theme.text.secondary}>
+          {text}
+        </Text>
+        {truncated && (
+          <Text color={theme.text.muted}>
+            ... (output truncated)
           </Text>
-          {truncated && (
-            <Text color={theme.text.muted}>
-              ... (output truncated)
-            </Text>
-          )}
-        </Box>
+        )}
       </Box>
     </Box>
   );

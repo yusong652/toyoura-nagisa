@@ -86,26 +86,22 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
 
   return (
     <Box
-      flexDirection="column"
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
+      height={3}
     >
-      <Box flexDirection="row" height={1}>
-        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-          <Text color={statusColor}>{statusIndicator}</Text>
-        </Box>
-        <Box flexGrow={1} overflow="hidden">
-          <Text wrap="truncate">
-            <Text bold color={theme.text.primary}>
-              {item.toolName}
-            </Text>
-            {description && (
-              <Text color={theme.text.secondary}> {description}</Text>
-            )}
-          </Text>
-        </Box>
+      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+        <Text color={statusColor}>{statusIndicator}</Text>
       </Box>
+      <Text wrap="truncate">
+        <Text bold color={theme.text.primary}>
+          {item.toolName}
+        </Text>
+        {description && (
+          <Text color={theme.text.secondary}> {description}</Text>
+        )}
+      </Text>
     </Box>
   );
 };
