@@ -136,40 +136,58 @@ export const AppContainer: React.FC<AppContainerProps> = ({
         }
 
         case 'STREAMING_UPDATE': {
-          if (message.content_block) {
-            const block = message.content_block;
+          // Backend sends accumulated content array: [{type: "thinking", thinking: "..."}, {type: "text", text: "..."}]
+          if (message.content && Array.isArray(message.content)) {
+            // Extract thinking content
+            const thinkingBlock = message.content.find((b: any) => b.type === 'thinking');
+            if (thinkingBlock) {
+              setThinkingContent(thinkingBlock.thinking || null);
+            }
 
-            if (block.type === 'thinking') {
-              setThinkingContent(block.thinking || null);
-            } else if (block.type === 'text' && currentStreamingMessageId) {
-              historyManager.updateItem(currentStreamingMessageId, (prev) => {
-                if (prev.type === MessageType.ASSISTANT) {
-                  const assistantItem = prev as AssistantHistoryItem;
-                  return {
-                    content: [...(assistantItem.content || []), { type: 'text' as const, text: block.text }],
-                  };
-                }
-                return {};
+            // Extract text content and update assistant message
+            const textBlocks = message.content.filter((b: any) => b.type === 'text');
+            if (textBlocks.length > 0 && currentStreamingMessageId) {
+              historyManager.updateItem(currentStreamingMessageId, {
+                content: textBlocks.map((b: any) => ({ type: 'text' as const, text: b.text })),
               });
-            } else if (block.type === 'tool_use') {
-              historyManager.addItem({
-                type: MessageType.TOOL_CALL,
-                toolName: block.name,
-                toolInput: block.input || {},
-                toolCallId: block.id,
-              } as Omit<ToolCallHistoryItem, 'id'>);
-            } else if (block.type === 'tool_result') {
-              historyManager.addItem({
-                type: MessageType.TOOL_RESULT,
-                toolCallId: block.tool_use_id,
-                content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
-                isError: block.is_error,
-              } as Omit<ToolResultHistoryItem, 'id'>);
+            }
+
+            // Handle tool calls
+            const toolUseBlocks = message.content.filter((b: any) => b.type === 'tool_use');
+            for (const block of toolUseBlocks) {
+              // Check if we already added this tool call
+              const existingToolCall = historyManager.history.find(
+                (item) => item.type === MessageType.TOOL_CALL && (item as any).toolCallId === block.id
+              );
+              if (!existingToolCall) {
+                historyManager.addItem({
+                  type: MessageType.TOOL_CALL,
+                  toolName: block.name,
+                  toolInput: block.input || {},
+                  toolCallId: block.id,
+                } as Omit<ToolCallHistoryItem, 'id'>);
+              }
+            }
+
+            // Handle tool results
+            const toolResultBlocks = message.content.filter((b: any) => b.type === 'tool_result');
+            for (const block of toolResultBlocks) {
+              const existingResult = historyManager.history.find(
+                (item) => item.type === MessageType.TOOL_RESULT && (item as any).toolCallId === block.tool_use_id
+              );
+              if (!existingResult) {
+                historyManager.addItem({
+                  type: MessageType.TOOL_RESULT,
+                  toolCallId: block.tool_use_id,
+                  content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
+                  isError: block.is_error,
+                } as Omit<ToolResultHistoryItem, 'id'>);
+              }
             }
           }
 
           // Check if streaming is complete
-          if (!message.streaming) {
+          if (message.streaming === false) {
             setIsStreaming(false);
             if (currentStreamingMessageId) {
               historyManager.updateItem(currentStreamingMessageId, { isStreaming: false });
@@ -246,12 +264,18 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       text,
     } as Omit<UserHistoryItem, 'id'>);
 
-    // Send via WebSocket
+    // Send via WebSocket (format matches backend ChatMessageRequest schema)
     connectionManager.send({
       type: 'CHAT_MESSAGE',
-      content: text,
+      message: text,  // Backend expects 'message' field, not 'content'
       session_id: currentSessionId,
       timestamp: new Date().toISOString(),
+      stream_response: true,
+      agent_profile: 'general',
+      enable_memory: true,
+      tts_enabled: false,
+      files: [],
+      mentioned_files: [],
     });
 
     setIsStreaming(true);
