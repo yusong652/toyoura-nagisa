@@ -2,41 +2,63 @@
  * Tool Confirmation Prompt Component
  * Reference: Gemini CLI ui/components/messages/ToolConfirmationMessage.tsx
  *
- * Displays a confirmation prompt for tool execution
+ * Displays a confirmation prompt for tool execution with keyboard navigation.
+ * Uses RadioButtonSelect for up/down arrow key selection.
  */
 
-import React, { useCallback } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React, { useCallback, useMemo } from 'react';
+import { Box, Text } from 'ink';
 import type { ToolConfirmationData } from '../types.js';
 import { theme } from '../colors.js';
+import { RadioButtonSelect, type RadioSelectItem } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ToolConfirmationPromptProps {
   data: ToolConfirmationData;
   onConfirm: (approved: boolean, message?: string) => void;
+  isFocused?: boolean;
 }
+
+type ConfirmationOutcome = 'approve' | 'reject';
 
 export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   data,
   onConfirm,
+  isFocused = true,
 }) => {
-  const handleConfirm = useCallback(
-    (approved: boolean) => {
-      onConfirm(approved);
+  const handleSelect = useCallback(
+    (outcome: ConfirmationOutcome) => {
+      onConfirm(outcome === 'approve');
     },
-    [onConfirm],
+    [onConfirm]
   );
 
-  useInput((input, key) => {
-    if (input === 'y' || input === 'Y') {
-      handleConfirm(true);
-      return;
-    }
+  // Handle escape key to reject
+  useKeypress(
+    (key) => {
+      if (!isFocused) return;
+      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        onConfirm(false);
+      }
+    },
+    { isActive: isFocused }
+  );
 
-    if (input === 'n' || input === 'N' || key.escape) {
-      handleConfirm(false);
-      return;
-    }
-  });
+  const options: Array<RadioSelectItem<ConfirmationOutcome>> = useMemo(
+    () => [
+      {
+        label: 'Yes, allow',
+        value: 'approve' as const,
+        key: 'approve',
+      },
+      {
+        label: 'No, reject (Esc)',
+        value: 'reject' as const,
+        key: 'reject',
+      },
+    ],
+    []
+  );
 
   return (
     <Box
@@ -46,12 +68,14 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       paddingX={1}
       marginY={1}
     >
+      {/* Header */}
       <Box marginBottom={1}>
         <Text bold color={theme.status.warning}>
           ? Tool Confirmation Required
         </Text>
       </Box>
 
+      {/* Tool Info */}
       <Box flexDirection="column" marginBottom={1}>
         <Box>
           <Text color={theme.text.secondary}>Tool: </Text>
@@ -69,17 +93,24 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
 
         {data.command && (
           <Box marginTop={1}>
-            <Text color={theme.text.muted}>{data.command}</Text>
+            <Text color={theme.text.accent}>{data.command}</Text>
           </Box>
         )}
       </Box>
 
+      {/* Question */}
+      <Box marginBottom={1}>
+        <Text color={theme.text.primary}>Allow execution?</Text>
+      </Box>
+
+      {/* Radio Button Select */}
       <Box>
-        <Text color={theme.text.secondary}>
-          Press <Text bold color={theme.status.success}>y</Text> to approve,{' '}
-          <Text bold color={theme.status.error}>n</Text> or{' '}
-          <Text bold color={theme.status.error}>Esc</Text> to reject
-        </Text>
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          isFocused={isFocused}
+          showNumbers={true}
+        />
       </Box>
     </Box>
   );
