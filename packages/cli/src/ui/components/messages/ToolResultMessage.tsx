@@ -17,6 +17,7 @@ const STATUS_INDICATOR_WIDTH = 3;
 
 interface ToolResultMessageProps {
   item: ToolResultHistoryItem;
+  terminalWidth?: number;
 }
 
 /**
@@ -33,16 +34,20 @@ function truncateContent(content: string, maxLines: number): { text: string; tru
   };
 }
 
-export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item }) => {
+export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item, terminalWidth }) => {
   const statusSymbol = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
   const statusColor = item.isError ? theme.status.error : theme.status.success;
   const { text, truncated } = truncateContent(item.content, MAX_RESULT_LINES);
+
+  // Width constraint prevents Ink rendering bug with borders spanning multiple lines
+  const boxWidth = terminalWidth ? terminalWidth : undefined;
 
   return (
     <Box
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
+      width={boxWidth}
     >
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusSymbol}</Text>

@@ -20,6 +20,7 @@ interface ToolCallMessageProps {
   isExecuting?: boolean;
   isSuccess?: boolean;
   isError?: boolean;
+  terminalWidth?: number;
 }
 
 /**
@@ -63,6 +64,7 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   isExecuting = false,
   isSuccess = false,
   isError = false,
+  terminalWidth,
 }) => {
   // Determine status indicator and color
   let statusIndicator: React.ReactNode;
@@ -84,12 +86,16 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
 
   const description = getToolDescription(item.toolName, item.toolInput);
 
+  // Width constraint prevents Ink rendering bug with borders spanning multiple lines
+  const boxWidth = terminalWidth ? terminalWidth : undefined;
+
   return (
     <Box
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={1}
       height={3}
+      width={boxWidth}
     >
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusIndicator}</Text>
