@@ -17,7 +17,7 @@
  * - Dialog system for interactive command responses
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Box } from 'ink';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
 import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js';
@@ -77,6 +77,13 @@ export const MainLayout: React.FC = () => {
   const appActions = useAppActions();
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
 
+  // Track previous width to detect actual changes
+  const previousWidthRef = useRef(terminalWidth);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Key to force re-render of history on terminal resize
+  const [renderKey, setRenderKey] = useState(0);
+
   // Active dialog state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
 
@@ -111,6 +118,33 @@ export const MainLayout: React.FC = () => {
   const { commands, processCommand, commandContext } = useSlashCommandProcessor({
     context: commandProcessorContext,
   });
+
+  // Handle terminal resize - force re-render to fix layout artifacts
+  useEffect(() => {
+    // Only process if width actually changed
+    if (previousWidthRef.current === terminalWidth) {
+      return;
+    }
+    previousWidthRef.current = terminalWidth;
+
+    // Clear any pending timeout
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+
+    // Debounce: wait for resize to settle before refreshing
+    resizeTimeoutRef.current = setTimeout(() => {
+      setRenderKey((prev) => prev + 1);
+      resizeTimeoutRef.current = null;
+    }, 150);
+
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = null;
+      }
+    };
+  }, [terminalWidth]);
 
   // Update text buffer viewport width when terminal size changes
   useEffect(() => {
@@ -297,11 +331,16 @@ export const MainLayout: React.FC = () => {
       {/* Scrollable content area - history and pending items */}
       {/* In alternate buffer mode, we render history directly (not in Static) */}
       {/* This allows proper flex layout calculation */}
-      <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+      {/* Key changes on resize to force re-render and fix layout artifacts */}
+      <Box key={renderKey} flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
         {/* History items - render directly for proper flex behavior */}
-        {appState.history.map((item) => (
-          <HistoryItemDisplay key={item.id} item={item} />
-        ))}
+        {appState.history.length > 0 && (
+          <Box flexDirection="column">
+            {appState.history.map((item) => (
+              <HistoryItemDisplay key={item.id} item={item} />
+            ))}
+          </Box>
+        )}
 
         {/* Pending items - rendered for real-time updates */}
         {appState.pendingHistoryItems.length > 0 && (
