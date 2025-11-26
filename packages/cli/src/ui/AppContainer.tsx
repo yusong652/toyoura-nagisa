@@ -17,6 +17,7 @@ import {
   FileStorageAdapter,
   SessionService,
   apiClient,
+  sessionService,
 } from '@aiNagisa/core';
 import { App } from './App.js';
 import {
@@ -29,7 +30,7 @@ import { StreamingState } from './contexts/StreamingContext.js';
 import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { MessageType, type ConnectionStatus, type AgentProfileType, type AgentProfileInfo } from './types.js';
+import { MessageType, type ConnectionStatus, type AgentProfileType, type AgentProfileInfo, type ContentBlock } from './types.js';
 import { type Config } from '../config/settings.js';
 import { profileCommand } from './commands/profileCommand.js';
 import { memoryCommand } from './commands/memoryCommand.js';
@@ -273,6 +274,56 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     setCurrentSessionId(sessionId);
     historyManager.clearItems();
     clearQueue();
+
+    // Load chat history for the session
+    try {
+      const historyResponse = await sessionService.getSessionHistory(sessionId);
+      if (historyResponse.history && historyResponse.history.length > 0) {
+        // Convert backend messages to CLI history items
+        for (const msg of historyResponse.history) {
+          const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+
+          if (msg.role === 'user') {
+            // User message
+            const content = typeof msg.content === 'string'
+              ? msg.content
+              : Array.isArray(msg.content)
+                ? msg.content.map((c: any) => c.text || '').join('')
+                : '';
+            historyManager.addItem({
+              type: MessageType.USER,
+              text: content,
+            }, timestamp);
+          } else if (msg.role === 'assistant') {
+            // Assistant message - convert content blocks
+            const contentBlocks: ContentBlock[] = [];
+
+            if (typeof msg.content === 'string') {
+              contentBlocks.push({ type: 'text', text: msg.content });
+            } else if (Array.isArray(msg.content)) {
+              for (const block of msg.content) {
+                if (block.type === 'text' && block.text) {
+                  contentBlocks.push({ type: 'text', text: block.text });
+                } else if (block.type === 'thinking' && block.thinking) {
+                  contentBlocks.push({ type: 'thinking', thinking: block.thinking });
+                }
+                // Skip tool_use and tool_result blocks for now
+              }
+            }
+
+            if (contentBlocks.length > 0) {
+              historyManager.addItem({
+                type: MessageType.ASSISTANT,
+                content: contentBlocks,
+              }, timestamp);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[AppContainer] Failed to load session history:', err);
+    }
+
     await connectionManager.connectToSession(sessionId);
   }, [connectionManager, historyManager, clearQueue]);
 

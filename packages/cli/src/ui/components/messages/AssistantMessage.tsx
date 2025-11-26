@@ -65,7 +65,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item }) => {
   }
 
   return (
-    <Box flexDirection="row" marginY={1}>
+    <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>

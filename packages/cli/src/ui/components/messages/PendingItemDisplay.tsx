@@ -74,7 +74,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
   const isStreaming = item.isStreaming === true;
 
   return (
-    <Box flexDirection="row" marginY={1}>
+    <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>
@@ -96,7 +96,7 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 // Pending Tool Call Message
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
   return (
-    <Box marginY={1} flexDirection="row">
+    <Box marginBottom={1} flexDirection="row">
       <Text color={theme.status.warning}>{TOOL_STATUS.EXECUTING} </Text>
       <Text color={theme.text.secondary}>
         {item.toolName}
@@ -115,7 +115,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
 
   return (
-    <Box marginY={1} flexDirection="column">
+    <Box marginBottom={1} flexDirection="column">
       <Box flexDirection="row">
         <Text color={statusColor}>{statusIcon} </Text>
         <Text color={theme.text.muted}>Tool result</Text>
@@ -134,7 +134,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
 // Pending Error Message
 const PendingErrorMessage: React.FC<{ item: ErrorHistoryItemWithoutId }> = ({ item }) => {
   return (
-    <Box marginY={1}>
+    <Box marginBottom={1}>
       <Text color={theme.status.error}>Error: {item.message}</Text>
     </Box>
   );
@@ -156,7 +156,7 @@ export const PendingItemDisplay: React.FC<PendingItemDisplayProps> = ({ item }) 
 
     default:
       return (
-        <Box marginY={1}>
+        <Box marginBottom={1}>
           <Text color={theme.text.muted}>Pending: {(item as any).type}</Text>
         </Box>
       );

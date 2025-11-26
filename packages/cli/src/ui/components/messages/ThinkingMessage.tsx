@@ -17,7 +17,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({ item }) => {
   const prefixWidth = prefix.length;
 
   return (
-    <Box flexDirection="row" marginY={1}>
+    <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.message.thinking}>{prefix}</Text>
       </Box>

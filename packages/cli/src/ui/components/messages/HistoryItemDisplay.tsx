@@ -48,7 +48,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
 
     default:
       return (
-        <Box marginY={1}>
+        <Box marginBottom={1}>
           <Text color={theme.text.muted}>Unknown message type</Text>
         </Box>
       );
