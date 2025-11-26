@@ -21,8 +21,8 @@ export const nagisaAscii = `
 @@@@@@@@@@@@@@@@@
 @ @@@@@@@@@@@@@ @
 @@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@
-    @@@@@@@@@
+ @@@@@@@@@@@@@@@
+   @@@@@@@@@@@
 `;
 
 // Full logo with Nagisa - for wide terminals (95+ columns)
@@ -37,8 +37,8 @@ export const fullAsciiLogo = `
 @@@@@@@@@@@@@@@@@
 @ @@@@@@@@@@@@@ @
 @@@@@@@@@@@@@@@@@
-  @@@@@@@@@@@@@
-    @@@@@@@@@
+ @@@@@@@@@@@@@@@
+   @@@@@@@@@@@
 `;
 
 // Short logo - for medium terminals (60+ columns)
@@ -49,7 +49,7 @@ export const shortAsciiLogo = `
 @@@ @@@@@ @@@   \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
 @ @@@@@@@@@ @                        |___/
 @@@@@@@@@@@@@@@
-  @@@@@@@@@@@
+ @@@@@@@@@@@@@
 `;
 
 // Tiny logo - for narrow terminals (40+ columns)
