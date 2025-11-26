@@ -87,7 +87,7 @@ export interface UseChatStreamReturn {
   pendingHistoryItems: HistoryItemWithoutId[];
 
   // Actions
-  submitQuery: (text: string) => void;
+  submitQuery: (text: string, mentionedFiles?: string[]) => void;
   cancelRequest: () => void;
   confirmTool: (approved: boolean, message?: string) => void;
   clearError: () => void;
@@ -397,7 +397,7 @@ export function useChatStream({
   }, [connectionManager, handleMessageCreate, handleStreamingUpdate, handleToolConfirmationRequest, handleToolResultUpdate, handleError]);
 
   // Submit a query
-  const submitQuery = useCallback(async (text: string) => {
+  const submitQuery = useCallback(async (text: string, mentionedFiles?: string[]) => {
     if (!text.trim() || isStreaming) return;
 
     // Add user message to history (committed immediately)
@@ -417,7 +417,7 @@ export function useChatStream({
       enable_memory: memoryEnabled,
       tts_enabled: false,
       files: [],
-      mentioned_files: [],
+      mentioned_files: mentionedFiles || [],
     });
 
     if (!sent) {

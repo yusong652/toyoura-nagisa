@@ -74,7 +74,7 @@ export interface AppActions {
   setMemoryEnabled: (enabled: boolean) => void;
 
   // Messages
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string, mentionedFiles?: string[]) => void;
   cancelRequest: () => void;
 
   // Tool confirmation

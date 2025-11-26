@@ -27,23 +27,30 @@
 
 import React, { useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { replaceMention } from '@aiNagisa/core/utils';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
+import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { theme } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import { FileMentionSuggestions } from './FileMentionSuggestions.js';
 import type { SlashCommand, CommandContext } from '../commands/types.js';
 import type { TextBuffer } from '../utils/text-buffer.js';
 
 interface InputPromptProps {
   /** Text buffer for input state - managed by parent to survive unmount */
   buffer: TextBuffer;
-  onSubmit: (text: string) => void | Promise<void>;
+  onSubmit: (text: string, mentionedFiles?: string[]) => void | Promise<void>;
   onSlashCommand?: (command: string, args: string) => void | Promise<void>;
   slashCommands?: readonly SlashCommand[];
   commandContext?: CommandContext;
   disabled?: boolean;
   placeholder?: string;
+  /** Agent profile for file search */
+  agentProfile?: string;
+  /** Session ID for file search */
+  sessionId?: string;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -54,6 +61,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   commandContext,
   disabled = false,
   placeholder = 'Type your message...',
+  agentProfile = 'general',
+  sessionId,
 }) => {
   const prefix = '> ';
   const continuationPrefix = '  ';  // No dot for continuation lines
@@ -62,6 +71,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Track if last character was backslash (for \ + Enter newline)
   const lastKeyWasBackslash = useRef(false);
 
+  // Track mentioned files
+  const mentionedFilesRef = useRef<string[]>([]);
+
   // Slash command completion
   const completion = useSlashCompletion({
     input: buffer.text,
@@ -69,6 +81,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     commandContext,
     enabled: !disabled && slashCommands.length > 0,
   });
+
+  // File mention detection
+  const fileMention = useFileMentionDetection(
+    buffer.text,
+    buffer.absoluteCursor,
+    agentProfile,
+    sessionId
+  );
 
   // Check if input is a slash command
   const isSlashCommand = (text: string): boolean => {
@@ -92,12 +112,46 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     };
   };
 
+  // Handle file mention selection
+  const handleFileMentionSelect = useCallback(() => {
+    const suggestion = fileMention.getSelectedSuggestion();
+    if (!suggestion) return;
+
+    const { atPosition } = fileMention.context;
+    if (atPosition === -1) return;
+
+    // Replace the mention query with the selected file path
+    const { text: newText, cursor: newCursor } = replaceMention(
+      buffer.text,
+      atPosition,
+      buffer.absoluteCursor,
+      suggestion.file.path
+    );
+
+    // Add space after the file path
+    const finalText = newText.slice(0, newCursor) + ' ' + newText.slice(newCursor);
+    buffer.setText(finalText);
+    buffer.setCursorToAbsolute(newCursor + 1);
+
+    // Track the mentioned file
+    if (!mentionedFilesRef.current.includes(suggestion.file.path)) {
+      mentionedFilesRef.current.push(suggestion.file.path);
+    }
+
+    fileMention.clearMention();
+  }, [buffer, fileMention]);
+
   // Handle submit and clear
   // Clear buffer BEFORE calling handlers to prevent re-submission issues
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      // Capture mentioned files before clearing
+      const mentionedFiles = [...mentionedFilesRef.current];
+
       buffer.setText('');
       completion.reset();
+      fileMention.clearMention();
+      mentionedFilesRef.current = [];
       lastKeyWasBackslash.current = false;
 
       // Check for slash command
@@ -109,9 +163,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      onSubmit(submittedValue);
+      onSubmit(submittedValue, mentionedFiles.length > 0 ? mentionedFiles : undefined);
     },
-    [buffer, completion, onSubmit, onSlashCommand]
+    [buffer, completion, fileMention, onSubmit, onSlashCommand]
   );
 
   // Handle submit
@@ -183,7 +237,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (key: Key) => {
       if (disabled) return;
 
-      // Handle suggestion navigation when suggestions are visible
+      // Handle file mention navigation when file suggestions are visible
+      if (fileMention.isMentionActive) {
+        // Up arrow - navigate file suggestions
+        if (key.name === 'up') {
+          fileMention.selectPrevious();
+          return;
+        }
+        // Down arrow - navigate file suggestions
+        if (key.name === 'down') {
+          fileMention.selectNext();
+          return;
+        }
+        // Tab or Enter - select file suggestion
+        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl && !key.shift && !key.meta)) {
+          handleFileMentionSelect();
+          return;
+        }
+        // Escape - dismiss file suggestions
+        if (key.name === 'escape') {
+          fileMention.clearMention();
+          return;
+        }
+      }
+
+      // Handle slash command suggestion navigation when suggestions are visible
       if (completion.showSuggestions) {
         // Up arrow - navigate suggestions
         if (key.name === 'up') {
@@ -245,7 +323,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Delegate to buffer's handleInput for all other keys
       buffer.handleInput(key);
     },
-    [disabled, buffer, handleSubmit, handleBackslashEnter, completion, handleAutocomplete, handleAutocompleteAndExecute]
+    [disabled, buffer, handleSubmit, handleBackslashEnter, completion, handleAutocomplete, handleAutocompleteAndExecute, fileMention, handleFileMentionSelect]
   );
 
   useKeypress(handleKeypress, { isActive: !disabled });
@@ -322,8 +400,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         )}
       </Box>
 
-      {/* Suggestions popup (below input) */}
-      {completion.showSuggestions && (
+      {/* File mention suggestions popup (below input) */}
+      {fileMention.isMentionActive && (
+        <FileMentionSuggestions
+          suggestions={fileMention.suggestions}
+          selectedIndex={fileMention.selectedIndex}
+          isLoading={fileMention.isSearching}
+        />
+      )}
+
+      {/* Slash command suggestions popup (below input) */}
+      {completion.showSuggestions && !fileMention.isMentionActive && (
         <SuggestionsDisplay
           suggestions={completion.suggestions}
           activeIndex={completion.activeIndex}

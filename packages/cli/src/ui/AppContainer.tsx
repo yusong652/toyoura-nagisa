@@ -113,7 +113,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // Message queue (queue messages during streaming)
   // Note: Declared before useChatStream because useMessageQueue needs submitQuery
   // We'll create a ref to handle the circular dependency
-  const submitQueryRef = useRef<((text: string) => void) | null>(null);
+  const submitQueryRef = useRef<((text: string, mentionedFiles?: string[]) => void) | null>(null);
 
   const {
     messageQueue,
@@ -192,15 +192,15 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   // ========== Actions ==========
 
   // Send message (uses queue if streaming, otherwise direct submit)
-  const sendMessage = useCallback((text: string) => {
+  const sendMessage = useCallback((text: string, mentionedFiles?: string[]) => {
     if (!text.trim()) return;
 
     if (isStreaming || streamingStateEnum !== StreamingState.Idle) {
-      // Queue message if currently streaming
+      // Queue message if currently streaming (mentionedFiles will be lost)
       addMessage(text);
     } else {
       // Direct submit
-      submitQuery(text);
+      submitQuery(text, mentionedFiles);
     }
   }, [isStreaming, streamingStateEnum, addMessage, submitQuery]);
 

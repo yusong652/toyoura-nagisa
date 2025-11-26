@@ -32,7 +32,8 @@ export type TextBufferAction =
   | { type: 'newline' }
   | { type: 'delete_word_left' }
   | { type: 'kill_line_left' }
-  | { type: 'kill_line_right' };
+  | { type: 'kill_line_right' }
+  | { type: 'set_cursor_absolute'; payload: number };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reducer Logic
@@ -296,6 +297,37 @@ function textBufferReducer(
       return state;
     }
 
+    case 'set_cursor_absolute': {
+      const position = action.payload;
+      const { lines } = state;
+
+      // Convert absolute position to row/col
+      let remaining = position;
+      let newRow = 0;
+      let newCol = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineLen = cpLen(lines[i]);
+        if (remaining <= lineLen) {
+          newRow = i;
+          newCol = remaining;
+          break;
+        }
+        remaining -= lineLen + 1; // +1 for newline character
+        if (i === lines.length - 1) {
+          // Past end of text, put cursor at end
+          newRow = i;
+          newCol = lineLen;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: newRow,
+        cursorCol: newCol,
+      };
+    }
+
     default:
       return state;
   }
@@ -315,6 +347,7 @@ export interface TextBuffer {
   lines: string[];
   text: string;
   cursor: [number, number]; // [row, col]
+  absoluteCursor: number; // Absolute cursor position in text
 
   // Actions
   setText: (text: string) => void;
@@ -327,6 +360,7 @@ export interface TextBuffer {
   killLineLeft: () => void;
   killLineRight: () => void;
   handleInput: (key: Key) => void;
+  setCursorToAbsolute: (position: number) => void;
 }
 
 export function useTextBuffer({
@@ -391,6 +425,20 @@ export function useTextBuffer({
     dispatch({ type: 'kill_line_right' });
   }, []);
 
+  const setCursorToAbsolute = useCallback((position: number): void => {
+    dispatch({ type: 'set_cursor_absolute', payload: position });
+  }, []);
+
+  // Calculate absolute cursor position
+  const absoluteCursor = useMemo(() => {
+    let pos = 0;
+    for (let i = 0; i < cursorRow; i++) {
+      pos += cpLen(lines[i]) + 1; // +1 for newline
+    }
+    pos += cursorCol;
+    return pos;
+  }, [lines, cursorRow, cursorCol]);
+
   // Handle keyboard input
   const handleInput = useCallback(
     (key: Key): void => {
@@ -440,6 +488,7 @@ export function useTextBuffer({
       lines,
       text,
       cursor: [cursorRow, cursorCol] as [number, number],
+      absoluteCursor,
       setText,
       insert,
       newline,
@@ -450,12 +499,14 @@ export function useTextBuffer({
       killLineLeft,
       killLineRight,
       handleInput,
+      setCursorToAbsolute,
     }),
     [
       lines,
       text,
       cursorRow,
       cursorCol,
+      absoluteCursor,
       setText,
       insert,
       newline,
@@ -466,6 +517,7 @@ export function useTextBuffer({
       killLineLeft,
       killLineRight,
       handleInput,
+      setCursorToAbsolute,
     ]
   );
 }

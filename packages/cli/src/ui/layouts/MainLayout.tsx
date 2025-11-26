@@ -432,6 +432,8 @@ export const MainLayout: React.FC = () => {
           slashCommands={commands}
           commandContext={commandContext}
           disabled={appState.isStreaming}
+          agentProfile={appState.currentProfile}
+          sessionId={appState.currentSessionId || undefined}
         />
       )}
 
