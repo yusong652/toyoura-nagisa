@@ -9,13 +9,13 @@ import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
 import type { AgentProfileType } from '../types.js';
 
-// Profile display info (icon and color)
-const PROFILE_DISPLAY: Record<AgentProfileType, { icon: string; color: string; name: string }> = {
-  coding: { icon: '\uD83D\uDCBB', color: '#4CAF50', name: 'Coding' },
-  lifestyle: { icon: '\uD83C\uDF1F', color: '#FF9800', name: 'Lifestyle' },
-  pfc: { icon: '\u269B\uFE0F', color: '#9C27B0', name: 'PFC' },
-  general: { icon: '\uD83E\uDD16', color: '#607D8B', name: 'General' },
-  disabled: { icon: '\uD83D\uDEAB', color: '#F44336', name: 'Disabled' },
+// Profile display info (color)
+const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }> = {
+  coding: { color: '#4CAF50', name: 'Coding' },
+  lifestyle: { color: '#FF9800', name: 'Lifestyle' },
+  pfc: { color: '#9C27B0', name: 'PFC' },
+  general: { color: '#607D8B', name: 'General' },
+  disabled: { color: '#F44336', name: 'Disabled' },
 };
 
 export const Header: React.FC = () => {
@@ -51,11 +51,11 @@ export const Header: React.FC = () => {
         )}
         <Text color={theme.text.muted}> | </Text>
         <Text color={profileInfo.color}>
-          {profileInfo.icon} {profileInfo.name}
+          {profileInfo.name}
         </Text>
         <Text color={theme.text.muted}> | </Text>
         <Text color={appState.memoryEnabled ? '#4CAF50' : theme.text.muted}>
-          {appState.memoryEnabled ? '\uD83E\uDDE0 Memory' : '\uD83E\uDDE0'}
+          {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}
         </Text>
       </Box>
       <Box>
