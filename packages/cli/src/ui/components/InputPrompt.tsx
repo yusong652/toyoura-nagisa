@@ -6,9 +6,12 @@
  * Uses TextBuffer with useReducer for reliable state management,
  * preventing issues with IME rapid character input.
  *
+ * IMPORTANT: The buffer is passed as a prop from the parent component
+ * to preserve state when dialogs are opened (component unmounts/remounts).
+ *
  * Supports:
  * - Left/Right arrow keys for cursor movement
- * - Up/Down arrow keys for line navigation
+ * - Up/Down arrow keys for line navigation (or suggestion navigation)
  * - Ctrl+A/Home for beginning of line
  * - Ctrl+E/End for end of line
  * - Backspace/Delete for character deletion
@@ -17,24 +20,38 @@
  * - Ctrl+W to delete word backward
  * - Ctrl+J for newline
  * - \ + Enter for newline (works in all terminals)
+ * - Tab to accept suggestion
  * - Enter to submit
+ * - Slash commands with autocomplete (/)
  */
 
 import React, { useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { useTextBuffer } from '../utils/text-buffer.js';
+import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { theme } from '../colors.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import type { SlashCommand, CommandContext } from '../commands/types.js';
+import type { TextBuffer } from '../utils/text-buffer.js';
 
 interface InputPromptProps {
+  /** Text buffer for input state - managed by parent to survive unmount */
+  buffer: TextBuffer;
   onSubmit: (text: string) => void | Promise<void>;
+  onSlashCommand?: (command: string, args: string) => void | Promise<void>;
+  slashCommands?: readonly SlashCommand[];
+  commandContext?: CommandContext;
   disabled?: boolean;
   placeholder?: string;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
+  buffer,
   onSubmit,
+  onSlashCommand,
+  slashCommands = [],
+  commandContext,
   disabled = false,
   placeholder = 'Type your message...',
 }) => {
@@ -45,18 +62,90 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Track if last character was backslash (for \ + Enter newline)
   const lastKeyWasBackslash = useRef(false);
 
-  // Use TextBuffer for reliable state management
-  const buffer = useTextBuffer();
+  // Slash command completion
+  const completion = useSlashCompletion({
+    input: buffer.text,
+    commands: slashCommands,
+    commandContext,
+    enabled: !disabled && slashCommands.length > 0,
+  });
+
+  // Check if input is a slash command
+  const isSlashCommand = (text: string): boolean => {
+    const trimmed = text.trim();
+    return trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/*');
+  };
+
+  // Parse slash command from input
+  const parseSlashCommand = (text: string): { name: string; args: string } | null => {
+    const trimmed = text.trim();
+    if (!isSlashCommand(trimmed)) return null;
+
+    const content = trimmed.substring(1); // Remove "/"
+    const spaceIndex = content.indexOf(' ');
+    if (spaceIndex === -1) {
+      return { name: content, args: '' };
+    }
+    return {
+      name: content.substring(0, spaceIndex),
+      args: content.substring(spaceIndex + 1).trim(),
+    };
+  };
+
+  // Handle submit and clear
+  // Clear buffer BEFORE calling handlers to prevent re-submission issues
+  const handleSubmitAndClear = useCallback(
+    (submittedValue: string) => {
+      buffer.setText('');
+      completion.reset();
+      lastKeyWasBackslash.current = false;
+
+      // Check for slash command
+      if (isSlashCommand(submittedValue) && onSlashCommand) {
+        const parsed = parseSlashCommand(submittedValue);
+        if (parsed) {
+          onSlashCommand(parsed.name, parsed.args);
+          return;
+        }
+      }
+
+      onSubmit(submittedValue);
+    },
+    [buffer, completion, onSubmit, onSlashCommand]
+  );
 
   // Handle submit
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(() => {
     const fullText = buffer.text.trim();
     if (!fullText || disabled) return;
+    handleSubmitAndClear(fullText);
+  }, [buffer, disabled, handleSubmitAndClear]);
 
-    await onSubmit(fullText);
-    buffer.setText('');
-    lastKeyWasBackslash.current = false;
-  }, [buffer, disabled, onSubmit]);
+  // Handle autocomplete selection
+  const handleAutocomplete = useCallback(() => {
+    const selectedValue = completion.getSelectedValue();
+    if (!selectedValue) return;
+
+    const { start, end } = completion.completionRange;
+    const text = buffer.text;
+
+    // Build new text with the selected value
+    let newText: string;
+    if (start === 0 && end === text.length) {
+      // Replace entire command
+      newText = '/' + selectedValue + ' ';
+    } else if (start === end) {
+      // Insert at position
+      newText = text.slice(0, start) + selectedValue + ' ' + text.slice(end);
+    } else {
+      // Replace range
+      const prefixText = text.slice(0, start);
+      const suffix = text.slice(end);
+      newText = prefixText + selectedValue + ' ' + suffix;
+    }
+
+    buffer.setText(newText);
+  }, [buffer, completion]);
 
   // Check if key matches newline command (Ctrl+J, or modifiers + Enter)
   const isNewlineKey = (key: Key): boolean => {
@@ -78,9 +167,50 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.newline();
   }, [buffer]);
 
+  // Handle autocomplete and execute: select suggestion and immediately submit
+  const handleAutocompleteAndExecute = useCallback(() => {
+    const selectedValue = completion.getSelectedValue();
+    if (!selectedValue) return;
+
+    // Build command text with the selected value
+    const commandText = '/' + selectedValue;
+
+    // Submit the command directly
+    handleSubmitAndClear(commandText);
+  }, [completion, handleSubmitAndClear]);
+
   const handleKeypress = useCallback(
     (key: Key) => {
       if (disabled) return;
+
+      // Handle suggestion navigation when suggestions are visible
+      if (completion.showSuggestions) {
+        // Up arrow - navigate suggestions
+        if (key.name === 'up') {
+          completion.navigateUp();
+          return;
+        }
+        // Down arrow - navigate suggestions
+        if (key.name === 'down') {
+          completion.navigateDown();
+          return;
+        }
+        // Tab - accept suggestion (autocomplete only, don't execute)
+        if (key.name === 'tab') {
+          handleAutocomplete();
+          return;
+        }
+        // Enter - accept suggestion and execute command
+        if (key.name === 'return' && !key.ctrl && !key.shift && !key.meta) {
+          handleAutocompleteAndExecute();
+          return;
+        }
+        // Escape - hide suggestions (reset)
+        if (key.name === 'escape') {
+          completion.reset();
+          return;
+        }
+      }
 
       // Check for backslash + Enter (newline in all terminals)
       if (key.name === 'return' && lastKeyWasBackslash.current) {
@@ -108,13 +238,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Ctrl+C to clear input
       if (key.ctrl && key.name === 'c') {
         buffer.setText('');
+        completion.reset();
         return;
       }
 
       // Delegate to buffer's handleInput for all other keys
       buffer.handleInput(key);
     },
-    [disabled, buffer, handleSubmit, handleBackslashEnter]
+    [disabled, buffer, handleSubmit, handleBackslashEnter, completion, handleAutocomplete, handleAutocompleteAndExecute]
   );
 
   useKeypress(handleKeypress, { isActive: !disabled });
@@ -171,22 +302,35 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   };
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={disabled ? theme.border.default : theme.border.focused}
-      paddingX={1}
-    >
-      {disabled ? (
-        <Box flexDirection="row">
-          <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.muted}>{prefix}</Text>
-          </Box>
-          <Text color={theme.text.muted}>...</Text>
-        </Box>
-      ) : (
-        buffer.lines.map((line, index) => renderLine(line, index, index === cursorRow))
+    <Box flexDirection="column">
+      {/* Suggestions popup (above input) */}
+      {completion.showSuggestions && (
+        <SuggestionsDisplay
+          suggestions={completion.suggestions}
+          activeIndex={completion.activeIndex}
+          isLoading={completion.isLoading}
+          scrollOffset={completion.scrollOffset}
+        />
       )}
+
+      {/* Input box */}
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={disabled ? theme.border.default : theme.border.focused}
+        paddingX={1}
+      >
+        {disabled ? (
+          <Box flexDirection="row">
+            <Box width={prefixWidth} flexShrink={0}>
+              <Text color={theme.text.muted}>{prefix}</Text>
+            </Box>
+            <Text color={theme.text.muted}>...</Text>
+          </Box>
+        ) : (
+          buffer.lines.map((line, index) => renderLine(line, index, index === cursorRow))
+        )}
+      </Box>
     </Box>
   );
 };

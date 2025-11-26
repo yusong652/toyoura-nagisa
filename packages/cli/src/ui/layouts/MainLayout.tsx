@@ -13,9 +13,11 @@
  * - <Static> renders committed history items (won't change)
  * - Pending items are rendered outside <Static> for real-time updates
  * - Terminal resize triggers history refresh to prevent rendering artifacts
+ * - Slash commands with autocomplete support
+ * - Dialog system for interactive command responses
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Static, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
@@ -26,7 +28,14 @@ import { Header } from '../components/Header.js';
 import { Footer } from '../components/Footer.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
+import { ProfileSelectDialog } from '../components/ProfileSelectDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
+import { useTextBuffer } from '../utils/text-buffer.js';
+import { MessageType, type AgentProfileType } from '../types.js';
+
+// Dialog types
+type ActiveDialog = 'profile' | 'memory' | null;
 
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
@@ -37,6 +46,34 @@ export const MainLayout: React.FC = () => {
 
   // Key to force re-mount of Static component on terminal resize
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
+
+  // Active dialog state
+  const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
+
+  // Input buffer - created here to survive InputPrompt unmount/remount
+  // This is the key pattern from gemini-cli to preserve state across dialogs
+  const buffer = useTextBuffer();
+
+  // Slash command processor context
+  const commandProcessorContext = useMemo(() => ({
+    ui: {
+      addItem: (item: any, timestamp?: number) => {
+        appActions.addHistoryItem(item, timestamp);
+      },
+      clear: appActions.clearHistory,
+      setPendingItem: () => {},
+      reloadCommands: () => {},
+    },
+    session: {
+      currentSessionId: appState.currentSessionId,
+      stats: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    },
+  }), [appActions, appState.currentSessionId]);
+
+  // Initialize slash command processor
+  const { commands, processCommand, commandContext } = useSlashCommandProcessor({
+    context: commandProcessorContext,
+  });
 
   // Refresh static content by clearing terminal and forcing re-render
   const refreshStatic = useCallback(() => {
@@ -59,6 +96,75 @@ export const MainLayout: React.FC = () => {
       clearTimeout(handler);
     };
   }, [terminalWidth, refreshStatic]);
+
+  // Handle profile selection from dialog
+  const handleProfileSelect = useCallback((profile: AgentProfileType) => {
+    appActions.setProfile(profile);
+    appActions.addHistoryItem({
+      type: MessageType.INFO,
+      message: `Switched to ${profile} profile`,
+    });
+    setActiveDialog(null);
+  }, [appActions]);
+
+  // Handle dialog cancel
+  const handleDialogCancel = useCallback(() => {
+    setActiveDialog(null);
+  }, []);
+
+  // Handle slash command execution
+  const handleSlashCommand = useCallback(async (name: string, args: string) => {
+    const result = await processCommand(name, args);
+
+    if (!result) return;
+
+    // Handle different result types
+    switch (result.type) {
+      case 'message':
+        appActions.addHistoryItem({
+          type: result.messageType === 'error' ? MessageType.ERROR : MessageType.INFO,
+          message: result.content,
+        });
+        break;
+
+      case 'memory_toggle':
+        appActions.setMemoryEnabled(result.enabled);
+        appActions.addHistoryItem({
+          type: MessageType.INFO,
+          message: `Memory ${result.enabled ? 'enabled' : 'disabled'}`,
+        });
+        break;
+
+      case 'quit':
+        appActions.quit();
+        break;
+
+      case 'dialog':
+        // Open the appropriate dialog
+        if (result.dialog === 'profile') {
+          setActiveDialog('profile');
+        }
+        break;
+
+      case 'load_history':
+        // Load history items
+        for (const item of result.history) {
+          appActions.addHistoryItem(item);
+        }
+        break;
+
+      case 'submit_prompt':
+        // Submit as a regular message
+        appActions.sendMessage(result.content);
+        break;
+
+      default:
+        break;
+    }
+  }, [processCommand, appActions]);
+
+  // Check if a dialog is active
+  const isDialogActive = activeDialog !== null;
 
   return (
     <Box flexDirection="column" width="100%">
@@ -92,10 +198,23 @@ export const MainLayout: React.FC = () => {
         />
       )}
 
-      {/* Input area */}
-      {appState.isInputActive && !appState.pendingConfirmation && (
+      {/* Profile selection dialog */}
+      {activeDialog === 'profile' && (
+        <ProfileSelectDialog
+          currentProfile={appState.currentProfile}
+          onSelect={handleProfileSelect}
+          onCancel={handleDialogCancel}
+        />
+      )}
+
+      {/* Input area with slash command support */}
+      {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
         <InputPrompt
+          buffer={buffer}
           onSubmit={appActions.sendMessage}
+          onSlashCommand={handleSlashCommand}
+          slashCommands={commands}
+          commandContext={commandContext}
           disabled={appState.isStreaming}
         />
       )}
