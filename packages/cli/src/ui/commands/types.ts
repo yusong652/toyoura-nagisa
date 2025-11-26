@@ -90,7 +90,7 @@ export interface QuitActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'help' | 'profile' | 'session' | 'settings';
+  dialog: 'help' | 'profile' | 'memory' | 'session' | 'settings';
   props?: Record<string, unknown>;
 }
 

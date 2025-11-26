@@ -28,7 +28,7 @@ import { Header } from '../components/Header.js';
 import { Footer } from '../components/Footer.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
-import { ProfileSelectDialog } from '../components/ProfileSelectDialog.js';
+import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
@@ -36,6 +36,21 @@ import { MessageType, type AgentProfileType } from '../types.js';
 
 // Dialog types
 type ActiveDialog = 'profile' | 'memory' | null;
+
+// Profile options for SelectDialog
+const PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
+  { key: 'coding', value: 'coding', label: 'Coding', description: 'Code development and programming tasks' },
+  { key: 'lifestyle', value: 'lifestyle', label: 'Lifestyle', description: 'Daily life, email, calendar, and communication' },
+  { key: 'pfc', value: 'pfc', label: 'PFC', description: 'ITASCA PFC simulation specialist' },
+  { key: 'general', value: 'general', label: 'General', description: 'Full tool capabilities for complex tasks' },
+  { key: 'disabled', value: 'disabled', label: 'Disabled', description: 'Pure text conversation mode (no tools)' },
+];
+
+// Memory options for SelectDialog
+const MEMORY_OPTIONS: SelectOption<boolean>[] = [
+  { key: 'on', value: true, label: 'On', description: 'AI can recall previous conversations' },
+  { key: 'off', value: false, label: 'Off', description: 'No long-term memory, fresh context each time' },
+];
 
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
@@ -107,6 +122,16 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
   }, [appActions]);
 
+  // Handle memory selection from dialog
+  const handleMemorySelect = useCallback((enabled: boolean) => {
+    appActions.setMemoryEnabled(enabled);
+    appActions.addHistoryItem({
+      type: MessageType.INFO,
+      message: `Memory ${enabled ? 'enabled' : 'disabled'}`,
+    });
+    setActiveDialog(null);
+  }, [appActions]);
+
   // Handle dialog cancel
   const handleDialogCancel = useCallback(() => {
     setActiveDialog(null);
@@ -143,6 +168,8 @@ export const MainLayout: React.FC = () => {
         // Open the appropriate dialog
         if (result.dialog === 'profile') {
           setActiveDialog('profile');
+        } else if (result.dialog === 'memory') {
+          setActiveDialog('memory');
         }
         break;
 
@@ -200,9 +227,25 @@ export const MainLayout: React.FC = () => {
 
       {/* Profile selection dialog */}
       {activeDialog === 'profile' && (
-        <ProfileSelectDialog
-          currentProfile={appState.currentProfile}
+        <SelectDialog
+          title="Select Agent Profile"
+          description="Choose a profile to optimize tool loading for your task:"
+          options={PROFILE_OPTIONS}
+          currentValue={appState.currentProfile}
           onSelect={handleProfileSelect}
+          onCancel={handleDialogCancel}
+          showNumbers={true}
+        />
+      )}
+
+      {/* Memory selection dialog */}
+      {activeDialog === 'memory' && (
+        <SelectDialog
+          title="Toggle Memory"
+          description="Enable or disable long-term conversation memory:"
+          options={MEMORY_OPTIONS}
+          currentValue={appState.memoryEnabled}
+          onSelect={handleMemorySelect}
           onCancel={handleDialogCancel}
         />
       )}
