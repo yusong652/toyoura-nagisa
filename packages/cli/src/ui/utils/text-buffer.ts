@@ -411,16 +411,21 @@ export function useTextBuffer({
         move('end');
       }
       // Deletion
-      else if (key.name === 'backspace' || input === '\x7f' || (key.ctrl && key.name === 'h')) {
+      // Ctrl+U: delete to beginning of line
+      else if (key.ctrl && key.name === 'u') {
+        killLineLeft();
+      }
+      // Ctrl+K: delete to end of line
+      else if (key.ctrl && key.name === 'k') {
+        killLineRight();
+      }
+      // Ctrl+W: delete word backward
+      else if (key.ctrl && key.name === 'w') {
+        deleteWordLeft();
+      } else if (key.name === 'backspace' || input === '\x7f' || (key.ctrl && key.name === 'h')) {
         backspace();
       } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) {
         del();
-      } else if (key.ctrl && key.name === 'w') {
-        deleteWordLeft();
-      } else if (key.ctrl && key.name === 'u') {
-        killLineLeft();
-      } else if (key.ctrl && key.name === 'k') {
-        killLineRight();
       }
       // Insertable characters
       else if (key.insertable && input) {

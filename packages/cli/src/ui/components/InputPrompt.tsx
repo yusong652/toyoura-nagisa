@@ -15,8 +15,8 @@
  * - Ctrl+A/Home for beginning of line
  * - Ctrl+E/End for end of line
  * - Backspace/Delete for character deletion
- * - Ctrl+U to clear line (to beginning)
- * - Ctrl+K to kill line (to end)
+ * - Ctrl+U to delete to beginning of line
+ * - Ctrl+K to delete to end of line
  * - Ctrl+W to delete word backward
  * - Ctrl+J for newline
  * - \ + Enter for newline (works in all terminals)
