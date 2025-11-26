@@ -39,7 +39,7 @@ export const Header: React.FC = () => {
   const profileInfo = PROFILE_DISPLAY[appState.currentProfile] || PROFILE_DISPLAY.general;
 
   return (
-    <Box flexDirection="row" justifyContent="space-between" marginBottom={1}>
+    <Box flexDirection="row" justifyContent="space-between">
       <Box>
         <Text bold color={theme.text.accent}>
           aiNagisa

@@ -438,8 +438,8 @@ export const MainLayout: React.FC = () => {
       {/* Status bar - below input */}
       <Header />
 
-      {/* Footer */}
-      <Footer />
+      {/* Footer - only show when no history (initial state) */}
+      {appState.history.length === 0 && <Footer />}
     </Box>
   );
 };
