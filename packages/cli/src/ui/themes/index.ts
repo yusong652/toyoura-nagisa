@@ -3,6 +3,9 @@
  * Supports multiple color schemes with runtime switching
  */
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 export type ThemeName = 'github' | 'monokai' | 'dracula' | 'nord';
 
 export interface ThemeColors {
@@ -232,6 +235,28 @@ export const themes: Record<ThemeName, ThemeDefinition> = {
 class ThemeManager {
   private currentThemeName: ThemeName = 'github';
   private listeners: Set<() => void> = new Set();
+  private initialized = false;
+
+  /**
+   * Initialize theme from saved config
+   * Should be called once at app startup
+   */
+  initialize(): void {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    try {
+      // Dynamic import to avoid circular dependencies
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { loadConfig } = require('../config/index.js') as { loadConfig: () => { theme?: ThemeName } };
+      const config = loadConfig();
+      if (config.theme && themes[config.theme]) {
+        this.currentThemeName = config.theme;
+      }
+    } catch {
+      // Config not available yet, use default
+    }
+  }
 
   getCurrentTheme(): ThemeDefinition {
     return themes[this.currentThemeName];
@@ -241,10 +266,20 @@ class ThemeManager {
     return this.currentThemeName;
   }
 
-  setTheme(name: ThemeName): void {
+  setTheme(name: ThemeName, persist = true): void {
     if (themes[name]) {
       this.currentThemeName = name;
       this.notifyListeners();
+
+      // Persist to config file
+      if (persist) {
+        try {
+          const { setConfigValue } = require('../config/index.js');
+          setConfigValue('theme', name);
+        } catch {
+          // Config not available, skip persistence
+        }
+      }
     }
   }
 

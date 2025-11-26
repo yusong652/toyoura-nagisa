@@ -81,6 +81,9 @@ backend/chat/local/config.py
 backend/location_data/
 backend/tool_db/
 
+# Project specific - CLI
+packages/cli/config.json
+
 # Project specific - Frontend
 packages/web/node_modules/
 packages/web/.vite/

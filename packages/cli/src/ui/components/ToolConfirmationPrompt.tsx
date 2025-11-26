@@ -91,7 +91,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       )}
 
       {data.command && (
-        <Box marginY={1}>
+        <Box>
           <Text color={theme.text.secondary}>{data.command}</Text>
         </Box>
       )}

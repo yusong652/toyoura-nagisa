@@ -17,6 +17,7 @@ import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { defaultConfig, type Config } from './config/settings.js';
+import { themeManager } from './ui/themes/index.js';
 
 // Simple argument parsing
 const args = process.argv.slice(2);
@@ -38,6 +39,9 @@ const config: Config = {
     port: port || defaultConfig.server.port,
   },
 };
+
+// Initialize theme from saved config
+themeManager.initialize();
 
 // Clear screen and show startup message
 console.clear();
