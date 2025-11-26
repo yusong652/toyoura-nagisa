@@ -17,8 +17,8 @@
  * - Dialog system for interactive command responses
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Box, Static } from 'ink';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Box } from 'ink';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
 import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js';
 import { PendingItemDisplay } from '../components/messages/PendingItemDisplay.js';
@@ -75,12 +75,7 @@ const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([ke
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
   const appActions = useAppActions();
-  const { columns: terminalWidth } = useTerminalSize();
-  const isInitialMount = useRef(true);
-  const previousWidthRef = useRef(terminalWidth);
-
-  // Key to force re-mount of Static component on terminal resize
-  const [historyRemountKey, setHistoryRemountKey] = useState(0);
+  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
 
   // Active dialog state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
@@ -117,51 +112,6 @@ export const MainLayout: React.FC = () => {
     context: commandProcessorContext,
   });
 
-  // Refresh static content by forcing re-render of Static component
-  // In alternate buffer mode, Ink handles the screen buffer automatically
-  // so we don't need to clear the terminal manually
-  const refreshStatic = useCallback(() => {
-    setHistoryRemountKey((prev) => prev + 1);
-  }, []);
-
-  // Handle terminal resize with debounce
-  // Use ref to track timeout for proper cleanup across re-renders
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    // Skip initial mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      previousWidthRef.current = terminalWidth;
-      return;
-    }
-
-    // Only process if width actually changed
-    if (previousWidthRef.current === terminalWidth) {
-      return;
-    }
-
-    previousWidthRef.current = terminalWidth;
-
-    // Clear any pending timeout
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current);
-    }
-
-    // Debounce: wait for resize to settle before refreshing
-    resizeTimeoutRef.current = setTimeout(() => {
-      refreshStatic();
-      resizeTimeoutRef.current = null;
-    }, 150);
-
-    return () => {
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current);
-        resizeTimeoutRef.current = null;
-      }
-    };
-  }, [terminalWidth, refreshStatic]);
-
   // Update text buffer viewport width when terminal size changes
   useEffect(() => {
     buffer.setViewportWidth(inputWidth);
@@ -196,9 +146,8 @@ export const MainLayout: React.FC = () => {
       message: `Switched to ${selectedTheme.displayName} theme`,
     });
     setActiveDialog(null);
-    // Force re-render to apply new theme colors
-    refreshStatic();
-  }, [appActions, refreshStatic]);
+    // In alternate buffer mode, Ink handles re-rendering automatically
+  }, [appActions]);
 
   // Handle dialog cancel
   const handleDialogCancel = useCallback(() => {
@@ -339,139 +288,151 @@ export const MainLayout: React.FC = () => {
   const isDialogActive = activeDialog !== null;
 
   return (
-    <Box flexDirection="column" width="100%">
-      {/* History - committed items in <Static> for performance */}
-      {/* Key changes on terminal resize to force re-render and fix artifacts */}
-      <Static key={historyRemountKey} items={appState.history}>
-        {(item) => <HistoryItemDisplay key={item.id} item={item} />}
-      </Static>
+    <Box
+      flexDirection="column"
+      width="100%"
+      height={terminalHeight - 1}
+      overflow="hidden"
+    >
+      {/* Scrollable content area - history and pending items */}
+      {/* In alternate buffer mode, we render history directly (not in Static) */}
+      {/* This allows proper flex layout calculation */}
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+        {/* History items - render directly for proper flex behavior */}
+        {appState.history.map((item) => (
+          <HistoryItemDisplay key={item.id} item={item} />
+        ))}
 
-      {/* Pending items - rendered outside <Static> for real-time updates */}
-      {appState.pendingHistoryItems.length > 0 && (
-        <Box flexDirection="column">
-          {appState.pendingHistoryItems.map((item, index) => (
-            <PendingItemDisplay key={`pending-${index}`} item={item} />
-          ))}
-        </Box>
-      )}
+        {/* Pending items - rendered for real-time updates */}
+        {appState.pendingHistoryItems.length > 0 && (
+          <Box flexDirection="column">
+            {appState.pendingHistoryItems.map((item, index) => (
+              <PendingItemDisplay key={`pending-${index}`} item={item} />
+            ))}
+          </Box>
+        )}
 
-      {/* Loading indicator when streaming but no pending items yet */}
-      {appState.isStreaming && appState.pendingHistoryItems.length === 0 && (
-        <LoadingIndicator
-          thinkingContent={appState.streamingState.thinkingContent}
-        />
-      )}
+        {/* Loading indicator when streaming but no pending items yet */}
+        {appState.isStreaming && appState.pendingHistoryItems.length === 0 && (
+          <LoadingIndicator
+            thinkingContent={appState.streamingState.thinkingContent}
+          />
+        )}
+      </Box>
 
-      {/* Tool confirmation dialog */}
-      {appState.pendingConfirmation && (
-        <ToolConfirmationPrompt
-          data={appState.pendingConfirmation}
-          onConfirm={appActions.confirmTool}
-        />
-      )}
+      {/* Fixed bottom controls - never shrink, never grow */}
+      <Box flexDirection="column" flexShrink={0} flexGrow={0}>
+        {/* Tool confirmation dialog */}
+        {appState.pendingConfirmation && (
+          <ToolConfirmationPrompt
+            data={appState.pendingConfirmation}
+            onConfirm={appActions.confirmTool}
+          />
+        )}
 
-      {/* Profile selection dialog */}
-      {activeDialog === 'profile' && (
-        <SelectDialog
-          title="Select Agent Profile"
-          description="Choose a profile to optimize tool loading for your task:"
-          options={PROFILE_OPTIONS}
-          currentValue={appState.currentProfile}
-          onSelect={handleProfileSelect}
-          onCancel={handleDialogCancel}
-          showNumbers={true}
-        />
-      )}
+        {/* Profile selection dialog */}
+        {activeDialog === 'profile' && (
+          <SelectDialog
+            title="Select Agent Profile"
+            description="Choose a profile to optimize tool loading for your task:"
+            options={PROFILE_OPTIONS}
+            currentValue={appState.currentProfile}
+            onSelect={handleProfileSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={true}
+          />
+        )}
 
-      {/* Memory selection dialog */}
-      {activeDialog === 'memory' && (
-        <SelectDialog
-          title="Toggle Memory"
-          description="Enable or disable long-term conversation memory:"
-          options={MEMORY_OPTIONS}
-          currentValue={appState.memoryEnabled}
-          onSelect={handleMemorySelect}
-          onCancel={handleDialogCancel}
-        />
-      )}
+        {/* Memory selection dialog */}
+        {activeDialog === 'memory' && (
+          <SelectDialog
+            title="Toggle Memory"
+            description="Enable or disable long-term conversation memory:"
+            options={MEMORY_OPTIONS}
+            currentValue={appState.memoryEnabled}
+            onSelect={handleMemorySelect}
+            onCancel={handleDialogCancel}
+          />
+        )}
 
-      {/* Theme selection dialog */}
-      {activeDialog === 'theme' && (
-        <SelectDialog
-          title="Select Theme"
-          description="Choose a color theme:"
-          options={THEME_OPTIONS}
-          currentValue={themeManager.getCurrentThemeName()}
-          onSelect={handleThemeSelect}
-          onCancel={handleDialogCancel}
-          showNumbers={true}
-        />
-      )}
+        {/* Theme selection dialog */}
+        {activeDialog === 'theme' && (
+          <SelectDialog
+            title="Select Theme"
+            description="Choose a color theme:"
+            options={THEME_OPTIONS}
+            currentValue={themeManager.getCurrentThemeName()}
+            onSelect={handleThemeSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={true}
+          />
+        )}
 
-      {/* Session action dialog */}
-      {activeDialog === 'session' && (
-        <SelectDialog
-          title="Session Management"
-          description="Choose an action:"
-          options={SESSION_ACTION_OPTIONS}
-          onSelect={handleSessionActionSelect}
-          onCancel={handleDialogCancel}
-        />
-      )}
+        {/* Session action dialog */}
+        {activeDialog === 'session' && (
+          <SelectDialog
+            title="Session Management"
+            description="Choose an action:"
+            options={SESSION_ACTION_OPTIONS}
+            onSelect={handleSessionActionSelect}
+            onCancel={handleDialogCancel}
+          />
+        )}
 
-      {/* Session restore dialog */}
-      {activeDialog === 'session_restore' && (
-        <SelectDialog
-          title="Restore Session"
-          description="Select a session to restore:"
-          options={sessionManager.getSessionOptions(appState.currentSessionId, false)}
-          isLoading={sessionManager.isLoading}
-          loadingMessage="Loading sessions..."
-          emptyMessage="No sessions available."
-          onSelect={handleSessionRestoreSelect}
-          onCancel={handleDialogCancel}
-          showNumbers={true}
-          showDescriptions={false}
-          maxItemsToShow={8}
-        />
-      )}
+        {/* Session restore dialog */}
+        {activeDialog === 'session_restore' && (
+          <SelectDialog
+            title="Restore Session"
+            description="Select a session to restore:"
+            options={sessionManager.getSessionOptions(appState.currentSessionId, false)}
+            isLoading={sessionManager.isLoading}
+            loadingMessage="Loading sessions..."
+            emptyMessage="No sessions available."
+            onSelect={handleSessionRestoreSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={true}
+            showDescriptions={false}
+            maxItemsToShow={8}
+          />
+        )}
 
-      {/* Session delete dialog */}
-      {activeDialog === 'session_delete' && (
-        <SelectDialog
-          title="Delete Session"
-          description="Select a session to delete (cannot be undone):"
-          options={sessionManager.getSessionOptions(appState.currentSessionId, true)}
-          isLoading={sessionManager.isLoading}
-          loadingMessage="Loading sessions..."
-          emptyMessage="No other sessions available to delete."
-          onSelect={handleSessionDeleteSelect}
-          onCancel={handleDialogCancel}
-          showNumbers={true}
-          showDescriptions={false}
-          maxItemsToShow={8}
-          borderColor={theme.status.error}
-        />
-      )}
+        {/* Session delete dialog */}
+        {activeDialog === 'session_delete' && (
+          <SelectDialog
+            title="Delete Session"
+            description="Select a session to delete (cannot be undone):"
+            options={sessionManager.getSessionOptions(appState.currentSessionId, true)}
+            isLoading={sessionManager.isLoading}
+            loadingMessage="Loading sessions..."
+            emptyMessage="No other sessions available to delete."
+            onSelect={handleSessionDeleteSelect}
+            onCancel={handleDialogCancel}
+            showNumbers={true}
+            showDescriptions={false}
+            maxItemsToShow={8}
+            borderColor={theme.status.error}
+          />
+        )}
 
-      {/* Input area with slash command support */}
-      {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
-        <InputPrompt
-          buffer={buffer}
-          onSubmit={appActions.sendMessage}
-          onSlashCommand={handleSlashCommand}
-          slashCommands={commands}
-          commandContext={commandContext}
-          agentProfile={appState.currentProfile}
-          sessionId={appState.currentSessionId || undefined}
-        />
-      )}
+        {/* Input area with slash command support */}
+        {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
+          <InputPrompt
+            buffer={buffer}
+            onSubmit={appActions.sendMessage}
+            onSlashCommand={handleSlashCommand}
+            slashCommands={commands}
+            commandContext={commandContext}
+            agentProfile={appState.currentProfile}
+            sessionId={appState.currentSessionId || undefined}
+          />
+        )}
 
-      {/* Status bar - below input */}
-      <Header />
+        {/* Status bar - below input */}
+        <Header />
 
-      {/* Footer - only show when no history (initial state) */}
-      {appState.history.length === 0 && <Footer />}
+        {/* Footer - only show when no history (initial state) */}
+        {appState.history.length === 0 && <Footer />}
+      </Box>
     </Box>
   );
 };
