@@ -56,7 +56,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   placeholder = 'Type your message...',
 }) => {
   const prefix = '> ';
-  const continuationPrefix = '. ';
+  const continuationPrefix = '  ';  // No dot for continuation lines
   const prefixWidth = prefix.length;
 
   // Track if last character was backslash (for \ + Enter newline)

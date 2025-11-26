@@ -19,10 +19,10 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({ item }) => {
   return (
     <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth} flexShrink={0}>
-        <Text color={theme.status.warning}>{prefix}</Text>
+        <Text color={theme.message.system}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={theme.status.warning}>
+        <Text wrap="wrap" color={theme.message.system}>
           {item.message}
         </Text>
       </Box>

@@ -1,79 +1,44 @@
 /**
  * CLI Color Definitions
- * Reference: Gemini CLI semantic-colors.ts and themes/semantic-tokens.ts
+ * Dynamic theme support with multiple color schemes
  */
 
-// Base ANSI-friendly color palette (works better in terminals)
-export const colors = {
-  // Primary colors (using ANSI-friendly values)
-  primary: 'magenta',      // Purple equivalent
-  secondary: 'cyan',       // Cyan
-  accent: 'yellow',        // Accent
+import { themeManager, getTheme, getColors, type SemanticTheme, type ThemeColors } from './themes/index.js';
 
-  // Status colors
-  success: 'green',
-  error: 'red',
-  warning: 'yellow',
-  info: 'blue',
+// Re-export theme utilities
+export { themeManager, getTheme, getColors };
+export type { SemanticTheme, ThemeColors };
 
-  // Text colors
-  text: 'white',
-  textDim: 'gray',
-  textMuted: 'gray',
+// Dynamic theme proxy that always returns current theme colors
+// This allows components to use `theme.text.primary` etc. and get the current theme's colors
+export const theme: SemanticTheme = new Proxy({} as SemanticTheme, {
+  get(_target, prop: string) {
+    const currentTheme = getTheme();
+    const value = currentTheme[prop as keyof SemanticTheme];
 
-  // Background colors
-  bg: 'black',
-  bgLight: 'gray',
+    // If the property is an object, return a proxy for it too
+    if (typeof value === 'object' && value !== null) {
+      return new Proxy(value, {
+        get(_t, subProp: string) {
+          // Always get fresh from current theme
+          const freshTheme = getTheme();
+          const freshValue = freshTheme[prop as keyof SemanticTheme];
+          return (freshValue as Record<string, string>)[subProp];
+        }
+      });
+    }
+    return value;
+  }
+});
 
-  // Role colors (matching Gemini CLI style)
-  user: 'cyan',            // User messages
-  assistant: 'white',      // Assistant messages (Gemini uses white)
-  system: 'gray',
-  tool: 'yellow',
-  thinking: 'magenta',
-} as const;
+// Dynamic colors proxy
+export const colors: ThemeColors = new Proxy({} as ThemeColors, {
+  get(_target, prop: string) {
+    return getColors()[prop as keyof ThemeColors];
+  }
+});
 
-// Semantic theme matching Gemini CLI SemanticColors interface
-export const theme = {
-  text: {
-    primary: colors.text,          // Main text color
-    secondary: colors.textDim,     // Dimmed text
-    muted: colors.textMuted,       // Very dim text
-    accent: colors.accent,         // Highlights (yellow like Gemini)
-    link: colors.secondary,        // Links (cyan)
-    response: colors.text,         // AI response text
-  },
-
-  status: {
-    success: colors.success,       // ✓ checkmarks
-    error: colors.error,           // ✕ errors
-    warning: colors.warning,       // Tool confirmations
-    info: colors.info,
-  },
-
-  message: {
-    user: colors.user,             // User input prefix
-    assistant: colors.text,        // AI response (white text)
-    system: colors.system,
-    tool: colors.tool,             // Tool names
-    thinking: colors.thinking,     // Thinking content
-  },
-
-  ui: {
-    border: 'gray',
-    borderFocus: colors.primary,
-    spinner: colors.secondary,
-    symbol: 'gray',                // Like Gemini's ui.symbol
-  },
-
-  // Border colors matching Gemini CLI
-  border: {
-    default: 'gray',
-    focused: colors.secondary,
-  },
-} as const;
-
-// Tool status symbols (matching Gemini CLI TOOL_STATUS constants)
+// Tool status symbols
 export const TOOL_STATUS = {
   PENDING: 'o',
   EXECUTING: '*',

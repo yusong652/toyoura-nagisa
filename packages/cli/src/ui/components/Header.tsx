@@ -9,13 +9,13 @@ import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
 import type { AgentProfileType } from '../types.js';
 
-// Profile display info (color)
+// Profile display info (GitHub-inspired colors)
 const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }> = {
-  coding: { color: '#4CAF50', name: 'Coding' },
-  lifestyle: { color: '#FF9800', name: 'Lifestyle' },
-  pfc: { color: '#9C27B0', name: 'PFC' },
-  general: { color: '#607D8B', name: 'General' },
-  disabled: { color: '#F44336', name: 'Disabled' },
+  coding: { color: '#3fb950', name: 'Coding' },      // GitHub green
+  lifestyle: { color: '#d29922', name: 'Lifestyle' }, // GitHub yellow
+  pfc: { color: '#a371f7', name: 'PFC' },            // GitHub purple
+  general: { color: '#8b949e', name: 'General' },    // GitHub gray
+  disabled: { color: '#f85149', name: 'Disabled' },  // GitHub red
 };
 
 export const Header: React.FC = () => {
@@ -54,7 +54,7 @@ export const Header: React.FC = () => {
           {profileInfo.name}
         </Text>
         <Text color={theme.text.muted}> | </Text>
-        <Text color={appState.memoryEnabled ? '#4CAF50' : theme.text.muted}>
+        <Text color={appState.memoryEnabled ? '#3fb950' : theme.text.muted}>
           {appState.memoryEnabled ? 'Memory ON' : 'Memory OFF'}
         </Text>
       </Box>

@@ -64,17 +64,20 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={theme.status.warning}
+      borderColor={theme.border.focused}
       paddingX={1}
     >
       {/* Header */}
-      <Text bold color={theme.status.warning}>
-        ? Tool Confirmation Required
-      </Text>
+      <Box marginBottom={1}>
+        <Text color={theme.text.accent}>? </Text>
+        <Text bold color={theme.text.primary}>
+          Tool Confirmation Required
+        </Text>
+      </Box>
 
       {/* Tool Info */}
       <Box>
-        <Text color={theme.text.secondary}>Tool: </Text>
+        <Text color={theme.text.muted}>Tool: </Text>
         <Text bold color={theme.text.primary}>
           {data.tool_name}
         </Text>
@@ -82,17 +85,21 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
 
       {data.description && (
         <Box>
-          <Text color={theme.text.secondary}>Description: </Text>
-          <Text color={theme.text.muted}>{data.description}</Text>
+          <Text color={theme.text.muted}>Description: </Text>
+          <Text color={theme.text.secondary}>{data.description}</Text>
         </Box>
       )}
 
       {data.command && (
-        <Text color={theme.text.accent}>{data.command}</Text>
+        <Box marginY={1}>
+          <Text color={theme.text.secondary}>{data.command}</Text>
+        </Box>
       )}
 
       {/* Question */}
-      <Text color={theme.text.primary}>Allow execution?</Text>
+      <Box marginTop={1}>
+        <Text color={theme.text.primary}>Allow execution?</Text>
+      </Box>
 
       {/* Radio Button Select */}
       <RadioButtonSelect
@@ -101,6 +108,13 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
         isFocused={isFocused}
         showNumbers={true}
       />
+
+      {/* Help text */}
+      <Box marginTop={1}>
+        <Text color={theme.text.muted}>
+          (Use arrows to navigate, Enter to select, Esc to cancel)
+        </Text>
+      </Box>
     </Box>
   );
 };

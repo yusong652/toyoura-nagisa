@@ -18,12 +18,14 @@ import type {
 import { profileCommand } from '../commands/profileCommand.js';
 import { memoryCommand } from '../commands/memoryCommand.js';
 import { sessionCommand } from '../commands/sessionCommand.js';
+import { themeCommand } from '../commands/themeCommand.js';
 
 // Built-in commands
 const BUILT_IN_COMMANDS: SlashCommand[] = [
   profileCommand,
   memoryCommand,
   sessionCommand,
+  themeCommand,
 ];
 
 export interface UseSlashCommandProcessorProps {

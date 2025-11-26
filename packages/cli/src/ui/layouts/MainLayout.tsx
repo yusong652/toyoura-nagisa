@@ -34,10 +34,11 @@ import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
-import { theme } from '../colors.js';
+import { theme, themeManager } from '../colors.js';
+import { themes, type ThemeName } from '../themes/index.js';
 
 // Dialog types
-type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | null;
+type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | null;
 
 // Session action type
 type SessionAction = 'create' | 'restore' | 'delete';
@@ -63,6 +64,14 @@ const SESSION_ACTION_OPTIONS: SelectOption<SessionAction>[] = [
   { key: 'restore', value: 'restore', label: 'Restore', description: 'Switch to an existing session' },
   { key: 'delete', value: 'delete', label: 'Delete', description: 'Delete an existing session' },
 ];
+
+// Theme options for SelectDialog
+const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([key, def]) => ({
+  key,
+  value: key as ThemeName,
+  label: def.displayName,
+  description: def.description,
+}));
 
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
@@ -146,6 +155,19 @@ export const MainLayout: React.FC = () => {
     });
     setActiveDialog(null);
   }, [appActions]);
+
+  // Handle theme selection from dialog
+  const handleThemeSelect = useCallback((themeName: ThemeName) => {
+    themeManager.setTheme(themeName);
+    const selectedTheme = themes[themeName];
+    appActions.addHistoryItem({
+      type: MessageType.INFO,
+      message: `Switched to ${selectedTheme.displayName} theme`,
+    });
+    setActiveDialog(null);
+    // Force re-render to apply new theme colors
+    refreshStatic();
+  }, [appActions, refreshStatic]);
 
   // Handle dialog cancel
   const handleDialogCancel = useCallback(() => {
@@ -260,6 +282,8 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('memory');
         } else if (result.dialog === 'session') {
           setActiveDialog('session');
+        } else if (result.dialog === 'theme') {
+          setActiveDialog('theme');
         }
         break;
 
@@ -337,6 +361,19 @@ export const MainLayout: React.FC = () => {
           currentValue={appState.memoryEnabled}
           onSelect={handleMemorySelect}
           onCancel={handleDialogCancel}
+        />
+      )}
+
+      {/* Theme selection dialog */}
+      {activeDialog === 'theme' && (
+        <SelectDialog
+          title="Select Theme"
+          description="Choose a color theme:"
+          options={THEME_OPTIONS}
+          currentValue={themeManager.getCurrentThemeName()}
+          onSelect={handleThemeSelect}
+          onCancel={handleDialogCancel}
+          showNumbers={true}
         />
       )}
 
