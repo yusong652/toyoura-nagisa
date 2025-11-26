@@ -29,7 +29,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
       return <UserMessage item={item} />;
 
     case MessageType.ASSISTANT:
-      return <AssistantMessage item={item} />;
+      return <AssistantMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.TOOL_CALL:
       // Historical tool calls are completed, show success status

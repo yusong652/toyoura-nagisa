@@ -14,6 +14,7 @@ import { theme } from '../../colors.js';
 
 interface AssistantMessageProps {
   item: AssistantHistoryItem;
+  terminalWidth?: number;
 }
 
 const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boolean): React.ReactNode => {
@@ -32,7 +33,6 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
       );
 
     case 'thinking':
-      // Thinking blocks are displayed inline with dimmed color
       return (
         <Box key={index} marginBottom={1}>
           <Text color={theme.message.thinking} dimColor wrap="wrap">
@@ -46,7 +46,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
   }
 };
 
-export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item }) => {
+export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, terminalWidth }) => {
   // Use ✦ prefix like Gemini CLI
   const prefix = '✦ ';
   const prefixWidth = 2; // Unicode character width
@@ -65,7 +65,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item }) => {
   }
 
   return (
-    <Box flexDirection="row" marginBottom={1}>
+    <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>
