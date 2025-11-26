@@ -96,12 +96,10 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
       {/* Down scroll indicator */}
       {endIndex < suggestions.length && <Text color={theme.text.muted}>▼</Text>}
 
-      {/* Page indicator when there are more items than visible */}
-      {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-        <Text color={theme.text.muted}>
-          ({activeIndex + 1}/{suggestions.length})
-        </Text>
-      )}
+      {/* Page indicator - always show total count */}
+      <Text color={theme.text.muted}>
+        ({activeIndex + 1}/{suggestions.length})
+      </Text>
     </Box>
   );
 };

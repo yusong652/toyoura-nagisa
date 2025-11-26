@@ -303,16 +303,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   return (
     <Box flexDirection="column">
-      {/* Suggestions popup (above input) */}
-      {completion.showSuggestions && (
-        <SuggestionsDisplay
-          suggestions={completion.suggestions}
-          activeIndex={completion.activeIndex}
-          isLoading={completion.isLoading}
-          scrollOffset={completion.scrollOffset}
-        />
-      )}
-
       {/* Input box */}
       <Box
         flexDirection="column"
@@ -331,6 +321,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.lines.map((line, index) => renderLine(line, index, index === cursorRow))
         )}
       </Box>
+
+      {/* Suggestions popup (below input) */}
+      {completion.showSuggestions && (
+        <SuggestionsDisplay
+          suggestions={completion.suggestions}
+          activeIndex={completion.activeIndex}
+          isLoading={completion.isLoading}
+          scrollOffset={completion.scrollOffset}
+        />
+      )}
     </Box>
   );
 };
