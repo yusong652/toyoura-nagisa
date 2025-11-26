@@ -118,8 +118,8 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
   const statusColor = item.isError ? theme.status.error : theme.status.success;
   const statusIcon = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
 
-  // Truncate content for display
-  const content = item.content || '';
+  // Trim and truncate content for display
+  const content = (item.content || '').trim();
   const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
 
   return (

@@ -38,7 +38,8 @@ function truncateContent(content: string, maxLines: number): { text: string; tru
 export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item, terminalWidth }) => {
   const statusSymbol = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
   const statusColor = item.isError ? theme.status.error : theme.status.success;
-  const { text, truncated } = truncateContent(item.content, MAX_RESULT_LINES);
+  // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
+  const { text, truncated } = truncateContent(item.content.trim(), MAX_RESULT_LINES);
 
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
