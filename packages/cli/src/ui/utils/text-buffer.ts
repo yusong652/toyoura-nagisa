@@ -4,14 +4,31 @@
  *
  * Uses useReducer to ensure all state updates are synchronous,
  * preventing issues with IME rapid character input.
+ *
+ * Key concepts:
+ * - Logical lines: The actual text lines separated by newlines
+ * - Visual lines: Lines as displayed on screen, accounting for word wrapping
+ * - Visual cursor: Cursor position in visual coordinates
  */
 
 import { useReducer, useCallback, useMemo, useEffect } from 'react';
-import { toCodePoints, cpLen, cpSlice, stripUnsafeCharacters } from './textUtils.js';
+import { toCodePoints, cpLen, cpSlice, stripUnsafeCharacters, getCachedStringWidth } from './textUtils.js';
 import type { Key } from '../contexts/KeypressContext.js';
 
 // Direction types for cursor movement
 export type Direction = 'left' | 'right' | 'up' | 'down' | 'home' | 'end';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visual Layout Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface VisualLayout {
+  visualLines: string[];
+  // For each logical line, an array of [visualLineIndex, startColInLogical]
+  logicalToVisualMap: Array<Array<[number, number]>>;
+  // For each visual line, its [logicalLineIndex, startColInLogical]
+  visualToLogicalMap: Array<[number, number]>;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State & Action Types
@@ -21,6 +38,8 @@ export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  viewportWidth: number;
+  visualLayout: VisualLayout;
 }
 
 export type TextBufferAction =
@@ -33,13 +52,135 @@ export type TextBufferAction =
   | { type: 'delete_word_left' }
   | { type: 'kill_line_left' }
   | { type: 'kill_line_right' }
-  | { type: 'set_cursor_absolute'; payload: number };
+  | { type: 'set_cursor_absolute'; payload: number }
+  | { type: 'set_viewport_width'; payload: number };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visual Layout Calculation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate the visual layout of text lines for a given viewport width.
+ * This handles word wrapping and maps between logical and visual coordinates.
+ */
+function calculateLayout(logicalLines: string[], viewportWidth: number): VisualLayout {
+  const visualLines: string[] = [];
+  const logicalToVisualMap: Array<Array<[number, number]>> = [];
+  const visualToLogicalMap: Array<[number, number]> = [];
+
+  // Handle edge case where viewport is too narrow
+  const effectiveWidth = Math.max(viewportWidth, 1);
+
+  logicalLines.forEach((logLine, logIndex) => {
+    logicalToVisualMap[logIndex] = [];
+
+    if (logLine.length === 0) {
+      // Empty logical line
+      logicalToVisualMap[logIndex].push([visualLines.length, 0]);
+      visualToLogicalMap.push([logIndex, 0]);
+      visualLines.push('');
+    } else {
+      // Non-empty logical line - wrap based on character width
+      const codePoints = toCodePoints(logLine);
+      let currentPosInLogLine = 0;
+
+      while (currentPosInLogLine < codePoints.length) {
+        let currentChunk = '';
+        let currentChunkVisualWidth = 0;
+        let numCodePointsInChunk = 0;
+
+        // Build a visual line chunk that fits within viewport width
+        for (let i = currentPosInLogLine; i < codePoints.length; i++) {
+          const char = codePoints[i];
+          const charVisualWidth = getCachedStringWidth(char);
+
+          if (currentChunkVisualWidth + charVisualWidth > effectiveWidth) {
+            // This character would exceed viewport width
+            if (numCodePointsInChunk === 0) {
+              // Single character wider than viewport - take it anyway
+              currentChunk = char;
+              numCodePointsInChunk = 1;
+            }
+            break;
+          }
+
+          currentChunk += char;
+          currentChunkVisualWidth += charVisualWidth;
+          numCodePointsInChunk++;
+        }
+
+        // Safety check - ensure we advance
+        if (numCodePointsInChunk === 0 && currentPosInLogLine < codePoints.length) {
+          currentChunk = codePoints[currentPosInLogLine];
+          numCodePointsInChunk = 1;
+        }
+
+        logicalToVisualMap[logIndex].push([visualLines.length, currentPosInLogLine]);
+        visualToLogicalMap.push([logIndex, currentPosInLogLine]);
+        visualLines.push(currentChunk);
+
+        currentPosInLogLine += numCodePointsInChunk;
+      }
+    }
+  });
+
+  // Ensure at least one visual line
+  if (visualLines.length === 0) {
+    visualLines.push('');
+    if (!logicalToVisualMap[0]) logicalToVisualMap[0] = [];
+    logicalToVisualMap[0].push([0, 0]);
+    visualToLogicalMap.push([0, 0]);
+  }
+
+  return { visualLines, logicalToVisualMap, visualToLogicalMap };
+}
+
+/**
+ * Calculate visual cursor position from logical cursor position
+ */
+function calculateVisualCursor(
+  layout: VisualLayout,
+  logicalCursor: [number, number]
+): [number, number] {
+  const { logicalToVisualMap, visualLines } = layout;
+  const [logicalRow, logicalCol] = logicalCursor;
+
+  const segmentsForLogicalLine = logicalToVisualMap[logicalRow];
+
+  if (!segmentsForLogicalLine || segmentsForLogicalLine.length === 0) {
+    return [0, 0];
+  }
+
+  // Find the segment where the logical column fits
+  let targetSegmentIndex = segmentsForLogicalLine.findIndex(
+    ([, startColInLogical], index) => {
+      const nextStartColInLogical =
+        index + 1 < segmentsForLogicalLine.length
+          ? segmentsForLogicalLine[index + 1][1]
+          : Infinity;
+      return logicalCol >= startColInLogical && logicalCol < nextStartColInLogical;
+    }
+  );
+
+  // If not found, cursor is at the end of the logical line
+  if (targetSegmentIndex === -1) {
+    targetSegmentIndex = logicalCol === 0 ? 0 : segmentsForLogicalLine.length - 1;
+  }
+
+  const [visualRow, startColInLogical] = segmentsForLogicalLine[targetSegmentIndex];
+  const visualCol = logicalCol - startColInLogical;
+
+  // Clamp to visual line length
+  const clampedVisualCol = Math.min(visualCol, cpLen(visualLines[visualRow] ?? ''));
+
+  return [visualRow, clampedVisualCol];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reducer Logic
 // ─────────────────────────────────────────────────────────────────────────────
 
-function textBufferReducer(
+function textBufferReducerCore(
   state: TextBufferState,
   action: TextBufferAction
 ): TextBufferState {
@@ -52,6 +193,7 @@ function textBufferReducer(
       const lines = newLines.length === 0 ? [''] : newLines;
       const lastLineIndex = lines.length - 1;
       return {
+        ...state,
         lines,
         cursorRow: lastLineIndex,
         cursorCol: cpLen(lines[lastLineIndex] ?? ''),
@@ -97,6 +239,7 @@ function textBufferReducer(
       }
 
       return {
+        ...state,
         lines: newLines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
@@ -128,6 +271,7 @@ function textBufferReducer(
       }
 
       return {
+        ...state,
         lines: newLines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
@@ -217,6 +361,7 @@ function textBufferReducer(
       newLines.splice(cursorRow + 1, 0, after);
 
       return {
+        ...state,
         lines: newLines,
         cursorRow: cursorRow + 1,
         cursorCol: 0,
@@ -257,6 +402,7 @@ function textBufferReducer(
       }
 
       return {
+        ...state,
         lines: newLines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
@@ -272,6 +418,7 @@ function textBufferReducer(
       newLines[cursorRow] = cpSlice(lineContent, cursorCol);
 
       return {
+        ...state,
         lines: newLines,
         cursorRow,
         cursorCol: 0,
@@ -328,9 +475,35 @@ function textBufferReducer(
       };
     }
 
+    case 'set_viewport_width': {
+      const newWidth = action.payload;
+      if (newWidth === state.viewportWidth) return state;
+      return { ...state, viewportWidth: newWidth };
+    }
+
     default:
       return state;
   }
+}
+
+/**
+ * Wrapper reducer that recalculates visual layout when needed
+ */
+function textBufferReducer(
+  state: TextBufferState,
+  action: TextBufferAction
+): TextBufferState {
+  const newState = textBufferReducerCore(state, action);
+
+  // Recalculate layout if lines or viewport width changed
+  if (newState.lines !== state.lines || newState.viewportWidth !== state.viewportWidth) {
+    return {
+      ...newState,
+      visualLayout: calculateLayout(newState.lines, newState.viewportWidth),
+    };
+  }
+
+  return newState;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -340,14 +513,21 @@ function textBufferReducer(
 export interface UseTextBufferOptions {
   initialText?: string;
   onChange?: (text: string) => void;
+  /** Width of the viewport for visual line wrapping */
+  viewportWidth?: number;
 }
 
 export interface TextBuffer {
   // State
   lines: string[];
   text: string;
-  cursor: [number, number]; // [row, col]
+  cursor: [number, number]; // [row, col] - logical cursor
   absoluteCursor: number; // Absolute cursor position in text
+
+  // Visual state (for rendering wrapped lines)
+  visualLines: string[];
+  visualCursor: [number, number]; // [row, col] - visual cursor position
+  visualToLogicalMap: Array<[number, number]>; // Maps visual line to [logicalRow, startCol]
 
   // Actions
   setText: (text: string) => void;
@@ -361,25 +541,38 @@ export interface TextBuffer {
   killLineRight: () => void;
   handleInput: (key: Key) => void;
   setCursorToAbsolute: (position: number) => void;
+  setViewportWidth: (width: number) => void;
 }
+
+const DEFAULT_VIEWPORT_WIDTH = 80;
 
 export function useTextBuffer({
   initialText = '',
   onChange,
+  viewportWidth: initialViewportWidth = DEFAULT_VIEWPORT_WIDTH,
 }: UseTextBufferOptions = {}): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
+    const linesArray = lines.length === 0 ? [''] : lines;
     return {
-      lines: lines.length === 0 ? [''] : lines,
+      lines: linesArray,
       cursorRow: 0,
       cursorCol: 0,
+      viewportWidth: initialViewportWidth,
+      visualLayout: calculateLayout(linesArray, initialViewportWidth),
     };
-  }, [initialText]);
+  }, [initialText, initialViewportWidth]);
 
   const [state, dispatch] = useReducer(textBufferReducer, initialState);
-  const { lines, cursorRow, cursorCol } = state;
+  const { lines, cursorRow, cursorCol, visualLayout } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
+
+  // Calculate visual cursor from logical cursor
+  const visualCursor = useMemo(
+    () => calculateVisualCursor(visualLayout, [cursorRow, cursorCol]),
+    [visualLayout, cursorRow, cursorCol]
+  );
 
   // Notify onChange when text changes
   useEffect(() => {
@@ -427,6 +620,10 @@ export function useTextBuffer({
 
   const setCursorToAbsolute = useCallback((position: number): void => {
     dispatch({ type: 'set_cursor_absolute', payload: position });
+  }, []);
+
+  const setViewportWidth = useCallback((width: number): void => {
+    dispatch({ type: 'set_viewport_width', payload: width });
   }, []);
 
   // Calculate absolute cursor position
@@ -489,6 +686,9 @@ export function useTextBuffer({
       text,
       cursor: [cursorRow, cursorCol] as [number, number],
       absoluteCursor,
+      visualLines: visualLayout.visualLines,
+      visualCursor,
+      visualToLogicalMap: visualLayout.visualToLogicalMap,
       setText,
       insert,
       newline,
@@ -500,6 +700,7 @@ export function useTextBuffer({
       killLineRight,
       handleInput,
       setCursorToAbsolute,
+      setViewportWidth,
     }),
     [
       lines,
@@ -507,6 +708,9 @@ export function useTextBuffer({
       cursorRow,
       cursorCol,
       absoluteCursor,
+      visualLayout.visualLines,
+      visualCursor,
+      visualLayout.visualToLogicalMap,
       setText,
       insert,
       newline,
@@ -518,6 +722,7 @@ export function useTextBuffer({
       killLineRight,
       handleInput,
       setCursorToAbsolute,
+      setViewportWidth,
     ]
   );
 }

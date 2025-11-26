@@ -330,17 +330,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Check if empty
   const isEmpty = buffer.lines.length === 1 && buffer.lines[0] === '';
-  const [cursorRow, cursorCol] = buffer.cursor;
 
-  // Render the input with cursor
-  const renderLine = (line: string, lineIndex: number, isCurrentLine: boolean) => {
-    const linePrefix = lineIndex === 0 ? prefix : continuationPrefix;
-    const codePoints = toCodePoints(line);
+  // Use visual cursor for correct cursor positioning in wrapped lines
+  const [visualCursorRow, visualCursorCol] = buffer.visualCursor;
 
-    if (isEmpty && lineIndex === 0 && !disabled) {
+  // Render a visual line with cursor
+  const renderVisualLine = (
+    visualLine: string,
+    visualLineIndex: number,
+    isCurrentLine: boolean
+  ) => {
+    // Check if this is the first visual line of a logical line
+    // visualToLogicalMap[index] = [logicalRow, startCol]
+    const mapEntry = buffer.visualToLogicalMap[visualLineIndex];
+    const isFirstVisualLineOfLogical = mapEntry ? mapEntry[1] === 0 : true;
+    const linePrefix = isFirstVisualLineOfLogical ? prefix : continuationPrefix;
+    const codePoints = toCodePoints(visualLine);
+
+    if (isEmpty && visualLineIndex === 0 && !disabled) {
       // Show placeholder with cursor at start
       return (
-        <Box key={lineIndex} flexDirection="row">
+        <Box key={visualLineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
             <Text color={theme.text.accent}>{linePrefix}</Text>
           </Box>
@@ -353,24 +363,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     if (!isCurrentLine) {
       // Non-active line - just render text
       return (
-        <Box key={lineIndex} flexDirection="row">
+        <Box key={visualLineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={theme.text.muted}>{linePrefix}</Text>
+            <Text color={isFirstVisualLineOfLogical ? theme.text.accent : theme.text.muted}>
+              {linePrefix}
+            </Text>
           </Box>
-          <Text color={theme.text.primary}>{line}</Text>
+          <Text color={theme.text.primary}>{visualLine}</Text>
         </Box>
       );
     }
 
     // Active line with cursor
-    const beforeCursor = codePoints.slice(0, cursorCol).join('');
-    const atCursor = codePoints[cursorCol] || ' ';
-    const afterCursor = codePoints.slice(cursorCol + 1).join('');
+    const beforeCursor = codePoints.slice(0, visualCursorCol).join('');
+    const atCursor = codePoints[visualCursorCol] || ' ';
+    const afterCursor = codePoints.slice(visualCursorCol + 1).join('');
 
     return (
-      <Box key={lineIndex} flexDirection="row">
+      <Box key={visualLineIndex} flexDirection="row">
         <Box width={prefixWidth} flexShrink={0}>
-          <Text color={theme.text.accent}>{linePrefix}</Text>
+          <Text color={isFirstVisualLineOfLogical ? theme.text.accent : theme.text.muted}>
+            {linePrefix}
+          </Text>
         </Box>
         <Text color={theme.text.primary}>{beforeCursor}</Text>
         <Text inverse>{atCursor}</Text>
@@ -396,7 +410,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             <Text color={theme.text.muted}>...</Text>
           </Box>
         ) : (
-          buffer.lines.map((line, index) => renderLine(line, index, index === cursorRow))
+          buffer.visualLines.map((visualLine, index) =>
+            renderVisualLine(visualLine, index, index === visualCursorRow)
+          )
         )}
       </Box>
 

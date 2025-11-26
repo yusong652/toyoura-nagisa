@@ -86,9 +86,13 @@ export const MainLayout: React.FC = () => {
   // Active dialog state
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
 
+  // Calculate input width (terminal width minus border and padding)
+  // Border: 2 (left + right), Padding: 2 (left + right), Prefix: 2 ("> ")
+  const inputWidth = Math.max(1, terminalWidth - 6);
+
   // Input buffer - created here to survive InputPrompt unmount/remount
   // This is the key pattern from gemini-cli to preserve state across dialogs
-  const buffer = useTextBuffer();
+  const buffer = useTextBuffer({ viewportWidth: inputWidth });
 
   // Session manager for API calls
   const sessionManager = useSessionManager();
@@ -135,6 +139,11 @@ export const MainLayout: React.FC = () => {
       clearTimeout(handler);
     };
   }, [terminalWidth, refreshStatic]);
+
+  // Update text buffer viewport width when terminal size changes
+  useEffect(() => {
+    buffer.setViewportWidth(inputWidth);
+  }, [inputWidth, buffer]);
 
   // Handle profile selection from dialog
   const handleProfileSelect = useCallback((profile: AgentProfileType) => {
