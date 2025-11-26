@@ -99,6 +99,8 @@ export function useSessionManager(): UseSessionManagerReturn {
           value: session.id,
           label: `${session.name || 'Unnamed'}${isCurrent ? ' (current)' : ''}`,
           description: dateStr,
+          // Mark current session as disabled for visual styling (grayed out)
+          // Navigation still works, but Enter is ignored in the handler
           disabled: isCurrent && !excludeCurrent,
         };
       });

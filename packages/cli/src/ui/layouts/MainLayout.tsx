@@ -186,6 +186,11 @@ export const MainLayout: React.FC = () => {
 
   // Handle session restore selection
   const handleSessionRestoreSelect = useCallback(async (sessionId: string) => {
+    // Skip if selecting current session
+    if (sessionId === appState.currentSessionId) {
+      return;
+    }
+
     try {
       await appActions.switchSession(sessionId);
       const session = sessionManager.sessions.find(s => s.id === sessionId);
@@ -200,7 +205,7 @@ export const MainLayout: React.FC = () => {
       });
     }
     setActiveDialog(null);
-  }, [sessionManager, appActions]);
+  }, [sessionManager, appActions, appState.currentSessionId]);
 
   // Handle session delete selection
   const handleSessionDeleteSelect = useCallback(async (sessionId: string) => {

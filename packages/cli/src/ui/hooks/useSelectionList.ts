@@ -54,7 +54,10 @@ type SelectionListAction =
 const NUMBER_INPUT_TIMEOUT_MS = 1000;
 
 /**
- * Helper function to find the next enabled index in a given direction, supporting wrapping.
+ * Helper function to find the next index in a given direction, supporting wrapping.
+ * Note: This function allows navigation to disabled items (they are visually grayed out
+ * but can still be highlighted). Selection of disabled items is prevented in the
+ * SELECT_CURRENT action handler.
  */
 function findNextValidIndex<T>(
   currentIndex: number,
@@ -64,17 +67,8 @@ function findNextValidIndex<T>(
   const len = items.length;
   if (len === 0) return currentIndex;
 
-  let nextIndex = currentIndex;
   const step = direction === 'down' ? 1 : -1;
-
-  for (let i = 0; i < len; i++) {
-    nextIndex = (nextIndex + step + len) % len;
-    if (!items[nextIndex]?.disabled) {
-      return nextIndex;
-    }
-  }
-
-  return currentIndex;
+  return (currentIndex + step + len) % len;
 }
 
 function selectionListReducer(
