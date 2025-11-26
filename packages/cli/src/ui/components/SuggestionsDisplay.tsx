@@ -11,7 +11,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../colors.js';
 
 // Maximum suggestions to show at once
-const MAX_SUGGESTIONS_TO_SHOW = 6;
+export const MAX_SUGGESTIONS_TO_SHOW = 8;
 
 export interface Suggestion {
   /** Display label */
@@ -27,7 +27,6 @@ interface SuggestionsDisplayProps {
   activeIndex: number;
   isLoading: boolean;
   scrollOffset: number;
-  width?: number;
 }
 
 export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
@@ -35,11 +34,10 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
   activeIndex,
   isLoading,
   scrollOffset,
-  width,
 }) => {
   if (isLoading) {
     return (
-      <Box paddingX={1} width={width}>
+      <Box paddingX={1}>
         <Text color={theme.text.muted}>Loading suggestions...</Text>
       </Box>
     );
@@ -57,58 +55,36 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  // Calculate column width for alignment
+  // Calculate column width for alignment (use all suggestions for consistent width)
   const maxLabelWidth = Math.max(
-    ...visibleSuggestions.map((s) => s.label.length),
+    ...suggestions.map((s) => s.label.length),
     8 // minimum width
   );
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={theme.border.default}
-      paddingX={1}
-      width={width}
-    >
-      {/* Header */}
-      <Box marginBottom={0}>
-        <Text color={theme.text.muted} dimColor>
-          Commands ({suggestions.length})
-        </Text>
-      </Box>
+    <Box flexDirection="column" paddingX={1}>
+      {/* Up scroll indicator */}
+      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
       {/* Suggestions list */}
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
+        const textColor = isActive ? theme.text.accent : theme.text.secondary;
 
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
-            {/* Selection indicator */}
-            <Box width={2}>
-              <Text color={isActive ? theme.text.accent : theme.text.muted}>
-                {isActive ? '>' : ' '}
-              </Text>
-            </Box>
-
-            {/* Command name */}
-            <Box width={maxLabelWidth + 2}>
-              <Text
-                color={isActive ? theme.text.accent : theme.text.primary}
-                bold={isActive}
-              >
+            {/* Command name with slash */}
+            <Box width={maxLabelWidth + 2} flexShrink={0}>
+              <Text color={textColor} bold={isActive}>
                 /{suggestion.label}
               </Text>
             </Box>
 
             {/* Description */}
             {suggestion.description && (
-              <Box flexGrow={1}>
-                <Text
-                  color={isActive ? theme.text.secondary : theme.text.muted}
-                  wrap="truncate"
-                >
+              <Box flexGrow={1} paddingLeft={2}>
+                <Text color={textColor} wrap="truncate">
                   {suggestion.description}
                 </Text>
               </Box>
@@ -117,16 +93,15 @@ export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
         );
       })}
 
-      {/* Scroll indicator */}
+      {/* Down scroll indicator */}
+      {endIndex < suggestions.length && <Text color={theme.text.muted}>▼</Text>}
+
+      {/* Page indicator when there are more items than visible */}
       {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-        <Box marginTop={0}>
-          <Text color={theme.text.muted} dimColor>
-            [{startIndex + 1}-{endIndex}/{suggestions.length}] Use arrows to navigate
-          </Text>
-        </Box>
+        <Text color={theme.text.muted}>
+          ({activeIndex + 1}/{suggestions.length})
+        </Text>
       )}
     </Box>
   );
 };
-
-export { MAX_SUGGESTIONS_TO_SHOW };
