@@ -23,7 +23,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
       const displayText = block.text.trim();
       return (
-        <Box key={index} flexDirection="row">
+        <Box key={`text-${index}`} flexDirection="row">
           <Text wrap="wrap" color={theme.text.primary}>
             {displayText}
           </Text>
@@ -39,7 +39,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
       // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
       const displayThinking = block.thinking.trim();
       return (
-        <Box key={index}>
+        <Box key={`thinking-${index}`}>
           <Text color={theme.message.thinking} dimColor wrap="wrap">
             {displayThinking}
           </Text>
