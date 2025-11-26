@@ -69,6 +69,8 @@ export interface SemanticTheme {
     default: string;
     focused: string;
   };
+  /** Gradient colors for header/branding */
+  gradient: string[];
 }
 
 export interface ThemeDefinition {
@@ -163,7 +165,7 @@ const nordColors: ThemeColors = {
   thinking: '#4c566a',   // Polar night
 };
 
-function createSemanticTheme(colors: ThemeColors): SemanticTheme {
+function createSemanticTheme(colors: ThemeColors, gradient?: string[]): SemanticTheme {
   return {
     text: {
       primary: colors.text,
@@ -196,38 +198,39 @@ function createSemanticTheme(colors: ThemeColors): SemanticTheme {
       default: colors.textMuted,
       focused: colors.primary,
     },
+    gradient: gradient || [colors.primary, colors.accent],
   };
 }
 
-// Theme definitions
+// Theme definitions with custom gradients
 export const themes: Record<ThemeName, ThemeDefinition> = {
   github: {
     name: 'github',
     displayName: 'GitHub Dark',
     description: 'GitHub-inspired dark theme with blue accents',
     colors: githubColors,
-    semantic: createSemanticTheme(githubColors),
+    semantic: createSemanticTheme(githubColors, ['#58a6ff', '#a371f7', '#f778ba']),
   },
   monokai: {
     name: 'monokai',
     displayName: 'Monokai',
     description: 'Classic editor theme with vibrant colors',
     colors: monokaiColors,
-    semantic: createSemanticTheme(monokaiColors),
+    semantic: createSemanticTheme(monokaiColors, ['#66d9ef', '#a6e22e', '#f92672']),
   },
   dracula: {
     name: 'dracula',
     displayName: 'Dracula',
     description: 'Dark theme with purple and pink accents',
     colors: draculaColors,
-    semantic: createSemanticTheme(draculaColors),
+    semantic: createSemanticTheme(draculaColors, ['#bd93f9', '#ff79c6', '#8be9fd']),
   },
   nord: {
     name: 'nord',
     displayName: 'Nord',
     description: 'Arctic, north-bluish color palette',
     colors: nordColors,
-    semantic: createSemanticTheme(nordColors),
+    semantic: createSemanticTheme(nordColors, ['#88c0d0', '#81a1c1', '#b48ead']),
   },
 };
 

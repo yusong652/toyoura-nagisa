@@ -16,13 +16,19 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["aiNagisa", "cli", "ai", "assistant"],
+  "keywords": [
+    "aiNagisa",
+    "cli",
+    "ai",
+    "assistant"
+  ],
   "author": "aiNagisa Team",
   "license": "MIT",
   "dependencies": {
     "@aiNagisa/core": "*",
     "ansi-escapes": "^7.0.0",
     "ink": "npm:@jrichman/ink@6.4.6",
+    "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "react": "^19.0.0",
     "string-width": "^7.2.0",
@@ -36,8 +42,8 @@
     "@types/react": "^19.0.0",
     "@types/ws": "^8.5.13",
     "esbuild": "^0.25.0",
-    "typescript": "^5.7.0",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "typescript": "^5.7.0"
   },
   "engines": {
     "node": ">=20"

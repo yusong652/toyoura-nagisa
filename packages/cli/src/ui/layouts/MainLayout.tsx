@@ -24,7 +24,7 @@ import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js
 import { PendingItemDisplay } from '../components/messages/PendingItemDisplay.js';
 import { InputPrompt } from '../components/InputPrompt.js';
 import { Header } from '../components/Header.js';
-import { Footer } from '../components/Footer.js';
+import { AppHeader } from '../components/AppHeader.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
@@ -333,6 +333,11 @@ export const MainLayout: React.FC = () => {
       {/* This allows proper flex layout calculation */}
       {/* Key changes on resize to force re-render and fix layout artifacts */}
       <Box key={renderKey} flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+        {/* App header with logo and tips - only show when no history (initial state) */}
+        {appState.history.length === 0 && !appState.isStreaming && (
+          <AppHeader showTips={true} />
+        )}
+
         {/* History items - render directly for proper flex behavior */}
         {appState.history.length > 0 && (
           <Box flexDirection="column">
@@ -468,9 +473,6 @@ export const MainLayout: React.FC = () => {
 
         {/* Status bar - below input */}
         <Header />
-
-        {/* Footer - only show when no history (initial state) */}
-        {appState.history.length === 0 && <Footer />}
       </Box>
     </Box>
   );
