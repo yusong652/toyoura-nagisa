@@ -35,6 +35,7 @@ import { useChatStream } from './hooks/useChatStream.js';
 import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
 import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
@@ -187,6 +188,17 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const clearScreen = useCallback(() => {
     historyManager.clearItems();
   }, [historyManager]);
+
+  // ========== Global Keypress Handling ==========
+
+  // Handle Ctrl+C to quit
+  const handleGlobalKeypress = useCallback((key: Key) => {
+    if (key.ctrl && key.name === 'c') {
+      quit();
+    }
+  }, [quit]);
+
+  useKeypress(handleGlobalKeypress, { isActive: true });
 
   // ========== Context Values ==========
 
