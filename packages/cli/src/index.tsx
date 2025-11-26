@@ -43,13 +43,16 @@ const config: Config = {
 // Initialize theme from saved config
 themeManager.initialize();
 
-// Clear screen and show startup message
-console.clear();
-console.log('aiNagisa CLI - Starting...\n');
-
 // Render Ink app with KeypressProvider for proper key handling
+// Using alternateBuffer mode for better resize handling
 render(
   <KeypressProvider>
     <AppContainer config={config} initialSessionId={sessionId} />
-  </KeypressProvider>
+  </KeypressProvider>,
+  {
+    exitOnCtrlC: false,
+    // Alternate buffer mode: Ink manages a separate screen buffer
+    // This eliminates flickering during resize as Ink handles re-rendering automatically
+    alternateBuffer: true,
+  }
 );

@@ -18,8 +18,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Box, Static, useStdout } from 'ink';
-import ansiEscapes from 'ansi-escapes';
+import { Box, Static } from 'ink';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
 import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js';
 import { PendingItemDisplay } from '../components/messages/PendingItemDisplay.js';
@@ -76,9 +75,9 @@ const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([ke
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
   const appActions = useAppActions();
-  const { stdout } = useStdout();
   const { columns: terminalWidth } = useTerminalSize();
   const isInitialMount = useRef(true);
+  const previousWidthRef = useRef(terminalWidth);
 
   // Key to force re-mount of Static component on terminal resize
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
@@ -118,25 +117,48 @@ export const MainLayout: React.FC = () => {
     context: commandProcessorContext,
   });
 
-  // Refresh static content by clearing terminal and forcing re-render
+  // Refresh static content by forcing re-render of Static component
+  // In alternate buffer mode, Ink handles the screen buffer automatically
+  // so we don't need to clear the terminal manually
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
     setHistoryRemountKey((prev) => prev + 1);
-  }, [stdout]);
+  }, []);
 
   // Handle terminal resize with debounce
+  // Use ref to track timeout for proper cleanup across re-renders
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
+    // Skip initial mount
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      previousWidthRef.current = terminalWidth;
       return;
     }
 
-    const handler = setTimeout(() => {
+    // Only process if width actually changed
+    if (previousWidthRef.current === terminalWidth) {
+      return;
+    }
+
+    previousWidthRef.current = terminalWidth;
+
+    // Clear any pending timeout
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+
+    // Debounce: wait for resize to settle before refreshing
+    resizeTimeoutRef.current = setTimeout(() => {
       refreshStatic();
-    }, 300);
+      resizeTimeoutRef.current = null;
+    }, 150);
 
     return () => {
-      clearTimeout(handler);
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = null;
+      }
     };
   }, [terminalWidth, refreshStatic]);
 
