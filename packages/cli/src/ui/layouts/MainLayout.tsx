@@ -31,11 +31,16 @@ import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js'
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
+import { useSessionManager } from '../hooks/useSessionManager.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
 import { MessageType, type AgentProfileType } from '../types.js';
+import { theme } from '../colors.js';
 
 // Dialog types
-type ActiveDialog = 'profile' | 'memory' | null;
+type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | null;
+
+// Session action type
+type SessionAction = 'create' | 'restore' | 'delete';
 
 // Profile options for SelectDialog
 const PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
@@ -50,6 +55,13 @@ const PROFILE_OPTIONS: SelectOption<AgentProfileType>[] = [
 const MEMORY_OPTIONS: SelectOption<boolean>[] = [
   { key: 'on', value: true, label: 'On', description: 'AI can recall previous conversations' },
   { key: 'off', value: false, label: 'Off', description: 'No long-term memory, fresh context each time' },
+];
+
+// Session action options for SelectDialog
+const SESSION_ACTION_OPTIONS: SelectOption<SessionAction>[] = [
+  { key: 'create', value: 'create', label: 'Create', description: 'Create a new chat session' },
+  { key: 'restore', value: 'restore', label: 'Restore', description: 'Switch to an existing session' },
+  { key: 'delete', value: 'delete', label: 'Delete', description: 'Delete an existing session' },
 ];
 
 export const MainLayout: React.FC = () => {
@@ -68,6 +80,9 @@ export const MainLayout: React.FC = () => {
   // Input buffer - created here to survive InputPrompt unmount/remount
   // This is the key pattern from gemini-cli to preserve state across dialogs
   const buffer = useTextBuffer();
+
+  // Session manager for API calls
+  const sessionManager = useSessionManager();
 
   // Slash command processor context
   const commandProcessorContext = useMemo(() => ({
@@ -137,6 +152,74 @@ export const MainLayout: React.FC = () => {
     setActiveDialog(null);
   }, []);
 
+  // Handle session action selection (create/restore/delete)
+  const handleSessionActionSelect = useCallback(async (action: SessionAction) => {
+    switch (action) {
+      case 'create': {
+        try {
+          const sessionId = await appActions.createSession();
+          appActions.addHistoryItem({
+            type: MessageType.INFO,
+            message: `Created new session: ${sessionId.slice(0, 8)}...`,
+          });
+        } catch (e) {
+          appActions.addHistoryItem({
+            type: MessageType.ERROR,
+            message: e instanceof Error ? e.message : 'Failed to create session',
+          });
+        }
+        setActiveDialog(null);
+        break;
+      }
+      case 'restore':
+        // Load sessions and show restore dialog
+        await sessionManager.loadSessions();
+        setActiveDialog('session_restore');
+        break;
+      case 'delete':
+        // Load sessions and show delete dialog
+        await sessionManager.loadSessions();
+        setActiveDialog('session_delete');
+        break;
+    }
+  }, [sessionManager, appActions]);
+
+  // Handle session restore selection
+  const handleSessionRestoreSelect = useCallback(async (sessionId: string) => {
+    try {
+      await appActions.switchSession(sessionId);
+      const session = sessionManager.sessions.find(s => s.id === sessionId);
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: `Restored session: ${session?.name || sessionId}`,
+      });
+    } catch (e) {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: e instanceof Error ? e.message : 'Failed to restore session',
+      });
+    }
+    setActiveDialog(null);
+  }, [sessionManager, appActions]);
+
+  // Handle session delete selection
+  const handleSessionDeleteSelect = useCallback(async (sessionId: string) => {
+    const session = sessionManager.sessions.find(s => s.id === sessionId);
+    const success = await sessionManager.deleteSession(sessionId);
+    if (success) {
+      appActions.addHistoryItem({
+        type: MessageType.INFO,
+        message: `Deleted session: ${session?.name || sessionId}`,
+      });
+    } else {
+      appActions.addHistoryItem({
+        type: MessageType.ERROR,
+        message: sessionManager.error || 'Failed to delete session',
+      });
+    }
+    setActiveDialog(null);
+  }, [sessionManager, appActions]);
+
   // Handle slash command execution
   const handleSlashCommand = useCallback(async (name: string, args: string) => {
     const result = await processCommand(name, args);
@@ -170,6 +253,8 @@ export const MainLayout: React.FC = () => {
           setActiveDialog('profile');
         } else if (result.dialog === 'memory') {
           setActiveDialog('memory');
+        } else if (result.dialog === 'session') {
+          setActiveDialog('session');
         }
         break;
 
@@ -247,6 +332,52 @@ export const MainLayout: React.FC = () => {
           currentValue={appState.memoryEnabled}
           onSelect={handleMemorySelect}
           onCancel={handleDialogCancel}
+        />
+      )}
+
+      {/* Session action dialog */}
+      {activeDialog === 'session' && (
+        <SelectDialog
+          title="Session Management"
+          description="Choose an action:"
+          options={SESSION_ACTION_OPTIONS}
+          onSelect={handleSessionActionSelect}
+          onCancel={handleDialogCancel}
+        />
+      )}
+
+      {/* Session restore dialog */}
+      {activeDialog === 'session_restore' && (
+        <SelectDialog
+          title="Restore Session"
+          description="Select a session to restore:"
+          options={sessionManager.getSessionOptions(appState.currentSessionId, false)}
+          isLoading={sessionManager.isLoading}
+          loadingMessage="Loading sessions..."
+          emptyMessage="No sessions available."
+          onSelect={handleSessionRestoreSelect}
+          onCancel={handleDialogCancel}
+          showNumbers={true}
+          showDescriptions={false}
+          maxItemsToShow={8}
+        />
+      )}
+
+      {/* Session delete dialog */}
+      {activeDialog === 'session_delete' && (
+        <SelectDialog
+          title="Delete Session"
+          description="Select a session to delete (cannot be undone):"
+          options={sessionManager.getSessionOptions(appState.currentSessionId, true)}
+          isLoading={sessionManager.isLoading}
+          loadingMessage="Loading sessions..."
+          emptyMessage="No other sessions available to delete."
+          onSelect={handleSessionDeleteSelect}
+          onCancel={handleDialogCancel}
+          showNumbers={true}
+          showDescriptions={false}
+          maxItemsToShow={8}
+          borderColor={theme.status.error}
         />
       )}
 
