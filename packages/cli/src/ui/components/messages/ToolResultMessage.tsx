@@ -9,7 +9,8 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolResultHistoryItem } from '../../types.js';
-import { theme, TOOL_STATUS } from '../../colors.js';
+import { theme } from '../../colors.js';
+import { TOOL_STATUS } from '../../markers.js';
 
 // Maximum lines to show before truncating
 const MAX_RESULT_LINES = 10;

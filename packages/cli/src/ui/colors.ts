@@ -37,13 +37,3 @@ export const colors: ThemeColors = new Proxy({} as ThemeColors, {
     return getColors()[prop as keyof ThemeColors];
   }
 });
-
-// Tool status symbols
-export const TOOL_STATUS = {
-  PENDING: '○',
-  EXECUTING: '▶',
-  SUCCESS: '⏺',
-  CONFIRMING: '?',
-  CANCELED: '✕',
-  ERROR: '⏺',
-} as const;

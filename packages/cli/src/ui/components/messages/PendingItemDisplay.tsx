@@ -18,7 +18,9 @@ import {
   type ErrorHistoryItemWithoutId,
   type ContentBlock,
 } from '../../types.js';
-import { theme, TOOL_STATUS } from '../../colors.js';
+import { theme } from '../../colors.js';
+import { TOOL_STATUS } from '../../markers.js';
+import { BlinkingCircle } from '../BlinkingCircle.js';
 
 interface PendingItemDisplayProps {
   item: HistoryItemWithoutId;
@@ -97,9 +99,9 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
   return (
     <Box marginBottom={1} flexDirection="row">
-      <Text color={theme.status.warning}>{TOOL_STATUS.EXECUTING} </Text>
+      <BlinkingCircle color={theme.status.warning} />
       <Text color={theme.text.secondary}>
-        {item.toolName}
+        {' '}{item.toolName}
       </Text>
     </Box>
   );

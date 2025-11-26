@@ -8,9 +8,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
 import type { ToolCallHistoryItem } from '../../types.js';
-import { theme, TOOL_STATUS } from '../../colors.js';
+import { theme } from '../../colors.js';
+import { TOOL_STATUS } from '../../markers.js';
+import { BlinkingCircle } from '../BlinkingCircle.js';
 
 // Status indicator width (matching Gemini CLI STATUS_INDICATOR_WIDTH = 3)
 const STATUS_INDICATOR_WIDTH = 3;
@@ -77,8 +78,8 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
     statusIndicator = TOOL_STATUS.SUCCESS;
     statusColor = theme.status.success;
   } else if (isExecuting) {
-    statusIndicator = <Spinner type="toggle" />;
     statusColor = theme.status.warning;
+    statusIndicator = <BlinkingCircle color={statusColor} />;
   } else {
     statusIndicator = TOOL_STATUS.PENDING;
     statusColor = theme.status.success;
