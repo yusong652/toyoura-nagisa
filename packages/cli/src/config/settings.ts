@@ -28,7 +28,7 @@ export const configSchema = z.object({
 
   // Agent profile
   agent: z.object({
-    defaultProfile: z.string().default('general'),
+    defaultProfile: z.string().default('pfc'),
   }).default({}),
 });
 

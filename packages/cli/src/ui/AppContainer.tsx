@@ -86,7 +86,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [isQuitting, setIsQuitting] = useState(false);
 
   // Agent profile state
-  const [currentProfile, setCurrentProfile] = useState<AgentProfileType>('general');
+  const [currentProfile, setCurrentProfile] = useState<AgentProfileType>('pfc');
   const [availableProfiles, setAvailableProfiles] = useState<AgentProfileInfo[]>([]);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 

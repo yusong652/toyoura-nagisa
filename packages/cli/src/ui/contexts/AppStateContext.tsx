@@ -92,7 +92,7 @@ const defaultState: AppState = {
   connectionStatus: 'disconnected',
   error: null,
   currentSessionId: null,
-  currentProfile: 'general',
+  currentProfile: 'pfc',
   availableProfiles: [],
   isProfileLoading: false,
   memoryEnabled: false,
