@@ -159,25 +159,47 @@ export function useChatStream({
     } else {
       // New assistant message starting - commit any pending items from previous round
       // This happens when tool calling triggers a new LLM round
-      if (pendingToolItems.length > 0) {
-        for (const toolItem of pendingToolItems) {
-          historyManager.addItem(toolItem);
-        }
-        setPendingToolItems([]);
-        seenToolCallIdsRef.current.clear();
-        seenToolResultIdsRef.current.clear();
-      }
 
-      // Assistant message - create pending item (not in history yet)
-      setPendingAssistantItem({
-        type: MessageType.ASSISTANT,
-        content: [],
-        isStreaming: true,
+      // First, commit pending assistant item if it has content
+      // Use functional update to get the latest state
+      setPendingAssistantItem((prevAssistant) => {
+        if (prevAssistant && prevAssistant.content.length > 0) {
+          const hasNonEmptyContent = prevAssistant.content.some((block) => {
+            if (block.type === 'text') return block.text.trim().length > 0;
+            if (block.type === 'thinking') return block.thinking.trim().length > 0;
+            return false;
+          });
+          if (hasNonEmptyContent) {
+            historyManager.addItem({
+              ...prevAssistant,
+              isStreaming: false,
+            });
+          }
+        }
+        // Return new pending item
+        return {
+          type: MessageType.ASSISTANT,
+          content: [],
+          isStreaming: true,
+        };
       });
+
+      // Then commit pending tool items
+      setPendingToolItems((prevToolItems) => {
+        if (prevToolItems.length > 0) {
+          for (const toolItem of prevToolItems) {
+            historyManager.addItem(toolItem);
+          }
+          seenToolCallIdsRef.current.clear();
+          seenToolResultIdsRef.current.clear();
+        }
+        return [];
+      });
+
       setStreamingState(StreamingState.Responding);
       setIsStreaming(true);
     }
-  }, [pendingToolItems, historyManager]);
+  }, [historyManager]);
 
   // Handle STREAMING_UPDATE event from ConnectionManager
   const handleStreamingUpdate = useCallback((event: StreamingUpdateEvent) => {
@@ -210,6 +232,11 @@ export function useChatStream({
       // Handle tool calls - use Set to track seen IDs, add to pending
       const toolUseBlocks = event.content.filter((b) => b.type === 'tool_use');
       const newToolItems: HistoryItemWithoutId[] = [];
+
+      // If tool calls are present, stop streaming indicator on assistant message
+      if (toolUseBlocks.length > 0) {
+        setPendingAssistantItem((prev) => prev ? { ...prev, isStreaming: false } : prev);
+      }
 
       for (const block of toolUseBlocks) {
         if (block.type !== 'tool_use') continue;

@@ -29,26 +29,32 @@ interface PendingItemDisplayProps {
 // Render content block for assistant message
 const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boolean): React.ReactNode => {
   switch (block.type) {
-    case 'text':
+    case 'text': {
+      // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
+      const displayText = block.text.trim();
       return (
         <Box key={index} flexDirection="row">
           <Text wrap="wrap" color={theme.text.primary}>
-            {block.text}
+            {displayText}
           </Text>
           {isStreaming && (
             <Text color={theme.text.muted}>▌</Text>
           )}
         </Box>
       );
+    }
 
-    case 'thinking':
+    case 'thinking': {
+      // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
+      const displayThinking = block.thinking.trim();
       return (
-        <Box key={index} marginBottom={1}>
+        <Box key={index}>
           <Text color={theme.message.thinking} dimColor wrap="wrap">
-            {block.thinking}
+            {displayThinking}
           </Text>
         </Box>
       );
+    }
 
     default:
       return null;
