@@ -6,6 +6,11 @@
  * - Initializes core services (ConnectionManager, SessionManager)
  * - Composes hooks for business logic
  * - Provides contexts to child components
+ *
+ * Following gemini-cli's hook-driven architecture pattern:
+ * - AppContainer orchestrates hooks at the top level
+ * - Each hook manages a specific concern
+ * - Context values are assembled from hook returns
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -17,7 +22,6 @@ import {
   FileStorageAdapter,
   SessionService,
   apiClient,
-  sessionService,
 } from '@aiNagisa/core';
 import { App } from './App.js';
 import {
@@ -30,10 +34,10 @@ import { StreamingState } from './contexts/StreamingContext.js';
 import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { MessageType, type ConnectionStatus, type AgentProfileType, type AgentProfileInfo, type ContentBlock } from './types.js';
-import { type Config } from '../config/settings.js';
-import { profileCommand } from './commands/profileCommand.js';
-import { memoryCommand } from './commands/memoryCommand.js';
+import { useConnectionState } from './hooks/useConnectionState.js';
+import { useSessionManagement } from './hooks/useSessionManagement.js';
+import { useProfileManager } from './hooks/useProfileManager.js';
+import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
   config: Config;
@@ -46,6 +50,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 }) => {
   const { exit } = useApp();
 
+  // ========== Service Initialization ==========
   // Initialize core services (refs to persist across renders)
   const connectionManagerRef = useRef<ConnectionManager | null>(null);
   const sessionManagerRef = useRef<SessionManager | null>(null);
@@ -81,23 +86,44 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const connectionManager = connectionManagerRef.current;
   const sessionManager = sessionManagerRef.current;
 
-  // ========== State ==========
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  // ========== Local State ==========
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [isQuitting, setIsQuitting] = useState(false);
-
-  // Agent profile state
-  const [currentProfile, setCurrentProfile] = useState<AgentProfileType>('pfc');
-  const [availableProfiles, setAvailableProfiles] = useState<AgentProfileInfo[]>([]);
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
-
-  // Memory state (disabled by default)
   const [memoryEnabled, setMemoryEnabled] = useState(false);
 
   // ========== Hooks ==========
 
+  // Connection state management
+  const { connectionStatus } = useConnectionState({
+    connectionManager,
+  });
+
   // History management
   const historyManager = useHistoryManager();
+
+  // Profile management
+  const {
+    currentProfile,
+    availableProfiles,
+    isProfileLoading,
+    setProfile,
+    refreshProfiles,
+  } = useProfileManager({ defaultProfile: 'pfc' });
+
+  // Message queue (queue messages during streaming)
+  // Note: Declared before useChatStream because useMessageQueue needs submitQuery
+  // We'll create a ref to handle the circular dependency
+  const submitQueryRef = useRef<((text: string) => void) | null>(null);
+
+  const {
+    messageQueue,
+    addMessage,
+    clearQueue,
+  } = useMessageQueue({
+    isConnected: connectionStatus === 'connected',
+    streamingState: StreamingState.Idle, // Will be updated
+    submitQuery: (text: string) => submitQueryRef.current?.(text),
+  });
 
   // Chat stream (message handling, streaming state)
   const {
@@ -119,37 +145,20 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     memoryEnabled,
   });
 
-  // Message queue (queue messages during streaming)
+  // Update the ref after useChatStream is called
+  submitQueryRef.current = submitQuery;
+
+  // Session management (switch, create, history loading)
   const {
-    messageQueue,
-    addMessage,
+    switchSession,
+    createSession,
+  } = useSessionManagement({
+    connectionManager,
+    sessionManager,
+    historyManager,
     clearQueue,
-  } = useMessageQueue({
-    isConnected: connectionStatus === 'connected',
-    streamingState: streamingStateEnum,
-    submitQuery,
+    setCurrentSessionId,
   });
-
-  // ========== Connection State Handling ==========
-  useEffect(() => {
-    const handleStateChange = (data: { oldState: string; newState: string }) => {
-      const statusMap: Record<string, ConnectionStatus> = {
-        'disconnected': 'disconnected',
-        'connecting': 'connecting',
-        'connected': 'connected',
-        'error': 'error',
-        'reconnecting': 'connecting',
-        'disconnecting': 'disconnected',
-      };
-      setConnectionStatus(statusMap[data.newState] || 'disconnected');
-    };
-
-    connectionManager.on('stateChanged', handleStateChange);
-
-    return () => {
-      connectionManager.off('stateChanged', handleStateChange);
-    };
-  }, [connectionManager]);
 
   // ========== Session Initialization ==========
   useEffect(() => {
@@ -182,83 +191,9 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Actions ==========
 
-  // Process slash commands
-  const handleSlashCommand = useCallback((text: string): boolean => {
-    const trimmed = text.trim();
-    if (!trimmed.startsWith('/')) return false;
-
-    // Parse command and args
-    const spaceIndex = trimmed.indexOf(' ');
-    const commandName = spaceIndex === -1
-      ? trimmed.slice(1).toLowerCase()
-      : trimmed.slice(1, spaceIndex).toLowerCase();
-    const args = spaceIndex === -1 ? '' : trimmed.slice(spaceIndex + 1);
-
-    // Add user message to history
-    historyManager.addItem({
-      type: MessageType.USER,
-      text: trimmed,
-    });
-
-    // Handle built-in commands
-    if (commandName === 'profile' || commandName === 'p') {
-      const result = profileCommand.action?.({} as any, args);
-      if (result && typeof result === 'object' && 'type' in result) {
-        if (result.type === 'message') {
-          historyManager.addItem({
-            type: result.messageType === 'error' ? MessageType.ERROR : MessageType.INFO,
-            message: result.content,
-          });
-        } else if (result.type === 'profile_switch') {
-          const newProfile = result.profile as AgentProfileType;
-          setCurrentProfile(newProfile);
-          historyManager.addItem({
-            type: MessageType.INFO,
-            message: `Profile switched to: ${newProfile}`,
-          });
-        }
-      }
-      return true;
-    }
-
-    // Handle memory command
-    if (commandName === 'memory' || commandName === 'm') {
-      const result = memoryCommand.action?.({} as any, args);
-      if (result && typeof result === 'object' && 'type' in result) {
-        if (result.type === 'message') {
-          historyManager.addItem({
-            type: result.messageType === 'error' ? MessageType.ERROR : MessageType.INFO,
-            message: result.content,
-          });
-        } else if (result.type === 'memory_toggle') {
-          const enabled = (result as any).enabled as boolean;
-          setMemoryEnabled(enabled);
-          historyManager.addItem({
-            type: MessageType.INFO,
-            message: `Memory ${enabled ? 'enabled' : 'disabled'}`,
-          });
-        }
-      }
-      return true;
-    }
-
-    // Unknown command
-    historyManager.addItem({
-      type: MessageType.ERROR,
-      message: `Unknown command: /${commandName}\n\nAvailable commands:\n  /profile, /p - View or switch agent profile\n  /memory, /m  - Toggle long-term memory`,
-    });
-    return true;
-  }, [historyManager, setCurrentProfile, setMemoryEnabled]);
-
   // Send message (uses queue if streaming, otherwise direct submit)
   const sendMessage = useCallback((text: string) => {
     if (!text.trim()) return;
-
-    // Check for slash commands first
-    if (text.trim().startsWith('/')) {
-      handleSlashCommand(text);
-      return;
-    }
 
     if (isStreaming || streamingStateEnum !== StreamingState.Idle) {
       // Queue message if currently streaming
@@ -267,132 +202,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       // Direct submit
       submitQuery(text);
     }
-  }, [isStreaming, streamingStateEnum, addMessage, submitQuery, handleSlashCommand]);
-
-  const switchSession = useCallback(async (sessionId: string) => {
-    connectionManager.disconnect();
-    setCurrentSessionId(sessionId);
-    historyManager.clearItems();
-    clearQueue();
-
-    // Load chat history for the session
-    try {
-      const historyResponse = await sessionService.getSessionHistory(sessionId);
-      if (historyResponse.history && historyResponse.history.length > 0) {
-        // Convert backend messages to CLI history items
-        for (const msg of historyResponse.history) {
-          const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-
-          if (msg.role === 'user') {
-            // User message - extract text content
-            let textContent = '';
-            if (typeof msg.content === 'string') {
-              textContent = msg.content;
-            } else if (Array.isArray(msg.content)) {
-              // Check for tool_result blocks (user messages can contain tool results)
-              for (const block of msg.content) {
-                if (block.type === 'text' && block.text) {
-                  textContent += block.text;
-                } else if (block.type === 'tool_result') {
-                  // Add tool result as a separate history item
-                  const resultContent = block.content?.parts
-                    ?.map((p: any) => p.text || '')
-                    .join('\n') || '';
-                  historyManager.addItem({
-                    type: MessageType.TOOL_RESULT,
-                    toolCallId: block.tool_use_id || '',
-                    content: resultContent,
-                    isError: block.is_error || false,
-                  }, timestamp);
-                }
-              }
-            }
-            // Only add user message if there's text content
-            if (textContent.trim()) {
-              historyManager.addItem({
-                type: MessageType.USER,
-                text: textContent,
-              }, timestamp);
-            }
-          } else if (msg.role === 'assistant') {
-            // Assistant message - process all content blocks
-            const contentBlocks: ContentBlock[] = [];
-            const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
-
-            if (typeof msg.content === 'string') {
-              contentBlocks.push({ type: 'text', text: msg.content });
-            } else if (Array.isArray(msg.content)) {
-              for (const block of msg.content) {
-                if (block.type === 'text' && block.text) {
-                  contentBlocks.push({ type: 'text', text: block.text });
-                } else if (block.type === 'thinking' && block.thinking) {
-                  contentBlocks.push({ type: 'thinking', thinking: block.thinking });
-                } else if (block.type === 'tool_use') {
-                  // Collect tool calls to add as separate items
-                  toolCalls.push({
-                    id: block.id || '',
-                    name: block.name || '',
-                    input: block.input || {},
-                  });
-                }
-              }
-            }
-
-            // Add assistant message if there's text/thinking content
-            if (contentBlocks.length > 0) {
-              historyManager.addItem({
-                type: MessageType.ASSISTANT,
-                content: contentBlocks,
-              }, timestamp);
-            }
-
-            // Add tool call items
-            for (const tc of toolCalls) {
-              historyManager.addItem({
-                type: MessageType.TOOL_CALL,
-                toolCallId: tc.id,
-                toolName: tc.name,
-                toolInput: tc.input,
-              }, timestamp);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('[AppContainer] Failed to load session history:', err);
-    }
-
-    await connectionManager.connectToSession(sessionId);
-  }, [connectionManager, historyManager, clearQueue]);
-
-  const createSession = useCallback(async (name?: string) => {
-    const sessionId = await sessionManager.createSession(name);
-    await switchSession(sessionId);
-    return sessionId;
-  }, [sessionManager, switchSession]);
-
-  // Fetch available profiles from backend
-  const refreshProfiles = useCallback(async () => {
-    setIsProfileLoading(true);
-    try {
-      const response = await apiClient.get<{
-        success: boolean;
-        profiles: AgentProfileInfo[];
-      }>('/api/profiles');
-      if (response.success && response.profiles) {
-        setAvailableProfiles(response.profiles);
-      }
-    } catch (err) {
-      console.error('[AppContainer] Failed to fetch profiles:', err);
-    } finally {
-      setIsProfileLoading(false);
-    }
-  }, []);
-
-  // Set current profile
-  const setProfile = useCallback((profile: AgentProfileType) => {
-    setCurrentProfile(profile);
-  }, []);
+  }, [isStreaming, streamingStateEnum, addMessage, submitQuery]);
 
   const quit = useCallback(() => {
     setIsQuitting(true);
