@@ -27,6 +27,9 @@ export interface FileMentionContext {
   suggestions: FileMentionSuggestion[];
 }
 
+// Maximum suggestions to show at once
+const MAX_SUGGESTIONS_TO_SHOW = 8;
+
 export interface UseFileMentionDetectionReturn {
   /** Current mention context */
   context: FileMentionContext;
@@ -40,6 +43,8 @@ export interface UseFileMentionDetectionReturn {
   clearMention: () => void;
   /** Selected suggestion index */
   selectedIndex: number;
+  /** Scroll offset for visible window */
+  scrollOffset: number;
   /** Move selection up */
   selectPrevious: () => void;
   /** Move selection down */
@@ -67,6 +72,7 @@ export function useFileMentionDetection(
 
   // Selection state for keyboard navigation
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   // Generate suggestions from search results
   const generateSuggestions = useCallback((): FileMentionSuggestion[] => {
@@ -144,9 +150,10 @@ export function useFileMentionDetection(
     }
   }, [message, cursorPosition, isActivated, clearResults]);
 
-  // Reset selection when results change
+  // Reset selection and scroll when results change
   useEffect(() => {
     setSelectedIndex(0);
+    setScrollOffset(0);
   }, [results]);
 
   // Build context
@@ -175,23 +182,53 @@ export function useFileMentionDetection(
       setSuppressSuggestions(true);
       clearResults();
       setSelectedIndex(0);
+      setScrollOffset(0);
     }
   }, [isActivated, clearResults]);
 
-  // Selection navigation
+  // Selection navigation with scroll adjustment
   const selectPrevious = useCallback(() => {
+    const suggestions = generateSuggestions();
+    if (suggestions.length === 0) return;
+
     setSelectedIndex((prev) => {
-      const suggestions = generateSuggestions();
-      if (suggestions.length === 0) return 0;
-      return prev <= 0 ? suggestions.length - 1 : prev - 1;
+      const newIndex = prev <= 0 ? suggestions.length - 1 : prev - 1;
+      // Adjust scroll
+      setScrollOffset((prevScroll) => {
+        if (newIndex === suggestions.length - 1) {
+          // Wrapped to end - scroll to show last items
+          return Math.max(0, suggestions.length - MAX_SUGGESTIONS_TO_SHOW);
+        }
+        if (newIndex < prevScroll) {
+          // Selection moved above visible window
+          return newIndex;
+        }
+        return prevScroll;
+      });
+      return newIndex;
     });
   }, [generateSuggestions]);
 
   const selectNext = useCallback(() => {
+    const suggestions = generateSuggestions();
+    if (suggestions.length === 0) return;
+
     setSelectedIndex((prev) => {
-      const suggestions = generateSuggestions();
-      if (suggestions.length === 0) return 0;
-      return prev >= suggestions.length - 1 ? 0 : prev + 1;
+      const newIndex = prev >= suggestions.length - 1 ? 0 : prev + 1;
+      // Adjust scroll
+      setScrollOffset((prevScroll) => {
+        if (newIndex === 0) {
+          // Wrapped to beginning
+          return 0;
+        }
+        const visibleEnd = prevScroll + MAX_SUGGESTIONS_TO_SHOW;
+        if (newIndex >= visibleEnd) {
+          // Selection moved below visible window
+          return newIndex - MAX_SUGGESTIONS_TO_SHOW + 1;
+        }
+        return prevScroll;
+      });
+      return newIndex;
     });
   }, [generateSuggestions]);
 
@@ -214,6 +251,7 @@ export function useFileMentionDetection(
     isSearching,
     clearMention,
     selectedIndex,
+    scrollOffset,
     selectPrevious,
     selectNext,
     getSelectedSuggestion,

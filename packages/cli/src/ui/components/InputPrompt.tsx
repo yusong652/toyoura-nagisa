@@ -33,7 +33,7 @@ import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { theme } from '../colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import { SlashCommandSuggestions } from './SlashCommandSuggestions.js';
 import { FileMentionSuggestions } from './FileMentionSuggestions.js';
 import type { SlashCommand, CommandContext } from '../commands/types.js';
 import type { TextBuffer } from '../utils/text-buffer.js';
@@ -405,13 +405,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         <FileMentionSuggestions
           suggestions={fileMention.suggestions}
           selectedIndex={fileMention.selectedIndex}
+          scrollOffset={fileMention.scrollOffset}
           isLoading={fileMention.isSearching}
         />
       )}
 
       {/* Slash command suggestions popup (below input) */}
       {completion.showSuggestions && !fileMention.isMentionActive && (
-        <SuggestionsDisplay
+        <SlashCommandSuggestions
           suggestions={completion.suggestions}
           activeIndex={completion.activeIndex}
           isLoading={completion.isLoading}

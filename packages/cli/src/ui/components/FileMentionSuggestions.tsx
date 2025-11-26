@@ -10,57 +10,26 @@ import { Box, Text } from 'ink';
 import { theme } from '../colors.js';
 import type { FileMentionSuggestion } from '../hooks/useFileMentionDetection.js';
 
+// Maximum suggestions to show at once (must match hook constant)
+const MAX_SUGGESTIONS_TO_SHOW = 8;
+
 interface FileMentionSuggestionsProps {
   suggestions: FileMentionSuggestion[];
   selectedIndex: number;
+  scrollOffset: number;
   isLoading: boolean;
-  maxDisplay?: number;
-}
-
-/**
- * Get file type indicator based on extension
- */
-function getFileTypeIndicator(filename: string): string {
-  const extension = filename.split('.').pop()?.toLowerCase();
-
-  switch (extension) {
-    case 'py':
-      return 'py';
-    case 'ts':
-    case 'tsx':
-      return 'ts';
-    case 'js':
-    case 'jsx':
-      return 'js';
-    case 'md':
-      return 'md';
-    case 'json':
-      return 'json';
-    case 'txt':
-      return 'txt';
-    case 'css':
-    case 'scss':
-      return 'css';
-    case 'html':
-      return 'html';
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'gif':
-    case 'svg':
-      return 'img';
-    default:
-      return 'file';
-  }
 }
 
 export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
   suggestions,
   selectedIndex,
+  scrollOffset,
   isLoading,
-  maxDisplay = 8,
 }) => {
-  const displaySuggestions = suggestions.slice(0, maxDisplay);
+  // Calculate visible slice based on scrollOffset
+  const startIndex = scrollOffset;
+  const endIndex = Math.min(scrollOffset + MAX_SUGGESTIONS_TO_SHOW, suggestions.length);
+  const visibleSuggestions = suggestions.slice(startIndex, endIndex);
   const showNoResults = suggestions.length === 0 && !isLoading;
 
   return (
@@ -74,10 +43,13 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
       <Box>
         <Text color={theme.text.muted}>$ </Text>
         <Text color={theme.text.secondary}>files</Text>
-        {!isLoading && (
-          <Text color={theme.text.muted}> [{displaySuggestions.length}]</Text>
+        {!isLoading && suggestions.length > 0 && (
+          <Text color={theme.text.muted}> ({selectedIndex + 1}/{suggestions.length})</Text>
         )}
       </Box>
+
+      {/* Up scroll indicator */}
+      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
       {/* Suggestions list */}
       {isLoading && suggestions.length === 0 ? (
@@ -89,9 +61,9 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
           <Text color={theme.text.muted}>no results found</Text>
         </Box>
       ) : (
-        displaySuggestions.map((suggestion, index) => {
-          const isSelected = index === selectedIndex;
-          const fileType = getFileTypeIndicator(suggestion.file.filename);
+        visibleSuggestions.map((suggestion, index) => {
+          const originalIndex = startIndex + index;
+          const isSelected = originalIndex === selectedIndex;
 
           return (
             <Box key={suggestion.file.path}>
@@ -101,15 +73,16 @@ export const FileMentionSuggestions: React.FC<FileMentionSuggestionsProps> = ({
               >
                 {isSelected ? '> ' : '  '}
               </Text>
-              <Text color={theme.status.info}>[{fileType}]</Text>
               <Text color={isSelected ? theme.text.primary : theme.text.secondary}>
-                {' '}
                 {suggestion.file.path}
               </Text>
             </Box>
           );
         })
       )}
+
+      {/* Down scroll indicator */}
+      {endIndex < suggestions.length && <Text color={theme.text.muted}>▼</Text>}
 
       {/* Footer hint */}
       <Box>

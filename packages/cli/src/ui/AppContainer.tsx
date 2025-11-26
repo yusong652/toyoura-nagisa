@@ -30,10 +30,8 @@ import {
   type AppState,
   type AppActions,
 } from './contexts/AppStateContext.js';
-import { StreamingState } from './contexts/StreamingContext.js';
 import { useHistoryManager } from './hooks/useHistoryManager.js';
 import { useChatStream } from './hooks/useChatStream.js';
-import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
@@ -110,21 +108,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     refreshProfiles,
   } = useProfileManager({ defaultProfile: 'pfc' });
 
-  // Message queue (queue messages during streaming)
-  // Note: Declared before useChatStream because useMessageQueue needs submitQuery
-  // We'll create a ref to handle the circular dependency
-  const submitQueryRef = useRef<((text: string, mentionedFiles?: string[]) => void) | null>(null);
-
-  const {
-    messageQueue,
-    addMessage,
-    clearQueue,
-  } = useMessageQueue({
-    isConnected: connectionStatus === 'connected',
-    streamingState: StreamingState.Idle, // Will be updated
-    submitQuery: (text: string) => submitQueryRef.current?.(text),
-  });
-
   // Chat stream (message handling, streaming state)
   const {
     streamingState: streamingStateEnum,
@@ -145,9 +128,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     memoryEnabled,
   });
 
-  // Update the ref after useChatStream is called
-  submitQueryRef.current = submitQuery;
-
   // Session management (switch, create, history loading)
   const {
     switchSession,
@@ -156,7 +136,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     connectionManager,
     sessionManager,
     historyManager,
-    clearQueue,
     setCurrentSessionId,
   });
 
@@ -191,18 +170,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Actions ==========
 
-  // Send message (uses queue if streaming, otherwise direct submit)
+  // Send message (backend handles queuing if streaming)
   const sendMessage = useCallback((text: string, mentionedFiles?: string[]) => {
     if (!text.trim()) return;
-
-    if (isStreaming || streamingStateEnum !== StreamingState.Idle) {
-      // Queue message if currently streaming (mentionedFiles will be lost)
-      addMessage(text);
-    } else {
-      // Direct submit
-      submitQuery(text, mentionedFiles);
-    }
-  }, [isStreaming, streamingStateEnum, addMessage, submitQuery]);
+    submitQuery(text, mentionedFiles);
+  }, [submitQuery]);
 
   const quit = useCallback(() => {
     setIsQuitting(true);
@@ -235,8 +207,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isStreaming,
     pendingConfirmation,
     isQuitting,
-    isInputActive: connectionStatus === 'connected' && !isQuitting && !isStreaming,
-    messageQueue,
+    isInputActive: connectionStatus === 'connected' && !isQuitting,
   }), [
     connectionStatus,
     error,
@@ -252,7 +223,6 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isStreaming,
     pendingConfirmation,
     isQuitting,
-    messageQueue,
   ]);
 
   const appActions: AppActions = useMemo(() => ({

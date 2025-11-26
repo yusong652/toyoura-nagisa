@@ -51,9 +51,6 @@ export interface AppState {
   // UI state
   isQuitting: boolean;
   isInputActive: boolean;
-
-  // Message queue (messages queued during streaming)
-  messageQueue: string[];
 }
 
 export interface AppActions {
@@ -106,7 +103,6 @@ const defaultState: AppState = {
   pendingConfirmation: null,
   isQuitting: false,
   isInputActive: true,
-  messageQueue: [],
 };
 
 const defaultActions: AppActions = {

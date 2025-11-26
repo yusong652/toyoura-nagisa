@@ -14,7 +14,6 @@ interface UseSessionManagementParams {
   connectionManager: ConnectionManager;
   sessionManager: SessionManager;
   historyManager: ReturnType<typeof useHistoryManager>;
-  clearQueue: () => void;
   setCurrentSessionId: (sessionId: string) => void;
 }
 
@@ -113,7 +112,6 @@ export function useSessionManagement({
   connectionManager,
   sessionManager,
   historyManager,
-  clearQueue,
   setCurrentSessionId,
 }: UseSessionManagementParams): UseSessionManagementReturn {
 
@@ -121,7 +119,6 @@ export function useSessionManagement({
     connectionManager.disconnect();
     setCurrentSessionId(sessionId);
     historyManager.clearItems();
-    clearQueue();
 
     // Load chat history for the session
     try {
@@ -134,7 +131,7 @@ export function useSessionManagement({
     }
 
     await connectionManager.connectToSession(sessionId);
-  }, [connectionManager, historyManager, clearQueue, setCurrentSessionId]);
+  }, [connectionManager, historyManager, setCurrentSessionId]);
 
   const createSession = useCallback(async (name?: string) => {
     const sessionId = await sessionManager.createSession(name);

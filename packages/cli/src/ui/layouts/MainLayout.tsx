@@ -431,7 +431,6 @@ export const MainLayout: React.FC = () => {
           onSlashCommand={handleSlashCommand}
           slashCommands={commands}
           commandContext={commandContext}
-          disabled={appState.isStreaming}
           agentProfile={appState.currentProfile}
           sessionId={appState.currentSessionId || undefined}
         />

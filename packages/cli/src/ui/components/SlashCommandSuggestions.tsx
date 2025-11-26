@@ -1,5 +1,5 @@
 /**
- * Suggestions Display Component
+ * Slash Command Suggestions Component
  * Reference: Gemini CLI ui/components/SuggestionsDisplay.tsx
  *
  * Renders autocomplete suggestions popup for slash commands.
@@ -29,7 +29,7 @@ interface SuggestionsDisplayProps {
   scrollOffset: number;
 }
 
-export const SuggestionsDisplay: React.FC<SuggestionsDisplayProps> = ({
+export const SlashCommandSuggestions: React.FC<SuggestionsDisplayProps> = ({
   suggestions,
   activeIndex,
   isLoading,

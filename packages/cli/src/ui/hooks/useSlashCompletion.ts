@@ -11,8 +11,8 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { SlashCommand, CommandContext } from '../commands/types.js';
-import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SlashCommandSuggestions.js';
+import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SlashCommandSuggestions.js';
 
 export interface UseSlashCompletionProps {
   /** Current input text */

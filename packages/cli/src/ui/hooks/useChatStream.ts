@@ -396,9 +396,9 @@ export function useChatStream({
     };
   }, [connectionManager, handleMessageCreate, handleStreamingUpdate, handleToolConfirmationRequest, handleToolResultUpdate, handleError]);
 
-  // Submit a query
+  // Submit a query (backend handles queuing if already streaming)
   const submitQuery = useCallback(async (text: string, mentionedFiles?: string[]) => {
-    if (!text.trim() || isStreaming) return;
+    if (!text.trim()) return;
 
     // Add user message to history (committed immediately)
     historyManager.addItem({
@@ -407,6 +407,7 @@ export function useChatStream({
     } as HistoryItemWithoutId);
 
     // Send via WebSocket (format matches backend ChatMessageRequest schema)
+    // Backend's SessionQueueManager handles queuing if already processing
     const sent = await connectionManager.send({
       type: 'CHAT_MESSAGE',
       message: text,
@@ -429,8 +430,11 @@ export function useChatStream({
       return;
     }
 
-    setIsStreaming(true);
-    setStreamingState(StreamingState.Responding);
+    // Only set streaming state if not already streaming
+    if (!isStreaming) {
+      setIsStreaming(true);
+      setStreamingState(StreamingState.Responding);
+    }
   }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager]);
 
   // Cancel current request
