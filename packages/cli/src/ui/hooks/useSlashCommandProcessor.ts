@@ -9,19 +9,21 @@
  * - Returns action results for UI handling
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import type {
   SlashCommand,
   CommandContext,
   SlashCommandActionReturn,
 } from '../commands/types.js';
+import { helpCommand, setHelpCommands } from '../commands/helpCommand.js';
 import { profileCommand } from '../commands/profileCommand.js';
 import { memoryCommand } from '../commands/memoryCommand.js';
 import { sessionCommand } from '../commands/sessionCommand.js';
 import { themeCommand } from '../commands/themeCommand.js';
 
-// Built-in commands
+// Built-in commands (help first for visibility)
 const BUILT_IN_COMMANDS: SlashCommand[] = [
+  helpCommand,
   profileCommand,
   memoryCommand,
   sessionCommand,
@@ -113,6 +115,11 @@ export function useSlashCommandProcessor({
   const commands = useMemo(() => {
     return BUILT_IN_COMMANDS;
   }, []);
+
+  // Register commands with help command for display
+  useEffect(() => {
+    setHelpCommands(commands);
+  }, [commands]);
 
   // Build full command context
   const commandContext = useMemo((): CommandContext => {
