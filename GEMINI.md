@@ -92,23 +92,40 @@ This modular, registration-based pattern makes the system extremely easy to exte
 
 ## 5. Development Workflow & Commands
 
-### 5.1. Running the Application
+The project is a monorepo. Commands should be run from the project root unless specified otherwise.
+
+### 5.1. Running the Full Application (Web + Backend)
+
+To run the web interface and the backend services together for standard development:
 
 ```bash
 # From the project root
-npm run dev
+npm run dev:all
 ```
+
+This uses `concurrently` to start both the React frontend and the Python backend.
 
 ### 5.2. Backend Development (Python)
 
+- **Running Standalone**: `npm run dev:backend`
 - **Package Management**: `uv` (`uv sync`)
-- **Linting & Formatting**: `ruff` (`ruff check . && ruff format .` in `/backend`)
+- **Linting & Formatting**: `ruff` (`ruff check . && ruff format .` in `packages/backend`)
 - **Testing**: `pytest` (`uv run pytest`)
 
 ### 5.3. Frontend Development (React)
 
+- **Running Standalone**: `npm run dev:web`
 - **Package Management**: `npm`
-- **Linting**: `ESLint` (`npm run lint` in `/frontend`)
+- **Linting**: `ESLint` (`npm run lint:web`)
+- **Testing**: `npm run test:web`
+
+### 5.4. CLI Development (React/Ink)
+
+The CLI provides a terminal-based interface for interacting with the agent.
+
+- **Running in Dev Mode**: `npm run dev:cli`
+- **Building**: `npm run build:cli`
+- **Running Compiled CLI**: After building, the CLI can be run with `npm -w @aiNagisa/cli run start`. The compiled entry point is `packages/cli/dist/index.js`.
 
 ## 6. How to Contribute
 

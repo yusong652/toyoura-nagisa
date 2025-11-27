@@ -160,13 +160,52 @@ export type HistoryItemWithoutId =
   | InfoHistoryItemWithoutId;
 
 // Tool confirmation types
-export interface ToolConfirmationData {
+export type ToolConfirmationType = 'edit' | 'exec' | 'info';
+
+/** Base confirmation data shared by all confirmation types */
+export interface BaseToolConfirmationData {
   tool_call_id: string;
   tool_name: string;
   tool_input: Record<string, unknown>;
   description?: string;
+}
+
+/** Confirmation for file edit operations (write, edit tools) */
+export interface EditToolConfirmationData extends BaseToolConfirmationData {
+  type: 'edit';
+  /** Name of the file being modified */
+  fileName: string;
+  /** Full path to the file */
+  filePath: string;
+  /** Unified diff content showing the changes */
+  fileDiff: string;
+  /** Original file content (empty string for new files) */
+  originalContent: string;
+  /** New content to be written */
+  newContent: string;
+}
+
+/** Confirmation for command execution (bash, shell tools) */
+export interface ExecToolConfirmationData extends BaseToolConfirmationData {
+  type: 'exec';
+  /** The root command being executed */
+  rootCommand: string;
+  /** Full command string */
+  command: string;
+}
+
+/** Generic confirmation for other tools */
+export interface InfoToolConfirmationData extends BaseToolConfirmationData {
+  type: 'info';
+  /** Optional command string for display */
   command?: string;
 }
+
+/** Union type for all confirmation data types */
+export type ToolConfirmationData =
+  | EditToolConfirmationData
+  | ExecToolConfirmationData
+  | InfoToolConfirmationData;
 
 export interface ConfirmationRequest {
   id: string;

@@ -6,6 +6,7 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 """
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from fastmcp import Client as MCPClient
 from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
@@ -625,32 +626,67 @@ class BaseToolManager(ABC):
                     print(f"[BaseToolManager] Tool confirmation service not available, auto-rejecting {tool_name}")
                 return (False, "Confirmation service not available")
 
+            # Initialize confirmation parameters
+            confirmation_type: Optional[str] = None
+            file_name_param: Optional[str] = None
+            file_path_param: Optional[str] = None
+            file_diff: Optional[str] = None
+            original_content: Optional[str] = None
+            new_content: Optional[str] = None
+
             # Extract command from tool arguments based on tool type
             if tool_name == "bash":
                 command = tool_args.get("command", "")
                 description = tool_args.get("description", None)
+                confirmation_type = "exec"
                 if not description:
                     description = f"Execute bash command: {command}"
             elif tool_name == "edit":
                 file_path = tool_args.get("file_path", "unknown")
                 command = f"Edit file: {file_path}"
                 description = tool_args.get("description", None)
+                confirmation_type = "edit"
+                file_path_param = file_path
+                file_name_param = Path(file_path).name if file_path else "unknown"
+
+                # Generate diff for edit confirmation
+                diff_info = await self._generate_edit_diff(file_path, tool_args)
+                if diff_info:
+                    file_diff = diff_info.get("diff")
+                    original_content = diff_info.get("original", "")
+                    new_content = diff_info.get("new", "")
+
             elif tool_name == "write":
                 file_path = tool_args.get("file_path", "unknown")
                 command = f"Write file: {file_path}"
                 description = tool_args.get("description", None)
+                confirmation_type = "edit"
+                file_path_param = file_path
+                file_name_param = Path(file_path).name if file_path else "unknown"
+
+                # Generate diff for write confirmation
+                diff_info = await self._generate_write_diff(file_path, tool_args)
+                if diff_info:
+                    file_diff = diff_info.get("diff")
+                    original_content = diff_info.get("original", "")
+                    new_content = diff_info.get("new", "")
+
             elif tool_name == "pfc_execute_script":
                 script_path = tool_args.get("script_path", "unknown")
                 run_in_background = tool_args.get("run_in_background", True)
                 bg_info = " (background)" if run_in_background else " (foreground)"
                 command = f"Execute PFC script{bg_info}: {script_path}"
                 description = tool_args.get("description", None)
+                confirmation_type = "exec"
             else:
                 command = f"{tool_name} operation"
                 description = tool_args.get("description", None)
+                confirmation_type = "info"
 
             if llm_settings.debug:
                 print(f"[BaseToolManager] Requesting user confirmation for {tool_name} (tool_id={tool_id}): {command}")
+                if file_diff:
+                    print(f"[BaseToolManager] Including diff for file: {file_path_param}")
 
             # Request confirmation (no timeout - wait indefinitely)
             approved, user_message = await confirmation_service.request_confirmation(
@@ -659,7 +695,13 @@ class BaseToolManager(ABC):
                 tool_call_id=tool_id,
                 tool_name=tool_name,
                 command=command,
-                description=description
+                description=description,
+                confirmation_type=confirmation_type,
+                file_name=file_name_param,
+                file_path=file_path_param,
+                file_diff=file_diff,
+                original_content=original_content,
+                new_content=new_content
             )
 
             if llm_settings.debug:
@@ -678,3 +720,103 @@ class BaseToolManager(ABC):
                 print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
             # On error, default to rejecting for security
             return (False, f"Error during confirmation: {str(e)}")
+
+    async def _generate_edit_diff(self, file_path: str, tool_args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """
+        Generate diff for edit tool confirmation.
+
+        Args:
+            file_path: Path to the file being edited
+            tool_args: Edit tool arguments containing old_string and new_string
+
+        Returns:
+            Dict with 'diff', 'original', 'new' keys or None if diff generation fails
+        """
+        try:
+            import difflib
+            from pathlib import Path
+
+            old_string = tool_args.get("old_string", "")
+            new_string = tool_args.get("new_string", "")
+
+            # Read current file content
+            abs_path = Path(file_path)
+            if abs_path.exists():
+                original_content = abs_path.read_text(encoding='utf-8')
+            else:
+                original_content = ""
+
+            # Apply the edit to get new content
+            if old_string:
+                new_content = original_content.replace(old_string, new_string, 1)
+            else:
+                # Empty old_string means creating new file
+                new_content = new_string
+
+            # Generate unified diff
+            file_name = abs_path.name
+            diff_lines = difflib.unified_diff(
+                original_content.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile=f"a/{file_name}",
+                tofile=f"b/{file_name}",
+                n=3  # Context lines
+            )
+            file_diff = ''.join(diff_lines)
+
+            return {
+                "diff": file_diff,
+                "original": original_content,
+                "new": new_content
+            }
+        except Exception as e:
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Error generating edit diff: {e}")
+            return None
+
+    async def _generate_write_diff(self, file_path: str, tool_args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """
+        Generate diff for write tool confirmation.
+
+        Args:
+            file_path: Path to the file being written
+            tool_args: Write tool arguments containing content
+
+        Returns:
+            Dict with 'diff', 'original', 'new' keys or None if diff generation fails
+        """
+        try:
+            import difflib
+            from pathlib import Path
+
+            new_content = tool_args.get("content", "")
+
+            # Read current file content if exists
+            abs_path = Path(file_path)
+            if abs_path.exists():
+                original_content = abs_path.read_text(encoding='utf-8')
+            else:
+                original_content = ""
+
+            # Generate unified diff
+            file_name = abs_path.name
+            diff_lines = difflib.unified_diff(
+                original_content.splitlines(keepends=True),
+                new_content.splitlines(keepends=True),
+                fromfile=f"a/{file_name}",
+                tofile=f"b/{file_name}",
+                n=3  # Context lines
+            )
+            file_diff = ''.join(diff_lines)
+
+            return {
+                "diff": file_diff,
+                "original": original_content,
+                "new": new_content
+            }
+        except Exception as e:
+            llm_settings = get_llm_settings()
+            if llm_settings.debug:
+                print(f"[BaseToolManager] Error generating write diff: {e}")
+            return None

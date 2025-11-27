@@ -48,7 +48,14 @@ class ToolConfirmationService:
         tool_name: str,
         command: str,
         description: Optional[str] = None,
-        timeout_seconds: Optional[int] = None
+        timeout_seconds: Optional[int] = None,
+        # New parameters for edit confirmation with diff display
+        confirmation_type: Optional[str] = None,
+        file_name: Optional[str] = None,
+        file_path: Optional[str] = None,
+        file_diff: Optional[str] = None,
+        original_content: Optional[str] = None,
+        new_content: Optional[str] = None
     ) -> tuple[bool, Optional[str]]:
         """
         Request user confirmation for a tool execution.
@@ -63,6 +70,12 @@ class ToolConfirmationService:
             command: The command/operation to execute
             description: Optional description of what the command does
             timeout_seconds: Timeout for waiting for confirmation (default None = infinite wait)
+            confirmation_type: Type of confirmation ('edit', 'exec', 'info')
+            file_name: For edit type - name of the file being modified
+            file_path: For edit type - full path to the file
+            file_diff: For edit type - unified diff content showing changes
+            original_content: For edit type - original file content (empty for new files)
+            new_content: For edit type - new content to be written
 
         Returns:
             tuple[bool, Optional[str]]: (approved, user_message) - approved is True if approved,
@@ -75,15 +88,33 @@ class ToolConfirmationService:
         self.active_confirmations[tool_call_id] = confirmation_future
 
         try:
+            # Build message kwargs (only include non-None values)
+            msg_kwargs = {
+                "message_id": message_id,
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "command": command,
+                "session_id": session_id,
+            }
+            if description is not None:
+                msg_kwargs["description"] = description
+            if confirmation_type is not None:
+                msg_kwargs["confirmation_type"] = confirmation_type
+            if file_name is not None:
+                msg_kwargs["file_name"] = file_name
+            if file_path is not None:
+                msg_kwargs["file_path"] = file_path
+            if file_diff is not None:
+                msg_kwargs["file_diff"] = file_diff
+            if original_content is not None:
+                msg_kwargs["original_content"] = original_content
+            if new_content is not None:
+                msg_kwargs["new_content"] = new_content
+
             # Send confirmation request to frontend (include message_id for unique identification)
             request_msg = create_message(
                 MessageType.TOOL_CONFIRMATION_REQUEST,
-                message_id=message_id,
-                tool_call_id=tool_call_id,
-                tool_name=tool_name,
-                command=command,
-                description=description,
-                session_id=session_id
+                **msg_kwargs
             ).model_dump(mode="json", exclude_none=True)
 
             # Check if session is connected

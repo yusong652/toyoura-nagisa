@@ -15,6 +15,13 @@ export interface ToolConfirmationData {
   command?: string;
   description?: string;
   timestamp?: string;
+  // New fields for edit confirmation with diff display
+  confirmation_type?: 'edit' | 'exec' | 'info';
+  file_name?: string;
+  file_path?: string;
+  file_diff?: string;
+  original_content?: string;
+  new_content?: string;
 }
 
 export interface LocationData {
@@ -177,7 +184,14 @@ export class ConnectionManager extends WebSocketManager {
           tool_name: message.tool_name,
           command: message.command,
           description: message.description,
-          timestamp: message.timestamp
+          timestamp: message.timestamp,
+          // New fields for edit confirmation with diff display
+          confirmation_type: message.confirmation_type,
+          file_name: message.file_name,
+          file_path: message.file_path,
+          file_diff: message.file_diff,
+          original_content: message.original_content,
+          new_content: message.new_content
         } as ToolConfirmationData);
         break;
 

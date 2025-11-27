@@ -54,6 +54,13 @@ interface ToolConfirmationEvent {
   tool_name: string;
   command?: string;
   description?: string;
+  // New fields for edit confirmation with diff display
+  confirmation_type?: 'edit' | 'exec' | 'info';
+  file_name?: string;
+  file_path?: string;
+  file_diff?: string;
+  original_content?: string;
+  new_content?: string;
 }
 
 // Type for tool result update events
@@ -333,16 +340,55 @@ export function useChatStream({
     }
     setPendingToolItems([]);
 
-    setPendingConfirmation({
-      tool_call_id: event.tool_call_id,
-      tool_name: event.tool_name,
-      tool_input: {
+    // Build confirmation data based on confirmation type
+    const confirmationType = event.confirmation_type || 'info';
+
+    if (confirmationType === 'edit' && event.file_diff) {
+      // Edit confirmation with diff display
+      setPendingConfirmation({
+        type: 'edit',
+        tool_call_id: event.tool_call_id,
+        tool_name: event.tool_name,
+        tool_input: {
+          command: event.command,
+          description: event.description,
+        },
+        description: event.description,
+        fileName: event.file_name || 'unknown',
+        filePath: event.file_path || '',
+        fileDiff: event.file_diff,
+        originalContent: event.original_content || '',
+        newContent: event.new_content || '',
+      });
+    } else if (confirmationType === 'exec') {
+      // Exec confirmation (bash commands)
+      setPendingConfirmation({
+        type: 'exec',
+        tool_call_id: event.tool_call_id,
+        tool_name: event.tool_name,
+        tool_input: {
+          command: event.command,
+          description: event.description,
+        },
+        description: event.description,
+        rootCommand: event.tool_name,
+        command: event.command || '',
+      });
+    } else {
+      // Info confirmation (generic)
+      setPendingConfirmation({
+        type: 'info',
+        tool_call_id: event.tool_call_id,
+        tool_name: event.tool_name,
+        tool_input: {
+          command: event.command,
+          description: event.description,
+        },
         command: event.command,
         description: event.description,
-      },
-      command: event.command,
-      description: event.description,
-    });
+      });
+    }
+
     setStreamingState(StreamingState.WaitingForConfirmation);
     setIsStreaming(false);
   }, [pendingAssistantItem, pendingToolItems, historyManager]);

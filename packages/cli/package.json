@@ -27,6 +27,7 @@
   "dependencies": {
     "@aiNagisa/core": "*",
     "ansi-escapes": "^7.0.0",
+    "diff": "^8.0.2",
     "ink": "npm:@jrichman/ink@6.4.6",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
@@ -38,6 +39,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/ws": "^8.5.13",
