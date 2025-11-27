@@ -8,3 +8,4 @@ export * from './useChatStream.js';
 export * from './useSlashCompletion.js';
 export * from './useSlashCommandProcessor.js';
 export * from './useSessionManager.js';
+export * from './useBracketedPaste.js';

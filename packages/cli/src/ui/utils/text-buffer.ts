@@ -641,6 +641,13 @@ export function useTextBuffer({
     (key: Key): void => {
       const { sequence: input } = key;
 
+      // Handle paste events first - paste flag indicates bracketed paste content
+      // which may contain newlines and special characters that should be inserted as-is
+      if (key.paste) {
+        insert(input);
+        return;
+      }
+
       // Navigation
       if (key.name === 'left' && !key.meta && !key.ctrl) {
         move('left');

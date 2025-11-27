@@ -16,10 +16,14 @@ import { theme } from './colors.js';
 import { GradientText } from './components/GradientText.js';
 import { selectLogo, normalizeLineWidths, minimalLogo } from './components/AsciiArt.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 
 export const App = () => {
   const appState = useAppState();
   const { columns: terminalWidth } = useTerminalSize();
+
+  // Enable bracketed paste mode for multiline content support
+  useBracketedPaste();
 
   // Show quitting message with logo
   if (appState.isQuitting) {
