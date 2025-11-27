@@ -49,15 +49,24 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     [onConfirm]
   );
 
-  // Calculate available height and total lines for scroll bounds
+  // Calculate available height for diff content
+  // We need to reserve space for:
+  // - Outer border (2 lines: top + bottom)
+  // - Header "Tool Confirmation Required" (1 line + 1 margin)
+  // - File info line (1 line + 1 margin)
+  // - Diff border (2 lines: top + bottom)
+  // - Question line (1 line + 1 margin)
+  // - Radio options (2 lines)
+  // - Help text (1-2 lines + 1 margin)
+  // Total fixed UI: ~14 lines minimum
+  const UI_CHROME_HEIGHT = 14;
+
   const { availableHeight, totalLines } = useMemo(() => {
     const confirmationType = (data as { type?: string }).type;
     if (confirmationType === 'edit') {
       const editData = data as EditToolConfirmationData;
-      const headerHeight = 4;
-      const questionHeight = 3;
-      const helpHeight = 2;
-      const height = Math.max(5, terminalHeight - headerHeight - questionHeight - helpHeight - 4);
+      // Ensure at least 3 lines for diff content
+      const height = Math.max(3, terminalHeight - UI_CHROME_HEIGHT);
       const lines = getDiffLineCount(editData.fileDiff);
       return { availableHeight: height, totalLines: lines };
     }
@@ -131,12 +140,6 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       const editData = data as EditToolConfirmationData;
       const diffStats = getDiffStats(editData.fileDiff);
       const isNewFile = editData.originalContent === '';
-
-      // Calculate available height for diff (reserve space for UI elements)
-      const headerHeight = 4;  // Header + stats
-      const questionHeight = 3; // Question + options
-      const helpHeight = 2;    // Help text + margin
-      const availableHeight = Math.max(5, terminalHeight - headerHeight - questionHeight - helpHeight - 4);
 
       question = 'Apply this change?';
       bodyContent = (
@@ -242,41 +245,49 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     return { bodyContent, question };
   }, [data, terminalWidth, terminalHeight, scrollOffset]);
 
+  // Calculate maximum height for the entire component
+  // This ensures the component never exceeds terminal height
+  const maxComponentHeight = Math.max(UI_CHROME_HEIGHT, terminalHeight - 2);
+
   return (
     <Box
       flexDirection="column"
       borderStyle="round"
       borderColor={theme.border.focused}
       paddingX={1}
+      maxHeight={maxComponentHeight}
+      overflow="hidden"
     >
-      {/* Header */}
-      <Box marginBottom={1}>
+      {/* Header - fixed height, never shrinks */}
+      <Box marginBottom={1} flexShrink={0}>
         <Text color={theme.text.accent}>? </Text>
         <Text bold color={theme.text.primary}>
           Tool Confirmation Required
         </Text>
       </Box>
 
-      {/* Body Content (Diff or Command) */}
-      <Box flexGrow={1} marginBottom={1}>
+      {/* Body Content (Diff or Command) - can shrink if needed */}
+      <Box flexGrow={1} flexShrink={1} marginBottom={1} overflow="hidden">
         {bodyContent}
       </Box>
 
-      {/* Question */}
-      <Box marginBottom={1}>
+      {/* Question - fixed height, never shrinks */}
+      <Box marginBottom={1} flexShrink={0}>
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
-      {/* Radio Button Select */}
-      <RadioButtonSelect
-        items={options}
-        onSelect={handleSelect}
-        isFocused={isFocused}
-        showNumbers={true}
-      />
+      {/* Radio Button Select - fixed height, never shrinks */}
+      <Box flexShrink={0}>
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          isFocused={isFocused}
+          showNumbers={true}
+        />
+      </Box>
 
-      {/* Help text */}
-      <Box marginTop={1} flexDirection="column">
+      {/* Help text - fixed height, never shrinks */}
+      <Box marginTop={1} flexDirection="column" flexShrink={0}>
         <Text color={theme.text.muted}>
           (↑↓ select, Enter confirm, Esc cancel)
         </Text>
