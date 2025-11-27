@@ -18,6 +18,7 @@ import { AppContainer } from './ui/AppContainer.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
+import { TerminalSizeProvider } from './ui/contexts/TerminalSizeContext.js';
 import { defaultConfig, type Config } from './config/settings.js';
 import { themeManager } from './ui/themes/index.js';
 
@@ -48,13 +49,15 @@ themeManager.initialize();
 // Render Ink app with provider hierarchy for proper event handling
 // alternateBuffer is disabled to enable native terminal scrolling and text selection
 render(
-  <KeypressProvider>
-    <MouseProvider mouseEventsEnabled={false}>
-      <ScrollProvider>
-        <AppContainer config={config} initialSessionId={sessionId} />
-      </ScrollProvider>
-    </MouseProvider>
-  </KeypressProvider>,
+  <TerminalSizeProvider>
+    <KeypressProvider>
+      <MouseProvider mouseEventsEnabled={false}>
+        <ScrollProvider>
+          <AppContainer config={config} initialSessionId={sessionId} />
+        </ScrollProvider>
+      </MouseProvider>
+    </KeypressProvider>
+  </TerminalSizeProvider>,
   {
     exitOnCtrlC: false,
     // Disable alternate buffer to use native terminal scrolling
