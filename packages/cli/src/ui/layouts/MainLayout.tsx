@@ -327,23 +327,16 @@ export const MainLayout: React.FC = () => {
 
   // Build static items for history (rendered once to terminal buffer)
   // Using Static component enables native terminal scrolling and text selection
+  // NOTE: AppHeader is rendered separately outside Static to avoid rendering issues
+  // when items are removed from Static (Ink's Static doesn't clear previous output)
   const staticItems = useMemo(() => {
-    const items: React.ReactElement[] = [];
+    return appState.history.map((item) => (
+      <MemoizedHistoryItemDisplay key={item.id} item={item} />
+    ));
+  }, [appState.history]);
 
-    // Add header only when no history
-    if (appState.history.length === 0 && !appState.isStreaming) {
-      items.push(<MemoizedAppHeader key="app-header" showTips={true} />);
-    }
-
-    // Add all history items
-    appState.history.forEach((item) => {
-      items.push(
-        <MemoizedHistoryItemDisplay key={item.id} item={item} />
-      );
-    });
-
-    return items;
-  }, [appState.history, appState.isStreaming]);
+  // Show welcome header only when no history and not streaming
+  const showWelcomeHeader = appState.history.length === 0 && !appState.isStreaming;
 
   // Pending items component (dynamically updated, not in Static)
   const pendingItems = useMemo(
@@ -365,6 +358,10 @@ export const MainLayout: React.FC = () => {
 
   return (
     <Box flexDirection="column" width="100%">
+      {/* Welcome header - rendered outside Static to avoid removal issues */}
+      {/* Ink's Static doesn't clear previous output when items are removed */}
+      {showWelcomeHeader && <MemoizedAppHeader showTips={true} />}
+
       {/* Static content area - rendered once to terminal buffer */}
       {/* Key changes on resize to force re-render and fix layout artifacts */}
       <Static key={renderKey} items={staticItems}>
