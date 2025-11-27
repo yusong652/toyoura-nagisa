@@ -340,11 +340,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     visualLineIndex: number,
     isCurrentLine: boolean
   ) => {
-    // Check if this is the first visual line of a logical line
-    // visualToLogicalMap[index] = [logicalRow, startCol]
-    const mapEntry = buffer.visualToLogicalMap[visualLineIndex];
-    const isFirstVisualLineOfLogical = mapEntry ? mapEntry[1] === 0 : true;
-    const linePrefix = isFirstVisualLineOfLogical ? prefix : continuationPrefix;
+    // Only show ">" prefix on the very first line
+    const isFirstLine = visualLineIndex === 0;
+    const linePrefix = isFirstLine ? prefix : continuationPrefix;
     const codePoints = toCodePoints(visualLine);
 
     if (isEmpty && visualLineIndex === 0 && !disabled) {
@@ -365,7 +363,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return (
         <Box key={visualLineIndex} flexDirection="row">
           <Box width={prefixWidth} flexShrink={0}>
-            <Text color={isFirstVisualLineOfLogical ? theme.text.accent : theme.text.muted}>
+            <Text color={isFirstLine ? theme.text.accent : theme.text.muted}>
               {linePrefix}
             </Text>
           </Box>
@@ -382,7 +380,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     return (
       <Box key={visualLineIndex} flexDirection="row">
         <Box width={prefixWidth} flexShrink={0}>
-          <Text color={isFirstVisualLineOfLogical ? theme.text.accent : theme.text.muted}>
+          <Text color={isFirstLine ? theme.text.accent : theme.text.muted}>
             {linePrefix}
           </Text>
         </Box>
