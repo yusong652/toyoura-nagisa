@@ -525,6 +525,12 @@ export function useChatStream({
       timestamp: new Date().toISOString(),
     });
 
+    // Add system message about interruption
+    historyManager.addItem({
+      type: MessageType.INFO,
+      message: 'Request cancelled by user.',
+    } as HistoryItemWithoutId);
+
     // Clear all state - discard the interrupted response
     // Don't commit pending items since user explicitly cancelled
     setThinkingContent(null);
@@ -534,7 +540,7 @@ export function useChatStream({
     seenToolResultIdsRef.current.clear();
     setIsStreaming(false);
     setStreamingState(StreamingState.Idle);
-  }, [connectionManager]);
+  }, [connectionManager, historyManager]);
 
   // Confirm or reject tool execution
   const confirmTool = useCallback((approved: boolean, message?: string) => {
