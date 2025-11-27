@@ -26,15 +26,15 @@ export const nagisaAscii = `
    ███████████
 `;
 
-// Full logo with Nagisa - for wide terminals (95+ columns)
+// Full logo with Nagisa - for wide terminals (70+ columns)
 // Features: particle cluster ears, eyes, blush marks
 export const fullAsciiLogo = `
-                               _  _   _             _
-█████       █████         __ _(_)| \\ | | __ _  __ _(_)___  __ _
-█████       █████        / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
-█████████████████       | (_| | || |\\  | (_| | (_| | \\__ \\ (_| |
- ███████████████         \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
-█████ █████ █████                             |___/
+                       _   _             _
+█████       █████     | \\ | | __ _  __ _(_)___  __ _
+█████       █████     |  \\| |/ _\` |/ _\` | / __|/ _\` |
+█████████████████     | |\\  | (_| | (_| | \\__ \\ (_| |
+ ███████████████      |_| \\_|\\__,_|\\__, |_|___/\\__,_|
+█████ █████ █████                  |___/
 █████████████████
 █ █████████████ █
 █████████████████
@@ -42,29 +42,29 @@ export const fullAsciiLogo = `
    ███████████
 `;
 
-// Short logo - for medium terminals (60+ columns)
+// Short logo - for medium terminals (50+ columns)
 export const shortAsciiLogo = `
-█████   █████         _  _   _             _
-█████████████    __ _(_)| \\ | | __ _  __ _(_)___  __ _
- ███████████    / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
-███ █████ ███   \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
-█████████████                        |___/
-█ █████████ █
+█████   █████    _   _             _
+█████████████   | \\ | | __ _  __ _(_)___  __ _
+ ███████████    |  \\| |/ _\` |/ _\` | / __|/ _\` |
+███ █████ ███   | |\\  | (_| | (_| | \\__ \\ (_| |
+█████████████   |_| \\_|\\__,_|\\__, |_|___/\\__,_|
+█ █████████ █                |___/
  ███████████
 `;
 
-// Tiny logo - for narrow terminals (40+ columns)
+// Tiny logo - for narrow terminals (30+ columns)
 export const tinyAsciiLogo = `
 ███     ███
  █████████
-███ ███ ███   aiNagisa
+███ ███ ███   Nagisa
 ███████████
 █ ███████ █
  █████████
 `;
 
 // Minimal - just text for very narrow terminals
-export const minimalLogo = '(◕ω◕) aiNagisa';
+export const minimalLogo = '(◕ω◕) Nagisa';
 
 /**
  * Get the width of an ASCII art string (max line length)
