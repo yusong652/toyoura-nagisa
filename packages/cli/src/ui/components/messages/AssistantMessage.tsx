@@ -2,7 +2,8 @@
  * Assistant Message Component
  * Reference: Gemini CLI ui/components/messages/GeminiMessage.tsx
  *
- * Displays AI assistant responses with the ✦ prefix like Gemini CLI.
+ * Displays AI assistant responses with Nagisa's ball icon (⏺) prefix.
+ * The white ball represents Nagisa's round body shape.
  * Supports text and thinking content blocks.
  */
 
@@ -53,8 +54,8 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 };
 
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, terminalWidth }) => {
-  // Use ✦ prefix like Gemini CLI
-  const prefix = '✦ ';
+  // Use ⏺ (white ball) prefix - represents Nagisa's round body shape
+  const prefix = '⏺ ';
   const prefixWidth = 2; // Unicode character width
 
   // Filter to get only text blocks for streaming indicator logic
