@@ -77,7 +77,7 @@ Homepage = "https://github.com/yusong652/aiNagisa"
 "Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend"]
+packages = ["packages/backend"]
 
 [tool.uv]
 dev-dependencies = [
@@ -88,11 +88,12 @@ dev-dependencies = [
 
 [tool.uv.workspace]
 members = [
-    "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot",
-    # Note: pfc-server is NOT a workspace member
-    # It runs in PFC's embedded Python environment with its own dependencies
-    # Install in PFC environment: pip install websockets==9.1
+    "packages/backend",
+    "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot"
 ]
+# Note: services/pfc-server is NOT a workspace member
+# It runs in PFC's embedded Python environment with its own dependencies
+# Install in PFC environment: pip install websockets==9.1
 
 [project.optional-dependencies]
 dev = [

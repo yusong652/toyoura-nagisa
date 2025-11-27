@@ -1,17 +1,32 @@
 {
-  "name": "ainagisa",
-  "version": "1.0.0",
-  "description": "An AI-powered chat assistant with multi-turn conversation memory and voice output capabilities",
-  "main": "index.js",
+  "name": "ainagisa-monorepo",
+  "version": "0.1.0",
+  "description": "aiNagisa - Production-grade AI agent platform",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "packages/web",
+    "packages/cli"
+  ],
   "scripts": {
-    "install:frontend": "cd frontend && npm install",
-    "start:frontend": "cd frontend && npm run dev",
-    "install:backend": "cd backend && uv pip install -r requirements.txt",
-    "lint:backend": "cd backend && ruff check .",
-    "format:backend": "cd backend && ruff format .",
-    "start:backend": "PYTHONUNBUFFERED=1 uv run python backend/run.py",
-    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:backend": "cd packages/backend && uv run python run.py",
+    "dev:web": "npm -w @aiNagisa/web run dev",
+    "dev:cli": "npm -w @aiNagisa/cli run dev",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
+    "build:core": "npm -w @aiNagisa/core run build",
+    "build:web": "npm -w @aiNagisa/web run build",
+    "build:cli": "npm -w @aiNagisa/cli run build",
+    "build:all": "npm run build:core && npm run build:web && npm run build:cli",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
+    "install:all": "npm install",
+    "test:backend": "uv run pytest",
+    "test:web": "npm -w @aiNagisa/web run test",
+    "lint:web": "npm -w @aiNagisa/web run lint",
+    "test": "npm run test:backend && npm run test:web",
+    "kill:backend": "pkill -9 -f 'python.*run.py' 2>/dev/null; pkill -9 -f 'uvicorn' 2>/dev/null; lsof -ti:9000 | xargs kill -9 2>/dev/null; echo '✅ Backend processes killed'",
+    "kill:web": "lsof -ti:5173 | xargs kill -9 2>/dev/null; echo '✅ Web processes killed'",
+    "kill:all": "npm run kill:backend && npm run kill:web"
   },
   "repository": {
     "type": "git",
@@ -26,6 +41,11 @@
   "homepage": "https://github.com/yusong652/aiNagisa#readme",
   "devDependencies": {
     "@google/gemini-cli": "^0.1.7",
-    "concurrently": "^9.2.0"
+    "concurrently": "^9.2.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

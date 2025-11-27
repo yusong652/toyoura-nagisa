@@ -11,6 +11,7 @@ resolution-markers = [
 [manifest]
 members = [
     "ainagisa",
+    "ainagisa-backend",
     "ainagisa-uv-plot",
 ]
 
@@ -159,6 +160,11 @@ dev = [
     { name = "pytest-cov" },
     { name = "tiktoken", specifier = ">=0.9.0" },
 ]
+
+[[package]]
+name = "ainagisa-backend"
+version = "0.1.0"
+source = { editable = "packages/backend" }
 
 [[package]]
 name = "ainagisa-uv-plot"

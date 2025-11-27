@@ -188,10 +188,12 @@ Query Tools      Small-Scale Test   Full Simulation
 ### Backend Development
 ```bash
 # Start the backend server
-uv run python backend/app.py
+npm run dev:backend
+# OR manually:
+cd packages/backend && uv run python run.py
 
 # Run the MCP server directly
-uv run python backend/infrastructure/mcp/smart_mcp_server.py
+uv run python packages/backend/infrastructure/mcp/smart_mcp_server.py
 
 # Run tests
 uv run pytest
@@ -205,10 +207,10 @@ uv sync --extra dev
 
 ### Frontend Development
 ```bash
-cd frontend
-
-# Start development server
-npm run dev
+# Start Web frontend
+npm run dev:web
+# OR manually:
+cd packages/web && npm run dev
 
 # Build for production
 npm run build
@@ -245,9 +247,10 @@ uv run python examples/pfc_integration/DEMo.py
 
 ```
 aiNagisa/
-├── backend/
-│   ├── app.py                      # Main FastAPI application
-│   ├── presentation/               # API routes and WebSocket handlers
+├── packages/
+│   ├── backend/
+│   │   ├── app.py                      # Main FastAPI application
+│   │   ├── presentation/               # API routes and WebSocket handlers
 │   │   ├── api/
 │   │   │   ├── profiles.py        # Agent profile API
 │   │   │   └── file_search.py     # File mention search API
@@ -303,44 +306,51 @@ aiNagisa/
 │   │   └── tts/                   # Text-to-speech engines
 │   ├── config/                     # Configuration management
 │   ├── shared/                     # Common utilities and exceptions
-│   ├── memory_db/                  # ChromaDB persistence
-│   └── workspace/                  # Development workspace
-├── pfc-server/                     # PFC WebSocket server (independent service)
-│   ├── server/                    # Server implementation
-│   │   ├── server.py              # WebSocket server + routing
-│   │   ├── executor.py            # Command executor + task classification
-│   │   ├── script_executor.py     # Script execution with output capture
-│   │   ├── main_thread_executor.py # Queue-based main thread execution
-│   │   └── task_manager.py        # Long-running task tracking
-│   ├── examples/                  # Example PFC projects
-│   │   ├── scripts/               # Example simulation scripts
-│   │   └── test_scripts/          # Test scripts
-│   ├── start_server.py            # Startup script
-│   ├── pyproject.toml             # Server dependencies
-│   └── README.md                  # Independent server documentation
-├── frontend/
-│   ├── src/
-│   │   ├── components/            # React components
-│   │   ├── contexts/              # React contexts
-│   │   └── App.tsx               # Main application
-│   └── package.json              # Frontend dependencies
-└── pyproject.toml                # Python project configuration
+│   │   ├── memory_db/                  # ChromaDB persistence
+│   │   └── workspace/                  # Development workspace
+│   ├── web/                        # React Web frontend
+│   │   ├── src/
+│   │   │   ├── components/            # React components
+│   │   │   ├── contexts/              # React contexts
+│   │   │   └── App.tsx               # Main application
+│   │   └── package.json              # Frontend dependencies
+│   ├── cli/                        # CLI frontend
+│   │   └── src/
+│   └── core/                       # Shared TypeScript core (future)
+├── services/
+│   └── pfc-server/                 # PFC WebSocket server (independent service)
+│       ├── server/                    # Server implementation
+│       │   ├── server.py              # WebSocket server + routing
+│       │   ├── executor.py            # Command executor + task classification
+│       │   ├── script_executor.py     # Script execution with output capture
+│       │   ├── main_thread_executor.py # Queue-based main thread execution
+│       │   └── task_manager.py        # Long-running task tracking
+│       ├── examples/                  # Example PFC projects
+│       │   ├── scripts/               # Example simulation scripts
+│       │   └── test_scripts/          # Test scripts
+│       ├── start_server.py            # Startup script
+│       ├── pyproject.toml             # Server dependencies
+│       └── README.md                  # Independent server documentation
+├── workspace/                      # UV workspace
+├── memory_db/                      # ChromaDB storage
+├── package.json                   # Root package.json (npm workspaces)
+└── pyproject.toml                # Root Python configuration (uv workspace)
 ```
 
 ## Configuration
 
 ### Environment Setup
-- Copy configuration examples from `backend/config_example/` to `backend/config/`
+- Copy configuration examples from `packages/backend/config_example/` to `packages/backend/config/`
 - Main config files: `base.py`, `llm.py`, `tts.py`, `email.py`, `text_to_image.py`
 - Database locations:
-  - Memory DB: `backend/memory_db/`
-  - Session data: `backend/chat/data/`
+  - Memory DB: `memory_db/` (root level)
+  - Session data: `data/` (root level)
 
 ### Google Services Integration
 Many tools integrate with Google services via OAuth:
-- Authentication tokens stored in `backend/infrastructure/mcp/tools/google_auth/tokens/`
+- Authentication tokens stored in `packages/backend/infrastructure/mcp/tools/google_auth/tokens/`
 - Supports Gmail, Google Calendar, and Google Contacts
-- Use `backend/infrastructure/mcp/tools/google_auth/init_google_token.py` to set up authentication
+- Use `packages/backend/infrastructure/mcp/tools/google_auth/init_google_token.py` to set up authentication
 
 ## Development Patterns
 
@@ -400,7 +410,7 @@ uv run python examples/pfc_integration/DEMo.py
 ## Common Issues & Quick Fixes
 
 ### LLM Provider Selection
-- Configure preferred provider in `backend/config/llm.py`
+- Configure preferred provider in `packages/backend/config/llm.py`
 - All providers support tool calling and streaming
 - Local models supported via vLLM and Ollama
 
@@ -424,7 +434,7 @@ uv run python examples/pfc_integration/DEMo.py
 
 ## Key Development Notes
 
-- **Clean Architecture**: Implemented, not just theoretical - see dependency flow in `backend/`
+- **Clean Architecture**: Implemented, not just theoretical - see dependency flow in `packages/backend/`
 - **Python Dependency Management**: Uses UV with `pyproject.toml`
 - **Frontend Development**: Vite + TypeScript + Material-UI
 - **Real-time Communication**: WebSocket for streaming responses

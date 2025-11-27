@@ -10,9 +10,7 @@ venv/
 ENV/
 env/
 build/
-data/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -30,7 +28,6 @@ wheels/
 node_modules/
 .npm
 .eslintcache
-frontend/.vite/
 *.log
 dist/
 build/
@@ -55,7 +52,22 @@ build/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
+# Project specific - Root level data storage
+data/
+memory_db/
+workspace/
+pfc_workspace/
+
+# Project specific - Backend
+packages/backend/.env
+packages/backend/.venv/
+packages/backend/__pycache__/
+packages/backend/workspace/
+packages/backend/infrastructure/tts/data/
+# Configuration files with sensitive information
+packages/backend/config/
+*.bak
+# Legacy paths (kept for backwards compatibility)
 backend/.env
 backend/.venv/
 backend/__pycache__/
@@ -63,18 +75,25 @@ backend/data/
 backend/tts/data/
 backend/prompts/
 backend/memory_db/
-frontend/node_modules/
-# Configuration files with sensitive information
 backend/config/
 backend/config.py
-
-# Local model configurations with HPC SSH credentials
 backend/chat/local/config.py
-workspace/
-pfc_workspace/
 backend/location_data/
+backend/tool_db/
+
+# Project specific - CLI
+packages/cli/config.json
+
+# Project specific - Frontend
+packages/web/node_modules/
+packages/web/.vite/
+# Legacy paths (kept for backwards compatibility)
+frontend/node_modules/
+frontend/.vite/
 
 # PFC server examples (user-specific test files)
+services/pfc-server/examples/
+# Legacy path (kept for backwards compatibility)
 pfc-server/examples/
 
 # Test coverage
@@ -86,9 +105,13 @@ htmlcov/
 # Environment variables
 .env*
 !.env.example
+packages/backend/.env
+packages/backend/.env.*
+!packages/backend/.env.example
 
 # Sensitive credentials and tokens
 credentials/
+packages/backend/infrastructure/mcp/tools/google_auth/tokens/
 
 # SSH keys (VS Code Remote SSH issue)
 *id_ed25519*
@@ -97,23 +120,10 @@ credentials/
 C:*id_ed25519*
 C\357\200\272*id_ed25519*
 
-# Ignore tool vector database
-backend/tool_db/
-
-# Memory database (Mem0/Qdrant storage)
-memory_db/
-
-# Persona prompt (user-specific)
-backend/chat/persona_prompt.md
-
-# Legacy LLM clients (deprecated, replaced by gemini client)
-backend/chat/anthropic.py
-backend/chat/gpt.py
-backend/chat/grok.py
-backend/chat/mistral.py
 
 # Third-party libraries and dependencies
 _third_party/
 nul
 *.zip
 reverse_tunnel.txt
+.ainagisa/

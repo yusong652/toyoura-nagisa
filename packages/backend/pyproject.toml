@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ainagisa-backend"
+version = "0.1.0"
+description = "aiNagisa FastAPI backend"
+requires-python = ">=3.10"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
