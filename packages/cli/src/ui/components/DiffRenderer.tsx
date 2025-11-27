@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react';
 import { Box, Text } from 'ink';
+import * as Diff from 'diff';
 import { theme } from '../colors.js';
 
 interface DiffLine {
@@ -338,8 +339,6 @@ export function createDiff(
   newContent: string,
   context = 3,
 ): string {
-  // Use dynamic import to avoid bundling issues
-  const Diff = require('diff');
   return Diff.createPatch(
     filename,
     oldContent,
