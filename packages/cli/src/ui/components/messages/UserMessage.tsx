@@ -17,7 +17,8 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item }) => {
   const prefixWidth = prefix.length;
   const isSlashCommand = item.text.startsWith('/');
 
-  const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
+  // Use message.user color for user messages (distinct from assistant text)
+  const textColor = isSlashCommand ? theme.text.accent : theme.message.user;
 
   return (
     <Box flexDirection="row" marginBottom={1}>

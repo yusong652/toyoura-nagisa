@@ -175,20 +175,21 @@ function ScrollableList<T>(
   );
 
   // Keyboard scrolling
+  // Use Shift+Up/Down to avoid conflict with input cursor navigation
   useKeypress(
     (key: Key) => {
-      // Up arrow or k (vim-style)
-      if (key.name === 'up' || key.name === 'k') {
+      // Shift+Up arrow - scroll up (avoids conflict with input cursor movement)
+      if (key.name === 'up' && key.shift) {
         stopSmoothScroll();
         scrollBy(-SCROLL_LINE_HEIGHT);
       }
-      // Down arrow or j (vim-style)
-      else if (key.name === 'down' || key.name === 'j') {
+      // Shift+Down arrow - scroll down (avoids conflict with input cursor movement)
+      else if (key.name === 'down' && key.shift) {
         stopSmoothScroll();
         scrollBy(SCROLL_LINE_HEIGHT);
       }
-      // Page Up or Ctrl+U
-      else if (key.name === 'pageup' || (key.ctrl && key.name === 'u')) {
+      // Page Up
+      else if (key.name === 'pageup') {
         const scrollState = getScrollState();
         const current = smoothScrollState.current.active
           ? smoothScrollState.current.to
@@ -196,8 +197,8 @@ function ScrollableList<T>(
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current - innerHeight);
       }
-      // Page Down or Ctrl+D
-      else if (key.name === 'pagedown' || (key.ctrl && key.name === 'd')) {
+      // Page Down
+      else if (key.name === 'pagedown') {
         const scrollState = getScrollState();
         const current = smoothScrollState.current.active
           ? smoothScrollState.current.to
@@ -205,11 +206,11 @@ function ScrollableList<T>(
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + innerHeight);
       }
-      // Home or gg (vim-style)
+      // Home - scroll to top
       else if (key.name === 'home') {
         smoothScrollTo(0);
       }
-      // End or G (vim-style)
+      // End - scroll to bottom
       else if (key.name === 'end') {
         smoothScrollTo(SCROLL_TO_ITEM_END);
       }
