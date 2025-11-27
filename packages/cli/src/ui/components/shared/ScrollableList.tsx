@@ -2,8 +2,11 @@
  * ScrollableList Component
  * Reference: Gemini CLI components/shared/ScrollableList.tsx
  *
- * A wrapper around VirtualizedList that provides keyboard scrolling
- * and smooth scroll animations.
+ * A wrapper around VirtualizedList that provides:
+ * - Keyboard scrolling (Shift+Arrow, PageUp/Down)
+ * - Mouse wheel scrolling (via ScrollProvider)
+ * - Scrollbar drag support
+ * - Smooth scroll animations
  */
 
 import React, {
@@ -12,6 +15,8 @@ import React, {
   useImperativeHandle,
   useCallback,
   useEffect,
+  useState,
+  useMemo,
 } from 'react';
 import {
   VirtualizedList,
@@ -20,9 +25,13 @@ import {
 } from './VirtualizedList.js';
 import { Box, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import { useScrollable } from '../../contexts/ScrollProvider.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
 const SCROLL_LINE_HEIGHT = 3; // Scroll 3 lines at a time
+
+// Scrollbar flash duration
+const SCROLLBAR_FLASH_DURATION_MS = 1500;
 
 type VirtualizedListProps<T> = {
   data: T[];
@@ -46,6 +55,10 @@ function ScrollableList<T>(
   const { hasFocus } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
+
+  // Scrollbar flash state for visual feedback
+  const [isScrollbarFlashing, setIsScrollbarFlashing] = useState(false);
+  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(
     ref,
@@ -80,6 +93,31 @@ function ScrollableList<T>(
 
   const scrollBy = useCallback((delta: number) => {
     virtualizedListRef.current?.scrollBy(delta);
+  }, []);
+
+  const scrollTo = useCallback((offset: number, _duration?: number) => {
+    virtualizedListRef.current?.scrollTo(offset);
+  }, []);
+
+  // Flash scrollbar for visual feedback
+  const flashScrollbar = useCallback(() => {
+    if (flashTimeoutRef.current) {
+      clearTimeout(flashTimeoutRef.current);
+    }
+    setIsScrollbarFlashing(true);
+    flashTimeoutRef.current = setTimeout(() => {
+      setIsScrollbarFlashing(false);
+      flashTimeoutRef.current = null;
+    }, SCROLLBAR_FLASH_DURATION_MS);
+  }, []);
+
+  // Cleanup flash timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (flashTimeoutRef.current) {
+        clearTimeout(flashTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Smooth scroll state
@@ -173,6 +211,22 @@ function ScrollableList<T>(
     },
     [stopSmoothScroll],
   );
+
+  // Memoize scrollable entry to prevent unnecessary re-registrations
+  const scrollableEntry = useMemo(
+    () => ({
+      ref: containerRef,
+      getScrollState,
+      scrollBy,
+      scrollTo,
+      hasFocus: () => hasFocus,
+      flashScrollbar,
+    }),
+    [getScrollState, scrollBy, scrollTo, hasFocus, flashScrollbar],
+  );
+
+  // Register with ScrollProvider for mouse scroll support
+  useScrollable(scrollableEntry, hasFocus);
 
   // Keyboard scrolling
   // Use Shift+Up/Down for line scrolling to avoid conflict with input cursor navigation
