@@ -213,8 +213,8 @@ function createSemanticTheme(colors: ThemeColors, gradient?: string[], diff?: Di
       focused: colors.primary,
     },
     diff: diff || {
-      addedBg: '#1e4620',      // High saturation dark green bg
-      removedBg: '#6e1b1b',    // High saturation dark red bg
+      addedBg: '#145a24',      // Bright vivid green bg
+      removedBg: '#8b2525',    // Bright vivid red bg
       addedText: colors.success,
       removedText: colors.error,
     },

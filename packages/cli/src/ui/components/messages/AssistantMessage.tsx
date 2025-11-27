@@ -12,6 +12,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { AssistantHistoryItem, ContentBlock } from '../../types.js';
 import { theme } from '../../colors.js';
+import { getCachedStringWidth } from '../../utils/textUtils.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 const MAX_THINKING_LINES = 8;
@@ -76,7 +77,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 export const AssistantMessage: React.FC<AssistantMessageProps> = ({ item, terminalWidth }) => {
   // Use ⏺ (white ball) prefix - represents Nagisa's round body shape
   const prefix = '⏺ ';
-  const prefixWidth = 2; // Unicode character width
+  const prefixWidth = getCachedStringWidth(prefix);
 
   // Filter to get only text blocks for streaming indicator logic
   const textBlocks = item.content.filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text');

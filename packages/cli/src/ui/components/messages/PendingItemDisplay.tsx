@@ -21,6 +21,7 @@ import {
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
 import { BlinkingCircle } from '../BlinkingCircle.js';
+import { getCachedStringWidth } from '../../utils/textUtils.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
 const MAX_THINKING_LINES = 3;
@@ -85,7 +86,7 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }> = ({ item }) => {
   // Use ⏺ (ball) prefix - represents Nagisa
   const prefix = '⏺ ';
-  const prefixWidth = 2;
+  const prefixWidth = getCachedStringWidth(prefix);
 
   const content = item.content || [];
   const textBlocks = content.filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
