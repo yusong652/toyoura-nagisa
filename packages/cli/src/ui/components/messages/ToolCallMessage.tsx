@@ -92,11 +92,9 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
 
   return (
     <Box
-      borderStyle="round"
-      borderColor={theme.border.default}
       paddingX={1}
-      height={3}
       width={boxWidth}
+      marginBottom={1}
     >
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusIndicator}</Text>

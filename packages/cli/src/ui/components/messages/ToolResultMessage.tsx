@@ -46,15 +46,14 @@ export const ToolResultMessage: React.FC<ToolResultMessageProps> = ({ item, term
 
   return (
     <Box
-      borderStyle="round"
-      borderColor={theme.border.default}
       paddingX={1}
       width={boxWidth}
+      marginBottom={1}
     >
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
         <Text color={statusColor}>{statusSymbol}</Text>
       </Box>
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexGrow={1}>
         <Text wrap="wrap" color={theme.text.secondary}>
           {text}
         </Text>
