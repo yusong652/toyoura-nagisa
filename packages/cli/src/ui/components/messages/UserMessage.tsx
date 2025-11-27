@@ -10,9 +10,10 @@ import { theme } from '../../colors.js';
 
 interface UserMessageProps {
   item: UserHistoryItem;
+  terminalWidth?: number;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ item }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ item, terminalWidth }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = item.text.startsWith('/');
@@ -21,7 +22,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ item }) => {
   const textColor = isSlashCommand ? theme.text.accent : theme.message.user;
 
   return (
-    <Box flexDirection="row" marginBottom={1}>
+    <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.text.accent}>{prefix}</Text>
       </Box>

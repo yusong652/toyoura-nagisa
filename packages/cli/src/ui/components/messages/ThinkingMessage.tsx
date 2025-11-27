@@ -10,15 +10,16 @@ import { theme } from '../../colors.js';
 
 interface ThinkingMessageProps {
   item: ThinkingHistoryItem;
+  terminalWidth?: number;
 }
 
-export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({ item }) => {
+export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({ item, terminalWidth }) => {
   // Use ⏺ (ball) prefix - same as AssistantMessage, represents Nagisa
   const prefix = '⏺ ';
   const prefixWidth = 2; // Unicode character width
 
   return (
-    <Box flexDirection="row" marginBottom={1}>
+    <Box flexDirection="row" marginBottom={1} width={terminalWidth}>
       <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.message.thinking}>{prefix}</Text>
       </Box>

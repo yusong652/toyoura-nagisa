@@ -19,7 +19,6 @@ import React, {
 } from 'react';
 import { type DOMElement, measureElement, Box } from 'ink';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { theme } from '../../colors.js';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
 
@@ -30,7 +29,6 @@ type VirtualizedListProps<T> = {
   keyExtractor: (item: T, index: number) => string;
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
-  scrollbarThumbColor?: string;
 };
 
 export type VirtualizedListRef<T> = {
@@ -467,18 +465,18 @@ function VirtualizedList<T>(
     ],
   );
 
-  // paddingRight=2: 1 for scrollbar + 1 for spacing between content and scrollbar
+  // Scrollable container with padding for scrollbar area
+  // Keyboard navigation: Shift+Up/Down for line scroll, Page Up/Down for page scroll
   return (
     <Box
       ref={containerRef}
       overflowY="scroll"
       overflowX="hidden"
       scrollTop={scrollTop}
-      scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={2}
+      paddingRight={4}
     >
       <Box flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />

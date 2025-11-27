@@ -21,18 +21,17 @@ interface HistoryItemDisplayProps {
   item: HistoryItem;
 }
 
-// Reserve space for scrollbar area (VirtualizedList has paddingRight={2})
-// This ensures tool message borders don't overlap with scrollbar
-const SCROLLBAR_WIDTH = 2;
+// Width reduction to match VirtualizedList's paddingRight
+// This ensures message components don't overflow into scrollbar area
+const SCROLLBAR_PADDING = 4;
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) => {
   const { columns: rawTerminalWidth } = useTerminalSize();
-  // Reduce width to prevent overlap with scrollbar
-  const terminalWidth = rawTerminalWidth - SCROLLBAR_WIDTH;
+  const terminalWidth = rawTerminalWidth - SCROLLBAR_PADDING;
 
   switch (item.type) {
     case MessageType.USER:
-      return <UserMessage item={item} />;
+      return <UserMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.ASSISTANT:
       return <AssistantMessage item={item} terminalWidth={terminalWidth} />;
@@ -45,13 +44,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
       return <ToolResultMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.THINKING:
-      return <ThinkingMessage item={item} />;
+      return <ThinkingMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.INFO:
-      return <InfoMessage item={item} />;
+      return <InfoMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.ERROR:
-      return <ErrorMessage item={item} />;
+      return <ErrorMessage item={item} terminalWidth={terminalWidth} />;
 
     default:
       return (
