@@ -89,6 +89,8 @@ interface DiffRendererProps {
   maxWidth?: number;
   /** Maximum height for the diff display */
   maxHeight?: number;
+  /** Scroll offset (number of lines to skip from the top) */
+  scrollOffset?: number;
 }
 
 // Default tab width for normalization
@@ -99,6 +101,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   filename,
   maxWidth = 80,
   maxHeight,
+  scrollOffset = 0,
 }) => {
   const parsedLines = useMemo(() => {
     if (!diffContent || typeof diffContent !== 'string') {
@@ -162,8 +165,8 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     }
 
     // Render diff with line numbers
-    return renderDiffContent(parsedLines, filename, DEFAULT_TAB_WIDTH, maxWidth, maxHeight);
-  }, [diffContent, parsedLines, isNewFile, filename, maxWidth, maxHeight]);
+    return renderDiffContent(parsedLines, filename, DEFAULT_TAB_WIDTH, maxWidth, maxHeight, scrollOffset);
+  }, [diffContent, parsedLines, isNewFile, filename, maxWidth, maxHeight, scrollOffset]);
 
   return <Box flexDirection="column">{renderedOutput}</Box>;
 };
@@ -177,6 +180,7 @@ function renderDiffContent(
   tabWidth: number,
   _maxWidth: number,
   maxHeight?: number,
+  scrollOffset: number = 0,
 ): React.ReactNode {
   // Normalize whitespace (replace tabs with spaces)
   const normalizedLines = parsedLines.map((line) => ({
@@ -221,12 +225,19 @@ function renderDiffContent(
     baseIndentation = 0;
   }
 
-  // Limit lines if maxHeight is specified
+  // Apply scroll offset and limit lines if maxHeight is specified
   let linesToRender = displayableLines;
-  let truncatedCount = 0;
+  let linesAbove = 0;
+  let linesBelow = 0;
+
   if (maxHeight && displayableLines.length > maxHeight) {
-    truncatedCount = displayableLines.length - maxHeight;
-    linesToRender = displayableLines.slice(0, maxHeight);
+    // Clamp scroll offset to valid range
+    const maxScrollOffset = Math.max(0, displayableLines.length - maxHeight);
+    const clampedOffset = Math.min(Math.max(0, scrollOffset), maxScrollOffset);
+
+    linesAbove = clampedOffset;
+    linesToRender = displayableLines.slice(clampedOffset, clampedOffset + maxHeight);
+    linesBelow = Math.max(0, displayableLines.length - clampedOffset - maxHeight);
   }
 
   const content = linesToRender.map((line, index) => {
@@ -300,14 +311,23 @@ function renderDiffContent(
         </Box>
       )}
 
+      {/* Above scroll indicator */}
+      {linesAbove > 0 && (
+        <Box>
+          <Text color={theme.text.muted}>
+            ↑ {linesAbove} more line{linesAbove > 1 ? 's' : ''} above
+          </Text>
+        </Box>
+      )}
+
       {/* Diff content */}
       {content}
 
-      {/* Truncation notice */}
-      {truncatedCount > 0 && (
-        <Box marginTop={1}>
+      {/* Below scroll indicator */}
+      {linesBelow > 0 && (
+        <Box>
           <Text color={theme.text.muted}>
-            ... and {truncatedCount} more lines
+            ↓ {linesBelow} more line{linesBelow > 1 ? 's' : ''} below
           </Text>
         </Box>
       )}
@@ -356,4 +376,34 @@ export function getDiffStats(diffContent: string): {
   }
 
   return { additions, deletions };
+}
+
+/**
+ * Get the total number of displayable lines in a diff
+ */
+export function getDiffLineCount(diffContent: string): number {
+  if (!diffContent || typeof diffContent !== 'string') {
+    return 0;
+  }
+
+  const lines = diffContent.split('\n');
+  let count = 0;
+  let inHunk = false;
+  const hunkHeaderRegex = /^@@ -\d+,?\d* \+\d+,?\d* @@/;
+
+  for (const line of lines) {
+    if (hunkHeaderRegex.test(line)) {
+      inHunk = true;
+      continue;
+    }
+
+    if (!inHunk) continue;
+
+    // Count add, del, and context lines
+    if (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ')) {
+      count++;
+    }
+  }
+
+  return count;
 }

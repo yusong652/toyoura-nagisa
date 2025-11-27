@@ -9,7 +9,7 @@
  * - info: Generic tool confirmation
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Box, Text, useStdout } from 'ink';
 import type {
   ToolConfirmationData,
@@ -20,7 +20,7 @@ import type {
 import { theme } from '../colors.js';
 import { RadioButtonSelect, type RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { DiffRenderer, getDiffStats } from './DiffRenderer.js';
+import { DiffRenderer, getDiffStats, getDiffLineCount } from './DiffRenderer.js';
 
 interface ToolConfirmationPromptProps {
   data: ToolConfirmationData;
@@ -39,6 +39,9 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
   const terminalWidth = stdout?.columns ?? 80;
   const terminalHeight = stdout?.rows ?? 24;
 
+  // Scroll state for diff content
+  const [scrollOffset, setScrollOffset] = useState(0);
+
   const handleSelect = useCallback(
     (outcome: ConfirmationOutcome) => {
       onConfirm(outcome === 'approve');
@@ -46,12 +49,55 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     [onConfirm]
   );
 
-  // Handle escape key to reject
+  // Calculate available height and total lines for scroll bounds
+  const { availableHeight, totalLines } = useMemo(() => {
+    const confirmationType = (data as { type?: string }).type;
+    if (confirmationType === 'edit') {
+      const editData = data as EditToolConfirmationData;
+      const headerHeight = 4;
+      const questionHeight = 3;
+      const helpHeight = 2;
+      const height = Math.max(5, terminalHeight - headerHeight - questionHeight - helpHeight - 4);
+      const lines = getDiffLineCount(editData.fileDiff);
+      return { availableHeight: height, totalLines: lines };
+    }
+    return { availableHeight: 0, totalLines: 0 };
+  }, [data, terminalHeight]);
+
+  // Calculate max scroll offset
+  const maxScrollOffset = useMemo(() => {
+    return Math.max(0, totalLines - availableHeight);
+  }, [totalLines, availableHeight]);
+
+  // Handle escape key and scroll keys
   useKeypress(
     (key) => {
       if (!isFocused) return;
+
+      // Escape to reject
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         onConfirm(false);
+        return;
+      }
+
+      // Shift+Up/Down for scrolling
+      if (key.shift && key.name === 'up') {
+        setScrollOffset((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.shift && key.name === 'down') {
+        setScrollOffset((prev) => Math.min(maxScrollOffset, prev + 1));
+        return;
+      }
+
+      // PageUp/PageDown for faster scrolling
+      if (key.name === 'pageup') {
+        setScrollOffset((prev) => Math.max(0, prev - availableHeight));
+        return;
+      }
+      if (key.name === 'pagedown') {
+        setScrollOffset((prev) => Math.min(maxScrollOffset, prev + availableHeight));
+        return;
       }
     },
     { isActive: isFocused }
@@ -123,6 +169,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
               filename={editData.fileName}
               maxWidth={terminalWidth - 4}
               maxHeight={availableHeight}
+              scrollOffset={scrollOffset}
             />
           </Box>
         </Box>
@@ -193,7 +240,7 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
     }
 
     return { bodyContent, question };
-  }, [data, terminalWidth, terminalHeight]);
+  }, [data, terminalWidth, terminalHeight, scrollOffset]);
 
   return (
     <Box
@@ -229,10 +276,15 @@ export const ToolConfirmationPrompt: React.FC<ToolConfirmationPromptProps> = ({
       />
 
       {/* Help text */}
-      <Box marginTop={1}>
+      <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.muted}>
-          (Use arrows to navigate, Enter to select, Esc to cancel)
+          (↑↓ select, Enter confirm, Esc cancel)
         </Text>
+        {totalLines > availableHeight && (
+          <Text color={theme.text.muted}>
+            (Shift+↑↓ scroll, PageUp/PageDown page)
+          </Text>
+        )}
       </Box>
     </Box>
   );
