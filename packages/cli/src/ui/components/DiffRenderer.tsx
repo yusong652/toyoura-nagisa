@@ -1,8 +1,12 @@
 /**
  * Diff Renderer Component
- * Git diff-style visualization for file changes
+ * VSCode-style diff visualization for file changes
  *
- * Reference: Gemini CLI ui/components/messages/DiffRenderer.tsx
+ * Features:
+ * - Clean, minimal design similar to VSCode diff view
+ * - Background colors for added/removed lines
+ * - Line numbers in gutter
+ * - Truncation for long content with indicator
  */
 
 import React, { useMemo } from 'react';
@@ -87,10 +91,8 @@ interface DiffRendererProps {
   filename?: string;
   /** Maximum width for the diff display */
   maxWidth?: number;
-  /** Maximum height for the diff display */
+  /** Maximum height for the diff display (content exceeding this will be truncated) */
   maxHeight?: number;
-  /** Scroll offset (number of lines to skip from the top) */
-  scrollOffset?: number;
 }
 
 // Default tab width for normalization
@@ -98,10 +100,9 @@ const DEFAULT_TAB_WIDTH = 4;
 
 export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
-  filename,
+  filename: _filename, // Reserved for future syntax highlighting
   maxWidth = 80,
   maxHeight,
-  scrollOffset = 0,
 }) => {
   const parsedLines = useMemo(() => {
     if (!diffContent || typeof diffContent !== 'string') {
@@ -126,92 +127,79 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     }
 
     if (parsedLines.length === 0) {
-      return (
-        <Box
-          borderStyle="round"
-          borderColor={theme.border.default}
-          paddingX={1}
-        >
-          <Text color={theme.text.muted}>No changes detected.</Text>
-        </Box>
-      );
+      return <Text color={theme.text.muted}>No changes detected.</Text>;
     }
 
-    // For new files, show content with scroll support
+    // For new files, show content with truncation
     if (isNewFile) {
       const addedLines = parsedLines
         .filter((line) => line.type === 'add')
         .map((line) => line.content);
 
-      // Apply scroll offset and height limit for new files too
+      // Apply height limit with truncation
       let linesToShow = addedLines;
-      let linesAbove = 0;
-      let linesBelow = 0;
+      let hiddenLines = 0;
 
       if (maxHeight && addedLines.length > maxHeight) {
-        const maxScrollOffset = Math.max(0, addedLines.length - maxHeight);
-        const clampedOffset = Math.min(Math.max(0, scrollOffset), maxScrollOffset);
-
-        linesAbove = clampedOffset;
-        linesToShow = addedLines.slice(clampedOffset, clampedOffset + maxHeight);
-        linesBelow = Math.max(0, addedLines.length - clampedOffset - maxHeight);
+        const visibleLines = maxHeight - 1;
+        linesToShow = addedLines.slice(0, visibleLines);
+        hiddenLines = addedLines.length - visibleLines;
       }
+
+      // Calculate gutter width
+      const gutterWidth = Math.max(3, addedLines.length.toString().length);
+      const bgColor = theme.diff.addedBg;
 
       return (
         <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text color={theme.status.success} bold>
-              + New file{filename ? `: ${filename}` : ''}
-            </Text>
-          </Box>
-          <Box
-            borderStyle="round"
-            borderColor={theme.status.success}
-            paddingX={1}
-            flexDirection="column"
-          >
-            {/* Above scroll indicator */}
-            {linesAbove > 0 && (
-              <Text color={theme.text.muted}>
-                ↑ {linesAbove} more line{linesAbove > 1 ? 's' : ''} above
+          {/* File content with line numbers */}
+          {linesToShow.map((line, index) => (
+            <Box key={index} flexDirection="row">
+              {/* Line number gutter */}
+              <Text color={theme.text.muted} backgroundColor={bgColor}>
+                {(index + 1).toString().padStart(gutterWidth)}
               </Text>
-            )}
-
-            {/* File content */}
-            {linesToShow.map((line, index) => (
-              <Text key={index} color={theme.text.primary}>
+              {/* Prefix symbol */}
+              <Text color={theme.diff.addedText} backgroundColor={bgColor} bold>
+                {' + '}
+              </Text>
+              {/* Line content */}
+              <Text color={theme.text.primary} backgroundColor={bgColor}>
                 {line}
               </Text>
-            ))}
+            </Box>
+          ))}
 
-            {/* Below scroll indicator */}
-            {linesBelow > 0 && (
+          {/* Truncation indicator */}
+          {hiddenLines > 0 && (
+            <Box marginTop={1}>
               <Text color={theme.text.muted}>
-                ↓ {linesBelow} more line{linesBelow > 1 ? 's' : ''} below
+                {'─'.repeat(gutterWidth + 3)}
               </Text>
-            )}
-          </Box>
+              <Text color={theme.text.muted}>
+                {' '}↓ {hiddenLines} more line{hiddenLines > 1 ? 's' : ''} below
+              </Text>
+            </Box>
+          )}
         </Box>
       );
     }
 
     // Render diff with line numbers
-    return renderDiffContent(parsedLines, filename, DEFAULT_TAB_WIDTH, maxWidth, maxHeight, scrollOffset);
-  }, [diffContent, parsedLines, isNewFile, filename, maxWidth, maxHeight, scrollOffset]);
+    return renderDiffContent(parsedLines, DEFAULT_TAB_WIDTH, maxWidth, maxHeight);
+  }, [diffContent, parsedLines, isNewFile, maxWidth, maxHeight]);
 
   return <Box flexDirection="column">{renderedOutput}</Box>;
 };
 
 /**
- * Render diff content with line numbers and syntax highlighting
+ * Render diff content with VSCode-style visualization
  */
 function renderDiffContent(
   parsedLines: DiffLine[],
-  filename: string | undefined,
   tabWidth: number,
-  _maxWidth: number,
+  maxWidth: number,
   maxHeight?: number,
-  scrollOffset: number = 0,
 ): React.ReactNode {
   // Normalize whitespace (replace tabs with spaces)
   const normalizedLines = parsedLines.map((line) => ({
@@ -225,15 +213,7 @@ function renderDiffContent(
   );
 
   if (displayableLines.length === 0) {
-    return (
-      <Box
-        borderStyle="round"
-        borderColor={theme.border.default}
-        paddingX={1}
-      >
-        <Text color={theme.text.muted}>No changes detected.</Text>
-      </Box>
-    );
+    return <Text color={theme.text.muted}>No changes detected.</Text>;
   }
 
   // Calculate gutter width based on max line number
@@ -242,7 +222,7 @@ function renderDiffContent(
     ...displayableLines.map((l) => l.oldLine ?? 0),
     ...displayableLines.map((l) => l.newLine ?? 0)
   );
-  const gutterWidth = Math.max(1, maxLineNumber.toString().length);
+  const gutterWidth = Math.max(3, maxLineNumber.toString().length);
 
   // Calculate minimum indentation for better display
   let baseIndentation = Infinity;
@@ -256,38 +236,36 @@ function renderDiffContent(
     baseIndentation = 0;
   }
 
-  // Apply scroll offset and limit lines if maxHeight is specified
+  // Apply truncation if maxHeight is specified
   let linesToRender = displayableLines;
-  let linesAbove = 0;
-  let linesBelow = 0;
+  let hiddenLines = 0;
 
   if (maxHeight && displayableLines.length > maxHeight) {
-    // Clamp scroll offset to valid range
-    const maxScrollOffset = Math.max(0, displayableLines.length - maxHeight);
-    const clampedOffset = Math.min(Math.max(0, scrollOffset), maxScrollOffset);
-
-    linesAbove = clampedOffset;
-    linesToRender = displayableLines.slice(clampedOffset, clampedOffset + maxHeight);
-    linesBelow = Math.max(0, displayableLines.length - clampedOffset - maxHeight);
+    const visibleLines = maxHeight - 1;
+    linesToRender = displayableLines.slice(0, visibleLines);
+    hiddenLines = displayableLines.length - visibleLines;
   }
+
+  // Calculate content width for proper line display
+  const contentWidth = Math.max(1, maxWidth - gutterWidth - 4); // 4 = gutter padding + prefix
 
   const content = linesToRender.map((line, index) => {
     const lineKey = `diff-line-${index}`;
     let gutterNumStr = '';
-    let prefixSymbol = ' ';
+    let prefixChar = ' ';
 
     switch (line.type) {
       case 'add':
         gutterNumStr = (line.newLine ?? '').toString();
-        prefixSymbol = '+';
+        prefixChar = '+';
         break;
       case 'del':
         gutterNumStr = (line.oldLine ?? '').toString();
-        prefixSymbol = '-';
+        prefixChar = '-';
         break;
       case 'context':
         gutterNumStr = (line.newLine ?? '').toString();
-        prefixSymbol = ' ';
+        prefixChar = ' ';
         break;
       default:
         return null;
@@ -295,37 +273,37 @@ function renderDiffContent(
 
     const displayContent = line.content.substring(baseIndentation);
 
-    // Determine colors based on line type
-    const lineColor = line.type === 'add'
-      ? theme.status.success
-      : line.type === 'del'
-        ? theme.status.error
-        : theme.text.primary;
-
-    const bgColor = line.type === 'add'
-      ? '#1a3d1a'  // Dark green background
-      : line.type === 'del'
-        ? '#3d1a1a'  // Dark red background
-        : undefined;
+    // Determine styling based on line type
+    const isAdded = line.type === 'add';
+    const isRemoved = line.type === 'del';
+    const bgColor = isAdded ? theme.diff.addedBg : isRemoved ? theme.diff.removedBg : undefined;
+    const prefixColor = isAdded ? theme.diff.addedText : isRemoved ? theme.diff.removedText : theme.text.muted;
 
     return (
       <Box key={lineKey} flexDirection="row">
         {/* Line number gutter */}
-        <Text color={theme.text.muted}>
-          {gutterNumStr.padStart(gutterWidth)}{' '}
+        <Text color={theme.text.muted} backgroundColor={bgColor}>
+          {gutterNumStr.padStart(gutterWidth)}
         </Text>
 
-        {/* Diff line content */}
+        {/* Prefix symbol (+/-/space) */}
+        <Text color={prefixColor} backgroundColor={bgColor} bold={isAdded || isRemoved}>
+          {' '}{prefixChar}{' '}
+        </Text>
+
+        {/* Line content */}
         <Text
-          color={lineColor}
+          color={theme.text.primary}
           backgroundColor={bgColor}
           wrap="truncate-end"
         >
-          <Text color={lineColor} bold={line.type !== 'context'}>
-            {prefixSymbol}
-          </Text>
-          {' '}
           {displayContent}
+          {/* Fill remaining width with background */}
+          {bgColor && displayContent.length < contentWidth && (
+            <Text backgroundColor={bgColor}>
+              {' '.repeat(Math.max(0, contentWidth - displayContent.length))}
+            </Text>
+          )}
         </Text>
       </Box>
     );
@@ -333,32 +311,17 @@ function renderDiffContent(
 
   return (
     <Box flexDirection="column">
-      {/* File header if filename provided */}
-      {filename && (
-        <Box marginBottom={1}>
-          <Text color={theme.text.accent} bold>
-            {filename}
-          </Text>
-        </Box>
-      )}
-
-      {/* Above scroll indicator */}
-      {linesAbove > 0 && (
-        <Box>
-          <Text color={theme.text.muted}>
-            ↑ {linesAbove} more line{linesAbove > 1 ? 's' : ''} above
-          </Text>
-        </Box>
-      )}
-
       {/* Diff content */}
       {content}
 
-      {/* Below scroll indicator */}
-      {linesBelow > 0 && (
-        <Box>
+      {/* Truncation indicator */}
+      {hiddenLines > 0 && (
+        <Box marginTop={1}>
           <Text color={theme.text.muted}>
-            ↓ {linesBelow} more line{linesBelow > 1 ? 's' : ''} below
+            {'─'.repeat(gutterWidth + 3)}
+          </Text>
+          <Text color={theme.text.muted}>
+            {' '}↓ {hiddenLines} more line{hiddenLines > 1 ? 's' : ''} below
           </Text>
         </Box>
       )}

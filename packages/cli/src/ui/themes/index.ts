@@ -69,6 +69,13 @@ export interface SemanticTheme {
     default: string;
     focused: string;
   };
+  /** Diff view background colors */
+  diff: {
+    addedBg: string;
+    removedBg: string;
+    addedText: string;
+    removedText: string;
+  };
   /** Gradient colors for header/branding */
   gradient: string[];
 }
@@ -165,7 +172,14 @@ const nordColors: ThemeColors = {
   thinking: '#4c566a',   // Polar night
 };
 
-function createSemanticTheme(colors: ThemeColors, gradient?: string[]): SemanticTheme {
+interface DiffColors {
+  addedBg: string;
+  removedBg: string;
+  addedText: string;
+  removedText: string;
+}
+
+function createSemanticTheme(colors: ThemeColors, gradient?: string[], diff?: DiffColors): SemanticTheme {
   return {
     text: {
       primary: colors.text,
@@ -197,6 +211,12 @@ function createSemanticTheme(colors: ThemeColors, gradient?: string[]): Semantic
     border: {
       default: colors.textMuted,
       focused: colors.primary,
+    },
+    diff: diff || {
+      addedBg: '#1e4620',      // High saturation dark green bg
+      removedBg: '#6e1b1b',    // High saturation dark red bg
+      addedText: colors.success,
+      removedText: colors.error,
     },
     gradient: gradient || [colors.primary, colors.accent],
   };
