@@ -180,6 +180,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const quit = useCallback(() => {
     setIsQuitting(true);
     connectionManager.disconnect();
+    // Farewell message is printed in index.tsx after exiting alternate buffer
     setTimeout(() => {
       exit();
     }, 100);

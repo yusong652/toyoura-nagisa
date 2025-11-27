@@ -13,15 +13,24 @@ import { useAppState } from './contexts/AppStateContext.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { MainLayout } from './layouts/MainLayout.js';
 import { theme } from './colors.js';
+import { GradientText } from './components/GradientText.js';
+import { selectLogo, normalizeLineWidths, minimalLogo } from './components/AsciiArt.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 
 export const App = () => {
   const appState = useAppState();
+  const { columns: terminalWidth } = useTerminalSize();
 
-  // Show quitting message
+  // Show quitting message with logo
   if (appState.isQuitting) {
+    const rawLogo = selectLogo(terminalWidth);
+    const isMinimal = rawLogo === minimalLogo;
+    const logo = isMinimal ? rawLogo : normalizeLineWidths(rawLogo);
+
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color={theme.text.secondary}>Goodbye! 👋</Text>
+        <GradientText>{logo}</GradientText>
+        <Text color={theme.text.secondary}>Goodbye! See you next time~</Text>
       </Box>
     );
   }
