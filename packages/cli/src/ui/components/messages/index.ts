@@ -7,6 +7,5 @@ export * from './UserMessage.js';
 export * from './AssistantMessage.js';
 export * from './ToolCallMessage.js';
 export * from './ToolResultMessage.js';
-export * from './ThinkingMessage.js';
 export * from './InfoMessage.js';
 export * from './ErrorMessage.js';

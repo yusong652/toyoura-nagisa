@@ -22,8 +22,25 @@ import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
 import { BlinkingCircle } from '../BlinkingCircle.js';
 
+// Maximum lines for thinking blocks (shows last N lines when exceeded)
+const MAX_THINKING_LINES = 3;
+
 interface PendingItemDisplayProps {
   item: HistoryItemWithoutId;
+}
+
+/**
+ * Get the last N lines of content, showing most recent thinking
+ */
+function getLastLines(content: string, maxLines: number): { text: string; truncated: boolean } {
+  const lines = content.split('\n');
+  if (lines.length <= maxLines) {
+    return { text: content, truncated: false };
+  }
+  return {
+    text: lines.slice(-maxLines).join('\n'),
+    truncated: true,
+  };
 }
 
 // Render content block for assistant message
@@ -45,12 +62,15 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
     }
 
     case 'thinking': {
-      // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
-      const displayThinking = block.thinking.trim();
+      // Trim and limit thinking content to last N lines (auto-scroll effect)
+      const { text, truncated } = getLastLines(block.thinking.trim(), MAX_THINKING_LINES);
       return (
-        <Box key={`thinking-${index}`}>
+        <Box key={`thinking-${index}`} flexDirection="column">
+          {truncated && (
+            <Text color={theme.text.muted}>...</Text>
+          )}
           <Text color={theme.message.thinking} dimColor wrap="wrap">
-            {displayThinking}
+            {text}
           </Text>
         </Box>
       );

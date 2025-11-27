@@ -11,7 +11,6 @@ import { UserMessage } from './UserMessage.js';
 import { AssistantMessage } from './AssistantMessage.js';
 import { ToolCallMessage } from './ToolCallMessage.js';
 import { ToolResultMessage } from './ToolResultMessage.js';
-import { ThinkingMessage } from './ThinkingMessage.js';
 import { InfoMessage } from './InfoMessage.js';
 import { ErrorMessage } from './ErrorMessage.js';
 import { theme } from '../../colors.js';
@@ -42,9 +41,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) 
 
     case MessageType.TOOL_RESULT:
       return <ToolResultMessage item={item} terminalWidth={terminalWidth} />;
-
-    case MessageType.THINKING:
-      return <ThinkingMessage item={item} terminalWidth={terminalWidth} />;
 
     case MessageType.INFO:
       return <InfoMessage item={item} terminalWidth={terminalWidth} />;

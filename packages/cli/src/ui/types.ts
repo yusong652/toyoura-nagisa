@@ -11,7 +11,6 @@ export enum MessageType {
   ASSISTANT = 'assistant',
   TOOL_CALL = 'tool_call',
   TOOL_RESULT = 'tool_result',
-  THINKING = 'thinking',
   ERROR = 'error',
   INFO = 'info',
   CHAT_LIST = 'chat_list',
@@ -61,12 +60,6 @@ export interface AssistantHistoryItem extends HistoryItemBase {
   isStreaming?: boolean;
 }
 
-export interface ThinkingHistoryItem extends HistoryItemBase {
-  type: MessageType.THINKING;
-  thinking: string;
-  isExpanded?: boolean;
-}
-
 export interface ToolCallHistoryItem extends HistoryItemBase {
   type: MessageType.TOOL_CALL;
   toolName: string;
@@ -94,7 +87,6 @@ export interface InfoHistoryItem extends HistoryItemBase {
 export type HistoryItem =
   | UserHistoryItem
   | AssistantHistoryItem
-  | ThinkingHistoryItem
   | ToolCallHistoryItem
   | ToolResultHistoryItem
   | ErrorHistoryItem
@@ -111,13 +103,6 @@ export interface AssistantHistoryItemWithoutId {
   type: MessageType.ASSISTANT;
   content: ContentBlock[];
   isStreaming?: boolean;
-  timestamp?: number;
-}
-
-export interface ThinkingHistoryItemWithoutId {
-  type: MessageType.THINKING;
-  thinking: string;
-  isExpanded?: boolean;
   timestamp?: number;
 }
 
@@ -153,7 +138,6 @@ export interface InfoHistoryItemWithoutId {
 export type HistoryItemWithoutId =
   | UserHistoryItemWithoutId
   | AssistantHistoryItemWithoutId
-  | ThinkingHistoryItemWithoutId
   | ToolCallHistoryItemWithoutId
   | ToolResultHistoryItemWithoutId
   | ErrorHistoryItemWithoutId
