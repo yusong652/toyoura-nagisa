@@ -54,12 +54,8 @@ function formatHelpMessage(): string {
   lines.push('    Escape          Cancel request');
   lines.push('');
   lines.push('  Scrolling:');
-  lines.push('    Shift+Up        Scroll up');
-  lines.push('    Shift+Down      Scroll down');
-  lines.push('    Page Up         Page up');
-  lines.push('    Page Down       Page down');
-  lines.push('    Home            Scroll to top');
-  lines.push('    End             Scroll to bottom');
+  lines.push('    Shift+Up/Down   Scroll line by line');
+  lines.push('    Page Up/Down    Scroll page by page');
   lines.push('');
   lines.push('  Suggestions:');
   lines.push('    Up/Down         Navigate suggestions');

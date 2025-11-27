@@ -175,15 +175,15 @@ function ScrollableList<T>(
   );
 
   // Keyboard scrolling
-  // Use Shift+Up/Down to avoid conflict with input cursor navigation
+  // Use Shift+Up/Down for line scrolling to avoid conflict with input cursor navigation
   useKeypress(
     (key: Key) => {
-      // Shift+Up arrow - scroll up (avoids conflict with input cursor movement)
+      // Shift+Up arrow - scroll up
       if (key.name === 'up' && key.shift) {
         stopSmoothScroll();
         scrollBy(-SCROLL_LINE_HEIGHT);
       }
-      // Shift+Down arrow - scroll down (avoids conflict with input cursor movement)
+      // Shift+Down arrow - scroll down
       else if (key.name === 'down' && key.shift) {
         stopSmoothScroll();
         scrollBy(SCROLL_LINE_HEIGHT);
@@ -205,14 +205,6 @@ function ScrollableList<T>(
           : scrollState.scrollTop;
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + innerHeight);
-      }
-      // Home - scroll to top
-      else if (key.name === 'home') {
-        smoothScrollTo(0);
-      }
-      // End - scroll to bottom
-      else if (key.name === 'end') {
-        smoothScrollTo(SCROLL_TO_ITEM_END);
       }
     },
     { isActive: hasFocus },
