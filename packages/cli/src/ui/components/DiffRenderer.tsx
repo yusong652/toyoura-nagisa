@@ -137,12 +137,25 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       );
     }
 
-    // For new files, just show the content without diff styling
+    // For new files, show content with scroll support
     if (isNewFile) {
-      const addedContent = parsedLines
+      const addedLines = parsedLines
         .filter((line) => line.type === 'add')
-        .map((line) => line.content)
-        .join('\n');
+        .map((line) => line.content);
+
+      // Apply scroll offset and height limit for new files too
+      let linesToShow = addedLines;
+      let linesAbove = 0;
+      let linesBelow = 0;
+
+      if (maxHeight && addedLines.length > maxHeight) {
+        const maxScrollOffset = Math.max(0, addedLines.length - maxHeight);
+        const clampedOffset = Math.min(Math.max(0, scrollOffset), maxScrollOffset);
+
+        linesAbove = clampedOffset;
+        linesToShow = addedLines.slice(clampedOffset, clampedOffset + maxHeight);
+        linesBelow = Math.max(0, addedLines.length - clampedOffset - maxHeight);
+      }
 
       return (
         <Box flexDirection="column">
@@ -155,10 +168,28 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
             borderStyle="round"
             borderColor={theme.status.success}
             paddingX={1}
+            flexDirection="column"
           >
-            <Text color={theme.text.primary} wrap="wrap">
-              {addedContent}
-            </Text>
+            {/* Above scroll indicator */}
+            {linesAbove > 0 && (
+              <Text color={theme.text.muted}>
+                ↑ {linesAbove} more line{linesAbove > 1 ? 's' : ''} above
+              </Text>
+            )}
+
+            {/* File content */}
+            {linesToShow.map((line, index) => (
+              <Text key={index} color={theme.text.primary}>
+                {line}
+              </Text>
+            ))}
+
+            {/* Below scroll indicator */}
+            {linesBelow > 0 && (
+              <Text color={theme.text.muted}>
+                ↓ {linesBelow} more line{linesBelow > 1 ? 's' : ''} below
+              </Text>
+            )}
           </Box>
         </Box>
       );

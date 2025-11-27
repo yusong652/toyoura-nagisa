@@ -118,16 +118,20 @@ function selectionListReducer(
 }
 
 /**
- * Check if key matches navigation up (j, up arrow)
+ * Check if key matches navigation up (k, up arrow without shift)
+ * Note: shift: false ensures Shift+Up is NOT captured, allowing scroll
  */
 function isNavigationUp(key: Key): boolean {
+  if (key.shift) return false;  // Don't capture Shift+Up
   return key.name === 'up' || key.sequence === 'k';
 }
 
 /**
- * Check if key matches navigation down (k, down arrow)
+ * Check if key matches navigation down (j, down arrow without shift)
+ * Note: shift: false ensures Shift+Down is NOT captured, allowing scroll
  */
 function isNavigationDown(key: Key): boolean {
+  if (key.shift) return false;  // Don't capture Shift+Down
   return key.name === 'down' || key.sequence === 'j';
 }
 
