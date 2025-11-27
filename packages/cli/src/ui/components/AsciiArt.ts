@@ -28,7 +28,7 @@ export const nagisaAscii = `
 // Full logo with Nagisa - for wide terminals (95+ columns)
 // Features: particle cluster ears, eyes, blush marks
 export const fullAsciiLogo = `
-                               _  _   _            _
+                               _  _   _             _
 @@@@@       @@@@@         __ _(_)| \\ | | __ _  __ _(_)___  __ _
 @@@@@       @@@@@        / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
 @@@@@@@@@@@@@@@@@       | (_| | || |\\  | (_| | (_| | \\__ \\ (_| |
@@ -43,7 +43,7 @@ export const fullAsciiLogo = `
 
 // Short logo - for medium terminals (60+ columns)
 export const shortAsciiLogo = `
-@@@@@   @@@@@        _  _   _            _
+@@@@@   @@@@@         _  _   _             _
 @@@@@@@@@@@@@    __ _(_)| \\ | | __ _  __ _(_)___  __ _
  @@@@@@@@@@@    / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
 @@@ @@@@@ @@@   \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
