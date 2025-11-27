@@ -313,14 +313,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+C to clear input
-      if (key.ctrl && key.name === 'c') {
-        buffer.setText('');
-        completion.reset();
-        return;
-      }
-
       // Delegate to buffer's handleInput for all other keys
+      // Note: Ctrl+C is handled at app level for quit/interrupt
       buffer.handleInput(key);
     },
     [disabled, buffer, handleSubmit, handleBackslashEnter, completion, handleAutocomplete, handleAutocompleteAndExecute, fileMention, handleFileMentionSelect]

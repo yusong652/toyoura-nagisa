@@ -43,12 +43,15 @@ function formatHelpMessage(): string {
   lines.push('    Ctrl+J          Insert newline');
   lines.push('    Shift+Enter     Insert newline');
   lines.push('    \\ + Enter       Insert newline');
-  lines.push('    Ctrl+C          Clear input');
   lines.push('    Ctrl+U          Delete to line start');
   lines.push('    Ctrl+K          Delete to line end');
   lines.push('    Ctrl+W          Delete word backward');
   lines.push('    Ctrl+A / Home   Move to line start');
   lines.push('    Ctrl+E / End    Move to line end');
+  lines.push('');
+  lines.push('  App:');
+  lines.push('    Ctrl+C          Cancel request / Quit');
+  lines.push('    Escape          Cancel request');
   lines.push('');
   lines.push('  Scrolling:');
   lines.push('    Shift+Up        Scroll up');
