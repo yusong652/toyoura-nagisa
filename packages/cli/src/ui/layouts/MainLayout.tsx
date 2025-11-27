@@ -4,22 +4,21 @@
  *
  * Handles the main application layout:
  * - Header (status bar)
- * - History (committed messages in ScrollableList for proper scrolling)
+ * - History (committed messages)
  * - Pending items (streaming messages)
  * - Input area
  * - Footer (connection status, session info)
  *
  * Key Architecture:
- * - ScrollableList with virtualization for efficient rendering of long conversations
- * - Auto-scroll to bottom when new messages arrive
- * - Keyboard navigation (arrow keys, page up/down, home/end)
+ * - Uses Ink's Static component to render history to terminal's main buffer
+ * - This enables native terminal scrolling and text selection
  * - Terminal resize triggers history refresh to prevent rendering artifacts
  * - Slash commands with autocomplete support
  * - Dialog system for interactive command responses
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
-import { Box } from 'ink';
+import { Box, Static } from 'ink';
 import { useAppState, useAppActions } from '../contexts/AppStateContext.js';
 import { HistoryItemDisplay } from '../components/messages/HistoryItemDisplay.js';
 import { PendingItemDisplay } from '../components/messages/PendingItemDisplay.js';
@@ -29,24 +28,17 @@ import { AppHeader } from '../components/AppHeader.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
-import { ScrollableList, SCROLL_TO_ITEM_END } from '../components/shared/ScrollableList.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSlashCommandProcessor } from '../hooks/useSlashCommandProcessor.js';
 import { useSessionManager } from '../hooks/useSessionManager.js';
 import { useTextBuffer } from '../utils/text-buffer.js';
-import { MessageType, type AgentProfileType, type HistoryItem } from '../types.js';
+import { MessageType, type AgentProfileType } from '../types.js';
 import { theme, themeManager } from '../colors.js';
 import { themes, type ThemeName } from '../themes/index.js';
 
 // Memoized components for performance
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
-
-// Data item type for ScrollableList
-type ScrollableDataItem =
-  | { type: 'header' }
-  | { type: 'history'; item: HistoryItem }
-  | { type: 'pending' };
 
 // Dialog types
 type ActiveDialog = 'profile' | 'memory' | 'session' | 'session_restore' | 'session_delete' | 'theme' | null;
@@ -87,7 +79,7 @@ const THEME_OPTIONS: SelectOption<ThemeName>[] = Object.entries(themes).map(([ke
 export const MainLayout: React.FC = () => {
   const appState = useAppState();
   const appActions = useAppActions();
-  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
+  const { columns: terminalWidth } = useTerminalSize();
 
   // Track previous width to detect actual changes
   const previousWidthRef = useRef(terminalWidth);
@@ -333,21 +325,27 @@ export const MainLayout: React.FC = () => {
   // Check if a dialog is active
   const isDialogActive = activeDialog !== null;
 
-  // Build virtualized data for ScrollableList
-  // Includes header, all history items, and a pending items placeholder
-  const virtualizedData = useMemo<ScrollableDataItem[]>(() => {
-    const data: ScrollableDataItem[] = [
-      { type: 'header' as const },
-      ...appState.history.map((item) => ({ type: 'history' as const, item })),
-    ];
-    // Add pending placeholder if there are pending items or streaming
-    if (appState.pendingHistoryItems.length > 0 || appState.isStreaming) {
-      data.push({ type: 'pending' as const });
-    }
-    return data;
-  }, [appState.history, appState.pendingHistoryItems.length, appState.isStreaming]);
+  // Build static items for history (rendered once to terminal buffer)
+  // Using Static component enables native terminal scrolling and text selection
+  const staticItems = useMemo(() => {
+    const items: React.ReactElement[] = [];
 
-  // Pending items component (rendered as part of ScrollableList)
+    // Add header only when no history
+    if (appState.history.length === 0 && !appState.isStreaming) {
+      items.push(<MemoizedAppHeader key="app-header" showTips={true} />);
+    }
+
+    // Add all history items
+    appState.history.forEach((item) => {
+      items.push(
+        <MemoizedHistoryItemDisplay key={item.id} item={item} />
+      );
+    });
+
+    return items;
+  }, [appState.history, appState.isStreaming]);
+
+  // Pending items component (dynamically updated, not in Static)
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
@@ -365,66 +363,19 @@ export const MainLayout: React.FC = () => {
     [appState.pendingHistoryItems, appState.isStreaming, appState.streamingState.thinkingContent],
   );
 
-  // Render function for ScrollableList items
-  const renderItem = useCallback(
-    ({ item }: { item: ScrollableDataItem }) => {
-      if (item.type === 'header') {
-        // Show header only when no history
-        if (appState.history.length === 0 && !appState.isStreaming) {
-          return <MemoizedAppHeader key="app-header" showTips={true} />;
-        }
-        // Return empty box when there's history
-        return <Box key="app-header" />;
-      } else if (item.type === 'history') {
-        return (
-          <MemoizedHistoryItemDisplay
-            key={item.item.id}
-            item={item.item}
-          />
-        );
-      } else {
-        return pendingItems;
-      }
-    },
-    [appState.history.length, appState.isStreaming, pendingItems],
-  );
-
-  // Key extractor for ScrollableList
-  const keyExtractor = useCallback(
-    (item: ScrollableDataItem, _index: number) => {
-      if (item.type === 'header') return 'header';
-      if (item.type === 'history') return item.item.id.toString();
-      return 'pending';
-    },
-    [],
-  );
-
-  // Estimate item height for virtualization
-  const estimatedItemHeight = useCallback(() => 10, []); // Default estimate
-
   return (
-    <Box
-      flexDirection="column"
-      width="100%"
-      height={terminalHeight - 1}
-      overflow="hidden"
-    >
-      {/* Scrollable content area using VirtualizedList */}
+    <Box flexDirection="column" width="100%">
+      {/* Static content area - rendered once to terminal buffer */}
       {/* Key changes on resize to force re-render and fix layout artifacts */}
-      <Box key={renderKey} flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
-        <ScrollableList
-          hasFocus={!isDialogActive && !appState.pendingConfirmation}
-          data={virtualizedData}
-          renderItem={renderItem}
-          estimatedItemHeight={estimatedItemHeight}
-          keyExtractor={keyExtractor}
-          initialScrollIndex={SCROLL_TO_ITEM_END}
-          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
-        />
-      </Box>
+      <Static key={renderKey} items={staticItems}>
+        {(item) => item}
+      </Static>
 
-      {/* Fixed bottom controls - never shrink, never grow */}
-      <Box flexDirection="column" flexShrink={0} flexGrow={0}>
+      {/* Dynamic pending items - updated during streaming */}
+      {pendingItems}
+
+      {/* Bottom controls */}
+      <Box flexDirection="column">
         {/* Tool confirmation dialog */}
         {appState.pendingConfirmation && (
           <ToolConfirmationPrompt

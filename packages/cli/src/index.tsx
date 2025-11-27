@@ -45,12 +45,11 @@ const config: Config = {
 // Initialize theme from saved config
 themeManager.initialize();
 
-// Render Ink app with full provider hierarchy for proper event handling
-// Order: Keypress -> Mouse -> Scroll -> App
-// Using alternateBuffer mode for better resize handling and mouse support
+// Render Ink app with provider hierarchy for proper event handling
+// alternateBuffer is disabled to enable native terminal scrolling and text selection
 render(
   <KeypressProvider>
-    <MouseProvider mouseEventsEnabled={true}>
+    <MouseProvider mouseEventsEnabled={false}>
       <ScrollProvider>
         <AppContainer config={config} initialSessionId={sessionId} />
       </ScrollProvider>
@@ -58,11 +57,8 @@ render(
   </KeypressProvider>,
   {
     exitOnCtrlC: false,
-    // Alternate buffer mode: Ink manages a separate screen buffer
-    // This eliminates flickering during resize as Ink handles re-rendering automatically
-    alternateBuffer: true,
-    // Enable incremental rendering for better performance
-    // Only re-renders changed regions instead of full screen
-    incrementalRendering: true,
+    // Disable alternate buffer to use native terminal scrolling
+    // This allows text selection and keeps content in terminal history
+    alternateBuffer: false,
   }
 );

@@ -4,8 +4,6 @@
  *
  * A wrapper around VirtualizedList that provides:
  * - Keyboard scrolling (Shift+Arrow, PageUp/Down)
- * - Mouse wheel scrolling (via ScrollProvider)
- * - Scrollbar drag support
  * - Smooth scroll animations
  */
 
@@ -15,7 +13,6 @@ import React, {
   useImperativeHandle,
   useCallback,
   useEffect,
-  useState,
   useMemo,
 } from 'react';
 import {
@@ -29,9 +26,6 @@ import { useScrollable } from '../../contexts/ScrollProvider.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
 const SCROLL_LINE_HEIGHT = 3; // Scroll 3 lines at a time
-
-// Scrollbar flash duration
-const SCROLLBAR_FLASH_DURATION_MS = 1500;
 
 type VirtualizedListProps<T> = {
   data: T[];
@@ -55,10 +49,6 @@ function ScrollableList<T>(
   const { hasFocus } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
-
-  // Scrollbar flash state for visual feedback
-  const [isScrollbarFlashing, setIsScrollbarFlashing] = useState(false);
-  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(
     ref,
@@ -97,27 +87,6 @@ function ScrollableList<T>(
 
   const scrollTo = useCallback((offset: number, _duration?: number) => {
     virtualizedListRef.current?.scrollTo(offset);
-  }, []);
-
-  // Flash scrollbar for visual feedback
-  const flashScrollbar = useCallback(() => {
-    if (flashTimeoutRef.current) {
-      clearTimeout(flashTimeoutRef.current);
-    }
-    setIsScrollbarFlashing(true);
-    flashTimeoutRef.current = setTimeout(() => {
-      setIsScrollbarFlashing(false);
-      flashTimeoutRef.current = null;
-    }, SCROLLBAR_FLASH_DURATION_MS);
-  }, []);
-
-  // Cleanup flash timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (flashTimeoutRef.current) {
-        clearTimeout(flashTimeoutRef.current);
-      }
-    };
   }, []);
 
   // Smooth scroll state
@@ -220,12 +189,12 @@ function ScrollableList<T>(
       scrollBy,
       scrollTo,
       hasFocus: () => hasFocus,
-      flashScrollbar,
+      flashScrollbar: () => {}, // No-op since mouse events are disabled
     }),
-    [getScrollState, scrollBy, scrollTo, hasFocus, flashScrollbar],
+    [getScrollState, scrollBy, scrollTo, hasFocus],
   );
 
-  // Register with ScrollProvider for mouse scroll support
+  // Register with ScrollProvider for keyboard scroll support
   useScrollable(scrollableEntry, hasFocus);
 
   // Keyboard scrolling

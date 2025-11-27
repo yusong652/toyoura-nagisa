@@ -247,19 +247,23 @@ export function isIncompleteMouseSequence(buffer: string): boolean {
 /**
  * Enable mouse event reporting in the terminal
  * Enables SGR extended coordinates for better position reporting
+ *
+ * Note: We intentionally don't enable ?1003h (any-event tracking) because
+ * it captures ALL mouse motion events, which prevents native text selection
+ * in the terminal. With ?1002h alone, we still get motion events while a
+ * button is pressed (for scrollbar dragging), but text selection works normally.
  */
 export function enableMouseEvents(): string {
   // Enable mouse tracking modes:
   // ?1000h - Enable basic mouse tracking (button events)
   // ?1002h - Enable button-event tracking (motion while pressed)
-  // ?1003h - Enable any-event tracking (all motion)
   // ?1006h - Enable SGR extended mode (better coordinate reporting)
-  return '\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h';
+  return '\x1b[?1000h\x1b[?1002h\x1b[?1006h';
 }
 
 /**
  * Disable mouse event reporting in the terminal
  */
 export function disableMouseEvents(): string {
-  return '\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l';
+  return '\x1b[?1006l\x1b[?1002l\x1b[?1000l';
 }

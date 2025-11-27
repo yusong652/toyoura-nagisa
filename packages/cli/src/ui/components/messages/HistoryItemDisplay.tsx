@@ -20,13 +20,12 @@ interface HistoryItemDisplayProps {
   item: HistoryItem;
 }
 
-// Width reduction to match VirtualizedList's paddingRight
-// This ensures message components don't overflow into scrollbar area
-const SCROLLBAR_PADDING = 4;
+// Small padding to prevent content from touching the edge
+const EDGE_PADDING = 1;
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) => {
   const { columns: rawTerminalWidth } = useTerminalSize();
-  const terminalWidth = rawTerminalWidth - SCROLLBAR_PADDING;
+  const terminalWidth = rawTerminalWidth - EDGE_PADDING;
 
   switch (item.type) {
     case MessageType.USER:

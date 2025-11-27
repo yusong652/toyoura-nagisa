@@ -465,7 +465,7 @@ function VirtualizedList<T>(
     ],
   );
 
-  // Scrollable container with padding for scrollbar area
+  // Scrollable container
   // Keyboard navigation: Shift+Up/Down for line scroll, Page Up/Down for page scroll
   return (
     <Box
@@ -476,7 +476,6 @@ function VirtualizedList<T>(
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={4}
     >
       <Box flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />
