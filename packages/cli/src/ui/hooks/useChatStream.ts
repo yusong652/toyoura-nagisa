@@ -130,32 +130,13 @@ export function useChatStream({
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
   const seenToolResultIdsRef = useRef<Set<string>>(new Set());
 
+  // Ref to track if current stream was interrupted (prevents double commit)
+  const wasInterruptedRef = useRef<boolean>(false);
+
   // Clear error
   const clearError = useCallback(() => {
     setError(null);
   }, []);
-
-  // Commit all pending items to history
-  const commitPendingItems = useCallback(() => {
-    // Commit assistant message
-    if (pendingAssistantItem) {
-      historyManager.addItem({
-        ...pendingAssistantItem,
-        isStreaming: false,
-      } as HistoryItemWithoutId);
-      setPendingAssistantItem(null);
-    }
-
-    // Commit tool items
-    for (const toolItem of pendingToolItems) {
-      historyManager.addItem(toolItem);
-    }
-    setPendingToolItems([]);
-
-    // Reset seen IDs for next message
-    seenToolCallIdsRef.current.clear();
-    seenToolResultIdsRef.current.clear();
-  }, [pendingAssistantItem, pendingToolItems, historyManager]);
 
   // Handle MESSAGE_CREATE event from ConnectionManager
   const handleMessageCreate = useCallback((event: MessageCreateEvent) => {
@@ -164,21 +145,24 @@ export function useChatStream({
       // User message echoed back from server (usually we add it locally first)
       // Skip if we already added it
     } else {
+      // New assistant message starting - reset interrupt flag for new stream
+      wasInterruptedRef.current = false;
+
       // New assistant message starting - commit any pending items from previous round
       // This happens when tool calling triggers a new LLM round
 
       // First, commit pending assistant item if it has content
       // Use functional update to get the latest state
+      // Keep both text and thinking blocks in history
       setPendingAssistantItem((prevAssistant) => {
         if (prevAssistant && prevAssistant.content.length > 0) {
-          const hasNonEmptyContent = prevAssistant.content.some((block) => {
-            if (block.type === 'text') return block.text.trim().length > 0;
-            if (block.type === 'thinking') return block.thinking.trim().length > 0;
-            return false;
-          });
-          if (hasNonEmptyContent) {
+          const validContent = prevAssistant.content.filter(
+            (block) => (block.type === 'text' && block.text.trim().length > 0) || block.type === 'thinking'
+          );
+          if (validContent.length > 0) {
             historyManager.addItem({
               ...prevAssistant,
+              content: validContent,
               isStreaming: false,
             });
           }
@@ -210,6 +194,11 @@ export function useChatStream({
 
   // Handle STREAMING_UPDATE event from ConnectionManager
   const handleStreamingUpdate = useCallback((event: StreamingUpdateEvent) => {
+    // Ignore updates if stream was interrupted
+    if (wasInterruptedRef.current) {
+      return;
+    }
+
     // Backend sends accumulated content array
     if (event.content && Array.isArray(event.content)) {
       // Extract thinking content
@@ -282,6 +271,12 @@ export function useChatStream({
 
     // Check if streaming is complete
     if (event.streaming === false) {
+      // If this stream was interrupted, skip committing (already done in cancelRequest)
+      if (wasInterruptedRef.current) {
+        wasInterruptedRef.current = false;  // Reset for next stream
+        return;
+      }
+
       // Commit all pending items to history
       // Need to capture current values since state might not be updated yet
       const currentAssistantItem = pendingAssistantItem;
@@ -293,20 +288,30 @@ export function useChatStream({
       setThinkingContent(null);
 
       // Commit to history - use the latest content from the event
+      // Keep both text and thinking blocks in history for display
       if (event.content && Array.isArray(event.content)) {
         const finalContent = event.content.filter(
           (b): b is ContentBlock => b.type === 'text' || b.type === 'thinking'
         );
-        historyManager.addItem({
-          type: MessageType.ASSISTANT,
-          content: finalContent,
-          isStreaming: false,
-        });
+        if (finalContent.length > 0) {
+          historyManager.addItem({
+            type: MessageType.ASSISTANT,
+            content: finalContent,
+            isStreaming: false,
+          });
+        }
       } else if (currentAssistantItem) {
-        historyManager.addItem({
-          ...currentAssistantItem,
-          isStreaming: false,
-        });
+        // Keep both text and thinking blocks
+        const validContent = (currentAssistantItem.content || []).filter(
+          (block) => block.type === 'text' || block.type === 'thinking'
+        );
+        if (validContent.length > 0) {
+          historyManager.addItem({
+            ...currentAssistantItem,
+            content: validContent,
+            isStreaming: false,
+          });
+        }
       }
 
       // Commit tool items
@@ -512,17 +517,24 @@ export function useChatStream({
 
   // Cancel current request
   const cancelRequest = useCallback(() => {
+    // Mark as interrupted to prevent handleStreamingUpdate from committing again
+    wasInterruptedRef.current = true;
+
     connectionManager.send({
       type: 'USER_INTERRUPT',
       timestamp: new Date().toISOString(),
     });
+
+    // Clear all state - discard the interrupted response
+    // Don't commit pending items since user explicitly cancelled
+    setThinkingContent(null);
+    setPendingAssistantItem(null);
+    setPendingToolItems([]);
+    seenToolCallIdsRef.current.clear();
+    seenToolResultIdsRef.current.clear();
     setIsStreaming(false);
     setStreamingState(StreamingState.Idle);
-    setThinkingContent(null);
-
-    // Commit any pending items before canceling
-    commitPendingItems();
-  }, [connectionManager, commitPendingItems]);
+  }, [connectionManager]);
 
   // Confirm or reject tool execution
   const confirmTool = useCallback((approved: boolean, message?: string) => {

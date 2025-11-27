@@ -191,12 +191,23 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Global Keypress Handling ==========
 
-  // Handle Ctrl+C to quit
+  // Handle global keys: Ctrl+C to quit, ESC to interrupt
   const handleGlobalKeypress = useCallback((key: Key) => {
+    // Ctrl+C: quit application
     if (key.ctrl && key.name === 'c') {
       quit();
+      return;
     }
-  }, [quit]);
+
+    // ESC: interrupt streaming or reject pending confirmation
+    if (key.name === 'escape') {
+      if (isStreaming) {
+        // Interrupt ongoing LLM response
+        cancelRequest();
+      }
+      // Note: pendingConfirmation ESC is handled by ToolConfirmationPrompt component
+    }
+  }, [quit, isStreaming, cancelRequest]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
