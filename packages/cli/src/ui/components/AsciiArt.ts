@@ -12,54 +12,55 @@
 // Nagisa pixel avatar - compact version (half height)
 // Matches nagisa_round_ears.py create_round_ears_ball_v4()
 // Features: particle cluster ears, eyes, blush marks, cute mouth (ω)
+// Using █ (full block) and half blocks (▀▄▌▐) for higher resolution details
 export const nagisaAscii = `
-@@@@@       @@@@@
-@@@@@       @@@@@
-@@@@@@@@@@@@@@@@@
- @@@@@@@@@@@@@@@
-@@@@@ @@@@@ @@@@@
-@@@@@@@@@@@@@@@@@
-@ @@@@@@@@@@@@@ @
-@@@@@@@@@@@@@@@@@
- @@@@@@@@@@@@@@@
-   @@@@@@@@@@@
+█████       █████
+█████       █████
+█████████████████
+ ███████████████
+█████ █████ █████
+█████████████████
+█ █████████████ █
+█████████████████
+ ███████████████
+   ███████████
 `;
 
 // Full logo with Nagisa - for wide terminals (95+ columns)
 // Features: particle cluster ears, eyes, blush marks
 export const fullAsciiLogo = `
                                _  _   _             _
-@@@@@       @@@@@         __ _(_)| \\ | | __ _  __ _(_)___  __ _
-@@@@@       @@@@@        / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
-@@@@@@@@@@@@@@@@@       | (_| | || |\\  | (_| | (_| | \\__ \\ (_| |
- @@@@@@@@@@@@@@@         \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
-@@@@@ @@@@@ @@@@@                             |___/
-@@@@@@@@@@@@@@@@@
-@ @@@@@@@@@@@@@ @
-@@@@@@@@@@@@@@@@@
- @@@@@@@@@@@@@@@
-   @@@@@@@@@@@
+█████       █████         __ _(_)| \\ | | __ _  __ _(_)___  __ _
+█████       █████        / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
+█████████████████       | (_| | || |\\  | (_| | (_| | \\__ \\ (_| |
+ ███████████████         \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
+█████ █████ █████                             |___/
+█████████████████
+█ █████████████ █
+█████████████████
+ ███████████████
+   ███████████
 `;
 
 // Short logo - for medium terminals (60+ columns)
 export const shortAsciiLogo = `
-@@@@@   @@@@@         _  _   _             _
-@@@@@@@@@@@@@    __ _(_)| \\ | | __ _  __ _(_)___  __ _
- @@@@@@@@@@@    / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
-@@@ @@@@@ @@@   \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
-@@@@@@@@@@@@@                        |___/
-@ @@@@@@@@@ @
- @@@@@@@@@@@
+█████   █████         _  _   _             _
+█████████████    __ _(_)| \\ | | __ _  __ _(_)___  __ _
+ ███████████    / _\` | ||  \\| |/ _\` |/ _\` | / __|/ _\` |
+███ █████ ███   \\__,_|_||_| \\_|\\__,_|\\__, |_|___/\\__,_|
+█████████████                        |___/
+█ █████████ █
+ ███████████
 `;
 
 // Tiny logo - for narrow terminals (40+ columns)
 export const tinyAsciiLogo = `
-@@@     @@@
-@@@@@@@@@@@
-@@@ @@@ @@@   aiNagisa
-@@@@@@@@@@@
-@ @@@@@@@ @
- @@@@@@@@@
+███     ███
+ █████████
+███ ███ ███   aiNagisa
+███████████
+█ ███████ █
+ █████████
 `;
 
 // Minimal - just text for very narrow terminals
@@ -71,6 +72,16 @@ export const minimalLogo = '(◕ω◕) aiNagisa';
 export function getAsciiArtWidth(art: string): number {
   const lines = art.split('\n').filter(line => line.length > 0);
   return Math.max(...lines.map(line => line.length));
+}
+
+/**
+ * Normalize line widths for consistent gradient rendering
+ * Pads shorter lines with spaces to match the longest line
+ */
+export function normalizeLineWidths(art: string): string {
+  const lines = art.split('\n');
+  const maxWidth = Math.max(...lines.map(line => line.length));
+  return lines.map(line => line.padEnd(maxWidth)).join('\n');
 }
 
 /**

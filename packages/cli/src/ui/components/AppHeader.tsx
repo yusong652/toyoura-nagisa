@@ -8,7 +8,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { GradientText } from './GradientText.js';
-import { selectLogo, getAsciiArtWidth, minimalLogo } from './AsciiArt.js';
+import { selectLogo, getAsciiArtWidth, normalizeLineWidths, minimalLogo } from './AsciiArt.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { theme } from '../colors.js';
 
@@ -21,9 +21,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showTips = true,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
-  const logo = selectLogo(terminalWidth);
-  const isMinimal = logo === minimalLogo;
-  const logoWidth = isMinimal ? minimalLogo.length : getAsciiArtWidth(logo);
+  const rawLogo = selectLogo(terminalWidth);
+  const isMinimal = rawLogo === minimalLogo;
+  // Normalize line widths for consistent gradient rendering
+  const logo = isMinimal ? rawLogo : normalizeLineWidths(rawLogo);
+  const logoWidth = isMinimal ? minimalLogo.length : getAsciiArtWidth(rawLogo);
 
   return (
     <Box flexDirection="column" marginBottom={1}>
