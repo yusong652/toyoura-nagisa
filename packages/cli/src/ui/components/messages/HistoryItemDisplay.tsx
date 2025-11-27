@@ -21,8 +21,9 @@ interface HistoryItemDisplayProps {
   item: HistoryItem;
 }
 
-// Reserve space for scrollbar (VirtualizedList has paddingRight={1})
-const SCROLLBAR_WIDTH = 1;
+// Reserve space for scrollbar area (VirtualizedList has paddingRight={2})
+// This ensures tool message borders don't overlap with scrollbar
+const SCROLLBAR_WIDTH = 2;
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({ item }) => {
   const { columns: rawTerminalWidth } = useTerminalSize();

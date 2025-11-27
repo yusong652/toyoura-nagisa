@@ -467,6 +467,7 @@ function VirtualizedList<T>(
     ],
   );
 
+  // paddingRight=2: 1 for scrollbar + 1 for spacing between content and scrollbar
   return (
     <Box
       ref={containerRef}
@@ -477,7 +478,7 @@ function VirtualizedList<T>(
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={1}
+      paddingRight={2}
     >
       <Box flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />
