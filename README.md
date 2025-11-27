@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="./frontend/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
+  <img src="./packages/web/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
 </p>
 
 <p align="center">
@@ -134,59 +134,54 @@ Beyond the core PFC integration, aiNagisa includes:
 +------------------------------------------------+
 ```
 
-### Project Structure (Clean Architecture)
+### Project Structure (Monorepo Architecture)
 
 ```
 aiNagisa/
-├── backend/
-│   ├── app.py                     # FastAPI application entrypoint
-│   ├── presentation/              # Presentation Layer
-│   │   ├── api/                   # REST API endpoints
-│   │   ├── websocket/             # WebSocket connection management
-│   │   └── streaming/             # Response streaming handlers
-│   ├── domain/                    # Domain Layer
-│   │   └── models/                # Core business logic and message models
-│   ├── infrastructure/            # Infrastructure Layer
-│   │   ├── llm/                   # Multi-provider LLM architecture
-│   │   │   ├── base/              # Unified LLM base classes
-│   │   │   ├── providers/         # Provider-specific implementations
-│   │   │   │   ├── gemini/        # Google Gemini integration
-│   │   │   │   ├── anthropic/     # Anthropic Claude integration
-│   │   │   │   ├── openai/        # OpenAI integration
-│   │   │   │   └── local/         # Local LLM support (vLLM, Ollama)
-│   │   │   └── shared/            # Common utilities and constants
-│   │   ├── mcp/                   # Tool Execution (MCP)
-│   │   │   ├── smart_mcp_server.py # Main MCP server
-│   │   │   ├── tool_profile_manager.py # Agent profile management
-│   │   │   └── tools/             # Tool implementations by category
-│   │   │       └── pfc/           # PFC simulation tools (query + execute + monitor)
-│   │   ├── pfc/                   # PFC WebSocket client integration
-│   │   │   └── websocket_client.py # Auto-reconnecting WebSocket client
-│   │   ├── memory/                # Mem0-powered long-term memory system
-│   │   ├── storage/               # File and session storage
-│   │   └── tts/                   # Text-to-speech engines
-│   ├── config/                    # Configuration management
-│   └── shared/                    # Common utilities and exceptions
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx               # Main React application component
-│   │   ├── components/           # UI components (ChatBox, Live2DCanvas, etc.)
-│   │   └── contexts/             # React contexts for state management
-│   └── public/
-│       └── live2d_models/        # Live2D model files
-├── pfc-server/                   # PFC WebSocket server (independent service)
-│   ├── server/                   # Server implementation (runs in PFC process)
-│   │   ├── server.py             # WebSocket server + routing
-│   │   ├── executor.py           # Command executor + task classification
-│   │   ├── script_executor.py    # Python script execution
-│   │   ├── main_thread_executor.py # Queue-based main thread execution
-│   │   └── task_manager.py       # Long-running task tracking
-│   ├── examples/                 # Example PFC projects
-│   │   ├── scripts/              # Example simulation scripts
-│   │   └── test_scripts/         # Test scripts
-│   ├── start_server.py           # Server startup script
-│   ├── pyproject.toml            # Server dependencies
-│   └── README.md                 # Independent server documentation
+├── packages/
+│   ├── backend/                   # Python backend (FastAPI)
+│   │   ├── app.py                 # FastAPI application entrypoint
+│   │   ├── presentation/          # Presentation Layer
+│   │   │   ├── api/               # REST API endpoints
+│   │   │   └── websocket/         # WebSocket connection management
+│   │   ├── domain/                # Domain Layer
+│   │   │   └── models/            # Core business logic and message models
+│   │   ├── infrastructure/        # Infrastructure Layer
+│   │   │   ├── llm/               # Multi-provider LLM architecture
+│   │   │   │   ├── base/          # Unified LLM base classes
+│   │   │   │   └── providers/     # Provider implementations (gemini, anthropic, openai, local)
+│   │   │   ├── mcp/               # Tool Execution (MCP)
+│   │   │   │   ├── smart_mcp_server.py # Main MCP server
+│   │   │   │   ├── tool_profile_manager.py # Agent profile management
+│   │   │   │   └── tools/         # Tool implementations by category
+│   │   │   ├── pfc/               # PFC WebSocket client integration
+│   │   │   ├── memory/            # Long-term memory system (ChromaDB)
+│   │   │   └── tts/               # Text-to-speech engines
+│   │   └── config/                # Configuration management
+│   ├── web/                       # React web frontend
+│   │   ├── src/
+│   │   │   ├── App.tsx            # Main React application
+│   │   │   ├── components/        # UI components (ChatBox, Live2DCanvas, etc.)
+│   │   │   └── contexts/          # React contexts for state management
+│   │   └── public/
+│   │       └── live2d_models/     # Live2D model files
+│   ├── cli/                       # Terminal CLI frontend (Ink/React)
+│   │   └── src/
+│   │       └── ui/                # CLI components and hooks
+│   └── core/                      # Shared TypeScript core library
+│       └── src/
+│           ├── connection/        # WebSocket connection management
+│           ├── session/           # Session management
+│           └── api/               # API client
+├── services/
+│   └── pfc-server/                # PFC WebSocket server (independent service)
+│       ├── server/                # Server implementation (runs in PFC process)
+│       │   ├── server.py          # WebSocket server + routing
+│       │   ├── script_executor.py # Python script execution
+│       │   ├── main_thread_executor.py # Queue-based main thread execution
+│       │   └── task_manager.py    # Long-running task tracking
+│       ├── examples/              # Example PFC projects
+│       └── README.md              # Independent server documentation
 └── ...
 ```
 
@@ -229,72 +224,80 @@ Traditional approaches to PFC automation require users to:
 **Optional:**
 - **GitHub CLI (`gh`)** - For development workflows (issue/PR management)
 
-### Quick Start (Concurrent Mode)
+### Quick Start
 
 ```bash
 # Clone the repository
 git clone https://github.com/yusong652/aiNagisa.git
 cd aiNagisa
 
-# Install frontend dependencies
-npm run install:frontend
-
-# Install backend dependencies with uv
+# Install all dependencies (frontend + backend)
+npm install
 uv sync
 
 # Copy and configure settings
-cp -r backend/config_example/ backend/config/
-# Edit backend/config/llm.py with your API keys
+cp -r packages/backend/config_example/ packages/backend/config/
+# Edit packages/backend/config/llm.py with your API keys
 
 # Start both frontend and backend together
 npm run dev
 ```
 
 The application will be available at:
-- Frontend: http://localhost:5173
+- Web Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
+
+### CLI Mode
+
+```bash
+# Start CLI interface (terminal-based)
+npm run dev:cli
+
+# Or start backend separately and run CLI
+npm run dev:backend  # Terminal 1
+npm run dev:cli      # Terminal 2
+```
 
 ### Manual Setup
 
 #### Backend Setup
 ```bash
-# Clone the repository (if not already done)
-git clone https://github.com/yusong652/aiNagisa.git
-cd aiNagisa
-
 # Install dependencies with uv
 uv sync
 
 # Copy and configure settings
-cp -r backend/config_example/ backend/config/
-# Edit backend/config/llm.py with your API keys
+cp -r packages/backend/config_example/ packages/backend/config/
+# Edit packages/backend/config/llm.py with your API keys
 
 # Start the backend server
-uv run python backend/app.py
+npm run dev:backend
+# Or manually: cd packages/backend && uv run python run.py
 ```
 
-#### Frontend Setup
+#### Web Frontend Setup
 ```bash
-# Navigate to frontend directory
-cd frontend
+# Start web development server
+npm run dev:web
+# Or manually: cd packages/web && npm run dev
+```
 
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+#### CLI Setup
+```bash
+# Build and run CLI
+npm run dev:cli
+# Or manually: cd packages/cli && npm run dev
 ```
 
 ### Configuration
 
-Configure your preferred LLM providers in `backend/config/llm.py`:
+Configure your preferred LLM providers in `packages/backend/config/llm.py`:
 - **Gemini**: Primary provider with full feature support
 - **Anthropic**: Claude integration with tool calling
 - **OpenAI**: GPT models with comprehensive API integration
 - **Local**: vLLM and Ollama support for self-hosted models
 
-Configure additional features in `backend/config/`:
-- **Memory**: `memory.py` - Long-term memory settings (Mem0 + ChromaDB)
+Configure additional features in `packages/backend/config/`:
+- **Memory**: `memory.py` - Long-term memory settings (ChromaDB)
 - **TTS**: `tts.py` - Text-to-speech providers (local/cloud)
 - **Email**: `email.py` - Gmail integration for lifestyle agent
 - **Text-to-Image**: `text_to_image.py` - Image generation capabilities
@@ -305,12 +308,12 @@ For ITASCA PFC discrete element simulations:
 
 ```bash
 # 1. Install websockets in PFC's Python environment
-pip install websockets
+pip install websockets==9.1
 
 # 2. Start PFC WebSocket server in PFC IPython shell
 import sys
-sys.path.append(r'/path/to/aiNagisa/pfc-server')
-exec(open(r'/path/to/aiNagisa/pfc-server/start_server.py', encoding='utf-8').read())
+sys.path.append(r'/path/to/aiNagisa/services/pfc-server')
+exec(open(r'/path/to/aiNagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
 
 # 3. In aiNagisa, select "PFC Expert" agent profile
 # 4. Interact with PFC through natural language
@@ -329,7 +332,7 @@ Nagisa:
 6. Reports results
 ```
 
-See `pfc-server/README.md` for detailed setup and usage instructions.
+See `services/pfc-server/README.md` for detailed setup and usage instructions.
 
 ## 🤝 Contributing
 
