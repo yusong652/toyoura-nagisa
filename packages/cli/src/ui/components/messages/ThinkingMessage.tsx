@@ -1,6 +1,6 @@
 /**
  * Thinking Message Component
- * Displays AI thinking/reasoning content
+ * Displays AI thinking/reasoning content with Nagisa's ball icon
  */
 
 import React from 'react';
@@ -13,8 +13,9 @@ interface ThinkingMessageProps {
 }
 
 export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({ item }) => {
-  const prefix = '~ ';
-  const prefixWidth = prefix.length;
+  // Use ⏺ (ball) prefix - same as AssistantMessage, represents Nagisa
+  const prefix = '⏺ ';
+  const prefixWidth = 2; // Unicode character width
 
   return (
     <Box flexDirection="row" marginBottom={1}>

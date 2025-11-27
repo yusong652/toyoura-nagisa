@@ -63,7 +63,8 @@ const renderContentBlock = (block: ContentBlock, index: number, isStreaming: boo
 
 // Pending Assistant Message
 const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }> = ({ item }) => {
-  const prefix = '✦ ';
+  // Use ⏺ (ball) prefix - represents Nagisa
+  const prefix = '⏺ ';
   const prefixWidth = 2;
 
   const content = item.content || [];

@@ -3,7 +3,7 @@
  * Reference: Gemini CLI ui/components/GeminiRespondingSpinner.tsx
  *
  * Shows a spinner when the AI is responding, with optional thinking content.
- * Uses the ✦ prefix to match Gemini CLI style.
+ * Uses the ⏺ (ball) prefix to represent Nagisa.
  */
 
 import React from 'react';
@@ -34,7 +34,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thinkingContent,
   message = 'Thinking...',
 }) => {
-  const prefix = '✦ ';
+  // Use ⏺ (ball) prefix - represents Nagisa
+  const prefix = '⏺ ';
   const prefixWidth = 2;
 
   return (
