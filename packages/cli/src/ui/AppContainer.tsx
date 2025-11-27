@@ -36,6 +36,7 @@ import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { MessageType } from './types.js';
 import type { Config } from '../config/settings.js';
 
 interface AppContainerProps {
@@ -89,6 +90,10 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
+
+  // Ctrl+C confirmation state
+  const [ctrlCPending, setCtrlCPending] = useState(false);
+  const ctrlCTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ========== Hooks ==========
 
@@ -192,12 +197,43 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
   // ========== Global Keypress Handling ==========
 
-  // Handle global keys: Ctrl+C to quit, ESC to interrupt
+  // Clear Ctrl+C pending state
+  const clearCtrlCPending = useCallback(() => {
+    if (ctrlCTimeoutRef.current) {
+      clearTimeout(ctrlCTimeoutRef.current);
+      ctrlCTimeoutRef.current = null;
+    }
+    setCtrlCPending(false);
+  }, []);
+
+  // Handle global keys: Ctrl+C to quit (with confirmation), ESC to interrupt
   const handleGlobalKeypress = useCallback((key: Key) => {
-    // Ctrl+C: quit application
+    // Ctrl+C: quit application (requires double-tap within 2 seconds)
     if (key.ctrl && key.name === 'c') {
-      quit();
+      if (ctrlCPending) {
+        // Second Ctrl+C within timeout - quit
+        clearCtrlCPending();
+        quit();
+      } else {
+        // First Ctrl+C - show warning and start timeout
+        setCtrlCPending(true);
+        historyManager.addItem({
+          type: MessageType.INFO,
+          message: 'Press Ctrl+C again to quit',
+        });
+
+        // Clear pending state after 2 seconds
+        ctrlCTimeoutRef.current = setTimeout(() => {
+          setCtrlCPending(false);
+          ctrlCTimeoutRef.current = null;
+        }, 2000);
+      }
       return;
+    }
+
+    // Any other key press cancels the Ctrl+C pending state
+    if (ctrlCPending) {
+      clearCtrlCPending();
     }
 
     // ESC: interrupt streaming or reject pending confirmation
@@ -208,9 +244,18 @@ export const AppContainer: React.FC<AppContainerProps> = ({
       }
       // Note: pendingConfirmation ESC is handled by ToolConfirmationPrompt component
     }
-  }, [quit, isStreaming, cancelRequest]);
+  }, [quit, isStreaming, cancelRequest, ctrlCPending, clearCtrlCPending, historyManager]);
 
   useKeypress(handleGlobalKeypress, { isActive: true });
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (ctrlCTimeoutRef.current) {
+        clearTimeout(ctrlCTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ========== Context Values ==========
 
