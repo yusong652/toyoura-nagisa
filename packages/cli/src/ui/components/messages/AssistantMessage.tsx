@@ -14,7 +14,7 @@ import type { AssistantHistoryItem, ContentBlock } from '../../types.js';
 import { theme } from '../../colors.js';
 
 // Maximum lines for thinking blocks (shows last N lines when exceeded)
-const MAX_THINKING_LINES = 3;
+const MAX_THINKING_LINES = 8;
 
 interface AssistantMessageProps {
   item: AssistantHistoryItem;
