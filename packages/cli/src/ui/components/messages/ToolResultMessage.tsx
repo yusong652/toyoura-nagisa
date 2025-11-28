@@ -93,6 +93,7 @@ const DiffToolResultDisplay: React.FC<{
 
 /**
  * Default tool result display (text output)
+ * Shows tool name on first line, content on subsequent lines with consistent indentation
  */
 const DefaultToolResultDisplay: React.FC<{
   item: ToolResultHistoryItem;
@@ -100,31 +101,48 @@ const DefaultToolResultDisplay: React.FC<{
 }> = ({ item, terminalWidth }) => {
   const statusSymbol = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
   const statusColor = item.isError ? theme.status.error : theme.status.success;
-  // Trim whitespace for display (some LLM APIs add leading/trailing newlines)
-  const { text, truncated } = truncateContent(item.content.trim(), MAX_RESULT_LINES);
+  // Only trim trailing whitespace to preserve line number indentation
+  // (some LLM APIs add trailing newlines, but leading spaces are part of formatting)
+  const { text, truncated } = truncateContent(item.content.trimEnd(), MAX_RESULT_LINES);
 
   // Width constraint prevents Ink rendering bug with borders spanning multiple lines
   const boxWidth = terminalWidth ? terminalWidth : undefined;
 
+  // Split into lines for individual rendering (preserves line formatting)
+  const lines = text.split('\n');
+
   return (
     <Box
+      flexDirection="column"
       paddingX={1}
       width={boxWidth}
       marginBottom={1}
     >
-      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        <Text color={statusColor}>{statusSymbol}</Text>
-      </Box>
-      <Box flexDirection="column" flexGrow={1}>
-        <Text wrap="wrap" color={theme.text.secondary}>
-          {text}
+      {/* Header line: status + tool name */}
+      <Box>
+        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+          <Text color={statusColor}>{statusSymbol}</Text>
+        </Box>
+        <Text color={theme.text.secondary}>
+          {item.toolName || 'tool result'}
         </Text>
-        {truncated && (
+      </Box>
+
+      {/* Content lines - each line rendered separately to preserve formatting */}
+      {lines.map((line, index) => (
+        <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
+          <Text wrap="truncate-end" color={theme.text.secondary}>
+            {line}
+          </Text>
+        </Box>
+      ))}
+      {truncated && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text color={theme.text.muted}>
             ... (output truncated)
           </Text>
-        )}
-      </Box>
+        </Box>
+      )}
     </Box>
   );
 };
