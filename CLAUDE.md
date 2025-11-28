@@ -314,9 +314,13 @@ aiNagisa/
 │   │   │   ├── contexts/              # React contexts
 │   │   │   └── App.tsx               # Main application
 │   │   └── package.json              # Frontend dependencies
-│   ├── cli/                        # CLI frontend
+│   ├── cli/                        # Terminal CLI frontend (React/Ink)
 │   │   └── src/
-│   └── core/                       # Shared TypeScript core (future)
+│   │       └── ui/
+│   │           ├── hooks/             # Hook-driven architecture (chat, session, profile)
+│   │           ├── components/        # Terminal UI components
+│   │           └── commands/          # Slash command system
+│   └── core/                       # Shared TypeScript core
 ├── services/
 │   └── pfc-server/                 # PFC WebSocket server (independent service)
 │       ├── server/                    # Server implementation

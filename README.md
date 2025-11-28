@@ -249,14 +249,18 @@ The application will be available at:
 
 ### CLI Mode
 
+For engineers who prefer working in the terminal - run the full agentic PFC workflow without leaving your command line:
+
 ```bash
-# Start CLI interface (terminal-based)
+# Start CLI interface
 npm run dev:cli
 
 # Or start backend separately and run CLI
 npm run dev:backend  # Terminal 1
 npm run dev:cli      # Terminal 2
 ```
+
+The CLI provides the same documentation-driven workflow as the web interface: natural language → documentation query → test script → production simulation, all from your terminal.
 
 ### Manual Setup
 
