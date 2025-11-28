@@ -73,6 +73,15 @@ interface ToolResultUpdateEvent {
     tool_name: string;
     content: any;  // llm_content format from backend
     is_error: boolean;
+    data?: {
+      diff?: {
+        content: string;
+        additions: number;
+        deletions: number;
+        file_path: string;
+      };
+      [key: string]: any;
+    };
   }>;
 }
 
@@ -441,11 +450,16 @@ export function useChatStream({
         }
       }
 
+      // Extract diff info from data field (for edit/write tools)
+      const diff = block.data?.diff;
+
       newToolResults.push({
         type: MessageType.TOOL_RESULT,
         toolCallId: block.tool_use_id,
+        toolName: block.tool_name,
         content: contentText,
         isError: block.is_error,
+        diff: diff,
       } as HistoryItemWithoutId);
     }
 

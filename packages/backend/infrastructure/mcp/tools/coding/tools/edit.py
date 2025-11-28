@@ -295,12 +295,27 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
 
 
         # ------------------------------------------------------------------
-        # Build response
+        # Build response with diff information
         # ------------------------------------------------------------------
 
         # Use absolute path with forward slashes for LLM consistency
         abs_path = path_to_llm_format(target_file)
         message = f"The file {abs_path} has been updated."
+
+        # Generate unified diff for CLI display
+        import difflib
+        diff_lines = list(difflib.unified_diff(
+            old_string.splitlines(),
+            new_string.splitlines(),
+            fromfile=abs_path,
+            tofile=abs_path,
+            lineterm=''
+        ))
+        diff_content = '\n'.join(diff_lines) if diff_lines else ''
+
+        # Count additions and deletions
+        additions = sum(1 for line in diff_lines if line.startswith('+') and not line.startswith('+++'))
+        deletions = sum(1 for line in diff_lines if line.startswith('-') and not line.startswith('---'))
 
         return success_response(
             message,
@@ -309,6 +324,13 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
                     {"type": "text", "text": message}
                 ]
             },
+            # Include diff info in data for CLI display
+            diff={
+                "content": diff_content,
+                "additions": additions,
+                "deletions": deletions,
+                "file_path": abs_path,
+            }
         )
 
     except Exception as exc:

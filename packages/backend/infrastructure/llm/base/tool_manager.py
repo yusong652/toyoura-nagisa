@@ -754,15 +754,18 @@ class BaseToolManager(ABC):
                 new_content = new_string
 
             # Generate unified diff
+            # Use splitlines() without keepends to avoid issues with missing newlines,
+            # then add linebreak='' to unified_diff for proper line ending handling
             file_name = abs_path.name
             diff_lines = difflib.unified_diff(
-                original_content.splitlines(keepends=True),
-                new_content.splitlines(keepends=True),
+                original_content.splitlines(),
+                new_content.splitlines(),
                 fromfile=f"a/{file_name}",
                 tofile=f"b/{file_name}",
-                n=3  # Context lines
+                n=3,  # Context lines
+                lineterm=''  # Don't add line terminators, we'll join with \n
             )
-            file_diff = ''.join(diff_lines)
+            file_diff = '\n'.join(diff_lines)
 
             return {
                 "diff": file_diff,
@@ -800,15 +803,18 @@ class BaseToolManager(ABC):
                 original_content = ""
 
             # Generate unified diff
+            # Use splitlines() without keepends to avoid issues with missing newlines,
+            # then use lineterm='' for proper line ending handling
             file_name = abs_path.name
             diff_lines = difflib.unified_diff(
-                original_content.splitlines(keepends=True),
-                new_content.splitlines(keepends=True),
+                original_content.splitlines(),
+                new_content.splitlines(),
                 fromfile=f"a/{file_name}",
                 tofile=f"b/{file_name}",
-                n=3  # Context lines
+                n=3,  # Context lines
+                lineterm=''  # Don't add line terminators, we'll join with \n
             )
-            file_diff = ''.join(diff_lines)
+            file_diff = '\n'.join(diff_lines)
 
             return {
                 "diff": file_diff,

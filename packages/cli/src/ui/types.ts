@@ -67,11 +67,21 @@ export interface ToolCallHistoryItem extends HistoryItemBase {
   toolCallId: string;
 }
 
+/** Diff information for file modification tools (edit, write) */
+export interface DiffInfo {
+  content: string;       // Unified diff content
+  additions: number;     // Number of added lines
+  deletions: number;     // Number of deleted lines
+  file_path: string;     // Path to the modified file
+}
+
 export interface ToolResultHistoryItem extends HistoryItemBase {
   type: MessageType.TOOL_RESULT;
   toolCallId: string;
+  toolName?: string;     // Tool name for specialized display
   content: string;
   isError?: boolean;
+  diff?: DiffInfo;       // Diff info for edit/write tools
 }
 
 export interface ErrorHistoryItem extends HistoryItemBase {
@@ -117,8 +127,10 @@ export interface ToolCallHistoryItemWithoutId {
 export interface ToolResultHistoryItemWithoutId {
   type: MessageType.TOOL_RESULT;
   toolCallId: string;
+  toolName?: string;     // Tool name for specialized display
   content: string;
   isError?: boolean;
+  diff?: DiffInfo;       // Diff info for edit/write tools
   timestamp?: number;
 }
 

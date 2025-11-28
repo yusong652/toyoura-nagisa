@@ -327,7 +327,9 @@ class WebSocketNotificationService:
                 "tool_use_id": tool_call_id,
                 "tool_name": tool_name,
                 "content": llm_content,
-                "is_error": tool_result.get("status") == "error"
+                "is_error": tool_result.get("status") == "error",
+                # Include data field for diff display in CLI (edit/write tools)
+                "data": tool_result.get("data")
             }
 
             # Send TOOL_RESULT_UPDATE notification
