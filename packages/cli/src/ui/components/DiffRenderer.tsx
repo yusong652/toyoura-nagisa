@@ -156,16 +156,20 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
           {/* File content with line numbers */}
           {linesToShow.map((line, index) => (
             <Box key={index} flexDirection="row">
-              {/* Line number gutter */}
-              <Text color={theme.text.muted} backgroundColor={bgColor}>
-                {(index + 1).toString().padStart(gutterWidth)}
-              </Text>
-              {/* Prefix symbol */}
-              <Text color={theme.diff.addedText} backgroundColor={bgColor} bold>
-                {' + '}
-              </Text>
+              {/* Line number gutter - fixed width to prevent compression */}
+              <Box width={gutterWidth} flexShrink={0}>
+                <Text color={theme.text.muted} backgroundColor={bgColor}>
+                  {(index + 1).toString().padStart(gutterWidth)}
+                </Text>
+              </Box>
+              {/* Prefix symbol - fixed width */}
+              <Box width={3} flexShrink={0}>
+                <Text color={theme.diff.addedText} backgroundColor={bgColor} bold>
+                  {' + '}
+                </Text>
+              </Box>
               {/* Line content */}
-              <Text color={theme.text.primary} backgroundColor={bgColor}>
+              <Text color={theme.text.primary} backgroundColor={bgColor} wrap="truncate-end">
                 {line}
               </Text>
             </Box>
@@ -199,7 +203,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 function renderDiffContent(
   parsedLines: DiffLine[],
   tabWidth: number,
-  maxWidth: number,
+  _maxWidth: number,
   maxHeight?: number,
 ): React.ReactNode {
   // Normalize whitespace (replace tabs with spaces)
@@ -247,9 +251,6 @@ function renderDiffContent(
     hiddenLines = displayableLines.length - visibleLines;
   }
 
-  // Calculate content width for proper line display
-  const contentWidth = Math.max(1, maxWidth - gutterWidth - 4); // 4 = gutter padding + prefix
-
   const content = linesToRender.map((line, index) => {
     const lineKey = `diff-line-${index}`;
     let gutterNumStr = '';
@@ -282,15 +283,19 @@ function renderDiffContent(
 
     return (
       <Box key={lineKey} flexDirection="row">
-        {/* Line number gutter */}
-        <Text color={theme.text.muted} backgroundColor={bgColor}>
-          {gutterNumStr.padStart(gutterWidth)}
-        </Text>
+        {/* Line number gutter - fixed width to prevent compression */}
+        <Box width={gutterWidth} flexShrink={0}>
+          <Text color={theme.text.muted} backgroundColor={bgColor}>
+            {gutterNumStr.padStart(gutterWidth)}
+          </Text>
+        </Box>
 
-        {/* Prefix symbol (+/-/space) */}
-        <Text color={prefixColor} backgroundColor={bgColor} bold={isAdded || isRemoved}>
-          {' '}{prefixChar}{' '}
-        </Text>
+        {/* Prefix symbol (+/-/space) - fixed width */}
+        <Box width={3} flexShrink={0}>
+          <Text color={prefixColor} backgroundColor={bgColor} bold={isAdded || isRemoved}>
+            {' '}{prefixChar}{' '}
+          </Text>
+        </Box>
 
         {/* Line content */}
         <Text
@@ -299,12 +304,6 @@ function renderDiffContent(
           wrap="truncate-end"
         >
           {displayContent}
-          {/* Fill remaining width with background */}
-          {bgColor && displayContent.length < contentWidth && (
-            <Text backgroundColor={bgColor}>
-              {' '.repeat(Math.max(0, contentWidth - displayContent.length))}
-            </Text>
-          )}
         </Text>
       </Box>
     );

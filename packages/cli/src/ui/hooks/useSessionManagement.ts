@@ -50,8 +50,10 @@ function convertBackendHistory(
             historyManager.addItem({
               type: MessageType.TOOL_RESULT,
               toolCallId: block.tool_use_id || '',
+              toolName: block.tool_name || '',
               content: resultContent,
               isError: block.is_error || false,
+              diff: block.data?.diff,  // Extract diff info for edit/write tools
             }, timestamp);
           }
         }

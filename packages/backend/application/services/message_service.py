@@ -190,7 +190,8 @@ class MessageService:
             "tool_use_id": tool_call_id,
             "tool_name": tool_name,
             "content": llm_content,  # Use llm_content from ToolResult
-            "is_error": tool_result.get("status") == "error"
+            "is_error": tool_result.get("status") == "error",
+            "data": tool_result.get("data"),  # Include data field for diff display
         }
 
         # Generate message ID

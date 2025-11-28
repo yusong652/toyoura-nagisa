@@ -97,10 +97,18 @@ async def write(
 
     try:
         abs_p = Path(abs_path)
-        
-        # Check if file already exists
+
+        # Check if file already exists and read original content for diff
         file_existed = abs_p.exists()
-        
+        original_content = ""
+        if file_existed:
+            try:
+                with abs_p.open("r", encoding=encoding, errors='replace') as fh:
+                    original_content = fh.read()
+            except Exception:
+                # If we can't read original, just use empty string
+                original_content = ""
+
         # Symlink security checks (use dynamic workspace root for consistency)
         if file_existed:
             # Check if target file itself is an unsafe symlink
@@ -139,6 +147,21 @@ async def write(
         else:
             display_msg = f"File updated successfully at: {abs_display}"
 
+        # Generate unified diff for CLI display
+        import difflib
+        diff_lines = list(difflib.unified_diff(
+            original_content.splitlines(),
+            content.splitlines(),
+            fromfile=abs_display,
+            tofile=abs_display,
+            lineterm=''
+        ))
+        diff_content = '\n'.join(diff_lines) if diff_lines else ''
+
+        # Count additions and deletions
+        additions = sum(1 for line in diff_lines if line.startswith('+') and not line.startswith('+++'))
+        deletions = sum(1 for line in diff_lines if line.startswith('-') and not line.startswith('---'))
+
         return success_response(
             display_msg,
             llm_content={
@@ -150,6 +173,13 @@ async def write(
             size_bytes=size_bytes,
             lines_count=lines_count,
             file_created=not file_existed,
+            # Include diff info in data for CLI display
+            diff={
+                "content": diff_content,
+                "additions": additions,
+                "deletions": deletions,
+                "file_path": abs_display,
+            }
         )
 
     except PermissionError:
