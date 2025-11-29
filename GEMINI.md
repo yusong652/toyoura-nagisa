@@ -30,7 +30,7 @@ To manage this stateful interaction, the agent must follow a structured, three-p
 
 - **Phase 1: VALIDATION (`pfc_execute_command`)**: Interactively explore the simulation in a REPL-like manner.
 - **Phase 2: CODIFICATION (`write`/`edit`)**: Preserve a validated sequence of commands as a reusable Python script.
-- **Phase 3: EXECUTION (`pfc_execute_script`)**: Execute a fully validated script for a production-scale simulation.
+- **Phase 3: EXECUTION (`pfc_execute_task`)**: Execute a fully validated script for a production-scale simulation (creates git snapshot for reproducibility).
 
 ## 3. System Architecture
 

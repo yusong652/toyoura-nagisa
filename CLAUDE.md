@@ -124,7 +124,7 @@ class ToolResult:
 | `builtin/` | web_search | Internet search |
 | `coding/` | write, read, edit, bash, glob, grep, etc. | Development tools |
 | `lifestyle/` | email, calendar, contacts, location, time, etc. | Productivity tools |
-| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_script, pfc_check_task_status, pfc_list_tasks | PFC simulation control (script-only workflow) |
+| `pfc/` | pfc_query_command, pfc_query_python_api, pfc_execute_task, pfc_check_task_status, pfc_list_tasks | PFC simulation control (script-only workflow) |
 
 **Benefits**:
 - Explicit schema for automatic documentation
@@ -156,10 +156,10 @@ Query Tools      Small-Scale Test   Full Simulation
 
 **PFC Tools Workflow (Script-Only)**:
 1. **Query**: `pfc_query_command` / `pfc_query_python_api` - Get command syntax and Python examples
-2. **Test**: `pfc_execute_script` (small scale, `run_in_background=False`) - Quick validation
-3. **Production**: `pfc_execute_script` (full scale, `run_in_background=True`) - Long simulations
+2. **Test**: `pfc_execute_task` (small scale, `run_in_background=False`) - Quick validation
+3. **Production**: `pfc_execute_task` (full scale, `run_in_background=True`) - Long simulations with git snapshot
 4. **Monitor**: `pfc_check_task_status` - Query progress with real-time output
-5. **List**: `pfc_list_tasks` - Overview of all tracked tasks
+5. **List**: `pfc_list_tasks` - Overview of all tracked tasks with version info
 
 **Core Pattern**: All PFC commands executed via Python scripts using `itasca.command("...")` pattern.
 
