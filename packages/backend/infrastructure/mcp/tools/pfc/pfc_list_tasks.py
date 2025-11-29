@@ -54,7 +54,7 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
         - offset=20, limit=20: Next 20 tasks (older)
 
         Note:
-            - Shows scripts submitted via pfc_execute_script
+            - Shows tasks submitted via pfc_execute_task
             - Tasks sorted by start time (newest first)
             - Tasks persisted across server restarts (historical tasks marked [Historical])
             - Use pfc_check_task_status for detailed output of specific scripts

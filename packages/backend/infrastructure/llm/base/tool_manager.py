@@ -313,8 +313,8 @@ class BaseToolManager(ABC):
         Executes tools one by one, stopping subsequent tools if:
         1. User rejects a tool → block all remaining tools
         2. PFC tool fails → block remaining PFC tools only (stateful dependency chain)
-        3. Any tool fails when pfc_execute_script is in queue → block all remaining tools
-           (pfc_execute_script depends on preparatory tools like file creation, data processing)
+        3. Any tool fails when pfc_execute_task is in queue → block all remaining tools
+           (pfc_execute_task depends on preparatory tools like file creation, data processing)
 
         This implements Claude Code's intelligent cascade pattern with contextual
         error messages to help LLM understand why each tool was blocked.
@@ -341,24 +341,24 @@ class BaseToolManager(ABC):
             If one PFC tool fails, subsequent PFC tools will likely fail too
             (e.g., "ball generate" requires successful "model new").
 
-            pfc_execute_script is special: it often depends on preparatory tools
-            (file creation, data processing). If queue contains pfc_execute_script,
+            pfc_execute_task is special: it often depends on preparatory tools
+            (file creation, data processing). If queue contains pfc_execute_task,
             any tool failure blocks all subsequent tools.
 
             Other tools (read, write, bash) are stateless and independent,
-            so they continue executing even if PFC tools fail (unless pfc_execute_script
+            so they continue executing even if PFC tools fail (unless pfc_execute_task
             is in the queue).
         """
-        # Check if queue contains pfc_execute_script (triggers strict dependency mode)
-        has_pfc_execute_script = any(
-            call.get("name") == "pfc_execute_script"
+        # Check if queue contains pfc_execute_task (triggers strict dependency mode)
+        has_pfc_execute_task = any(
+            call.get("name") == "pfc_execute_task"
             for call in function_calls
         )
 
         results = []
         user_rejected_tool = None  # Track which tool was rejected by user
         failed_pfc_tool = None  # Track which PFC tool failed
-        failed_tool = None  # Track any failed tool (when pfc_execute_script present)
+        failed_tool = None  # Track any failed tool (when pfc_execute_task present)
         user_interrupted = False  # Track if user interrupted during execution
 
         for function_call in function_calls:
@@ -427,14 +427,14 @@ class BaseToolManager(ABC):
                     print(f"[BaseToolManager] Cascade blocking PFC tool {tool_name} due to failure of {failed_pfc_tool}")
                 continue
 
-            # Cascade blocking check 3: Any tool failure when pfc_execute_script in queue (blocks all)
-            if has_pfc_execute_script and failed_tool is not None:
+            # Cascade blocking check 3: Any tool failure when pfc_execute_task in queue (blocks all)
+            if has_pfc_execute_task and failed_tool is not None:
                 from backend.infrastructure.mcp.utils.tool_result import error_response
 
                 cascade_message = (
                     f"Cannot execute {tool_name}: Previous tool failed ({failed_tool}). "
-                    f"Stopping all subsequent tools because pfc_execute_script in queue depends on preparatory tools. "
-                    f"Fix the error before executing PFC script."
+                    f"Stopping all subsequent tools because pfc_execute_task in queue depends on preparatory tools. "
+                    f"Fix the error before executing PFC task."
                 )
                 cascade_result = error_response(
                     cascade_message,
@@ -473,13 +473,13 @@ class BaseToolManager(ABC):
                 if llm_settings.debug:
                     print(f"[BaseToolManager] PFC tool {tool_name} failed, will cascade block remaining PFC tools")
 
-            # Trigger 3: Any tool error when pfc_execute_script in queue (blocks all)
+            # Trigger 3: Any tool error when pfc_execute_task in queue (blocks all)
             # Note: status="pending" (background tasks) is not considered failure
-            if has_pfc_execute_script and result.get('status') == 'error':
+            if has_pfc_execute_task and result.get('status') == 'error':
                 failed_tool = tool_name
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
-                    print(f"[BaseToolManager] Tool {tool_name} failed (pfc_execute_script dependency mode), will cascade block remaining tools")
+                    print(f"[BaseToolManager] Tool {tool_name} failed (pfc_execute_task dependency mode), will cascade block remaining tools")
 
         return results
 
@@ -691,7 +691,7 @@ class BaseToolManager(ABC):
             "bash": True,              # All bash commands require confirmation
             "edit": True,              # All file edits require confirmation
             "write": True,             # All file writes require confirmation
-            "pfc_execute_script": True,  # PFC script execution requires confirmation
+            "pfc_execute_task": True,  # PFC task execution requires confirmation
             # Add other tools here as needed
             # "system_command": True,  # Example: other system commands
         }
@@ -779,11 +779,11 @@ class BaseToolManager(ABC):
                     original_content = diff_info.get("original", "")
                     new_content = diff_info.get("new", "")
 
-            elif tool_name == "pfc_execute_script":
-                script_path = tool_args.get("script_path", "unknown")
+            elif tool_name == "pfc_execute_task":
+                entry_script = tool_args.get("entry_script", "unknown")
                 run_in_background = tool_args.get("run_in_background", True)
                 bg_info = " (background)" if run_in_background else " (foreground)"
-                command = f"Execute PFC script{bg_info}: {script_path}"
+                command = f"Execute PFC task{bg_info}: {entry_script}"
                 description = tool_args.get("description", None)
                 confirmation_type = "exec"
             else:
