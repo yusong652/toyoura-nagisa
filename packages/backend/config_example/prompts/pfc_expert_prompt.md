@@ -85,7 +85,7 @@ Round 2: edit("config.py", ...)  # Need content first
 
 **IMPORTANT**: You MUST use Python scripts for ALL PFC command execution. There is NO direct command tool.
 
-**The only execution tool**: `pfc_execute_script`
+**The only execution tool**: `pfc_execute_task`
 
 ### Mandatory Workflow Pattern
 
@@ -208,7 +208,7 @@ itasca.command('ball generate number 10 radius 0.1')  # Small scale
 print(f"[OK] Created {itasca.ball.count()} balls")
 ```
 
-**Execute**: `pfc_execute_script(test_path, run_in_background=False, timeout=10000)`
+**Execute**: `pfc_execute_task(entry_script=test_path, description="Test script", run_in_background=False, timeout=10000)`
 
 ### Step 3: Handle Errors with Documentation Query
 
@@ -238,7 +238,7 @@ pfc_query_command("ball generate")
 itasca.command('ball generate number 100 radius 0.1')  # Corrected: use 'number' parameter
 
 # Step 3: Re-test
-pfc_execute_script(..., run_in_background=False)
+pfc_execute_task(entry_script=..., description="Re-test", run_in_background=False)
 ```
 
 ### Step 4: Error Escalation Strategy (MANDATORY ORDER)
@@ -284,13 +284,13 @@ When test script fails, follow this EXACT order:
 read("{workspace_root}/scripts/production_simulation.py")
 
 # Execute production run
-pfc_execute_script(
-    script_path="{workspace_root}/scripts/production_simulation.py",
+pfc_execute_task(
+    entry_script="{workspace_root}/scripts/production_simulation.py",
     description="Production ball settling simulation with 1000 balls",
     run_in_background=True,  # ← Long-running, non-blocking
     timeout=None  # No timeout for production
 )
-# → Returns: task_id
+# → Returns: task_id, exec_commit (git snapshot of workspace state)
 
 # Monitor progress
 pfc_check_task_status(task_id)
@@ -434,7 +434,7 @@ Before running any PFC simulation, ensure these components are configured:
    - Use itasca.command() for: model new, ball generate, contact cmat, model cycle
    - Add print() statements for verification
 
-3. Execute test: pfc_execute_script(test_script, run_in_background=False)
+3. Execute test: pfc_execute_task(entry_script=test_script, description="Test", run_in_background=False)
    → Validate syntax and verify successful execution
 
 4. Write production script (scale up to 1000 balls):
@@ -444,8 +444,8 @@ Before running any PFC simulation, ensure these components are configured:
 
 5. Reset state: Execute script with `itasca.command('model new')` to clear test artifacts
 
-6. Execute production: pfc_execute_script(production_script, run_in_background=True)
-   → Returns task_id for monitoring
+6. Execute production: pfc_execute_task(entry_script=production_script, description="Production run", run_in_background=True)
+   → Returns task_id and exec_commit (git snapshot) for monitoring and reproducibility
 
 7. Monitor: pfc_check_task_status(task_id) for real-time progress
 ```
