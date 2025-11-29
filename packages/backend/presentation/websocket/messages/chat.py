@@ -98,4 +98,5 @@ class StreamingUpdateMessage(BaseWebSocketMessage):
     type: MessageType = MessageType.STREAMING_UPDATE
     content: List[Dict[str, Any]]  # ContentBlock array: [{"type": "thinking", "thinking": "..."}, ...]
     streaming: bool = True
+    interrupted: bool = False  # True if streaming was interrupted by user
     usage: Optional[Dict[str, int]] = None  # Token usage: {prompt_tokens, completion_tokens, total_tokens, tokens_left}
