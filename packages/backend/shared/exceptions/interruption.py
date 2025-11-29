@@ -6,7 +6,9 @@ rather than system errors, enabling graceful handling of user rejections
 and feedback cycles.
 """
 
-from typing import List
+from typing import List, Optional
+
+
 
 
 class UserRejectionInterruption(Exception):
@@ -23,7 +25,7 @@ class UserRejectionInterruption(Exception):
     cause immediate interruption, and user feedback continues via new requests.
     """
 
-    def __init__(self, session_id: str, rejected_tools: List[str], message: str = None):
+    def __init__(self, session_id: str, rejected_tools: List[str], message: Optional[str] = None):
         """
         Initialize user rejection interruption.
 
