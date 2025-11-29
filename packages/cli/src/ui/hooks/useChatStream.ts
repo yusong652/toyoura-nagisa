@@ -31,6 +31,7 @@ interface StreamingUpdateEvent {
   messageId: string;
   content: ContentBlock[];
   streaming: boolean;
+  interrupted?: boolean;  // True if streaming was interrupted by user (backend authority)
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -139,9 +140,6 @@ export function useChatStream({
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
   const seenToolResultIdsRef = useRef<Set<string>>(new Set());
 
-  // Ref to track if current stream was interrupted (prevents double commit)
-  const wasInterruptedRef = useRef<boolean>(false);
-
   // Clear error
   const clearError = useCallback(() => {
     setError(null);
@@ -154,9 +152,6 @@ export function useChatStream({
       // User message echoed back from server (usually we add it locally first)
       // Skip if we already added it
     } else {
-      // New assistant message starting - reset interrupt flag for new stream
-      wasInterruptedRef.current = false;
-
       // New assistant message starting - commit any pending items from previous round
       // This happens when tool calling triggers a new LLM round
 
@@ -203,11 +198,6 @@ export function useChatStream({
 
   // Handle STREAMING_UPDATE event from ConnectionManager
   const handleStreamingUpdate = useCallback((event: StreamingUpdateEvent) => {
-    // Ignore updates if stream was interrupted
-    if (wasInterruptedRef.current) {
-      return;
-    }
-
     // Backend sends accumulated content array
     if (event.content && Array.isArray(event.content)) {
       // Extract thinking content
@@ -280,15 +270,21 @@ export function useChatStream({
 
     // Check if streaming is complete
     if (event.streaming === false) {
-      // If this stream was interrupted, skip committing (already done in cancelRequest)
-      if (wasInterruptedRef.current) {
-        wasInterruptedRef.current = false;  // Reset for next stream
+      // Use backend's interrupted flag as the authority (eliminates race condition)
+      // Backend sets interrupted=true when user interrupt was processed
+      if (event.interrupted) {
+        // Stream was interrupted by user - don't commit, just clean up
+        setIsStreaming(false);
+        setStreamingState(StreamingState.Idle);
+        setThinkingContent(null);
+        setPendingAssistantItem(null);
+        setPendingToolItems([]);
+        seenToolCallIdsRef.current.clear();
+        seenToolResultIdsRef.current.clear();
         return;
       }
 
-      // Commit all pending items to history
-      // Need to capture current values since state might not be updated yet
-      const currentAssistantItem = pendingAssistantItem;
+      // Normal completion - commit all pending items to history
       const currentToolItems = [...pendingToolItems];
 
       // Update state first
@@ -309,18 +305,6 @@ export function useChatStream({
             isStreaming: false,
           });
         }
-      } else if (currentAssistantItem) {
-        // Keep both text and thinking blocks
-        const validContent = (currentAssistantItem.content || []).filter(
-          (block) => block.type === 'text' || block.type === 'thinking'
-        );
-        if (validContent.length > 0) {
-          historyManager.addItem({
-            ...currentAssistantItem,
-            content: validContent,
-            isStreaming: false,
-          });
-        }
       }
 
       // Commit tool items
@@ -334,7 +318,7 @@ export function useChatStream({
       seenToolCallIdsRef.current.clear();
       seenToolResultIdsRef.current.clear();
     }
-  }, [pendingAssistantItem, pendingToolItems, historyManager]);
+  }, [pendingToolItems, historyManager]);
 
   // Handle TOOL_CONFIRMATION_REQUEST event from ConnectionManager
   const handleToolConfirmationRequest = useCallback((event: ToolConfirmationEvent) => {
@@ -530,30 +514,25 @@ export function useChatStream({
   }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager]);
 
   // Cancel current request
+  // Note: State cleanup is handled by handleStreamingUpdate when it receives
+  // the backend's streaming=false, interrupted=true message.
+  // This eliminates race conditions by using backend as the authority.
   const cancelRequest = useCallback(() => {
-    // Mark as interrupted to prevent handleStreamingUpdate from committing again
-    wasInterruptedRef.current = true;
-
+    // Send interrupt request to backend
     connectionManager.send({
       type: 'USER_INTERRUPT',
       timestamp: new Date().toISOString(),
     });
 
-    // Add system message about interruption
+    // Add system message about interruption (immediate feedback to user)
     historyManager.addItem({
       type: MessageType.INFO,
       message: 'Request cancelled by user.',
     } as HistoryItemWithoutId);
 
-    // Clear all state - discard the interrupted response
-    // Don't commit pending items since user explicitly cancelled
-    setThinkingContent(null);
-    setPendingAssistantItem(null);
-    setPendingToolItems([]);
-    seenToolCallIdsRef.current.clear();
-    seenToolResultIdsRef.current.clear();
-    setIsStreaming(false);
-    setStreamingState(StreamingState.Idle);
+    // Note: Don't clear state here - let handleStreamingUpdate do it
+    // when it receives the backend's interrupted=true response.
+    // This ensures proper synchronization with backend state.
   }, [connectionManager, historyManager]);
 
   // Confirm or reject tool execution

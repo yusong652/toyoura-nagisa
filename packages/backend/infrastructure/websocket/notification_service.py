@@ -27,6 +27,7 @@ class WebSocketNotificationService:
         message_id: str,
         content: List[Dict[str, Any]],
         streaming: bool = True,
+        interrupted: bool = False,
         usage: Optional[Dict[str, int]] = None
     ) -> None:
         """
@@ -43,6 +44,7 @@ class WebSocketNotificationService:
             message_id: Message ID to update
             content: Complete content blocks array [{"type": "thinking", "thinking": "..."}, ...]
             streaming: Whether message is still streaming (True) or complete (False)
+            interrupted: Whether streaming was interrupted by user (for frontend state handling)
             usage: Optional token usage statistics
                 - prompt_tokens: Input tokens (context window usage)
                 - completion_tokens: Output tokens (AI response)
@@ -85,6 +87,7 @@ class WebSocketNotificationService:
                 message_id=message_id,
                 content=content,
                 streaming=streaming,
+                interrupted=interrupted,
                 usage=usage
             )
 

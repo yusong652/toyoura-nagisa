@@ -268,13 +268,15 @@ class ChatOrchestrator:
         await self.message_service.delete_message_async(session_id, state.message_id)
         print(f"[DEBUG] Deleted placeholder message {state.message_id} from database")
 
-        # Send final update with streaming=False (frontend will show interrupted state)
+        # Send final update with streaming=False and interrupted=True
+        # Frontend uses interrupted flag to determine state handling (not local ref)
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         await WebSocketNotificationService.send_streaming_update(
             session_id=session_id,
             message_id=state.message_id,
             content=content_blocks,
-            streaming=False
+            streaming=False,
+            interrupted=True
         )
 
         # Trigger title generation after user interruption
@@ -544,6 +546,18 @@ class ChatOrchestrator:
         status_monitor = get_status_monitor(session_id)
         if status_monitor.is_user_interrupted():
             print(f"[INFO] Tool calling interrupted by user at iteration {iterations}")
+
+            # Send streaming=false, interrupted=true to frontend
+            # This notifies frontend to clean up state without committing to history
+            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=state.message_id,
+                content=state.get_content_blocks(),
+                streaming=False,
+                interrupted=True
+            )
+
             return response
 
         # Continue recursively

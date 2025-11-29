@@ -189,6 +189,23 @@ class BaseToolManager(ABC):
         """
         pass
 
+    def _check_user_interrupted(self, session_id: str) -> bool:
+        """
+        Check if user has requested interrupt for this session.
+
+        Args:
+            session_id: Session ID to check
+
+        Returns:
+            bool: True if user interrupt flag is set
+        """
+        try:
+            from backend.infrastructure.monitoring import get_status_monitor
+            status_monitor = get_status_monitor(session_id)
+            return status_monitor.is_user_interrupted()
+        except Exception:
+            return False
+
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any],
                                session_id: str) -> CallToolResult:
         """
@@ -217,6 +234,72 @@ class BaseToolManager(ABC):
             )
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
+
+    async def _execute_tool_with_interrupt_check(
+        self,
+        function_call: dict,
+        session_id: str,
+        message_id: str
+    ) -> Dict[str, Any]:
+        """
+        Execute a tool with periodic interrupt checking.
+
+        Wraps handle_function_call with asyncio polling to check for user
+        interrupt during long-running tool execution.
+
+        Args:
+            function_call: Function call dictionary
+            session_id: Session ID
+            message_id: Message ID
+
+        Returns:
+            Dict[str, Any]: Tool result, or interrupt error if interrupted
+        """
+        import asyncio
+
+        tool_name = function_call.get("name", "unknown")
+
+        # Create task for tool execution
+        tool_task = asyncio.create_task(
+            self.handle_function_call(function_call, session_id, message_id)
+        )
+
+        # Poll for interrupt every 100ms while tool is executing
+        while not tool_task.done():
+            if self._check_user_interrupted(session_id):
+                # User interrupted - cancel the task
+                tool_task.cancel()
+                try:
+                    await tool_task
+                except asyncio.CancelledError:
+                    pass
+
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Tool {tool_name} interrupted by user")
+
+                # Return interrupt error (matches Claude Code behavior)
+                from backend.infrastructure.mcp.utils.tool_result import error_response
+                interrupt_message = "[Request interrupted by user for tool use]"
+                interrupt_result = error_response(
+                    interrupt_message,
+                    llm_content={
+                        "parts": [{"type": "text", "text": interrupt_message}]
+                    }
+                )
+                interrupt_result["user_interrupted"] = True
+                return interrupt_result
+
+            # Wait a short time before checking again
+            try:
+                # Use wait_for with shield to avoid cancelling the actual task
+                return await asyncio.wait_for(asyncio.shield(tool_task), timeout=0.1)
+            except asyncio.TimeoutError:
+                # Timeout just means we should check interrupt again
+                continue
+
+        # Task completed normally
+        return await tool_task
 
     async def handle_multiple_function_calls(
         self,
@@ -276,10 +359,32 @@ class BaseToolManager(ABC):
         user_rejected_tool = None  # Track which tool was rejected by user
         failed_pfc_tool = None  # Track which PFC tool failed
         failed_tool = None  # Track any failed tool (when pfc_execute_script present)
+        user_interrupted = False  # Track if user interrupted during execution
 
         for function_call in function_calls:
             tool_name = function_call.get("name", "unknown")
             is_pfc_tool = tool_name.startswith("pfc_")
+
+            # Cascade blocking check 0: User interrupt (blocks all remaining tools)
+            # Check at start of each tool to respond quickly to ESC during tool execution
+            if user_interrupted or self._check_user_interrupted(session_id):
+                user_interrupted = True
+                from backend.infrastructure.mcp.utils.tool_result import error_response
+
+                interrupt_message = "[Request interrupted by user for tool use]"
+                interrupt_result = error_response(
+                    interrupt_message,
+                    llm_content={
+                        "parts": [{"type": "text", "text": interrupt_message}]
+                    }
+                )
+                interrupt_result["user_interrupted"] = True
+                results.append(interrupt_result)
+
+                llm_settings = get_llm_settings()
+                if llm_settings.debug:
+                    print(f"[BaseToolManager] Skipping {tool_name} due to user interrupt")
+                continue
 
             # Cascade blocking check 1: User rejection (blocks all remaining tools)
             if user_rejected_tool is not None:
@@ -340,14 +445,17 @@ class BaseToolManager(ABC):
                 cascade_result["cascade_blocked"] = True
                 results.append(cascade_result)
 
-                llm_settings = get_llm_settings()
-                if llm_settings.debug:
-                    print(f"[BaseToolManager] Cascade blocking {tool_name} due to failure of {failed_tool} (pfc_execute_script dependency mode)")
                 continue
 
-            # Execute tool normally
-            result = await self.handle_function_call(function_call, session_id, message_id)
+            # Execute tool with interrupt checking
+            result = await self._execute_tool_with_interrupt_check(
+                function_call, session_id, message_id
+            )
             results.append(result)
+
+            # Check if tool execution was interrupted
+            if result.get("user_interrupted"):
+                user_interrupted = True
 
             # Check cascade triggers after execution
             # Trigger 1: User rejection (blocks all)
