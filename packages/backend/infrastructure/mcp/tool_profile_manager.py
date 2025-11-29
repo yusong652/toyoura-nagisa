@@ -84,7 +84,7 @@ class ToolProfileManager:
         "pfc_query_python_api",      # Query Python SDK docs (try first)
         "pfc_query_command",          # Query command docs + model properties
         # PFC execution tools (script-only workflow)
-        "pfc_execute_script",
+        "pfc_execute_task",           # Execute project with entry script
         "pfc_check_task_status",
         "pfc_list_tasks"
     ]
@@ -108,7 +108,7 @@ class ToolProfileManager:
         "pfc_query_python_api",     # Query PFC Python SDK docs (try first for Python approach)
         "pfc_query_command",         # Query PFC command docs + model properties (use for itasca.command() syntax)
         # PFC execution tools (script-only workflow: all commands via itasca.command())
-        "pfc_execute_script",       # Execute Python scripts (test + production)
+        "pfc_execute_task",         # Execute project with entry script (creates git snapshot)
         "pfc_check_task_status",    # Query status of long-running tasks
         "pfc_list_tasks",           # List all tracked long-running tasks
     ]

@@ -31,7 +31,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
         context: Context,
         task_id: str = Field(
             ...,
-            description="Task ID from pfc_execute_script (e.g., 'a1b2c3d4')"
+            description="Task ID from pfc_execute_task (e.g., 'a1b2c3d4')"
         ),
         offset: int = Field(
             0,
@@ -108,8 +108,9 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 elapsed_time = data.get("elapsed_time", 0)
                 output = data.get("output", "")
                 description = data.get("description", "")
-                script_path = data.get("script_path", "unknown")
+                entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
+                exec_commit = data.get("exec_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -133,13 +134,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build version info
+                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Running | Task ID: {task_id} | {time_info}{session_marker}\n"
-                    f"  Script: {script_path}\n"
+                    f"**STATUS**: Running | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
                     f"Showing: lines {pagination['line_range']} "
@@ -171,9 +175,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 output = data.get("output", "")
                 task_result = data.get("result")
                 description = data.get("description", "")
-                script_path = data.get("script_path", "unknown")
+                entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
+                exec_commit = data.get("exec_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -197,13 +202,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build version info
+                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{session_marker}\n"
-                    f"  Script: {script_path}\n"
+                    f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Result: {task_result}\n"
                     f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
@@ -236,9 +244,10 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 output = data.get("output", "")
                 error_msg = data.get("error", "Unknown error")
                 description = data.get("description", "")
-                script_path = data.get("script_path", "unknown")
+                entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
+                exec_commit = data.get("exec_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -262,13 +271,16 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     task_session_id_display = task_session_id[:8] if task_session_id != 'unknown' else 'unknown'
                     session_marker = f" [Session: {task_session_id_display}]"
 
+                # Build version info
+                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{session_marker}\n"
-                    f"  Script: {script_path}\n"
+                    f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Error: {error_msg}\n"
                     f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "

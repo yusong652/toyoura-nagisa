@@ -24,7 +24,7 @@ class Task(ABC):
     implementing type-specific behavior (e.g., output capture for scripts).
     """
 
-    def __init__(self, task_id, session_id, future, description, task_type, on_status_change=None):
+    def __init__(self, task_id, session_id, future, description, task_type="script", on_status_change=None):
         # type: (str, str, Any, str, str, Any) -> None
         """
         Initialize common task properties.
@@ -34,7 +34,7 @@ class Task(ABC):
             session_id: Session identifier for task isolation
             future: asyncio Future object for the task
             description: Human-readable task description
-            task_type: Task type identifier ("command" or "script")
+            task_type: Task type identifier (default: "script")
             on_status_change: Optional callback function(task) called when task status changes
         """
         self.task_id = task_id

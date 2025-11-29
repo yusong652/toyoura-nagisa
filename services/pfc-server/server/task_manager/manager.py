@@ -9,7 +9,7 @@ Python 3.6 compatible implementation.
 
 import uuid
 import logging
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 
 from .task_base import Task
 from .task_types import ScriptTask
@@ -72,18 +72,19 @@ class TaskManager:
         except Exception as e:
             logger.error("Failed to load historical tasks: {}".format(e))
 
-    def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None):
-        # type: (str, Any, str, Optional[str], Any, Optional[str]) -> str
+    def create_script_task(self, session_id, future, script_name, script_path=None, output_buffer=None, description=None, exec_commit=None):
+        # type: (str, Any, str, Optional[str], Any, Optional[str], Optional[str]) -> str
         """
         Register a new long-running Python script task.
 
         Args:
             session_id: Session identifier for task isolation
             future: asyncio Future object for the task
-            script_name: Name of the script file (e.g., "simulation.py")
-            script_path: Optional full path to script for reference
+            script_name: Name of the script file (e.g., "main.py")
+            script_path: Optional full path to entry script for reference
             output_buffer: Optional StringIO buffer for real-time output capture
             description: Task description from PFC agent (LLM-provided)
+            exec_commit: Git commit hash on pfc-executions branch (version snapshot)
 
         Returns:
             str: Unique task ID for tracking
@@ -92,7 +93,8 @@ class TaskManager:
         # Pass save callback for automatic persistence on status change
         task = ScriptTask(
             task_id, session_id, future, script_name, script_path,
-            output_buffer, description, on_status_change=self._on_task_status_change
+            output_buffer, description, on_status_change=self._on_task_status_change,
+            exec_commit=exec_commit
         )
         self.tasks[task_id] = task
 

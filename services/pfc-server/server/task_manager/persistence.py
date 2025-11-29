@@ -91,15 +91,13 @@ class TaskPersistence:
             "notified": getattr(task, "notified", False)  # Notification status (default: False)
         }
 
-        # Type-specific fields
-        if task.task_type == "command":
-            task_data["command"] = task.command
-        elif task.task_type == "script":
-            task_data["script_name"] = task.script_name
-            task_data["script_path"] = task.script_path
-            # Save output snapshot
-            output = task.get_current_output()
-            task_data["output"] = output if output else ""
+        # Script task fields
+        task_data["script_name"] = task.script_name
+        task_data["script_path"] = task.script_path
+        task_data["exec_commit"] = getattr(task, "exec_commit", None)  # Git version snapshot
+        # Save output snapshot
+        output = task.get_current_output()
+        task_data["output"] = output if output else ""
 
         return task_data
 
@@ -309,13 +307,11 @@ class HistoricalTask:
         self.end_time = task_data.get("end_time")  # Optional
         self.notified = task_data.get("notified", False)  # Notification status (default: False)
 
-        # Restore type-specific fields
-        if self.task_type == "command":
-            self.command = task_data.get("command", "")
-        elif self.task_type == "script":
-            self.script_name = task_data.get("script_name", "")
-            self.script_path = task_data.get("script_path")
-            self.output_snapshot = task_data.get("output", "")
+        # Restore script task fields
+        self.script_name = task_data.get("script_name", "")
+        self.script_path = task_data.get("script_path")
+        self.exec_commit = task_data.get("exec_commit")  # Git version snapshot
+        self.output_snapshot = task_data.get("output", "")
 
         # No Future or output_buffer for historical tasks
         self.future = None
@@ -331,58 +327,13 @@ class HistoricalTask:
 
     def get_current_output(self):
         # type: () -> Optional[str]
-        """Return output snapshot (for ScriptTask compatibility)."""
-        if self.task_type == "script":
-            return self.output_snapshot
-        return None
+        """Return output snapshot."""
+        return self.output_snapshot
 
     def get_status_response(self):
         # type: () -> Dict[str, Any]
-        """Get historical task status."""
+        """Get historical task status response."""
         elapsed_time = self.get_elapsed_time()
-
-        # Build response based on task type
-        if self.task_type == "command":
-            return self._get_command_status_response(elapsed_time)
-        else:  # script
-            return self._get_script_status_response(elapsed_time)
-
-    def _get_command_status_response(self, elapsed_time):
-        # type: (float) -> Dict[str, Any]
-        """Build status response for historical command task."""
-        if self.status == "completed":
-            return {
-                "status": "success",
-                "message": "[Historical] Command completed: {}\nElapsed time: {:.2f}s".format(
-                    self.description, elapsed_time
-                ),
-                "data": {
-                    "task_id": self.task_id,
-                    "task_type": self.task_type,
-                    "description": self.description,
-                    "elapsed_time": elapsed_time,
-                    "historical": True
-                }
-            }
-        else:  # failed
-            return {
-                "status": "error",
-                "message": "[Historical] Command failed: {}\nElapsed time: {:.2f}s".format(
-                    self.description, elapsed_time
-                ),
-                "data": {
-                    "task_id": self.task_id,
-                    "task_type": self.task_type,
-                    "description": self.description,
-                    "elapsed_time": elapsed_time,
-                    "historical": True,
-                    "error": "Task failed or interrupted"
-                }
-            }
-
-    def _get_script_status_response(self, elapsed_time):
-        # type: (float) -> Dict[str, Any]
-        """Build status response for historical script task."""
         output = self.get_current_output()
 
         if self.status == "completed":
@@ -399,10 +350,12 @@ class HistoricalTask:
                     "task_id": self.task_id,
                     "task_type": self.task_type,
                     "script_name": self.script_name,
+                    "entry_script": self.script_path,
                     "script_path": self.script_path,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "output": output if output else "",
+                    "exec_commit": getattr(self, "exec_commit", None),
                     "historical": True
                 }
             }
@@ -420,10 +373,12 @@ class HistoricalTask:
                     "task_id": self.task_id,
                     "task_type": self.task_type,
                     "script_name": self.script_name,
+                    "entry_script": self.script_path,
                     "script_path": self.script_path,
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "output": output if output else "",
+                    "exec_commit": getattr(self, "exec_commit", None),
                     "historical": True,
                     "error": "Task failed or interrupted"
                 }
@@ -434,22 +389,20 @@ class HistoricalTask:
         """Get task summary for listing (historical)."""
         info = {
             "task_id": self.task_id,
-            "session_id": self.session_id,  # Include session_id for filtering
+            "session_id": self.session_id,
             "task_type": self.task_type,
             "description": self.description,
             "status": self.status,
             "elapsed_time": self.get_elapsed_time(),
             "start_time": self.start_time,
-            "notified": self.notified,  # Whether completion notification has been sent
-            "historical": True  # Mark as historical
+            "notified": self.notified,
+            "historical": True,
+            # Script task fields
+            "name": self.script_name,
+            "entry_script": self.script_path,
+            "script_path": self.script_path,
+            "exec_commit": self.exec_commit
         }
-
-        # Add type-specific fields
-        if self.task_type == "command":
-            info["name"] = self.command
-        else:  # script
-            info["name"] = self.script_name
-            info["script_path"] = self.script_path
 
         # Add end_time if available
         if self.end_time is not None:

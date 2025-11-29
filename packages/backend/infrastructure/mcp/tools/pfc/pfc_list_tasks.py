@@ -90,12 +90,13 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
                 for task in data:
                     task_id = task.get("task_id", "unknown")
                     task_session_id = task.get("session_id", "unknown")
-                    script_path = task.get("script_path", task.get("name", "unknown"))
+                    entry_script = task.get("entry_script", task.get("script_path", task.get("name", "unknown")))
                     description = task.get("description", "")
                     status = task.get("status", "unknown")
                     elapsed = task.get("elapsed_time", 0)
                     start_time = task.get("start_time")
                     end_time = task.get("end_time")
+                    exec_commit = task.get("exec_commit")
                     is_historical = task.get("historical", False)
 
                     status_text = {
@@ -114,12 +115,15 @@ def register_pfc_list_tasks_tool(mcp: FastMCP):
 
                     historical_marker = " [Historical]" if is_historical else ""
 
+                    # Version info (exec_commit)
+                    version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+
                     # Format time info with date
                     time_info = format_time_range(start_time, end_time)
 
                     task_lines.append(
-                        f"[{status_text}] Task ID: {task_id} | {elapsed:.1f}s | {time_info}{session_marker}{historical_marker}\n"
-                        f"  Script: {script_path}\n"
+                        f"[{status_text}] Task ID: {task_id} | {elapsed:.1f}s | {time_info}{version_marker}{session_marker}{historical_marker}\n"
+                        f"  Entry: {entry_script}\n"
                         f"  → {description}"
                     )
 

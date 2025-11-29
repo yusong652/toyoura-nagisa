@@ -21,7 +21,7 @@ from backend.infrastructure.mcp.tools.lifestyle.tools.places import register_pla
 from backend.infrastructure.mcp.tools.lifestyle.tools.location import register_location_tools
 from backend.infrastructure.mcp.tools.lifestyle.tools.time import register_time_tools
 from backend.infrastructure.mcp.tools.pfc import (
-    register_pfc_script_tool,
+    register_pfc_task_tool,
     register_pfc_task_status_tool,
     register_pfc_list_tasks_tool,
     register_pfc_query_python_api_tool,
@@ -50,8 +50,8 @@ register_contact_tools(mcp)
 register_places_tools(mcp)
 register_location_tools(mcp)
 register_time_tools(mcp)
-# PFC tools - script-only workflow (all commands via itasca.command())
-register_pfc_script_tool(mcp)
+# PFC tools - task execution with version tracking (Script is Context)
+register_pfc_task_tool(mcp)
 register_pfc_task_status_tool(mcp)
 register_pfc_list_tasks_tool(mcp)
 register_pfc_query_python_api_tool(mcp)

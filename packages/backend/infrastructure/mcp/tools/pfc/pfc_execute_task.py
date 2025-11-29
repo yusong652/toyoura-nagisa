@@ -1,8 +1,9 @@
 """
-PFC Script Tools - MCP tool for executing Python SDK scripts.
+PFC Task Execution Tool - MCP tool for executing PFC simulation tasks.
 
-Provides script execution functionality for PFC Python SDK operations
-that return data (unlike native commands which don't return values).
+Provides task execution functionality for PFC Python SDK operations.
+Each execution creates a versioned snapshot on the pfc-executions branch
+for complete traceability ("Script is Context" philosophy).
 """
 
 from fastmcp import FastMCP
@@ -13,36 +14,37 @@ from backend.infrastructure.pfc import get_client
 from backend.infrastructure.mcp.utils.tool_result import success_response, error_response
 from backend.infrastructure.mcp.utils.path_normalization import normalize_path_separators
 from backend.infrastructure.mcp.utils.pagination import format_paginated_output
-from backend.infrastructure.mcp.utils.time_utils import format_timestamp, format_time_range
+from backend.infrastructure.mcp.utils.time_utils import format_time_range
 import time
 
 
-def register_pfc_script_tool(mcp: FastMCP):
+def register_pfc_task_tool(mcp: FastMCP):
     """
-    Register PFC script tool with the MCP server.
+    Register PFC task execution tool with the MCP server.
 
     Args:
         mcp: FastMCP server instance
     """
 
     @mcp.tool(
-        tags={"pfc", "simulation", "python", "script", "sdk"},
+        tags={"pfc", "simulation", "python", "task", "sdk"},
         annotations={"category": "pfc", "tags": ["pfc", "simulation", "python", "sdk"]}
     )
-    async def pfc_execute_script(
+    async def pfc_execute_task(
         context: Context,
-        script_path: str = Field(
+        entry_script: str = Field(
             ...,
             description=(
-                "Absolute path to Python script file for PFC SDK execution. "
-                "Example: '/workspace/scripts/settling_sim.py'. "
-                "Read the script first to understand its functionality."
+                "Path to entry script file for PFC task execution. "
+                "This is the main entry point of your simulation project. "
+                "Example: 'main.py' or '/workspace/project/main.py'. "
+                "The script can import other modules from the project."
             )
         ),
         description: str = Field(
             ...,
             description=(
-                "Task description explaining what this script does and its purpose in the workflow. "
+                "Task description explaining what this execution does and its purpose. "
                 "Recommended length: 30-80 characters. "
                 "This helps track task purpose across multi-stage simulations."
             )
@@ -50,7 +52,7 @@ def register_pfc_script_tool(mcp: FastMCP):
         timeout: Optional[int] = Field(
             default=None,
             description=(
-                "Script execution timeout in milliseconds (None = no limit). Valid range: 1000-600000 (1s to 10min). "
+                "Execution timeout in milliseconds (None = no limit). Valid range: 1000-600000 (1s to 10min). "
                 "Only applies when run_in_background=False. "
                 "Recommended: 60000-120000ms for testing, None for production simulations."
             )
@@ -58,28 +60,41 @@ def register_pfc_script_tool(mcp: FastMCP):
         run_in_background: bool = Field(
             default=True,
             description=(
-                "Set to false to wait for completion and return result directly (for quick test scripts). "
+                "Set to false to wait for completion and return result directly (for quick tests). "
                 "When true, returns task_id immediately for long-running simulations. "
                 "Query progress with pfc_check_task_status when using background mode."
             )
         )
     ) -> Dict[str, Any]:
         """
-        Execute Python SDK script for long-running simulations and analysis.
+        Execute a PFC simulation task with automatic version tracking.
 
-        Data flow pattern (three channels):
-            1. Real-time monitoring: Scripts print progress; check output via pfc_check_task_status
-            2. Checkpoint persistence: Scripts save complete state with "model save"
-            3. Analysis data: Scripts export CSV/JSON; write analysis scripts to process (don't read CSV directly)
+        Version Tracking:
+            Each execution creates a snapshot on the 'pfc-executions' git branch,
+            capturing the exact code state. Use exec_commit to trace back to the
+            code version used for any execution.
 
-        Usage workflow:
-            1. Read script file to understand what it does
-            2. Call this tool with script path → returns task_id
-            3. Monitor progress with pfc_check_task_status (see print output)
-            4. After completion, process exported files
+        Project Structure (recommended):
+            project/
+            ├── main.py           # Entry point (pass this to entry_script)
+            ├── geometry/         # Geometry generation modules
+            ├── materials/        # Material definitions
+            ├── analysis/         # Post-processing tools
+            └── config.py         # Shared parameters
+
+        Data Flow Pattern:
+            1. Real-time monitoring: Scripts print progress; check via pfc_check_task_status
+            2. Checkpoint persistence: Scripts save state with "model save"
+            3. Analysis data: Scripts export CSV/JSON for processing
+
+        Usage Workflow:
+            1. Develop project with modular structure
+            2. Call this tool with entry script → returns task_id + exec_commit
+            3. Monitor progress with pfc_check_task_status
+            4. Compare versions using exec_commit (git diff)
 
         Note:
-            All PFC commands must be executed through Python scripts using itasca.command().
+            All PFC commands must use itasca.command() in scripts.
             Query pfc_query_command for command syntax before writing scripts.
         """
         try:
@@ -91,7 +106,7 @@ def register_pfc_script_tool(mcp: FastMCP):
             # Validate description length (LLM-friendly guidance)
             if not description or not description.strip():
                 return error_response(
-                    "description is required. Please provide a brief explanation of what this script does. "
+                    "description is required. Please provide a brief explanation of what this task does. "
                     "Example: 'Initial settling simulation with 10k particles'"
                 )
 
@@ -104,17 +119,14 @@ def register_pfc_script_tool(mcp: FastMCP):
                 )
 
             # Normalize path separators for cross-platform compatibility
-            # This handles cases where LLM generates mixed separators (e.g., C:\path/to/file.py)
-            # Note: PFC server expects forward slashes, so we normalize to Linux-style paths
-            if not script_path or not script_path.strip():
-                return error_response("script_path is required and cannot be empty")
-            script_path = normalize_path_separators(script_path.strip(), target_platform='linux')
+            if not entry_script or not entry_script.strip():
+                return error_response("entry_script is required and cannot be empty")
+            script_path = normalize_path_separators(entry_script.strip(), target_platform='linux')
 
             # Get WebSocket client (auto-connects if needed)
             client = await get_client()
 
-            # Execute script
-            # WebSocket timeout is auto-calculated based on timeout + infrastructure buffer
+            # Execute script (server handles git versioning)
             result = await client.send_script(
                 script_path=script_path,
                 description=description,
@@ -124,16 +136,12 @@ def register_pfc_script_tool(mcp: FastMCP):
             )
 
             # Handle result based on execution mode
-            # Use run_in_background as primary branch logic (clearer intent)
             status = result.get("status")
             data = result.get("data")
 
             if run_in_background:
                 # ===== Background Mode =====
-                # Expect: status == "pending" (task submitted)
-                # Return: task_id for progress monitoring
                 if status != "pending":
-                    # Protocol violation: background mode should return "pending"
                     return error_response(
                         f"Unexpected server response in background mode: status={status} "
                         f"(expected 'pending'). Server may have changed behavior."
@@ -141,43 +149,45 @@ def register_pfc_script_tool(mcp: FastMCP):
 
                 # Extract metadata from unified data structure
                 task_id = data.get("task_id") if data else None
-                script_path_display = data.get("script_path", script_path) if data else script_path
+                entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
                 submit_time = data.get("start_time", time.time()) if data else time.time()
+                exec_commit = data.get("exec_commit") if data else None
                 time_info = format_time_range(submit_time)
 
+                # Build version info string
+                version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+
                 return success_response(
-                    message=result.get("message", f"Script submitted: {script_path}"),
+                    message=result.get("message", f"Task submitted: {script_path}"),
                     llm_content={
                         "parts": [{
                             "type": "text",
                             "text": (
-                                f"**STATUS**: Task submitted | Task ID: {task_id} | {time_info}\n"
-                                f"  Script: {script_path_display}\n"
+                                f"**STATUS**: Task submitted | Task ID: {task_id} | {time_info}{version_info}\n"
+                                f"  Entry: {entry_script_display}\n"
                                 f"  → {description}\n\n"
                                 f"Use pfc_check_task_status to monitor progress."
                             )
                         }]
                     },
-                    script_path=script_path,
+                    entry_script=script_path,
+                    exec_commit=exec_commit,
                     result=data
                 )
 
             else:
                 # ===== Foreground Mode (Synchronous) =====
-                # Expect: status == "success" | "error" (script completed/failed)
-                # Return: task_id + output summary (NOT full output)
-
                 if status == "success":
-                    # Script completed successfully
-                    # Extract all metadata from unified data structure
+                    # Task completed successfully
                     task_id = data.get("task_id") if data else None
-                    script_path_display = data.get("script_path", script_path) if data else script_path
+                    entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
                     output = data.get("output", "") if data else ""
                     script_result = data.get("result") if data else None
                     start_time = data.get("start_time") if data else None
                     end_time = data.get("end_time") if data else None
+                    exec_commit = data.get("exec_commit") if data else None
 
-                    # Use pagination utility to extract output summary (last 10 lines)
+                    # Use pagination utility to extract output summary
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
 
                     # Build navigation hints
@@ -186,18 +196,19 @@ def register_pfc_script_tool(mcp: FastMCP):
                         nav_hints.append(f"older: offset={10}")
                     nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
 
-                    # Build LLM-friendly text with summary
+                    # Build LLM-friendly text
                     llm_text_parts = []
 
-                    # 1. Success message with task_id and time range (three-line format)
+                    # 1. Success message with version info
                     time_info = format_time_range(start_time, end_time)
+                    version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
                     llm_text_parts.append(
-                        f"**STATUS**: Completed | Task ID: {task_id} | {time_info}\n"
-                        f"  Script: {script_path_display}\n"
+                        f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{version_info}\n"
+                        f"  Entry: {entry_script_display}\n"
                         f"  → {description}"
                     )
 
-                    # 2. Output summary (last 10 lines by default)
+                    # 2. Output summary
                     if output:
                         llm_text_parts.append(
                             f"\nOutput: {pagination['total_lines']} lines total | "
@@ -208,58 +219,58 @@ def register_pfc_script_tool(mcp: FastMCP):
                             f"**NEXT**: {nav_hint}"
                         )
 
-                    # 3. Structured result (if script defined 'result' variable)
+                    # 3. Structured result
                     if script_result is not None:
                         llm_text_parts.append(f"\n\n=== Script Result ===\n{script_result}")
 
                     llm_text = "".join(llm_text_parts)
 
                     return success_response(
-                        message=result.get("message", f"Script executed: {script_path}"),
+                        message=result.get("message", f"Task completed: {script_path}"),
                         llm_content={
                             "parts": [{
                                 "type": "text",
                                 "text": llm_text
                             }]
                         },
-                        script_path=script_path,
-                        task_id=task_id,  # NEW: Enable post-execution query
+                        entry_script=script_path,
+                        task_id=task_id,
+                        exec_commit=exec_commit,
                         script_result=script_result,
-                        pagination=pagination  # Include pagination metadata
+                        pagination=pagination
                     )
 
                 else:
-                    # Script execution failed (status == "error" or other)
-                    # Extract all metadata from unified data structure
+                    # Task execution failed
                     task_id = data.get("task_id") if data else None
-                    script_path_display = data.get("script_path", script_path) if data else script_path
+                    entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
                     output = data.get("output", "") if data else ""
-                    error_message = data.get("error", result.get("message", "Script execution failed")) if data else result.get("message", "Script execution failed")
+                    error_message = data.get("error", result.get("message", "Task execution failed")) if data else result.get("message", "Task execution failed")
                     start_time = data.get("start_time") if data else None
                     end_time = data.get("end_time") if data else None
+                    exec_commit = data.get("exec_commit") if data else None
 
-                    # Use pagination utility to extract output summary (last 10 lines)
+                    # Use pagination utility
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
 
-                    # Build navigation hints
                     nav_hints = []
                     if pagination["has_earlier"]:
                         nav_hints.append(f"older: offset={10}")
                     nav_hint = " | ".join(nav_hints) if nav_hints else "all output shown"
 
-                    # Build LLM content with error message and output summary
                     llm_text_parts = []
 
-                    # 1. Error message with task_id and time range (three-line format)
+                    # 1. Error message with version info
                     time_info = format_time_range(start_time, end_time)
+                    version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
                     llm_text_parts.append(
-                        f"**STATUS**: Failed | Task ID: {task_id} | {time_info}\n"
-                        f"  Script: {script_path_display}\n"
+                        f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{version_info}\n"
+                        f"  Entry: {entry_script_display}\n"
                         f"  → {description}\n\n"
                         f"Error: {error_message}"
                     )
 
-                    # 2. Script output before error (summary) - helps with debugging
+                    # 2. Output before error
                     if output:
                         llm_text_parts.append(
                             f"\nOutput: {pagination['total_lines']} lines total | "
@@ -273,23 +284,24 @@ def register_pfc_script_tool(mcp: FastMCP):
                     llm_text = "".join(llm_text_parts)
 
                     return success_response(
-                        message=result.get("message", f"Script error: {script_path}"),
+                        message=result.get("message", f"Task failed: {script_path}"),
                         llm_content={
                             "parts": [{
                                 "type": "text",
                                 "text": llm_text
                             }]
                         },
-                        script_path=script_path,
-                        task_id=task_id,  # NEW: Enable post-execution query
+                        entry_script=script_path,
+                        task_id=task_id,
+                        exec_commit=exec_commit,
                         script_error=error_message,
-                        pagination=pagination  # Include pagination metadata
+                        pagination=pagination
                     )
 
         except ConnectionError as e:
             return error_response(f"Cannot connect to PFC server: {str(e)}")
 
         except Exception as e:
-            return error_response(f"System error executing script: {str(e)}")
+            return error_response(f"System error executing task: {str(e)}")
 
-    print(f"[DEBUG] Registered PFC script tool: pfc_execute_script")
+    print(f"[DEBUG] Registered PFC task tool: pfc_execute_task")
