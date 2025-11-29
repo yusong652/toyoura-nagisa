@@ -34,7 +34,7 @@ def _parse_validation_error_details(error_text: str) -> Optional[Dict[str, str]]
     Parse FastMCP validation error text to extract structured error details.
 
     Parses error text like:
-    "1 validation error for call[pfc_execute_script]
+    "1 validation error for call[pfc_execute_task]
      script_path
      Field required [type=missing, ...]"
 
@@ -97,7 +97,7 @@ def _format_mcp_validation_error(error_text: str) -> Dict[str, Any]:
             - llm_content: Structured content for LLM with helpful guidance
 
     Example:
-        Input: "ValidationError: 1 validation error for call[pfc_execute_script]\\n..."
+        Input: "ValidationError: 1 validation error for call[pfc_execute_task]\\n..."
         Output: ToolResult with formatted error message guiding LLM to fix parameters
     """
     from backend.infrastructure.mcp.utils.tool_result import error_response
