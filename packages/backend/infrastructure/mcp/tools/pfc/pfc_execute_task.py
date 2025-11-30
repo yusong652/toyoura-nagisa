@@ -34,68 +34,40 @@ def register_pfc_task_tool(mcp: FastMCP):
         context: Context,
         entry_script: str = Field(
             ...,
-            description=(
-                "Path to entry script file for PFC task execution. "
-                "This is the main entry point of your simulation project. "
-                "Example: 'main.py' or '/workspace/project/main.py'. "
-                "The script can import other modules from the project."
-            )
+            description="The absolute path to the entry script to execute"
         ),
         description: str = Field(
             ...,
             description=(
-                "Task description explaining what this execution does and its purpose. "
-                "Recommended length: 30-80 characters. "
-                "This helps track task purpose across multi-stage simulations."
+                "Brief description of what this task does (5-15 words). "
+                "Examples: 'Compression test with 100kPa confining pressure', "
+                "'Triaxial shear test under drained conditions'"
             )
         ),
         timeout: Optional[int] = Field(
             default=None,
             description=(
-                "Execution timeout in milliseconds (None = no limit). Valid range: 1000-600000 (1s to 10min). "
-                "Only applies when run_in_background=False. "
-                "Recommended: 60000-120000ms for testing, None for production simulations."
+                "Timeout in milliseconds (None = no limit). "
+                "Range: 1000-600000. Only applies when run_in_background=False. "
+                "Recommended: 60000-120000ms for testing."
             )
         ),
         run_in_background: bool = Field(
             default=True,
             description=(
-                "Set to false to wait for completion and return result directly (for quick tests). "
-                "When true, returns task_id immediately for long-running simulations. "
-                "Query progress with pfc_check_task_status when using background mode."
+                "When true (default), returns task_id immediately without blocking. "
+                "When false, waits for completion. "
+                "Use pfc_check_task_status to monitor background tasks."
             )
         )
     ) -> Dict[str, Any]:
         """
-        Execute a PFC simulation task with automatic version tracking.
+        Execute a PFC simulation task.
 
-        Version Tracking:
-            Each execution creates a snapshot on the 'pfc-executions' git branch,
-            capturing the exact code state. Use exec_commit to trace back to the
-            code version used for any execution.
+        Returns task_id for tracking. Scripts can print progress during execution,
+        monitor real-time output via pfc_check_task_status(task_id).
 
-        Project Structure (recommended):
-            project/
-            ├── main.py           # Entry point (pass this to entry_script)
-            ├── geometry/         # Geometry generation modules
-            ├── materials/        # Material definitions
-            ├── analysis/         # Post-processing tools
-            └── config.py         # Shared parameters
-
-        Data Flow Pattern:
-            1. Real-time monitoring: Scripts print progress; check via pfc_check_task_status
-            2. Checkpoint persistence: Scripts save state with "model save"
-            3. Analysis data: Scripts export CSV/JSON for processing
-
-        Usage Workflow:
-            1. Develop project with modular structure
-            2. Call this tool with entry script → returns task_id + exec_commit
-            3. Monitor progress with pfc_check_task_status
-            4. Compare versions using exec_commit (git diff)
-
-        Note:
-            All PFC commands must use itasca.command() in scripts.
-            Query pfc_query_command for command syntax before writing scripts.
+        Note: Query pfc_query_command for command syntax before writing scripts.
         """
         try:
             # Get session ID from MCP context for task isolation
