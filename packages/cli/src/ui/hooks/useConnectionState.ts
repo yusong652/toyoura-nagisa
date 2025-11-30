@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { ConnectionManager } from '@aiNagisa/core';
+import type { ConnectionManager } from '@toyoura-nagisa/core';
 import type { ConnectionStatus } from '../types.js';
 
 interface UseConnectionStateParams {

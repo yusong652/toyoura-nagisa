@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 import { useSession } from '../../../contexts/session/SessionContext'
 import { UseTitleManagementReturn } from '../types'
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useChat } from '../../../contexts/chat/ChatContext'
-import { FileData } from '@aiNagisa/core'
+import { FileData } from '@toyoura-nagisa/core'
 import { 
   MessageSendingHookReturn, 
   SendingStatus,

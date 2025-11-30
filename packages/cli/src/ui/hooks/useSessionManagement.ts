@@ -6,7 +6,7 @@
  */
 
 import { useCallback } from 'react';
-import { sessionService, type ConnectionManager, type SessionManager } from '@aiNagisa/core';
+import { sessionService, type ConnectionManager, type SessionManager } from '@toyoura-nagisa/core';
 import { MessageType, type ContentBlock } from '../types.js';
 import type { useHistoryManager } from './useHistoryManager.js';
 

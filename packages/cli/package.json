@@ -1,7 +1,7 @@
 {
-  "name": "@aiNagisa/cli",
+  "name": "@toyoura-nagisa/cli",
   "version": "0.1.0",
-  "description": "Command-line interface for aiNagisa AI assistant",
+  "description": "Command-line interface for toyoura-nagisa AI assistant",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -11,21 +11,21 @@
   "scripts": {
     "dev": "node --import tsx src/index.tsx",
     "build": "tsc",
-    "bundle": "esbuild src/index.tsx --bundle --platform=node --format=esm --outfile=dist/bundle.js --external:@aiNagisa/core",
+    "bundle": "esbuild src/index.tsx --bundle --platform=node --format=esm --outfile=dist/bundle.js --external:@toyoura-nagisa/core",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
-    "aiNagisa",
+    "toyoura-nagisa",
     "cli",
     "ai",
     "assistant"
   ],
-  "author": "aiNagisa Team",
+  "author": "toyoura-nagisa Team",
   "license": "MIT",
   "dependencies": {
-    "@aiNagisa/core": "*",
+    "@toyoura-nagisa/core": "*",
     "ansi-escapes": "^7.0.0",
     "diff": "^8.0.2",
     "ink": "npm:@jrichman/ink@6.4.6",

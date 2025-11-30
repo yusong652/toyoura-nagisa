@@ -4,7 +4,7 @@ import {
   findAtSignPosition,
   extractQuery,
   parseCurrentMention as parseCurrentMentionCore
-} from '@aiNagisa/core/utils'
+} from '@toyoura-nagisa/core/utils'
 import {
   FileMentionMatch,
   FileMentionSuggestion,

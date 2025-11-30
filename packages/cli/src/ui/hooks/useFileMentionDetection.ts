@@ -9,7 +9,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   findAtSignPosition,
   extractQuery,
-} from '@aiNagisa/core/utils';
+} from '@toyoura-nagisa/core/utils';
 import { useFileSearch, type FileSearchResult } from './useFileSearch.js';
 
 export interface FileMentionSuggestion {

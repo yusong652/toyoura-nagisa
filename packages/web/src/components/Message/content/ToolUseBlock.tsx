@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { ToolUseBlock as ToolUseBlockType } from '@aiNagisa/core'
+import { ToolUseBlock as ToolUseBlockType } from '@toyoura-nagisa/core'
 import { useConnection } from '../../../contexts/connection/ConnectionContext'
 
 interface ToolUseBlockProps {

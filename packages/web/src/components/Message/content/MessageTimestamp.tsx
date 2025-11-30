@@ -1,5 +1,5 @@
 import React from 'react'
-import { formatSmartTime } from '@aiNagisa/core/utils'
+import { formatSmartTime } from '@toyoura-nagisa/core/utils'
 import { MessageTimestampProps } from '../types'
 
 /**

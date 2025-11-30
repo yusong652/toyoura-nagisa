@@ -20,7 +20,7 @@ export enum ConnectionState {
 
 /**
  * Generic WebSocket message interface for WebSocketManager
- * For specific message types, use the types from @aiNagisa/core/types
+ * For specific message types, use the types from @toyoura-nagisa/core/types
  */
 export interface WebSocketManagerMessage {
   type: string;

@@ -1,7 +1,7 @@
 {
-  "name": "@aiNagisa/core",
+  "name": "@toyoura-nagisa/core",
   "version": "0.1.0",
-  "description": "Shared core logic for aiNagisa web and CLI",
+  "description": "Shared core logic for toyoura-nagisa web and CLI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -41,8 +41,8 @@
     "dev": "tsc --watch",
     "test": "vitest"
   },
-  "keywords": ["aiNagisa", "core", "shared"],
-  "author": "aiNagisa Team",
+  "keywords": ["toyoura-nagisa", "core", "shared"],
+  "author": "toyoura-nagisa Team",
   "license": "MIT",
   "dependencies": {
     "eventemitter3": "^5.0.1"

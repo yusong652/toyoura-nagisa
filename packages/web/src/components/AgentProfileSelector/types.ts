@@ -1,4 +1,4 @@
-import { AgentProfileType, AgentProfileInfo } from '@aiNagisa/core'
+import { AgentProfileType, AgentProfileInfo } from '@toyoura-nagisa/core'
 
 /**
  * AgentProfileSelector TypeScript type definitions.

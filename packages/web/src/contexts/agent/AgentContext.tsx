@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { toolService, agentService } from '@aiNagisa/core'
-import { AgentProfileType, AgentProfileInfo } from '@aiNagisa/core'
+import { toolService, agentService } from '@toyoura-nagisa/core'
+import { AgentProfileType, AgentProfileInfo } from '@toyoura-nagisa/core'
 
 interface AgentContextType {
   // Tool-related state

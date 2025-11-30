@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { toolService } from '@aiNagisa/core'
+import { toolService } from '@toyoura-nagisa/core'
 
 interface TtsEnableContextType {
   ttsEnabled: boolean

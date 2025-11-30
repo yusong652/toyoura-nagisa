@@ -22,7 +22,7 @@ import {
   FileStorageAdapter,
   SessionService,
   apiClient,
-} from '@aiNagisa/core';
+} from '@toyoura-nagisa/core';
 import { App } from './App.js';
 import {
   AppStateContext,

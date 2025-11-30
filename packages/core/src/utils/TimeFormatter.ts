@@ -4,7 +4,7 @@
  * Provides both relative time display (e.g., "5 minutes ago")
  * and absolute time formatting with locale support.
  *
- * @module @aiNagisa/core/utils/TimeFormatter
+ * @module @toyoura-nagisa/core/utils/TimeFormatter
  * @author Nagisa Toyoura
  */
 

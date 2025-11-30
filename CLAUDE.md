@@ -499,7 +499,7 @@ Detailed PFC integration documentation covering:
 
 When creating commits, follow these guidelines for attribution and project identification:
 
-1. **Project Attribution**: Always reference the aiNagisa project repository URL `https://github.com/yusong652/aiNagisa` in commit messages rather than external tools
+1. **Project Attribution**: Always reference the aiNagisa project repository URL `https://github.com/yusong652/toyoura-nagisa` in commit messages rather than external tools
 2. **Co-authorship**: Use "Co-authored-with: Nagisa Toyoura" to reflect collaborative development instead of external tool attribution
 3. **Project Context**: Ensure commit messages reflect the aiNagisa project context and goals
 
@@ -510,7 +510,7 @@ feat: improve tool extraction logic
 Enhance MCP tool result processing for better LLM integration
 in the aiNagisa voice-enabled AI assistant.
 
-https://github.com/yusong652/aiNagisa
+https://github.com/yusong652/toyoura-nagisa
 
 Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>
 ```

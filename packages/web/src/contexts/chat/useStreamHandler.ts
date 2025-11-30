@@ -17,7 +17,7 @@ interface StreamHandlerOptions {
 }
 
 // Import Message type
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 
 /**
  * Refactored stream handler using modular hooks.

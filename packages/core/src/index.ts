@@ -1,5 +1,5 @@
 /**
- * @aiNagisa/core - Shared core logic for web and CLI frontends
+ * @toyoura-nagisa/core - Shared core logic for web and CLI frontends
  *
  * This package provides platform-agnostic business logic, type definitions,
  * and utilities that can be shared across different frontend implementations.

@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useRef, useEffect } from 'react'
-import { Message, TokenUsage } from '@aiNagisa/core'
+import { Message, TokenUsage } from '@toyoura-nagisa/core'
 import { useSession } from '../../../contexts/session/SessionContext'
 import './TokenUsageDisplay.css'
 

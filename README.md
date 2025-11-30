@@ -4,10 +4,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yusong652/aiNagisa/blob/main/LICENSE">
+  <a href="https://github.com/yusong652/toyoura-nagisa/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-GPL%20v3-blue.svg" alt="License">
   </a>
-  <a href="https://github.com/yusong652/aiNagisa/pulls">
+  <a href="https://github.com/yusong652/toyoura-nagisa/pulls">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
   </a>
 </p>
@@ -16,7 +16,7 @@
 
 ## 💡 Script is Context
 
-**aiNagisa** pioneers context engineering for LLM-driven discrete element simulations. Every PFC operation becomes a versioned Python script—queryable through git history and task lists, forming persistent cross-session context that the LLM learns from.
+**Toyoura Nagisa** pioneers context engineering for LLM-driven discrete element simulations. Every PFC operation becomes a versioned Python script—queryable through git history and task lists, forming persistent cross-session context that the LLM learns from.
 
 Traditional simulation tools demand users memorize syntax. We invert this: scripts *are* the context. The LLM queries documentation, generates tested code, and builds understanding from execution history—elegant context engineering at scale.
 
@@ -228,7 +228,7 @@ Traditional approaches to PFC automation require users to:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yusong652/aiNagisa.git
+git clone https://github.com/yusong652/toyoura-nagisa.git
 cd aiNagisa
 
 # Install all dependencies (frontend + backend)

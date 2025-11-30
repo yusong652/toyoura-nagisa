@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useCallback } from 'react'
-import { MessageStatus } from '@aiNagisa/core'
+import { MessageStatus } from '@toyoura-nagisa/core'
 
 interface MessageStatusEvent {
   messageId: string

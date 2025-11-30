@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { StreamProcessor, StreamEventHandlers } from '@aiNagisa/core'
+import { StreamProcessor, StreamEventHandlers } from '@toyoura-nagisa/core'
 
 interface UseStreamProcessorProps {
   handleTitleUpdate: (data: any) => void
@@ -20,7 +20,7 @@ interface UseStreamProcessorReturn {
  * React hook wrapper for core StreamProcessor.
  *
  * Provides React-specific lifecycle management and event handler binding
- * while delegating core stream processing logic to @aiNagisa/core.
+ * while delegating core stream processing logic to @toyoura-nagisa/core.
  */
 export const useStreamProcessor = ({
   handleTitleUpdate,

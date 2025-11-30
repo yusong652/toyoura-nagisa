@@ -14,7 +14,7 @@
  */
 
 import { useEffect } from 'react'
-import { Message, TokenUsage, ContentBlock } from '@aiNagisa/core'
+import { Message, TokenUsage, ContentBlock } from '@toyoura-nagisa/core'
 
 interface StreamingUpdateDetail {
   messageId: string

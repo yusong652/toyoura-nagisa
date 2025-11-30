@@ -15,7 +15,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { ConnectionManager } from '@aiNagisa/core';
+import type { ConnectionManager } from '@toyoura-nagisa/core';
 import { StreamingState } from '../contexts/StreamingContext.js';
 import {
   MessageType,

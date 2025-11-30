@@ -5,7 +5,7 @@
  * from text input. This module contains platform-agnostic parsing functions
  * that can be used in both web and CLI environments.
  *
- * @module @aiNagisa/core/utils/FileMentionParser
+ * @module @toyoura-nagisa/core/utils/FileMentionParser
  */
 
 /**

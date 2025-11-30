@@ -6,7 +6,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { Message, MessageStatus, ContentBlock } from '@aiNagisa/core'
+import { Message, MessageStatus, ContentBlock } from '@toyoura-nagisa/core'
 
 // =====================
 // Backend Message Types

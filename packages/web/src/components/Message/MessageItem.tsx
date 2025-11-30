@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import './MessageItem.css'
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 import { useImageNavigation } from '../../hooks/useImageNavigation'
 import { useErrorDisplay } from '../../hooks/useErrorDisplay'
 import ImageViewer from '../ImageViewer'

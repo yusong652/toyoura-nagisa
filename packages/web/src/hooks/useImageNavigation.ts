@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Message, FileData } from '@aiNagisa/core';
+import { Message, FileData } from '@toyoura-nagisa/core';
 
 export interface ImageItem {
   url: string;

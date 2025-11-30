@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { ChunkProcessor, ChunkEventHandlers, ChunkData as CoreChunkData } from '@aiNagisa/core'
+import { ChunkProcessor, ChunkEventHandlers, ChunkData as CoreChunkData } from '@toyoura-nagisa/core'
 import { useWebSocketTTS } from './useWebSocketTTS'
 
 // Re-export ChunkData from core for backward compatibility
@@ -24,7 +24,7 @@ interface UseChunkProcessorReturn {
  * React hook wrapper for core ChunkProcessor.
  *
  * Provides React-specific lifecycle management and event handler binding
- * while delegating core chunk processing logic to @aiNagisa/core.
+ * while delegating core chunk processing logic to @toyoura-nagisa/core.
  *
  * Also integrates WebSocket TTS functionality for real-time audio streaming.
  */

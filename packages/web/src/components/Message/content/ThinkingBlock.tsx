@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ThinkingBlock as ThinkingBlockType } from '@aiNagisa/core'
+import { ThinkingBlock as ThinkingBlockType } from '@toyoura-nagisa/core'
 import ReactMarkdown from 'react-markdown'
 
 interface ThinkingBlockProps {

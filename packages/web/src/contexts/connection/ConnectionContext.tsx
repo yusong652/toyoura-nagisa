@@ -7,7 +7,7 @@ import {
   ConnectionState,
   type LocationData,
   chatService
-} from '@aiNagisa/core'
+} from '@toyoura-nagisa/core'
 
 const ConnectionContext = createContext<ConnectionContextType | undefined>(undefined)
 

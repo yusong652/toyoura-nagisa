@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 
 interface UseMessageStateManagerProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>

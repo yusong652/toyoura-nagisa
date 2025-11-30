@@ -8,7 +8,7 @@ import {
   SessionEvent,
   LocalStorageAdapter,
   sessionService
-} from '@aiNagisa/core'
+} from '@toyoura-nagisa/core'
 import { useConnection } from '../connection/ConnectionContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
 

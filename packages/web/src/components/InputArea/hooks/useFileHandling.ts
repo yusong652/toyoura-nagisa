@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react'
-import { FileData } from '@aiNagisa/core'
+import { FileData } from '@toyoura-nagisa/core'
 import { 
   FileHandlingHookReturn, 
   validateFileSize, 

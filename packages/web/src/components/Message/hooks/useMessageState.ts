@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 import { MessageStateHookReturn } from '../types'
 
 /**

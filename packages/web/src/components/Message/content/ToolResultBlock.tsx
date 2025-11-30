@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ToolResultBlock as ToolResultBlockType } from '@aiNagisa/core'
+import { ToolResultBlock as ToolResultBlockType } from '@toyoura-nagisa/core'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 

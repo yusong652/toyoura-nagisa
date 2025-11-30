@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { apiClient } from '@aiNagisa/core';
+import { apiClient } from '@toyoura-nagisa/core';
 
 export interface FileSearchResult {
   path: string;

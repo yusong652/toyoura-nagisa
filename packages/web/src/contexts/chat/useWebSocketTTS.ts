@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { MessageType, TTSChunkMessage } from '@aiNagisa/core'
+import { MessageType, TTSChunkMessage } from '@toyoura-nagisa/core'
 
 interface WebSocketTTSProps {
   ttsEnabled: boolean

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
-import { FileData, ChatContextType} from '@aiNagisa/core'
+import { FileData, ChatContextType} from '@toyoura-nagisa/core'
 import { useAudio } from '../audio/AudioContext'
 import { useTtsEnable } from '../audio/TtsEnableContext'
 import { useAgent } from '../agent/AgentContext'

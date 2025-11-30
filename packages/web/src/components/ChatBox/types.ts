@@ -6,7 +6,7 @@
  * interface design, optional properties, and function type signatures.
  */
 
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 
 /**
  * Main ChatBox component props interface.

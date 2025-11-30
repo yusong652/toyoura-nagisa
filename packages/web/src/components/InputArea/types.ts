@@ -12,7 +12,7 @@
  * - Consistent with other aiNagisa component patterns
  */
 
-import { FileData } from '@aiNagisa/core'
+import { FileData } from '@toyoura-nagisa/core'
 
 // =============================================================================
 // Core Component Types

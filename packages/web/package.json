@@ -1,5 +1,5 @@
 {
-  "name": "@aiNagisa/web",
+  "name": "@toyoura-nagisa/web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aiNagisa/core": "*",
+    "@toyoura-nagisa/core": "*",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.18.0",

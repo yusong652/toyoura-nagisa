@@ -1,10 +1,10 @@
 /**
  * WebSocket Connection Hook
- * Wraps ConnectionManager from @aiNagisa/core
+ * Wraps ConnectionManager from @toyoura-nagisa/core
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import type { ConnectionManager } from '@aiNagisa/core';
+import type { ConnectionManager } from '@toyoura-nagisa/core';
 
 export interface UseWebSocketOptions {
   connectionManager: ConnectionManager;

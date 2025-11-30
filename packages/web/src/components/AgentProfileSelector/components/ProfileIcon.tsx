@@ -1,5 +1,5 @@
 import React from 'react'
-import { AgentProfileType } from '@aiNagisa/core'
+import { AgentProfileType } from '@toyoura-nagisa/core'
 import { ProfileIconProps } from '../types'
 
 /**

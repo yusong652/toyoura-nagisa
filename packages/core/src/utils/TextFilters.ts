@@ -4,7 +4,7 @@
  * Provides functions to clean and format text content before rendering,
  * including removal of emotion keyword markers.
  *
- * @module @aiNagisa/core/utils/TextFilters
+ * @module @toyoura-nagisa/core/utils/TextFilters
  */
 
 /**

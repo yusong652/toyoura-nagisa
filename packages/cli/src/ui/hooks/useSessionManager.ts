@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { sessionService, type ChatSession } from '@aiNagisa/core';
+import { sessionService, type ChatSession } from '@toyoura-nagisa/core';
 import type { SelectOption } from '../components/SelectDialog.js';
 
 export interface UseSessionManagerReturn {

@@ -20,7 +20,7 @@ import {
   ChatEvent,
   sessionService,
   chatService
-} from '@aiNagisa/core'
+} from '@toyoura-nagisa/core'
 import { useWebSocketMessageStatus } from '../../hooks/useWebSocketMessageStatus'
 
 export interface UseChatMessageOptions {

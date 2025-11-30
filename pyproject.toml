@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ainagisa"
+name = "toyoura-nagisa"
 version = "0.1.0"
-description = "AI Nagisa"
+description = "Toyoura Nagisa - LLM-Driven PFC Simulation Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

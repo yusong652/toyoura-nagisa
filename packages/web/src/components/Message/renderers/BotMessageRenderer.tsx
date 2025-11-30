@@ -6,7 +6,7 @@ import ToolUseBlock from '../content/ToolUseBlock'
 import ToolDiffBlock from '../content/ToolDiffBlock'
 import ThinkingBlock from '../content/ThinkingBlock'
 import { BotMessageRendererProps } from '../types'
-import { ContentBlock } from '@aiNagisa/core'
+import { ContentBlock } from '@toyoura-nagisa/core'
 
 /**
  * Bot message renderer component.

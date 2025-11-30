@@ -27,7 +27,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
-import { replaceMention } from '@aiNagisa/core/utils';
+import { replaceMention } from '@toyoura-nagisa/core/utils';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { useSlashCompletion } from '../hooks/useSlashCompletion.js';
 import { useFileMentionDetection } from '../hooks/useFileMentionDetection.js';

@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { apiClient } from '@aiNagisa/core';
+import { apiClient } from '@toyoura-nagisa/core';
 import type { AgentProfileType, AgentProfileInfo } from '../types.js';
 
 interface UseProfileManagerParams {

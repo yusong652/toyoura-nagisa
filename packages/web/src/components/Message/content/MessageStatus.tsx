@@ -1,5 +1,5 @@
 import React from 'react'
-import { MessageStatus } from '@aiNagisa/core'
+import { MessageStatus } from '@toyoura-nagisa/core'
 import { MessageStatusProps } from '../types'
 
 /**

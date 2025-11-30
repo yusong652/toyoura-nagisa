@@ -20,9 +20,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yusong652/aiNagisa"
-"Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
-Documentation = "https://github.com/yusong652/aiNagisa/blob/master/pfc-server/README.md"
+Homepage = "https://github.com/yusong652/toyoura-nagisa"
+"Bug Tracker" = "https://github.com/yusong652/toyoura-nagisa/issues"
+Documentation = "https://github.com/yusong652/toyoura-nagisa/blob/master/pfc-server/README.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["server"]

@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Message } from '@aiNagisa/core'
+import { Message } from '@toyoura-nagisa/core'
 import { useChat } from '../../../contexts/chat/ChatContext'
 import { useErrorDisplay } from '../../../hooks/useErrorDisplay'
 import { VideoFormat } from '../../VideoPlayer/types'
