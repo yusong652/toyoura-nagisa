@@ -313,47 +313,46 @@ def user_rejected_response(user_message: Optional[str] = None) -> Dict[str, Any]
     """Create a standardized user rejection response for all MCP tools.
 
     This function provides a unified way for tools to return user rejection responses,
-    indicating that the user chose not to proceed with the operation. This is NOT an error,
-    but a valid user decision that should be communicated clearly to the LLM.
+    indicating that the user chose not to proceed with the operation.
+
+    Following Claude Code's pattern: user rejection is treated as an error from the
+    tool execution perspective (operation was NOT completed), even though it's not
+    a backend logic error. The <error> tag helps LLM clearly understand the operation
+    did not execute, and red UI feedback shows users the action was rejected.
 
     Args:
         user_message: Optional message from the user explaining the rejection
 
     Returns:
         Dict[str, Any]: ToolResult dictionary with four fields:
-            - status: "success" (successfully captured user's decision, not an error)
+            - status: "error" (tool operation was not completed)
             - message: str (rejection message for UI)
-            - llm_content: {"parts": [{"type": "text", "text": "..."}]}
+            - llm_content: {"parts": [{"type": "text", "text": "<error>...</error>"}]}
             - data: None
-
-    Note:
-        Status is "success" (not "error") because the tool successfully captured
-        the user's decision to reject. This prevents the LLM from treating valid
-        user choices as system failures.
 
     Example:
         return user_rejected_response(user_message="This command looks dangerous")
         # Returns:
         # {
-        #   "status": "success",
+        #   "status": "error",
         #   "message": "The user doesn't want to proceed...",
-        #   "llm_content": {"parts": [{"type": "text", "text": "The user doesn't..."}]},
+        #   "llm_content": {"parts": [{"type": "text", "text": "<error>...</error>"}]},
         #   "data": None
         # }
     """
-    # Follow Claude Code's rejection message pattern
+    # Follow Claude Code's rejection message pattern with clear instruction to stop
     if user_message:
-        text = f"The user doesn't want to proceed with this tool use. The tool use was rejected: {user_message}"
+        text = (
+            f"The user doesn't want to proceed with this tool use. "
+            f"The tool use was rejected: {user_message}. "
+            f"STOP what you are doing and wait for the user to tell you how to proceed."
+        )
     else:
-        text = "The user doesn't want to proceed with this tool use. The tool use was rejected."
+        text = (
+            "The user doesn't want to proceed with this tool use. "
+            "The tool use was rejected. "
+            "STOP what you are doing and wait for the user to tell you how to proceed."
+        )
 
-    return ToolResult(
-        status="success",  # Successfully captured user's decision
-        message=text,
-        llm_content={
-            "parts": [
-                {"type": "text", "text": text}
-            ]
-        },
-        data=None
-    ).model_dump()
+    # Use error_response for consistent error formatting with <error> tags
+    return error_response(text)

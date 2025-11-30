@@ -388,15 +388,14 @@ class BaseToolManager(ABC):
 
             # Cascade blocking check 1: User rejection (blocks all remaining tools)
             if user_rejected_tool is not None:
-                from backend.infrastructure.mcp.utils.tool_result import success_response
+                from backend.infrastructure.mcp.utils.tool_result import error_response
 
-                cascade_message = f"The user doesn't want to take this action right now. Skipping {tool_name} due to previous rejection."
-                cascade_result = success_response(
-                    cascade_message,
-                    llm_content={
-                        "parts": [{"type": "text", "text": cascade_message}]
-                    }
+                cascade_message = (
+                    f"The user doesn't want to take this action right now. "
+                    f"Skipping {tool_name} due to previous rejection. "
+                    f"STOP what you are doing and wait for the user to tell you how to proceed."
                 )
+                cascade_result = error_response(cascade_message)
                 cascade_result["cascade_blocked"] = True
                 results.append(cascade_result)
 
@@ -467,7 +466,9 @@ class BaseToolManager(ABC):
 
             # Trigger 2: PFC tool error (blocks PFC chain only)
             # Note: status="pending" (background tasks) is not considered failure
-            if is_pfc_tool and result.get('status') == 'error':
+            # Note: user_rejected errors are handled separately (Trigger 1), don't double-count
+            is_tool_error = result.get('status') == 'error' and not result.get('user_rejected', False)
+            if is_pfc_tool and is_tool_error:
                 failed_pfc_tool = tool_name
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
@@ -475,7 +476,8 @@ class BaseToolManager(ABC):
 
             # Trigger 3: Any tool error when pfc_execute_task in queue (blocks all)
             # Note: status="pending" (background tasks) is not considered failure
-            if has_pfc_execute_task and result.get('status') == 'error':
+            # Note: user_rejected errors are handled separately (Trigger 1), don't double-count
+            if has_pfc_execute_task and is_tool_error:
                 failed_tool = tool_name
                 llm_settings = get_llm_settings()
                 if llm_settings.debug:
