@@ -4,10 +4,10 @@
  * toyoura-nagisa CLI - Command-line interface for toyoura-nagisa AI assistant
  *
  * Usage:
- *   ainagisa                    # Start interactive chat
- *   ainagisa --session <id>     # Connect to existing session
- *   ainagisa --host <host>      # Custom backend host
- *   ainagisa --port <port>      # Custom backend port
+ *   nagisa                    # Start interactive chat
+ *   nagisa --session <id>     # Connect to existing session
+ *   nagisa --host <host>      # Custom backend host
+ *   nagisa --port <port>      # Custom backend port
  *
  * Note: Start backend separately with: npm run start:backend
  */

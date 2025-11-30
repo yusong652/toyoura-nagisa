@@ -78,7 +78,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   }
 
   if (!sessionManagerRef.current) {
-    const storageAdapter = new FileStorageAdapter('.ainagisa');
+    const storageAdapter = new FileStorageAdapter('.toyoura-nagisa');
     const sessionService = new SessionService();
     sessionManagerRef.current = new SessionManager(sessionService, storageAdapter);
   }

@@ -111,14 +111,14 @@ export class ConnectionManager extends WebSocketManager {
    */
   private setupMessageHandlers(): void {
     this.on('message', (message: WebSocketManagerMessage) => {
-      this.handleAiNagisaMessage(message);
+      this.handleNagisaMessage(message);
     });
   }
 
   /**
    * Handle toyoura-nagisa-specific messages
    */
-  private async handleAiNagisaMessage(message: WebSocketManagerMessage): Promise<void> {
+  private async handleNagisaMessage(message: WebSocketManagerMessage): Promise<void> {
     switch (message.type) {
       case 'LOCATION_REQUEST':
         await this.handleLocationRequest(message);
