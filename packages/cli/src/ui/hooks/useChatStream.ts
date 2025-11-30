@@ -539,13 +539,9 @@ export function useChatStream({
   const confirmTool = useCallback((approved: boolean, message?: string) => {
     if (!pendingConfirmation) return;
 
-    // Add an info message about the confirmation result
-    if (!approved) {
-      historyManager.addItem({
-        type: MessageType.INFO,
-        message: `Tool "${pendingConfirmation.tool_name}" was rejected.`,
-      } as HistoryItemWithoutId);
-    }
+    // Note: No info message here - tool result will show rejection status (red error)
+    // Adding an info message immediately would cause it to appear before tool results
+    // because info goes to committed history while tool results are in pending state
 
     connectionManager.send({
       type: 'TOOL_CONFIRMATION_RESPONSE',
@@ -556,13 +552,14 @@ export function useChatStream({
     });
 
     setPendingConfirmation(null);
-    if (approved) {
-      setIsStreaming(true);
-      setStreamingState(StreamingState.Responding);
-    } else {
-      setStreamingState(StreamingState.Idle);
-    }
-  }, [pendingConfirmation, connectionManager, historyManager]);
+
+    // Always keep streaming state until backend returns results
+    // For approved: backend will execute tool and return results
+    // For rejected: backend will return rejection results (and cascade blocked results)
+    // State will be set to Idle when handleStreamingUpdate receives streaming=false
+    setIsStreaming(true);
+    setStreamingState(StreamingState.Responding);
+  }, [pendingConfirmation, connectionManager]);
 
   // Compute pending history items for rendering outside <Static>
   const pendingHistoryItems: HistoryItemWithoutId[] = useMemo(() => {
