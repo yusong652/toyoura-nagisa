@@ -123,11 +123,11 @@ def register_pfc_task_tool(mcp: FastMCP):
                 task_id = data.get("task_id") if data else None
                 entry_script_display = data.get("entry_script", data.get("script_path", script_path)) if data else script_path
                 submit_time = data.get("start_time", time.time()) if data else time.time()
-                exec_commit = data.get("exec_commit") if data else None
+                git_commit = data.get("git_commit") if data else None
                 time_info = format_time_range(submit_time)
 
                 # Build version info string
-                version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
 
                 return success_response(
                     message=result.get("message", f"Task submitted: {script_path}"),
@@ -135,7 +135,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                         "parts": [{
                             "type": "text",
                             "text": (
-                                f"**STATUS**: Task submitted | Task ID: {task_id} | {time_info}{version_info}\n"
+                                f"**STATUS**: Task submitted | task_id: {task_id} | {time_info}{version_info}\n"
                                 f"  Entry: {entry_script_display}\n"
                                 f"  → {description}\n\n"
                                 f"Use pfc_check_task_status to monitor progress."
@@ -143,7 +143,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                         }]
                     },
                     entry_script=script_path,
-                    exec_commit=exec_commit,
+                    git_commit=git_commit,
                     result=data
                 )
 
@@ -157,7 +157,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                     script_result = data.get("result") if data else None
                     start_time = data.get("start_time") if data else None
                     end_time = data.get("end_time") if data else None
-                    exec_commit = data.get("exec_commit") if data else None
+                    git_commit = data.get("git_commit") if data else None
 
                     # Use pagination utility to extract output summary
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -173,9 +173,9 @@ def register_pfc_task_tool(mcp: FastMCP):
 
                     # 1. Success message with version info
                     time_info = format_time_range(start_time, end_time)
-                    version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                    version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
                     llm_text_parts.append(
-                        f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{version_info}\n"
+                        f"**STATUS**: Completed | task_id: {task_id} | {time_info}{version_info}\n"
                         f"  Entry: {entry_script_display}\n"
                         f"  → {description}"
                     )
@@ -207,7 +207,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                         },
                         entry_script=script_path,
                         task_id=task_id,
-                        exec_commit=exec_commit,
+                        git_commit=git_commit,
                         script_result=script_result,
                         pagination=pagination
                     )
@@ -220,7 +220,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                     error_message = data.get("error", result.get("message", "Task execution failed")) if data else result.get("message", "Task execution failed")
                     start_time = data.get("start_time") if data else None
                     end_time = data.get("end_time") if data else None
-                    exec_commit = data.get("exec_commit") if data else None
+                    git_commit = data.get("git_commit") if data else None
 
                     # Use pagination utility
                     output_text, pagination = format_paginated_output(output, offset=0, limit=10)
@@ -234,9 +234,9 @@ def register_pfc_task_tool(mcp: FastMCP):
 
                     # 1. Error message with version info
                     time_info = format_time_range(start_time, end_time)
-                    version_info = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                    version_info = f" | git_commit: {git_commit[:8]}" if git_commit else ""
                     llm_text_parts.append(
-                        f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{version_info}\n"
+                        f"**STATUS**: Failed | task_id: {task_id} | {time_info}{version_info}\n"
                         f"  Entry: {entry_script_display}\n"
                         f"  → {description}\n\n"
                         f"Error: {error_message}"
@@ -265,7 +265,7 @@ def register_pfc_task_tool(mcp: FastMCP):
                         },
                         entry_script=script_path,
                         task_id=task_id,
-                        exec_commit=exec_commit,
+                        git_commit=git_commit,
                         script_error=error_message,
                         pagination=pagination
                     )

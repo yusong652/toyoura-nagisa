@@ -110,7 +110,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 description = data.get("description", "")
                 entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
-                exec_commit = data.get("exec_commit")
+                git_commit = data.get("git_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -135,14 +135,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     session_marker = f" [Session: {task_session_id_display}]"
 
                 # Build version info
-                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                version_marker = f" | git_commit: {git_commit[:8]}" if git_commit else ""
 
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Running | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"**STATUS**: Running | task_id: {task_id} | {time_info}{version_marker}{session_marker}\n"
                     f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Output: {pagination['total_lines']} lines{' (filtered)' if filter else ' total'}{filter_info} | "
@@ -178,7 +178,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
-                exec_commit = data.get("exec_commit")
+                git_commit = data.get("git_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -203,14 +203,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     session_marker = f" [Session: {task_session_id_display}]"
 
                 # Build version info
-                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                version_marker = f" | git_commit: {git_commit[:8]}" if git_commit else ""
 
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Completed | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"**STATUS**: Completed | task_id: {task_id} | {time_info}{version_marker}{session_marker}\n"
                     f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Result: {task_result}\n"
@@ -247,7 +247,7 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                 entry_script = data.get("entry_script", data.get("script_path", "unknown"))
                 start_time = data.get("start_time")
                 end_time = data.get("end_time")
-                exec_commit = data.get("exec_commit")
+                git_commit = data.get("git_commit")
                 task_session_id = data.get("session_id", "unknown")
 
                 # Format paginated output
@@ -272,14 +272,14 @@ def register_pfc_task_status_tool(mcp: FastMCP):
                     session_marker = f" [Session: {task_session_id_display}]"
 
                 # Build version info
-                version_marker = f" | Commit: {exec_commit[:8]}" if exec_commit else ""
+                version_marker = f" | git_commit: {git_commit[:8]}" if git_commit else ""
 
                 # Build filter info
                 filter_info = f" | Filter: '{filter}'" if filter else ""
 
                 # Build LLM-friendly text with three-line format
                 llm_text = (
-                    f"**STATUS**: Failed | Task ID: {task_id} | {time_info}{version_marker}{session_marker}\n"
+                    f"**STATUS**: Failed | task_id: {task_id} | {time_info}{version_marker}{session_marker}\n"
                     f"  Entry: {entry_script}\n"
                     f"  → {description}\n\n"
                     f"Error: {error_msg}\n"

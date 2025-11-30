@@ -22,10 +22,10 @@ class ScriptTask(Task):
 
     Enhanced task type with real-time output capture via StringIO buffer,
     suitable for long-running simulations with progress monitoring.
-    Includes git-based version tracking via exec_commit.
+    Includes git-based version tracking via git_commit.
     """
 
-    def __init__(self, task_id, session_id, future, script_name, script_path=None, output_buffer=None, description=None, on_status_change=None, exec_commit=None):
+    def __init__(self, task_id, session_id, future, script_name, script_path=None, output_buffer=None, description=None, on_status_change=None, git_commit=None):
         # type: (str, str, Any, str, Optional[str], Any, Optional[str], Any, Optional[str]) -> None
         """
         Initialize script task.
@@ -39,14 +39,14 @@ class ScriptTask(Task):
             output_buffer: Optional StringIO buffer for real-time output capture
             description: Task description from PFC agent (LLM-provided)
             on_status_change: Optional callback function(task) called when task status changes
-            exec_commit: Git commit hash on pfc-executions branch (version snapshot)
+            git_commit: Git commit hash on pfc-executions branch (version snapshot)
         """
         # Use agent-provided description (default to empty string if None)
         super(ScriptTask, self).__init__(task_id, session_id, future, description or "", "script", on_status_change)
         self.script_name = script_name
         self.script_path = script_path  # Entry script path
         self.output_buffer = output_buffer
-        self.exec_commit = exec_commit  # Git version snapshot
+        self.git_commit = git_commit  # Git version snapshot
 
         logger.info("✓ Script task registered: {} (ID: {}, Session: {})".format(
             script_name, task_id, session_id
@@ -81,7 +81,7 @@ class ScriptTask(Task):
                 "description": self.description,
                 "start_time": self.start_time,
                 "elapsed_time": elapsed_time,
-                "exec_commit": self.exec_commit
+                "git_commit": self.git_commit
             }
 
             if current_output:
@@ -156,7 +156,7 @@ class ScriptTask(Task):
                 "elapsed_time": elapsed_time,
                 "output": output_text if output_text else "",
                 "result": serialized_result,  # Script's 'result' variable
-                "exec_commit": self.exec_commit
+                "git_commit": self.git_commit
             }
 
             return {
@@ -201,7 +201,7 @@ class ScriptTask(Task):
                 "elapsed_time": elapsed_time,
                 "output": output_text if output_text else "",
                 "error": error_msg,
-                "exec_commit": self.exec_commit
+                "git_commit": self.git_commit
             }
 
             return {
@@ -224,7 +224,7 @@ class ScriptTask(Task):
             "name": self.script_name,  # Script file name (for backward compatibility)
             "entry_script": self.script_path,  # Entry script path (new naming)
             "script_path": self.script_path,  # Absolute path for LLM (backward compatibility)
-            "exec_commit": self.exec_commit,  # Git version snapshot
+            "git_commit": self.git_commit,  # Git version snapshot
             "notified": self.notified  # Whether completion notification has been sent
         }
         # Add end_time for completed/failed tasks

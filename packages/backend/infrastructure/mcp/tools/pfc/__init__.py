@@ -14,8 +14,8 @@ Documentation Query Tools:
 - pfc_query_command: Query PFC command documentation (115 commands + model properties)
 
 Version Tracking:
-    Each pfc_execute_task creates a snapshot on 'pfc-executions' branch.
-    Use exec_commit in task info to trace code versions.
+    Each pfc_execute_task creates a git snapshot for traceability.
+    Use git_commit in task info to trace code versions.
 
 Note: All PFC command execution is done through Python scripts using itasca.command().
       Query pfc_query_command for command syntax, then use in scripts.

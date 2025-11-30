@@ -271,19 +271,19 @@ class PFCScriptExecutor:
             # Create git execution snapshot (before running script)
             # This captures the exact code state that will be executed
             git_manager = get_git_manager()
-            exec_commit = None
+            git_commit = None
             if git_manager.is_git_available():
                 # Generate task_id early for commit message
                 import uuid
                 task_id_preview = uuid.uuid4().hex[:8]
-                exec_commit = git_manager.create_execution_commit(
+                git_commit = git_manager.create_execution_commit(
                     task_id=task_id_preview,
                     description=description,
                     entry_script=script_path
                 )
-                if exec_commit:
+                if git_commit:
                     logger.info("✓ Created execution snapshot: {} for task {}".format(
-                        exec_commit[:8], task_id_preview
+                        git_commit[:8], task_id_preview
                     ))
             else:
                 logger.warning("Git not available - skipping version snapshot")
@@ -308,7 +308,7 @@ class PFCScriptExecutor:
                     script_path,
                     output_buffer,  # Pass buffer reference for live status queries
                     description,  # Agent-provided task description
-                    exec_commit  # Git version snapshot
+                    git_commit  # Git version snapshot
                 )
 
                 return {
@@ -322,7 +322,7 @@ class PFCScriptExecutor:
                         "script_path": script_path,
                         "description": description,
                         "start_time": submit_time,
-                        "exec_commit": exec_commit
+                        "git_commit": git_commit
                     }
                 }
 
@@ -342,7 +342,7 @@ class PFCScriptExecutor:
                     script_path,
                     output_buffer,  # Pass buffer reference for output caching
                     description,  # Agent-provided task description
-                    exec_commit  # Git version snapshot
+                    git_commit  # Git version snapshot
                 )
 
                 loop = asyncio.get_event_loop()
@@ -378,7 +378,7 @@ class PFCScriptExecutor:
                         "elapsed_time": elapsed_time,
                         "output": full_output,
                         "result": result_dict.get("data"),  # Script's 'result' variable
-                        "exec_commit": exec_commit
+                        "git_commit": git_commit
                     }
                 }
 
@@ -424,7 +424,7 @@ class PFCScriptExecutor:
                         "start_time": task.start_time if task else None,
                         "output": output_buffer.getvalue() if 'output_buffer' in locals() else "", # type: ignore
                         "error": error_message,
-                        "exec_commit": locals().get('exec_commit')
+                        "git_commit": locals().get('git_commit')
                     }
                 }
 
@@ -444,7 +444,7 @@ class PFCScriptExecutor:
                     "script_path": script_path,
                     "description": description,
                     "error": error_message,
-                    "exec_commit": locals().get('exec_commit')
+                    "git_commit": locals().get('git_commit')
                 }
             }
 

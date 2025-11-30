@@ -94,7 +94,7 @@ class TaskPersistence:
         # Script task fields
         task_data["script_name"] = task.script_name
         task_data["script_path"] = task.script_path
-        task_data["exec_commit"] = getattr(task, "exec_commit", None)  # Git version snapshot
+        task_data["git_commit"] = getattr(task, "git_commit", None)  # Git version snapshot
         # Save output snapshot
         output = task.get_current_output()
         task_data["output"] = output if output else ""
@@ -310,7 +310,7 @@ class HistoricalTask:
         # Restore script task fields
         self.script_name = task_data.get("script_name", "")
         self.script_path = task_data.get("script_path")
-        self.exec_commit = task_data.get("exec_commit")  # Git version snapshot
+        self.git_commit = task_data.get("git_commit")  # Git version snapshot
         self.output_snapshot = task_data.get("output", "")
 
         # No Future or output_buffer for historical tasks
@@ -355,7 +355,7 @@ class HistoricalTask:
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "output": output if output else "",
-                    "exec_commit": getattr(self, "exec_commit", None),
+                    "git_commit": getattr(self, "git_commit", None),
                     "historical": True
                 }
             }
@@ -378,7 +378,7 @@ class HistoricalTask:
                     "description": self.description,
                     "elapsed_time": elapsed_time,
                     "output": output if output else "",
-                    "exec_commit": getattr(self, "exec_commit", None),
+                    "git_commit": getattr(self, "git_commit", None),
                     "historical": True,
                     "error": "Task failed or interrupted"
                 }
@@ -401,7 +401,7 @@ class HistoricalTask:
             "name": self.script_name,
             "entry_script": self.script_path,
             "script_path": self.script_path,
-            "exec_commit": self.exec_commit
+            "git_commit": self.git_commit
         }
 
         # Add end_time if available
