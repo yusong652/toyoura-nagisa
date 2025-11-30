@@ -12,7 +12,7 @@ Architecture:
 - Task Processing: IPython post_execute hook (triggered by any IPython command)
 
 Usage in PFC GUI IPython shell (one-line command):
-    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\toyoura-nagisa\\pfc-server'); exec(open(r'C:\\Dev\\Han\\toyoura-nagisa\\pfc-server\\start_server.py', encoding='utf-8').read())
+    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\toyoura-nagisa\\services\\pfc-server'); exec(open(r'C:\\Dev\\Han\\toyoura-nagisa\\services\\pfc-server\\start_server.py', encoding='utf-8').read())
 
 Features:
     - IPython shell remains fully interactive (not blocked)
@@ -44,7 +44,7 @@ from server.server import create_server
 
 # Load configuration
 try:
-    from config import (
+    from config import ( # type: ignore
         WEBSOCKET_HOST,
         WEBSOCKET_PORT,
         PING_INTERVAL,
@@ -76,7 +76,7 @@ stop_event = threading.Event()
 # ===== Configure PFC Python State =====
 # Prevent PFC from resetting Python state/cache on initialization
 try:
-    import itasca as it
+    import itasca as it # type: ignore
     it.command("python-reset-state false")
     print("✓ Python state preservation enabled (python-reset-state false)")
 except ImportError:
