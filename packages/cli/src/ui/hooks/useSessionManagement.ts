@@ -20,6 +20,7 @@ interface UseSessionManagementParams {
 interface UseSessionManagementReturn {
   switchSession: (sessionId: string) => Promise<void>;
   createSession: (name?: string) => Promise<string>;
+  loadHistory: (sessionId: string) => Promise<void>;
 }
 
 /**
@@ -117,12 +118,8 @@ export function useSessionManagement({
   setCurrentSessionId,
 }: UseSessionManagementParams): UseSessionManagementReturn {
 
-  const switchSession = useCallback(async (sessionId: string) => {
-    connectionManager.disconnect();
-    setCurrentSessionId(sessionId);
-    historyManager.clearItems();
-
-    // Load chat history for the session
+  // Load history for a session (reusable, doesn't manage connection)
+  const loadHistory = useCallback(async (sessionId: string) => {
     try {
       const historyResponse = await sessionService.getSessionHistory(sessionId);
       if (historyResponse.history && historyResponse.history.length > 0) {
@@ -131,9 +128,21 @@ export function useSessionManagement({
     } catch (err) {
       console.error('[useSessionManagement] Failed to load session history:', err);
     }
+  }, [historyManager]);
+
+  const switchSession = useCallback(async (sessionId: string) => {
+    connectionManager.disconnect();
+    setCurrentSessionId(sessionId);
+    historyManager.clearItems();
+
+    // Persist current session ID to storage (for CLI restart)
+    await sessionManager.switchSession(sessionId);
+
+    // Load chat history for the session
+    await loadHistory(sessionId);
 
     await connectionManager.connectToSession(sessionId);
-  }, [connectionManager, historyManager, setCurrentSessionId]);
+  }, [connectionManager, sessionManager, historyManager, setCurrentSessionId, loadHistory]);
 
   const createSession = useCallback(async (name?: string) => {
     const sessionId = await sessionManager.createSession(name);
@@ -144,5 +153,6 @@ export function useSessionManagement({
   return {
     switchSession,
     createSession,
+    loadHistory,
   };
 }

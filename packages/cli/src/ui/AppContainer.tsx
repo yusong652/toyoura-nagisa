@@ -138,6 +138,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const {
     switchSession,
     createSession,
+    loadHistory,
   } = useSessionManagement({
     connectionManager,
     sessionManager,
@@ -146,15 +147,42 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   });
 
   // ========== Session Initialization ==========
+  // Use ref to access loadHistory without adding it to deps
+  const loadHistoryRef = useRef(loadHistory);
+  loadHistoryRef.current = loadHistory;
+
   useEffect(() => {
     const initSession = async () => {
       try {
-        let sessionId = currentSessionId;
+        // Initialize session manager (loads stored session ID and session list from backend)
+        await sessionManager.initialize();
+
+        // Priority: CLI arg > stored session > create new
+        let sessionId = currentSessionId || sessionManager.getCurrentSessionId();
+        let isExistingSession = false;
+
+        // Validate stored session exists in backend
+        if (sessionId) {
+          const sessions = sessionManager.getSessions();
+          const sessionExists = sessions.some(s => s.id === sessionId);
+          if (sessionExists) {
+            isExistingSession = true;
+          } else {
+            // Stored session no longer exists, clear it
+            sessionId = null;
+          }
+        }
 
         // Create new session if none exists
         if (!sessionId) {
           sessionId = await sessionManager.createSession();
-          setCurrentSessionId(sessionId);
+        }
+
+        setCurrentSessionId(sessionId);
+
+        // Load chat history for existing sessions
+        if (isExistingSession) {
+          await loadHistoryRef.current(sessionId);
         }
 
         // Connect WebSocket
