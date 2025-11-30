@@ -60,6 +60,9 @@ def create_new_history(name: Optional[str] = None) -> str:
         "updated_at": datetime.now().isoformat()
     }
 
+    # Ensure base directory exists
+    os.makedirs(HISTORY_BASE_DIR, exist_ok=True)
+
     # Save metadata
     metadata_file = os.path.join(HISTORY_BASE_DIR, "sessions_metadata.json")
     metadata = {}
