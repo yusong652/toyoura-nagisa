@@ -12,7 +12,7 @@ Architecture:
 - Task Processing: IPython post_execute hook (triggered by any IPython command)
 
 Usage in PFC GUI IPython shell (one-line command):
-    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\aiNagisa\\pfc-server'); exec(open(r'C:\\Dev\\Han\\aiNagisa\\pfc-server\\start_server.py', encoding='utf-8').read())
+    >>> import sys; sys.path.append(r'C:\\Dev\\Han\\toyoura-nagisa\\pfc-server'); exec(open(r'C:\\Dev\\Han\\toyoura-nagisa\\pfc-server\\start_server.py', encoding='utf-8').read())
 
 Features:
     - IPython shell remains fully interactive (not blocked)

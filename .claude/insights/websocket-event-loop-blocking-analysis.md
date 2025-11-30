@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在aiNagisa的WebSocket通信系统中，发现了一个关键的性能问题：当MCP工具请求用户位置信息时，整个WebSocket连接会被阻塞30秒，期间无法接收前端发送的任何消息（包括LOCATION_RESPONSE和HEARTBEAT_ACK）。
+在toyoura-nagisa的WebSocket通信系统中，发现了一个关键的性能问题：当MCP工具请求用户位置信息时，整个WebSocket连接会被阻塞30秒，期间无法接收前端发送的任何消息（包括LOCATION_RESPONSE和HEARTBEAT_ACK）。
 
 ## 根本原因分析
 

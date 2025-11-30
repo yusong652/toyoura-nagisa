@@ -1,5 +1,5 @@
 """
-WebSocket utility functions for aiNagisa.
+WebSocket utility functions for toyoura-nagisa.
 
 This module contains utility functions for WebSocket message processing,
 including data conversion and transformation utilities.

@@ -2,7 +2,7 @@
  * AgentProfileSelector components module exports.
  * 
  * Centralized exports for all profile selector UI components.
- * Following aiNagisa's modular component architecture pattern.
+ * Following toyoura-nagisa's modular component architecture pattern.
  * 
  * Usage:
  *     import { ProfileButton, ProfileDropdown, ProfileIcon } from './components'

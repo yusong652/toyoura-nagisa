@@ -5,7 +5,7 @@ import { DropdownStateHookReturn } from '../types'
  * Custom hook for managing dropdown state and click-outside behavior.
  * 
  * Handles dropdown open/close state, ref management for click-outside detection,
- * and automatic cleanup of event listeners. Follows aiNagisa's hook patterns
+ * and automatic cleanup of event listeners. Follows toyoura-nagisa's hook patterns
  * with proper TypeScript typing and resource management.
  * 
  * Returns:

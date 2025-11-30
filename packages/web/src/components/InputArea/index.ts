@@ -2,7 +2,7 @@
  * InputArea module exports.
  * 
  * Main export point for the InputArea component and related types.
- * Following aiNagisa's clean architecture pattern with comprehensive
+ * Following toyoura-nagisa's clean architecture pattern with comprehensive
  * type exports and clear module boundaries.
  * 
  * Usage:

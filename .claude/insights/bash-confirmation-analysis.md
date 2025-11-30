@@ -1,11 +1,11 @@
 # Bash Confirmation System Analysis
 
 ## Overview
-Analysis of bash command confirmation mechanisms in aiNagisa vs Claude Code, focusing on concurrent command handling and user rejection feedback.
+Analysis of bash command confirmation mechanisms in toyoura-nagisa vs Claude Code, focusing on concurrent command handling and user rejection feedback.
 
 ## Current System Architecture
 
-### aiNagisa Implementation
+### toyoura-nagisa Implementation
 - **Service**: `BashConfirmationService` in `backend/application/services/notifications/bash_confirmation_service.py`
 - **Hook**: `useBashConfirmation` in `frontend/src/components/Tools/hooks/useBashConfirmation.ts`
 - **UI**: `BashConfirmation` component in `frontend/src/components/Tools/BashConfirmation.tsx`
@@ -72,7 +72,7 @@ tool_request_2 → tool_response_2
                 → user_message (optional rejection feedback)
 ```
 
-#### aiNagisa Current Pattern
+#### toyoura-nagisa Current Pattern
 ```
 tool_request_1 → tool_response_1 (embedded user feedback)
 tool_request_2 → tool_response_2 (embedded user feedback)

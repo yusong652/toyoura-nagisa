@@ -1,5 +1,5 @@
 """
-WebSocket Connection Lifecycle Manager for aiNagisa.
+WebSocket Connection Lifecycle Manager for toyoura-nagisa.
 
 This module manages the WebSocket connection lifecycle - NOT message content processing.
 

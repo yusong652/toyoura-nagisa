@@ -1,14 +1,14 @@
 # PFC Documentation Retrieval System Research
 
 **Date**: 2025-10-20
-**Context**: Design and implementation of intelligent documentation retrieval for PFC Python SDK in aiNagisa project
+**Context**: Design and implementation of intelligent documentation retrieval for PFC Python SDK in toyoura-nagisa project
 **Status**: Research phase - preparing for implementation
 
 ---
 
 ## Executive Summary
 
-This research investigates state-of-the-art documentation retrieval techniques for LLM-powered applications, specifically for the aiNagisa PFC (Particle Flow Code) SDK documentation system. The goal is to design an efficient, accurate retrieval system that helps LLMs discover and use the 1600+ PFC API methods effectively.
+This research investigates state-of-the-art documentation retrieval techniques for LLM-powered applications, specifically for the toyoura-nagisa PFC (Particle Flow Code) SDK documentation system. The goal is to design an efficient, accurate retrieval system that helps LLMs discover and use the 1600+ PFC API methods effectively.
 
 **Key Finding**: Our initial design intuition (two-tool separation, hierarchical search, hybrid retrieval) aligns perfectly with 2024-2025 best practices.
 
@@ -62,7 +62,7 @@ Gorilla = Fine-tuned LLaMA + Retriever Aware Training (RAT)
 ### Key Insight
 > Specialized small model + retriever > General large model alone
 
-**Relevance to aiNagisa**: We should design retrieval-first, not prompt-engineering-first
+**Relevance to toyoura-nagisa**: We should design retrieval-first, not prompt-engineering-first
 
 ### References
 - Paper: https://arxiv.org/abs/2305.15334
@@ -262,7 +262,7 @@ reranked = co.rerank(
 
 ---
 
-## 7. Design Recommendations for aiNagisa PFC
+## 7. Design Recommendations for toyoura-nagisa PFC
 
 ### Current Architecture (Well-Designed!)
 

@@ -14,7 +14,7 @@ import {
  * Core state management hook for VideoPlayer.
  * 
  * Manages video metadata, playback state, and player readiness following
- * aiNagisa's separation of concerns principle. Handles format detection,
+ * toyoura-nagisa's separation of concerns principle. Handles format detection,
  * URL normalization, and state initialization.
  * 
  * This hook serves as the central state coordinator, providing processed
@@ -165,7 +165,7 @@ export default useVideoPlayerState
  * - URL normalization handles various input formats gracefully
  * - State initialization provides safe defaults for all scenarios
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Single responsibility (state management only)
  * ✓ Optimized performance with memoization
  * ✓ Clear TypeScript interfaces and documentation

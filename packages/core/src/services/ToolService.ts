@@ -2,7 +2,7 @@
  * Tool API service for handling tool and TTS configuration.
  * 
  * Provides methods for managing tool enablement status and TTS settings
- * in the aiNagisa application.
+ * in the toyoura-nagisa application.
  */
 
 import { apiClient } from './HttpClient'

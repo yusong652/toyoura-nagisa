@@ -282,7 +282,7 @@ export default VideoContainer
  * - .error-message: Error message styling
  * - .error-details: Error details styling
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Clean separation between content types (video vs image)
  * ✓ Comprehensive error handling and user feedback
  * ✓ Accessibility features and semantic HTML

@@ -1,5 +1,5 @@
 """
-Unified workspace resolution for aiNagisa.
+Unified workspace resolution for toyoura-nagisa.
 
 This module provides a single source of truth for determining workspace directories
 based on agent profiles. Both system prompt construction and tool execution use
@@ -27,9 +27,9 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         - PFC profile with PFC server connected: PFC server's actual working directory
           → Ensures agent can access files saved by PFC (e.g., checkpoints, data)
         - PFC profile without PFC server: Fallback to local pfc_workspace
-          → aiNagisa/pfc_workspace (standalone mode)
+          → toyoura-nagisa/pfc_workspace (standalone mode)
         - Other profiles (coding, general, lifestyle, etc.): Unified workspace
-          → aiNagisa/workspace
+          → toyoura-nagisa/workspace
 
     Args:
         agent_profile: Agent profile type ("pfc", "coding", "general", etc.)
@@ -78,7 +78,7 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
             fallback.mkdir(parents=True, exist_ok=True)
             return fallback
 
-    # Non-PFC profiles: use aiNagisa/workspace
+    # Non-PFC profiles: use toyoura-nagisa/workspace
     try:
         from backend.shared.utils.prompt.config import BASE_DIR
         workspace = BASE_DIR / "workspace"

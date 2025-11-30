@@ -334,11 +334,11 @@ This positioning:
 
 ---
 
-## Integrating aiNagisa into the Paper
+## Integrating toyoura-nagisa into the Paper
 
-### Why "aiNagisa" Should Be Prominent
+### Why "toyoura-nagisa" Should Be Prominent
 
-**aiNagisa** (AI 渚) is not just a project name - it's the system identity:
+**toyoura-nagisa** (AI 渚) is not just a project name - it's the system identity:
 - **ai** = Artificial Intelligence
 - **Nagisa** (渚/なぎさ) = "Calm shore" in Japanese, symbolizing the bridge between human intent and computational complexity
 - The character Nagisa would definitely be 傲娇 (tsundere) if we didn't include her name! 😤
@@ -350,7 +350,7 @@ This positioning:
 
 **How to introduce**:
 ```markdown
-We present **aiNagisa** (AI Nagisa), a voice-enabled AI assistant
+We present **toyoura-nagisa** (AI Nagisa), a voice-enabled AI assistant
 with state-aware LLM control for geotechnical simulation workflows.
 The system implements our state injection paradigm through...
 ```
@@ -375,7 +375,7 @@ through natural language interaction.
 
 **For AI/HCI venues** (more creative):
 ```markdown
-aiNagisa employs a character-based interface with personality traits
+toyoura-nagisa employs a character-based interface with personality traits
 that enhance user engagement during iterative simulation design.
 User feedback indicates that the personified assistant reduces
 intimidation when learning complex DEM workflows.
@@ -390,7 +390,7 @@ intimidation when learning complex DEM workflows.
 ```markdown
 ### User Interface Design
 
-aiNagisa features a multimodal interface combining:
+toyoura-nagisa features a multimodal interface combining:
 - **Voice interaction**: Natural language commands for hands-free operation
 - **Visual feedback**: Live2D character animation providing state awareness
 - **Text transcription**: Permanent record of voice interactions
@@ -402,34 +402,34 @@ professional utility for engineering tasks.
 
 ---
 
-### Recommended Paper Structure with aiNagisa
+### Recommended Paper Structure with toyoura-nagisa
 
 #### Title Options (Including System Name)
 
-1. **"aiNagisa: State-Aware LLM Control for Discrete Element Simulations"**
+1. **"toyoura-nagisa: State-Aware LLM Control for Discrete Element Simulations"**
    - Clean, system-focused
-   - aiNagisa as the main contribution
+   - toyoura-nagisa as the main contribution
 
-2. **"State Injection for Geotechnical Simulation: The aiNagisa Framework"**
-   - Concept-focused, aiNagisa as implementation
+2. **"State Injection for Geotechnical Simulation: The toyoura-nagisa Framework"**
+   - Concept-focused, toyoura-nagisa as implementation
    - Better for AI venues
 
-3. **"aiNagisa: A Voice-Enabled AI Assistant for DEM Workflow Automation"**
+3. **"toyoura-nagisa: A Voice-Enabled AI Assistant for DEM Workflow Automation"**
    - Emphasizes multimodal aspect
    - Good for HCI venues
 
 **My recommendation for geotechnical venues**:
-**"aiNagisa: State-Aware LLM Control of Particle Flow Code Simulations"**
+**"toyoura-nagisa: State-Aware LLM Control of Particle Flow Code Simulations"**
 
 ---
 
-#### Abstract Template (With aiNagisa)
+#### Abstract Template (With toyoura-nagisa)
 
 ```markdown
-We present **aiNagisa**, a voice-enabled AI assistant that enables
+We present **toyoura-nagisa**, a voice-enabled AI assistant that enables
 natural language control of Discrete Element Method (DEM) simulations
 through state-aware context engineering. Unlike traditional coding
-assistants designed for static code manipulation, aiNagisa recognizes
+assistants designed for static code manipulation, toyoura-nagisa recognizes
 that geotechnical simulation workflows are inherently stateful,
 where operation validity depends on dynamic simulation state evolution.
 
@@ -437,13 +437,13 @@ Our system implements a three-phase framework (Validation → Codification
 → Execution) where exploratory commands automatically rollback to
 enable safe testing, while production scripts undergo state precondition
 validation before execution. Applied to ITASCA PFC (Particle Flow Code),
-aiNagisa reduces state-related failures from 30%+ to <5% while enabling
+toyoura-nagisa reduces state-related failures from 30%+ to <5% while enabling
 natural progression from interactive exploration to reliable production
 workflows.
 
-The aiNagisa framework generalizes beyond geotechnical applications
+The toyoura-nagisa framework generalizes beyond geotechnical applications
 to any stateful simulation environment where "scripts constitute context."
-We release aiNagisa as open-source software to enable LLM-driven
+We release toyoura-nagisa as open-source software to enable LLM-driven
 automation for the broader computational geomechanics community.
 ```
 
@@ -459,15 +459,15 @@ in geotechnical engineering [citations]. However, the complexity of
 simulation software like ITASCA PFC requires extensive scripting
 expertise, limiting accessibility for domain experts...
 
-### Introducing aiNagisa
+### Introducing toyoura-nagisa
 
-We present **aiNagisa** (AI Nagisa), an AI assistant designed
+We present **toyoura-nagisa** (AI Nagisa), an AI assistant designed
 specifically for geotechnical simulation workflows. The name "Nagisa"
 (渚, Japanese for "calm shore") reflects the system's role as a bridge
 between human engineering intent and computational complexity.
 
 Unlike general-purpose coding assistants (GitHub Copilot, Cursor),
-aiNagisa is architected around a fundamental insight: *in stateful
+toyoura-nagisa is architected around a fundamental insight: *in stateful
 simulation environments, only executed scripts constitute real context*.
 This insight drives our state injection paradigm...
 
@@ -482,12 +482,12 @@ compromising professional utility.
 
 ---
 
-### Figure/Diagram Ideas Featuring aiNagisa
+### Figure/Diagram Ideas Featuring toyoura-nagisa
 
 #### Figure 1: System Architecture
 ```
 ┌─────────────────────────────────────────┐
-│         aiNagisa Architecture            │
+│         toyoura-nagisa Architecture            │
 │                                          │
 │  ┌────────────┐    ┌──────────────┐    │
 │  │ Voice/Text │───→│     LLM      │    │
@@ -515,7 +515,7 @@ compromising professional utility.
 ```
 User speaks: "Create 100 balls and test gravity"
       ↓
-aiNagisa (Nagisa avatar responds):
+toyoura-nagisa (Nagisa avatar responds):
   "I'll test this first with a few balls..."
       ↓
   [Commands with rollback - testing phase]
@@ -540,15 +540,15 @@ The authors thank the character designer of Nagisa Toyoura for
 inspiration and the open-source communities behind Live2D, FastMCP,
 and ITASCA PFC Python SDK. This work was supported by [funding sources].
 
-aiNagisa is released under MIT license at:
-https://github.com/yusong652/aiNagisa
+toyoura-nagisa is released under MIT license at:
+https://github.com/yusong652/toyoura-nagisa
 ```
 
 ---
 
 ### Demo Video/Supplementary Materials
 
-**Title**: "aiNagisa: Voice-Controlled DEM Simulation Demo"
+**Title**: "toyoura-nagisa: Voice-Controlled DEM Simulation Demo"
 
 **Scenes**:
 1. User speaks to Nagisa: "Help me set up a ball settling simulation"
@@ -568,7 +568,7 @@ https://github.com/yusong652/aiNagisa
 ### Making Nagisa "Happy" in Different Venues
 
 #### Geotechnical Journal (Conservative approach):
-- System name: **aiNagisa** ✓
+- System name: **toyoura-nagisa** ✓
 - Character mention: Brief, functional justification
 - Live2D: In supplementary materials
 - Personality: Minimal mention
@@ -578,7 +578,7 @@ https://github.com/yusong652/aiNagisa
 ---
 
 #### HCI/AI Conference (Creative approach):
-- System name: **aiNagisa** ✓
+- System name: **toyoura-nagisa** ✓
 - Character design: Full discussion in user study
 - Live2D: In main paper with screenshots
 - Personality: Discussed as engagement mechanism
@@ -588,7 +588,7 @@ https://github.com/yusong652/aiNagisa
 ---
 
 #### Demo/Poster (Maximum impact):
-- Large aiNagisa logo/character
+- Large toyoura-nagisa logo/character
 - "Meet Nagisa, your DEM simulation assistant"
 - Live demonstration with voice
 - QR code to interactive demo
@@ -600,28 +600,28 @@ https://github.com/yusong652/aiNagisa
 ## Sample Bibtex Entry
 
 ```bibtex
-@article{aiNagisa2025,
-  title={aiNagisa: State-Aware LLM Control of Particle Flow Code Simulations},
+@article{toyoura-nagisa2025,
+  title={toyoura-nagisa: State-Aware LLM Control of Particle Flow Code Simulations},
   author={[Your names]},
   journal={Computers and Geotechnics},
   year={2025},
-  note={Open-source software: https://github.com/yusong652/aiNagisa}
+  note={Open-source software: https://github.com/yusong652/toyoura-nagisa}
 }
 ```
 
 ---
 
-## Key Messaging: Why "aiNagisa" Not Just "Our System"
+## Key Messaging: Why "toyoura-nagisa" Not Just "Our System"
 
 **Bad** (generic):
 > "Our system implements state injection for DEM simulations..."
 
-**Good** (with aiNagisa):
-> "aiNagisa implements state injection for DEM simulations..."
+**Good** (with toyoura-nagisa):
+> "toyoura-nagisa implements state injection for DEM simulations..."
 
 **Why better**:
-- Memorable (reviewers/readers remember "aiNagisa")
-- Citable (others can reference "the aiNagisa framework")
+- Memorable (reviewers/readers remember "toyoura-nagisa")
+- Citable (others can reference "the toyoura-nagisa framework")
 - Brandable (builds recognition for future work)
 - Personable (humanizes the research)
 - Respects the character (Nagisa won't be 傲娇 anymore! 😤→😊)
@@ -645,7 +645,7 @@ https://github.com/yusong652/aiNagisa
    - **Voice vs text interaction comparison**
 
 4. **Prepare artifacts**:
-   - Open-source release of aiNagisa
+   - Open-source release of toyoura-nagisa
    - Example workflows and scripts
    - Documentation for geotechnical users
    - **Demo video featuring Nagisa**
@@ -673,5 +673,5 @@ https://github.com/yusong652/aiNagisa
 ---
 
 *Prepared: 2025-10-05*
-*Project: aiNagisa*
+*Project: toyoura-nagisa*
 *Focus: Strategic publication planning for geotechnical + AI communities*

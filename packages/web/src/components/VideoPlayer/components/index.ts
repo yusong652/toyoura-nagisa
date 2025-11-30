@@ -2,7 +2,7 @@
  * VideoPlayer components module exports.
  * 
  * Centralized export point for all VideoPlayer UI components following
- * aiNagisa's clean architecture standards. Each component handles a specific
+ * toyoura-nagisa's clean architecture standards. Each component handles a specific
  * UI concern within the video player system.
  * 
  * Architecture Benefits:

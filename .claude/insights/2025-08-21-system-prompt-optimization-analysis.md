@@ -1,8 +1,8 @@
-# aiNagisa System Prompt优化分析报告
+# toyoura-nagisa System Prompt优化分析报告
 
 ## 执行摘要
 
-通过分析Anthropic官方文档推荐的system prompt格式与aiNagisa当前实现的对比，发现了关键的优化机会。**重要发现：Claude Code确实在system prompt中嵌入了完整的工具定义**，这与aiNagisa当前仅通过API参数传递工具schema的做法形成鲜明对比。
+通过分析Anthropic官方文档推荐的system prompt格式与toyoura-nagisa当前实现的对比，发现了关键的优化机会。**重要发现：Claude Code确实在system prompt中嵌入了完整的工具定义**，这与toyoura-nagisa当前仅通过API参数传递工具schema的做法形成鲜明对比。
 
 ## 🔍 关键发现：Claude Code的实际实现
 
@@ -23,7 +23,7 @@ Here are the functions available in JSONSchema format:
 
 ### 关键对比
 
-| 方面 | Claude Code | aiNagisa |
+| 方面 | Claude Code | toyoura-nagisa |
 |------|-------------|----------|
 | 工具定义位置 | **System prompt中嵌入** | 仅API参数传递 |
 | Schema格式 | 完整JSON Schema | 完整JSON Schema |
@@ -35,11 +35,11 @@ Here are the functions available in JSONSchema format:
 1. **验证了Anthropic最佳实践**：System prompt中嵌入工具定义确实是推荐做法
 2. **解释了Claude Code的优异表现**：完整的工具上下文提高了调用准确性
 3. **重新评估token成本**：Claude Code愿意用5,000+ tokens换取工具调用的可靠性
-4. **为aiNagisa提供明确方向**：应该考虑在system prompt中嵌入工具定义
+4. **为toyoura-nagisa提供明确方向**：应该考虑在system prompt中嵌入工具定义
 
 ## 当前System Prompt结构分析
 
-### aiNagisa现有架构
+### toyoura-nagisa现有架构
 
 ```
 get_system_prompt(tools_enabled=True) 构建顺序：
@@ -115,7 +115,7 @@ Here are the functions available in JSONSchema format:
 
 #### 1. 格式化指令 (Formatting Instructions)
 
-**问题**：aiNagisa缺乏明确的参数格式说明
+**问题**：toyoura-nagisa缺乏明确的参数格式说明
 
 **官方要求**：
 - 字符串和标量参数直接指定
@@ -146,7 +146,7 @@ Here are the functions available in JSONSchema format:
 - 特殊行为说明
 - 错误处理指导
 
-### aiNagisa的优势特色
+### toyoura-nagisa的优势特色
 
 #### 1. 实用性导向的工具指南
 
@@ -155,7 +155,7 @@ Here are the functions available in JSONSchema format:
 - 工作环境的明确说明
 - 路径安全的重点强调
 
-**对比**：官方格式更注重格式规范，aiNagisa更注重实际使用指导
+**对比**：官方格式更注重格式规范，toyoura-nagisa更注重实际使用指导
 
 #### 2. 项目特色集成
 
@@ -175,7 +175,7 @@ Here are the functions available in JSONSchema format:
 
 ### 策略1：增强型混合格式（推荐）
 
-保持aiNagisa的优势特色，同时集成Anthropic的格式要求：
+保持toyoura-nagisa的优势特色，同时集成Anthropic的格式要求：
 
 ```markdown
 # 建议的新System Prompt结构
@@ -211,7 +211,7 @@ After completing your response, append emotion keyword...
 
 **缺点**：
 - 大幅增加token消耗
-- 失去aiNagisa的特色优势
+- 失去toyoura-nagisa的特色优势
 - 维护复杂度增加
 
 ### 策略3：格式化指令增强（最小改动）
@@ -286,7 +286,7 @@ Total: ~3,500 tokens
 ### 🎯 新的推荐实施路径
 
 #### 1. 立即实施（高优先级）
-**在aiNagisa中实现完整的工具定义嵌入**：
+**在toyoura-nagisa中实现完整的工具定义嵌入**：
 - 修改AnthropicToolManager，在system prompt中嵌入完整工具schema
 - 采用Claude Code的格式：`<functions><function>...</function></functions>`
 - 这是Claude Code成功的核心要素之一
@@ -324,11 +324,11 @@ def build_enhanced_system_prompt(self, base_prompt: str, tool_schemas: List[Dict
 
 ### 🔄 更新的Token成本分析
 
-既然Claude Code使用5,000+ tokens用于工具定义仍然被认为是可接受的，aiNagisa也应该重新考虑这个成本：
+既然Claude Code使用5,000+ tokens用于工具定义仍然被认为是可接受的，toyoura-nagisa也应该重新考虑这个成本：
 
 | 场景 | Token消耗 | 预期收益 |
 |------|-----------|----------|
-| 当前aiNagisa | ~3,500 | 基础功能 |
+| 当前toyoura-nagisa | ~3,500 | 基础功能 |
 | +工具定义嵌入 | ~8,500 | **显著提升工具调用准确性** |
 | Claude Code参考 | ~8,500+ | 极高的工具调用可靠性 |
 
@@ -353,7 +353,7 @@ def build_enhanced_system_prompt(self, base_prompt: str, tool_schemas: List[Dict
 ### 🚀 战略意义
 
 这个发现表明：
-1. **aiNagisa目前可能处于次优状态** - 没有采用Anthropic的最佳实践
+1. **toyoura-nagisa目前可能处于次优状态** - 没有采用Anthropic的最佳实践
 2. **竞争优势机会** - 通过采用Claude Code的成功模式提升系统可靠性
 3. **用户体验提升** - 更准确的工具调用直接改善用户交互体验
 
@@ -365,4 +365,4 @@ def build_enhanced_system_prompt(self, base_prompt: str, tool_schemas: List[Dict
 - [ ] 评估在其他provider中的适用性
 - [ ] 建立性能监控和回滚机制
 
-**结论**：Claude Code的成功证明了在system prompt中嵌入工具定义的价值，aiNagisa应该积极采用这一最佳实践，以实现更高的工具调用可靠性和用户体验。
+**结论**：Claude Code的成功证明了在system prompt中嵌入工具定义的价值，toyoura-nagisa应该积极采用这一最佳实践，以实现更高的工具调用可靠性和用户体验。

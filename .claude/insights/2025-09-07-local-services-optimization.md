@@ -24,7 +24,7 @@
 
 ```
 Windows服务器
-├── aiNagisa主程序
+├── toyoura-nagisa主程序
 ├── ComfyUI (图像生成)
 ├── GPT-SoVITS (语音合成)
 ├── Fish Audio本地替代
@@ -184,8 +184,8 @@ Start-Process python -ArgumentList "C:\Bert-VITS2\server.py" -WorkingDirectory "
 # 等待服务启动
 Start-Sleep -Seconds 10
 
-# 启动aiNagisa
-Start-Process python -ArgumentList "C:\Projects\aiNagisa\backend\app.py"
+# 启动toyoura-nagisa
+Start-Process python -ArgumentList "C:\Projects\toyoura-nagisa\backend\app.py"
 ```
 
 ### 3. Docker容器化（可选）
@@ -325,4 +325,4 @@ class GPUResourceManager:
 - 零外部依赖
 - 完整的数据隐私
 
-这将使aiNagisa成为真正的离线可用、高性能的AI助手系统！
+这将使toyoura-nagisa成为真正的离线可用、高性能的AI助手系统！

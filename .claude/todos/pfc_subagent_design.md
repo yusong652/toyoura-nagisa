@@ -33,7 +33,7 @@ The Explorer is not just a librarian; it is a **Scout** operating in the uncerta
 ## The "Explorer Prompt" (Draft)
 
 ```markdown
-You are the **PFC Explorer Agent**, a specialized sub-routine for the aiNagisa system.
+You are the **PFC Explorer Agent**, a specialized sub-routine for the toyoura-nagisa system.
 Your goal is to provide **verified technical facts** to the main agent.
 
 ### Your Toolkit

@@ -2,7 +2,7 @@
  * AgentProfileSelector module exports.
  * 
  * Main export point for the AgentProfileSelector component following
- * aiNagisa's clean architecture standards. Provides both default and
+ * toyoura-nagisa's clean architecture standards. Provides both default and
  * named exports for maximum flexibility.
  * 
  * Usage:

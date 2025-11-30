@@ -24,13 +24,13 @@
 ```
 ┌─────────────────┐     WebSocket      ┌──────────────────┐     API       ┌────────────┐
 │  Client Apps    │ ◄───────────────── │  PFC Server      │ ◄──────────── │ ITASCA SDK │
-│  (e.g. aiNagisa)│     ws://9001      │  (This Project)  │   itasca.*    │   (PFC)    │
+│  (e.g. toyoura-nagisa)│     ws://9001      │  (This Project)  │   itasca.*    │   (PFC)    │
 └─────────────────┘                    └──────────────────┘               └────────────┘
      Python 3.11+                           Python 3.6+                    Main Thread
      Any machine                            PFC GUI Process                Thread-Sensitive
 ```
 
-**Not part of aiNagisa runtime** - This server is an external dependency that happens to be distributed with aiNagisa for convenience.
+**Not part of toyoura-nagisa runtime** - This server is an external dependency that happens to be distributed with toyoura-nagisa for convenience.
 
 ---
 
@@ -319,10 +319,10 @@ LONG_RUNNING_COMMANDS = {
 
 ## 🧪 Testing
 
-If using with aiNagisa, run the integration demo:
+If using with toyoura-nagisa, run the integration demo:
 
 ```bash
-# From aiNagisa root (with PFC server running)
+# From toyoura-nagisa root (with PFC server running)
 uv run python examples/pfc_integration/DEMo.py
 ```
 
@@ -351,13 +351,13 @@ Tests: normal tasks, long tasks, status queries, WebSocket responsiveness, main 
 
 - **[ITASCA PFC Documentation](https://www.itascacg.com/software/pfc)**: Official PFC docs
 - **Integration Example**: See `examples/` directory for PFC project templates
-- **Client Implementation**: If using aiNagisa, see `backend/infrastructure/pfc/` for WebSocket client
+- **Client Implementation**: If using toyoura-nagisa, see `backend/infrastructure/pfc/` for WebSocket client
 
 ---
 
 ## 📄 License
 
-Same as parent aiNagisa project - see LICENSE file in repository root.
+Same as parent toyoura-nagisa project - see LICENSE file in repository root.
 
 ---
 
@@ -369,5 +369,5 @@ Same as parent aiNagisa project - see LICENSE file in repository root.
 
 ---
 
-**This is an independent service, not a module of aiNagisa.**
+**This is an independent service, not a module of toyoura-nagisa.**
 It runs in PFC GUI's Python environment and can be used by any WebSocket client.

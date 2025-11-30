@@ -1,4 +1,4 @@
-# IDEAS.md - Future Concepts for aiNagisa
+# IDEAS.md - Future Concepts for toyoura-nagisa
 
 ## Shadow Learning Mode (影子学习模式)
 

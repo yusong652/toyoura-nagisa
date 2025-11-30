@@ -2,7 +2,7 @@
  * MediaModal components module exports.
  * 
  * Centralized exports for all media modal UI components.
- * Following aiNagisa's modular component architecture pattern.
+ * Following toyoura-nagisa's modular component architecture pattern.
  * 
  * Usage:
  *     import { MediaModalContainer, MediaModalHeader } from './components'

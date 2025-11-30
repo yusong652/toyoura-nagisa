@@ -1,5 +1,5 @@
 """
-TTS module for aiNagisa
+TTS module for toyoura-nagisa
 """
 
 from backend.infrastructure.tts.base import BaseTTS, TTSConfig, TTSException, TTSSynthesisError, TTSInitError

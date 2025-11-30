@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="./packages/web/public/readme_header.png" alt="aiNagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
+  <img src="./packages/web/public/readme_header.png" alt="toyoura-nagisa - LLM-Driven PFC Simulation Assistant with Script is Context Philosophy" width="900"/>
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@ The LLM doesn't guess - it queries before acting:
 ```
 User: "Create a ball settling simulation with 1000 particles"
 
-aiNagisa:
+toyoura-nagisa:
 1. Queries 'ball generate' documentation → learns syntax
 2. Queries 'model gravity' API → understands scripting
 3. Writes test script (10 particles) → validates approach
@@ -46,7 +46,7 @@ aiNagisa:
 
 ### 🧠 **Agent Profile System**
 
-Different tasks need different tools. aiNagisa loads tool categories based on agent profiles:
+Different tasks need different tools. toyoura-nagisa loads tool categories based on agent profiles:
 
 | Profile | Tools | Token Usage | Purpose |
 |---------|-------|-------------|---------|
@@ -85,7 +85,7 @@ All providers share the same tool orchestration engine and conversation manageme
 
 ## 🎨 Additional Features
 
-Beyond the core PFC integration, aiNagisa includes:
+Beyond the core PFC integration, toyoura-nagisa includes:
 
 - **Long-Term Memory** (Mem0 + ChromaDB) - Learns user preferences across sessions
 - **Live2D Character** - Interactive visual companion that responds to conversations
@@ -137,7 +137,7 @@ Beyond the core PFC integration, aiNagisa includes:
 ### Project Structure (Monorepo Architecture)
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── packages/
 │   ├── backend/                   # Python backend (FastAPI)
 │   │   ├── app.py                 # FastAPI application entrypoint
@@ -185,7 +185,7 @@ aiNagisa/
 └── ...
 ```
 
-## 🚀 What Makes aiNagisa Different?
+## 🚀 What Makes toyoura-nagisa Different?
 
 Traditional approaches to PFC automation require users to:
 - ❌ Remember complex command syntax
@@ -193,7 +193,7 @@ Traditional approaches to PFC automation require users to:
 - ❌ Monitor console output continuously
 - ❌ Context-switch between documentation and coding
 
-**aiNagisa automates this entire workflow:**
+**toyoura-nagisa automates this entire workflow:**
 - ✅ LLM queries documentation automatically
 - ✅ Test-first validation catches errors early
 - ✅ Script-based execution creates self-documenting history
@@ -203,7 +203,7 @@ Traditional approaches to PFC automation require users to:
 
 ### Prerequisites
 
-**aiNagisa Backend:**
+**toyoura-nagisa Backend:**
 - **Python 3.10+** with `uv` package manager ([install guide](https://github.com/astral-sh/uv))
 - **Git** - Required for file search tools (glob/grep functionality)
 - **Node.js 16+** - For frontend development
@@ -229,7 +229,7 @@ Traditional approaches to PFC automation require users to:
 ```bash
 # Clone the repository
 git clone https://github.com/yusong652/toyoura-nagisa.git
-cd aiNagisa
+cd toyoura-nagisa
 
 # Install all dependencies (frontend + backend)
 npm install
@@ -316,10 +316,10 @@ pip install websockets==9.1
 
 # 2. Start PFC WebSocket server in PFC IPython shell
 import sys
-sys.path.append(r'/path/to/aiNagisa/services/pfc-server')
-exec(open(r'/path/to/aiNagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
+sys.path.append(r'/path/to/toyoura-nagisa/services/pfc-server')
+exec(open(r'/path/to/toyoura-nagisa/services/pfc-server/start_server.py', encoding='utf-8').read())
 
-# 3. In aiNagisa, select "PFC Expert" agent profile
+# 3. In toyoura-nagisa, select "PFC Expert" agent profile
 # 4. Interact with PFC through natural language
 ```
 

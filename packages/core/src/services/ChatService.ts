@@ -2,7 +2,7 @@
  * Chat API service for handling message-related operations.
  *
  * Provides methods for sending messages via WebSocket, deleting messages,
- * and managing chat-related functionality in the aiNagisa application.
+ * and managing chat-related functionality in the toyoura-nagisa application.
  *
  * Note: Chat messaging has been migrated from HTTP SSE to WebSocket for
  * better real-time performance and unified architecture.

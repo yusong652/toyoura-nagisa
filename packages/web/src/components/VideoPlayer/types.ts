@@ -1,7 +1,7 @@
 /**
  * VideoPlayer module types and interfaces.
  * 
- * Following aiNagisa's clean architecture standards for comprehensive
+ * Following toyoura-nagisa's clean architecture standards for comprehensive
  * type definitions supporting video playback, format handling, and
  * component interaction.
  * 
@@ -408,7 +408,7 @@ export const normalizeVideoUrl = (url: string, format: VideoFormat): string => {
  * - Comprehensive utility functions with proper typing
  * - Consistent interface patterns across the module
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Detailed TypeScript documentation
  * ✓ Logical type organization and grouping
  * ✓ Utility functions with type guards

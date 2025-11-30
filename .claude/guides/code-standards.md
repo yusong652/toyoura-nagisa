@@ -1,6 +1,6 @@
 # Code Quality and Documentation Standards
 
-**For aiNagisa project development**
+**For toyoura-nagisa project development**
 
 ## Type Validation and Logic Redundancy
 
@@ -92,4 +92,4 @@ def extract_tool_result_from_mcp(result: CallToolResult) -> Dict[str, Any]:
     """
 ```
 
-**These standards ensure consistent, maintainable, and well-documented code across the aiNagisa project.**
+**These standards ensure consistent, maintainable, and well-documented code across the toyoura-nagisa project.**

@@ -1,5 +1,5 @@
 """
-Improved Background Process Manager for aiNagisa with better output handling.
+Improved Background Process Manager for toyoura-nagisa with better output handling.
 
 Key improvements:
 1. Force unbuffered output for Python scripts

@@ -2,7 +2,7 @@
 Chat and streaming message schemas.
 
 This module defines WebSocket messages for chat interactions, real-time
-streaming, and message creation in the aiNagisa conversation system.
+streaming, and message creation in the toyoura-nagisa conversation system.
 """
 from typing import Optional, Dict, Any, List
 from backend.presentation.websocket.messages.base import BaseWebSocketMessage

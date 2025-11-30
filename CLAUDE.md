@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**aiNagisa** is a **production-grade AI agent platform** bridging conversational AI with professional scientific computing workflows. The project demonstrates how modern LLM capabilities can be extended to control complex external systems while maintaining architectural elegance and reliability.
+**toyoura-nagisa** is a **production-grade AI agent platform** bridging conversational AI with professional scientific computing workflows. The project demonstrates how modern LLM capabilities can be extended to control complex external systems while maintaining architectural elegance and reliability.
 
 ### Core Value Propositions
 
@@ -232,21 +232,21 @@ npm run preview
 pip install websockets==9.1
 
 # 2. Start PFC WebSocket server (in PFC GUI Python console)
-exec(open(r'C:\Dev\Han\aiNagisa\pfc-server\start_server.py', encoding='utf-8').read())
+exec(open(r'C:\Dev\Han\toyoura-nagisa\pfc-server\start_server.py', encoding='utf-8').read())
 
-# 3. Test integration from aiNagisa environment (with PFC server running)
+# 3. Test integration from toyoura-nagisa environment (with PFC server running)
 uv run python examples/pfc_integration/DEMo.py
 ```
 
 **Why separate?**
 - pfc-server requires `websockets==9.1` (PFC Python environment constraint)
-- aiNagisa requires `websockets>=15.0.1` (modern features)
+- toyoura-nagisa requires `websockets>=15.0.1` (modern features)
 - Different runtime environments → separate dependency management
 
 ## File Structure
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── packages/
 │   ├── backend/
 │   │   ├── app.py                      # Main FastAPI application
@@ -499,16 +499,16 @@ Detailed PFC integration documentation covering:
 
 When creating commits, follow these guidelines for attribution and project identification:
 
-1. **Project Attribution**: Always reference the aiNagisa project repository URL `https://github.com/yusong652/toyoura-nagisa` in commit messages rather than external tools
+1. **Project Attribution**: Always reference the toyoura-nagisa project repository URL `https://github.com/yusong652/toyoura-nagisa` in commit messages rather than external tools
 2. **Co-authorship**: Use "Co-authored-with: Nagisa Toyoura" to reflect collaborative development instead of external tool attribution
-3. **Project Context**: Ensure commit messages reflect the aiNagisa project context and goals
+3. **Project Context**: Ensure commit messages reflect the toyoura-nagisa project context and goals
 
 ### Example Commit Format
 ```
 feat: improve tool extraction logic
 
 Enhance MCP tool result processing for better LLM integration
-in the aiNagisa voice-enabled AI assistant.
+in the toyoura-nagisa voice-enabled AI assistant.
 
 https://github.com/yusong652/toyoura-nagisa
 

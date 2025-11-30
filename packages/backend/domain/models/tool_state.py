@@ -1,5 +1,5 @@
 """
-Tool execution state models for aiNagisa.
+Tool execution state models for toyoura-nagisa.
 
 Domain models representing the state of tool execution workflows,
 particularly for user confirmation and feedback scenarios.

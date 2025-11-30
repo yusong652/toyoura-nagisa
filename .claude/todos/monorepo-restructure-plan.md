@@ -1,4 +1,4 @@
-# aiNagisa Monorepo 目录结构重构计划
+# toyoura-nagisa Monorepo 目录结构重构计划
 
 **日期**: 2025-11-23
 **状态**: 规划阶段
@@ -11,7 +11,7 @@
 ### 1.1 新目录结构
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── packages/                    # 所有可复用包
 │   ├── backend/                # Python FastAPI 后端
 │   │   ├── pyproject.toml
@@ -204,18 +204,18 @@ mkdir -p scripts
   ],
   "scripts": {
     "dev:backend": "uv run python packages/backend/app.py",
-    "dev:web": "npm -w @aiNagisa/web run dev",
-    "dev:cli": "npm -w @aiNagisa/cli run dev",
+    "dev:web": "npm -w @toyoura-nagisa/web run dev",
+    "dev:cli": "npm -w @toyoura-nagisa/cli run dev",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
-    "build:core": "npm -w @aiNagisa/core run build",
-    "build:web": "npm -w @aiNagisa/web run build",
-    "build:cli": "npm -w @aiNagisa/cli run build",
+    "build:core": "npm -w @toyoura-nagisa/core run build",
+    "build:web": "npm -w @toyoura-nagisa/web run build",
+    "build:cli": "npm -w @toyoura-nagisa/cli run build",
     "build:all": "npm run build:core && npm run build:web && npm run build:cli",
     "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
     "install:all": "npm install",
     "test:backend": "uv run pytest",
-    "test:web": "npm -w @aiNagisa/web run test",
-    "lint:web": "npm -w @aiNagisa/web run lint"
+    "test:web": "npm -w @toyoura-nagisa/web run test",
+    "lint:web": "npm -w @toyoura-nagisa/web run lint"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -252,8 +252,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yusong652/aiNagisa"
-"Bug Tracker" = "https://github.com/yusong652/aiNagisa/issues"
+Homepage = "https://github.com/yusong652/toyoura-nagisa"
+"Bug Tracker" = "https://github.com/yusong652/toyoura-nagisa/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["packages/backend"]
@@ -268,7 +268,7 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = [
     "packages/backend",
-    "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot"
+    "workspace/default/toyoura-nagisa_uv_workspace/toyoura-nagisa-uv-plot"
 ]
 # Note: services/pfc-server NOT included
 # It runs in PFC's embedded Python environment
@@ -285,9 +285,9 @@ dev = [
 
 ```json
 {
-  "name": "@aiNagisa/core",
+  "name": "@toyoura-nagisa/core",
   "version": "0.1.0",
-  "description": "Shared core logic for aiNagisa web and CLI",
+  "description": "Shared core logic for toyoura-nagisa web and CLI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -323,8 +323,8 @@ dev = [
     "dev": "tsc --watch",
     "test": "vitest"
   },
-  "keywords": ["aiNagisa", "core", "shared"],
-  "author": "aiNagisa Team",
+  "keywords": ["toyoura-nagisa", "core", "shared"],
+  "author": "toyoura-nagisa Team",
   "license": "MIT",
   "dependencies": {
     "eventemitter3": "^5.0.1"
@@ -370,12 +370,12 @@ dev = [
 **位置**: `/packages/web/package.json`
 
 **变更**:
-- 更新 `name` 为 `@aiNagisa/web`
-- 添加 `@aiNagisa/core` 依赖
+- 更新 `name` 为 `@toyoura-nagisa/web`
+- 添加 `@toyoura-nagisa/core` 依赖
 
 ```json
 {
-  "name": "@aiNagisa/web",
+  "name": "@toyoura-nagisa/web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -387,7 +387,7 @@ dev = [
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aiNagisa/core": "*",
+    "@toyoura-nagisa/core": "*",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.18.0",
@@ -438,7 +438,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ainagisa-backend"
 version = "0.1.0"
-description = "aiNagisa FastAPI backend"
+description = "toyoura-nagisa FastAPI backend"
 requires-python = ">=3.10"
 
 dependencies = [
@@ -514,7 +514,7 @@ packages/web/src/components/ChatBox.tsx
 #!/bin/bash
 # 环境初始化脚本
 
-echo "🚀 Setting up aiNagisa development environment..."
+echo "🚀 Setting up toyoura-nagisa development environment..."
 
 # 1. 安装 Python 依赖
 echo "📦 Installing Python dependencies..."
@@ -525,7 +525,7 @@ echo "📦 Installing Node.js dependencies..."
 npm install
 
 # 3. 构建 core 包
-echo "🔨 Building @aiNagisa/core..."
+echo "🔨 Building @toyoura-nagisa/core..."
 npm run build:core
 
 echo "✅ Setup complete! Run 'npm run dev:all' to start."
@@ -537,7 +537,7 @@ echo "✅ Setup complete! Run 'npm run dev:all' to start."
 #!/bin/bash
 # 启动开发环境
 
-echo "🚀 Starting aiNagisa development environment..."
+echo "🚀 Starting toyoura-nagisa development environment..."
 
 # 使用 concurrently 同时启动 backend 和 frontend
 npm run dev:all
@@ -551,7 +551,7 @@ npm run dev:all
 
 set -e  # 遇到错误立即退出
 
-echo "🔄 Migrating aiNagisa directory structure..."
+echo "🔄 Migrating toyoura-nagisa directory structure..."
 
 # 备份
 echo "📦 Creating backup..."
@@ -653,7 +653,7 @@ git commit -m "refactor: restructure project to monorepo layout
 - Update all configuration files
 - Add migration scripts
 
-https://github.com/yusong652/aiNagisa
+https://github.com/yusong652/toyoura-nagisa
 
 Co-authored-with: Nagisa Toyoura <nagisa.toyoura@gmail.com>"
 ```
@@ -666,7 +666,7 @@ gh pr create \
   --body "$(cat <<'EOF'
 ## Summary
 
-Restructure aiNagisa to follow monorepo best practices:
+Restructure toyoura-nagisa to follow monorepo best practices:
 
 - ✅ All packages in `packages/` directory
 - ✅ Independent services in `services/` directory
@@ -761,8 +761,8 @@ npm run dev:cli
 // Before
 import { ChatService } from '../services/api/chatService'
 
-// After (使用 @aiNagisa/core)
-import { ChatService } from '@aiNagisa/core/services'
+// After (使用 @toyoura-nagisa/core)
+import { ChatService } from '@toyoura-nagisa/core/services'
 ```
 
 **Backend**:

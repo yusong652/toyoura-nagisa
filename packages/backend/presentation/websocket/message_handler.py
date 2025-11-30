@@ -1,5 +1,5 @@
 """
-WebSocket Message Handler System for aiNagisa.
+WebSocket Message Handler System for toyoura-nagisa.
 
 This module handles incoming WebSocket messages from the frontend and routes them
 to appropriate processors. The main purpose is to:
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class WebSocketMessageProcessor:
     """
-    Central WebSocket message router for aiNagisa.
+    Central WebSocket message router for toyoura-nagisa.
 
     Routes incoming WebSocket messages from frontend to appropriate handlers:
     - CHAT_MESSAGE → ChatHandler (main user interaction)

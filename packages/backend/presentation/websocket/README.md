@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the new unified WebSocket architecture for aiNagisa, which replaces the previous mixed SSE/WebSocket approach with a single, extensible real-time communication system.
+This document describes the new unified WebSocket architecture for toyoura-nagisa, which replaces the previous mixed SSE/WebSocket approach with a single, extensible real-time communication system.
 
 ## Architecture Components
 

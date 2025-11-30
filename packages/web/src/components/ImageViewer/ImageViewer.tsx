@@ -20,7 +20,7 @@ import './ImageViewer.css'
 /**
  * Advanced image viewer component with clean architecture.
  * 
- * Refactored following aiNagisa's modular component standards with:
+ * Refactored following toyoura-nagisa's modular component standards with:
  * - Separation of concerns through custom hooks
  * - Modular child components for each UI section
  * - MediaModal base for consistent modal behavior
@@ -39,7 +39,7 @@ import './ImageViewer.css'
  * - 70% reduction in component complexity
  * - Clear separation between state, interactions, and UI
  * - Easy to test individual hooks and components
- * - Consistent with aiNagisa component patterns
+ * - Consistent with toyoura-nagisa component patterns
  * - Better performance with optimized hooks
  * 
  * Args:
@@ -239,7 +239,7 @@ export default ImageViewer
  * - UI complexity moved to specialized components
  * - Much easier to understand and modify
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Custom hooks for logic separation
  * ✓ Child components in /components subdirectory
  * ✓ Types defined in separate types file

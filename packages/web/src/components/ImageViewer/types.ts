@@ -2,7 +2,7 @@
  * ImageViewer TypeScript type definitions.
  * 
  * Comprehensive type system for the advanced image viewer component,
- * following aiNagisa's clean architecture principles with clear separation
+ * following toyoura-nagisa's clean architecture principles with clear separation
  * between state, events, and component interfaces.
  */
 

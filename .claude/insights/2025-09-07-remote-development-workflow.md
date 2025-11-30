@@ -123,7 +123,7 @@ mkdir ~/windows-dev
 sshfs username@windows-server:/C:/Projects ~/windows-dev
 
 # 现在可以直接编辑远程文件
-cd ~/windows-dev/aiNagisa
+cd ~/windows-dev/toyoura-nagisa
 code .  # VSCode打开
 ```
 
@@ -133,10 +133,10 @@ code .  # VSCode打开
 ```bash
 # Windows服务器作为Git远程仓库
 # Windows上初始化裸仓库
-git init --bare C:\GitRepos\aiNagisa.git
+git init --bare C:\GitRepos\toyoura-nagisa.git
 
 # Mac上添加远程仓库
-git remote add windows ssh://username@windows-server/C:/GitRepos/aiNagisa.git
+git remote add windows ssh://username@windows-server/C:/GitRepos/toyoura-nagisa.git
 
 # 自动同步脚本
 #!/bin/bash
@@ -145,7 +145,7 @@ while true; do
     git add .
     git commit -m "Auto sync"
     git push windows main
-    ssh username@windows-server "cd /C/Projects/aiNagisa && git pull"
+    ssh username@windows-server "cd /C/Projects/toyoura-nagisa && git pull"
     sleep 5
 done
 ```
@@ -155,7 +155,7 @@ done
 ### Windows服务器上运行MCP Server
 ```python
 # 在Windows服务器上运行
-# C:\Projects\aiNagisa\backend\infrastructure\mcp\pfc_mcp_server.py
+# C:\Projects\toyoura-nagisa\backend\infrastructure\mcp\pfc_mcp_server.py
 
 import asyncio
 from fastmcp import FastMCP
@@ -213,7 +213,7 @@ ssh -L 9000:localhost:9000 username@windows-server
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",
-                    "remoteRoot": "C:/Projects/aiNagisa"
+                    "remoteRoot": "C:/Projects/toyoura-nagisa"
                 }
             ]
         }
@@ -246,7 +246,7 @@ def run_on_windows(command):
     return result.stdout.decode()
 
 # 运行PFC仿真
-output = run_on_windows("python C:/Projects/aiNagisa/run_pfc_simulation.py")
+output = run_on_windows("python C:/Projects/toyoura-nagisa/run_pfc_simulation.py")
 ```
 
 ### 实时文件监控
@@ -259,7 +259,7 @@ import subprocess
 class SyncHandler(FileSystemEventHandler):
     def on_modified(self, event):
         # 文件修改后自动同步到Windows
-        subprocess.run("rsync -avz . pfc-windows:/C/Projects/aiNagisa/", shell=True)
+        subprocess.run("rsync -avz . pfc-windows:/C/Projects/toyoura-nagisa/", shell=True)
 
 observer = Observer()
 observer.schedule(SyncHandler(), path='.', recursive=True)

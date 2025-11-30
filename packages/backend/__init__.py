@@ -1,3 +1,3 @@
 """
-aiNagisa backend package
+toyoura-nagisa backend package
 """ 

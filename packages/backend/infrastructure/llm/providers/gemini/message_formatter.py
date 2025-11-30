@@ -1,7 +1,7 @@
 """
 Gemini-specific message formatter.
 
-Handles conversion from aiNagisa's internal message format to Gemini API format.
+Handles conversion from toyoura-nagisa's internal message format to Gemini API format.
 """
 
 from typing import List, Dict, Any, Optional
@@ -13,7 +13,7 @@ class GeminiMessageFormatter(BaseMessageFormatter):
     """
     Gemini-specific message formatter.
 
-    Converts aiNagisa BaseMessage objects to Gemini API format with proper
+    Converts toyoura-nagisa BaseMessage objects to Gemini API format with proper
     handling of multimodal content, roles, and metadata.
     """
 
@@ -23,13 +23,13 @@ class GeminiMessageFormatter(BaseMessageFormatter):
         preserve_thinking: Optional[bool] = None
     ) -> List[Dict[str, Any]]:
         """
-        Convert aiNagisa BaseMessage objects to Gemini API format.
+        Convert toyoura-nagisa BaseMessage objects to Gemini API format.
 
         Handles conversation history messages for context initialization and content generation.
         Tool results are handled separately via add_tool_result pathway.
 
         Args:
-            messages: List of BaseMessage objects from aiNagisa's internal format
+            messages: List of BaseMessage objects from toyoura-nagisa's internal format
             preserve_thinking: Whether to preserve thinking content with thought_signature.
                              If None, automatically reads from Gemini client configuration.
                              Explicit True/False values override the configuration.

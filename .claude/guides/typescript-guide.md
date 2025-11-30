@@ -1,6 +1,6 @@
 # TypeScript Development Guide
 
-**For frontend development in the aiNagisa project**
+**For frontend development in the toyoura-nagisa project**
 
 When creating or refactoring TypeScript code in the frontend, provide comprehensive explanations to help the user systematically learn TypeScript principles through hands-on project work.
 
@@ -356,4 +356,4 @@ After explaining concepts, ask learning questions:
 
 ---
 
-This approach ensures every TypeScript interaction becomes a structured learning opportunity, building expertise through practical application in the aiNagisa project.
+This approach ensures every TypeScript interaction becomes a structured learning opportunity, building expertise through practical application in the toyoura-nagisa project.

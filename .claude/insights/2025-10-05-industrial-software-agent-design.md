@@ -254,7 +254,7 @@ LLM ← Standardized Interface ← Adapter Layer ← Chaotic Industrial Interfac
 
 ### The Value of Unified Interfaces
 
-aiNagisa's PFC tool design elegantly handles chaos:
+toyoura-nagisa's PFC tool design elegantly handles chaos:
 - `command`: Command body
 - `arg`: Optional positional argument (single value)
 - `params`: JSON object for keyword arguments (null values = boolean flags)
@@ -295,7 +295,7 @@ Context Engineering (Holistic System Design)
 | **Structure Layer** | How to organize information | Prompt Templates, System Messages |
 | **Control Layer** | How to guide output | Output Format, Guardrails |
 
-### aiNagisa's Context Engineering Implementation
+### toyoura-nagisa's Context Engineering Implementation
 
 ```python
 # Content Layer
@@ -705,7 +705,7 @@ LLM
  ↓
 pfc_execute_command (MCP Tool)
  ↓
-Backend (aiNagisa)
+Backend (toyoura-nagisa)
  ↓
 WebSocket → PFC Server
  ↓
@@ -744,7 +744,7 @@ LLM
  ↓
 pfc_execute_script (MCP Tool)
  ↓
-Backend (aiNagisa)
+Backend (toyoura-nagisa)
  ↓
 WebSocket → PFC Server
  ↓
@@ -1723,5 +1723,5 @@ LLM: "Script created. Running full simulation..."
 ---
 
 *Generated: 2025-10-05*
-*Project: aiNagisa - Voice-enabled AI Assistant with Industrial Software Control*
-*Repository: <https://github.com/yusong652/aiNagisa>*
+*Project: toyoura-nagisa - Voice-enabled AI Assistant with Industrial Software Control*
+*Repository: <https://github.com/yusong652/toyoura-nagisa>*

@@ -83,11 +83,11 @@ class KimiConfig(BaseSettings):
         description="OpenRouter API base URL"
     )
     openrouter_http_referer: str = Field(
-        default="https://github.com/yusong652/aiNagisa",
+        default="https://github.com/yusong652/toyoura-nagisa",
         description="OpenRouter HTTP Referer header"
     )
     openrouter_title: str = Field(
-        default="aiNagisa Voice Assistant",
+        default="toyoura-nagisa Voice Assistant",
         description="OpenRouter X-Title header"
     )
     openrouter_model: str = Field(

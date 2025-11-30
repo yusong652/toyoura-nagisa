@@ -1,15 +1,15 @@
-# aiNagisa CLI Architecture Plan
+# toyoura-nagisa CLI Architecture Plan
 
 **Date**: 2025-11-25
 **Status**: Ready for Implementation
-**Goal**: Build a modern CLI frontend based on @aiNagisa/core, referencing Gemini CLI v0.19.0 architecture
+**Goal**: Build a modern CLI frontend based on @toyoura-nagisa/core, referencing Gemini CLI v0.19.0 architecture
 **Reference**: `_third_party/gemini-cli-src/` (Gemini CLI v0.19.0-nightly.20251125)
 
 ---
 
 ## Executive Summary
 
-Based on the latest Gemini CLI architecture (v0.19.0), we will build aiNagisa CLI with:
+Based on the latest Gemini CLI architecture (v0.19.0), we will build toyoura-nagisa CLI with:
 - **Ink + React 19** for terminal UI (proven by Gemini CLI)
 - **Command System** with `SlashCommand` + `CommandContext` pattern
 - **Stream-style Output** using Ink's Static component for history
@@ -88,9 +88,9 @@ packages/cli/src/
 ### 1.2 Dependency Graph
 
 ```
-@aiNagisa/cli
+@toyoura-nagisa/cli
     |
-    +-- @aiNagisa/core (business logic)
+    +-- @toyoura-nagisa/core (business logic)
     |     |-- ConnectionManager
     |     |-- SessionManager
     |     |-- ChatService, SessionService
@@ -210,7 +210,7 @@ export const sessionCommand: SlashCommand = {
 | `services/CommandService.ts` | Command service architecture |
 | `services/BuiltinCommandLoader.ts` | Built-in command loading |
 
-### 3.2 @aiNagisa/core Reference Files
+### 3.2 @toyoura-nagisa/core Reference Files
 
 | File | Purpose |
 |------|---------|
@@ -225,7 +225,7 @@ export const sessionCommand: SlashCommand = {
 
 ### Phase 6.1 - Core Chat (Current Priority)
 
-**Goal**: Refactor existing code, use @aiNagisa/core, implement basic streaming chat
+**Goal**: Refactor existing code, use @toyoura-nagisa/core, implement basic streaming chat
 
 **Tasks**:
 
@@ -233,7 +233,7 @@ export const sessionCommand: SlashCommand = {
    ```json
    {
      "dependencies": {
-       "@aiNagisa/core": "*",
+       "@toyoura-nagisa/core": "*",
        "ink": "npm:@jrichman/ink@6.4.6",
        "react": "^19.2.0",
        "ws": "^8.14.0",
@@ -330,7 +330,7 @@ export const sessionCommand: SlashCommand = {
 
 ```typescript
 // hooks/useWebSocket.ts
-import { ConnectionManager, NodeWebSocketAdapter } from '@aiNagisa/core'
+import { ConnectionManager, NodeWebSocketAdapter } from '@toyoura-nagisa/core'
 
 export function useWebSocket(host: string, port: number) {
   const [connectionManager] = useState(() => {
@@ -497,7 +497,7 @@ export const ToolConfirmation: React.FC<ToolConfirmationProps> = ({
 
 ### Overall Completion Criteria
 - [ ] CLI can complete same basic chat tasks as web frontend
-- [ ] Code reuse rate 80%+ (via @aiNagisa/core)
+- [ ] Code reuse rate 80%+ (via @toyoura-nagisa/core)
 - [ ] Zero functional regression
 
 ---

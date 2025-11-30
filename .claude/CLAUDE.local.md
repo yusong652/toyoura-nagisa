@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-aiNagisa is an extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework. The project combines a Python FastAPI backend with a React frontend and features a sophisticated MCP (Model Context Protocol) for tool orchestration. The system follows clean architecture principles with clear separation of concerns.
+toyoura-nagisa is an extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework. The project combines a Python FastAPI backend with a React frontend and features a sophisticated MCP (Model Context Protocol) for tool orchestration. The system follows clean architecture principles with clear separation of concerns.
 
 ## Development Commands
 
@@ -239,7 +239,7 @@ The frontend uses standard React testing practices with Vite.
 ## File Structure Highlights
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── backend/
 │   ├── app.py                      # Main FastAPI application
 │   ├── presentation/               # API routes and WebSocket handlers

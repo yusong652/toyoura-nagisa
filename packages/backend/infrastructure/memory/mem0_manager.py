@@ -1,5 +1,5 @@
 """
-Mem0-based memory manager for aiNagisa.
+Mem0-based memory manager for toyoura-nagisa.
 
 This module provides a modern memory management system using Mem0,
 replacing the legacy ChromaDB-based implementation.

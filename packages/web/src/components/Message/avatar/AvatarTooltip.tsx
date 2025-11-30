@@ -22,7 +22,7 @@ export const showAvatarTooltip = (e: React.MouseEvent<HTMLImageElement>, role: M
   tooltip.className = 'avatar-tooltip'
 
   if (role === 'user') {
-    tooltip.textContent = 'User\nName：yusong\nIntroduction： developer of aiNagisa.'
+    tooltip.textContent = 'User\nName：yusong\nIntroduction： developer of toyoura-nagisa.'
   } else {
     tooltip.textContent = 'Toyoura Nagisa\nPersonality: Energetic, cute, clingy\nHobbies: Chatting with you, being adorable\nBio: Nagisa is your AI virtual companion who loves to keep you company and interact with you!'
   }

@@ -213,7 +213,7 @@ for part in chunk.candidates[0].content.parts:
 
 ---
 
-## 💡 对aiNagisa的优化建议
+## 💡 对toyoura-nagisa的优化建议
 
 ### 实时Thinking显示实现
 

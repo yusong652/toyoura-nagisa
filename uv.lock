@@ -10,166 +10,10 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "ainagisa",
-    "ainagisa-backend",
-    "ainagisa-uv-plot",
+    "toyoura-nagisa",
+    "toyoura-nagisa-backend",
+    "toyoura-nagisa-uv-plot",
 ]
-
-[[package]]
-name = "ainagisa"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "aiohttp" },
-    { name = "annotated-types" },
-    { name = "anthropic" },
-    { name = "anyio" },
-    { name = "beautifulsoup4" },
-    { name = "certifi" },
-    { name = "chromadb" },
-    { name = "email-validator" },
-    { name = "emoji" },
-    { name = "exceptiongroup" },
-    { name = "fastapi" },
-    { name = "fastmcp" },
-    { name = "fish-audio-sdk" },
-    { name = "google-api-python-client" },
-    { name = "google-auth" },
-    { name = "google-auth-oauthlib" },
-    { name = "google-genai" },
-    { name = "googlemaps" },
-    { name = "h11" },
-    { name = "httpcore" },
-    { name = "httptools" },
-    { name = "httpx" },
-    { name = "httpx-ws" },
-    { name = "idna" },
-    { name = "matplotlib" },
-    { name = "mcp" },
-    { name = "mem0ai" },
-    { name = "mistralai" },
-    { name = "numpy" },
-    { name = "ollama" },
-    { name = "openai" },
-    { name = "pathspec" },
-    { name = "psutil" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "pydantic-settings" },
-    { name = "pytest" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "sniffio" },
-    { name = "soundfile" },
-    { name = "starlette" },
-    { name = "timezonefinder" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "trafilatura" },
-    { name = "typing-extensions" },
-    { name = "typing-inspection" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "uvloop", marker = "sys_platform != 'win32'" },
-    { name = "vllm", marker = "sys_platform != 'win32'" },
-    { name = "watchfiles" },
-    { name = "websockets" },
-    { name = "wsproto" },
-    { name = "zai-sdk" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "github-cli" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "tiktoken" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=25.0.0" },
-    { name = "aiohttp", specifier = ">=3.13.0" },
-    { name = "annotated-types", specifier = ">=0.7.0" },
-    { name = "anthropic", specifier = ">=0.72.0" },
-    { name = "anyio", specifier = ">=4.11.0" },
-    { name = "beautifulsoup4", specifier = ">=4.14.0" },
-    { name = "certifi", specifier = ">=2025.10.0" },
-    { name = "chromadb", specifier = ">=1.3.0" },
-    { name = "email-validator", specifier = ">=2.3.0" },
-    { name = "emoji", specifier = ">=2.15.0" },
-    { name = "exceptiongroup", specifier = ">=1.2.2" },
-    { name = "fastapi", specifier = ">=0.120.0" },
-    { name = "fastmcp", specifier = ">=2.13.0" },
-    { name = "fish-audio-sdk", specifier = ">=2025.4.2" },
-    { name = "github-cli", marker = "extra == 'dev'" },
-    { name = "google-api-python-client", specifier = ">=2.186.0" },
-    { name = "google-auth", specifier = ">=2.42.0" },
-    { name = "google-auth-oauthlib", specifier = ">=1.2.0" },
-    { name = "google-genai", specifier = ">=1.47.0" },
-    { name = "googlemaps", specifier = ">=4.10.0" },
-    { name = "h11", specifier = ">=0.14.0" },
-    { name = "httpcore", specifier = ">=1.0.8" },
-    { name = "httptools", specifier = ">=0.7.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "httpx-ws", specifier = ">=0.8.0" },
-    { name = "idna", specifier = ">=3.11" },
-    { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "mcp", specifier = ">=1.20.0" },
-    { name = "mem0ai", specifier = ">=1.0.0" },
-    { name = "mistralai", specifier = ">=1.9.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "ollama", specifier = ">=0.6.0" },
-    { name = "openai", specifier = ">=2.6.0" },
-    { name = "pathspec", specifier = ">=0.12.0" },
-    { name = "psutil", specifier = ">=7.1.0" },
-    { name = "pydantic", specifier = ">=2.12.0" },
-    { name = "pydantic-core", specifier = ">=2.41.0" },
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "pytest", specifier = ">=8.4.0" },
-    { name = "python-dotenv", specifier = ">=1.2.0" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "requests", specifier = ">=2.32.5" },
-    { name = "sniffio", specifier = ">=1.3.1" },
-    { name = "soundfile", specifier = ">=0.12.1" },
-    { name = "starlette", specifier = ">=0.49.0" },
-    { name = "timezonefinder", specifier = ">=8.0.0" },
-    { name = "torch", specifier = ">=2.8.0" },
-    { name = "torchaudio", specifier = ">=2.8.0" },
-    { name = "trafilatura", specifier = ">=1.6.1" },
-    { name = "typing-extensions", specifier = ">=4.15.0" },
-    { name = "typing-inspection", specifier = ">=0.4.2" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
-    { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.22.0" },
-    { name = "vllm", marker = "sys_platform != 'win32'", specifier = ">=0.11.0" },
-    { name = "watchfiles", specifier = ">=1.1.0" },
-    { name = "websockets", specifier = ">=15.0.1" },
-    { name = "wsproto", specifier = ">=1.2.0" },
-    { name = "zai-sdk", specifier = ">=0.0.4" },
-]
-provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "tiktoken", specifier = ">=0.9.0" },
-]
-
-[[package]]
-name = "ainagisa-backend"
-version = "0.1.0"
-source = { editable = "packages/backend" }
-
-[[package]]
-name = "ainagisa-uv-plot"
-version = "0.1.0"
-source = { editable = "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot" }
 
 [[package]]
 name = "aiofiles"
@@ -6563,6 +6407,162 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/9d/406cea60a9eb9882145bcd62a184ee61e823e8e1d550cdc3c3ea866a9445/torchvision-0.23.0-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:2a3299d2b1d5a7aed2d3b6ffb69c672ca8830671967eb1cee1497bacd82fe47b", size = 2359295 },
     { url = "https://files.pythonhosted.org/packages/2b/f4/34662f71a70fa1e59de99772142f22257ca750de05ccb400b8d2e3809c1d/torchvision-0.23.0-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:76bc4c0b63d5114aa81281390f8472a12a6a35ce9906e67ea6044e5af4cab60c", size = 8800474 },
 ]
+
+[[package]]
+name = "toyoura-nagisa"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "aiohttp" },
+    { name = "annotated-types" },
+    { name = "anthropic" },
+    { name = "anyio" },
+    { name = "beautifulsoup4" },
+    { name = "certifi" },
+    { name = "chromadb" },
+    { name = "email-validator" },
+    { name = "emoji" },
+    { name = "exceptiongroup" },
+    { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "fish-audio-sdk" },
+    { name = "google-api-python-client" },
+    { name = "google-auth" },
+    { name = "google-auth-oauthlib" },
+    { name = "google-genai" },
+    { name = "googlemaps" },
+    { name = "h11" },
+    { name = "httpcore" },
+    { name = "httptools" },
+    { name = "httpx" },
+    { name = "httpx-ws" },
+    { name = "idna" },
+    { name = "matplotlib" },
+    { name = "mcp" },
+    { name = "mem0ai" },
+    { name = "mistralai" },
+    { name = "numpy" },
+    { name = "ollama" },
+    { name = "openai" },
+    { name = "pathspec" },
+    { name = "psutil" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "pydantic-settings" },
+    { name = "pytest" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "sniffio" },
+    { name = "soundfile" },
+    { name = "starlette" },
+    { name = "timezonefinder" },
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "trafilatura" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "uvloop", marker = "sys_platform != 'win32'" },
+    { name = "vllm", marker = "sys_platform != 'win32'" },
+    { name = "watchfiles" },
+    { name = "websockets" },
+    { name = "wsproto" },
+    { name = "zai-sdk" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "github-cli" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "tiktoken" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=25.0.0" },
+    { name = "aiohttp", specifier = ">=3.13.0" },
+    { name = "annotated-types", specifier = ">=0.7.0" },
+    { name = "anthropic", specifier = ">=0.72.0" },
+    { name = "anyio", specifier = ">=4.11.0" },
+    { name = "beautifulsoup4", specifier = ">=4.14.0" },
+    { name = "certifi", specifier = ">=2025.10.0" },
+    { name = "chromadb", specifier = ">=1.3.0" },
+    { name = "email-validator", specifier = ">=2.3.0" },
+    { name = "emoji", specifier = ">=2.15.0" },
+    { name = "exceptiongroup", specifier = ">=1.2.2" },
+    { name = "fastapi", specifier = ">=0.120.0" },
+    { name = "fastmcp", specifier = ">=2.13.0" },
+    { name = "fish-audio-sdk", specifier = ">=2025.4.2" },
+    { name = "github-cli", marker = "extra == 'dev'" },
+    { name = "google-api-python-client", specifier = ">=2.186.0" },
+    { name = "google-auth", specifier = ">=2.42.0" },
+    { name = "google-auth-oauthlib", specifier = ">=1.2.0" },
+    { name = "google-genai", specifier = ">=1.47.0" },
+    { name = "googlemaps", specifier = ">=4.10.0" },
+    { name = "h11", specifier = ">=0.14.0" },
+    { name = "httpcore", specifier = ">=1.0.8" },
+    { name = "httptools", specifier = ">=0.7.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx-ws", specifier = ">=0.8.0" },
+    { name = "idna", specifier = ">=3.11" },
+    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "mcp", specifier = ">=1.20.0" },
+    { name = "mem0ai", specifier = ">=1.0.0" },
+    { name = "mistralai", specifier = ">=1.9.0" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "ollama", specifier = ">=0.6.0" },
+    { name = "openai", specifier = ">=2.6.0" },
+    { name = "pathspec", specifier = ">=0.12.0" },
+    { name = "psutil", specifier = ">=7.1.0" },
+    { name = "pydantic", specifier = ">=2.12.0" },
+    { name = "pydantic-core", specifier = ">=2.41.0" },
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "pytest", specifier = ">=8.4.0" },
+    { name = "python-dotenv", specifier = ">=1.2.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "requests", specifier = ">=2.32.5" },
+    { name = "sniffio", specifier = ">=1.3.1" },
+    { name = "soundfile", specifier = ">=0.12.1" },
+    { name = "starlette", specifier = ">=0.49.0" },
+    { name = "timezonefinder", specifier = ">=8.0.0" },
+    { name = "torch", specifier = ">=2.8.0" },
+    { name = "torchaudio", specifier = ">=2.8.0" },
+    { name = "trafilatura", specifier = ">=1.6.1" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+    { name = "typing-inspection", specifier = ">=0.4.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
+    { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.22.0" },
+    { name = "vllm", marker = "sys_platform != 'win32'", specifier = ">=0.11.0" },
+    { name = "watchfiles", specifier = ">=1.1.0" },
+    { name = "websockets", specifier = ">=15.0.1" },
+    { name = "wsproto", specifier = ">=1.2.0" },
+    { name = "zai-sdk", specifier = ">=0.0.4" },
+]
+provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "tiktoken", specifier = ">=0.9.0" },
+]
+
+[[package]]
+name = "toyoura-nagisa-backend"
+version = "0.1.0"
+source = { editable = "packages/backend" }
+
+[[package]]
+name = "toyoura-nagisa-uv-plot"
+version = "0.1.0"
+source = { editable = "workspace/default/toyoura_nagisa_uv_workspace/toyoura-nagisa-uv-plot" }
 
 [[package]]
 name = "tqdm"

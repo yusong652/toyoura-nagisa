@@ -48,7 +48,7 @@ class Config:
 2. **Windows环境变量设置**
 ```powershell
 # 创建环境配置文件
-# C:\Projects\aiNagisa\.env.production
+# C:\Projects\toyoura-nagisa\.env.production
 
 # API Keys
 $env:GEMINI_API_KEY = "your-gemini-key"
@@ -171,7 +171,7 @@ class BaseConfig:
     """基础配置，不包含敏感信息"""
     
     # 应用配置
-    APP_NAME = "aiNagisa"
+    APP_NAME = "toyoura-nagisa"
     VERSION = "1.0.0"
     DEBUG = False
     
@@ -251,7 +251,7 @@ config = get_config()
 # 1. 加密传输敏感配置
 tar czf - backend/config/production.py | \
   openssl enc -aes-256-cbc -salt -pass pass:$CONFIG_PASSWORD | \
-  ssh user@windows-server "cd /C/Projects/aiNagisa && openssl enc -aes-256-cbc -d -pass pass:$CONFIG_PASSWORD | tar xzf -"
+  ssh user@windows-server "cd /C/Projects/toyoura-nagisa && openssl enc -aes-256-cbc -d -pass pass:$CONFIG_PASSWORD | tar xzf -"
 
 # 2. 使用rsync排除敏感文件
 rsync -avz \
@@ -260,11 +260,11 @@ rsync -avz \
   --exclude='backend/config/local.py' \
   --exclude='backend/config/production.py' \
   --exclude='.env*' \
-  ./ user@windows-server:/C/Projects/aiNagisa/
+  ./ user@windows-server:/C/Projects/toyoura-nagisa/
 
 # 3. 单独安全传输配置
 scp -i ~/.ssh/id_rsa backend/config/production.py \
-  user@windows-server:/C/Projects/aiNagisa/backend/config/
+  user@windows-server:/C/Projects/toyoura-nagisa/backend/config/
 ```
 
 ### Windows PowerShell同步
@@ -327,7 +327,7 @@ sed -i 's/sk-[a-zA-Z0-9]*/YOUR_API_KEY_HERE/g' backend/config/local.example.py
 echo "GEMINI_API_KEY=sk-xxxxx" > .env.production
 
 # 安全传输到Windows
-scp .env.production user@windows:/C/Projects/aiNagisa/
+scp .env.production user@windows:/C/Projects/toyoura-nagisa/
 ```
 
 ### 专业方案（推荐）：

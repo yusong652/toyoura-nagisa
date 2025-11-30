@@ -1,7 +1,7 @@
 """
 BashOutput tool for retrieving output from background bash processes.
 
-Provides output retrieval functionality for aiNagisa's background bash execution,
+Provides output retrieval functionality for toyoura-nagisa's background bash execution,
 designed to match Claude Code's BashOutput tool behavior.
 """
 

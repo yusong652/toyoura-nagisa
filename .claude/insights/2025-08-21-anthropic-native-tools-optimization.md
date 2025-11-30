@@ -13,7 +13,7 @@
 - **功能对应**：
   ```
   Anthropic原生: text_editor_20250728, str_replace_based_edit_tool, bash_20241022
-  aiNagisa实现: read.py, edit.py, shell.py
+  toyoura-nagisa实现: read.py, edit.py, shell.py
   ```
 
 - **行为模式匹配**：

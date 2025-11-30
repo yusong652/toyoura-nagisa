@@ -267,7 +267,7 @@ Running production simulation (estimated 2 hours)..."
 
 ```
 ┌─────────────────────────────────────────┐
-│         aiNagisa LLM Agent              │
+│         toyoura-nagisa LLM Agent              │
 │  (Gemini/Claude/GPT with tool calling)  │
 └─────────────────────────────────────────┘
               ↓ ↑
@@ -487,5 +487,5 @@ We enable reliable, natural progression from exploratory testing to production e
 ---
 
 *Draft prepared: 2025-10-05*
-*Project: aiNagisa*
+*Project: toyoura-nagisa*
 *Authors: [To be determined]*

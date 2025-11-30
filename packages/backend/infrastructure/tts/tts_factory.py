@@ -1,5 +1,5 @@
 """
-TTS Factory module for aiNagisa
+TTS Factory module for toyoura-nagisa
 用于根据配置动态选择和实例化 TTS 引擎
 """
 

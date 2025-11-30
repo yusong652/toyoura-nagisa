@@ -1,10 +1,10 @@
-# Gemini Context: aiNagisa Project
+# Gemini Context: toyoura-nagisa Project
 
-This document provides comprehensive architectural, philosophical, and development context for the Gemini AI agent to effectively understand, analyze, and contribute to the `aiNagisa` project.
+This document provides comprehensive architectural, philosophical, and development context for the Gemini AI agent to effectively understand, analyze, and contribute to the `toyoura-nagisa` project.
 
 ## 1. Core Philosophy & Value Proposition
 
-**aiNagisa** is a production-grade AI agent platform designed to bridge the gap between conversational AI and professional scientific computing. It is built on a foundation of architectural elegance, scalability, and deep domain expertise.
+**toyoura-nagisa** is a production-grade AI agent platform designed to bridge the gap between conversational AI and professional scientific computing. It is built on a foundation of architectural elegance, scalability, and deep domain expertise.
 
 - **Agent Specialization**: The platform's core innovation is its **Agent Profile System**, which dynamically configures the AI's capabilities (i.e., available tools) based on the task domain (e.g., Coding, Scientific Simulation, Lifestyle). This optimizes context token usage and improves the relevance of the AI's responses.
 - **Clean Architecture**: The backend strictly adheres to a **Clean Architecture**, ensuring separation of concerns between the domain logic, application logic, and infrastructure. This makes the system highly maintainable, testable, and adaptable.
@@ -125,7 +125,7 @@ The CLI provides a terminal-based interface for interacting with the agent.
 
 - **Running in Dev Mode**: `npm run dev:cli`
 - **Building**: `npm run build:cli`
-- **Running Compiled CLI**: After building, the CLI can be run with `npm -w @aiNagisa/cli run start`. The compiled entry point is `packages/cli/dist/index.js`.
+- **Running Compiled CLI**: After building, the CLI can be run with `npm -w @toyoura-nagisa/cli run start`. The compiled entry point is `packages/cli/dist/index.js`.
 
 ## 6. How to Contribute
 
@@ -136,12 +136,12 @@ The CLI provides a terminal-based interface for interacting with the agent.
 3.  In the `__init__.py` for that tool category, import and call your new registration helper inside the aggregate registration function (e.g., `register_coding_tools`).
 4.  Finally, add your new tool's name to the desired profiles in `backend/infrastructure/mcp/tool_profile_manager.py`.
 
-## 7. Guiding Principles for Analyzing `aiNagisa`
+## 7. Guiding Principles for Analyzing `toyoura-nagisa`
 
-To effectively contribute to `aiNagisa`, the agent must move beyond surface-level documentation and conversational inference. It must adopt the mindset of a software archaeologist, digging into the codebase to uncover the ground truth. The following principles, derived from analyzing the project's structure, serve as a guide for this deep analysis.
+To effectively contribute to `toyoura-nagisa`, the agent must move beyond surface-level documentation and conversational inference. It must adopt the mindset of a software archaeologist, digging into the codebase to uncover the ground truth. The following principles, derived from analyzing the project's structure, serve as a guide for this deep analysis.
 
 ### Principle 1: Assume Abstraction
-The `aiNagisa` architecture heavily favors abstraction (e.g., `LLMClientBase`, `mem0` for memory). When investigating a feature, do not search for direct, low-level implementation details (like a raw API call). Instead, assume an abstraction layer exists. The primary task is to **find the seam**: identify the key "manager," "client," or "service" module that acts as a facade over the underlying dependency.
+The `toyoura-nagisa` architecture heavily favors abstraction (e.g., `LLMClientBase`, `mem0` for memory). When investigating a feature, do not search for direct, low-level implementation details (like a raw API call). Instead, assume an abstraction layer exists. The primary task is to **find the seam**: identify the key "manager," "client," or "service" module that acts as a facade over the underlying dependency.
 
 ### Principle 2: Configuration is the Source of Truth
 Implementation logic can be complex and distributed. In contrast, configuration files provide direct, unambiguous evidence of what the system uses.

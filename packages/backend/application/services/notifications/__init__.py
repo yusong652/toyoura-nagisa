@@ -2,7 +2,7 @@
 Notification Application Services
 
 This module contains application services for handling various types of
-notifications in the aiNagisa system, following DDD architecture principles.
+notifications in the toyoura-nagisa system, following DDD architecture principles.
 
 These services coordinate between business logic and infrastructure services
 to implement notification use cases.

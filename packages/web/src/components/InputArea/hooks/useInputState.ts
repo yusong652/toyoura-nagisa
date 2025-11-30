@@ -13,7 +13,7 @@ import {
  * 
  * This hook centralizes all state management for the input area including
  * message text, files array, and derived state calculations. It follows
- * aiNagisa's clean architecture by separating state concerns from UI logic.
+ * toyoura-nagisa's clean architecture by separating state concerns from UI logic.
  * 
  * Features:
  * - Message text state with validation

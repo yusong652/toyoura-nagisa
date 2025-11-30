@@ -2,7 +2,7 @@
  * VideoPlayer hooks module exports.
  * 
  * Centralized export point for all VideoPlayer custom hooks following
- * aiNagisa's clean architecture standards. Each hook handles a specific
+ * toyoura-nagisa's clean architecture standards. Each hook handles a specific
  * concern within the video player system.
  * 
  * Architecture Benefits:

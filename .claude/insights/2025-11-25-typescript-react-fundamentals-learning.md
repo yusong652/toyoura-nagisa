@@ -1,7 +1,7 @@
 # TypeScript React 基础学习笔记
 
 **日期**: 2025-11-25
-**背景**: 通过 aiNagisa CLI 项目学习 TypeScript 和 React 基础
+**背景**: 通过 toyoura-nagisa CLI 项目学习 TypeScript 和 React 基础
 
 ## 学习内容总结
 

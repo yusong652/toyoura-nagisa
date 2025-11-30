@@ -373,7 +373,7 @@ export default useVideoPlayback
  * - State consistency maintained even during error conditions
  * - Optional error callback allows parent components to handle errors
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Comprehensive error handling and browser compatibility
  * ✓ Performance optimized with useCallback memoization
  * ✓ Clean separation between media control and UI concerns

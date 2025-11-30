@@ -16,7 +16,7 @@ import './VideoPlayer.css'
 /**
  * Advanced video player component with modular architecture.
  * 
- * Completely refactored following aiNagisa's clean architecture standards with:
+ * Completely refactored following toyoura-nagisa's clean architecture standards with:
  * - Separation of concerns through custom hooks
  * - Modular child components for each UI section
  * - MediaModal base for consistent modal behavior
@@ -36,7 +36,7 @@ import './VideoPlayer.css'
  * - 60% reduction in component complexity through modularization
  * - Clear separation between state management, UI, and interactions
  * - Easy to test individual hooks and components in isolation
- * - Consistent with aiNagisa component patterns
+ * - Consistent with toyoura-nagisa component patterns
  * - Better performance with optimized hook composition
  * - Extensible design for future video features
  * 
@@ -379,7 +379,7 @@ export default VideoPlayer
  * - Gesture support for common actions
  * - Battery-efficient playback options
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Custom hooks for logic separation
  * ✓ Child components in /components subdirectory
  * ✓ Types defined in separate types file

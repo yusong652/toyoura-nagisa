@@ -5,7 +5,7 @@ import { VideoPlayerHeaderProps } from '../types'
  * VideoPlayer header component with video info and close button.
  * 
  * Displays video metadata and provides a prominent close button following
- * aiNagisa's component composition patterns. Designed to work consistently
+ * toyoura-nagisa's component composition patterns. Designed to work consistently
  * with other modal header components in the application.
  * 
  * Features:
@@ -18,7 +18,7 @@ import { VideoPlayerHeaderProps } from '../types'
  * - Single responsibility (header display only)
  * - Reusable across different video player layouts
  * - Clean props interface for easy customization
- * - Consistent with aiNagisa header patterns
+ * - Consistent with toyoura-nagisa header patterns
  * 
  * Args:
  *     videoInfo: Processed video metadata including format and source
@@ -188,7 +188,7 @@ export default VideoPlayerHeader
  * - Easy to customize with props and CSS classes
  * - Supports different close button styles
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Single responsibility principle
  * ✓ Props-based interface design  
  * ✓ Accessibility and user experience focus

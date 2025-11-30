@@ -9,7 +9,7 @@
 
 ## 📋 Executive Summary
 
-This document outlines a comprehensive optimization plan to address two critical issues in aiNagisa's Gemini integration:
+This document outlines a comprehensive optimization plan to address two critical issues in toyoura-nagisa's Gemini integration:
 
 1. **Multipart Text Loss**: Current implementation only saves the first text part from Gemini responses, losing subsequent text parts in multimodal/streaming responses
 2. **Tool Context Loss**: Server restart causes tool call context loss, breaking multi-turn reasoning chains
@@ -536,7 +536,7 @@ Add handling for tool_result content type:
 ```python
 @staticmethod
 def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
-    """Convert aiNagisa BaseMessage objects to Gemini API format."""
+    """Convert toyoura-nagisa BaseMessage objects to Gemini API format."""
     from google.genai import types
 
     contents = []
@@ -904,7 +904,7 @@ function extractTextFromContent(content: any[]): string {
 ## 📚 References
 
 - Gemini API Documentation: https://ai.google.dev/api
-- aiNagisa Message Flow: `CLAUDE.md` - Message Handling section
+- toyoura-nagisa Message Flow: `CLAUDE.md` - Message Handling section
 - Tool Result Format: `backend/infrastructure/mcp/utils/tool_result.py`
 - MCP Tool System: `backend/infrastructure/mcp/` directory
 - Storage Architecture: `backend/infrastructure/storage/` directory

@@ -8,7 +8,7 @@ import { ProfileSelectorEventHandlers, ProfileChangeHandler } from '../types'
  * Custom hook for managing AgentProfileSelector event handlers.
  * 
  * Provides all event handling logic for profile selection, dropdown interaction,
- * and keyboard navigation. Follows aiNagisa's event handling patterns with
+ * and keyboard navigation. Follows toyoura-nagisa's event handling patterns with
  * proper error handling and context integration.
  * 
  * Args:

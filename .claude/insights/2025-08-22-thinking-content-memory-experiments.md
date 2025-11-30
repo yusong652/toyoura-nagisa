@@ -2,7 +2,7 @@
 
 **Date**: 2025-8-23  
 **Model**: Claude Opus 4.1 (claude-opus-4-1-20250805)  
-**Context**: aiNagisa project - Extensible AI assistant with dynamic tool framework
+**Context**: toyoura-nagisa project - Extensible AI assistant with dynamic tool framework
 
 ## Experimental Background
 
@@ -64,7 +64,7 @@ Through a series of memory retention experiments, we explored how Claude models 
 2. **Asymmetric Information**: Anthropic's internal apps have access to richer context than API users
 3. **Optimization Challenges**: External developers cannot optimize for content they cannot access
 
-### Architecture Constraints for aiNagisa
+### Architecture Constraints for toyoura-nagisa
 
 The project's context manager faces inherent limitations:
 
@@ -82,7 +82,7 @@ The project's context manager faces inherent limitations:
 
 ## Future Research Directions
 
-### For aiNagisa Project
+### For toyoura-nagisa Project
 
 1. **Explicit Reasoning Prompts**: Design prompts that encourage models to output important reasoning visibly
 2. **Visible Context Optimization**: Focus on aggressive optimization of user messages, assistant responses, and tool results
@@ -95,7 +95,7 @@ The project's context manager faces inherent limitations:
 2. **Context Budget Modeling**: Account for hidden thinking content when estimating token usage
 3. **Cross-Model Consistency**: Develop strategies that work across different model access patterns
 
-## Relevance to aiNagisa
+## Relevance to toyoura-nagisa
 
 This insight directly impacts several aspects of the project:
 
@@ -106,8 +106,8 @@ This insight directly impacts several aspects of the project:
 
 ## Key Takeaway
 
-The discovery that thinking content behavior differs between internal Anthropic applications and external API access represents a fundamental constraint that shapes how context management systems must be designed. Rather than attempting to work around this limitation, aiNagisa's architecture should embrace strategies that maximize the value of accessible content while accepting that some model capabilities remain exclusive to first-party applications.
+The discovery that thinking content behavior differs between internal Anthropic applications and external API access represents a fundamental constraint that shapes how context management systems must be designed. Rather than attempting to work around this limitation, toyoura-nagisa's architecture should embrace strategies that maximize the value of accessible content while accepting that some model capabilities remain exclusive to first-party applications.
 
 ---
 
-*This insight emerged from experimental testing and discussion about context management challenges in the aiNagisa project.*
+*This insight emerged from experimental testing and discussion about context management challenges in the toyoura-nagisa project.*

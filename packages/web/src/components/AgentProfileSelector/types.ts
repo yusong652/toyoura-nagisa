@@ -4,7 +4,7 @@ import { AgentProfileType, AgentProfileInfo } from '@toyoura-nagisa/core'
  * AgentProfileSelector TypeScript type definitions.
  * 
  * Comprehensive type system for the agent profile selection component,
- * following aiNagisa's clean architecture principles with clear separation
+ * following toyoura-nagisa's clean architecture principles with clear separation
  * between state, events, and component interfaces.
  */
 

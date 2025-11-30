@@ -13,7 +13,7 @@ export type {
   ConnectionStats
 } from './WebSocketManager';
 
-// Connection Manager (aiNagisa-specific)
+// Connection Manager (toyoura-nagisa-specific)
 export { ConnectionManager } from './ConnectionManager';
 export type {
   ToolConfirmationData,

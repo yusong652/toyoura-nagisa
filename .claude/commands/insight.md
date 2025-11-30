@@ -15,6 +15,6 @@ The insight file should include:
 - Key findings and observations
 - Technical analysis and conclusions
 - Future research directions
-- Relevance to the aiNagisa project context
+- Relevance to the toyoura-nagisa project context
 
 Focus on capturing actionable insights that advance our understanding of the system or contribute to future development decisions.

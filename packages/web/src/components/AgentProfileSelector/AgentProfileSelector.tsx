@@ -13,7 +13,7 @@ import './AgentProfileSelector.css'
 /**
  * Unified Agent Profile Selector Component
  * 
- * Refactored according to aiNagisa's clean architecture standards with:
+ * Refactored according to toyoura-nagisa's clean architecture standards with:
  * - Separation of concerns using custom hooks
  * - Modular component composition  
  * - Type-safe throughout with comprehensive TypeScript
@@ -194,7 +194,7 @@ export default AgentProfileSelector
  * - Accessibility: Built-in throughout all child components
  * - Type Safety: Complete TypeScript coverage with proper interfaces
  * 
- * aiNagisa Architecture Compliance:
+ * toyoura-nagisa Architecture Compliance:
  * ✓ Custom hooks for logic separation
  * ✓ Child components in /components subdirectory
  * ✓ Types defined in separate types file

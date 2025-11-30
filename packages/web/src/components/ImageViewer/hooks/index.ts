@@ -2,7 +2,7 @@
  * ImageViewer hooks module exports.
  * 
  * Centralized exports for all image viewer related custom hooks.
- * Following aiNagisa's clean architecture pattern with organized hook modules.
+ * Following toyoura-nagisa's clean architecture pattern with organized hook modules.
  * 
  * Usage:
  *     import { useImageViewerState, useImageNavigation } from './hooks'

@@ -1,7 +1,7 @@
 /**
  * Services module exports
  *
- * Provides HTTP client and API service layers for aiNagisa.
+ * Provides HTTP client and API service layers for toyoura-nagisa.
  * All services are platform-agnostic and can be used in web, CLI, or other frontends.
  */
 

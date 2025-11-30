@@ -4,7 +4,7 @@ import { ReactNode } from 'react'
  * MediaModal TypeScript type definitions.
  * 
  * Comprehensive type system for media modal components (Image, Video, etc.),
- * following aiNagisa's clean architecture principles with shared modal behavior.
+ * following toyoura-nagisa's clean architecture principles with shared modal behavior.
  */
 
 // =============================================================================

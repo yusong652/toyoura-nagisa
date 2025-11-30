@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-aiNagisa is split into service-focused folders. `backend/` holds the FastAPI app using a layered structure (`application/`, `domain/`, `infrastructure/`, `presentation/`, `shared/`). Place backend tests in `backend/tests/` beside the feature they verify. `frontend/` delivers the React + Vite client (UI in `src/`, static assets in `public/`). `pfc-server/` is an optional companion for ITASCA PFC integration. Reference material lives in `docs/` and `examples/`; automation scripts and adapters sit in `scripts/` and `workspace/`.
+toyoura-nagisa is split into service-focused folders. `backend/` holds the FastAPI app using a layered structure (`application/`, `domain/`, `infrastructure/`, `presentation/`, `shared/`). Place backend tests in `backend/tests/` beside the feature they verify. `frontend/` delivers the React + Vite client (UI in `src/`, static assets in `public/`). `pfc-server/` is an optional companion for ITASCA PFC integration. Reference material lives in `docs/` and `examples/`; automation scripts and adapters sit in `scripts/` and `workspace/`.
 
 ## Build, Test, and Development Commands
 Install backend dependencies with `uv sync` and run the API locally via `uv run python backend/run.py`. Frontend dependencies install with `npm run install:frontend`; start both tiers together with `npm run dev`, or run them separately using `npm run start:backend` and `npm run start:frontend`. Validate updates with `uv run pytest backend/tests` (optionally `--cov backend`), `npm run lint` from `frontend/`, and `npm run build`.

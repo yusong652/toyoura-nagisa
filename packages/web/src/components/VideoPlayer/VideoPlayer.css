@@ -2,7 +2,7 @@
  * VideoPlayer module specific styles.
  * 
  * Comprehensive styling for the modular VideoPlayer architecture following
- * aiNagisa's clean architecture and design system standards. Extends
+ * toyoura-nagisa's clean architecture and design system standards. Extends
  * MediaModal base styles with video-specific enhancements.
  * 
  * Architecture Benefits:
@@ -765,7 +765,7 @@
  *    - Consistent spacing and sizing patterns
  *    - Professional visual polish with shadows and blur effects
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Consistent with MediaModal and ImageViewer styling patterns
  * ✓ Mobile-responsive design with touch optimizations
  * ✓ Accessibility features and high contrast support

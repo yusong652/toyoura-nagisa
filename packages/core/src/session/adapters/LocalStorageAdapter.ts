@@ -18,9 +18,9 @@ export class LocalStorageAdapter implements StorageAdapter {
   /**
    * Create a new LocalStorageAdapter
    *
-   * @param prefix - Optional prefix for all storage keys (default: 'aiNagisa_')
+   * @param prefix - Optional prefix for all storage keys (default: 'toyoura-nagisa_')
    */
-  constructor(prefix: string = 'aiNagisa_') {
+  constructor(prefix: string = 'toyoura-nagisa_') {
     this.prefix = prefix
   }
 

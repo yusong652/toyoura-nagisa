@@ -1,5 +1,5 @@
 """
-User interruption exceptions for aiNagisa.
+User interruption exceptions for toyoura-nagisa.
 
 This module defines exceptions that represent user-initiated interruptions
 rather than system errors, enabling graceful handling of user rejections

@@ -1,7 +1,7 @@
 """
 KillShell tool for terminating background bash processes.
 
-Provides process termination functionality for aiNagisa's background bash execution,
+Provides process termination functionality for toyoura-nagisa's background bash execution,
 designed to match Claude Code's KillShell tool behavior.
 """
 

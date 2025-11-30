@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * aiNagisa CLI - Command-line interface for aiNagisa AI assistant
+ * toyoura-nagisa CLI - Command-line interface for toyoura-nagisa AI assistant
  *
  * Usage:
  *   ainagisa                    # Start interactive chat

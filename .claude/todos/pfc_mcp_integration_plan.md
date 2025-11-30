@@ -1,7 +1,7 @@
 # ITASCA PFC MCP Integration Master Plan
 
 ## Executive Summary
-This document outlines the comprehensive plan for integrating ITASCA Particle Flow Code (PFC) with the aiNagisa MCP (Model Context Protocol) ecosystem. The integration will enable AI-powered control and analysis of PFC simulations through a sophisticated tool architecture, documentation system, and task management framework.
+This document outlines the comprehensive plan for integrating ITASCA Particle Flow Code (PFC) with the toyoura-nagisa MCP (Model Context Protocol) ecosystem. The integration will enable AI-powered control and analysis of PFC simulations through a sophisticated tool architecture, documentation system, and task management framework.
 
 ## 1. Architecture Overview
 
@@ -9,7 +9,7 @@ This document outlines the comprehensive plan for integrating ITASCA Particle Fl
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         aiNagisa                             │
+│                         toyoura-nagisa                             │
 │                                                              │
 │  ┌──────────────┐    ┌──────────────┐   ┌──────────────┐  │
 │  │ Agent Profile│───▶│  MCP Server  │───▶│ Tool Manager │  │
@@ -35,7 +35,7 @@ This document outlines the comprehensive plan for integrating ITASCA Particle Fl
 ```
 
 ### 1.2 Communication Flow
-1. **User Request** → aiNagisa Agent Profile
+1. **User Request** → toyoura-nagisa Agent Profile
 2. **Tool Selection** → MCP Server routes to appropriate PFC tools
 3. **Command Translation** → PFC Bridge Server converts MCP calls to PFC commands
 4. **Execution** → IPython SDK executes commands within PFC environment
@@ -466,7 +466,7 @@ class ReActAgent:
 - Context retrieval
 
 **Advantages:**
-- Already integrated in aiNagisa
+- Already integrated in toyoura-nagisa
 - Excellent for natural language queries
 - Supports metadata filtering
 
@@ -640,7 +640,7 @@ class TestPFCPerformance:
 
 ## 12. Conclusion
 
-This comprehensive plan provides a roadmap for integrating ITASCA PFC with the aiNagisa MCP ecosystem. The architecture balances performance, reliability, and extensibility while providing a superior user experience for PFC simulation workflows.
+This comprehensive plan provides a roadmap for integrating ITASCA PFC with the toyoura-nagisa MCP ecosystem. The architecture balances performance, reliability, and extensibility while providing a superior user experience for PFC simulation workflows.
 
 Key success factors:
 1. Robust communication architecture
@@ -745,4 +745,4 @@ class PFCModelState(BaseModel):
 
 *Document Version: 1.0*
 *Last Updated: 2025-01-07*
-*Author: aiNagisa Development Team*
+*Author: toyoura-nagisa Development Team*

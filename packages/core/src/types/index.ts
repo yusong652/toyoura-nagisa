@@ -1,5 +1,5 @@
 /**
- * Core type definitions for aiNagisa.
+ * Core type definitions for toyoura-nagisa.
  *
  * This module exports all shared type definitions used across web and CLI frontends.
  */

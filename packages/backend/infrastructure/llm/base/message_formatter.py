@@ -14,7 +14,7 @@ class BaseMessageFormatter(ABC):
     """
     Abstract base class for message formatters.
     
-    Defines unified interface for converting aiNagisa's internal message format
+    Defines unified interface for converting toyoura-nagisa's internal message format
     to provider-specific API formats. Each LLM provider has different requirements
     for message structure, content types, and metadata handling.
     """
@@ -23,10 +23,10 @@ class BaseMessageFormatter(ABC):
     @abstractmethod
     def format_messages(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
-        Convert aiNagisa BaseMessage objects to provider-specific API format.
+        Convert toyoura-nagisa BaseMessage objects to provider-specific API format.
         
         Args:
-            messages: List of BaseMessage objects from aiNagisa's internal format
+            messages: List of BaseMessage objects from toyoura-nagisa's internal format
             
         Returns:
             List[Dict[str, Any]]: Messages formatted for specific LLM provider API

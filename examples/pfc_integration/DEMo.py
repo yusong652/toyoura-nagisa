@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-DEMo - aiNagisa PFC Integration Complete Example
+DEMo - toyoura-nagisa PFC Integration Complete Example
 DEMo = Demo + DEM (Discrete Element Method)
 
-This is the complete demonstration of aiNagisa's PFC integration capabilities,
+This is the complete demonstration of toyoura-nagisa's PFC integration capabilities,
 showcasing best practices and the full feature set.
 
 Features Demonstrated:
@@ -29,7 +29,7 @@ Architecture Highlights:
 
 Usage:
     # 1. Start PFC server in PFC GUI IPython shell:
-    >>> exec(open(r'C:\Dev\Han\aiNagisa\pfc-server\start_server.py', encoding='utf-8').read())
+    >>> exec(open(r'C:\Dev\Han\toyoura-nagisa\pfc-server\start_server.py', encoding='utf-8').read())
 
     # 2. Run this demo from command line:
     python DEMo.py
@@ -121,7 +121,7 @@ async def run_full_simulation():
     try:
         # Connect to server
         print("=" * 70)
-        print("DEMo - aiNagisa PFC Integration Complete Example")
+        print("DEMo - toyoura-nagisa PFC Integration Complete Example")
         print("=" * 70)
         print("\nConnecting to PFC WebSocket Server...")
 
@@ -545,5 +545,5 @@ async def run_full_simulation():
 
 
 if __name__ == "__main__":
-    print("\n🎯 Starting DEMo - aiNagisa PFC Integration Complete Example\n")
+    print("\n🎯 Starting DEMo - toyoura-nagisa PFC Integration Complete Example\n")
     asyncio.run(run_full_simulation())

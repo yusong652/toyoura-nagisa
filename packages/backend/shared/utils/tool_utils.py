@@ -1,5 +1,5 @@
 """
-Tool utility functions for the aiNagisa project.
+Tool utility functions for the toyoura-nagisa project.
 
 This module provides common utility functions for tool management that can be
 shared across different components and modules.

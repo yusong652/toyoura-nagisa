@@ -1,5 +1,5 @@
 """
-Prompt utilities for aiNagisa - Centralized prompt construction following Anthropic best practices.
+Prompt utilities for toyoura-nagisa - Centralized prompt construction following Anthropic best practices.
 
 This module provides a modular and extensible prompt building system with:
 - Core prompt loading (no caching - always fresh)

@@ -12,7 +12,7 @@ import {
  * Custom hook for comprehensive file handling in input area.
  * 
  * This hook encapsulates all file-related operations including file selection,
- * paste handling, file processing, and validation. It follows aiNagisa's
+ * paste handling, file processing, and validation. It follows toyoura-nagisa's
  * clean architecture by isolating file handling concerns from UI rendering.
  * 
  * Features:

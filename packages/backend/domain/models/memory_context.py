@@ -2,7 +2,7 @@
 Memory context models for the enhanced memory infrastructure.
 
 This module defines the data structures and context management
-for the aiNagisa memory system.
+for the toyoura-nagisa memory system.
 """
 
 from dataclasses import dataclass, field

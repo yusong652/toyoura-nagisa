@@ -14,7 +14,7 @@ import {
  * 
  * This hook encapsulates all message sending operations including validation,
  * keyboard handling, send state management, and integration with the chat
- * context. It follows aiNagisa's clean architecture by isolating sending
+ * context. It follows toyoura-nagisa's clean architecture by isolating sending
  * concerns from input state and UI rendering.
  * 
  * Features:

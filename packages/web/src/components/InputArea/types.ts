@@ -2,14 +2,14 @@
  * InputArea TypeScript type definitions.
  * 
  * Comprehensive type system for the input area component following
- * aiNagisa's clean architecture principles with clear separation
+ * toyoura-nagisa's clean architecture principles with clear separation
  * between state, events, and component interfaces.
  * 
  * Architecture Benefits:
  * - Type-safe prop threading between hooks and components
  * - Clear contracts for each responsibility area
  * - Extensible design for future slash command features
- * - Consistent with other aiNagisa component patterns
+ * - Consistent with other toyoura-nagisa component patterns
  */
 
 import { FileData } from '@toyoura-nagisa/core'

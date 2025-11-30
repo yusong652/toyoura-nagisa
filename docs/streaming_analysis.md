@@ -1,7 +1,7 @@
 # LLM流式输出Chunk粒度分析
 
 **测试日期**: 2025-10-27
-**测试目的**: 了解不同LLM提供商的流式API的chunk粒度，为优化aiNagisa的实时响应体验提供数据支持
+**测试目的**: 了解不同LLM提供商的流式API的chunk粒度，为优化toyoura-nagisa的实时响应体验提供数据支持
 
 ---
 
@@ -123,7 +123,7 @@ Statistics:
 
 ---
 
-## 💡 对aiNagisa的优化建议
+## 💡 对toyoura-nagisa的优化建议
 
 ### 当前问题
 ```python

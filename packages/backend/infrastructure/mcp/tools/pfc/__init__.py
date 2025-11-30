@@ -1,5 +1,5 @@
 """
-PFC Tools - ITASCA PFC simulation integration for aiNagisa.
+PFC Tools - ITASCA PFC simulation integration for toyoura-nagisa.
 
 This package provides MCP tools for controlling ITASCA PFC simulations
 through a WebSocket connection to a PFC server running in the PFC GUI.

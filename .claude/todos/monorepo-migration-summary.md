@@ -1,4 +1,4 @@
-# aiNagisa Monorepo 迁移完成报告
+# toyoura-nagisa Monorepo 迁移完成报告
 
 **日期**: 2025-11-23  
 **分支**: refactor/monorepo-restructure  
@@ -11,7 +11,7 @@
 ### 新目录结构
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── packages/                    # 所有可复用的包 (Monorepo)
 │   ├── backend/                # Python FastAPI 后端
 │   ├── core/                   # TypeScript 共享核心逻辑 (新建)
@@ -116,8 +116,8 @@ npm run test          # 运行所有测试
 
 **依赖关系**:
 ```
-@aiNagisa/web → @aiNagisa/core
-@aiNagisa/cli → @aiNagisa/core
+@toyoura-nagisa/web → @toyoura-nagisa/core
+@toyoura-nagisa/cli → @toyoura-nagisa/core
 ```
 
 ### uv Workspace
@@ -126,7 +126,7 @@ npm run test          # 运行所有测试
 [tool.uv.workspace]
 members = [
     "packages/backend",
-    "workspace/default/aiNagisa_uv_workspace/aiNagisa-uv-plot"
+    "workspace/default/toyoura-nagisa_uv_workspace/toyoura-nagisa-uv-plot"
 ]
 ```
 
@@ -166,7 +166,7 @@ sys.path.insert(0, str(_PROJECT_ROOT))  # _PROJECT_ROOT = packages/
 - **删除行数**: 4,250 deletions
 
 ### Workspace 包统计
-- **Python packages**: 2 (backend, aiNagisa-uv-plot)
+- **Python packages**: 2 (backend, toyoura-nagisa-uv-plot)
 - **TypeScript packages**: 3 (core, web, cli)
 - **独立服务**: 1 (pfc-server)
 
@@ -185,7 +185,7 @@ sys.path.insert(0, str(_PROJECT_ROOT))  # _PROJECT_ROOT = packages/
 **目标**: 实现 Web 和 CLI 之间 85-90% 的代码复用
 
 **关键任务**:
-1. 提取 WebSocket Manager 到 @aiNagisa/core
+1. 提取 WebSocket Manager 到 @toyoura-nagisa/core
 2. 提取 Message Processing 逻辑
 3. 提取 Session Management
 4. 创建平台适配器 (Browser/Node.js)
@@ -205,7 +205,7 @@ sys.path.insert(0, str(_PROJECT_ROOT))  # _PROJECT_ROOT = packages/
 - [x] 文档已更新
 
 ### 🎯 未来目标
-- [ ] 提取共享业务逻辑到 @aiNagisa/core
+- [ ] 提取共享业务逻辑到 @toyoura-nagisa/core
 - [ ] 实现 85% 代码复用率
 - [ ] 支持移动端 (React Native)
 - [ ] 支持桌面端 (Electron)

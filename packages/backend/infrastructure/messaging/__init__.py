@@ -1,5 +1,5 @@
 """
-Message passing infrastructure for aiNagisa.
+Message passing infrastructure for toyoura-nagisa.
 
 This module provides message queue management and processing capabilities
 for handling concurrent user messages and ensuring sequential processing.

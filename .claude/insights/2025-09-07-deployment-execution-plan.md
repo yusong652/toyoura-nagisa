@@ -5,7 +5,7 @@
 ### Step 0: 先提交当前工作（5分钟）
 ```bash
 # 在Mac上，确保当前代码已提交
-cd /Users/hanyusong/aiNagisa
+cd /Users/hanyusong/toyoura-nagisa
 
 # 查看状态
 git status
@@ -87,8 +87,8 @@ mkdir C:\Projects
 cd C:\Projects
 
 # 克隆项目
-git clone https://github.com/yusong652/aiNagisa.git
-cd aiNagisa
+git clone https://github.com/yusong652/toyoura-nagisa.git
+cd toyoura-nagisa
 
 # 切换到正确的分支
 git checkout feature/pfc-mcp-integration
@@ -102,7 +102,7 @@ git pull
 pip install uv
 
 # 安装项目依赖
-cd C:\Projects\aiNagisa
+cd C:\Projects\toyoura-nagisa
 uv sync
 
 # 验证安装
@@ -127,11 +127,11 @@ ENVIRONMENT=development
 #### 方案B：从Mac安全传输配置
 ```bash
 # 在Mac上打包配置
-cd /Users/hanyusong/aiNagisa
+cd /Users/hanyusong/toyoura-nagisa
 tar czf config.tar.gz backend/config/*.py .env
 
 # 安全传输到Windows
-scp config.tar.gz username@windows-ip:C:/Projects/aiNagisa/
+scp config.tar.gz username@windows-ip:C:/Projects/toyoura-nagisa/
 
 # Windows上解压
 # 在PowerShell中
@@ -159,14 +159,14 @@ Host windows-dev
 ssh windows-dev
 
 # VSCode连接
-code --remote ssh-remote+windows-dev /C/Projects/aiNagisa
+code --remote ssh-remote+windows-dev /C/Projects/toyoura-nagisa
 ```
 
 ### Step 7: 测试运行（5分钟）
 
 在Windows上测试项目：
 ```powershell
-cd C:\Projects\aiNagisa
+cd C:\Projects\toyoura-nagisa
 
 # 测试MCP服务器
 uv run python backend\infrastructure\mcp\smart_mcp_server.py
@@ -186,7 +186,7 @@ npm run dev
 □ Step 0: Mac上代码已提交推送
 □ Step 1: Windows SSH服务器运行中
 □ Step 2: Git、Python、Node.js已安装
-□ Step 3: 项目已克隆到C:\Projects\aiNagisa
+□ Step 3: 项目已克隆到C:\Projects\toyoura-nagisa
 □ Step 4: Python依赖已安装（uv sync成功）
 □ Step 5: 配置文件已设置
 □ Step 6: VSCode可以远程连接

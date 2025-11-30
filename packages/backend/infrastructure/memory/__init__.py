@@ -1,5 +1,5 @@
 """
-Memory infrastructure module for aiNagisa.
+Memory infrastructure module for toyoura-nagisa.
 
 This module provides the memory management system using Mem0 framework
 with automatic context injection capabilities.

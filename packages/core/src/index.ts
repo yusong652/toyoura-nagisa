@@ -4,7 +4,7 @@
  * This package provides platform-agnostic business logic, type definitions,
  * and utilities that can be shared across different frontend implementations.
  *
- * @see https://github.com/yusong652/aiNagisa
+ * @see https://github.com/yusong652/toyoura-nagisa
  */
 
 export const version = '0.1.0';

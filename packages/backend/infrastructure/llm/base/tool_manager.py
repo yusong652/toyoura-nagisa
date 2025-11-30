@@ -1,7 +1,7 @@
 """
 BaseToolManager - Abstract base class for all LLM client Tool Managers.
 
-Designed for aiNagisa's multi-LLM architecture as a unified tool management interface.
+Designed for toyoura-nagisa's multi-LLM architecture as a unified tool management interface.
 Defines core methods that all Tool Managers must implement to ensure consistency and extensibility.
 """
 

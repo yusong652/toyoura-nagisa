@@ -1,7 +1,7 @@
 /**
- * aiNagisa Connection Manager
+ * toyoura-nagisa Connection Manager
  *
- * Extends WebSocketManager with aiNagisa-specific message handling
+ * Extends WebSocketManager with toyoura-nagisa-specific message handling
  * and business logic for chat sessions, tool confirmations, and notifications.
  */
 
@@ -47,7 +47,7 @@ export interface ConnectionManagerOptions {
 }
 
 /**
- * aiNagisa-specific connection manager
+ * toyoura-nagisa-specific connection manager
  * Handles session-based WebSocket connections with message routing
  */
 export class ConnectionManager extends WebSocketManager {
@@ -107,7 +107,7 @@ export class ConnectionManager extends WebSocketManager {
   }
 
   /**
-   * Setup aiNagisa-specific message handlers
+   * Setup toyoura-nagisa-specific message handlers
    */
   private setupMessageHandlers(): void {
     this.on('message', (message: WebSocketManagerMessage) => {
@@ -116,7 +116,7 @@ export class ConnectionManager extends WebSocketManager {
   }
 
   /**
-   * Handle aiNagisa-specific messages
+   * Handle toyoura-nagisa-specific messages
    */
   private async handleAiNagisaMessage(message: WebSocketManagerMessage): Promise<void> {
     switch (message.type) {

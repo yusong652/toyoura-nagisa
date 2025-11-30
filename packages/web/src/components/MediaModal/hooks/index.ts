@@ -2,7 +2,7 @@
  * MediaModal hooks module exports.
  * 
  * Centralized exports for all media modal related custom hooks.
- * Following aiNagisa's clean architecture pattern with organized hook modules.
+ * Following toyoura-nagisa's clean architecture pattern with organized hook modules.
  * 
  * Usage:
  *     import { useMediaModal, useKeyboardShortcuts } from './hooks'

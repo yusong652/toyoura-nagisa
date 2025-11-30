@@ -7,7 +7,7 @@ import { ProfileSelectorStateHookReturn } from '../types'
  * Custom hook for managing AgentProfileSelector state.
  * 
  * Handles data source determination (context vs props) and provides
- * computed state values for the selector component. Follows aiNagisa's
+ * computed state values for the selector component. Follows toyoura-nagisa's
  * hook architecture pattern with clear return type interface.
  * 
  * Args:

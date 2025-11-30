@@ -4,7 +4,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-aiNagisa is an extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework. The system combines a Python FastAPI backend with a React frontend and features sophisticated parallel tool execution, multi-provider LLM architecture, and intelligent memory management.
+toyoura-nagisa is an extensible, voice-enabled AI assistant with long-term memory and a dynamic tool-use framework. The system combines a Python FastAPI backend with a React frontend and features sophisticated parallel tool execution, multi-provider LLM architecture, and intelligent memory management.
 
 **Key Innovation**: The project delivers 60-70% faster performance for multi-tool scenarios through parallel execution with intelligent batching, making it significantly faster than traditional sequential tool execution.
 
@@ -78,7 +78,7 @@ uv run pytest -k "test_pattern_name"
 
 ### High-Level System Design
 
-aiNagisa follows **Clean Architecture** principles with clear separation of concerns:
+toyoura-nagisa follows **Clean Architecture** principles with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -258,4 +258,4 @@ uv run pytest --cov
 - Implement WebSocket communication for real-time features
 - Consider Live2D character integration for interactive elements
 
-This architecture enables rapid development while maintaining high performance and extensibility for the aiNagisa AI assistant platform.
+This architecture enables rapid development while maintaining high performance and extensibility for the toyoura-nagisa AI assistant platform.

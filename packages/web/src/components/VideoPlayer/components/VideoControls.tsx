@@ -319,7 +319,7 @@ export default VideoControls
  * - Touch-friendly button sizes
  * - Mouse and touch event handling
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Comprehensive accessibility and user interaction support
  * ✓ Clean separation between UI and business logic
  * ✓ Performance optimized rendering and event handling

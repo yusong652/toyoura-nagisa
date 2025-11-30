@@ -42,7 +42,7 @@ export const Header: React.FC = () => {
     <Box flexDirection="row" justifyContent="space-between">
       <Box>
         <Text bold color={theme.text.accent}>
-          aiNagisa
+          toyoura-nagisa
         </Text>
         {appState.currentSessionId && (
           <Text color={theme.text.muted}>

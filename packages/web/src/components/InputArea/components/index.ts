@@ -2,7 +2,7 @@
  * InputArea components module exports.
  * 
  * Centralized exports for all input area child components.
- * Following aiNagisa's clean architecture pattern with focused,
+ * Following toyoura-nagisa's clean architecture pattern with focused,
  * reusable components that handle specific UI concerns.
  * 
  * Usage:

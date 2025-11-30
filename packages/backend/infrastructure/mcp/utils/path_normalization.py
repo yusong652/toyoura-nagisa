@@ -14,8 +14,8 @@ def normalize_windows_paths(command: str) -> str:
     """
     Normalize mixed path separators in Windows commands.
 
-    Converts paths like 'C:\\Dev\\Han\\aiNagisa/pfc_workspace/file.py'
-    to 'C:\\Dev\\Han\\aiNagisa\\pfc_workspace\\file.py' for Windows compatibility.
+    Converts paths like 'C:\\Dev\\Han\\toyoura-nagisa/pfc_workspace/file.py'
+    to 'C:\\Dev\\Han\\toyoura-nagisa\\pfc_workspace\\file.py' for Windows compatibility.
 
     This handles cases where LLMs generate commands with mixed separators,
     which cause errors in Windows cmd.exe and PowerShell.
@@ -43,7 +43,7 @@ def normalize_windows_paths(command: str) -> str:
 
     def replace_path(match):
         drive = match.group(1)  # e.g., "C:"
-        path_part = match.group(2)  # e.g., "Dev\Han\aiNagisa/pfc_workspace/file.py"
+        path_part = match.group(2)  # e.g., "Dev\Han\toyoura-nagisa/pfc_workspace/file.py"
         # Replace all forward slashes with backslashes
         normalized_path = path_part.replace('/', '\\')
         return f"{drive}\\{normalized_path}"
@@ -143,7 +143,7 @@ def normalize_output_paths_to_llm_format(output: str) -> str:
 
     def replace_path(match):
         drive = match.group(1)  # e.g., "C:"
-        path_part = match.group(2)  # e.g., "Dev\\Han\\aiNagisa\\file.py"
+        path_part = match.group(2)  # e.g., "Dev\\Han\\toyoura-nagisa\\file.py"
         # Replace all backslashes with forward slashes
         normalized_path = path_part.replace('\\', '/')
         return f"{drive}/{normalized_path}"

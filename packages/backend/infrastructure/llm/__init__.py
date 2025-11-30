@@ -1,5 +1,5 @@
 """
-LLM infrastructure package for aiNagisa with unified architecture.
+LLM infrastructure package for toyoura-nagisa with unified architecture.
 
 This package provides a unified interface for multiple LLM providers including
 Gemini, Anthropic, OpenAI, and local model support using the new base/shared/providers architecture.

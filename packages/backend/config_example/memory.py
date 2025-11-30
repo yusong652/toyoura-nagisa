@@ -1,5 +1,5 @@
 """
-Memory system configuration examples for aiNagisa.
+Memory system configuration examples for toyoura-nagisa.
 
 This file demonstrates how to configure the memory system, including:
 - Feature toggles

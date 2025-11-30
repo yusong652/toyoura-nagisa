@@ -193,7 +193,7 @@ export default LoadingOverlay
  * - Minimal props interface for simplicity
  * - Type-safe props with TypeScript
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Accessibility-first design with proper ARIA attributes
  * ✓ Performance optimized with CSS animations
  * ✓ Clean, reusable component architecture

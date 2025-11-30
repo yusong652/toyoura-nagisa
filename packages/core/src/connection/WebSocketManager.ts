@@ -3,7 +3,7 @@
  *
  * Platform-agnostic WebSocket manager using adapter pattern.
  * Provides robust connection handling with automatic reconnection,
- * heartbeat monitoring, and error recovery for aiNagisa.
+ * heartbeat monitoring, and error recovery for toyoura-nagisa.
  */
 
 import { EventEmitter } from 'eventemitter3';
@@ -256,7 +256,7 @@ export class WebSocketManager extends EventEmitter {
 
       case 'HEARTBEAT_ACK':
         // This is for scenarios where client sends heartbeat and server responds
-        // In aiNagisa, server initiates heartbeat, so this is less common
+        // In toyoura-nagisa, server initiates heartbeat, so this is less common
         this.stats.lastHeartbeat = new Date();
         this.clearHeartbeatTimeout();
         break;
@@ -271,10 +271,10 @@ export class WebSocketManager extends EventEmitter {
   }
 
   private startHeartbeat(): void {
-    // Note: In aiNagisa architecture, the server sends HEARTBEAT and client responds with HEARTBEAT_ACK.
+    // Note: In toyoura-nagisa architecture, the server sends HEARTBEAT and client responds with HEARTBEAT_ACK.
     // The client does NOT need to proactively send heartbeats.
     // This method is kept for potential future use with servers that expect client-initiated heartbeats.
-    // For aiNagisa backend, heartbeat response is handled in handleSystemMessage().
+    // For toyoura-nagisa backend, heartbeat response is handled in handleSystemMessage().
     this.clearHeartbeatTimers();
 
     // Set up a timeout to detect if server stops sending heartbeats

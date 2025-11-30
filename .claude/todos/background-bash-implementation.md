@@ -22,7 +22,7 @@ Through experimentation with Claude Code, we discovered the following patterns:
    - Support for regex filtering in BashOutput
    - Incremental output reading (only new content since last check)
 
-## Design Approach for aiNagisa
+## Design Approach for toyoura-nagisa
 
 ### Core Philosophy: Static Registration, Dynamic Combination
 Instead of dynamic tool registration/deregistration, we'll use static tool registration with conditional tool combination in `tool_manager.py`:
@@ -109,4 +109,4 @@ kill_shell(shell_id="abc123")
 # Returns: "Successfully killed shell: abc123"
 ```
 
-This approach provides Claude Code-compatible behavior while maintaining aiNagisa's clean architecture principles.
+This approach provides Claude Code-compatible behavior while maintaining toyoura-nagisa's clean architecture principles.

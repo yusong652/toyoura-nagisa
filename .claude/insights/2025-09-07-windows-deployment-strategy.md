@@ -52,8 +52,8 @@ git config --global user.email "your.email@example.com"
 
 # 3. 克隆项目
 cd C:\Projects
-git clone https://github.com/yusong652/aiNagisa.git
-cd aiNagisa
+git clone https://github.com/yusong652/toyoura-nagisa.git
+cd toyoura-nagisa
 
 # 4. 安装Python依赖
 # 安装UV包管理器
@@ -183,16 +183,16 @@ Host ainagisa-windows
 Windows服务器上创建启动脚本：
 
 ```powershell
-# C:\Projects\aiNagisa\start_servers.ps1
+# C:\Projects\toyoura-nagisa\start_servers.ps1
 
 # 启动MCP服务器
-Start-Process python -ArgumentList "backend\infrastructure\mcp\smart_mcp_server.py" -WorkingDirectory "C:\Projects\aiNagisa"
+Start-Process python -ArgumentList "backend\infrastructure\mcp\smart_mcp_server.py" -WorkingDirectory "C:\Projects\toyoura-nagisa"
 
 # 启动FastAPI后端
-Start-Process python -ArgumentList "backend\app.py" -WorkingDirectory "C:\Projects\aiNagisa"
+Start-Process python -ArgumentList "backend\app.py" -WorkingDirectory "C:\Projects\toyoura-nagisa"
 
 # 启动前端（如果需要）
-Start-Process npm -ArgumentList "run dev" -WorkingDirectory "C:\Projects\aiNagisa\frontend"
+Start-Process npm -ArgumentList "run dev" -WorkingDirectory "C:\Projects\toyoura-nagisa\frontend"
 ```
 
 Windows服务配置（使用NSSM）：
@@ -201,8 +201,8 @@ Windows服务配置（使用NSSM）：
 choco install nssm -y
 
 # 注册MCP服务
-nssm install AiNagisaMCP "C:\Python39\python.exe" "C:\Projects\aiNagisa\backend\infrastructure\mcp\smart_mcp_server.py"
-nssm set AiNagisaMCP AppDirectory "C:\Projects\aiNagisa"
+nssm install AiNagisaMCP "C:\Python39\python.exe" "C:\Projects\toyoura-nagisa\backend\infrastructure\mcp\smart_mcp_server.py"
+nssm set AiNagisaMCP AppDirectory "C:\Projects\toyoura-nagisa"
 nssm set AiNagisaMCP Start SERVICE_AUTO_START
 
 # 启动服务
@@ -279,10 +279,10 @@ New-NetFirewallRule -DisplayName "AI Nagisa API" -Direction Inbound -LocalPort 8
 ssh ainagisa-windows
 
 # 或使用VSCode
-code --remote ssh-remote+ainagisa-windows /C/Projects/aiNagisa
+code --remote ssh-remote+ainagisa-windows /C/Projects/toyoura-nagisa
 
 # 2. 在Windows上启动服务
-powershell C:\Projects\aiNagisa\start_servers.ps1
+powershell C:\Projects\toyoura-nagisa\start_servers.ps1
 
 # 3. 通过Cloudflare访问服务
 # MCP: https://mcp.ainagisa.dev
@@ -303,7 +303,7 @@ brew install fswatch
 fswatch -o . | while read f; do
     rsync -avz --exclude='.git' --exclude='node_modules' \
           --exclude='__pycache__' --exclude='.venv' \
-          ./ ainagisa-windows:/C/Projects/aiNagisa/
+          ./ ainagisa-windows:/C/Projects/toyoura-nagisa/
 done
 ```
 

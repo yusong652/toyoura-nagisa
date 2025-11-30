@@ -123,8 +123,8 @@ def get_openrouter_client_config(**overrides) -> OpenRouterClientConfig:
         top_p = 1.0
         api_key = None
         openrouter_headers = {
-            "HTTP-Referer": "https://github.com/yusong652/aiNagisa",
-            "X-Title": "aiNagisa",
+            "HTTP-Referer": "https://github.com/yusong652/toyoura-nagisa",
+            "X-Title": "toyoura-nagisa",
         }
 
     # Build model settings

@@ -1,5 +1,5 @@
 /**
- * ASCII Art for aiNagisa CLI
+ * ASCII Art for toyoura-nagisa CLI
  * Responsive logo designs for different terminal widths
  *
  * Features Nagisa - the cute pink pixel ball mascot with particle cluster ears

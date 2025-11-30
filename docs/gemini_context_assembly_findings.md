@@ -261,7 +261,7 @@ Has .candidates attribute: False
 
 ---
 
-## 🔧 aiNagisa 实现建议
+## 🔧 toyoura-nagisa 实现建议
 
 ### 1. 完整响应组装函数
 

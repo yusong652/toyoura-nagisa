@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ainagisa-backend"
+name = "toyoura-nagisa-backend"
 version = "0.1.0"
-description = "aiNagisa FastAPI backend"
+description = "toyoura-nagisa FastAPI backend"
 requires-python = ">=3.10"
 
 [tool.hatch.build.targets.wheel]

@@ -1,4 +1,4 @@
-# aiNagisa Tool Confirmation Architecture Refactoring Plan
+# toyoura-nagisa Tool Confirmation Architecture Refactoring Plan
 
 ## 1. Current Architecture Analysis
 

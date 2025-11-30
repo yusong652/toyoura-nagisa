@@ -1,5 +1,5 @@
 """
-PFC WebSocket Client - Connects aiNagisa backend to PFC server.
+PFC WebSocket Client - Connects toyoura-nagisa backend to PFC server.
 
 This client maintains a WebSocket connection to the PFC server running
 in the PFC GUI IPython shell, enabling real-time command execution.

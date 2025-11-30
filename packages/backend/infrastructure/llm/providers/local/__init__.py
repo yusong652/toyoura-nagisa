@@ -1,5 +1,5 @@
 """
-Local Model Framework for aiNagisa
+Local Model Framework for toyoura-nagisa
 
 This module provides local model inference capabilities including:
 - vLLM client via HTTPS

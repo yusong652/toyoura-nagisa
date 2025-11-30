@@ -2,7 +2,7 @@
  * HTTP client utility for making API requests with consistent error handling.
  * 
  * Provides a standardized interface for HTTP operations with proper error
- * handling, request/response logging, and type safety for aiNagisa frontend.
+ * handling, request/response logging, and type safety for toyoura-nagisa frontend.
  */
 
 export interface ApiError extends Error {

@@ -6,7 +6,7 @@ import { InputAutoResizeHookReturn, DEFAULT_INPUT_CONFIG } from '../types'
  * 
  * This hook manages automatic height adjustment of textarea elements based
  * on content, providing a smooth user experience for multi-line input.
- * It follows aiNagisa's clean architecture by isolating UI behavior logic
+ * It follows toyoura-nagisa's clean architecture by isolating UI behavior logic
  * from the main component concerns.
  * 
  * Features:

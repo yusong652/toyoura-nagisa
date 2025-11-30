@@ -1,6 +1,6 @@
 # LLM Tool Schema Payload Format
 
-This document details how tool schemas flow from FastMCP to LLMs (Gemini and Anthropic) through aiNagisa's architecture.
+This document details how tool schemas flow from FastMCP to LLMs (Gemini and Anthropic) through toyoura-nagisa's architecture.
 
 ## Overview
 

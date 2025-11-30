@@ -249,7 +249,7 @@ export default useVideoKeyboardShortcuts
  * - Consistent behavior with other modal components
  * - Predictable shortcut patterns across the application
  * 
- * aiNagisa Compliance:
+ * toyoura-nagisa Compliance:
  * ✓ Integrates with existing keyboard handling infrastructure
  * ✓ Comprehensive accessibility and user experience considerations
  * ✓ Performance optimized with useCallback patterns

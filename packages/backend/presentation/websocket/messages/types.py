@@ -1,7 +1,7 @@
 """
 WebSocket message type enumeration.
 
-This module defines all supported WebSocket message types for the aiNagisa
+This module defines all supported WebSocket message types for the toyoura-nagisa
 real-time communication system.
 """
 from enum import Enum

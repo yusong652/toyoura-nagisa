@@ -94,7 +94,7 @@ MESSAGE_CREATE | STATUS_UPDATE
 EMOTION_KEYWORD
 ```
 
-**Migration**: Move directly to `@aiNagisa/core/types`
+**Migration**: Move directly to `@toyoura-nagisa/core/types`
 
 ---
 
@@ -150,7 +150,7 @@ export class SessionService {
 }
 ```
 
-**Migration**: Extract to `@aiNagisa/core/services`, inject HTTP client via constructor
+**Migration**: Extract to `@toyoura-nagisa/core/services`, inject HTTP client via constructor
 
 ---
 
@@ -240,7 +240,7 @@ const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
 **Refactoring Strategy**:
 ```typescript
-// @aiNagisa/core/session/SessionManager.ts
+// @toyoura-nagisa/core/session/SessionManager.ts
 export class SessionManager extends EventEmitter {
   private sessionService: SessionService
 
@@ -257,7 +257,7 @@ export class SessionManager extends EventEmitter {
   // ... other methods
 }
 
-// @aiNagisa/web/contexts/SessionContext.tsx (Thin wrapper)
+// @toyoura-nagisa/web/contexts/SessionContext.tsx (Thin wrapper)
 export const SessionProvider: React.FC = ({ children }) => {
   const sessionManager = useRef(new SessionManager(sessionService)).current
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -301,7 +301,7 @@ export const ChatProvider: React.FC = ({ children }) => {
 
 **Refactoring Strategy**:
 ```typescript
-// @aiNagisa/core/messaging/ChatManager.ts
+// @toyoura-nagisa/core/messaging/ChatManager.ts
 export class ChatManager extends EventEmitter {
   constructor(
     private chatService: ChatService,
@@ -346,7 +346,7 @@ export class ChatManager extends EventEmitter {
   }
 }
 
-// @aiNagisa/web/contexts/ChatContext.tsx (Thin wrapper)
+// @toyoura-nagisa/web/contexts/ChatContext.tsx (Thin wrapper)
 export const ChatProvider: React.FC = ({ children }) => {
   const chatManager = useRef(new ChatManager(...)).current
   const [messages, setMessages] = useState<Message[]>([])
@@ -406,7 +406,7 @@ function parseCurrentMention(text: string, cursor: number): FileMentionMatch | n
 - Real-time suggestion dropdown rendering
 - Keyboard navigation (↑↓ keys)
 
-**Migration**: Extract parsing logic to `@aiNagisa/core/utils/FileMentionParser.ts`
+**Migration**: Extract parsing logic to `@toyoura-nagisa/core/utils/FileMentionParser.ts`
 
 ---
 
@@ -462,7 +462,7 @@ export const SessionProvider: React.FC = ({ children }) => {
 ### 2.1 Package Structure
 
 ```
-aiNagisa/
+toyoura-nagisa/
 ├── packages/
 │   ├── core/                      # Shared business logic
 │   │   ├── src/
@@ -537,14 +537,14 @@ aiNagisa/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     @aiNagisa/web                           │
-│                     @aiNagisa/cli                           │
+│                     @toyoura-nagisa/web                           │
+│                     @toyoura-nagisa/cli                           │
 │  (Platform-specific UI + thin state wrappers)               │
 └─────────────────┬───────────────────────────────────────────┘
                   │ depends on
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    @aiNagisa/core                           │
+│                    @toyoura-nagisa/core                           │
 │  - ChatManager, SessionManager                              │
 │  - WebSocketManager, HttpClient                             │
 │  - Services, Converters, Processors                         │
@@ -565,7 +565,7 @@ aiNagisa/
 ### 3.1 WebSocket Adapter
 
 ```typescript
-// @aiNagisa/core/connection/adapters/WebSocketAdapter.ts
+// @toyoura-nagisa/core/connection/adapters/WebSocketAdapter.ts
 export interface WebSocketAdapter {
   connect(url: string, protocols?: string[]): void
   send(data: string): void
@@ -578,7 +578,7 @@ export interface WebSocketAdapter {
   onClose(callback: (code: number, reason: string) => void): void
 }
 
-// @aiNagisa/core/connection/adapters/BrowserWebSocketAdapter.ts
+// @toyoura-nagisa/core/connection/adapters/BrowserWebSocketAdapter.ts
 export class BrowserWebSocketAdapter implements WebSocketAdapter {
   private ws: WebSocket | null = null
 
@@ -611,7 +611,7 @@ export class BrowserWebSocketAdapter implements WebSocketAdapter {
   }
 }
 
-// @aiNagisa/core/connection/adapters/NodeWebSocketAdapter.ts
+// @toyoura-nagisa/core/connection/adapters/NodeWebSocketAdapter.ts
 import WebSocket from 'ws'
 
 export class NodeWebSocketAdapter implements WebSocketAdapter {
@@ -628,7 +628,7 @@ export class NodeWebSocketAdapter implements WebSocketAdapter {
 
 **Usage in WebSocketManager**:
 ```typescript
-// @aiNagisa/core/connection/WebSocketManager.ts
+// @toyoura-nagisa/core/connection/WebSocketManager.ts
 export class WebSocketManager extends EventEmitter {
   constructor(private adapter: WebSocketAdapter) {
     super()
@@ -643,10 +643,10 @@ export class WebSocketManager extends EventEmitter {
   }
 }
 
-// @aiNagisa/web - Browser usage
+// @toyoura-nagisa/web - Browser usage
 const wsManager = new WebSocketManager(new BrowserWebSocketAdapter())
 
-// @aiNagisa/cli - Node.js usage
+// @toyoura-nagisa/cli - Node.js usage
 const wsManager = new WebSocketManager(new NodeWebSocketAdapter())
 ```
 
@@ -655,7 +655,7 @@ const wsManager = new WebSocketManager(new NodeWebSocketAdapter())
 ### 3.2 HTTP Client Adapter
 
 ```typescript
-// @aiNagisa/core/services/adapters/HttpAdapter.ts
+// @toyoura-nagisa/core/services/adapters/HttpAdapter.ts
 export interface HttpAdapter {
   request<T>(url: string, options: RequestOptions): Promise<T>
   stream(url: string, options: RequestOptions): Promise<ReadableStream>
@@ -668,7 +668,7 @@ export interface RequestOptions {
   timeout?: number
 }
 
-// @aiNagisa/core/services/adapters/FetchAdapter.ts (Browser)
+// @toyoura-nagisa/core/services/adapters/FetchAdapter.ts (Browser)
 export class FetchAdapter implements HttpAdapter {
   async request<T>(url: string, options: RequestOptions): Promise<T> {
     const response = await fetch(url, {
@@ -703,7 +703,7 @@ export class FetchAdapter implements HttpAdapter {
   }
 }
 
-// @aiNagisa/core/services/adapters/AxiosAdapter.ts (Node.js)
+// @toyoura-nagisa/core/services/adapters/AxiosAdapter.ts (Node.js)
 import axios, { AxiosInstance } from 'axios'
 
 export class AxiosAdapter implements HttpAdapter {
@@ -743,7 +743,7 @@ export class AxiosAdapter implements HttpAdapter {
 
 **Usage in HttpClient**:
 ```typescript
-// @aiNagisa/core/services/HttpClient.ts
+// @toyoura-nagisa/core/services/HttpClient.ts
 export class HttpClient {
   constructor(private adapter: HttpAdapter) {}
 
@@ -760,10 +760,10 @@ export class HttpClient {
   }
 }
 
-// @aiNagisa/web
+// @toyoura-nagisa/web
 const httpClient = new HttpClient(new FetchAdapter())
 
-// @aiNagisa/cli
+// @toyoura-nagisa/cli
 const httpClient = new HttpClient(new AxiosAdapter())
 ```
 
@@ -772,7 +772,7 @@ const httpClient = new HttpClient(new AxiosAdapter())
 ### 3.3 Storage Adapter
 
 ```typescript
-// @aiNagisa/core/session/adapters/StorageAdapter.ts
+// @toyoura-nagisa/core/session/adapters/StorageAdapter.ts
 export interface StorageAdapter {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<void>
@@ -780,7 +780,7 @@ export interface StorageAdapter {
   clear(): Promise<void>
 }
 
-// @aiNagisa/core/session/adapters/LocalStorageAdapter.ts (Browser)
+// @toyoura-nagisa/core/session/adapters/LocalStorageAdapter.ts (Browser)
 export class LocalStorageAdapter implements StorageAdapter {
   async get(key: string): Promise<string | null> {
     return localStorage.getItem(key)
@@ -799,7 +799,7 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 }
 
-// @aiNagisa/core/session/adapters/FileStorageAdapter.ts (Node.js)
+// @toyoura-nagisa/core/session/adapters/FileStorageAdapter.ts (Node.js)
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -841,7 +841,7 @@ export class FileStorageAdapter implements StorageAdapter {
 ### 4.1 ChatManager
 
 ```typescript
-// @aiNagisa/core/messaging/ChatManager.ts
+// @toyoura-nagisa/core/messaging/ChatManager.ts
 export class ChatManager extends EventEmitter {
   constructor(
     private chatService: ChatService,
@@ -981,7 +981,7 @@ export interface SendResult {
 ### 4.2 SessionManager
 
 ```typescript
-// @aiNagisa/core/session/SessionManager.ts
+// @toyoura-nagisa/core/session/SessionManager.ts
 export class SessionManager extends EventEmitter {
   constructor(
     private sessionService: SessionService,
@@ -1062,8 +1062,8 @@ export interface TokenUsage {
 ### 5.1 Web Frontend Integration
 
 ```typescript
-// @aiNagisa/web/contexts/ChatContext.tsx
-import { ChatManager, BrowserWebSocketAdapter, FetchAdapter } from '@aiNagisa/core'
+// @toyoura-nagisa/web/contexts/ChatContext.tsx
+import { ChatManager, BrowserWebSocketAdapter, FetchAdapter } from '@toyoura-nagisa/core'
 
 export const ChatProvider: React.FC<PropsWithChildren> = ({ children }) => {
   // Initialize core managers
@@ -1135,8 +1135,8 @@ export const ChatProvider: React.FC<PropsWithChildren> = ({ children }) => {
 ### 5.2 CLI Frontend Integration
 
 ```typescript
-// @aiNagisa/cli/managers/CLIChatManager.ts
-import { ChatManager, NodeWebSocketAdapter, AxiosAdapter } from '@aiNagisa/core'
+// @toyoura-nagisa/cli/managers/CLIChatManager.ts
+import { ChatManager, NodeWebSocketAdapter, AxiosAdapter } from '@toyoura-nagisa/core'
 import { MessageRenderer } from '../ui/MessageRenderer'
 
 export class CLIChatManager {
@@ -1210,7 +1210,7 @@ export class CLIChatManager {
 ```
 
 ```typescript
-// @aiNagisa/cli/ui/MessageRenderer.ts
+// @toyoura-nagisa/cli/ui/MessageRenderer.ts
 import chalk from 'chalk'
 import ora from 'ora'
 
@@ -1276,22 +1276,22 @@ export class MessageRenderer {
 2. ✅ Initialize `package.json` and `tsconfig.json`
 3. ✅ Create directory structure (connection/, messaging/, session/, services/, types/, utils/)
 4. ✅ Extract type definitions:
-   - Move `types/websocket.ts` → `@aiNagisa/core/types/websocket.ts`
-   - Move `types/chat.ts` → `@aiNagisa/core/types/messages.ts`
-   - Move `types/session.ts` → `@aiNagisa/core/types/session.ts`
+   - Move `types/websocket.ts` → `@toyoura-nagisa/core/types/websocket.ts`
+   - Move `types/chat.ts` → `@toyoura-nagisa/core/types/messages.ts`
+   - Move `types/session.ts` → `@toyoura-nagisa/core/types/session.ts`
    - Fix TokenUsage type duplication (use session.ts as single source)
 5. ✅ Update imports in web frontend (41+ files updated)
 6. ✅ Test type compilation
 
-**Success Criteria**: ✅ Types compile without errors, web frontend uses `@aiNagisa/core` types
+**Success Criteria**: ✅ Types compile without errors, web frontend uses `@toyoura-nagisa/core` types
 
 **Commits**:
-- `8d726ac` - refactor: extract WebSocket connection layer to @aiNagisa/core
-- `2253959` - refactor: extract type definitions to @aiNagisa/core package
+- `8d726ac` - refactor: extract WebSocket connection layer to @toyoura-nagisa/core
+- `2253959` - refactor: extract type definitions to @toyoura-nagisa/core package
 
 **Achievements**:
 - ✅ Zero-cost abstraction - types are 100% reusable
-- ✅ All web frontend imports updated to use `@aiNagisa/core`
+- ✅ All web frontend imports updated to use `@toyoura-nagisa/core`
 - ✅ Build and compilation verified
 
 ---
@@ -1301,7 +1301,7 @@ export class MessageRenderer {
 
 **Tasks**:
 1. ✅ Create adapter interfaces:
-   - `@aiNagisa/core/connection/adapters/WebSocketAdapter.ts`
+   - `@toyoura-nagisa/core/connection/adapters/WebSocketAdapter.ts`
 2. ✅ Implement adapters:
    - `BrowserWebSocketAdapter.ts` (with `getNativeWebSocket()` method)
    - `NodeWebSocketAdapter.ts`
@@ -1310,11 +1310,11 @@ export class MessageRenderer {
    - Update event handlers to use adapter callbacks
    - Implement passive heartbeat response (backend-initiated)
 4. ✅ Create `ConnectionManager.ts` extending `WebSocketManager`:
-   - Add aiNagisa-specific message routing (TTS, tool confirmations, location)
+   - Add toyoura-nagisa-specific message routing (TTS, tool confirmations, location)
    - Implement location request handler
    - Emit typed events for frontend consumption
 5. ✅ Update web frontend `ConnectionContext.tsx`:
-   - Import `ConnectionManager` from `@aiNagisa/core`
+   - Import `ConnectionManager` from `@toyoura-nagisa/core`
    - Inject `BrowserWebSocketAdapter`
    - Reduce from 628 lines to 362 lines (42% reduction)
    - Convert to thin React wrapper over core business logic
@@ -1345,7 +1345,7 @@ export class MessageRenderer {
 
 **Tasks**:
 1. ✅ Create HTTP adapter interfaces:
-   - `@aiNagisa/core/services/adapters/HttpAdapter.ts`
+   - `@toyoura-nagisa/core/services/adapters/HttpAdapter.ts`
 2. ✅ Implement adapters:
    - `FetchAdapter.ts` (browser)
    - `AxiosAdapter.ts` (Node.js)
@@ -1367,10 +1367,10 @@ export class MessageRenderer {
 
 **Tasks**:
 1. ✅ Extract message converters:
-   - `@aiNagisa/core/messaging/MessageConverters.ts` (already existed from previous work)
+   - `@toyoura-nagisa/core/messaging/MessageConverters.ts` (already existed from previous work)
 2. ✅ Extract stream processors:
-   - Created `@aiNagisa/core/messaging/StreamProcessor.ts` - Pure SSE stream processing logic
-   - Created `@aiNagisa/core/messaging/ChunkProcessor.ts` - Chunk ordering and buffering logic
+   - Created `@toyoura-nagisa/core/messaging/StreamProcessor.ts` - Pure SSE stream processing logic
+   - Created `@toyoura-nagisa/core/messaging/ChunkProcessor.ts` - Chunk ordering and buffering logic
 3. ✅ Remove React hooks from processing logic:
    - Core processors use pure event-based architecture
    - No React dependencies in core logic
@@ -1389,7 +1389,7 @@ export class MessageRenderer {
 **Success Criteria**: ✅ Messages stream correctly, converters work with events
 
 **Commits**:
-- (To be committed) - feat: extract message processing logic to @aiNagisa/core
+- (To be committed) - feat: extract message processing logic to @toyoura-nagisa/core
 
 **Achievements**:
 - ✅ ~300 lines of reusable stream/chunk processing logic extracted to core
@@ -1423,7 +1423,7 @@ export class MessageRenderer {
    - `TimeFormatter.ts` - Relative/absolute time formatting
    - `FileMentionParser.ts` - @ mention detection and parsing logic
 6. ✅ Update web package imports:
-   - Replaced local utils with `@aiNagisa/core/utils` imports
+   - Replaced local utils with `@toyoura-nagisa/core/utils` imports
    - Removed duplicate parsing logic from `useFileMentionDetection`
 7. ✅ Test full chat flow (send message, load history, delete)
 8. ✅ Test session management (create, switch, delete)
@@ -1432,7 +1432,7 @@ export class MessageRenderer {
 **Success Criteria**: ✅ Web frontend works with core managers and utilities, zero regression
 
 **Commits**:
-- (Pending) - feat: extract utility functions to @aiNagisa/core
+- (Pending) - feat: extract utility functions to @toyoura-nagisa/core
 
 **Achievements**:
 - ✅ ~200 lines of reusable utility functions extracted to core
@@ -1450,7 +1450,7 @@ export class MessageRenderer {
 **Tasks**:
 1. ✅ Initialize `packages/cli`:
    - Create `package.json`, `tsconfig.json`
-   - Add dependencies: `@aiNagisa/core`, `ink`, `chalk`, `ora`, `commander`
+   - Add dependencies: `@toyoura-nagisa/core`, `ink`, `chalk`, `ora`, `commander`
 2. ✅ Create CLI managers:
    - `CLIChatManager.ts` (wraps `ChatManager`)
    - `CLIConnectionManager.ts` (wraps `WebSocketManager`)
@@ -1479,11 +1479,11 @@ export class MessageRenderer {
 
 **Tasks**:
 1. ✅ Add JSDoc comments to all public APIs
-2. ✅ Write `@aiNagisa/core` README:
+2. ✅ Write `@toyoura-nagisa/core` README:
    - Architecture overview
    - API documentation
    - Usage examples
-3. ✅ Write `@aiNagisa/cli` README:
+3. ✅ Write `@toyoura-nagisa/cli` README:
    - Installation instructions
    - CLI commands
    - Configuration
@@ -1507,7 +1507,7 @@ export class MessageRenderer {
 ### 7.1 Core Package Tests
 
 ```typescript
-// @aiNagisa/core/tests/messaging/ChatManager.test.ts
+// @toyoura-nagisa/core/tests/messaging/ChatManager.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import { ChatManager } from '../../src/messaging/ChatManager'
 
@@ -1539,7 +1539,7 @@ describe('ChatManager', () => {
 ### 7.2 Adapter Tests
 
 ```typescript
-// @aiNagisa/core/tests/adapters/WebSocketAdapter.test.ts
+// @toyoura-nagisa/core/tests/adapters/WebSocketAdapter.test.ts
 describe('BrowserWebSocketAdapter', () => {
   it('should connect to WebSocket server', async () => {
     const adapter = new BrowserWebSocketAdapter()
@@ -1556,7 +1556,7 @@ describe('BrowserWebSocketAdapter', () => {
 ### 7.3 Integration Tests
 
 ```typescript
-// @aiNagisa/web/tests/integration/chat.test.tsx
+// @toyoura-nagisa/web/tests/integration/chat.test.tsx
 describe('Chat Integration', () => {
   it('should send message and receive response', async () => {
     render(
@@ -1590,8 +1590,8 @@ frontend/dist/index.js: 450 KB (gzipped: 120 KB)
 
 **After Refactoring** (Web + Core):
 ```
-@aiNagisa/core/dist/index.js: 80 KB (gzipped: 25 KB)
-@aiNagisa/web/dist/index.js: 380 KB (gzipped: 100 KB)
+@toyoura-nagisa/core/dist/index.js: 80 KB (gzipped: 25 KB)
+@toyoura-nagisa/web/dist/index.js: 380 KB (gzipped: 100 KB)
 Total: 460 KB (gzipped: 125 KB)
 ```
 
@@ -1747,7 +1747,7 @@ packages/
       main/
         main.ts                    # Electron main process
       renderer/
-        App.tsx                    # Reuse @aiNagisa/web
+        App.tsx                    # Reuse @toyoura-nagisa/web
       preload/
         preload.ts                 # IPC bridge
 ```

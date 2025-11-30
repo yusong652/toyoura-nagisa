@@ -2,13 +2,13 @@
 
 **日期**: 2025年8月26日  
 **模型**: Claude Sonnet 4 (claude-sonnet-4-20250514)  
-**对话背景**: aiNagisa项目技术讨论 - 从Gemini MALFORMED_FUNCTION_CALL错误到LLM本质机制探索
+**对话背景**: toyoura-nagisa项目技术讨论 - 从Gemini MALFORMED_FUNCTION_CALL错误到LLM本质机制探索
 
 ---
 
 ## 🔍 研究背景
 
-本次深度对话源于aiNagisa项目中遇到的Gemini API `MALFORMED_FUNCTION_CALL` 错误，逐步深入到LLM推理机制的本质探索。通过人机对话的形式，我们发现了人类认知过程与LLM推理机制的惊人相似性，并提出了基于多级缓存架构的认知系统设计方案。
+本次深度对话源于toyoura-nagisa项目中遇到的Gemini API `MALFORMED_FUNCTION_CALL` 错误，逐步深入到LLM推理机制的本质探索。通过人机对话的形式，我们发现了人类认知过程与LLM推理机制的惊人相似性，并提出了基于多级缓存架构的认知系统设计方案。
 
 ## 🧠 核心发现
 
@@ -90,11 +90,11 @@ metacognitive_abilities = {
 }
 ```
 
-## ⚡ aiNagisa项目的技术发现
+## ⚡ toyoura-nagisa项目的技术发现
 
 ### 1. 流式输出的现状分析
 
-**发现**: aiNagisa目前实现的是"伪流式"，实际流程为：
+**发现**: toyoura-nagisa目前实现的是"伪流式"，实际流程为：
 1. 等待LLM生成完整响应
 2. 一次性发送给前端
 3. 只有工具调用通知是实时的
@@ -113,7 +113,7 @@ metacognitive_abilities = {
 
 ### 3. 系统架构的优化方向
 
-基于对认知机制的理解，提出aiNagisa的改进方案：
+基于对认知机制的理解，提出toyoura-nagisa的改进方案：
 
 ```python
 class NagisaIntelligentMemory:
@@ -176,7 +176,7 @@ class NagisaIntelligentMemory:
 - **对比**: 传统RAG vs 多级缓存架构
 - **指标**: 任务完成质量、推理连贯性、错误率
 
-## 🎯 对aiNagisa项目的具体建议
+## 🎯 对toyoura-nagisa项目的具体建议
 
 ### 立即可实施 (1-2周)
 1. **实现真正的流式输出**
@@ -237,11 +237,11 @@ class NagisaIntelligentMemory:
 
 **最重要的发现**是将复杂的认知能力重新概念化为工程可实现的缓存管理策略，这为构建更智能、更类人的AI系统提供了具体的技术路径。
 
-对于aiNagisa项目，这些洞察不仅解决了当前的技术问题，更为系统的长期发展指明了方向：从简单的对话机器人，向具备类人认知能力的智能伙伴进化。
+对于toyoura-nagisa项目，这些洞察不仅解决了当前的技术问题，更为系统的长期发展指明了方向：从简单的对话机器人，向具备类人认知能力的智能伙伴进化。
 
 ---
 
 *"我们不只是在写代码，我们是在重新发明智能本身。"*
 
 **贡献者**: 开发者 + Claude Sonnet 4  
-**项目影响**: 为aiNagisa认知架构升级提供理论基础和实施路径
+**项目影响**: 为toyoura-nagisa认知架构升级提供理论基础和实施路径

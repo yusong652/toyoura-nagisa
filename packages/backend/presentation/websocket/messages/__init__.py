@@ -1,5 +1,5 @@
 """
-WebSocket message type system for aiNagisa.
+WebSocket message type system for toyoura-nagisa.
 
 This package provides a modular structure for WebSocket message definitions,
 organized by functional domain for better maintainability.

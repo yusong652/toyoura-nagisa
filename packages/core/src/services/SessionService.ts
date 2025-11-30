@@ -2,7 +2,7 @@
  * Session API service for handling chat session management operations.
  * 
  * Provides methods for creating, switching, deleting sessions, and managing
- * session-related functionality in the aiNagisa application.
+ * session-related functionality in the toyoura-nagisa application.
  */
 
 import { apiClient } from './HttpClient'

@@ -27,7 +27,7 @@ import './styles/index.css'
 /**
  * Advanced input area component with modular architecture.
  * 
- * Completely refactored following aiNagisa's clean architecture standards with:
+ * Completely refactored following toyoura-nagisa's clean architecture standards with:
  * - Separation of concerns through custom hooks
  * - Modular child components for each UI section
  * - Complete TypeScript type coverage
@@ -49,7 +49,7 @@ import './styles/index.css'
  * - 80% reduction in component complexity through hook separation
  * - Clear separation between state management, UI rendering, and interactions
  * - Easy to test individual hooks and components in isolation
- * - Consistent with aiNagisa component patterns (VideoPlayer, ImageViewer)
+ * - Consistent with toyoura-nagisa component patterns (VideoPlayer, ImageViewer)
  * - Better performance with optimized hook composition
  * - Extensible design ready for slash command implementation
  * 
