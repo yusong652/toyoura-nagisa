@@ -5,6 +5,9 @@ This module provides git-based version tracking for PFC script executions,
 creating commits on a dedicated branch without affecting the working directory.
 
 Python 3.6 compatible implementation.
+
+TODO: Consider auto-initializing git repository on pfc-server startup
+      if the PFC project directory is not yet a git repository.
 """
 
 import logging
@@ -36,7 +39,6 @@ class GitVersionManager:
             workspace_dir: Git repository root directory. If None, uses current directory.
         """
         self.workspace_dir = workspace_dir or os.getcwd()
-        self._git_available = None  # Lazy check
 
     def _run_git(self, args, check=True):
         # type: (list, bool) -> subprocess.CompletedProcess
@@ -53,13 +55,20 @@ class GitVersionManager:
         cmd = ["git"] + args
         try:
             # Python 3.6 compatible: use run with capture_output equivalent
-            result = subprocess.run(
-                cmd,
-                cwd=self.workspace_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True  # Python 3.6 compatible (text=True in 3.7+)
-            )
+            # Use CREATE_NO_WINDOW on Windows to hide CMD popup
+            kwargs = {
+                "cwd": self.workspace_dir,
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "universal_newlines": True  # Python 3.6 compatible (text=True in 3.7+)
+            }
+            # Windows: hide console window
+            # CREATE_NO_WINDOW = 0x08000000 (Python 3.7+ has subprocess.CREATE_NO_WINDOW)
+            if os.name == 'nt':
+                CREATE_NO_WINDOW = 0x08000000
+                kwargs["creationflags"] = CREATE_NO_WINDOW
+
+            result = subprocess.run(cmd, **kwargs)
             if check and result.returncode != 0:
                 logger.error("Git command failed: {} -> {}".format(" ".join(cmd), result.stderr))
             return result
@@ -70,16 +79,74 @@ class GitVersionManager:
     def is_git_available(self):
         # type: () -> bool
         """Check if git is available and we're in a git repository."""
-        if self._git_available is not None:
-            return self._git_available
-
         try:
             result = self._run_git(["rev-parse", "--git-dir"], check=False)
-            self._git_available = result.returncode == 0
+            return result.returncode == 0
         except Exception:
-            self._git_available = False
+            return False
 
-        return self._git_available
+    def diagnose_git_status(self):
+        # type: () -> Dict[str, Any]
+        """
+        Diagnose git availability and provide actionable guidance.
+
+        Returns:
+            Dict with:
+                - available: bool - Whether git is fully functional
+                - issue: Optional[str] - Issue type if not available
+                - message: str - Human-readable status message
+                - action: Optional[str] - Suggested action to fix
+        """
+        try:
+            result = self._run_git(["rev-parse", "--git-dir"], check=False)
+
+            if result.returncode == 0:
+                return {
+                    "available": True,
+                    "issue": None,
+                    "message": "Git repository detected",
+                    "action": None
+                }
+
+            stderr = result.stderr.strip()
+
+            # Check for common issues
+            if "dubious ownership" in stderr:
+                return {
+                    "available": False,
+                    "issue": "ownership",
+                    "message": "Git detected dubious ownership (directory owned by different user)",
+                    "action": "git config --global --add safe.directory {}".format(self.workspace_dir)
+                }
+            elif "not a git repository" in stderr:
+                return {
+                    "available": False,
+                    "issue": "not_initialized",
+                    "message": "Directory is not a git repository",
+                    "action": "git init"
+                }
+            else:
+                return {
+                    "available": False,
+                    "issue": "unknown",
+                    "message": "Git error: {}".format(stderr),
+                    "action": None
+                }
+
+        except FileNotFoundError:
+            return {
+                "available": False,
+                "issue": "not_installed",
+                "message": "Git is not installed or not in PATH",
+                "action": "Install git and ensure it's in PATH"
+            }
+        except Exception as e:
+            return {
+                "available": False,
+                "issue": "error",
+                "message": "Git check failed: {}".format(str(e)),
+                "action": None
+            }
 
     def check_git_state(self):
         # type: () -> Dict[str, Any]
@@ -155,11 +222,10 @@ class GitVersionManager:
 
         # Create orphan branch with initial empty commit
         # We need to do this carefully to not affect current working directory
-        logger.info("Creating execution tracking branch: {}".format(EXECUTION_BRANCH))
 
         try:
             # Get current branch to restore later
-            current_result = self._run_git(["branch", "--show-current"])
+            current_result = self._run_git(["branch", "--show-current"], check=False)
             current_branch = current_result.stdout.strip()
 
             # Stash any changes
@@ -179,11 +245,11 @@ class GitVersionManager:
                     "-m", "Initialize PFC execution tracking\n\nThis branch stores snapshots of code state at each PFC task execution."
                 ])
 
-                logger.info("✓ Created execution branch: {}".format(EXECUTION_BRANCH))
 
             finally:
                 # Always restore original branch
-                self._run_git(["checkout", current_branch], check=False)
+                if current_branch:
+                    self._run_git(["checkout", current_branch], check=False)
 
                 # Restore stashed changes
                 if stash_created:
@@ -253,7 +319,6 @@ class GitVersionManager:
             # 7. Update execution branch ref to point to new commit
             self._run_git(["update-ref", "refs/heads/{}".format(EXECUTION_BRANCH), new_commit])
 
-            logger.info("✓ Created execution commit: {} on branch {}".format(new_commit[:8], EXECUTION_BRANCH))
 
             return new_commit
 
@@ -294,7 +359,7 @@ def get_git_manager(workspace_dir=None):
     Get or create the GitVersionManager singleton.
 
     Args:
-        workspace_dir: Git repository root directory
+        workspace_dir: Git repository root directory (default: os.getcwd())
 
     Returns:
         GitVersionManager instance

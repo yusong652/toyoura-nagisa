@@ -31,12 +31,26 @@ import logging
 import threading
 import time
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
+# Configure logging - output to both console and file
+import os
+# Use os.getcwd() since __file__ is not available when using exec()
+log_file = os.path.join(os.getcwd(), "pfc_server.log")
+
+# Force configure logging (basicConfig won't work if already configured)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+# Clear existing handlers
+root_logger.handlers.clear()
+# Add handlers
+formatter = logging.Formatter('[%(asctime)s] %(levelname)s - %(message)s')
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(formatter)
+file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+file_handler.setFormatter(formatter)
+root_logger.addHandler(console_handler)
+root_logger.addHandler(file_handler)
+
+print("Log file: {}".format(log_file))
 
 # Import server components
 from server.main_thread_executor import MainThreadExecutor
@@ -83,6 +97,28 @@ except ImportError:
     print("⚠ itasca module not available - skipping python-reset-state")
 except Exception as e:
     print("⚠ Failed to set python-reset-state: {}".format(e))
+
+# ===== Check Git Version Tracking =====
+# Git is used to create execution snapshots for reproducibility
+try:
+    from server.git_version_manager import get_git_manager
+    git_manager = get_git_manager()
+    git_status = git_manager.diagnose_git_status()
+
+    if git_status["available"]:
+        print("✓ Git version tracking enabled")
+    else:
+        print("")
+        print("=" * 70)
+        print("⚠ Git version tracking disabled: {}".format(git_status["message"]))
+        if git_status["action"]:
+            print("")
+            print("  To enable, run:")
+            print("    {}".format(git_status["action"]))
+        print("=" * 70)
+        print("")
+except Exception as e:
+    print("⚠ Git check failed: {}".format(e))
 
 # ===== Create Server Instance =====
 pfc_server = create_server(

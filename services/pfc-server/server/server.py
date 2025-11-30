@@ -85,7 +85,6 @@ class PFCWebSocketServer:
             path: Request path (for websockets 9.x compatibility)
         """
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        logger.info(f"✓ Client connected: {client_id}")
         self.active_connections.add(websocket)
 
         try:
@@ -93,7 +92,6 @@ class PFCWebSocketServer:
                 try:
                     # Parse incoming message
                     data = json.loads(message)
-                    logger.debug(f"Received message: {data}")
 
                     msg_type = data.get("type", "script")
 
@@ -121,7 +119,6 @@ class PFCWebSocketServer:
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
@@ -146,7 +143,6 @@ class PFCWebSocketServer:
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
@@ -173,7 +169,6 @@ class PFCWebSocketServer:
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
@@ -194,7 +189,6 @@ class PFCWebSocketServer:
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
@@ -227,7 +221,6 @@ class PFCWebSocketServer:
 
                         try:
                             await websocket.send(json.dumps(response))
-                            logger.info(f"✓ Request result sent: {request_id}")
                         except websockets.exceptions.ConnectionClosed:
                             logger.warning(f"Cannot send result, connection closed: {request_id}")
                             break  # Exit message loop
@@ -271,7 +264,7 @@ class PFCWebSocketServer:
                         break  # Exit message loop
 
         except websockets.exceptions.ConnectionClosed:
-            logger.info(f"✗ Client disconnected: {client_id}")
+            pass  # Client disconnected normally
 
         finally:
             self.active_connections.discard(websocket)
@@ -308,7 +301,6 @@ class PFCWebSocketServer:
 
     async def start(self):
         """Start the WebSocket server (non-blocking)."""
-        logger.info(f"Starting PFC WebSocket Server on {self.host}:{self.port}")
 
         try:
             # Use websockets 9.1 compatible syntax (Python 3.6)
@@ -319,7 +311,6 @@ class PFCWebSocketServer:
                 ping_interval=self.ping_interval,
                 ping_timeout=self.ping_timeout
             )
-            logger.info(f"✓ Server running on ws://{self.host}:{self.port}")
 
             # Note: Server is now running in the background
             # websockets.serve() automatically handles connections via the event loop

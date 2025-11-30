@@ -47,7 +47,6 @@ class PFCScriptExecutor:
         try:
             import itasca  # type: ignore
             self.itasca = itasca
-            logger.info("✓ ITASCA SDK loaded for script execution")
         except ImportError:
             logger.warning("⚠ ITASCA SDK not available for script execution")
             self.itasca = None
@@ -78,7 +77,6 @@ class PFCScriptExecutor:
         sys.stdout = output_buffer
 
         try:
-            logger.info("Executing Python script in main thread: {}".format(script_path))
 
             # Prepare execution context with itasca module
             # Use single namespace for both globals and locals to ensure imported modules
@@ -229,7 +227,6 @@ class PFCScriptExecutor:
                 }
 
             # Read script file
-            logger.info("Reading script file: {}".format(script_path))
             try:
                 with open(script_path, 'r', encoding='utf-8') as f:
                     script_content = f.read()
@@ -281,12 +278,6 @@ class PFCScriptExecutor:
                     description=description,
                     entry_script=script_path
                 )
-                if git_commit:
-                    logger.info("✓ Created execution snapshot: {} for task {}".format(
-                        git_commit[:8], task_id_preview
-                    ))
-            else:
-                logger.warning("Git not available - skipping version snapshot")
 
             # Submit to main thread queue
             future = self.main_executor.submit(
@@ -298,7 +289,6 @@ class PFCScriptExecutor:
 
             if run_in_background:
                 # Asynchronous execution: register with task manager and return immediately
-                logger.info("Submitting script as background task: {}".format(script_name))
 
                 submit_time = time.time()
                 task_id = self.task_manager.create_script_task(
@@ -330,7 +320,7 @@ class PFCScriptExecutor:
                 # Synchronous execution: wait for completion with optional timeout
                 # BUT still register as task for unified output management
                 timeout_seconds = timeout_ms / 1000.0 if timeout_ms else None
-                logger.info("Executing script synchronously: {} [timeout={}s]".format(
+                logger.debug("Executing script synchronously: {} [timeout={}s]".format(
                     script_name, timeout_seconds if timeout_seconds else "None"
                 ))
 
