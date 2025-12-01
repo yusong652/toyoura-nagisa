@@ -22,7 +22,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { ConnectionManager } from '@toyoura-nagisa/core';
+import type { ConnectionManager, TokenUsage } from '@toyoura-nagisa/core';
 import { StreamingState } from '../contexts/StreamingContext.js';
 import {
   MessageType,
@@ -121,6 +121,7 @@ export interface UseChatStreamReturn {
   pendingConfirmation: any | null;
   error: string | null;
   pendingHistoryItems: HistoryItemWithoutId[];
+  tokenUsage: TokenUsage | null;
 
   // Actions
   submitQuery: (text: string, mentionedFiles?: string[]) => void;
@@ -150,6 +151,7 @@ export function useChatStream({
   const [thinkingContent, setThinkingContent] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   // Pending history items (items currently being streamed - not in <Static>)
   const [pendingAssistantItem, setPendingAssistantItem] = useState<AssistantHistoryItemWithoutId | null>(null);
@@ -323,6 +325,11 @@ export function useChatStream({
       if (pairsUpdated) {
         setToolPairsVersion((v) => v + 1);
       }
+    }
+
+    // Update token usage if available (update regardless of streaming state)
+    if (event.usage) {
+      setTokenUsage(event.usage);
     }
 
     // Check if streaming is complete
@@ -737,6 +744,7 @@ export function useChatStream({
     pendingConfirmation,
     error,
     pendingHistoryItems,
+    tokenUsage,
 
     // Actions
     submitQuery,

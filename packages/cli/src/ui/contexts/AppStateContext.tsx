@@ -8,6 +8,7 @@
  */
 
 import { createContext, useContext } from 'react';
+import type { TokenUsage } from '@toyoura-nagisa/core';
 import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
 import { StreamingState } from './StreamingContext.js';
 
@@ -51,6 +52,9 @@ export interface AppState {
   // UI state
   isQuitting: boolean;
   isInputActive: boolean;
+
+  // Token usage
+  tokenUsage: TokenUsage | null;
 }
 
 export interface AppActions {
@@ -103,6 +107,7 @@ const defaultState: AppState = {
   pendingConfirmation: null,
   isQuitting: false,
   isInputActive: true,
+  tokenUsage: null,
 };
 
 const defaultActions: AppActions = {

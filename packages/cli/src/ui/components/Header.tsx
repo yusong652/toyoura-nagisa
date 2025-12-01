@@ -1,6 +1,6 @@
 /**
  * Header Component
- * Displays application title, agent profile, and status
+ * Displays application title, agent profile, status, and token usage
  */
 
 import React from 'react';
@@ -8,6 +8,14 @@ import { Box, Text } from 'ink';
 import { useAppState } from '../contexts/AppStateContext.js';
 import { theme } from '../colors.js';
 import type { AgentProfileType } from '../types.js';
+
+/**
+ * Format tokens in K units (e.g., 128000 -> "128k")
+ */
+const formatTokensK = (tokens: number): string => {
+  const k = Math.round(tokens / 1000);
+  return `${k}k`;
+};
 
 // Profile display info (GitHub-inspired colors)
 const PROFILE_DISPLAY: Record<AgentProfileType, { color: string; name: string }> = {
@@ -38,6 +46,15 @@ export const Header: React.FC = () => {
   // Get profile display info
   const profileInfo = PROFILE_DISPLAY[appState.currentProfile] || PROFILE_DISPLAY.general;
 
+  // Calculate token usage display
+  const usage = appState.tokenUsage;
+  const tokensLeft = usage?.tokens_left ?? 128000;  // Default 128k
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const totalCapacity = promptTokens + tokensLeft;
+  const remainingPercent = totalCapacity > 0
+    ? Math.round((tokensLeft / totalCapacity) * 100)
+    : 100;
+
   return (
     <Box flexDirection="row" justifyContent="space-between">
       <Box>
@@ -59,6 +76,10 @@ export const Header: React.FC = () => {
         </Text>
       </Box>
       <Box>
+        <Text color={theme.text.muted}>
+          usage: {remainingPercent}% ({formatTokensK(tokensLeft)})
+        </Text>
+        <Text color={theme.text.muted}> | </Text>
         <Text color={statusColor}>{statusText}</Text>
       </Box>
     </Box>

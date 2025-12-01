@@ -19,9 +19,11 @@ import {
   ConnectionManager,
   NodeWebSocketAdapter,
   SessionManager,
+  SessionEvent,
   FileStorageAdapter,
   SessionService,
   apiClient,
+  type TokenUsage,
 } from '@toyoura-nagisa/core';
 import { App } from './App.js';
 import {
@@ -90,6 +92,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
   const [isQuitting, setIsQuitting] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [sessionTokenUsage, setSessionTokenUsage] = useState<TokenUsage | null>(null);
 
   // Ctrl+C confirmation state
   const [ctrlCPending, setCtrlCPending] = useState(false);
@@ -122,6 +125,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     pendingConfirmation,
     error,
     pendingHistoryItems,
+    tokenUsage,
     submitQuery,
     cancelRequest,
     confirmTool,
@@ -145,6 +149,27 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     historyManager,
     setCurrentSessionId,
   });
+
+  // ========== SessionManager Event Listeners ==========
+  // Listen for token usage updates from SessionManager (triggered on session switch)
+  useEffect(() => {
+    const handleTokenUsageUpdate = ({ usage }: { usage: TokenUsage }) => {
+      setSessionTokenUsage(usage);
+    };
+
+    const handleSessionCreated = () => {
+      // New session has no token usage
+      setSessionTokenUsage(null);
+    };
+
+    sessionManager.on(SessionEvent.TOKEN_USAGE_UPDATED, handleTokenUsageUpdate);
+    sessionManager.on(SessionEvent.SESSION_CREATED, handleSessionCreated);
+
+    return () => {
+      sessionManager.off(SessionEvent.TOKEN_USAGE_UPDATED, handleTokenUsageUpdate);
+      sessionManager.off(SessionEvent.SESSION_CREATED, handleSessionCreated);
+    };
+  }, [sessionManager]);
 
   // ========== Session Initialization ==========
   // Use ref to access loadHistory without adding it to deps
@@ -180,9 +205,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
 
         setCurrentSessionId(sessionId);
 
-        // Load chat history for existing sessions
+        // Load chat history and token usage for existing sessions
         if (isExistingSession) {
           await loadHistoryRef.current(sessionId);
+          // Load token usage (triggers TOKEN_USAGE_UPDATED event)
+          await sessionManager.loadTokenUsage(sessionId);
         }
 
         // Connect WebSocket
@@ -305,6 +332,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     pendingConfirmation,
     isQuitting,
     isInputActive: connectionStatus === 'connected' && !isQuitting,
+    // Token usage: streaming update takes priority, fallback to session usage
+    tokenUsage: tokenUsage || sessionTokenUsage,
   }), [
     connectionStatus,
     error,
@@ -320,6 +349,8 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isStreaming,
     pendingConfirmation,
     isQuitting,
+    tokenUsage,
+    sessionTokenUsage,
   ]);
 
   const appActions: AppActions = useMemo(() => ({
