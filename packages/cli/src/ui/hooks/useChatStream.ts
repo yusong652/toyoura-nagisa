@@ -353,12 +353,18 @@ export function useChatStream({
 
       // Commit pending assistant item if it exists
       // Note: Don't use event.content here - it may contain already-committed content
-      // (e.g., if handleToolConfirmationRequest already committed the assistant message)
-      // Using functional update to get the latest state and avoid duplicate commits
-      setPendingAssistantItem((prevAssistant) => {
-        if (prevAssistant) {
+      // (e.g., if handleToolResultUpdate already committed the assistant message)
+      // Use ref as single source of truth to avoid race conditions with handleToolResultUpdate
+      setPendingAssistantItem(() => {
+        const assistantItem = pendingAssistantItemRef.current;
+        if (assistantItem) {
+          // Filter to get valid content (same logic as handleToolResultUpdate)
+          const validContent = assistantItem.content.filter(
+            (blk) => (blk.type === 'text' && blk.text.trim().length > 0) || blk.type === 'thinking'
+          );
           historyManager.addItem({
-            ...prevAssistant,
+            ...assistantItem,
+            content: validContent,
             isStreaming: false,
           });
         }
@@ -388,11 +394,17 @@ export function useChatStream({
     // This ensures the assistant message appears before the tool confirmation
     // Note: Do NOT commit tool pairs here - they stay in pending for rendering
     // and will be committed when stream ends
-    // Using functional update to avoid race condition with handleStreamingUpdate
-    setPendingAssistantItem((prevAssistant) => {
-      if (prevAssistant) {
+    // Use ref as single source of truth to avoid race conditions
+    setPendingAssistantItem(() => {
+      const assistantItem = pendingAssistantItemRef.current;
+      if (assistantItem) {
+        // Filter to get valid content (same logic as handleToolResultUpdate)
+        const validContent = assistantItem.content.filter(
+          (blk) => (blk.type === 'text' && blk.text.trim().length > 0) || blk.type === 'thinking'
+        );
         historyManager.addItem({
-          ...prevAssistant,
+          ...assistantItem,
+          content: validContent,
           isStreaming: false,
         });
       }
@@ -519,18 +531,20 @@ export function useChatStream({
       if (!pair || pair.toolResult) continue;  // Skip if no pair or already filled
 
       // Commit pending assistant message first to maintain order (synchronous via ref)
+      // Even if content is empty, we need to commit it when there are tool_use blocks
+      // (tool_use-only messages need the ⏺ prefix for visual consistency)
       const assistantItem = pendingAssistantItemRef.current;
-      if (assistantItem && assistantItem.content.length > 0) {
+      if (assistantItem) {
+        // Filter to get valid text/thinking content
         const validContent = assistantItem.content.filter(
           (blk) => (blk.type === 'text' && blk.text.trim().length > 0) || blk.type === 'thinking'
         );
-        if (validContent.length > 0) {
-          historyManager.addItem({
-            ...assistantItem,
-            content: validContent,
-            isStreaming: false,
-          });
-        }
+        // Commit assistant message (even with empty content, ⏺ should appear before tools)
+        historyManager.addItem({
+          ...assistantItem,
+          content: validContent,
+          isStreaming: false,
+        });
         // Clear ref and state synchronously
         pendingAssistantItemRef.current = null;
         setPendingAssistantItem(null);
