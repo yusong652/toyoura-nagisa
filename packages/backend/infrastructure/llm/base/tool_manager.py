@@ -349,6 +349,28 @@ class BaseToolManager(ABC):
             so they continue executing even if PFC tools fail (unless pfc_execute_task
             is in the queue).
         """
+        llm_settings = get_llm_settings()
+
+        # Phase 1: Classify tools into confirmation and non-confirmation categories
+        confirmation_tools: List[tuple[int, dict]] = []  # (original_index, function_call)
+        non_confirmation_tools: List[tuple[int, dict]] = []  # (original_index, function_call)
+
+        for idx, function_call in enumerate(function_calls):
+            tool_name = function_call.get("name", "unknown")
+            tool_args = function_call.get("arguments", {})
+
+            if self._requires_user_confirmation(tool_name, tool_args):
+                confirmation_tools.append((idx, function_call))
+            else:
+                non_confirmation_tools.append((idx, function_call))
+
+        if llm_settings.debug:
+            non_confirm_names = [fc.get("name") for _, fc in non_confirmation_tools]
+            confirm_names = [fc.get("name") for _, fc in confirmation_tools]
+            print(f"[BaseToolManager] Tool classification:")
+            print(f"  - Non-confirmation ({len(non_confirmation_tools)}): {non_confirm_names}")
+            print(f"  - Confirmation ({len(confirmation_tools)}): {confirm_names}")
+
         # Check if queue contains pfc_execute_task (triggers strict dependency mode)
         has_pfc_execute_task = any(
             call.get("name") == "pfc_execute_task"
@@ -460,9 +482,6 @@ class BaseToolManager(ABC):
             # Trigger 1: User rejection (blocks all)
             if result.get('user_rejected', False):
                 user_rejected_tool = tool_name
-                llm_settings = get_llm_settings()
-                if llm_settings.debug:
-                    print(f"[BaseToolManager] User rejected {tool_name}, will cascade block remaining tools")
 
             # Trigger 2: PFC tool error (blocks PFC chain only)
             # Note: status="pending" (background tasks) is not considered failure
@@ -470,18 +489,10 @@ class BaseToolManager(ABC):
             is_tool_error = result.get('status') == 'error' and not result.get('user_rejected', False)
             if is_pfc_tool and is_tool_error:
                 failed_pfc_tool = tool_name
-                llm_settings = get_llm_settings()
-                if llm_settings.debug:
-                    print(f"[BaseToolManager] PFC tool {tool_name} failed, will cascade block remaining PFC tools")
 
             # Trigger 3: Any tool error when pfc_execute_task in queue (blocks all)
-            # Note: status="pending" (background tasks) is not considered failure
-            # Note: user_rejected errors are handled separately (Trigger 1), don't double-count
             if has_pfc_execute_task and is_tool_error:
                 failed_tool = tool_name
-                llm_settings = get_llm_settings()
-                if llm_settings.debug:
-                    print(f"[BaseToolManager] Tool {tool_name} failed (pfc_execute_task dependency mode), will cascade block remaining tools")
 
         return results
 
