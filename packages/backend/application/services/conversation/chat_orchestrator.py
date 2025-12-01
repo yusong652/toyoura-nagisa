@@ -507,13 +507,50 @@ class ChatOrchestrator:
             # Send WebSocket update immediately (real-time notification)
             await self._notify_tool_result(session_id, tool_call, result, context_manager)
 
-        # Step 4: Process confirmation tools with cascade blocking
+        # Step 4: Request confirmations for all confirm tools (with cascade blocking)
+        # Phase 4a: Collect confirmations first
+        confirmations: Dict[str, tuple[bool, Optional[str]]] = {}  # tool_call_id -> (approved, user_message)
         user_rejected_tool = None
+
         for original_index, tool_call in confirm_tools:
             tool_name = tool_call.get('name', 'unknown')
+            tool_id = tool_call.get('id', '')
 
-            # Cascade blocking: if user rejected a confirmation tool, block remaining confirmation tools
             if user_rejected_tool is not None:
+                # Previous tool was rejected, cascade block this one
+                confirmations[tool_id] = (False, f"Cascade blocked due to {user_rejected_tool} rejection")
+            else:
+                # Request user confirmation
+                approved, user_message = await self._request_tool_confirmation(
+                    tool_call, session_id or "", message_id
+                )
+                confirmations[tool_id] = (approved, user_message)
+
+                if not approved:
+                    user_rejected_tool = tool_name
+                    rejected_tools.append(tool_name)
+
+        # Phase 4b: Execute confirmed tools or generate rejection responses
+        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+
+        for original_index, tool_call in confirm_tools:
+            tool_name = tool_call.get('name', 'unknown')
+            tool_id = tool_call.get('id', '')
+            approved, user_message = confirmations[tool_id]
+
+            if approved:
+                # User approved - execute the tool
+                result = await self.llm_client.tool_manager.handle_function_call(
+                    tool_call, session_id or "", message_id
+                )
+            elif tool_name in rejected_tools:
+                # User directly rejected this tool
+                result = user_rejected_response(
+                    user_message=user_message or f"User rejected {tool_name}"
+                )
+                result["user_rejected"] = True
+            else:
+                # Cascade blocked (not the first rejection)
                 cascade_message = (
                     f"The user doesn't want to take this action right now. "
                     f"Skipping {tool_name} due to previous rejection. "
@@ -521,16 +558,6 @@ class ChatOrchestrator:
                 )
                 result = error_response(cascade_message)
                 result["cascade_blocked"] = True
-            else:
-                # Execute single tool via infrastructure layer (includes confirmation request)
-                result = await self.llm_client.tool_manager.handle_function_call(
-                    tool_call, session_id or "", message_id
-                )
-
-                # Check if user rejected this tool
-                if result.get('user_rejected', False):
-                    user_rejected_tool = tool_name
-                    rejected_tools.append(tool_name)
 
             results[original_index] = result
 
@@ -728,3 +755,116 @@ class ChatOrchestrator:
                 )
             except Exception as e:
                 print(f"[WARNING] Failed to save iteration limit result: {e}")
+
+    async def _request_tool_confirmation(
+        self,
+        tool_call: Dict,
+        session_id: str,
+        message_id: str
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Request user confirmation for a tool execution.
+
+        This method handles the confirmation request flow for tools that require
+        user approval (bash, edit, write, pfc_execute_task).
+
+        Args:
+            tool_call: Tool call dictionary with 'id', 'name', 'arguments'
+            session_id: Session ID for the confirmation request
+            message_id: ID of the message containing this tool call
+
+        Returns:
+            tuple[bool, Optional[str]]: (approved, user_message)
+        """
+        from pathlib import Path
+        from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
+
+        tool_name = tool_call.get('name', '')
+        tool_args = tool_call.get('arguments', {})
+        tool_id = tool_call.get('id', '')
+
+        confirmation_service = get_tool_confirmation_service()
+        if not confirmation_service:
+            print(f"[ChatOrchestrator] Confirmation service not available, auto-rejecting {tool_name}")
+            return (False, "Confirmation service not available")
+
+        # Initialize confirmation parameters
+        confirmation_type: Optional[str] = None
+        file_name_param: Optional[str] = None
+        file_path_param: Optional[str] = None
+        file_diff: Optional[str] = None
+        original_content: Optional[str] = None
+        new_content: Optional[str] = None
+
+        # Extract command and prepare confirmation info based on tool type
+        if tool_name == "bash":
+            command = tool_args.get("command", "")
+            description = tool_args.get("description", None)
+            confirmation_type = "exec"
+            if not description:
+                description = f"Execute bash command: {command}"
+
+        elif tool_name == "edit":
+            file_path = tool_args.get("file_path", "unknown")
+            command = f"Edit file: {file_path}"
+            description = tool_args.get("description", None)
+            confirmation_type = "edit"
+            file_path_param = file_path
+            file_name_param = Path(file_path).name if file_path else "unknown"
+
+            # Generate diff for edit confirmation (reuse tool_manager method)
+            diff_info = await self.llm_client.tool_manager._generate_edit_diff(file_path, tool_args)
+            if diff_info:
+                file_diff = diff_info.get("diff")
+                original_content = diff_info.get("original", "")
+                new_content = diff_info.get("new", "")
+
+        elif tool_name == "write":
+            file_path = tool_args.get("file_path", "unknown")
+            command = f"Write file: {file_path}"
+            description = tool_args.get("description", None)
+            confirmation_type = "edit"
+            file_path_param = file_path
+            file_name_param = Path(file_path).name if file_path else "unknown"
+
+            # Generate diff for write confirmation (reuse tool_manager method)
+            diff_info = await self.llm_client.tool_manager._generate_write_diff(file_path, tool_args)
+            if diff_info:
+                file_diff = diff_info.get("diff")
+                original_content = diff_info.get("original", "")
+                new_content = diff_info.get("new", "")
+
+        elif tool_name == "pfc_execute_task":
+            entry_script = tool_args.get("entry_script", "unknown")
+            run_in_background = tool_args.get("run_in_background", True)
+            bg_info = " (background)" if run_in_background else " (foreground)"
+            command = f"Execute PFC task{bg_info}: {entry_script}"
+            description = tool_args.get("description", None)
+            confirmation_type = "exec"
+
+        else:
+            command = f"{tool_name} operation"
+            description = tool_args.get("description", None)
+            confirmation_type = "info"
+
+        # Request confirmation via confirmation service
+        try:
+            approved, user_message = await confirmation_service.request_confirmation(
+                session_id=session_id,
+                message_id=message_id,
+                tool_call_id=tool_id,
+                tool_name=tool_name,
+                command=command,
+                description=description,
+                confirmation_type=confirmation_type,
+                file_name=file_name_param,
+                file_path=file_path_param,
+                file_diff=file_diff,
+                original_content=original_content,
+                new_content=new_content
+            )
+            return (approved, user_message)
+
+        except Exception as e:
+            print(f"[ChatOrchestrator] Error requesting confirmation for {tool_name}: {e}")
+            return (False, f"Error during confirmation: {str(e)}")

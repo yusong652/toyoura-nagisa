@@ -365,31 +365,27 @@ class BaseToolManager(ABC):
                             }
                         )
 
-            # Step 1: Handle user confirmation if required
-            if self._requires_user_confirmation(tool_name, tool_args):
-                rejection_result = await self._handle_user_confirmation(tool_name, tool_args, tool_id, session_id, message_id)
-                if rejection_result is not None:
-                    # User rejected - return rejection result (already in ToolResult format)
-                    return rejection_result
+            # Note: User confirmation is now handled by ChatOrchestrator (application layer)
+            # This method only handles pure tool execution
 
-            # Step 2: Execute the tool (user approved or no confirmation needed)
+            # Step 1: Execute the tool
             call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
 
-            # Step 2.5: Track successful read operations for edit prerequisite validation
+            # Step 2: Track successful read operations for edit prerequisite validation
             if tool_name == "read" and tool_result.get("status") == "success":
                 file_path = tool_args.get("path", "")
                 if file_path:
                     self._track_read_file(session_id, file_path)
 
-            # Step 2.6: Track successful write operations as "read" for edit prerequisite
+            # Step 3: Track successful write operations as "read" for edit prerequisite
             # This allows edit tool to modify files that were just written
             if tool_name == "write" and tool_result.get("status") == "success":
                 file_path = tool_args.get("file_path", "")
                 if file_path:
                     self._track_read_file(session_id, file_path)
 
-            # Step 3: Return tool result directly (already in standardized ToolResult format)
+            # Step 4: Return tool result directly (already in standardized ToolResult format)
             return tool_result
 
         except ValidationError as e:
