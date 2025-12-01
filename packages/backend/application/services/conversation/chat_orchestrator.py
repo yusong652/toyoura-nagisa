@@ -475,19 +475,44 @@ class ChatOrchestrator:
             await self._handle_iteration_limit(session_id, tool_calls)
             return response
 
-        # Execute tools serially with cascade blocking (orchestration at service layer)
+        # Execute tools with classification and cascade blocking
+        # Non-confirmation tools execute first, confirmation tools have cascade blocking
         from backend.infrastructure.mcp.utils.tool_result import error_response
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
-        results = []
-        rejected_tools = []
-        user_rejected_tool = None  # Track which tool was rejected by user
-
+        # Step 1: Classify tools into confirm and non-confirm categories
+        non_confirm_tools = []  # (original_index, tool_call)
+        confirm_tools = []      # (original_index, tool_call)
         for i, tool_call in enumerate(tool_calls):
             tool_name = tool_call.get('name', 'unknown')
-            is_last_tool = (i == len(tool_calls) - 1)
+            if self.llm_client.tool_manager._requires_user_confirmation(tool_name, {}):
+                confirm_tools.append((i, tool_call))
+            else:
+                non_confirm_tools.append((i, tool_call))
 
-            # Cascade blocking: if user rejected a tool, block all remaining tools
+        # Step 2: Prepare results storage (indexed by original order)
+        results = [None] * len(tool_calls)
+        rejected_tools = []
+
+        # Step 3: Execute non-confirmation tools first (not affected by cascade blocking)
+        for original_index, tool_call in non_confirm_tools:
+            tool_name = tool_call.get('name', 'unknown')
+
+            # Execute single tool via infrastructure layer
+            result = await self.llm_client.tool_manager.handle_function_call(
+                tool_call, session_id or "", message_id
+            )
+            results[original_index] = result
+
+            # Send WebSocket update immediately (real-time notification)
+            await self._notify_tool_result(session_id, tool_call, result, context_manager)
+
+        # Step 4: Process confirmation tools with cascade blocking
+        user_rejected_tool = None
+        for original_index, tool_call in confirm_tools:
+            tool_name = tool_call.get('name', 'unknown')
+
+            # Cascade blocking: if user rejected a confirmation tool, block remaining confirmation tools
             if user_rejected_tool is not None:
                 cascade_message = (
                     f"The user doesn't want to take this action right now. "
@@ -497,7 +522,7 @@ class ChatOrchestrator:
                 result = error_response(cascade_message)
                 result["cascade_blocked"] = True
             else:
-                # Execute single tool via infrastructure layer
+                # Execute single tool via infrastructure layer (includes confirmation request)
                 result = await self.llm_client.tool_manager.handle_function_call(
                     tool_call, session_id or "", message_id
                 )
@@ -507,45 +532,26 @@ class ChatOrchestrator:
                     user_rejected_tool = tool_name
                     rejected_tools.append(tool_name)
 
-            results.append(result)
+            results[original_index] = result
 
-            # Add result to context
+            # Send WebSocket update (real-time notification)
+            await self._notify_tool_result(session_id, tool_call, result, context_manager)
+
+        # Step 5: Save and add results to context in ORIGINAL order
+        # This ensures database persistence matches LLM tool call order
+        for i, tool_call in enumerate(tool_calls):
+            is_last_tool = (i == len(tool_calls) - 1)
+
+            # Save to database in original order
+            await self._save_tool_result(session_id, tool_call, results[i])
+
+            # Add to context in original order
             await context_manager.add_tool_result(
                 tool_call['id'],
                 tool_call['name'],
-                result,
+                results[i],
                 inject_reminders=is_last_tool
             )
-
-            # Save tool result to database and send WebSocket update
-            try:
-                result_message_id = self.message_service.save_tool_result_message(
-                    tool_call_id=tool_call['id'],
-                    tool_name=tool_call['name'],
-                    tool_result=result,
-                    session_id=session_id
-                )
-
-                await WebSocketNotificationService.send_tool_result_update(
-                    session_id=session_id,
-                    message_id=result_message_id,
-                    tool_call_id=tool_call['id'],
-                    tool_name=tool_call['name'],
-                    tool_result=result
-                )
-            except Exception as e:
-                print(f"[WARNING] Failed to save tool result: {e}")
-
-            # Send todo update if todo_write was called
-            if tool_name == 'todo_write':
-                try:
-                    from backend.application.services.todo_service import get_todo_service
-                    agent_profile = getattr(context_manager, 'agent_profile', 'general')
-                    todo_service = get_todo_service()
-                    current_todo = await todo_service.get_current_todo(agent_profile, session_id)
-                    await WebSocketNotificationService.send_todo_update(session_id, current_todo)
-                except Exception as e:
-                    print(f"[WARNING] Failed to send todo update notification: {e}")
 
         # If any tool was directly rejected, send streaming end notification and interrupt
         if rejected_tools:
@@ -582,6 +588,80 @@ class ChatOrchestrator:
 
         # Continue recursively
         return await self._recursive_tool_calling(session_id, iterations + 1)
+
+    async def _notify_tool_result(
+        self,
+        session_id: str,
+        tool_call: Dict,
+        result: Dict,
+        context_manager: Any
+    ) -> None:
+        """
+        Send WebSocket notification for tool result (real-time update).
+
+        Args:
+            session_id: Session ID
+            tool_call: Tool call dict with 'id' and 'name'
+            result: Tool execution result
+            context_manager: Context manager for agent profile
+        """
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        tool_name = tool_call.get('name', 'unknown')
+
+        try:
+            # Send real-time update to frontend
+            await WebSocketNotificationService.send_tool_result_update(
+                session_id=session_id,
+                message_id=tool_call['id'],
+                tool_call_id=tool_call['id'],
+                tool_name=tool_name,
+                tool_result=result
+            )
+        except Exception as e:
+            print(f"[WARNING] Failed to send tool result notification: {e}")
+
+        # Send todo update if todo_write was called
+        if tool_name == 'todo_write':
+            try:
+                from backend.application.services.todo_service import get_todo_service
+                agent_profile = getattr(context_manager, 'agent_profile', 'general')
+                todo_service = get_todo_service()
+                current_todo = await todo_service.get_current_todo(agent_profile, session_id)
+                await WebSocketNotificationService.send_todo_update(session_id, current_todo)
+            except Exception as e:
+                print(f"[WARNING] Failed to send todo update notification: {e}")
+
+    async def _save_tool_result(
+        self,
+        session_id: str,
+        tool_call: Dict,
+        result: Dict
+    ) -> Optional[str]:
+        """
+        Save tool result to database (persistence in original order).
+
+        Args:
+            session_id: Session ID
+            tool_call: Tool call dict with 'id' and 'name'
+            result: Tool execution result
+
+        Returns:
+            Message ID if saved successfully, None otherwise
+        """
+        tool_name = tool_call.get('name', 'unknown')
+
+        try:
+            result_message_id = self.message_service.save_tool_result_message(
+                tool_call_id=tool_call['id'],
+                tool_name=tool_name,
+                tool_result=result,
+                session_id=session_id
+            )
+            return result_message_id
+        except Exception as e:
+            print(f"[WARNING] Failed to save tool result: {e}")
+            return None
 
     async def _handle_iteration_limit(
         self,

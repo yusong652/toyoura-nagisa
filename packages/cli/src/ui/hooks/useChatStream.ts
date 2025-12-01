@@ -153,6 +153,8 @@ export function useChatStream({
 
   // Pending history items (items currently being streamed - not in <Static>)
   const [pendingAssistantItem, setPendingAssistantItem] = useState<AssistantHistoryItemWithoutId | null>(null);
+  // Ref for synchronous access to pending assistant item (avoids async state issues)
+  const pendingAssistantItemRef = useRef<AssistantHistoryItemWithoutId | null>(null);
 
   // Tool pairs: maintains order of tool calls and their results
   // Using ref to avoid stale closure issues, with version counter to trigger re-renders
@@ -195,12 +197,14 @@ export function useChatStream({
             });
           }
         }
-        // Return new pending item
-        return {
+        // Return new pending item and sync ref
+        const newItem = {
           type: MessageType.ASSISTANT,
           content: [],
           isStreaming: true,
-        };
+        } as AssistantHistoryItemWithoutId;
+        pendingAssistantItemRef.current = newItem;
+        return newItem;
       });
 
       // Then commit pending tool pairs (in order)
@@ -240,22 +244,28 @@ export function useChatStream({
       );
       if (event.streaming !== false) {
         setPendingAssistantItem((prev) => {
+          let newItem: AssistantHistoryItemWithoutId | null;
           if (!prev) {
             // Don't create new assistant item if there's no content
             // (e.g., after confirmation, only tool results arrive)
             if (textAndThinkingContent.length === 0) {
-              return null;
+              newItem = null;
+            } else {
+              newItem = {
+                type: MessageType.ASSISTANT,
+                content: textAndThinkingContent,
+                isStreaming: true,
+              };
             }
-            return {
-              type: MessageType.ASSISTANT,
+          } else {
+            newItem = {
+              ...prev,
               content: textAndThinkingContent,
-              isStreaming: true,
             };
           }
-          return {
-            ...prev,
-            content: textAndThinkingContent,
-          };
+          // Sync ref with state
+          pendingAssistantItemRef.current = newItem;
+          return newItem;
         });
       }
 
@@ -265,7 +275,11 @@ export function useChatStream({
 
       // If tool calls are present, stop streaming indicator on assistant message
       if (toolUseBlocks.length > 0) {
-        setPendingAssistantItem((prev) => prev ? { ...prev, isStreaming: false } : prev);
+        setPendingAssistantItem((prev) => {
+          const newItem = prev ? { ...prev, isStreaming: false } : prev;
+          pendingAssistantItemRef.current = newItem;
+          return newItem;
+        });
       }
 
       for (const block of toolUseBlocks) {
@@ -321,6 +335,7 @@ export function useChatStream({
         setStreamingState(StreamingState.Idle);
         setThinkingContent(null);
         setPendingAssistantItem(null);
+        pendingAssistantItemRef.current = null;
         pendingToolPairsRef.current = [];
         seenToolCallIdsRef.current.clear();
         confirmedToolCallIdsRef.current.clear();
@@ -347,6 +362,7 @@ export function useChatStream({
             isStreaming: false,
           });
         }
+        pendingAssistantItemRef.current = null;
         return null;
       });
 
@@ -380,6 +396,7 @@ export function useChatStream({
           isStreaming: false,
         });
       }
+      pendingAssistantItemRef.current = null;
       return null;
     });
 
@@ -449,6 +466,7 @@ export function useChatStream({
 
     // Clear pending items on error
     setPendingAssistantItem(null);
+    pendingAssistantItemRef.current = null;
     pendingToolPairsRef.current = [];
     seenToolCallIdsRef.current.clear();
     confirmedToolCallIdsRef.current.clear();
@@ -500,8 +518,44 @@ export function useChatStream({
       const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
       if (!pair || pair.toolResult) continue;  // Skip if no pair or already filled
 
-      // Fill the pair's result
-      pair.toolResult = toolResult;
+      // Commit pending assistant message first to maintain order (synchronous via ref)
+      const assistantItem = pendingAssistantItemRef.current;
+      if (assistantItem && assistantItem.content.length > 0) {
+        const validContent = assistantItem.content.filter(
+          (blk) => (blk.type === 'text' && blk.text.trim().length > 0) || blk.type === 'thinking'
+        );
+        if (validContent.length > 0) {
+          historyManager.addItem({
+            ...assistantItem,
+            content: validContent,
+            isStreaming: false,
+          });
+        }
+        // Clear ref and state synchronously
+        pendingAssistantItemRef.current = null;
+        setPendingAssistantItem(null);
+      }
+
+      // Commit all pending tool pairs in order (before current one)
+      // This ensures tool calls appear in original order
+      while (pendingToolPairsRef.current.length > 0 && pendingToolPairsRef.current[0] !== pair) {
+        const prevPair = pendingToolPairsRef.current.shift()!;
+        historyManager.addItem(prevPair.toolCall);
+        if (prevPair.toolResult) {
+          historyManager.addItem(prevPair.toolResult);
+        }
+        confirmedToolCallIdsRef.current.add(prevPair.toolCallId);
+      }
+
+      // Move current tool call and result to committed history
+      historyManager.addItem(pair.toolCall);
+      historyManager.addItem(toolResult);
+
+      // Remove from pending pairs
+      pendingToolPairsRef.current.shift();  // Remove first element (which is current pair)
+
+      // Track as confirmed (so any duplicate results go directly to history)
+      confirmedToolCallIdsRef.current.add(block.tool_use_id);
       pairsUpdated = true;
     }
 
