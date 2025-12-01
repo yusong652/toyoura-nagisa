@@ -37,6 +37,7 @@ import { useChatStream } from './hooks/useChatStream.js';
 import { useConnectionState } from './hooks/useConnectionState.js';
 import { useSessionManagement } from './hooks/useSessionManagement.js';
 import { useProfileManager } from './hooks/useProfileManager.js';
+import { useTodoStatus } from './hooks/useTodoStatus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { MessageType } from './types.js';
 import type { Config } from '../config/settings.js';
@@ -148,6 +149,11 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     sessionManager,
     historyManager,
     setCurrentSessionId,
+  });
+
+  // Todo status (current in-progress task)
+  const { currentTodo } = useTodoStatus({
+    connectionManager,
   });
 
   // ========== SessionManager Event Listeners ==========
@@ -334,6 +340,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isInputActive: connectionStatus === 'connected' && !isQuitting,
     // Token usage: streaming update takes priority, fallback to session usage
     tokenUsage: tokenUsage || sessionTokenUsage,
+    currentTodo,
   }), [
     connectionStatus,
     error,
@@ -351,6 +358,7 @@ export const AppContainer: React.FC<AppContainerProps> = ({
     isQuitting,
     tokenUsage,
     sessionTokenUsage,
+    currentTodo,
   ]);
 
   const appActions: AppActions = useMemo(() => ({

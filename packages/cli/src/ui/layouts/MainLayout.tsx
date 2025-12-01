@@ -26,6 +26,7 @@ import { InputPrompt } from '../components/InputPrompt.js';
 import { Header } from '../components/Header.js';
 import { AppHeader } from '../components/AppHeader.js';
 import { LoadingIndicator } from '../components/LoadingIndicator.js';
+import { TodoStatusIndicator } from '../components/TodoStatusIndicator.js';
 import { ToolConfirmationPrompt } from '../components/ToolConfirmationPrompt.js';
 import { SelectDialog, type SelectOption } from '../components/SelectDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -462,6 +463,14 @@ export const MainLayout: React.FC = () => {
             showDescriptions={false}
             maxItemsToShow={8}
             borderColor={theme.status.error}
+          />
+        )}
+
+        {/* Todo status indicator - above input */}
+        {appState.isInputActive && !appState.pendingConfirmation && !isDialogActive && (
+          <TodoStatusIndicator
+            todo={appState.currentTodo}
+            isStreaming={appState.isStreaming}
           />
         )}
 

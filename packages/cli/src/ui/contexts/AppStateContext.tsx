@@ -10,6 +10,7 @@
 import { createContext, useContext } from 'react';
 import type { TokenUsage } from '@toyoura-nagisa/core';
 import type { HistoryItem, HistoryItemWithoutId, ToolConfirmationData, ConnectionStatus, AgentProfileType, AgentProfileInfo } from '../types.js';
+import type { TodoItem } from '../hooks/useTodoStatus.js';
 import { StreamingState } from './StreamingContext.js';
 
 /**
@@ -55,6 +56,9 @@ export interface AppState {
 
   // Token usage
   tokenUsage: TokenUsage | null;
+
+  // Current todo (in_progress task)
+  currentTodo: TodoItem | null;
 }
 
 export interface AppActions {
@@ -108,6 +112,7 @@ const defaultState: AppState = {
   isQuitting: false,
   isInputActive: true,
   tokenUsage: null,
+  currentTodo: null,
 };
 
 const defaultActions: AppActions = {

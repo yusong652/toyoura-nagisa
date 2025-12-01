@@ -13,3 +13,4 @@ export * from './useSlashCommandProcessor.js';
 export * from './useSessionManager.js';
 export * from './useBracketedPaste.js';
 export * from './useMouse.js';
+export * from './useTodoStatus.js';
