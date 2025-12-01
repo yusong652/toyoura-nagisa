@@ -123,22 +123,67 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
   );
 };
 
+// Status indicator width (matches ToolCallMessage and ToolResultMessage)
+const STATUS_INDICATOR_WIDTH = 3;
+// Maximum lines for tool result content
+const MAX_RESULT_LINES = 10;
+
+/**
+ * Get tool description from input parameters
+ * (matches ToolCallMessage logic)
+ */
+function getToolDescription(toolName: string, input: Record<string, unknown>): string {
+  // For edit/write tools, show file name
+  if (toolName === 'edit' || toolName === 'write') {
+    if (input.file_path !== undefined) {
+      const filePath = String(input.file_path);
+      const parts = filePath.split(/[/\\]/);
+      return parts[parts.length - 1] || filePath;
+    }
+  }
+
+  // Common tool input patterns
+  if (input.command !== undefined) return String(input.command);
+  if (input.file_path !== undefined) return String(input.file_path);
+  if (input.path !== undefined) return String(input.path);
+  if (input.pattern !== undefined) return String(input.pattern);
+  if (input.query !== undefined) return String(input.query);
+  if (input.url !== undefined) return String(input.url);
+
+  // For other tools, show a summary of the input
+  const keys = Object.keys(input);
+  if (keys.length > 0) {
+    const firstKey = keys[0];
+    const value = input[firstKey];
+    if (typeof value === 'string' && value.length < 100) {
+      return value;
+    }
+    return `${firstKey}: ...`;
+  }
+  return '';
+}
+
 // Pending Tool Call Message
+// Layout matches ToolCallMessage for visual consistency
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
+  const description = getToolDescription(item.toolName, item.toolInput);
+
   return (
-    <Box marginBottom={1} flexDirection="row">
-      <BlinkingCircle color={theme.status.warning} />
-      <Text color={theme.text.secondary}>
-        {' '}{item.toolName}
+    <Box paddingX={1} marginBottom={1}>
+      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+        <BlinkingCircle color={theme.status.warning} />
+      </Box>
+      <Text wrap="truncate">
+        <Text bold color={theme.text.primary}>
+          {item.toolName}
+        </Text>
+        {description && (
+          <Text color={theme.text.secondary}> {description}</Text>
+        )}
       </Text>
     </Box>
   );
 };
-
-// Status indicator width (matches ToolResultMessage)
-const STATUS_INDICATOR_WIDTH = 3;
-// Maximum lines for tool result content
-const MAX_RESULT_LINES = 10;
 
 // Pending Tool Result Message
 // Layout matches ToolResultMessage for visual consistency
