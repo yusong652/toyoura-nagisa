@@ -105,6 +105,16 @@ function convertBackendHistory(
         }, timestamp);
       }
     } else if (msg.role === 'assistant') {
+      // Flush any pending tool pairs before new assistant message
+      // This ensures previous round's tool calls appear before this assistant message
+      for (const pair of toolPairs) {
+        historyManager.addItem(pair.toolCall, pair.timestamp);
+        if (pair.toolResult) {
+          historyManager.addItem(pair.toolResult, pair.timestamp);
+        }
+      }
+      toolPairs.length = 0;
+
       // Assistant message - process all content blocks
       const contentBlocks: ContentBlock[] = [];
       let hasToolUse = false;
