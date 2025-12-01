@@ -12,6 +12,13 @@
  * - pendingHistoryItems: Items currently being streamed (rendered outside <Static>)
  * - history: Committed items that won't change (rendered in <Static>)
  * - When streaming completes, pending items are committed to history
+ *
+ * Tool Pair Model:
+ * - Tool calls and results are stored as pairs to maintain order
+ * - When a tool_use arrives, a pair is created with result=null (placeholder)
+ * - When a tool_result arrives, the corresponding pair's result is filled
+ * - Rendering: show all tool calls, show results as they arrive (non-blocking)
+ * - Commit: when stream ends, commit all pairs in original order
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -21,10 +28,22 @@ import {
   MessageType,
   type HistoryItemWithoutId,
   type AssistantHistoryItemWithoutId,
+  type ToolCallHistoryItemWithoutId,
+  type ToolResultHistoryItemWithoutId,
   type ContentBlock,
   type AgentProfileType,
 } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+
+/**
+ * Pending tool pair: tool call with its result (or placeholder)
+ * Maintains order when tools execute/complete out of order
+ */
+interface PendingToolPair {
+  toolCallId: string;
+  toolCall: ToolCallHistoryItemWithoutId;
+  toolResult: ToolResultHistoryItemWithoutId | null;  // null = waiting for result
+}
 
 // Type for streaming update events from ConnectionManager
 interface StreamingUpdateEvent {
@@ -134,11 +153,14 @@ export function useChatStream({
 
   // Pending history items (items currently being streamed - not in <Static>)
   const [pendingAssistantItem, setPendingAssistantItem] = useState<AssistantHistoryItemWithoutId | null>(null);
-  const [pendingToolItems, setPendingToolItems] = useState<HistoryItemWithoutId[]>([]);
+
+  // Tool pairs: maintains order of tool calls and their results
+  // Using ref to avoid stale closure issues, with version counter to trigger re-renders
+  const pendingToolPairsRef = useRef<PendingToolPair[]>([]);
+  const [toolPairsVersion, setToolPairsVersion] = useState(0);
 
   // Refs for tracking seen IDs (avoid duplicates)
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
-  const seenToolResultIdsRef = useRef<Set<string>>(new Set());
 
   // Clear error
   const clearError = useCallback(() => {
@@ -179,17 +201,18 @@ export function useChatStream({
         };
       });
 
-      // Then commit pending tool items
-      setPendingToolItems((prevToolItems) => {
-        if (prevToolItems.length > 0) {
-          for (const toolItem of prevToolItems) {
-            historyManager.addItem(toolItem);
+      // Then commit pending tool pairs (in order)
+      if (pendingToolPairsRef.current.length > 0) {
+        for (const pair of pendingToolPairsRef.current) {
+          historyManager.addItem(pair.toolCall);
+          if (pair.toolResult) {
+            historyManager.addItem(pair.toolResult);
           }
-          seenToolCallIdsRef.current.clear();
-          seenToolResultIdsRef.current.clear();
         }
-        return [];
-      });
+        pendingToolPairsRef.current = [];
+        seenToolCallIdsRef.current.clear();
+        setToolPairsVersion((v) => v + 1);
+      }
 
       setStreamingState(StreamingState.Responding);
       setIsStreaming(true);
@@ -224,9 +247,9 @@ export function useChatStream({
         };
       });
 
-      // Handle tool calls - use Set to track seen IDs, add to pending
+      // Handle tool calls - create pairs with result=null (placeholder)
       const toolUseBlocks = event.content.filter((b) => b.type === 'tool_use');
-      const newToolItems: HistoryItemWithoutId[] = [];
+      let pairsUpdated = false;
 
       // If tool calls are present, stop streaming indicator on assistant message
       if (toolUseBlocks.length > 0) {
@@ -238,33 +261,41 @@ export function useChatStream({
 
         if (!seenToolCallIdsRef.current.has(block.id)) {
           seenToolCallIdsRef.current.add(block.id);
-          newToolItems.push({
-            type: MessageType.TOOL_CALL,
-            toolName: block.name,
-            toolInput: block.input || {},
+          // Create pair with toolResult=null (placeholder)
+          pendingToolPairsRef.current.push({
             toolCallId: block.id,
-          } as HistoryItemWithoutId);
+            toolCall: {
+              type: MessageType.TOOL_CALL,
+              toolName: block.name,
+              toolInput: block.input || {},
+              toolCallId: block.id,
+            },
+            toolResult: null,
+          });
+          pairsUpdated = true;
         }
       }
 
-      // Handle tool results - use Set to track seen IDs, add to pending
+      // Handle tool results from streaming_update - fill corresponding pair
       const toolResultBlocks = event.content.filter((b) => b.type === 'tool_result');
       for (const block of toolResultBlocks) {
         if (block.type !== 'tool_result') continue;
 
-        if (!seenToolResultIdsRef.current.has(block.tool_use_id)) {
-          seenToolResultIdsRef.current.add(block.tool_use_id);
-          newToolItems.push({
+        // Find the pair and fill the result
+        const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
+        if (pair && !pair.toolResult) {
+          pair.toolResult = {
             type: MessageType.TOOL_RESULT,
             toolCallId: block.tool_use_id,
             content: typeof block.content === 'string' ? block.content : JSON.stringify(block.content),
             isError: block.is_error,
-          } as HistoryItemWithoutId);
+          };
+          pairsUpdated = true;
         }
       }
 
-      if (newToolItems.length > 0) {
-        setPendingToolItems((prev) => [...prev, ...newToolItems]);
+      if (pairsUpdated) {
+        setToolPairsVersion((v) => v + 1);
       }
     }
 
@@ -278,14 +309,14 @@ export function useChatStream({
         setStreamingState(StreamingState.Idle);
         setThinkingContent(null);
         setPendingAssistantItem(null);
-        setPendingToolItems([]);
+        pendingToolPairsRef.current = [];
         seenToolCallIdsRef.current.clear();
-        seenToolResultIdsRef.current.clear();
+        setToolPairsVersion((v) => v + 1);
         return;
       }
 
       // Normal completion - commit all pending items to history
-      const currentToolItems = [...pendingToolItems];
+      const currentPairs = [...pendingToolPairsRef.current];
 
       // Update state first
       setIsStreaming(false);
@@ -307,23 +338,28 @@ export function useChatStream({
         }
       }
 
-      // Commit tool items
-      for (const toolItem of currentToolItems) {
-        historyManager.addItem(toolItem);
+      // Commit tool pairs in order
+      for (const pair of currentPairs) {
+        historyManager.addItem(pair.toolCall);
+        if (pair.toolResult) {
+          historyManager.addItem(pair.toolResult);
+        }
       }
 
       // Clear pending state
       setPendingAssistantItem(null);
-      setPendingToolItems([]);
+      pendingToolPairsRef.current = [];
       seenToolCallIdsRef.current.clear();
-      seenToolResultIdsRef.current.clear();
+      setToolPairsVersion((v) => v + 1);
     }
-  }, [pendingToolItems, historyManager]);
+  }, [historyManager]);
 
   // Handle TOOL_CONFIRMATION_REQUEST event from ConnectionManager
   const handleToolConfirmationRequest = useCallback((event: ToolConfirmationEvent) => {
-    // First, commit any pending assistant message to history
+    // Commit any pending assistant message to history
     // This ensures the assistant message appears before the tool confirmation
+    // Note: Do NOT commit tool pairs here - they stay in pending for rendering
+    // and will be committed when stream ends
     if (pendingAssistantItem) {
       historyManager.addItem({
         ...pendingAssistantItem,
@@ -331,12 +367,6 @@ export function useChatStream({
       } as HistoryItemWithoutId);
       setPendingAssistantItem(null);
     }
-
-    // Commit any pending tool items to history
-    for (const toolItem of pendingToolItems) {
-      historyManager.addItem(toolItem);
-    }
-    setPendingToolItems([]);
 
     // Build confirmation data based on confirmation type
     const confirmationType = event.confirmation_type || 'info';
@@ -389,7 +419,7 @@ export function useChatStream({
 
     setStreamingState(StreamingState.WaitingForConfirmation);
     setIsStreaming(false);
-  }, [pendingAssistantItem, pendingToolItems, historyManager]);
+  }, [pendingAssistantItem, historyManager]);
 
   // Handle ERROR event from ConnectionManager
   const handleError = useCallback((err: Error) => {
@@ -404,21 +434,22 @@ export function useChatStream({
 
     // Clear pending items on error
     setPendingAssistantItem(null);
-    setPendingToolItems([]);
+    pendingToolPairsRef.current = [];
+    seenToolCallIdsRef.current.clear();
+    setToolPairsVersion((v) => v + 1);
   }, [historyManager]);
 
   // Handle TOOL_RESULT_UPDATE event from ConnectionManager
   // This provides real-time tool result display without API refresh
   const handleToolResultUpdate = useCallback((event: ToolResultUpdateEvent) => {
-    // Process each tool result in the content array
-    const newToolResults: HistoryItemWithoutId[] = [];
+    let pairsUpdated = false;
 
     for (const block of event.content) {
       if (block.type !== 'tool_result') continue;
 
-      // Skip if already seen
-      if (seenToolResultIdsRef.current.has(block.tool_use_id)) continue;
-      seenToolResultIdsRef.current.add(block.tool_use_id);
+      // Find the corresponding pair
+      const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
+      if (!pair || pair.toolResult) continue;  // Skip if no pair or already filled
 
       // Extract text content from llm_content
       let contentText = '';
@@ -437,19 +468,21 @@ export function useChatStream({
       // Extract diff info from data field (for edit/write tools)
       const diff = block.data?.diff;
 
-      newToolResults.push({
+      // Fill the pair's result
+      pair.toolResult = {
         type: MessageType.TOOL_RESULT,
         toolCallId: block.tool_use_id,
         toolName: block.tool_name,
         content: contentText,
         isError: block.is_error,
         diff: diff,
-      } as HistoryItemWithoutId);
+      };
+      pairsUpdated = true;
     }
 
-    // Add to pending tool items (will be committed when streaming ends)
-    if (newToolResults.length > 0) {
-      setPendingToolItems((prev) => [...prev, ...newToolResults]);
+    // Trigger re-render if any pairs were updated
+    if (pairsUpdated) {
+      setToolPairsVersion((v) => v + 1);
     }
   }, []);
 
@@ -476,13 +509,18 @@ export function useChatStream({
   const submitQuery = useCallback(async (text: string, mentionedFiles?: string[]) => {
     if (!text.trim()) return;
 
-    // Commit any pending tool items to history before adding new user message
-    // This ensures tool rejection results appear before the new user message
-    for (const toolItem of pendingToolItems) {
-      historyManager.addItem(toolItem);
-    }
-    if (pendingToolItems.length > 0) {
-      setPendingToolItems([]);
+    // Commit any pending tool pairs to history before adding new user message
+    // This ensures tool results appear before the new user message
+    if (pendingToolPairsRef.current.length > 0) {
+      for (const pair of pendingToolPairsRef.current) {
+        historyManager.addItem(pair.toolCall);
+        if (pair.toolResult) {
+          historyManager.addItem(pair.toolResult);
+        }
+      }
+      pendingToolPairsRef.current = [];
+      seenToolCallIdsRef.current.clear();
+      setToolPairsVersion((v) => v + 1);
     }
 
     // Add user message to history (committed immediately)
@@ -520,7 +558,7 @@ export function useChatStream({
       setIsStreaming(true);
       setStreamingState(StreamingState.Responding);
     }
-  }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager, pendingToolItems]);
+  }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager]);
 
   // Cancel current request
   // Note: State cleanup is handled by handleStreamingUpdate when it receives
@@ -571,6 +609,7 @@ export function useChatStream({
   }, [pendingConfirmation, connectionManager]);
 
   // Compute pending history items for rendering outside <Static>
+  // Flatten tool pairs: show all tool calls, show results as they arrive (non-blocking)
   const pendingHistoryItems: HistoryItemWithoutId[] = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
 
@@ -578,10 +617,17 @@ export function useChatStream({
       items.push(pendingAssistantItem);
     }
 
-    items.push(...pendingToolItems);
+    // Flatten pairs: toolCall always shown, toolResult shown if available
+    for (const pair of pendingToolPairsRef.current) {
+      items.push(pair.toolCall);
+      if (pair.toolResult) {
+        items.push(pair.toolResult);
+      }
+    }
 
     return items;
-  }, [pendingAssistantItem, pendingToolItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAssistantItem, toolPairsVersion]);
 
   return {
     // State

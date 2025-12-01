@@ -475,35 +475,41 @@ class ChatOrchestrator:
             await self._handle_iteration_limit(session_id, tool_calls)
             return response
 
-        # Execute tools
-        results = await self.llm_client.tool_manager.handle_multiple_function_calls(
-            tool_calls,
-            session_id or "",
-            message_id
-        )
+        # Execute tools serially with cascade blocking (orchestration at service layer)
+        from backend.infrastructure.mcp.utils.tool_result import error_response
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
-        # Send todo update notification if todo_write tool was called
-        # This happens AFTER tool execution to get the updated todo state
-        if any(tc['name'] == 'todo_write' for tc in tool_calls):
-            try:
-                from backend.application.services.todo_service import get_todo_service
-                from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-
-                # Get agent_profile from context_manager for correct workspace resolution
-                context_manager = self.llm_client.get_or_create_context_manager(session_id)
-                agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
-                todo_service = get_todo_service()
-                current_todo = await todo_service.get_current_todo(agent_profile, session_id)
-                await WebSocketNotificationService.send_todo_update(session_id, current_todo)
-            except Exception as e:
-                print(f"[WARNING] Failed to send todo update notification: {e}")
-
-        # Add results to context and check for rejections
+        results = []
         rejected_tools = []
-        for i, (tool_call, result) in enumerate(zip(tool_calls, results)):
+        user_rejected_tool = None  # Track which tool was rejected by user
+
+        for i, tool_call in enumerate(tool_calls):
+            tool_name = tool_call.get('name', 'unknown')
             is_last_tool = (i == len(tool_calls) - 1)
 
+            # Cascade blocking: if user rejected a tool, block all remaining tools
+            if user_rejected_tool is not None:
+                cascade_message = (
+                    f"The user doesn't want to take this action right now. "
+                    f"Skipping {tool_name} due to previous rejection. "
+                    f"STOP what you are doing and wait for the user to tell you how to proceed."
+                )
+                result = error_response(cascade_message)
+                result["cascade_blocked"] = True
+            else:
+                # Execute single tool via infrastructure layer
+                result = await self.llm_client.tool_manager.handle_function_call(
+                    tool_call, session_id or "", message_id
+                )
+
+                # Check if user rejected this tool
+                if result.get('user_rejected', False):
+                    user_rejected_tool = tool_name
+                    rejected_tools.append(tool_name)
+
+            results.append(result)
+
+            # Add result to context
             await context_manager.add_tool_result(
                 tool_call['id'],
                 tool_call['name'],
@@ -511,7 +517,7 @@ class ChatOrchestrator:
                 inject_reminders=is_last_tool
             )
 
-            # Save tool result to database
+            # Save tool result to database and send WebSocket update
             try:
                 result_message_id = self.message_service.save_tool_result_message(
                     tool_call_id=tool_call['id'],
@@ -520,9 +526,6 @@ class ChatOrchestrator:
                     session_id=session_id
                 )
 
-                # Send TOOL_RESULT_UPDATE for real-time display (CLI and Web)
-                # This sends the complete tool result content so frontends don't need API refresh
-                from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
                 await WebSocketNotificationService.send_tool_result_update(
                     session_id=session_id,
                     message_id=result_message_id,
@@ -533,12 +536,29 @@ class ChatOrchestrator:
             except Exception as e:
                 print(f"[WARNING] Failed to save tool result: {e}")
 
-            # Check for direct rejections
-            if result.get('user_rejected', False):
-                rejected_tools.append(tool_call['name'])
+            # Send todo update if todo_write was called
+            if tool_name == 'todo_write':
+                try:
+                    from backend.application.services.todo_service import get_todo_service
+                    agent_profile = getattr(context_manager, 'agent_profile', 'general')
+                    todo_service = get_todo_service()
+                    current_todo = await todo_service.get_current_todo(agent_profile, session_id)
+                    await WebSocketNotificationService.send_todo_update(session_id, current_todo)
+                except Exception as e:
+                    print(f"[WARNING] Failed to send todo update notification: {e}")
 
-        # If any tool was directly rejected, interrupt immediately
+        # If any tool was directly rejected, send streaming end notification and interrupt
         if rejected_tools:
+            # Send streaming=False to notify frontend that pending state should end
+            # This stops the blinking animation on tool call blocks
+            from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=state.get_content_blocks(),
+                streaming=False,
+                interrupted=False  # Not a user interrupt, just rejection completion
+            )
             raise UserRejectionInterruption(session_id, rejected_tools)
 
         # Check for user interrupt before continuing recursion
