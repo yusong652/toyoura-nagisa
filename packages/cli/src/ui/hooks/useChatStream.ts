@@ -161,6 +161,8 @@ export function useChatStream({
 
   // Refs for tracking seen IDs (avoid duplicates)
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
+  // Track confirmed tool calls (already committed to history)
+  const confirmedToolCallIdsRef = useRef<Set<string>>(new Set());
 
   // Clear error
   const clearError = useCallback(() => {
@@ -211,6 +213,7 @@ export function useChatStream({
         }
         pendingToolPairsRef.current = [];
         seenToolCallIdsRef.current.clear();
+        confirmedToolCallIdsRef.current.clear();
         setToolPairsVersion((v) => v + 1);
       }
 
@@ -230,22 +233,31 @@ export function useChatStream({
       }
 
       // Update pending assistant item with text and thinking content blocks
+      // Skip if streaming is ending - backend sends accumulated content but we may have
+      // already committed the assistant message during tool confirmation
       const textAndThinkingContent = event.content.filter(
         (b): b is ContentBlock => b.type === 'text' || b.type === 'thinking'
       );
-      setPendingAssistantItem((prev) => {
-        if (!prev) {
+      if (event.streaming !== false) {
+        setPendingAssistantItem((prev) => {
+          if (!prev) {
+            // Don't create new assistant item if there's no content
+            // (e.g., after confirmation, only tool results arrive)
+            if (textAndThinkingContent.length === 0) {
+              return null;
+            }
+            return {
+              type: MessageType.ASSISTANT,
+              content: textAndThinkingContent,
+              isStreaming: true,
+            };
+          }
           return {
-            type: MessageType.ASSISTANT,
+            ...prev,
             content: textAndThinkingContent,
-            isStreaming: true,
           };
-        }
-        return {
-          ...prev,
-          content: textAndThinkingContent,
-        };
-      });
+        });
+      }
 
       // Handle tool calls - create pairs with result=null (placeholder)
       const toolUseBlocks = event.content.filter((b) => b.type === 'tool_use');
@@ -311,6 +323,7 @@ export function useChatStream({
         setPendingAssistantItem(null);
         pendingToolPairsRef.current = [];
         seenToolCallIdsRef.current.clear();
+        confirmedToolCallIdsRef.current.clear();
         setToolPairsVersion((v) => v + 1);
         return;
       }
@@ -323,20 +336,19 @@ export function useChatStream({
       setStreamingState(StreamingState.Idle);
       setThinkingContent(null);
 
-      // Commit to history - use the latest content from the event
-      // Keep both text and thinking blocks in history for display
-      if (event.content && Array.isArray(event.content)) {
-        const finalContent = event.content.filter(
-          (b): b is ContentBlock => b.type === 'text' || b.type === 'thinking'
-        );
-        if (finalContent.length > 0) {
+      // Commit pending assistant item if it exists
+      // Note: Don't use event.content here - it may contain already-committed content
+      // (e.g., if handleToolConfirmationRequest already committed the assistant message)
+      // Using functional update to get the latest state and avoid duplicate commits
+      setPendingAssistantItem((prevAssistant) => {
+        if (prevAssistant) {
           historyManager.addItem({
-            type: MessageType.ASSISTANT,
-            content: finalContent,
+            ...prevAssistant,
             isStreaming: false,
           });
         }
-      }
+        return null;
+      });
 
       // Commit tool pairs in order
       for (const pair of currentPairs) {
@@ -347,9 +359,9 @@ export function useChatStream({
       }
 
       // Clear pending state
-      setPendingAssistantItem(null);
       pendingToolPairsRef.current = [];
       seenToolCallIdsRef.current.clear();
+      confirmedToolCallIdsRef.current.clear();
       setToolPairsVersion((v) => v + 1);
     }
   }, [historyManager]);
@@ -360,13 +372,16 @@ export function useChatStream({
     // This ensures the assistant message appears before the tool confirmation
     // Note: Do NOT commit tool pairs here - they stay in pending for rendering
     // and will be committed when stream ends
-    if (pendingAssistantItem) {
-      historyManager.addItem({
-        ...pendingAssistantItem,
-        isStreaming: false,
-      } as HistoryItemWithoutId);
-      setPendingAssistantItem(null);
-    }
+    // Using functional update to avoid race condition with handleStreamingUpdate
+    setPendingAssistantItem((prevAssistant) => {
+      if (prevAssistant) {
+        historyManager.addItem({
+          ...prevAssistant,
+          isStreaming: false,
+        });
+      }
+      return null;
+    });
 
     // Build confirmation data based on confirmation type
     const confirmationType = event.confirmation_type || 'info';
@@ -419,7 +434,7 @@ export function useChatStream({
 
     setStreamingState(StreamingState.WaitingForConfirmation);
     setIsStreaming(false);
-  }, [pendingAssistantItem, historyManager]);
+  }, [historyManager]);
 
   // Handle ERROR event from ConnectionManager
   const handleError = useCallback((err: Error) => {
@@ -436,6 +451,7 @@ export function useChatStream({
     setPendingAssistantItem(null);
     pendingToolPairsRef.current = [];
     seenToolCallIdsRef.current.clear();
+    confirmedToolCallIdsRef.current.clear();
     setToolPairsVersion((v) => v + 1);
   }, [historyManager]);
 
@@ -446,10 +462,6 @@ export function useChatStream({
 
     for (const block of event.content) {
       if (block.type !== 'tool_result') continue;
-
-      // Find the corresponding pair
-      const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
-      if (!pair || pair.toolResult) continue;  // Skip if no pair or already filled
 
       // Extract text content from llm_content
       let contentText = '';
@@ -468,8 +480,7 @@ export function useChatStream({
       // Extract diff info from data field (for edit/write tools)
       const diff = block.data?.diff;
 
-      // Fill the pair's result
-      pair.toolResult = {
+      const toolResult: ToolResultHistoryItemWithoutId = {
         type: MessageType.TOOL_RESULT,
         toolCallId: block.tool_use_id,
         toolName: block.tool_name,
@@ -477,6 +488,20 @@ export function useChatStream({
         isError: block.is_error,
         diff: diff,
       };
+
+      // Check if this tool call was already confirmed (committed to history)
+      if (confirmedToolCallIdsRef.current.has(block.tool_use_id)) {
+        // Tool call already in history, commit result directly to history
+        historyManager.addItem(toolResult);
+        continue;
+      }
+
+      // Find the corresponding pair in pending
+      const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
+      if (!pair || pair.toolResult) continue;  // Skip if no pair or already filled
+
+      // Fill the pair's result
+      pair.toolResult = toolResult;
       pairsUpdated = true;
     }
 
@@ -484,7 +509,7 @@ export function useChatStream({
     if (pairsUpdated) {
       setToolPairsVersion((v) => v + 1);
     }
-  }, []);
+  }, [historyManager]);
 
   // Set up WebSocket event handlers
   // ConnectionManager emits specific events after processing raw WebSocket messages
@@ -586,17 +611,35 @@ export function useChatStream({
   const confirmTool = useCallback((approved: boolean, message?: string) => {
     if (!pendingConfirmation) return;
 
+    const toolCallId = pendingConfirmation.tool_call_id;
+
     // Note: No info message here - tool result will show rejection status (red error)
     // Adding an info message immediately would cause it to appear before tool results
     // because info goes to committed history while tool results are in pending state
 
     connectionManager.send({
       type: 'TOOL_CONFIRMATION_RESPONSE',
-      tool_call_id: pendingConfirmation.tool_call_id,
+      tool_call_id: toolCallId,
       approved,
       user_message: message,
       timestamp: new Date().toISOString(),
     });
+
+    // End pending state for this specific tool call:
+    // 1. Find and remove the pair from pending
+    // 2. Commit tool call to history
+    // 3. Track as confirmed (so result goes directly to history when it arrives)
+    const pairIndex = pendingToolPairsRef.current.findIndex((p) => p.toolCallId === toolCallId);
+    if (pairIndex !== -1) {
+      const pair = pendingToolPairsRef.current[pairIndex];
+      // Commit tool call to history (no longer pending/blinking)
+      historyManager.addItem(pair.toolCall);
+      // Remove from pending pairs
+      pendingToolPairsRef.current.splice(pairIndex, 1);
+      // Track as confirmed
+      confirmedToolCallIdsRef.current.add(toolCallId);
+      setToolPairsVersion((v) => v + 1);
+    }
 
     setPendingConfirmation(null);
 
@@ -606,7 +649,7 @@ export function useChatStream({
     // State will be set to Idle when handleStreamingUpdate receives streaming=false
     setIsStreaming(true);
     setStreamingState(StreamingState.Responding);
-  }, [pendingConfirmation, connectionManager]);
+  }, [pendingConfirmation, connectionManager, historyManager]);
 
   // Compute pending history items for rendering outside <Static>
   // Flatten tool pairs: show all tool calls, show results as they arrive (non-blocking)

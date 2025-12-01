@@ -107,6 +107,7 @@ function convertBackendHistory(
     } else if (msg.role === 'assistant') {
       // Assistant message - process all content blocks
       const contentBlocks: ContentBlock[] = [];
+      let hasToolUse = false;
 
       if (typeof msg.content === 'string') {
         contentBlocks.push({ type: 'text', text: msg.content });
@@ -117,6 +118,7 @@ function convertBackendHistory(
           } else if (block.type === 'thinking' && block.thinking) {
             contentBlocks.push({ type: 'thinking', thinking: block.thinking });
           } else if (block.type === 'tool_use') {
+            hasToolUse = true;
             // Create tool pair with result=null (placeholder)
             toolPairs.push({
               toolCallId: block.id || '',
@@ -133,8 +135,9 @@ function convertBackendHistory(
         }
       }
 
-      // Add assistant message if there's text/thinking content
-      if (contentBlocks.length > 0) {
+      // Add assistant message if there's text/thinking content OR tool_use
+      // (tool_use-only messages need the ⏺ prefix for visual consistency with streaming)
+      if (contentBlocks.length > 0 || hasToolUse) {
         historyManager.addItem({
           type: MessageType.ASSISTANT,
           content: contentBlocks,
