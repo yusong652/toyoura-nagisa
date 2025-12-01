@@ -135,25 +135,46 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   );
 };
 
+// Status indicator width (matches ToolResultMessage)
+const STATUS_INDICATOR_WIDTH = 3;
+// Maximum lines for tool result content
+const MAX_RESULT_LINES = 10;
+
 // Pending Tool Result Message
+// Layout matches ToolResultMessage for visual consistency
 const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId }> = ({ item }) => {
   const statusColor = item.isError ? theme.status.error : theme.status.success;
   const statusIcon = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
 
-  // Trim and truncate content for display
-  const content = (item.content || '').trim();
-  const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
+  // Trim and split content into lines (matches ToolResultMessage behavior)
+  const content = (item.content || '').trimEnd();
+  const allLines = content.split('\n');
+  const truncated = allLines.length > MAX_RESULT_LINES;
+  const lines = truncated ? allLines.slice(0, MAX_RESULT_LINES) : allLines;
 
   return (
-    <Box marginBottom={1} flexDirection="column">
-      <Box flexDirection="row">
-        <Text color={statusColor}>{statusIcon} </Text>
-        <Text color={theme.text.muted}>Tool result</Text>
+    <Box flexDirection="column" paddingX={1} marginBottom={1}>
+      {/* Header line: status + tool name */}
+      <Box>
+        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+          <Text color={statusColor}>{statusIcon}</Text>
+        </Box>
+        <Text color={theme.text.secondary}>
+          {item.toolName || 'tool result'}
+        </Text>
       </Box>
-      {truncatedContent && (
-        <Box marginLeft={2}>
-          <Text color={theme.text.muted} wrap="truncate-end">
-            {truncatedContent}
+      {/* Content lines */}
+      {lines.map((line, index) => (
+        <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
+          <Text wrap="truncate-end" color={theme.text.secondary}>
+            {line}
+          </Text>
+        </Box>
+      ))}
+      {truncated && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
+          <Text color={theme.text.muted}>
+            ... (output truncated)
           </Text>
         </Box>
       )}
