@@ -476,6 +476,15 @@ export function useChatStream({
   const submitQuery = useCallback(async (text: string, mentionedFiles?: string[]) => {
     if (!text.trim()) return;
 
+    // Commit any pending tool items to history before adding new user message
+    // This ensures tool rejection results appear before the new user message
+    for (const toolItem of pendingToolItems) {
+      historyManager.addItem(toolItem);
+    }
+    if (pendingToolItems.length > 0) {
+      setPendingToolItems([]);
+    }
+
     // Add user message to history (committed immediately)
     historyManager.addItem({
       type: MessageType.USER,
@@ -511,7 +520,7 @@ export function useChatStream({
       setIsStreaming(true);
       setStreamingState(StreamingState.Responding);
     }
-  }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager]);
+  }, [currentSessionId, currentProfile, memoryEnabled, historyManager, isStreaming, connectionManager, pendingToolItems]);
 
   // Cancel current request
   // Note: State cleanup is handled by handleStreamingUpdate when it receives
