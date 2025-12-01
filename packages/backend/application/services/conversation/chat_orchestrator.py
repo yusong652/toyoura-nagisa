@@ -507,57 +507,46 @@ class ChatOrchestrator:
             # Send WebSocket update immediately (real-time notification)
             await self._notify_tool_result(session_id, tool_call, result, context_manager)
 
-        # Step 4: Request confirmations for all confirm tools (with cascade blocking)
-        # Phase 4a: Collect confirmations first
-        confirmations: Dict[str, tuple[bool, Optional[str]]] = {}  # tool_call_id -> (approved, user_message)
-        user_rejected_tool = None
+        # Step 4: Process confirm tools serially (confirm → execute → next)
+        # Serial execution allows user to see previous tool's result before deciding on next
+        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
+
+        user_rejected = False
+        rejected_tool_name: Optional[str] = None
 
         for original_index, tool_call in confirm_tools:
             tool_name = tool_call.get('name', 'unknown')
-            tool_id = tool_call.get('id', '')
 
-            if user_rejected_tool is not None:
-                # Previous tool was rejected, cascade block this one
-                confirmations[tool_id] = (False, f"Cascade blocked due to {user_rejected_tool} rejection")
+            if user_rejected:
+                # Previous tool was rejected, cascade block remaining tools
+                cascade_message = (
+                    f"The user doesn't want to take this action right now. "
+                    f"Skipping {tool_name} because {rejected_tool_name} was rejected. "
+                    f"STOP what you are doing and wait for the user to tell you how to proceed."
+                )
+                result = error_response(cascade_message)
+                result["cascade_blocked"] = True
+                rejected_tools.append(tool_name)
             else:
                 # Request user confirmation
                 approved, user_message = await self._request_tool_confirmation(
                     tool_call, session_id or "", message_id
                 )
-                confirmations[tool_id] = (approved, user_message)
 
-                if not approved:
-                    user_rejected_tool = tool_name
+                if approved:
+                    # User approved - execute immediately
+                    result = await self.llm_client.tool_manager.handle_function_call(
+                        tool_call, session_id or "", message_id
+                    )
+                else:
+                    # User rejected - mark for cascade blocking
+                    result = user_rejected_response(
+                        user_message=user_message or f"User rejected {tool_name}"
+                    )
+                    result["user_rejected"] = True
+                    user_rejected = True
+                    rejected_tool_name = tool_name
                     rejected_tools.append(tool_name)
-
-        # Phase 4b: Execute confirmed tools or generate rejection responses
-        from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-
-        for original_index, tool_call in confirm_tools:
-            tool_name = tool_call.get('name', 'unknown')
-            tool_id = tool_call.get('id', '')
-            approved, user_message = confirmations[tool_id]
-
-            if approved:
-                # User approved - execute the tool
-                result = await self.llm_client.tool_manager.handle_function_call(
-                    tool_call, session_id or "", message_id
-                )
-            elif tool_name in rejected_tools:
-                # User directly rejected this tool
-                result = user_rejected_response(
-                    user_message=user_message or f"User rejected {tool_name}"
-                )
-                result["user_rejected"] = True
-            else:
-                # Cascade blocked (not the first rejection)
-                cascade_message = (
-                    f"The user doesn't want to take this action right now. "
-                    f"Skipping {tool_name} due to previous rejection. "
-                    f"STOP what you are doing and wait for the user to tell you how to proceed."
-                )
-                result = error_response(cascade_message)
-                result["cascade_blocked"] = True
 
             results[original_index] = result
 

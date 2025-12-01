@@ -693,21 +693,10 @@ export function useChatStream({
       timestamp: new Date().toISOString(),
     });
 
-    // End pending state for this specific tool call:
-    // 1. Find and remove the pair from pending
-    // 2. Commit tool call to history
-    // 3. Track as confirmed (so result goes directly to history when it arrives)
-    const pairIndex = pendingToolPairsRef.current.findIndex((p) => p.toolCallId === toolCallId);
-    if (pairIndex !== -1) {
-      const pair = pendingToolPairsRef.current[pairIndex];
-      // Commit tool call to history (no longer pending/blinking)
-      historyManager.addItem(pair.toolCall);
-      // Remove from pending pairs
-      pendingToolPairsRef.current.splice(pairIndex, 1);
-      // Track as confirmed
-      confirmedToolCallIdsRef.current.add(toolCallId);
-      setToolPairsVersion((v) => v + 1);
-    }
+    // Important: Do NOT commit toolCall here!
+    // With all-or-nothing confirmation strategy, results arrive after ALL confirmations complete.
+    // If we commit toolCall immediately, the order becomes [call1][call2][result1][result2]
+    // Let handleToolResultUpdate commit [call, result] pairs in correct order.
 
     setPendingConfirmation(null);
 
@@ -717,7 +706,7 @@ export function useChatStream({
     // State will be set to Idle when handleStreamingUpdate receives streaming=false
     setIsStreaming(true);
     setStreamingState(StreamingState.Responding);
-  }, [pendingConfirmation, connectionManager, historyManager]);
+  }, [pendingConfirmation, connectionManager]);
 
   // Compute pending history items for rendering outside <Static>
   // Flatten tool pairs: show all tool calls, show results as they arrive (non-blocking)
