@@ -6,8 +6,7 @@ Defines core methods that all Tool Managers must implement to ensure consistency
 """
 
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from fastmcp import Client as MCPClient
 from mcp.types import CallToolRequestParams, CallToolRequest, ClientRequest, CallToolResult
 from pydantic import ValidationError
@@ -301,9 +300,11 @@ class BaseToolManager(ABC):
         # Task completed normally
         return await tool_task
 
-    async def handle_function_call(self, function_call: dict, session_id: str, message_id: str = "") -> Dict[str, Any]:
+    async def handle_function_call(self, function_call: dict, session_id: str, _message_id: str = "") -> Dict[str, Any]:
         """
         Handle LLM-generated function_call requests.
+
+        Pure tool execution - confirmation is handled by ChatOrchestrator.
 
         Args:
             function_call: Function call dictionary containing:
@@ -311,7 +312,7 @@ class BaseToolManager(ABC):
                 - arguments: Dict[str, Any] - Tool arguments (optional, defaults to {})
                 - id: str - Tool call ID for tracking (optional, defaults to "")
             session_id: Session ID for context-aware tools and dependency injection (required)
-            message_id: ID of the message containing this tool call (for unique identification)
+            _message_id: Reserved for future use (currently unused after confirmation moved to orchestrator)
 
         Returns:
             Dict[str, Any]: ToolResult dictionary with structure:
@@ -319,19 +320,12 @@ class BaseToolManager(ABC):
                 - message: str - User-facing summary
                 - llm_content: Dict with parts structure
                 - data: Optional[Dict[str, Any]] - Tool-specific data
-                - user_rejected: Optional[bool] - True if user rejected the tool
 
         Raises:
             RuntimeError: When tool execution fails due to infrastructure errors
-            ValueError: When required session_id is not provided
         """
         tool_name = function_call.get("name", "")
         tool_args = function_call.get("arguments", {})
-        tool_id = function_call.get("id", "")
-
-        # tool_id is used for:
-        # 1. LLM context managers to properly format tool results in conversation history
-        # 2. User confirmation matching (frontend uses it to match confirmation requests to tool blocks)
 
         try:
             # Step 0: Validate edit prerequisite (must read file before editing)
@@ -444,50 +438,6 @@ class BaseToolManager(ABC):
                 print(f"Error calling tool {tool_name}: {str(e)}")
             raise RuntimeError(f"Tool '{tool_name}' execution failed: {str(e)}") from e
 
-    async def _handle_user_confirmation(
-        self,
-        tool_name: str,
-        tool_args: Dict[str, Any],
-        tool_id: str,
-        session_id: str,
-        message_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Handle user confirmation for tool execution.
-
-        Args:
-            tool_name: Name of the tool requiring confirmation
-            tool_args: Tool arguments
-            tool_id: Tool call ID for matching with frontend
-            session_id: Session ID for confirmation (required)
-            message_id: ID of the message containing this tool call
-
-        Returns:
-            None if approved, rejection response dict if rejected
-        """
-
-        approved, user_message = await self._request_user_confirmation(
-            tool_name, tool_args, tool_id, session_id, message_id
-        )
-
-        if not approved:
-            # User rejected - format and return rejection response
-            llm_settings = get_llm_settings()
-            if llm_settings.debug:
-                print(f"[BaseToolManager] User rejected {tool_name}")
-
-            from backend.infrastructure.mcp.utils.tool_result import user_rejected_response
-            rejection_result = user_rejected_response(
-                user_message=user_message or f"User rejected {tool_name}"
-            )
-
-            # Add user_rejected flag for interruption detection
-            rejection_result["user_rejected"] = True
-            return rejection_result
-
-        # User approved - return None to continue execution
-        return None
-
     def _requires_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any]) -> bool:
         """
         Check if a tool requires user confirmation before execution.
@@ -521,127 +471,6 @@ class BaseToolManager(ABC):
             return True
 
         return False
-
-    async def _request_user_confirmation(self, tool_name: str, tool_args: Dict[str, Any], tool_id: str, session_id: str, message_id: str) -> tuple[bool, Optional[str]]:
-        """
-        Request user confirmation for tool execution.
-
-        Args:
-            tool_name: Name of the tool to execute
-            tool_args: Arguments for the tool
-            tool_id: Tool call ID for matching with frontend
-            session_id: Session ID for the confirmation request
-            message_id: ID of the message containing this tool call
-
-        Returns:
-            tuple[bool, Optional[str]]: (approved, user_message) - True if user approved,
-                                      False if rejected or timed out. user_message contains
-                                      optional feedback from user when rejecting
-        """
-        try:
-            from backend.application.services.notifications.tool_confirmation_service import get_tool_confirmation_service
-
-            llm_settings = get_llm_settings()
-            confirmation_service = get_tool_confirmation_service()
-            if not confirmation_service:
-                if llm_settings.debug:
-                    print(f"[BaseToolManager] Tool confirmation service not available, auto-rejecting {tool_name}")
-                return (False, "Confirmation service not available")
-
-            # Initialize confirmation parameters
-            confirmation_type: Optional[str] = None
-            file_name_param: Optional[str] = None
-            file_path_param: Optional[str] = None
-            file_diff: Optional[str] = None
-            original_content: Optional[str] = None
-            new_content: Optional[str] = None
-
-            # Extract command from tool arguments based on tool type
-            if tool_name == "bash":
-                command = tool_args.get("command", "")
-                description = tool_args.get("description", None)
-                confirmation_type = "exec"
-                if not description:
-                    description = f"Execute bash command: {command}"
-            elif tool_name == "edit":
-                file_path = tool_args.get("file_path", "unknown")
-                command = f"Edit file: {file_path}"
-                description = tool_args.get("description", None)
-                confirmation_type = "edit"
-                file_path_param = file_path
-                file_name_param = Path(file_path).name if file_path else "unknown"
-
-                # Generate diff for edit confirmation
-                diff_info = await self._generate_edit_diff(file_path, tool_args)
-                if diff_info:
-                    file_diff = diff_info.get("diff")
-                    original_content = diff_info.get("original", "")
-                    new_content = diff_info.get("new", "")
-
-            elif tool_name == "write":
-                file_path = tool_args.get("file_path", "unknown")
-                command = f"Write file: {file_path}"
-                description = tool_args.get("description", None)
-                confirmation_type = "edit"
-                file_path_param = file_path
-                file_name_param = Path(file_path).name if file_path else "unknown"
-
-                # Generate diff for write confirmation
-                diff_info = await self._generate_write_diff(file_path, tool_args)
-                if diff_info:
-                    file_diff = diff_info.get("diff")
-                    original_content = diff_info.get("original", "")
-                    new_content = diff_info.get("new", "")
-
-            elif tool_name == "pfc_execute_task":
-                entry_script = tool_args.get("entry_script", "unknown")
-                run_in_background = tool_args.get("run_in_background", True)
-                bg_info = " (background)" if run_in_background else " (foreground)"
-                command = f"Execute PFC task{bg_info}: {entry_script}"
-                description = tool_args.get("description", None)
-                confirmation_type = "exec"
-            else:
-                command = f"{tool_name} operation"
-                description = tool_args.get("description", None)
-                confirmation_type = "info"
-
-            if llm_settings.debug:
-                print(f"[BaseToolManager] Requesting user confirmation for {tool_name} (tool_id={tool_id}): {command}")
-                if file_diff:
-                    print(f"[BaseToolManager] Including diff for file: {file_path_param}")
-
-            # Request confirmation (no timeout - wait indefinitely)
-            approved, user_message = await confirmation_service.request_confirmation(
-                session_id=session_id,
-                message_id=message_id,
-                tool_call_id=tool_id,
-                tool_name=tool_name,
-                command=command,
-                description=description,
-                confirmation_type=confirmation_type,
-                file_name=file_name_param,
-                file_path=file_path_param,
-                file_diff=file_diff,
-                original_content=original_content,
-                new_content=new_content
-            )
-
-            if llm_settings.debug:
-                if approved:
-                    print(f"[BaseToolManager] User approved {tool_name} execution")
-                else:
-                    print(f"[BaseToolManager] User rejected {tool_name} execution")
-                    if user_message:
-                        print(f"[BaseToolManager] User message: {user_message}")
-
-            return (approved, user_message)
-
-        except Exception as e:
-            llm_settings = get_llm_settings()
-            if llm_settings.debug:
-                print(f"[BaseToolManager] Error requesting user confirmation for {tool_name}: {e}")
-            # On error, default to rejecting for security
-            return (False, f"Error during confirmation: {str(e)}")
 
     async def _generate_edit_diff(self, file_path: str, tool_args: Dict[str, Any]) -> Optional[Dict[str, str]]:
         """
