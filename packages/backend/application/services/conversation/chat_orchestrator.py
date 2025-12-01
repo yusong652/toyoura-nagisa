@@ -491,8 +491,8 @@ class ChatOrchestrator:
                 non_confirm_tools.append((i, tool_call))
 
         # Step 2: Prepare results storage (indexed by original order)
-        results = [None] * len(tool_calls)
-        rejected_tools = []
+        results: List[Optional[Dict]] = [None] * len(tool_calls)
+        rejected_tools: List[str] = []
 
         # Step 3: Execute non-confirmation tools first (not affected by cascade blocking)
         for original_index, tool_call in non_confirm_tools:
@@ -543,7 +543,9 @@ class ChatOrchestrator:
             is_last_tool = (i == len(tool_calls) - 1)
 
             # Save to database in original order
-            await self._save_tool_result(session_id, tool_call, results[i])
+            result = results[i]
+            if result is not None:
+                await self._save_tool_result(session_id, tool_call, result)
 
             # Add to context in original order
             await context_manager.add_tool_result(
