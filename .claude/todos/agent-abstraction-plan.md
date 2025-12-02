@@ -900,6 +900,99 @@ messages = [
 
 ---
 
+### Future Refactoring: Agent as First-Class Citizen
+
+**Status**: Planning / Future Phase
+
+#### 问题分析
+
+当前设计存在语义问题：
+
+```
+AgentDefinition (配置) + AgentExecutor (执行器) = 被动组合
+```
+
+- `AgentExecutor` 是被动的执行引擎
+- `Agent` 应该是具有**主动行为**的对象
+- `ChatOrchestrator` 和 `AgentExecutor` 功能高度重叠
+
+#### 目标设计
+
+将 `Agent` 设计为一等公民，具有主动行为：
+
+```python
+class Agent:
+    """具有主动行为的 Agent 对象"""
+
+    def __init__(
+        self,
+        definition: AgentDefinition,
+        llm_client: LLMClient,
+        on_activity: Callable = None,
+    ):
+        self.definition = definition
+        self.llm_client = llm_client
+        self._on_activity = on_activity
+
+    async def run(self, inputs: dict) -> AgentResult:
+        """Agent 自主执行任务 (non-streaming)"""
+        # SubAgent 使用此方法
+
+    async def stream(self, inputs: dict) -> AsyncGenerator:
+        """Agent 以流式方式执行 (streaming)"""
+        # Main Agent 使用此方法
+```
+
+#### 使用方式
+
+```python
+# SubAgent - non-streaming
+explorer = Agent(PFC_EXPLORER, llm_client)
+result = await explorer.run({"objective": "Find ball syntax"})
+
+# Main Agent - streaming
+nagisa = Agent(NAGISA_MAIN, llm_client)
+async for chunk in nagisa.stream({"user_input": "..."}):
+    yield chunk
+```
+
+#### 重构路径
+
+```
+当前架构:
+┌─────────────────────────────────────────────┐
+│ AgentDefinition + AgentExecutor (SubAgent)  │
+│ ChatOrchestrator (Main Agent)               │
+│ → 重复逻辑，被动组合                          │
+└─────────────────────────────────────────────┘
+
+目标架构:
+┌─────────────────────────────────────────────┐
+│ Agent (统一的主动对象)                        │
+│   ├── run()      # non-streaming (SubAgent) │
+│   └── stream()   # streaming (Main Agent)   │
+│ → 语义正确，逻辑统一                          │
+└─────────────────────────────────────────────┘
+```
+
+#### 差异处理策略
+
+| 差异点 | 处理方式 |
+|--------|----------|
+| Streaming vs Non-streaming | `definition.streaming_enabled` 配置控制 |
+| 消息持久化 | 策略模式注入 `MessagePersistence` |
+| WebSocket 通知 | 策略模式注入 `NotificationStrategy` |
+| Activity 回调 | 统一的 `on_activity` 回调 |
+
+#### 优势
+
+1. **语义正确** - Agent 是主动行为对象，不是被动配置
+2. **代码统一** - 消除 ChatOrchestrator 和 AgentExecutor 的重复
+3. **扩展性好** - 新增 Agent 类型只需定义 AgentDefinition
+4. **OOP 设计** - 行为和状态封装在一起
+
+---
+
 ### Next Steps
 
 1. **开始 Phase 1**: 创建 `domain/models/agent.py` 定义核心模型
