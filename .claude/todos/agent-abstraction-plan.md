@@ -695,9 +695,9 @@ packages/backend/
 
 ### Last Updated: 2025-12-02
 
-### Overall Status: 🟡 Phase 1 Ready to Start
+### Overall Status: 🟢 Phase 1 Completed, Phase 2 Ready
 
-项目基础设施已就绪，可以开始 Phase 1 的实现工作。
+Phase 1 基础模型已完成，可以开始 Phase 2 执行器实现。
 
 ---
 
@@ -717,18 +717,19 @@ packages/backend/
 
 ### 📋 Phase 1: Foundation
 
-**Status**: 🔴 Not Started
+**Status**: ✅ Completed (2025-12-02)
 **Target**: 建立 Agent 抽象的基础设施
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 创建 AgentDefinition 模型 | `domain/models/agent.py` | ⬜ | P0 |
-| 创建 AgentResult 模型 | `domain/models/agent.py` | ⬜ | P0 |
-| 创建 AgentActivity 模型 | `domain/models/agent.py` | ⬜ | P0 |
-| 定义 PFC_EXPLORER Agent | `domain/models/agent_definitions.py` | ⬜ | P0，基于现有 PFC profile |
-| 定义 ExplorerResult 输出模型 | `domain/models/explorer_output.py` | ⬜ | P0 |
+| 创建 AgentDefinition 模型 | `domain/models/agent.py` | ✅ | Pydantic BaseModel |
+| 创建 AgentResult 模型 | `domain/models/agent.py` | ✅ | 包含 raw_response |
+| 创建 AgentActivity 模型 | `domain/models/agent.py` | ✅ | 7 种事件类型 |
+| 定义 PFC_EXPLORER Agent | `domain/models/agent_definitions.py` | ✅ | 基于 pfc profile |
+| 定义 ExplorerResult 输出模型 | `domain/models/explorer_output.py` | ⏭️ | 跳过，初期不强制结构化输出 |
 
 **Blockers**: None
+**Decision**: 初期使用 raw_response 自然语言输出，后期按需添加 schema
 
 ---
 
@@ -816,6 +817,7 @@ packages/backend/
 | 2025-12-02 | 复用现有 `ToolExecutor` | 工具执行逻辑已完善，包含确认机制和级联阻塞 |
 | 2025-12-02 | 基于现有 `AgentProfile.PFC` | 避免重复定义，直接扩展 |
 | 2025-12-02 | 非流式优先 | SubAgent 不需要流式，简化实现 |
+| 2025-12-02 | 跳过结构化输出 | 初期用 raw_response，后期按需添加 schema |
 
 ---
 
