@@ -1,10 +1,9 @@
 """
-Agent services for SubAgent execution.
+Agent services module.
 
-This package provides the AgentExecutor for running SubAgents
-with configuration-driven behavior.
+Provides the Agent class - a first-class citizen with active behavior.
 """
 
-from backend.application.services.agent.executor import AgentExecutor
+from backend.application.services.agent.agent import Agent
 
-__all__ = ["AgentExecutor"]
+__all__ = ["Agent"]

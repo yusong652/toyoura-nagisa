@@ -1,8 +1,8 @@
 """
-AgentExecutor - Universal agent execution engine.
+Agent - First-class citizen with active behavior.
 
-This module provides the core execution loop for SubAgents,
-supporting non-streaming LLM calls with tool execution.
+This module provides the Agent class that encapsulates both
+configuration (AgentDefinition) and behavior (run/stream methods).
 """
 
 import asyncio
@@ -11,16 +11,18 @@ import uuid
 from typing import Any, Callable, Dict, List, Optional
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
+from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.message_service import MessageService
 
 
-class SubAgentContext:
+class _ToolExecutionContext:
     """
-    Minimal context adapter for SubAgent tool execution.
+    Minimal context adapter for Agent tool execution.
 
     Provides the interface expected by ToolExecutor.
+    This is an internal implementation detail.
     """
 
     def __init__(self, agent_profile: str):
@@ -28,31 +30,37 @@ class SubAgentContext:
 
     async def add_tool_result(
         self,
-        tool_call_id: str,
-        tool_name: str,
-        result: Dict[str, Any],
-        inject_reminders: bool = False
+        tool_call_id: str,  # noqa: ARG002
+        tool_name: str,  # noqa: ARG002
+        result: Dict[str, Any],  # noqa: ARG002
+        inject_reminders: bool = False  # noqa: ARG002
     ) -> None:
-        """No-op for SubAgent - results handled internally."""
+        """No-op - results handled by Agent internally."""
         pass
 
 
-class AgentExecutor:
+class Agent:
     """
-    Universal agent executor for SubAgents.
+    Agent with active behavior - first-class citizen in the system.
 
-    Handles the complete execution lifecycle:
-    1. Build initial context from definition and inputs
-    2. Execute LLM call (non-streaming)
-    3. Process tool calls if any
-    4. Repeat until done or limits reached
+    An Agent encapsulates:
+    - Configuration (AgentDefinition)
+    - Behavior (run for non-streaming, stream for streaming)
+    - State management (context, execution tracking)
 
-    Unlike ChatOrchestrator, this executor:
-    - Uses non-streaming LLM calls
-    - Does not require user confirmation for tools
-    - Does not persist messages to database
-    - Does not send WebSocket notifications
-    - Emits activity events via callback instead
+    Usage:
+        # Create agent instance
+        explorer = Agent(PFC_EXPLORER, llm_client)
+
+        # Execute task (non-streaming)
+        result = await explorer.run({"objective": "Find ball syntax"})
+
+        # Or with activity monitoring
+        def on_activity(activity):
+            print(f"[{activity.event_type}] {activity.data}")
+
+        explorer = Agent(PFC_EXPLORER, llm_client, on_activity=on_activity)
+        result = await explorer.run(inputs)
     """
 
     def __init__(
@@ -62,10 +70,10 @@ class AgentExecutor:
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
     ):
         """
-        Initialize AgentExecutor.
+        Initialize Agent.
 
         Args:
-            definition: Agent configuration
+            definition: Agent configuration (name, system_prompt, tools, limits)
             llm_client: LLM client for API calls
             on_activity: Optional callback for activity events
         """
@@ -73,8 +81,18 @@ class AgentExecutor:
         self.llm_client = llm_client
         self.on_activity = on_activity
 
-        # Generate unique execution ID for this run
-        self.execution_id = str(uuid.uuid4())[:8]
+        # Execution state (reset on each run)
+        self._execution_id: Optional[str] = None
+
+    @property
+    def name(self) -> str:
+        """Agent name from definition."""
+        return self.definition.name
+
+    @property
+    def display_name(self) -> str:
+        """Agent display name from definition."""
+        return self.definition.display_name
 
     async def run(
         self,
@@ -82,15 +100,24 @@ class AgentExecutor:
         abort_signal: Optional[asyncio.Event] = None,
     ) -> AgentResult:
         """
-        Execute agent with given inputs.
+        Execute agent task (non-streaming mode).
+
+        This is the primary method for SubAgents. The agent will:
+        1. Build context from inputs
+        2. Call LLM
+        3. Execute tools if requested
+        4. Repeat until done or limits reached
 
         Args:
-            inputs: Template variables (e.g., {"objective": "...", "context": "..."})
+            inputs: Task inputs (e.g., {"objective": "...", "context": "..."})
             abort_signal: Optional event to signal abort
 
         Returns:
             AgentResult with execution outcome
         """
+        # Generate unique execution ID for this run
+        self._execution_id = str(uuid.uuid4())[:8]
+
         start_time = time.time()
         iteration = 0
 
@@ -98,21 +125,20 @@ class AgentExecutor:
 
         try:
             # Setup context manager for this execution
-            context_manager = self.llm_client.get_or_create_context_manager(self.execution_id)
+            context_manager = self.llm_client.get_or_create_context_manager(
+                self._execution_id
+            )
             context_manager.agent_profile = self.definition.tool_profile
             context_manager.enable_memory = self.definition.enable_memory
 
             # Build initial user message from inputs (task from parent agent)
-            # Reuse the same mechanism as main agent: context_manager.add_user_message()
-            from backend.domain.models.messages import UserMessage
             initial_message = UserMessage(content=self._build_prompt_content(inputs))
             await context_manager.add_user_message(initial_message)
 
-            # Get api_config using _prepare_complete_context (reuses provider logic)
-            # Now working_contents contains the initial user message
+            # Get api_config using infrastructure layer
             messages, api_config = await self.llm_client._prepare_complete_context(
-                session_id=self.execution_id,
-                system_prompt=self.definition.system_prompt  # Fixed system prompt, no template
+                session_id=self._execution_id,
+                system_prompt=self.definition.system_prompt
             )
 
             # Execution loop
@@ -136,9 +162,10 @@ class AgentExecutor:
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # LLM call - get fresh messages from context_manager each iteration
+                # Get fresh messages from context_manager
                 messages = context_manager.get_working_contents()
 
+                # LLM call
                 self._emit_activity("thinking", {"iteration": iteration})
                 response = await self.llm_client.call_api_with_context(
                     context_contents=messages,
@@ -159,21 +186,18 @@ class AgentExecutor:
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # Add assistant response to context (reuse infrastructure)
+                # Add assistant response to context
                 context_manager.add_response(response)
 
-                # Generate message ID for tool execution
-                tool_message_id = f"subagent_{self.execution_id}_{iteration}"
-
                 # Execute tools and add results to context
-                tool_results = await self._execute_tools(tool_calls, tool_message_id)
+                tool_results = await self._execute_tools(tool_calls, iteration)
                 for tool_call, result in zip(tool_calls, tool_results):
                     if result is not None:
                         await context_manager.add_tool_result(
                             tool_call_id=tool_call.get("id", ""),
                             tool_name=tool_call.get("name", ""),
                             result=result,
-                            inject_reminders=False  # SubAgent doesn't need reminders
+                            inject_reminders=False
                         )
 
                 iteration += 1
@@ -201,27 +225,28 @@ class AgentExecutor:
                 "elapsed": time.time() - start_time,
             })
 
+    # async def stream(self, inputs: Dict[str, str]) -> AsyncGenerator:
+    #     """
+    #     Execute agent task (streaming mode).
+    #
+    #     This will be implemented when we refactor ChatOrchestrator.
+    #     For now, Main Agent continues to use ChatOrchestrator.
+    #     """
+    #     raise NotImplementedError("Streaming mode not yet implemented")
+
     def _build_prompt_content(self, inputs: Dict[str, str]) -> str:
         """
         Build prompt content from inputs for initial user message.
 
-        The format is flexible - this is the task message from parent agent.
-        For SubAgent, typically includes objective and context.
-        For Main Agent (future), this would be the actual user input.
-
         Args:
-            inputs: Task inputs (e.g., {"objective": "...", "context": "..."})
+            inputs: Task inputs
 
         Returns:
             Prompt string for the initial user message
         """
-        # Simple format: just concatenate inputs
-        # Parent agent controls the exact format
         if len(inputs) == 1:
-            # Single input - use directly
             return str(list(inputs.values())[0])
 
-        # Multiple inputs - format as sections
         parts = []
         for key, value in inputs.items():
             parts.append(f"## {key.replace('_', ' ').title()}\n{value}")
@@ -233,37 +258,33 @@ class AgentExecutor:
         Parse LLM response to extract text and tool calls.
 
         Uses the provider's response processor for format-agnostic parsing.
-
-        Returns:
-            Tuple of (response_text, tool_calls)
         """
         processor = self.llm_client._get_response_processor()
         if not processor:
             return "", []
 
         try:
-            # Use response processor's standard methods
             text_content = processor.extract_text_content(response)
             tool_calls = processor.extract_tool_calls(response)
             return text_content, tool_calls
         except Exception as e:
-            print(f"[AgentExecutor] Error parsing response: {e}")
+            print(f"[Agent] Error parsing response: {e}")
             return "", []
 
     async def _execute_tools(
         self,
         tool_calls: List[Dict],
-        message_id: str
+        iteration: int
     ) -> List[Optional[Dict[str, Any]]]:
         """
-        Execute tool calls using ToolExecutor (with confirmation support).
+        Execute tool calls.
 
         Args:
             tool_calls: List of tool call dicts
-            message_id: Message ID for tool execution context
+            iteration: Current iteration number
 
         Returns:
-            List of tool results (may contain None for rejected tools)
+            List of tool results
         """
         # Emit activity for each tool
         for tool_call in tool_calls:
@@ -273,16 +294,19 @@ class AgentExecutor:
             })
 
         # Create context adapter for ToolExecutor
-        context = SubAgentContext(agent_profile=self.definition.tool_profile)
+        context = _ToolExecutionContext(agent_profile=self.definition.tool_profile)
 
         # Create ToolExecutor
         tool_executor = ToolExecutor(
             tool_manager=self.llm_client.tool_manager,
             message_service=MessageService(),
-            session_id=self.execution_id,
+            session_id=self._execution_id or "",
         )
 
-        # Execute all tools (with confirmation if needed)
+        # Generate message ID for tool execution
+        message_id = f"agent_{self._execution_id}_{iteration}"
+
+        # Execute all tools
         execution_result = await tool_executor.execute_all(
             tool_calls=tool_calls,
             message_id=message_id,
@@ -301,41 +325,33 @@ class AgentExecutor:
         return execution_result.results
 
     def _extract_summary(self, response_text: str) -> str:
-        """
-        Extract a brief summary from response text.
-
-        Takes first meaningful line or truncates.
-        """
+        """Extract a brief summary from response text."""
         if not response_text:
             return "Task completed"
 
-        # Take first non-empty line
-        lines = [l.strip() for l in response_text.split('\n') if l.strip()]
+        lines = [line.strip() for line in response_text.split('\n') if line.strip()]
         if not lines:
             return "Task completed"
 
         first_line = lines[0]
 
-        # Remove markdown headers
         if first_line.startswith('#'):
             first_line = first_line.lstrip('#').strip()
 
-        # Truncate if too long
         if len(first_line) > 100:
             return first_line[:97] + "..."
 
         return first_line
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
-        """
-        Emit activity event if callback is registered.
-        """
+        """Emit activity event if callback is registered."""
         if not self.on_activity:
             return
 
-        # Filter out typing issues
-        valid_types = ["started", "thinking", "tool_call_start", "tool_call_end",
-                       "llm_response", "completed", "error"]
+        valid_types = [
+            "started", "thinking", "tool_call_start", "tool_call_end",
+            "llm_response", "completed", "error"
+        ]
         if event_type not in valid_types:
             return
 

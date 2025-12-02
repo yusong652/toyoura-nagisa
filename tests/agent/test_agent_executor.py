@@ -1,9 +1,9 @@
 """
-Test AgentExecutor functionality.
+Test Agent functionality.
 
-This test verifies that the AgentExecutor can:
-1. Initialize correctly
-2. Build prompts with workspace injection
+This test verifies that the Agent class can:
+1. Initialize correctly as a first-class citizen
+2. Execute tasks with run() method
 3. Make LLM calls
 4. Handle tool execution
 """
@@ -56,14 +56,14 @@ async def init_app_context():
     return app
 
 
-async def test_agent_executor_basic():
-    """Test basic AgentExecutor functionality."""
+async def test_agent_basic():
+    """Test basic Agent functionality."""
     from backend.domain.models.agent import AgentActivity
     from backend.domain.models.agent_definitions import PFC_EXPLORER
-    from backend.application.services.agent import AgentExecutor
+    from backend.application.services.agent import Agent
     from backend.shared.utils.app_context import get_llm_client
 
-    print("=== AgentExecutor Basic Test ===\n")
+    print("=== Agent Basic Test ===\n")
 
     # Get LLM client
     llm_client = get_llm_client()
@@ -75,13 +75,13 @@ async def test_agent_executor_basic():
         activities.append(activity)
         print(f"  [{activity.event_type}] {activity.data}")
 
-    # Create executor
-    executor = AgentExecutor(
+    # Create Agent instance (first-class citizen)
+    explorer = Agent(
         definition=PFC_EXPLORER,
         llm_client=llm_client,
         on_activity=on_activity,
     )
-    print(f"✓ Executor created for: {PFC_EXPLORER.name}")
+    print(f"✓ Agent created: {explorer.display_name} ({explorer.name})")
     print(f"  - Tool profile: {PFC_EXPLORER.tool_profile}")
     print(f"  - Max iterations: {PFC_EXPLORER.max_iterations}")
     print(f"  - Timeout: {PFC_EXPLORER.timeout_seconds}s")
@@ -97,8 +97,8 @@ async def test_agent_executor_basic():
     print(f"Context: {inputs['context']}")
     print()
 
-    # Run the agent
-    result = await executor.run(inputs)
+    # Run the agent (active behavior)
+    result = await explorer.run(inputs)
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -122,7 +122,7 @@ async def main():
     """Run tests with app context."""
     try:
         await init_app_context()
-        result = await test_agent_executor_basic()
+        result = await test_agent_basic()
         print(f"\n=== Test {'PASSED' if result.status == 'success' else 'COMPLETED with ' + result.status} ===")
     except Exception as e:
         print(f"\n=== Test FAILED ===")
