@@ -270,106 +270,23 @@ class ChatService:
 
     async def _inject_status_reminders(self, session_id: str, parsed_data: MessageParseResult) -> None:
         """
-        Inject system status reminders and file mentions into user message content before saving.
+        Inject system status reminders and file mentions into user message content.
 
-        This ensures that background task status (bash processes, PFC tasks, etc.) and
-        mentioned files are communicated to the LLM via the user message, maintaining
-        consistency with the existing tool result injection pattern.
+        Delegates to ReminderInjector for unified reminder collection and injection.
 
         Args:
             session_id: Session ID for retrieving status monitor
             parsed_data: Parsed message data (modified in-place)
-
-        Implementation notes:
-            - Processes file mentions first (from parsed_data['mentioned_files'])
-            - Retrieves reminders from StatusMonitor (same source as tool results)
-            - Injects into last text part of content list
-            - Creates new text part if no text exists (image-only messages)
-            - Format matches tool result injection: <system-reminder>...</system-reminder>
         """
         try:
-            reminders = []
+            from backend.application.services.reminder import ReminderInjector
 
-            # Get agent profile (used for both file mentions and status reminders)
             agent_profile = parsed_data.get('agent_profile', 'general')
-
-            # 1. Process file mentions (if present)
             mentioned_files = parsed_data.get('mentioned_files', [])
-            if mentioned_files:
-                from backend.infrastructure.file_mention import FileMentionProcessor
-                processor = FileMentionProcessor(session_id, agent_profile)
-                file_reminders = await processor.process_mentioned_files(mentioned_files)
-                reminders.extend(file_reminders)
-
-            # 2. Get status monitor for this session
-            from backend.infrastructure.monitoring import get_status_monitor
-            status_monitor = get_status_monitor(session_id)
-
-            # 3. Retrieve all system reminders (async) with agent_profile
-            status_reminders = await status_monitor.get_all_reminders(
-                agent_profile=agent_profile
-            )
-            reminders.extend(status_reminders)
-
-            if not reminders:
-                return
-
-            print(f"[DEBUG] Injecting {len(reminders)} status reminders into user message")
-
-            # 5. Get content array
             content = parsed_data.get('content', [])
-            if not isinstance(content, list):
-                print(f"[WARNING] Unexpected content format: {type(content)}")
-                return
 
-            # 6. Process and inject reminders
-            # Reminders can be:
-            # - String: text-based reminders (status, text files)
-            # - Dict with "type": "multimodal_file_mention": image/binary files
-            text_reminders = []
-            inline_data_parts = []
-
-            for reminder in reminders:
-                if isinstance(reminder, dict) and reminder.get("type") == "multimodal_file_mention":
-                    # Multimodal file mention (image, binary)
-                    # Extract parts: separate text content from inline_data
-                    for part in reminder.get("parts", []):
-                        if isinstance(part, dict):
-                            if part.get("type") == "text" and "text" in part:
-                                # Collect text content to merge with other text reminders
-                                text_reminders.append(part["text"])
-                            elif "inline_data" in part:
-                                # Keep inline_data parts separate for later injection
-                                inline_data_parts.append(part)
-                elif isinstance(reminder, str):
-                    # Text reminder (status or text file)
-                    text_reminders.append(reminder)
-
-            # 7. Inject all text reminders into last text part (merged)
-            if text_reminders:
-                reminder_text = "\n\n" + "\n\n".join(text_reminders)
-
-                # Find last text part and append
-                injected = False
-                for part in reversed(content):
-                    if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
-                        part['text'] += reminder_text
-                        injected = True
-                        print(f"[DEBUG] Injected {len(text_reminders)} text reminders (merged) to existing text part")
-                        break
-
-                # If no text part exists (image-only message), create one
-                if not injected:
-                    content.append({
-                        "type": "text",
-                        "text": reminder_text.lstrip()  # Remove leading newlines
-                    })
-                    print(f"[DEBUG] Created new text part for {len(text_reminders)} text reminders (merged)")
-
-            # 8. Inject inline_data parts (images, binary) directly into content array
-            if inline_data_parts:
-                content.extend(inline_data_parts)
-                print(f"[DEBUG] Injected {len(inline_data_parts)} inline_data parts (images/binary files)")
+            injector = ReminderInjector(session_id, agent_profile)
+            await injector.inject_to_user_message(content, mentioned_files or None)
 
         except Exception as e:
             # Non-critical: Log and continue without reminders

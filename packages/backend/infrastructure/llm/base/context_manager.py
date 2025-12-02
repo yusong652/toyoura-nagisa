@@ -367,36 +367,16 @@ class BaseContextManager(ABC):
         """
         Inject system reminders into tool result content.
 
-        This is a common implementation used by all providers. It modifies
-        result['llm_content']['parts'] in-place to append reminders to the
-        last text part. Should be called when inject_reminders=True in add_tool_result.
-
-        The method assumes the standard ToolResult format with:
-        - result['llm_content']['parts'] as a list of parts
-        - Each part having {'type': 'text', 'text': '...'} structure
+        Delegates to ReminderInjector for unified reminder collection and injection.
+        Should be called when inject_reminders=True in add_tool_result.
 
         Args:
             result: Tool result dict containing llm_content with parts format
         """
-        reminders = await self._status_monitor.get_all_reminders(
-            agent_profile=self.agent_profile,
-            check_queue=True
-        )
+        from backend.application.services.reminder import ReminderInjector
 
-        if reminders:
-            reminder_text = "\n\n" + "\n\n".join(reminders)
-
-            if isinstance(result, dict) and 'llm_content' in result:
-                llm_content = result.get('llm_content')
-
-                if isinstance(llm_content, dict) and 'parts' in llm_content:
-                    parts = llm_content.get('parts')
-                    if isinstance(parts, list) and parts:
-                        # Find last text part and append reminder
-                        for part in reversed(parts):
-                            if isinstance(part, dict) and part.get('type') == 'text' and 'text' in part:
-                                part['text'] += reminder_text
-                                break
+        injector = ReminderInjector(self.session_id, self.agent_profile)
+        await injector.inject_to_tool_result(result)
 
     @abstractmethod
     async def add_tool_result(self, tool_call_id: str, tool_name: str, result: Any, inject_reminders: bool = False) -> None:
