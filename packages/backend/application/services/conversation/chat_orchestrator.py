@@ -124,8 +124,24 @@ class ChatOrchestrator:
 
         # Get context manager and prepare context
         context_manager = self.llm_client.get_or_create_context_manager(session_id)
+        agent_profile = getattr(context_manager, 'agent_profile', 'general')
+        enable_memory = getattr(context_manager, 'enable_memory', True)
+
+        # Build system prompt
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
+            session_id, agent_profile
+        )
+        system_prompt = await build_system_prompt(
+            agent_profile=agent_profile,
+            session_id=session_id,
+            enable_memory=enable_memory,
+            tool_schemas=prompt_tool_schemas
+        )
+
         complete_context, api_config = await self.llm_client._prepare_complete_context(
-            session_id=session_id
+            session_id=session_id,
+            system_prompt=system_prompt
         )
 
         # Create placeholder message

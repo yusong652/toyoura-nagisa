@@ -10,6 +10,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "pfc-workspace",
     "toyoura-nagisa",
     "toyoura-nagisa-backend",
     "toyoura-nagisa-uv-plot",
@@ -4128,6 +4129,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/fa/2a/52a8da6fe965dea61
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl", hash = "sha256:5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f", size = 24305 },
 ]
+
+[[package]]
+name = "pfc-workspace"
+version = "0.1.0"
+source = { virtual = "pfc_workspace" }
 
 [[package]]
 name = "pillow"

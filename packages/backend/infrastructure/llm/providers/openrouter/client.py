@@ -297,16 +297,18 @@ class OpenRouterClient(LLMClientBase):
 
     async def _prepare_complete_context(
         self,
-        session_id: str
+        session_id: str,
+        system_prompt: str
     ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Prepare complete context and API configuration for stateless OpenRouter API call.
 
-        This method consolidates all context preparation logic for OpenRouter
+        This method consolidates context preparation logic for OpenRouter
         and returns all necessary configuration for thread-safe API calls.
 
         Args:
             session_id: Session identifier
+            system_prompt: Pre-built system prompt from caller
 
         Returns:
             Tuple containing:
@@ -316,23 +318,9 @@ class OpenRouterClient(LLMClientBase):
         # Get context manager and extract its properties
         context_manager = self.get_or_create_context_manager(session_id)
         agent_profile = getattr(context_manager, 'agent_profile', 'general')
-        enable_memory = getattr(context_manager, 'enable_memory', True)
 
         # Get tool schemas for API
         tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
-
-        # Get tool schemas formatted for system prompt
-        prompt_tool_schemas = await self.tool_manager.get_schemas_for_system_prompt(session_id, agent_profile)
-
-        # Build system prompt with tool schemas and memory
-        from backend.shared.utils.prompt.builder import build_system_prompt
-
-        system_prompt = await build_system_prompt(
-            agent_profile=agent_profile,
-            session_id=session_id,
-            enable_memory=enable_memory,
-            tool_schemas=prompt_tool_schemas
-        )
 
         # Get working contents from context manager
         working_contents = context_manager.get_working_contents()

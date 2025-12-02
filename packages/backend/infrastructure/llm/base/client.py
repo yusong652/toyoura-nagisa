@@ -1,6 +1,4 @@
 """
-Enhanced LLM Client Base with SOTA streaming architecture.
-
 This module provides the foundational LLMClientBase class that all provider-specific
 clients inherit from, implementing common patterns extracted from the Gemini implementation.
 """
@@ -172,23 +170,23 @@ class LLMClientBase(ABC):
     @abstractmethod
     async def _prepare_complete_context(
         self,
-        session_id: str
+        session_id: str,
+        system_prompt: str
     ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Prepare complete context and API configuration for stateless API call.
 
-        This method consolidates all context preparation logic including:
+        This method consolidates context preparation logic including:
         - Getting or creating context manager for the session
-        - Extracting agent_profile and enable_memory from context manager
-        - Getting recent_messages_length from configuration
+        - Extracting agent_profile from context manager for tool loading
         - Getting tool schemas for API
-        - Getting tool schemas for system prompt
-        - Building system prompt with memory and tools
         - Getting working contents from context manager
-        - Preparing provider-specific API configuration
+        - Preparing provider-specific API configuration with system_prompt
 
         Args:
             session_id: Session identifier
+            system_prompt: Pre-built system prompt. Caller is responsible for
+                          constructing this (via build_system_prompt or template rendering).
 
         Returns:
             Tuple containing:

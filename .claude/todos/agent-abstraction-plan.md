@@ -818,6 +818,85 @@ Phase 1-2 完成，可以开始 Phase 3 集成工作。
 | 2025-12-02 | 基于现有 `AgentProfile.PFC` | 避免重复定义，直接扩展 |
 | 2025-12-02 | 非流式优先 | SubAgent 不需要流式，简化实现 |
 | 2025-12-02 | 跳过结构化输出 | 初期用 raw_response，后期按需添加 schema |
+| 2025-12-02 | System prompt 固定化 | 不使用模板变量，任务通过 user message 传递 |
+| 2025-12-02 | Messages 支持完整对话历史 | 主 Agent 重构后也使用此框架，需要普适性 |
+| 2025-12-02 | 最大化基础设施复用 | 使用 `_prepare_complete_context()` 等现有方法 |
+
+---
+
+### Critical Design Principles
+
+#### 1. Universal Architecture (普适性)
+
+AgentExecutor 是**通用执行器**，未来主 Agent 也会重构到这套体系：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AgentExecutor                         │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐      ┌─────────────────┐          │
+│  │   SubAgent      │      │   Main Agent    │          │
+│  │   (Explorer)    │      │   (Future)      │          │
+│  │   - 单次任务     │      │   - 多轮对话     │          │
+│  │   - 非流式       │      │   - 流式         │          │
+│  └─────────────────┘      └─────────────────┘          │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 2. Message Structure (消息结构)
+
+**关键**: 不假设单条消息，必须支持完整对话历史：
+
+```python
+# SubAgent 场景
+messages = [
+    {"role": "user", "content": "Find PFC ball syntax..."},  # 主 Agent 发送的任务
+    {"role": "assistant", ...},                               # SubAgent 响应
+    {"role": "user", "parts": [FunctionResponse(...)]},       # 工具结果
+    ...
+]
+
+# Main Agent 场景 (未来)
+messages = [
+    {"role": "user", "content": "用户消息 1"},
+    {"role": "assistant", "content": "助手回复 1"},
+    {"role": "user", "content": "用户消息 2"},
+    ...  # 完整多轮对话历史
+]
+```
+
+#### 3. Prompt Architecture (提示架构)
+
+```
+┌─────────────────────────────────────┐
+│ System Prompt (固定)                │  ← 定义角色、工作流、规则
+│ - 无模板变量 ${...}                 │  ← 不含动态内容
+│ - 存储在 AgentDefinition           │
+└─────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│ Messages[0] (动态)                  │  ← 第一条 user message
+│ - 主 Agent 发送的任务指令            │  ← objective + context
+│ - 或用户的实际消息                   │
+└─────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│ Messages[1:] (对话历史)             │  ← 后续对话
+│ - assistant 响应                    │
+│ - 工具调用结果                       │
+└─────────────────────────────────────┘
+```
+
+#### 4. Infrastructure Reuse (基础设施复用)
+
+**原则**: 最大化复用现有 LLM 基础设施层代码
+
+| 操作 | 委托给 | 方法 |
+|------|--------|------|
+| API 配置构建 | LLMClient | `_prepare_complete_context()` |
+| 消息格式化 | ContextManager | `get_working_contents()` |
+| 工具 Schema | ToolManager | `get_function_call_schemas()` |
+| 响应解析 | ResponseProcessor | `extract_text_content()`, `extract_tool_calls()` |
+
+**禁止**: 在 AgentExecutor 中重复实现 provider-specific 逻辑
 
 ---
 

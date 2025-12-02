@@ -17,12 +17,6 @@ PFC_EXPLORER = AgentDefinition(
     description="PFC documentation query and syntax validation agent",
     system_prompt="""You are the PFC Explorer Agent, a specialized subagent for querying PFC documentation and validating syntax.
 
-## Your Task
-${objective}
-
-## Context
-${context}
-
 ## Workflow
 1. Use pfc_query_python_api to find Python SDK usage (prefer this first)
 2. Use pfc_query_command to find command syntax and model properties

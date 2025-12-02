@@ -6,7 +6,6 @@ supporting non-streaming LLM calls with tool execution.
 """
 
 import asyncio
-import re
 import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
@@ -98,10 +97,23 @@ class AgentExecutor:
         self._emit_activity("started", {"inputs": inputs})
 
         try:
-            # Build initial context
-            system_prompt = self._render_template(self.definition.system_prompt, inputs)
-            messages = self._build_initial_messages()
-            tools = await self._get_tools()
+            # Setup context manager for this execution
+            context_manager = self.llm_client.get_or_create_context_manager(self.execution_id)
+            context_manager.agent_profile = self.definition.tool_profile
+            context_manager.enable_memory = self.definition.enable_memory
+
+            # Build initial user message from inputs (task from parent agent)
+            # Reuse the same mechanism as main agent: context_manager.add_user_message()
+            from backend.domain.models.messages import UserMessage
+            initial_message = UserMessage(content=self._build_prompt_content(inputs))
+            await context_manager.add_user_message(initial_message)
+
+            # Get api_config using _prepare_complete_context (reuses provider logic)
+            # Now working_contents contains the initial user message
+            messages, api_config = await self.llm_client._prepare_complete_context(
+                session_id=self.execution_id,
+                system_prompt=self.definition.system_prompt  # Fixed system prompt, no template
+            )
 
             # Execution loop
             while iteration < self.definition.max_iterations:
@@ -124,9 +136,14 @@ class AgentExecutor:
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # LLM call
+                # LLM call - get fresh messages from context_manager each iteration
+                messages = context_manager.get_working_contents()
+
                 self._emit_activity("thinking", {"iteration": iteration})
-                response = await self._call_llm(messages, tools, system_prompt)
+                response = await self.llm_client.call_api_with_context(
+                    context_contents=messages,
+                    api_config=api_config,
+                )
                 self._emit_activity("llm_response", {"iteration": iteration})
 
                 # Extract response content and tool calls
@@ -142,17 +159,22 @@ class AgentExecutor:
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # Append assistant response to messages
-                messages.append(self._format_assistant_message(response))
+                # Add assistant response to context (reuse infrastructure)
+                context_manager.add_response(response)
 
                 # Generate message ID for tool execution
                 tool_message_id = f"subagent_{self.execution_id}_{iteration}"
 
-                # Execute tools (with confirmation support)
+                # Execute tools and add results to context
                 tool_results = await self._execute_tools(tool_calls, tool_message_id)
-
-                # Append tool results to messages
-                messages.append(self._format_tool_results(tool_calls, tool_results))
+                for tool_call, result in zip(tool_calls, tool_results):
+                    if result is not None:
+                        await context_manager.add_tool_result(
+                            tool_call_id=tool_call.get("id", ""),
+                            tool_name=tool_call.get("name", ""),
+                            result=result,
+                            inject_reminders=False  # SubAgent doesn't need reminders
+                        )
 
                 iteration += 1
 
@@ -179,100 +201,32 @@ class AgentExecutor:
                 "elapsed": time.time() - start_time,
             })
 
-    def _render_template(self, template: str, inputs: Dict[str, str]) -> str:
+    def _build_prompt_content(self, inputs: Dict[str, str]) -> str:
         """
-        Render template string, replacing ${variable} placeholders.
+        Build prompt content from inputs for initial user message.
+
+        The format is flexible - this is the task message from parent agent.
+        For SubAgent, typically includes objective and context.
+        For Main Agent (future), this would be the actual user input.
 
         Args:
-            template: Template string with ${variable} placeholders
-            inputs: Variable values
+            inputs: Task inputs (e.g., {"objective": "...", "context": "..."})
 
         Returns:
-            Rendered string
-
-        Raises:
-            ValueError: If required variable is missing
+            Prompt string for the initial user message
         """
-        pattern = r'\$\{(\w+)\}'
+        # Simple format: just concatenate inputs
+        # Parent agent controls the exact format
+        if len(inputs) == 1:
+            # Single input - use directly
+            return str(list(inputs.values())[0])
 
-        def replace(match):
-            key = match.group(1)
-            if key not in inputs:
-                raise ValueError(f"Missing required input: {key}")
-            return str(inputs[key])
+        # Multiple inputs - format as sections
+        parts = []
+        for key, value in inputs.items():
+            parts.append(f"## {key.replace('_', ' ').title()}\n{value}")
 
-        return re.sub(pattern, replace, template)
-
-    def _build_initial_messages(self) -> List[Dict[str, Any]]:
-        """
-        Build initial message list.
-
-        Returns empty list - user message will be provided via invoke_agent tool.
-        System prompt is passed separately to LLM config.
-        """
-        return []
-
-    async def _get_tools(self) -> List[Any]:
-        """
-        Get tool schemas for this agent's profile.
-
-        Returns:
-            List of tool schemas in provider format
-        """
-        tool_manager = self.llm_client.tool_manager
-        if not tool_manager:
-            return []
-
-        # Use execution_id as session_id for tool tracking
-        return await tool_manager.get_function_call_schemas(
-            session_id=self.execution_id,
-            agent_profile=self.definition.tool_profile
-        )
-
-    async def _call_llm(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: List[Any],
-        system_prompt: str
-    ) -> Any:
-        """
-        Execute non-streaming LLM call.
-
-        Args:
-            messages: Conversation messages
-            tools: Tool schemas
-            system_prompt: System instruction for the agent
-
-        Returns:
-            Raw LLM response
-        """
-        api_config = self._build_api_config(tools, system_prompt)
-
-        return await self.llm_client.call_api_with_context(
-            context_contents=messages,
-            api_config=api_config,
-        )
-
-    def _build_api_config(self, tools: List[Any], system_prompt: str) -> Dict[str, Any]:
-        """
-        Build provider-specific API config.
-
-        Currently supports Gemini format.
-        """
-        from google.genai import types
-
-        # Get config from provider
-        provider_config = self.llm_client._get_provider_config()
-
-        # Build generation config with system instruction
-        config = types.GenerateContentConfig(
-            system_instruction=system_prompt if system_prompt else None,
-            tools=tools if tools else None,
-            temperature=provider_config.temperature,
-            max_output_tokens=provider_config.max_tokens,
-        )
-
-        return {"config": config}
+        return "\n\n".join(parts)
 
     def _parse_response(self, response: Any) -> tuple[str, List[Dict]]:
         """
@@ -295,54 +249,6 @@ class AgentExecutor:
         except Exception as e:
             print(f"[AgentExecutor] Error parsing response: {e}")
             return "", []
-
-    def _format_assistant_message(self, response: Any) -> Dict[str, Any]:
-        """
-        Format LLM response as assistant message for context.
-
-        Uses provider's context manager to get the correct format.
-        """
-        # Get context manager class to access format_response method
-        context_manager_class = self.llm_client._get_context_manager_class()
-
-        # Use the class's static method if available, otherwise fall back
-        if hasattr(context_manager_class, 'format_response_for_context'):
-            return context_manager_class.format_response_for_context(response)
-
-        # Fallback: use response processor to format for storage, then convert
-        processor = self.llm_client._get_response_processor()
-        if processor:
-            try:
-                message = processor.format_response_for_storage(response)
-                # Convert BaseMessage to context format
-                return self._message_to_context_format(message)
-            except Exception:
-                pass
-
-        return {"role": "model", "parts": [{"text": ""}]}
-
-    def _message_to_context_format(self, message: Any) -> Dict[str, Any]:
-        """
-        Convert BaseMessage to provider context format.
-
-        Currently supports Gemini format.
-        """
-        if hasattr(message, 'content') and isinstance(message.content, list):
-            parts = []
-            for block in message.content:
-                if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        parts.append({"text": block.get("text", "")})
-                    elif block.get("type") == "tool_use":
-                        # Tool call format
-                        from google.genai import types
-                        parts.append(types.Part.from_function_call(
-                            name=block.get("name", ""),
-                            args=block.get("input", {})
-                        ))
-            return {"role": "model", "parts": parts}
-
-        return {"role": "model", "parts": [{"text": str(message)}]}
 
     async def _execute_tools(
         self,
@@ -393,58 +299,6 @@ class AgentExecutor:
             })
 
         return execution_result.results
-
-    def _format_tool_results(
-        self,
-        tool_calls: List[Dict],
-        results: List[Optional[Dict[str, Any]]]
-    ) -> Dict[str, Any]:
-        """
-        Format tool results as user message for context.
-
-        Uses provider-specific message formatter.
-        """
-        # Get provider name to select formatter
-        provider_name = self.llm_client.__class__.__name__.replace('Client', '').lower()
-
-        if provider_name == 'gemini':
-            return self._format_tool_results_gemini(tool_calls, results)
-        else:
-            # Fallback for other providers - can be extended
-            return self._format_tool_results_gemini(tool_calls, results)
-
-    def _format_tool_results_gemini(
-        self,
-        tool_calls: List[Dict],
-        results: List[Optional[Dict[str, Any]]]
-    ) -> Dict[str, Any]:
-        """
-        Format tool results for Gemini provider.
-
-        Uses GeminiMessageFormatter for proper formatting.
-        """
-        from backend.infrastructure.llm.providers.gemini.message_formatter import GeminiMessageFormatter
-
-        parts = []
-        for tool_call, result in zip(tool_calls, results):
-            if result is None:
-                # Handle rejected/None results
-                result = {
-                    "status": "error",
-                    "message": "Tool execution was rejected",
-                    "llm_content": {"parts": [{"type": "text", "text": "Tool execution was rejected by user"}]}
-                }
-
-            # Use message formatter to create proper function response part
-            formatted = GeminiMessageFormatter.format_tool_result_for_context(
-                tool_name=tool_call["name"],
-                result=result
-            )
-            # Extract parts from formatted message
-            if "parts" in formatted:
-                parts.extend(formatted["parts"])
-
-        return {"role": "user", "parts": parts}
 
     def _extract_summary(self, response_text: str) -> str:
         """
