@@ -695,9 +695,9 @@ packages/backend/
 
 ### Last Updated: 2025-12-02
 
-### Overall Status: 🟢 Phase 1 Completed, Phase 2 Ready
+### Overall Status: 🟢 Phase 2 Completed, Phase 3 Ready
 
-Phase 1 基础模型已完成，可以开始 Phase 2 执行器实现。
+Phase 1-2 完成，可以开始 Phase 3 集成工作。
 
 ---
 
@@ -735,19 +735,19 @@ Phase 1 基础模型已完成，可以开始 Phase 2 执行器实现。
 
 ### 📋 Phase 2: Executor
 
-**Status**: 🔴 Not Started
+**Status**: ✅ Completed (2025-12-02)
 **Target**: 实现通用 Agent 执行器
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 实现 AgentExecutor 基础框架 | `application/services/agent/executor.py` | ⬜ | P0 |
-| 实现模板渲染 `_render_template` | `application/services/agent/executor.py` | ⬜ | P0 |
-| 实现非流式 LLM 调用 | `application/services/agent/executor.py` | ⬜ | P0，复用现有 LLM client |
-| 集成现有 ToolExecutor | `application/services/agent/executor.py` | ⬜ | P0，复用 `tool_executor.py` |
-| 实现活动事件发射 | `application/services/agent/executor.py` | ⬜ | P1 |
-| 实现超时和中止处理 | `application/services/agent/executor.py` | ⬜ | P1 |
+| 实现 AgentExecutor 基础框架 | `application/services/agent/executor.py` | ✅ | 包含完整执行循环 |
+| 实现模板渲染 `_render_template` | `application/services/agent/executor.py` | ✅ | 支持 ${var} 占位符 |
+| 实现非流式 LLM 调用 | `application/services/agent/executor.py` | ✅ | 使用 call_api_with_context |
+| 工具执行集成 | `application/services/agent/executor.py` | ✅ | 直接用 tool_manager.handle_function_call |
+| 实现活动事件发射 | `application/services/agent/executor.py` | ✅ | 7 种事件类型 |
+| 实现超时和中止处理 | `application/services/agent/executor.py` | ✅ | 支持 abort_signal |
 
-**Blockers**: Phase 1 必须先完成
+**Decision**: 不复用 ToolExecutor（它有确认机制），直接用 tool_manager
 
 ---
 
