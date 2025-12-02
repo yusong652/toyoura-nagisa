@@ -35,6 +35,7 @@ build/
 # IDE and Editors
 .idea/
 .vscode/
+.obsidian/
 *.swp
 *.swo
 *~
