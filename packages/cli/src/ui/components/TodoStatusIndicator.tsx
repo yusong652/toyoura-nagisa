@@ -3,7 +3,7 @@
  * Displays current in-progress todo status above the input prompt.
  *
  * Shows what the AI agent is currently working on in real-time.
- * Only visible when there's an active in_progress todo or streaming.
+ * Only visible when streaming is active (matches web frontend behavior).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -64,8 +64,10 @@ export const TodoStatusIndicator: React.FC<TodoStatusIndicatorProps> = ({
     }
   }, [isStreaming]);
 
-  // Only show when there's an active todo or streaming
-  if (!todo && !isStreaming) {
+  // Only show when streaming is active (matches web frontend behavior)
+  // The todo prop only affects display text, not visibility
+  // Reference: packages/web/src/components/TodoStatusIndicator/TodoStatusIndicator.tsx:83
+  if (!isStreaming) {
     return null;
   }
 
