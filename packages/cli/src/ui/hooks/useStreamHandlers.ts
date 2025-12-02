@@ -137,8 +137,9 @@ export function useStreamHandlers({
           (b) => b.type === 'text' || b.type === 'thinking'
         );
 
-        // Skip if streaming is ending
-        if (event.streaming !== false) {
+        // Skip if streaming is ending or if assistant item was already committed
+        // This prevents duplicate messages when tool confirmation interrupts streaming
+        if (event.streaming !== false && pendingAssistantItemRef.current !== null) {
           updateAssistantContent(textAndThinkingContent, true);
         }
 
