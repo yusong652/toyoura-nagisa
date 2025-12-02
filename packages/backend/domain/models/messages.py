@@ -5,7 +5,7 @@ Defines core message entities in the chat application, including user messages, 
 These are pure domain objects with no infrastructure or presentation layer dependencies.
 """
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union, Literal
 from datetime import datetime
 
@@ -44,12 +44,7 @@ class UserMessage(BaseMessage):
 
     Represents input messages from the user, one side of the chat conversation.
     """
-    @model_validator(mode='before')
-    @classmethod
-    def set_role(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            data.setdefault('role', 'user')
-        return data
+    role: Literal["user"] = "user"  # type: ignore[override]
 
 
 class AssistantMessage(BaseMessage):
@@ -58,12 +53,7 @@ class AssistantMessage(BaseMessage):
 
     Represents reply messages from the AI assistant, the other side of the chat conversation.
     """
-    @model_validator(mode='before')
-    @classmethod
-    def set_role(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            data.setdefault('role', 'assistant')
-        return data
+    role: Literal["assistant"] = "assistant"  # type: ignore[override]
 
 
 class ImageMessage(BaseMessage):
@@ -72,14 +62,8 @@ class ImageMessage(BaseMessage):
 
     Represents system-generated or processed image content, containing image path information.
     """
+    role: Literal["image"] = "image"  # type: ignore[override]
     image_path: str
-
-    @model_validator(mode='before')
-    @classmethod
-    def set_role(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            data.setdefault('role', 'image')
-        return data
 
 
 class VideoMessage(BaseMessage):
@@ -88,14 +72,8 @@ class VideoMessage(BaseMessage):
 
     Represents system-generated or processed video content, containing video path information.
     """
+    role: Literal["video"] = "video"  # type: ignore[override]
     video_path: str
-
-    @model_validator(mode='before')
-    @classmethod
-    def set_role(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            data.setdefault('role', 'video')
-        return data
 
 
 # =====================
