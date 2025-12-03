@@ -278,8 +278,8 @@ class ChatOrchestrator:
         # Extract tool calls
         tool_calls = streaming_processor.extract_tool_calls(response)
 
-        # Update streaming message
-        self._update_tool_call_message(
+        # Update streaming message (await to ensure tool_use blocks are sent before tool_result_update)
+        await self._update_tool_call_message(
             session_id, response, message_id, state, streaming_processor, tool_calls
         )
 
@@ -341,7 +341,7 @@ class ChatOrchestrator:
         # Continue recursively
         return await self._recursive_tool_calling(session_id, iterations + 1)
 
-    def _update_tool_call_message(
+    async def _update_tool_call_message(
         self,
         session_id: str,
         response: Any,
@@ -363,22 +363,21 @@ class ChatOrchestrator:
 
             usage = streaming_processor.extract_usage(state)
 
-            # Send streaming update (sync wrapper for async call)
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(WebSocketNotificationService.send_streaming_update(
-                    session_id=session_id,
-                    message_id=message_id,
-                    content=content,
-                    streaming=True,
-                    usage=usage
-                ))
+            # Send streaming update and WAIT for completion
+            # This ensures tool_use blocks are sent to frontend BEFORE tool_result_update
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=content,
+                streaming=True,
+                usage=usage
+            )
 
             if usage:
                 from backend.infrastructure.storage.session_manager import save_token_usage
                 save_token_usage(session_id, usage)
 
-            # Trigger title generation
+            # Trigger title generation (can be async, doesn't need to wait)
             asyncio.create_task(
                 self.title_service.try_generate_title_if_needed_async(session_id, self.llm_client)
             )

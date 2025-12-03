@@ -11,6 +11,7 @@ export interface UseWebSocketOptions {
   onStateChange?: (state: string) => void;
   onMessageCreate?: (data: any) => void;
   onStreamingUpdate?: (data: any) => void;
+  onToolResultUpdate?: (data: any) => void;
   onToolConfirmation?: (data: any) => void;
   onError?: (error: Error) => void;
 }
@@ -27,6 +28,7 @@ export function useWebSocket({
   onStateChange,
   onMessageCreate,
   onStreamingUpdate,
+  onToolResultUpdate,
   onToolConfirmation,
   onError,
 }: UseWebSocketOptions): UseWebSocketReturn {
@@ -46,6 +48,9 @@ export function useWebSocket({
           break;
         case 'STREAMING_UPDATE':
           onStreamingUpdate?.(data);
+          break;
+        case 'TOOL_RESULT_UPDATE':
+          onToolResultUpdate?.(data);
           break;
         case 'TOOL_CONFIRMATION_REQUEST':
           onToolConfirmation?.(data);
@@ -69,7 +74,7 @@ export function useWebSocket({
       connectionManager.off('message', handleMessage);
       connectionManager.off('error', handleError);
     };
-  }, [connectionManager, onStateChange, onMessageCreate, onStreamingUpdate, onToolConfirmation, onError]);
+  }, [connectionManager, onStateChange, onMessageCreate, onStreamingUpdate, onToolResultUpdate, onToolConfirmation, onError]);
 
   const connect = useCallback(async () => {
     try {
