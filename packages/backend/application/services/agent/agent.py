@@ -3,17 +3,23 @@ Agent - First-class citizen with active behavior.
 
 This module provides the Agent class that encapsulates both
 configuration (AgentDefinition) and behavior (run/stream methods).
+
+Execution modes:
+- run(): Non-streaming mode for SubAgents (no persistence, activity callbacks)
+- stream(): Streaming mode for MainAgent (WebSocket, persistence, user interruption)
 """
 
 import asyncio
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
-from backend.domain.models.messages import UserMessage
+from backend.domain.models.messages import BaseMessage, UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.conversation.tool_executor import ToolExecutor
+from backend.application.services.conversation.models import StreamingState
+from backend.application.services.conversation.streaming_processor import StreamingProcessor
 from backend.application.services.message_service import MessageService
 
 
@@ -203,14 +209,414 @@ class Agent:
                 "elapsed": time.time() - start_time,
             })
 
-    # async def stream(self, inputs: Dict[str, str]) -> AsyncGenerator:
-    #     """
-    #     Execute agent task (streaming mode).
-    #
-    #     This will be implemented when we refactor ChatOrchestrator.
-    #     For now, Main Agent continues to use ChatOrchestrator.
-    #     """
-    #     raise NotImplementedError("Streaming mode not yet implemented")
+    async def stream(
+        self,
+        session_id: str,
+    ) -> Tuple[BaseMessage, Optional[str]]:
+        """
+        Execute agent task (streaming mode) for MainAgent.
+
+        This method mirrors ChatOrchestrator's behavior:
+        - Streaming LLM calls with WebSocket notifications
+        - Message persistence to database
+        - User interruption support
+        - Recursive tool calling
+
+        Args:
+            session_id: Session ID (uses existing context from session)
+
+        Returns:
+            Tuple[BaseMessage, Optional[str]]: (final_message, streaming_message_id)
+
+        Raises:
+            UserRejectionInterruption: When user rejects tool execution
+        """
+        from backend.shared.exceptions import UserRejectionInterruption
+
+        try:
+            final_response = await self._recursive_stream(session_id, iterations=0)
+
+            # Format response for storage
+            processor = self.llm_client._get_response_processor()
+            if processor:
+                final_message = processor.format_response_for_storage(final_response)
+            else:
+                from backend.domain.models.messages import AssistantMessage
+                final_message = AssistantMessage(
+                    role="assistant",
+                    content=[{"type": "text", "text": "Response processing unavailable"}]
+                )
+
+            context_manager = self.llm_client.get_or_create_context_manager(session_id)
+            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+
+            return final_message, streaming_message_id
+
+        except UserRejectionInterruption:
+            raise
+
+        except Exception as e:
+            import traceback
+            print(f"[Agent.stream] Exception: {e}")
+            print(f"[Agent.stream] Traceback: {traceback.format_exc()}")
+
+            # Clean up placeholder message on error
+            context_manager = self.llm_client.get_or_create_context_manager(session_id)
+            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+            if streaming_message_id:
+                try:
+                    message_service = MessageService()
+                    await message_service.delete_message_async(session_id, streaming_message_id)
+                except Exception as cleanup_error:
+                    print(f"[Agent.stream] Failed to clean up placeholder: {cleanup_error}")
+
+            raise Exception(f"Agent streaming failed: {e}")
+
+    async def _recursive_stream(
+        self,
+        session_id: str,
+        iterations: int = 0
+    ) -> Any:
+        """
+        Recursive streaming implementation with tool calling.
+
+        Mirrors ChatOrchestrator._recursive_tool_calling but uses Agent configuration.
+        """
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        from backend.infrastructure.monitoring import get_status_monitor
+
+        # Track conversation turn for todo reminders
+        status_monitor = get_status_monitor(session_id)
+        if hasattr(status_monitor, 'todo_monitor'):
+            status_monitor.todo_monitor.track_conversation_turn()
+
+        # Get context manager
+        context_manager = self.llm_client.get_or_create_context_manager(session_id)
+
+        # Build system prompt
+        from backend.shared.utils.prompt.builder import build_system_prompt
+        prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
+            session_id, context_manager.agent_profile
+        )
+        system_prompt = await build_system_prompt(
+            agent_profile=context_manager.agent_profile,
+            session_id=session_id,
+            enable_memory=context_manager.enable_memory,
+            tool_schemas=prompt_tool_schemas
+        )
+
+        complete_context, api_config = await self.llm_client._prepare_complete_context(
+            session_id=session_id,
+            system_prompt=system_prompt
+        )
+
+        # Create placeholder message
+        message_service = MessageService()
+        message_id = message_service.save_assistant_message([], session_id)
+
+        # Send MESSAGE_CREATE notification
+        await WebSocketNotificationService.send_message_create(
+            session_id, message_id, streaming=True
+        )
+
+        context_manager.streaming_message_id = message_id
+        state = StreamingState(message_id=message_id)
+
+        # Create streaming processor
+        streaming_processor = StreamingProcessor(self.llm_client, session_id)
+
+        # Process stream
+        stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
+        was_interrupted, current_response = await streaming_processor.process_stream(stream, state)
+
+        if was_interrupted:
+            return await self._handle_stream_interruption(
+                session_id, state, iterations, message_service
+            )
+
+        # Check for tool calls
+        if not streaming_processor.has_tool_calls(current_response):
+            return await self._finalize_stream_response(
+                session_id, current_response, message_id, state, streaming_processor, message_service
+            )
+
+        # Handle tool calls
+        return await self._handle_stream_tool_calls(
+            session_id, current_response, message_id, iterations, state, streaming_processor, message_service
+        )
+
+    async def _handle_stream_interruption(
+        self,
+        session_id: str,
+        state: StreamingState,
+        iterations: int,
+        message_service: MessageService
+    ) -> Any:
+        """Handle user interruption during streaming."""
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        from backend.infrastructure.monitoring import get_status_monitor
+
+        print(f"[Agent.stream] Interrupted by user at iteration {iterations}")
+
+        status_monitor = get_status_monitor(session_id)
+        status_monitor.set_interrupt_flag()
+
+        # Construct partial response
+        processor = self.llm_client._get_response_processor()
+        if processor:
+            partial_response = processor.construct_response_from_chunks(state.collected_chunks)
+        else:
+            partial_response = None
+
+        # Delete placeholder message
+        await message_service.delete_message_async(session_id, state.message_id)
+
+        # Send final update with interrupted=True
+        await WebSocketNotificationService.send_streaming_update(
+            session_id=session_id,
+            message_id=state.message_id,
+            content=state.get_content_blocks(),
+            streaming=False,
+            interrupted=True
+        )
+
+        # Trigger title generation
+        from backend.application.services.contents import TitleService
+        title_service = TitleService()
+        asyncio.create_task(
+            title_service.try_generate_title_if_needed_async(session_id, self.llm_client)
+        )
+
+        return partial_response
+
+    async def _finalize_stream_response(
+        self,
+        session_id: str,
+        response: Any,
+        message_id: str,
+        state: StreamingState,
+        streaming_processor: StreamingProcessor,
+        message_service: MessageService
+    ) -> Any:
+        """Finalize streaming response without tool calls."""
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        # Add to context
+        context_manager = self.llm_client.get_or_create_context_manager(session_id)
+        context_manager.add_response(response)
+
+        # Format and save
+        final_message = streaming_processor.format_for_storage(response)
+        if final_message:
+            content = final_message.content if isinstance(
+                final_message.content, list
+            ) else [{"type": "text", "text": str(final_message.content)}]
+            message_service.update_assistant_message(message_id, content, session_id)
+
+            usage = streaming_processor.extract_usage(state)
+
+            # Send final update
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=content,
+                streaming=False,
+                usage=usage
+            )
+
+            # Save usage
+            if usage:
+                from backend.infrastructure.storage.session_manager import save_token_usage
+                save_token_usage(session_id, usage)
+
+            # Trigger title generation
+            from backend.application.services.contents import TitleService
+            title_service = TitleService()
+            asyncio.create_task(
+                title_service.try_generate_title_if_needed_async(session_id, self.llm_client)
+            )
+
+        return response
+
+    async def _handle_stream_tool_calls(
+        self,
+        session_id: str,
+        response: Any,
+        message_id: str,
+        iterations: int,
+        state: StreamingState,
+        streaming_processor: StreamingProcessor,
+        message_service: MessageService
+    ) -> Any:
+        """Handle tool calls in streaming response."""
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+        from backend.infrastructure.monitoring import get_status_monitor
+        from backend.shared.exceptions import UserRejectionInterruption
+
+        # Add response to context
+        context_manager = self.llm_client.get_or_create_context_manager(session_id)
+        context_manager.add_response(response)
+
+        # Extract tool calls
+        tool_calls = streaming_processor.extract_tool_calls(response)
+
+        # Update streaming message (await to ensure tool_use blocks are sent before tool_result_update)
+        await self._update_stream_tool_message(
+            session_id, response, message_id, state, streaming_processor, tool_calls, message_service
+        )
+
+        if not tool_calls:
+            return response
+
+        # Check iteration limit
+        if iterations >= self.definition.max_iterations:
+            await self._handle_stream_iteration_limit(session_id, tool_calls, context_manager, message_service)
+            return response
+
+        # Execute tools
+        tool_executor = ToolExecutor(
+            self.llm_client.tool_manager,
+            message_service,
+            session_id
+        )
+
+        execution_result = await tool_executor.execute_all(
+            tool_calls, message_id, context_manager.agent_profile
+        )
+
+        # Save to context and database
+        await tool_executor.save_results_to_context(
+            tool_calls, execution_result.results, context_manager
+        )
+        await tool_executor.save_results_to_database(
+            tool_calls, execution_result.results
+        )
+
+        # Handle rejection
+        if execution_result.rejected_tools:
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=state.get_content_blocks(),
+                streaming=False,
+                interrupted=False
+            )
+            raise UserRejectionInterruption(session_id, execution_result.rejected_tools)
+
+        # Check for user interrupt before recursion
+        status_monitor = get_status_monitor(session_id)
+        if status_monitor.is_user_interrupted():
+            print(f"[Agent.stream] Tool calling interrupted by user at iteration {iterations}")
+
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=state.message_id,
+                content=state.get_content_blocks(),
+                streaming=False,
+                interrupted=True
+            )
+            return response
+
+        # Continue recursively
+        return await self._recursive_stream(session_id, iterations + 1)
+
+    async def _update_stream_tool_message(
+        self,
+        session_id: str,
+        response: Any,
+        message_id: str,
+        state: StreamingState,
+        streaming_processor: StreamingProcessor,
+        tool_calls: list,
+        message_service: MessageService
+    ) -> None:
+        """Update streaming message with tool call content."""
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        try:
+            tool_call_message = streaming_processor.format_for_storage(response, tool_calls)
+            content = tool_call_message.content if isinstance(
+                tool_call_message.content, list
+            ) else [{"type": "text", "text": str(tool_call_message.content)}]
+            message_service.update_assistant_message(message_id, content, session_id)
+
+            usage = streaming_processor.extract_usage(state)
+
+            # Send streaming update and WAIT for completion
+            await WebSocketNotificationService.send_streaming_update(
+                session_id=session_id,
+                message_id=message_id,
+                content=content,
+                streaming=True,
+                usage=usage
+            )
+
+            if usage:
+                from backend.infrastructure.storage.session_manager import save_token_usage
+                save_token_usage(session_id, usage)
+
+            # Trigger title generation
+            from backend.application.services.contents import TitleService
+            title_service = TitleService()
+            asyncio.create_task(
+                title_service.try_generate_title_if_needed_async(session_id, self.llm_client)
+            )
+
+        except Exception as e:
+            print(f"[Agent.stream] Failed to update streaming message: {e}")
+
+    async def _handle_stream_iteration_limit(
+        self,
+        session_id: str,
+        tool_calls: list,
+        context_manager: Any,
+        message_service: MessageService
+    ) -> None:
+        """Handle iteration limit reached in streaming mode."""
+        from backend.infrastructure.mcp.utils.tool_result import success_response
+        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
+
+        print(f"[Agent.stream] Reached iteration limit ({self.definition.max_iterations})")
+
+        stop_message = (
+            f"Tool execution stopped: Reached iteration limit "
+            f"({self.definition.max_iterations} iterations).\n\n"
+            f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
+            f"Note: This is a safety mechanism to prevent infinite loops."
+        )
+
+        for i, tool_call in enumerate(tool_calls):
+            is_last_tool = (i == len(tool_calls) - 1)
+
+            limit_result = success_response(
+                stop_message,
+                llm_content={"parts": [{"type": "text", "text": stop_message}]}
+            )
+
+            await context_manager.add_tool_result(
+                tool_call['id'],
+                tool_call['name'],
+                limit_result,
+                inject_reminders=is_last_tool
+            )
+
+            try:
+                result_message_id = message_service.save_tool_result_message(
+                    tool_call_id=tool_call['id'],
+                    tool_name=tool_call['name'],
+                    tool_result=limit_result,
+                    session_id=session_id
+                )
+
+                await WebSocketNotificationService.send_tool_result_update(
+                    session_id=session_id,
+                    message_id=result_message_id,
+                    tool_call_id=tool_call['id'],
+                    tool_name=tool_call['name'],
+                    tool_result=limit_result
+                )
+            except Exception as e:
+                print(f"[Agent.stream] Failed to save iteration limit result: {e}")
 
     def _build_prompt_content(self, inputs: Dict[str, str]) -> str:
         """
