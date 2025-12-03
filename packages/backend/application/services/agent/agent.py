@@ -160,7 +160,6 @@ class Agent:
                 if abort_signal and abort_signal.is_set():
                     return AgentResult(
                         status="aborted",
-                        summary="Agent aborted by user",
                         iterations_used=iteration,
                         execution_time_seconds=time.time() - start_time,
                     )
@@ -183,7 +182,6 @@ class Agent:
                 if not tool_calls:
                     return AgentResult(
                         status="success",
-                        summary=self._extract_summary(response_text),
                         raw_response=response_text,
                         iterations_used=iteration + 1,
                         execution_time_seconds=time.time() - start_time,
@@ -208,7 +206,6 @@ class Agent:
             # Max iterations reached
             return AgentResult(
                 status="max_iterations",
-                summary=f"Reached max iterations ({self.definition.max_iterations})",
                 iterations_used=iteration,
                 execution_time_seconds=time.time() - start_time,
             )
@@ -217,7 +214,7 @@ class Agent:
             self._emit_activity("error", {"error": str(e)})
             return AgentResult(
                 status="error",
-                summary=f"Agent error: {str(e)}",
+                raw_response=str(e),
                 iterations_used=iteration,
                 execution_time_seconds=time.time() - start_time,
             )
@@ -326,25 +323,6 @@ class Agent:
             })
 
         return execution_result.results
-
-    def _extract_summary(self, response_text: str) -> str:
-        """Extract a brief summary from response text."""
-        if not response_text:
-            return "Task completed"
-
-        lines = [line.strip() for line in response_text.split('\n') if line.strip()]
-        if not lines:
-            return "Task completed"
-
-        first_line = lines[0]
-
-        if first_line.startswith('#'):
-            first_line = first_line.lstrip('#').strip()
-
-        if len(first_line) > 100:
-            return first_line[:97] + "..."
-
-        return first_line
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit activity event if callback is registered."""

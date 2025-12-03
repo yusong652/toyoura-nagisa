@@ -101,43 +101,21 @@ class AgentDefinition(BaseModel):
 
 class AgentResult(BaseModel):
     """
-    Result of agent execution.
-
-    Captures the outcome of an agent's execution cycle, including
-    success/failure status, human-readable summary, and optional
-    structured data.
+    Result of agent execution (simplified).
 
     Attributes:
         status: Execution outcome status
-        summary: Human-readable summary of what happened
-        data: Structured data from the agent (if output_schema was used)
-        raw_response: Raw LLM response text (when no schema validation)
+        raw_response: Raw LLM response text or error message
         iterations_used: Number of tool call iterations used
         execution_time_seconds: Total execution time
-
-    Example:
-        AgentResult(
-            status="success",
-            summary="Found 3 relevant PFC commands for ball creation",
-            data={"commands": [...], "examples": [...]},
-            iterations_used=4,
-            execution_time_seconds=12.5
-        )
     """
 
-    status: Literal["success", "error", "timeout", "max_iterations", "aborted"] = Field(
+    status: Literal["success", "error", "max_iterations", "aborted"] = Field(
         description="Execution outcome status"
-    )
-    summary: str = Field(
-        description="Human-readable summary of the result"
-    )
-    data: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Structured data from validated output"
     )
     raw_response: Optional[str] = Field(
         default=None,
-        description="Raw LLM response when no schema validation"
+        description="Raw LLM response or error message"
     )
     iterations_used: int = Field(
         default=0,
@@ -149,25 +127,6 @@ class AgentResult(BaseModel):
         ge=0.0,
         description="Total execution time in seconds"
     )
-
-    class Config:
-        json_schema_extra = {
-            "examples": [
-                {
-                    "status": "success",
-                    "summary": "Task completed successfully",
-                    "data": {"result": "validated data"},
-                    "iterations_used": 3,
-                    "execution_time_seconds": 8.5
-                },
-                {
-                    "status": "timeout",
-                    "summary": "Agent timed out after 120 seconds",
-                    "iterations_used": 5,
-                    "execution_time_seconds": 120.0
-                }
-            ]
-        }
 
 
 class AgentActivity(BaseModel):
