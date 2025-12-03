@@ -2,11 +2,11 @@
  * Tool Call Message Component
  * Reference: Gemini CLI ui/components/messages/ToolMessage.tsx and ToolShared.tsx
  *
- * Displays tool calls in the Gemini CLI style with status indicator,
+ * Displays committed (historical) tool calls with status indicator,
  * tool name, and description/command.
  *
- * Note: Diff visualization for edit/write tools is now shown in ToolResultMessage
- * after the tool execution completes (based on actual result, not input).
+ * Note: Pending tool calls during streaming are rendered by PendingItemDisplay.
+ * Diff visualization is shown in ToolResultMessage after execution completes.
  */
 
 import React from 'react';
@@ -14,14 +14,12 @@ import { Box, Text } from 'ink';
 import type { ToolCallHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
 import { TOOL_STATUS } from '../../markers.js';
-import { BlinkingCircle } from '../BlinkingCircle.js';
 
 // Status indicator width (matching Gemini CLI STATUS_INDICATOR_WIDTH = 3)
 const STATUS_INDICATOR_WIDTH = 3;
 
 interface ToolCallMessageProps {
   item: ToolCallHistoryItem;
-  isExecuting?: boolean;
   isCompleted?: boolean;  // Tool execution has completed (has result)
   terminalWidth?: number;
 }
@@ -79,28 +77,20 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 
 export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   item,
-  isExecuting = false,
   isCompleted = false,
   terminalWidth,
 }) => {
-  // Tool call shows:
-  // - Blinking circle when executing (success color)
+  // Historical tool calls show:
   // - Success/error icon when completed (colored by result)
   // - Empty circle ○ when pending (white color)
-  let statusIndicator: React.ReactNode;
-  let statusColor: string;
+  // Note: Pending/executing states are handled by PendingItemDisplay
   const isError = item.isError === true;
-
-  if (isExecuting) {
-    statusIndicator = <BlinkingCircle color={theme.status.success} />;
-    statusColor = theme.status.success;
-  } else if (isCompleted) {
-    statusColor = isError ? theme.status.error : theme.status.success;
-    statusIndicator = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
-  } else {
-    statusColor = theme.text.primary;
-    statusIndicator = TOOL_STATUS.PENDING;  // Empty circle ○ for pending
-  }
+  const statusColor = isCompleted
+    ? (isError ? theme.status.error : theme.status.success)
+    : theme.text.primary;
+  const statusIndicator = isCompleted
+    ? (isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS)
+    : TOOL_STATUS.PENDING;
 
   const description = getToolDescription(item.toolName, item.toolInput);
   const boxWidth = terminalWidth ? terminalWidth : undefined;

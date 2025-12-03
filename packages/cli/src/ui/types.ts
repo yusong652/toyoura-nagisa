@@ -3,8 +3,6 @@
  * Reference: Gemini CLI ui/types.ts
  */
 
-import type { ReactNode } from 'react';
-
 // Message types for history display
 export enum MessageType {
   USER = 'user',
@@ -13,7 +11,6 @@ export enum MessageType {
   TOOL_RESULT = 'tool_result',
   ERROR = 'error',
   INFO = 'info',
-  CHAT_LIST = 'chat_list',
 }
 
 // Content block types
