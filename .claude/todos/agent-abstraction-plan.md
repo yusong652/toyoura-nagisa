@@ -693,11 +693,15 @@ packages/backend/
 
 ## Progress Tracking
 
-### Last Updated: 2025-12-02
+### Last Updated: 2025-12-04
 
-### Overall Status: 🟢 Phase 2 Completed, Phase 3 Ready
+### Overall Status: ✅ All Phases Completed
 
-Phase 1-2 完成，可以开始 Phase 3 集成工作。
+Agent 抽象架构已完成。Agent 类现在是系统的一等公民，同时支持：
+- `run()`: 非流式执行 (SubAgent)
+- `stream()`: 流式执行 (MainAgent)
+
+ChatOrchestrator 已被移除，所有对话逻辑统一到 Agent 类中。
 
 ---
 
@@ -753,48 +757,47 @@ Phase 1-2 完成，可以开始 Phase 3 集成工作。
 
 ### 📋 Phase 3: Integration
 
-**Status**: 🔴 Not Started
+**Status**: ✅ Completed (2025-12-04)
 **Target**: 将 Agent 系统集成到现有架构
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 实现 AgentRegistry | `application/services/agent/registry.py` | ⬜ | P0 |
-| 实现 invoke_agent 工具 | `infrastructure/mcp/tools/agent/invoke_agent.py` | ⬜ | P0 |
-| 注册工具到 MCP server | `infrastructure/mcp/smart_mcp_server.py` | ⬜ | P0 |
-| 扩展 WebSocket 通知支持 subagent 事件 | `infrastructure/websocket/notification_service.py` | ⬜ | P1 |
+| 实现 AgentRegistry | `domain/models/agent_definitions.py` | ✅ | 简化为静态定义 |
+| chat_request_handler 使用 Agent | `presentation/handlers/chat_request_handler.py` | ✅ | 替换 ChatOrchestrator |
+| MAIN_AGENT 定义 | `domain/models/agent_definitions.py` | ✅ | 用于 MainAgent 流式执行 |
 
-**Blockers**: Phase 2 必须先完成
+**Notes**:
+- invoke_agent 工具延后实现（Phase 4 后）
+- WebSocket 通知复用现有 StreamingProcessor
 
 ---
 
 ### 📋 Phase 4: Testing & Polish
 
-**Status**: 🔴 Not Started
+**Status**: ✅ Completed (2025-12-04)
 **Target**: 测试和完善
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 单元测试 AgentExecutor | `tests/agent/test_executor.py` | ⬜ | P0 |
-| 集成测试 invoke_agent | `tests/agent/test_invoke_agent.py` | ⬜ | P0 |
-| 端到端测试 PFC Explorer | `tests/agent/test_pfc_explorer.py` | ⬜ | P1 |
-| 文档更新 | `CLAUDE.md` | ⬜ | P2 |
-
-**Blockers**: Phase 3 必须先完成
+| 手动测试 Agent.run() | `tests/agent/test_agent_manual.py` | ✅ | 3 个测试用例通过 |
+| 端到端测试 Agent.stream() | - | ✅ | 通过实际对话验证 |
+| 文档更新 | 本文件 | ✅ | 已更新 |
 
 ---
 
-### 📋 Phase 5: Main Agent Migration (Future)
+### 📋 Phase 5: Main Agent Migration
 
-**Status**: 🔵 Deferred
-**Target**: 将主 Agent 也迁移到新架构 (可选)
+**Status**: ✅ Completed (2025-12-04)
+**Target**: 将主 Agent 也迁移到新架构
 
 | Task | Description | Status | Notes |
 |------|-------------|--------|-------|
-| 定义 NAGISA_MAIN Agent | 配置化主 Agent | ⬜ | P2 |
-| 重构 ChatOrchestrator | 使用 AgentExecutor | ⬜ | P2 |
-| 支持流式模式 | AgentExecutor 流式输出 | ⬜ | P2 |
+| 定义 MAIN_AGENT | `domain/models/agent_definitions.py` | ✅ | max_iterations=64 |
+| 实现 Agent.stream() | `application/services/agent/agent.py` | ✅ | 完整流式支持 |
+| 移除 ChatOrchestrator | `application/services/conversation/` | ✅ | -451 行代码 |
+| 更新 chat_request_handler | `presentation/handlers/` | ✅ | 使用 Agent.stream() |
 
-**Blockers**: Phase 4 完成后再评估是否需要
+**Result**: ChatOrchestrator 已完全移除，Agent 统一处理流式和非流式执行
 
 ---
 
@@ -821,23 +824,29 @@ Phase 1-2 完成，可以开始 Phase 3 集成工作。
 | 2025-12-02 | System prompt 固定化 | 不使用模板变量，任务通过 user message 传递 |
 | 2025-12-02 | Messages 支持完整对话历史 | 主 Agent 重构后也使用此框架，需要普适性 |
 | 2025-12-02 | 最大化基础设施复用 | 使用 `_prepare_complete_context()` 等现有方法 |
+| 2025-12-04 | 简化 AgentDefinition | 7 个字段足够，移除 system_prompt, timeout_seconds 等 |
+| 2025-12-04 | 简化 AgentResult | 4 个字段 (status, raw_response, iterations_used, execution_time_seconds) |
+| 2025-12-04 | Agent 作为一等公民 | run() + stream() 两种执行模式统一在 Agent 类中 |
+| 2025-12-04 | ToolExecutor 简化接口 | execute_all() 直接接受 agent_profile: str |
+| 2025-12-04 | 移除 ChatOrchestrator | Agent.stream() 完全替代，减少 451 行代码 |
+| 2025-12-04 | MAIN_AGENT 定义 | 用于 chat_request_handler，max_iterations=64 |
 
 ---
 
 ### Critical Design Principles
 
-#### 1. Universal Architecture (普适性)
+#### 1. Universal Architecture (普适性) ✅ ACHIEVED
 
-AgentExecutor 是**通用执行器**，未来主 Agent 也会重构到这套体系：
+Agent 类现在是**统一执行器**，主 Agent 和 SubAgent 共用同一套体系：
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
-│                    AgentExecutor                         │
+│                       Agent                              │
 ├─────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐      ┌─────────────────┐          │
 │  │   SubAgent      │      │   Main Agent    │          │
-│  │   (Explorer)    │      │   (Future)      │          │
-│  │   - 单次任务     │      │   - 多轮对话     │          │
+│  │   (Explorer)    │      │   (Nagisa)      │          │
+│  │   - run()       │      │   - stream()    │          │
 │  │   - 非流式       │      │   - 流式         │          │
 │  └─────────────────┘      └─────────────────┘          │
 └─────────────────────────────────────────────────────────┘
@@ -902,19 +911,21 @@ messages = [
 
 ### Future Refactoring: Agent as First-Class Citizen
 
-**Status**: Planning / Future Phase
+**Status**: ✅ COMPLETED (2025-12-04)
 
-#### 问题分析
+#### 问题分析 (已解决)
 
-当前设计存在语义问题：
+原设计存在的语义问题：
 
-```
+```text
 AgentDefinition (配置) + AgentExecutor (执行器) = 被动组合
 ```
 
-- `AgentExecutor` 是被动的执行引擎
-- `Agent` 应该是具有**主动行为**的对象
-- `ChatOrchestrator` 和 `AgentExecutor` 功能高度重叠
+- ~~`AgentExecutor` 是被动的执行引擎~~
+- ~~`Agent` 应该是具有**主动行为**的对象~~
+- ~~`ChatOrchestrator` 和 `AgentExecutor` 功能高度重叠~~
+
+**解决方案**: Agent 类现在直接包含 run() 和 stream() 方法，是具有主动行为的一等公民对象。
 
 #### 目标设计
 
@@ -993,8 +1004,11 @@ async for chunk in nagisa.stream({"user_input": "..."}):
 
 ---
 
-### Next Steps
+### Next Steps (Future Enhancements)
 
-1. **开始 Phase 1**: 创建 `domain/models/agent.py` 定义核心模型
-2. **创建目录结构**: `application/services/agent/` 和 `infrastructure/mcp/tools/agent/`
-3. **设计 ExplorerResult**: 确定 PFC Explorer 的输出格式
+所有核心阶段已完成。以下是可选的未来增强：
+
+1. **invoke_agent 工具**: 实现 `infrastructure/mcp/tools/agent/invoke_agent.py`，允许主 Agent 调用 SubAgent
+2. **SubAgent WebSocket 通知**: 在 `notification_service.py` 中添加 SubAgent 活动事件通知
+3. **结构化输出**: 为 PFC Explorer 等 SubAgent 添加 `output_schema` 验证
+4. **更多 SubAgent**: 根据需要定义新的专用 Agent（如代码审查、文档生成等）
