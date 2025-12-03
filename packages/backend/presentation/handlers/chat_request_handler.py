@@ -60,23 +60,22 @@ async def process_chat_request(
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
-            # ========== PHASE 2: Get LLM response using Agent.stream() ==========
+            # ========== PHASE 2: Get LLM response using AgentService ==========
             # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
 
-            # Create Agent with MainAgent definition
-            from backend.application.services.agent.agent import Agent
-            from backend.domain.models.agent_definitions import MAIN_AGENT
-            agent = Agent(MAIN_AGENT, llm_client)
+            # Use AgentService for clean separation of concerns
+            from backend.application.services.agent.agent_service import AgentService
+            agent_service = AgentService(llm_client)
 
             # Send WebSocket read status just before LLM processing starts
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
 
-            # Execute conversation turn via Agent.execute() (Application layer)
+            # Execute conversation turn via AgentService (Application layer)
             # Returns unified AgentResult with message and metadata
-            result = await agent.execute(session_id=session_id)
+            result = await agent_service.process_chat(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
