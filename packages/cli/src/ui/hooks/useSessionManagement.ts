@@ -34,6 +34,7 @@ interface HistoryToolPair {
     toolCallId: string;
     toolName: string;
     toolInput: Record<string, unknown>;
+    isError?: boolean;  // Copied from toolResult for status color display
   };
   toolResult: {
     type: typeof MessageType.TOOL_RESULT;
@@ -92,6 +93,10 @@ function convertBackendHistory(
       if (textContent.trim()) {
         // First, flush any pending tool pairs before user message
         for (const pair of toolPairs) {
+          // Copy isError from toolResult to toolCall for status color display
+          if (pair.toolResult) {
+            pair.toolCall.isError = pair.toolResult.isError;
+          }
           historyManager.addItem(pair.toolCall, pair.timestamp);
           if (pair.toolResult) {
             historyManager.addItem(pair.toolResult, pair.timestamp);
@@ -108,6 +113,10 @@ function convertBackendHistory(
       // Flush any pending tool pairs before new assistant message
       // This ensures previous round's tool calls appear before this assistant message
       for (const pair of toolPairs) {
+        // Copy isError from toolResult to toolCall for status color display
+        if (pair.toolResult) {
+          pair.toolCall.isError = pair.toolResult.isError;
+        }
         historyManager.addItem(pair.toolCall, pair.timestamp);
         if (pair.toolResult) {
           historyManager.addItem(pair.toolResult, pair.timestamp);
@@ -158,6 +167,10 @@ function convertBackendHistory(
 
   // Flush remaining tool pairs at the end
   for (const pair of toolPairs) {
+    // Copy isError from toolResult to toolCall for status color display
+    if (pair.toolResult) {
+      pair.toolCall.isError = pair.toolResult.isError;
+    }
     historyManager.addItem(pair.toolCall, pair.timestamp);
     if (pair.toolResult) {
       historyManager.addItem(pair.toolResult, pair.timestamp);

@@ -165,13 +165,24 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
 
 // Pending Tool Call Message
 // Layout matches ToolCallMessage for visual consistency
+// Shows BlinkingCircle when executing, success/error icon when result received
 const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> = ({ item }) => {
   const description = getToolDescription(item.toolName, item.toolInput);
+  const hasResult = item.hasResult === true;
+  const isError = item.isError === true;
+
+  // Color based on result status: success (green) or error (red)
+  const statusColor = isError ? theme.status.error : theme.status.success;
+  const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
 
   return (
     <Box paddingX={1} marginBottom={1}>
       <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        <BlinkingCircle color={theme.status.warning} />
+        {hasResult ? (
+          <Text color={statusColor}>{statusIcon}</Text>
+        ) : (
+          <BlinkingCircle color={theme.status.success} />
+        )}
       </Box>
       <Text wrap="truncate">
         <Text bold color={theme.text.primary}>
@@ -187,10 +198,8 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
 
 // Pending Tool Result Message
 // Layout matches ToolResultMessage for visual consistency
+// Note: Status indicator removed - success/error is shown on tool call block instead
 const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId }> = ({ item }) => {
-  const statusColor = item.isError ? theme.status.error : theme.status.success;
-  const statusIcon = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
-
   // Trim and split content into lines (matches ToolResultMessage behavior)
   const content = (item.content || '').trimEnd();
   const allLines = content.split('\n');
@@ -199,16 +208,7 @@ const PendingToolResultMessage: React.FC<{ item: ToolResultHistoryItemWithoutId 
 
   return (
     <Box flexDirection="column" paddingX={1} marginBottom={1}>
-      {/* Header line: status + tool name */}
-      <Box>
-        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-          <Text color={statusColor}>{statusIcon}</Text>
-        </Box>
-        <Text color={theme.text.secondary}>
-          {item.toolName || 'tool result'}
-        </Text>
-      </Box>
-      {/* Content lines */}
+      {/* Content lines - indented to align with tool call description */}
       {lines.map((line, index) => (
         <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text wrap="truncate-end" color={theme.text.secondary}>

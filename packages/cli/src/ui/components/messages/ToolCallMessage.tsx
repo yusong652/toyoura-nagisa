@@ -84,18 +84,21 @@ export const ToolCallMessage: React.FC<ToolCallMessageProps> = ({
   terminalWidth,
 }) => {
   // Tool call shows:
-  // - Blinking circle when executing
-  // - Filled circle ● when completed (white color)
+  // - Blinking circle when executing (success color)
+  // - Success/error icon when completed (colored by result)
   // - Empty circle ○ when pending (white color)
-  // Success/error status color is shown in ToolResultMessage
   let statusIndicator: React.ReactNode;
-  const statusColor = theme.text.primary;  // White/primary color for tool calls
+  let statusColor: string;
+  const isError = item.isError === true;
 
   if (isExecuting) {
-    statusIndicator = <BlinkingCircle color={theme.status.warning} />;
+    statusIndicator = <BlinkingCircle color={theme.status.success} />;
+    statusColor = theme.status.success;
   } else if (isCompleted) {
-    statusIndicator = TOOL_STATUS.SUCCESS;  // Filled circle ● for completed
+    statusColor = isError ? theme.status.error : theme.status.success;
+    statusIndicator = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
   } else {
+    statusColor = theme.text.primary;
     statusIndicator = TOOL_STATUS.PENDING;  // Empty circle ○ for pending
   }
 

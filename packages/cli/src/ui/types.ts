@@ -65,6 +65,7 @@ export interface ToolCallHistoryItem extends HistoryItemBase {
   toolName: string;
   toolInput: Record<string, unknown>;
   toolCallId: string;
+  isError?: boolean;    // True if the tool result was an error
 }
 
 /** Diff information for file modification tools (edit, write) */
@@ -122,6 +123,8 @@ export interface ToolCallHistoryItemWithoutId {
   toolInput: Record<string, unknown>;
   toolCallId: string;
   timestamp?: number;
+  hasResult?: boolean;  // True when tool result has been received
+  isError?: boolean;    // True if the tool result was an error
 }
 
 export interface ToolResultHistoryItemWithoutId {

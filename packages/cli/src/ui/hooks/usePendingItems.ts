@@ -43,7 +43,6 @@ export interface UsePendingItemsReturn {
   fillToolResult: (toolCallId: string, result: ToolResultHistoryItemWithoutId) => boolean;
   commitAssistantToHistory: () => void;
   commitAllPendingToHistory: () => void;
-  commitToolPairToHistory: (toolCallId: string, result: ToolResultHistoryItemWithoutId) => void;
   clearAll: () => void;
   triggerRerender: () => void;
 }
@@ -153,6 +152,8 @@ export function usePendingItems({
         return false; // Not found or already filled
       }
       pair.toolResult = result;
+      pair.toolCall.hasResult = true;  // Mark tool call as having result (stops executing indicator)
+      pair.toolCall.isError = result.isError === true;  // Copy error status for display
       triggerRerender();
       return true;
     },
@@ -195,45 +196,6 @@ export function usePendingItems({
     confirmedToolCallIdsRef.current.clear();
     triggerRerender();
   }, [historyManager, commitAssistantToHistory, triggerRerender]);
-
-  // Commit a specific tool pair to history (used when tool result arrives)
-  const commitToolPairToHistory = useCallback(
-    (toolCallId: string, result: ToolResultHistoryItemWithoutId) => {
-      // Check if already confirmed
-      if (confirmedToolCallIdsRef.current.has(toolCallId)) {
-        // Tool call already in history, commit result directly
-        historyManager.addItem(result);
-        return;
-      }
-
-      // Find the pair
-      const pairIndex = pendingToolPairsRef.current.findIndex((p) => p.toolCallId === toolCallId);
-      if (pairIndex === -1) return;
-
-      const pair = pendingToolPairsRef.current[pairIndex];
-
-      // Commit assistant message first if exists
-      commitAssistantToHistory();
-
-      // Commit all pairs before this one (maintains order)
-      while (pendingToolPairsRef.current.length > 0 && pendingToolPairsRef.current[0] !== pair) {
-        const prevPair = pendingToolPairsRef.current.shift()!;
-        historyManager.addItem(prevPair.toolCall);
-        if (prevPair.toolResult) {
-          historyManager.addItem(prevPair.toolResult);
-        }
-        confirmedToolCallIdsRef.current.add(prevPair.toolCallId);
-      }
-
-      // Commit current pair
-      historyManager.addItem(pair.toolCall);
-      historyManager.addItem(result);
-      pendingToolPairsRef.current.shift();
-      confirmedToolCallIdsRef.current.add(toolCallId);
-      triggerRerender();
-    },
-    [historyManager, commitAssistantToHistory, triggerRerender]
-  );
 
   // Clear all pending items (for interrupt/error)
   const clearAll = useCallback(() => {
@@ -284,7 +246,6 @@ export function usePendingItems({
     fillToolResult,
     commitAssistantToHistory,
     commitAllPendingToHistory,
-    commitToolPairToHistory,
     clearAll,
     triggerRerender,
   };

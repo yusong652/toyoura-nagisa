@@ -11,7 +11,6 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { ToolResultHistoryItem } from '../../types.js';
 import { theme } from '../../colors.js';
-import { TOOL_STATUS } from '../../markers.js';
 import { DiffRenderer } from '../DiffRenderer.js';
 
 // Maximum lines to show before truncating
@@ -49,6 +48,7 @@ function truncateContent(content: string, maxLines: number): { text: string; tru
 
 /**
  * Display for edit/write tool results with diff
+ * Note: Status indicator removed - success/error is shown on tool call block instead
  */
 const DiffToolResultDisplay: React.FC<{
   item: ToolResultHistoryItem;
@@ -56,17 +56,12 @@ const DiffToolResultDisplay: React.FC<{
 }> = ({ item, terminalWidth }) => {
   const diff = item.diff!;
   const fileName = getFileName(diff.file_path);
-  const statusSymbol = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
-  const statusColor = item.isError ? theme.status.error : theme.status.success;
   const contentWidth = terminalWidth ? terminalWidth - 4 : undefined;
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {/* Tool header line */}
-      <Box paddingX={1}>
-        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-          <Text color={statusColor}>{statusSymbol}</Text>
-        </Box>
+      {/* Tool header line - no status indicator */}
+      <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + 1}>
         <Text bold color={theme.text.primary}>{item.toolName || 'edit'}</Text>
         <Text color={theme.text.secondary}> </Text>
         <Text color={theme.text.link}>{fileName}</Text>
@@ -93,14 +88,13 @@ const DiffToolResultDisplay: React.FC<{
 
 /**
  * Default tool result display (text output)
- * Shows tool name on first line, content on subsequent lines with consistent indentation
+ * Shows content lines with consistent indentation
+ * Note: Status indicator removed - success/error is shown on tool call block instead
  */
 const DefaultToolResultDisplay: React.FC<{
   item: ToolResultHistoryItem;
   terminalWidth?: number;
 }> = ({ item, terminalWidth }) => {
-  const statusSymbol = item.isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
-  const statusColor = item.isError ? theme.status.error : theme.status.success;
   // Only trim trailing whitespace to preserve line number indentation
   // (some LLM APIs add trailing newlines, but leading spaces are part of formatting)
   const { text, truncated } = truncateContent(item.content.trimEnd(), MAX_RESULT_LINES);
@@ -118,17 +112,7 @@ const DefaultToolResultDisplay: React.FC<{
       width={boxWidth}
       marginBottom={1}
     >
-      {/* Header line: status + tool name */}
-      <Box>
-        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-          <Text color={statusColor}>{statusSymbol}</Text>
-        </Box>
-        <Text color={theme.text.secondary}>
-          {item.toolName || 'tool result'}
-        </Text>
-      </Box>
-
-      {/* Content lines - each line rendered separately to preserve formatting */}
+      {/* Content lines - indented to align with tool call description */}
       {lines.map((line, index) => (
         <Box key={index} paddingLeft={STATUS_INDICATOR_WIDTH}>
           <Text wrap="truncate-end" color={theme.text.secondary}>

@@ -64,9 +64,9 @@ export function useStreamHandlers({
     updateAssistantContent,
     stopAssistantStreaming,
     addToolPair,
+    fillToolResult,
     commitAssistantToHistory,
     commitAllPendingToHistory,
-    commitToolPairToHistory,
     clearAll,
     triggerRerender,
   } = pendingItems;
@@ -95,10 +95,12 @@ export function useStreamHandlers({
           if (pair.toolResult) {
             historyManager.addItem(pair.toolResult);
           }
+          // Track committed tool call IDs so late-arriving results can still be added
+          confirmedToolCallIdsRef.current.add(pair.toolCallId);
         }
         pendingToolPairsRef.current = [];
         seenToolCallIdsRef.current.clear();
-        confirmedToolCallIdsRef.current.clear();
+        // Don't clear confirmedToolCallIdsRef - late results need to find their tool calls
         triggerRerender();
       }
 
@@ -251,26 +253,26 @@ export function useStreamHandlers({
           diff: diff,
         };
 
-        // Check if this tool call was already confirmed
+        // Check if this tool call was already committed to history
         if (confirmedToolCallIdsRef.current.has(block.tool_use_id)) {
-          // Tool call already in history, commit result directly
+          // Tool call already in history, add result directly
           historyManager.addItem(toolResult);
           continue;
         }
 
-        // Find the corresponding pair in pending
-        const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === block.tool_use_id);
-        if (!pair || pair.toolResult) continue;
-
-        // Commit tool pair to history (handles assistant commit and ordering)
-        commitToolPairToHistory(block.tool_use_id, toolResult);
+        // Fill the pending pair with result - it will display via pendingHistoryItems
+        // Commit happens when streaming ends or new MESSAGE_CREATE arrives
+        const filled = fillToolResult(block.tool_use_id, toolResult);
+        if (!filled) {
+          // Pair not found - add to history as fallback
+          historyManager.addItem(toolResult);
+        }
       }
     },
     [
       historyManager,
-      pendingToolPairsRef,
       confirmedToolCallIdsRef,
-      commitToolPairToHistory,
+      fillToolResult,
     ]
   );
 
