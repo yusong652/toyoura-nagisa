@@ -88,8 +88,7 @@ async def process_chat_request(
                 )
 
             # ========== PHASE 4: Memory persistence ==========
-            # Note: Title generation now happens in ChatOrchestrator (Application layer)
-            # This maintains proper architecture: Application layer services can call each other
+            # Note: Title generation happens in Agent.stream() (Application layer)
             # Save conversation to memory after successful response
             # Get enable_memory from the session's context manager
             context_manager = llm_client.get_or_create_context_manager(session_id)

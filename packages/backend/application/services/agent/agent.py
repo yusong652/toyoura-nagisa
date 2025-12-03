@@ -119,7 +119,7 @@ class Agent:
             initial_message = UserMessage(content=self._build_prompt_content(inputs))
             await context_manager.add_user_message(initial_message)
 
-            # Build system prompt using infrastructure (like ChatOrchestrator)
+            # Build system prompt using infrastructure
             # Uses definition.name as the prompt profile to load {name}.md
             from backend.shared.utils.prompt.builder import build_system_prompt
             prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
@@ -216,7 +216,7 @@ class Agent:
         """
         Execute agent task (streaming mode) for MainAgent.
 
-        This method mirrors ChatOrchestrator's behavior:
+        This method provides full streaming support:
         - Streaming LLM calls with WebSocket notifications
         - Message persistence to database
         - User interruption support
@@ -279,8 +279,6 @@ class Agent:
     ) -> Any:
         """
         Recursive streaming implementation with tool calling.
-
-        Mirrors ChatOrchestrator._recursive_tool_calling but uses Agent configuration.
         """
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring import get_status_monitor

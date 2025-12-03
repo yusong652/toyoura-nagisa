@@ -23,7 +23,7 @@ MAIN_AGENT = AgentDefinition(
     display_name="Main Agent",
     description="Primary user-facing agent with streaming support",
     tool_profile="general",  # Fallback tool profile
-    max_iterations=64,  # Same as ChatOrchestrator.MAX_ITERATIONS
+    max_iterations=64,
     streaming_enabled=True,
     enable_memory=True,
 )
