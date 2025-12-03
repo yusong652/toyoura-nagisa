@@ -5,7 +5,7 @@ This handler serves as the primary entry point for WebSocket chat requests,
 coordinating the complete request lifecycle:
 - Request initialization and deduplication
 - WebSocket status notifications (sent/read/error)
-- Application service orchestration (ChatOrchestrator, ContentProcessor, Memory)
+- Application service orchestration (Agent.stream(), ContentProcessor, Memory)
 - Error handling and user interruption management
 
 As a presentation layer component, it bridges WebSocket-specific concerns
@@ -60,22 +60,23 @@ async def process_chat_request(
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
-            # ========== PHASE 2: Get LLM response using ChatOrchestrator ==========
+            # ========== PHASE 2: Get LLM response using Agent.stream() ==========
             # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
 
-            # Create ChatOrchestrator with LLM client
-            from backend.application.services.conversation import ChatOrchestrator
-            orchestrator = ChatOrchestrator(llm_client)
+            # Create Agent with MainAgent definition
+            from backend.application.services.agent.agent import Agent
+            from backend.domain.models.agent_definitions import MAIN_AGENT
+            agent = Agent(MAIN_AGENT, llm_client)
 
             # Send WebSocket read status just before LLM processing starts
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
 
-            # Execute conversation turn via ChatOrchestrator (Application layer)
+            # Execute conversation turn via Agent.stream() (Application layer)
             # Business logic now properly separated from infrastructure
-            final_message, streaming_message_id = await orchestrator.execute_conversation_turn(session_id)
+            final_message, streaming_message_id = await agent.stream(session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
             if final_message:

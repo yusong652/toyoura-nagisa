@@ -14,6 +14,21 @@ from typing import Dict
 from backend.domain.models.agent import AgentDefinition
 
 
+# === Main Agent (Streaming Mode) ===
+# Used by chat_request_handler for user-facing conversations.
+# Note: agent_profile and enable_memory are read from context_manager at runtime,
+# so these definition values serve as fallback defaults.
+MAIN_AGENT = AgentDefinition(
+    name="general",  # Fallback prompt profile
+    display_name="Main Agent",
+    description="Primary user-facing agent with streaming support",
+    tool_profile="general",  # Fallback tool profile
+    max_iterations=64,  # Same as ChatOrchestrator.MAX_ITERATIONS
+    streaming_enabled=True,
+    enable_memory=True,
+)
+
+
 # === PFC Explorer SubAgent ===
 # System prompt loaded from: config/prompts/pfc_explorer.md
 PFC_EXPLORER = AgentDefinition(
@@ -29,5 +44,6 @@ PFC_EXPLORER = AgentDefinition(
 
 # === Agent Registry ===
 AGENT_DEFINITIONS: Dict[str, AgentDefinition] = {
+    "main": MAIN_AGENT,
     "pfc_explorer": PFC_EXPLORER,
 }
