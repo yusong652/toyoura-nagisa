@@ -74,17 +74,17 @@ async def process_chat_request(
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
 
-            # Execute conversation turn via Agent.stream() (Application layer)
-            # Business logic now properly separated from infrastructure
-            final_message, streaming_message_id = await agent.stream(session_id)
+            # Execute conversation turn via Agent.execute() (Application layer)
+            # Returns unified AgentResult with message and metadata
+            result = await agent.execute(session_id=session_id)
 
             # ========== PHASE 3: Content processing pipeline ==========
-            if final_message:
+            if result.status == "success" and result.message:
                 # Process content via WebSocket
                 # Note: keyword extraction is handled in content_processor
-                # Pass streaming_message_id to avoid duplicate message creation
+                # Pass message_id to avoid duplicate message creation
                 await process_content_pipeline(
-                    final_message, session_id, message_id=streaming_message_id
+                    result.message, session_id, message_id=result.message_id
                 )
 
             # ========== PHASE 4: Memory persistence ==========

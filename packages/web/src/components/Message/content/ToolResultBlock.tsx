@@ -24,11 +24,28 @@ const ToolResultBlock: React.FC<ToolResultBlockProps> = ({ block }) => {
   // Default to expanded state for better visibility
   const [isExpanded, setIsExpanded] = useState(true)
 
-  // Extract text content from parts
-  const textContent = block.content.parts
-    .filter(part => part.type === 'text')
-    .map(part => part.text)
-    .join('\n')
+  // Extract text content from parts (with null safety like CLI)
+  const extractTextContent = (): string => {
+    const content = block.content
+    if (!content) return ''
+
+    // Handle string content directly
+    if (typeof content === 'string') {
+      return content
+    }
+
+    // Handle object with parts array
+    if (typeof content === 'object' && 'parts' in content && Array.isArray(content.parts)) {
+      return content.parts
+        .filter((part: any) => part.type === 'text')
+        .map((part: any) => part.text || '')
+        .join('\n')
+    }
+
+    return ''
+  }
+
+  const textContent = extractTextContent()
 
   return (
     <div className={`tool-result-block ${block.is_error ? 'error' : 'success'}`}>

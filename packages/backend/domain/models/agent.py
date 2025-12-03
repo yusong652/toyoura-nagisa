@@ -12,9 +12,12 @@ Key models:
 """
 
 import time
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+if TYPE_CHECKING:
+    from backend.domain.models.messages import BaseMessage
 
 
 class AgentDefinition(BaseModel):
@@ -101,22 +104,48 @@ class AgentDefinition(BaseModel):
 
 class AgentResult(BaseModel):
     """
-    Result of agent execution (simplified).
+    Unified result of agent execution.
+
+    Supports both MainAgent (streaming) and SubAgent (non-streaming) scenarios
+    with a single return type for consistent handling.
 
     Attributes:
         status: Execution outcome status
-        raw_response: Raw LLM response text or error message
+        message: Structured response message (BaseMessage)
+        message_id: Streaming message ID for WebSocket updates (MainAgent only)
         iterations_used: Number of tool call iterations used
         execution_time_seconds: Total execution time
+
+    Usage:
+        # MainAgent scenario
+        result = await agent.execute(instruction, session_id=session_id)
+        if result.status == "success" and result.message:
+            await process_content_pipeline(result.message, session_id, result.message_id)
+
+        # SubAgent scenario
+        result = await agent.execute(instruction)
+        if result.status == "success":
+            response_text = result.text  # Convenience property
     """
 
+    # === Status ===
     status: Literal["success", "error", "max_iterations", "aborted"] = Field(
         description="Execution outcome status"
     )
-    raw_response: Optional[str] = Field(
+
+    # === Response Content ===
+    message: Optional[Any] = Field(
         default=None,
-        description="Raw LLM response or error message"
+        description="Structured response message (BaseMessage)"
     )
+
+    # === Streaming Metadata ===
+    message_id: Optional[str] = Field(
+        default=None,
+        description="Streaming message ID for WebSocket updates (MainAgent only)"
+    )
+
+    # === Execution Metadata ===
     iterations_used: int = Field(
         default=0,
         ge=0,
@@ -127,6 +156,20 @@ class AgentResult(BaseModel):
         ge=0.0,
         description="Total execution time in seconds"
     )
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    @property
+    def text(self) -> str:
+        """
+        Convenience property to get plain text response.
+
+        Uses existing infrastructure from message_factory.
+        """
+        if self.message:
+            from backend.domain.models.message_factory import extract_text_from_message
+            return extract_text_from_message(self.message)
+        return ""
 
 
 class AgentActivity(BaseModel):

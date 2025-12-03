@@ -103,8 +103,8 @@ async def test_no_tools(llm_client):
     print(f"Status: {result.status}")
     print(f"Iterations: {result.iterations_used}")
     print(f"Time: {result.execution_time_seconds:.2f}s")
-    if result.raw_response:
-        print(f"Response (first 200 chars): {result.raw_response[:200]}...")
+    if result.text:
+        print(f"Response (first 200 chars): {result.text[:200]}...")
 
     return result.status == "success"
 
@@ -132,8 +132,8 @@ async def test_with_tools(llm_client):
     print(f"Status: {result.status}")
     print(f"Iterations: {result.iterations_used}")
     print(f"Time: {result.execution_time_seconds:.2f}s")
-    if result.raw_response:
-        print(f"Response (first 500 chars): {result.raw_response[:500]}...")
+    if result.text:
+        print(f"Response (first 500 chars): {result.text[:500]}...")
 
     return result.status == "success"
 
@@ -164,8 +164,8 @@ async def test_pfc_explorer(llm_client):
     print(f"Status: {result.status}")
     print(f"Iterations: {result.iterations_used}")
     print(f"Time: {result.execution_time_seconds:.2f}s")
-    if result.raw_response:
-        print(f"Response (first 500 chars): {result.raw_response[:500]}...")
+    if result.text:
+        print(f"Response (first 500 chars): {result.text[:500]}...")
 
     return result.status == "success"
 

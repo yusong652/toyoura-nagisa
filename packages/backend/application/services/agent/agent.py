@@ -12,10 +12,10 @@ Execution modes:
 import asyncio
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
-from backend.domain.models.messages import BaseMessage, UserMessage
+from backend.domain.models.messages import AssistantMessage, BaseMessage, UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.conversation.models import StreamingState
@@ -164,9 +164,14 @@ class Agent:
 
                 # No tool calls = done
                 if not tool_calls:
+                    # Wrap response text in AssistantMessage for unified handling
+                    final_message = AssistantMessage(
+                        role="assistant",
+                        content=[{"type": "text", "text": response_text}]
+                    )
                     return AgentResult(
                         status="success",
-                        raw_response=response_text,
+                        message=final_message,
                         iterations_used=iteration + 1,
                         execution_time_seconds=time.time() - start_time,
                     )
@@ -196,9 +201,14 @@ class Agent:
 
         except Exception as e:
             self._emit_activity("error", {"error": str(e)})
+            # Wrap error in AssistantMessage for unified handling
+            error_message = AssistantMessage(
+                role="assistant",
+                content=[{"type": "text", "text": f"Error: {str(e)}"}]
+            )
             return AgentResult(
                 status="error",
-                raw_response=str(e),
+                message=error_message,
                 iterations_used=iteration,
                 execution_time_seconds=time.time() - start_time,
             )
@@ -212,7 +222,8 @@ class Agent:
     async def stream(
         self,
         session_id: str,
-    ) -> Tuple[BaseMessage, Optional[str]]:
+        instruction: Optional[str] = None,
+    ) -> AgentResult:
         """
         Execute agent task (streaming mode) for MainAgent.
 
@@ -224,16 +235,26 @@ class Agent:
 
         Args:
             session_id: Session ID (uses existing context from session)
+            instruction: Optional instruction to inject if context is empty
 
         Returns:
-            Tuple[BaseMessage, Optional[str]]: (final_message, streaming_message_id)
+            AgentResult with execution outcome
 
         Raises:
             UserRejectionInterruption: When user rejects tool execution
         """
         from backend.shared.exceptions import UserRejectionInterruption
 
+        start_time = time.time()
+
         try:
+            # Inject instruction if provided and context needs it
+            if instruction:
+                context_manager = self.llm_client.get_or_create_context_manager(session_id)
+                if self._should_inject_instruction(context_manager):
+                    user_message = UserMessage(content=instruction)
+                    await context_manager.add_user_message(user_message)
+
             final_response = await self._recursive_stream(session_id, iterations=0)
 
             # Format response for storage
@@ -241,7 +262,6 @@ class Agent:
             if processor:
                 final_message = processor.format_response_for_storage(final_response)
             else:
-                from backend.domain.models.messages import AssistantMessage
                 final_message = AssistantMessage(
                     role="assistant",
                     content=[{"type": "text", "text": "Response processing unavailable"}]
@@ -250,7 +270,12 @@ class Agent:
             context_manager = self.llm_client.get_or_create_context_manager(session_id)
             streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
 
-            return final_message, streaming_message_id
+            return AgentResult(
+                status="success",
+                message=final_message,
+                message_id=streaming_message_id,
+                execution_time_seconds=time.time() - start_time,
+            )
 
         except UserRejectionInterruption:
             raise
@@ -271,6 +296,48 @@ class Agent:
                     print(f"[Agent.stream] Failed to clean up placeholder: {cleanup_error}")
 
             raise Exception(f"Agent streaming failed: {e}")
+
+    def _should_inject_instruction(self, context_manager) -> bool:
+        """Check if instruction should be injected (context is empty or no user message)."""
+        contents = context_manager.get_working_contents()
+        if not contents:
+            return True
+        # Check if last message is already a user message
+        last_msg = contents[-1]
+        return last_msg.get('role') != 'user'
+
+    async def execute(
+        self,
+        instruction: Optional[str] = None,
+        *,
+        session_id: Optional[str] = None,
+        context: Optional[str] = None,
+        abort_signal: Optional[asyncio.Event] = None,
+    ) -> AgentResult:
+        """
+        Unified agent execution entry point (facade).
+
+        Dispatches to run() or stream() based on session_id.
+        Future: Will be unified into a single execution path.
+
+        Args:
+            instruction: Task instruction for the agent
+            session_id: If provided, uses streaming mode
+            context: Additional context (SubAgent mode only)
+            abort_signal: Optional abort signal
+
+        Returns:
+            AgentResult with execution outcome
+        """
+        if session_id is not None:
+            return await self.stream(session_id, instruction)
+        else:
+            if instruction is None:
+                raise ValueError("instruction is required for SubAgent execution")
+            inputs = {"task": instruction}
+            if context:
+                inputs["context"] = context
+            return await self.run(inputs=inputs, abort_signal=abort_signal)
 
     async def _recursive_stream(
         self,

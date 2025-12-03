@@ -243,33 +243,58 @@ export const useChatMessage = ({
   }, [setIsLLMThinking])
 
   // Subscribe to tool result update events for real-time display
+  // Follows CLI pattern: use tool_use_id to match tool_call and tool_result
   useEffect(() => {
     const handleToolResultUpdate = (event: Event) => {
       const customEvent = event as CustomEvent
-      const { message_id, content } = customEvent.detail
-      console.log(`[useChatMessage] Tool result update received: ${message_id}`)
+      const { content } = customEvent.detail
 
       if (!content || !Array.isArray(content)) return
 
-      // Create a new message for the tool result
-      // Format matches database storage for consistency
-      const newMessage: Message = {
-        id: message_id,
-        role: 'user',  // tool_result is stored as user message
-        text: '',
-        content: content,
-        timestamp: Date.now(),
-        streaming: false
-      }
+      // Extract tool_use_id from content blocks (like CLI does)
+      for (const block of content) {
+        if (block.type !== 'tool_result') continue
 
-      setMessages(prev => {
-        // Check if message already exists (avoid duplicates)
-        if (prev.some(msg => msg.id === message_id)) {
-          console.log(`[useChatMessage] Tool result message ${message_id} already exists, skipping`)
-          return prev
+        const toolUseId = block.tool_use_id
+        if (!toolUseId) continue
+
+        // Get llm_content for the tool result content block
+        const llmContent = block.content
+
+        // Create tool result content block matching frontend expected format
+        const toolResultContent = {
+          type: 'tool_result' as const,
+          tool_use_id: toolUseId,
+          tool_name: block.tool_name || 'unknown',
+          content: llmContent,  // Keep original llm_content structure
+          is_error: block.is_error || false
         }
-        return [...prev, newMessage]
-      })
+
+        // Create a new message for the tool result
+        // Use tool_use_id as key for deduplication (like CLI)
+        const toolResultMessageId = `tool_result_${toolUseId}`
+        const newMessage: Message = {
+          id: toolResultMessageId,
+          role: 'user',  // tool_result is stored as user message
+          text: '',
+          content: [toolResultContent],
+          timestamp: Date.now(),
+          streaming: false
+        }
+
+        setMessages(prev => {
+          // Check if this tool result already exists (by tool_use_id)
+          const exists = prev.some(msg =>
+            msg.content?.some((b: any) =>
+              b.type === 'tool_result' && b.tool_use_id === toolUseId
+            )
+          )
+          if (exists) {
+            return prev
+          }
+          return [...prev, newMessage]
+        })
+      }
     }
 
     window.addEventListener('toolResultUpdate', handleToolResultUpdate)
