@@ -3,6 +3,10 @@ Predefined agent configurations.
 
 This module contains all built-in agent definitions. New agents
 can be added here or registered at runtime via AgentRegistry.
+
+Each agent's system prompt is loaded from config/prompts/{name}.md,
+reusing the existing prompt infrastructure with tool schemas and
+environment info injection.
 """
 
 from typing import Dict
@@ -11,30 +15,15 @@ from backend.domain.models.agent import AgentDefinition
 
 
 # === PFC Explorer SubAgent ===
+# System prompt loaded from: config/prompts/pfc_explorer.md
 PFC_EXPLORER = AgentDefinition(
-    name="pfc_explorer",
+    name="pfc_explorer",  # Also used as prompt profile
     display_name="PFC Explorer",
     description="PFC documentation query and syntax validation agent",
-    system_prompt="""You are the PFC Explorer Agent, a specialized subagent for querying PFC documentation and validating syntax.
-
-## Workflow
-1. Use pfc_query_python_api to find Python SDK usage (prefer this first)
-2. Use pfc_query_command to find command syntax and model properties
-3. If validation is needed, write a minimal test script and execute it
-4. Return verified, working code
-
-## Rules
-- Work autonomously, do not ask for user input
-- Only report validated syntax
-- Be concise and focused on the task
-- If you cannot find the information, say so clearly""",
-    tool_profile="pfc",
+    tool_profile="pfc",  # Uses PFC tool set
     max_iterations=10,
-    timeout_seconds=120,
     streaming_enabled=False,
-    inject_project_docs=False,
     enable_memory=False,
-    enable_status_monitor=True,
 )
 
 

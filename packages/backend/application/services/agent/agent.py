@@ -73,7 +73,7 @@ class Agent:
         Initialize Agent.
 
         Args:
-            definition: Agent configuration (name, system_prompt, tools, limits)
+            definition: Agent configuration (name, tool_profile, limits)
             llm_client: LLM client for API calls
             on_activity: Optional callback for activity events
         """
@@ -135,24 +135,27 @@ class Agent:
             initial_message = UserMessage(content=self._build_prompt_content(inputs))
             await context_manager.add_user_message(initial_message)
 
+            # Build system prompt using infrastructure (like ChatOrchestrator)
+            # Uses definition.name as the prompt profile to load {name}.md
+            from backend.shared.utils.prompt.builder import build_system_prompt
+            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
+                self._execution_id, self.definition.tool_profile
+            )
+            system_prompt = await build_system_prompt(
+                agent_profile=self.definition.name,  # name doubles as prompt profile
+                session_id=self._execution_id,
+                enable_memory=self.definition.enable_memory,
+                tool_schemas=prompt_tool_schemas
+            )
+
             # Get api_config using infrastructure layer
             messages, api_config = await self.llm_client._prepare_complete_context(
                 session_id=self._execution_id,
-                system_prompt=self.definition.system_prompt
+                system_prompt=system_prompt
             )
 
             # Execution loop
             while iteration < self.definition.max_iterations:
-                # Check timeout
-                elapsed = time.time() - start_time
-                if elapsed > self.definition.timeout_seconds:
-                    return AgentResult(
-                        status="timeout",
-                        summary=f"Agent timed out after {self.definition.timeout_seconds}s",
-                        iterations_used=iteration,
-                        execution_time_seconds=elapsed,
-                    )
-
                 # Check abort signal
                 if abort_signal and abort_signal.is_set():
                     return AgentResult(

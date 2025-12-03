@@ -12,68 +12,50 @@ Key models:
 """
 
 import time
-from typing import Any, Dict, List, Literal, Optional, Type
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class AgentDefinition(BaseModel):
     """
-    Configuration-driven agent definition.
+    Configuration-driven agent definition (simplified).
 
-    This model captures all aspects of an agent's behavior through configuration
-    rather than hardcoding, following the design pattern from Gemini-CLI.
+    The agent's system prompt is loaded from config/prompts/{name}.md,
+    reusing the existing prompt infrastructure with tool schemas and
+    environment info injection.
 
     Attributes:
-        name: Unique identifier (e.g., "nagisa_main", "pfc_explorer")
+        name: Unique identifier, also used as prompt profile name
+              (loads from config/prompts/{name}.md)
         display_name: Human-readable name for UI display
         description: Functional description of the agent
-
-        system_prompt: System prompt template with ${variable} placeholders
-        initial_messages: Few-shot examples for the agent
-
         tool_profile: Profile name from ToolProfileManager
-
         max_iterations: Maximum tool call rounds before termination
-        timeout_seconds: Execution timeout
-
-        output_schema: Optional Pydantic model for structured output validation
-
         streaming_enabled: Whether to use streaming LLM calls
-        inject_project_docs: Whether to inject CLAUDE.md and project context
         enable_memory: Whether to use long-term memory system
-        enable_status_monitor: Whether to emit status events
 
     Example:
         PFC_EXPLORER = AgentDefinition(
-            name="pfc_explorer",
+            name="pfc_explorer",        # loads config/prompts/pfc_explorer.md
             display_name="PFC Explorer",
             description="PFC documentation query and syntax validation agent",
-            system_prompt="You are a PFC expert. Task: ${objective}",
-            tool_profile="pfc",
+            tool_profile="pfc",         # uses PFC tool set
             max_iterations=10,
             streaming_enabled=False,
+            enable_memory=False,
         )
     """
 
-    # === Identity ===
+    # === Identity (name doubles as prompt profile) ===
     name: str = Field(
-        description="Unique identifier for the agent"
+        description="Unique identifier, also used as prompt profile (loads {name}.md)"
     )
     display_name: str = Field(
         description="Human-readable display name"
     )
     description: str = Field(
         description="Functional description of what this agent does"
-    )
-
-    # === Prompt Configuration ===
-    system_prompt: str = Field(
-        description="System prompt template (supports ${variable} placeholders)"
-    )
-    initial_messages: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="Few-shot example messages"
     )
 
     # === Tool Configuration ===
@@ -83,22 +65,10 @@ class AgentDefinition(BaseModel):
 
     # === Execution Constraints ===
     max_iterations: int = Field(
-        default=20,
+        default=64,
         ge=1,
         le=100,
         description="Maximum tool call iterations"
-    )
-    timeout_seconds: int = Field(
-        default=300,
-        ge=10,
-        le=3600,
-        description="Execution timeout in seconds"
-    )
-
-    # === Output Configuration ===
-    output_schema_name: Optional[str] = Field(
-        default=None,
-        description="Name of the Pydantic model for output validation (resolved at runtime)"
     )
 
     # === Streaming Configuration ===
@@ -108,17 +78,9 @@ class AgentDefinition(BaseModel):
     )
 
     # === Context Configuration ===
-    inject_project_docs: bool = Field(
-        default=True,
-        description="Whether to inject CLAUDE.md and project documentation"
-    )
     enable_memory: bool = Field(
-        default=False,
-        description="Whether to enable long-term memory (subagents typically disable)"
-    )
-    enable_status_monitor: bool = Field(
         default=True,
-        description="Whether to emit status events for progress tracking"
+        description="Whether to enable long-term memory (subagents typically disable)"
     )
 
     class Config:
@@ -128,11 +90,10 @@ class AgentDefinition(BaseModel):
                     "name": "pfc_explorer",
                     "display_name": "PFC Explorer",
                     "description": "PFC documentation query agent",
-                    "system_prompt": "You are a PFC expert. Task: ${objective}",
                     "tool_profile": "pfc",
                     "max_iterations": 10,
-                    "timeout_seconds": 120,
                     "streaming_enabled": False,
+                    "enable_memory": False,
                 }
             ]
         }
