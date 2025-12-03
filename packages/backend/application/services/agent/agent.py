@@ -17,28 +17,6 @@ from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.message_service import MessageService
 
 
-class _ToolExecutionContext:
-    """
-    Minimal context adapter for Agent tool execution.
-
-    Provides the interface expected by ToolExecutor.
-    This is an internal implementation detail.
-    """
-
-    def __init__(self, agent_profile: str):
-        self.agent_profile = agent_profile
-
-    async def add_tool_result(
-        self,
-        tool_call_id: str,  # noqa: ARG002
-        tool_name: str,  # noqa: ARG002
-        result: Dict[str, Any],  # noqa: ARG002
-        inject_reminders: bool = False  # noqa: ARG002
-    ) -> None:
-        """No-op - results handled by Agent internally."""
-        pass
-
-
 class Agent:
     """
     Agent with active behavior - first-class citizen in the system.
@@ -293,9 +271,6 @@ class Agent:
                 "args": tool_call.get("arguments", {}),
             })
 
-        # Create context adapter for ToolExecutor
-        context = _ToolExecutionContext(agent_profile=self.definition.tool_profile)
-
         # Create ToolExecutor
         tool_executor = ToolExecutor(
             tool_manager=self.llm_client.tool_manager,
@@ -310,7 +285,7 @@ class Agent:
         execution_result = await tool_executor.execute_all(
             tool_calls=tool_calls,
             message_id=message_id,
-            context_manager=context,
+            agent_profile=self.definition.tool_profile,
         )
 
         # Emit completion activity for each tool

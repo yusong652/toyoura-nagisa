@@ -82,7 +82,7 @@ class ToolExecutor:
         self,
         tool_calls: List[Dict],
         message_id: str,
-        context_manager: Any
+        agent_profile: str = "general"
     ) -> ToolExecutionResult:
         """
         Execute all tool calls with proper ordering and cascade blocking.
@@ -90,7 +90,7 @@ class ToolExecutor:
         Args:
             tool_calls: List of tool call dicts
             message_id: Message ID containing tool calls
-            context_manager: Context manager for agent profile
+            agent_profile: Agent profile name for WebSocket notifications
 
         Returns:
             ToolExecutionResult with all results and rejection info
@@ -106,7 +106,7 @@ class ToolExecutor:
         for original_index, tool_call in classified.non_confirm:
             result = await self._execute_single_tool(tool_call, message_id)
             results[original_index] = result
-            await self._notify_result(tool_call, result, context_manager)
+            await self._notify_result(tool_call, result, agent_profile)
 
         # Execute confirmation tools serially with cascade blocking
         user_rejected = False
@@ -130,7 +130,7 @@ class ToolExecutor:
                     rejected_tools.append(tool_name)
 
             results[original_index] = result
-            await self._notify_result(tool_call, result, context_manager)
+            await self._notify_result(tool_call, result, agent_profile)
 
         return ToolExecutionResult(
             results=results,
@@ -200,7 +200,7 @@ class ToolExecutor:
         self,
         tool_call: Dict,
         result: Dict,
-        context_manager: Any
+        agent_profile: str
     ) -> None:
         """Send WebSocket notification for tool result."""
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -222,7 +222,6 @@ class ToolExecutor:
         if tool_name == 'todo_write':
             try:
                 from backend.application.services.todo_service import get_todo_service
-                agent_profile = getattr(context_manager, 'agent_profile', 'general')
                 todo_service = get_todo_service()
                 current_todo = await todo_service.get_current_todo(agent_profile, self.session_id)
                 await WebSocketNotificationService.send_todo_update(self.session_id, current_todo)

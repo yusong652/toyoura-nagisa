@@ -299,7 +299,7 @@ class ChatOrchestrator:
         )
 
         execution_result = await tool_executor.execute_all(
-            tool_calls, message_id, context_manager
+            tool_calls, message_id, context_manager.agent_profile
         )
 
         # Save to context and database
