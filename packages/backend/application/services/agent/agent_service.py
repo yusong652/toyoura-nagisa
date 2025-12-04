@@ -15,7 +15,7 @@ from typing import Callable, Optional
 
 from backend.application.services.agent.agent import Agent
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
-from backend.domain.models.agent_definitions import MAIN_AGENT
+from backend.domain.models.agent_definitions import get_main_agent_definition
 from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 
@@ -33,8 +33,7 @@ class AgentService:
         result = await service.process_chat(
             session_id=session_id,
             instruction=user_message,
-            agent_profile="coding",
-            enable_memory=True
+            agent_profile="coding"
         )
 
         # For SubAgent execution
@@ -64,8 +63,8 @@ class AgentService:
         """
         Process a chat request using MainAgent.
 
-        Creates a MainAgent bound to the given session and executes
-        the conversation turn with full streaming support.
+        Creates a MainAgent with the appropriate definition based on profile
+        and executes the conversation turn with full streaming support.
 
         Args:
             session_id: Session ID for the conversation
@@ -76,16 +75,14 @@ class AgentService:
         Returns:
             AgentResult with execution outcome and response message
         """
+        definition = get_main_agent_definition(agent_profile)
         agent = Agent(
-            definition=MAIN_AGENT,
+            definition=definition,
             llm_client=self._llm_client,
             session_id=session_id,
-        )
-        return await agent.execute(
-            instruction=instruction,
-            agent_profile=agent_profile,
             enable_memory=enable_memory,
         )
+        return await agent.execute(instruction=instruction)
 
     async def run_subagent(
         self,

@@ -14,19 +14,77 @@ from typing import Dict
 from backend.domain.models.agent import AgentDefinition
 
 
-# === Main Agent (Streaming Mode) ===
-# Used by chat_request_handler for user-facing conversations.
-# Note: agent_profile and enable_memory are read from context_manager at runtime,
-# so these definition values serve as fallback defaults.
-MAIN_AGENT = AgentDefinition(
-    name="general",  # Fallback prompt profile
-    display_name="Main Agent",
-    description="Primary user-facing agent with streaming support",
-    tool_profile="general",  # Fallback tool profile
-    max_iterations=64,
-    streaming_enabled=True,
-    enable_memory=True,
+# === MainAgent Definitions (Streaming Mode) ===
+# Each profile has its own definition with appropriate tool_profile.
+# Used by AgentService.process_chat() for user-facing conversations.
+
+_MAIN_AGENT_BASE = {
+    "max_iterations": 64,
+    "streaming_enabled": True,
+    "enable_memory": True,
+}
+
+GENERAL_AGENT = AgentDefinition(
+    name="general",
+    display_name="General Agent",
+    description="Multi-domain agent with full tool access",
+    tool_profile="general",
+    **_MAIN_AGENT_BASE,
 )
+
+CODING_AGENT = AgentDefinition(
+    name="coding",
+    display_name="Coding Agent",
+    description="Code development and debugging agent",
+    tool_profile="coding",
+    **_MAIN_AGENT_BASE,
+)
+
+LIFESTYLE_AGENT = AgentDefinition(
+    name="lifestyle",
+    display_name="Lifestyle Agent",
+    description="Email, calendar, and communication agent",
+    tool_profile="lifestyle",
+    **_MAIN_AGENT_BASE,
+)
+
+PFC_AGENT = AgentDefinition(
+    name="pfc",
+    display_name="PFC Agent",
+    description="PFC simulation and scientific computing agent",
+    tool_profile="pfc",
+    **_MAIN_AGENT_BASE,
+)
+
+DISABLED_AGENT = AgentDefinition(
+    name="disabled",
+    display_name="Chat Agent",
+    description="Text-only conversation agent without tools",
+    tool_profile="disabled",
+    **_MAIN_AGENT_BASE,
+)
+
+# Lookup table for MainAgent profiles
+MAIN_AGENT_PROFILES: Dict[str, AgentDefinition] = {
+    "general": GENERAL_AGENT,
+    "coding": CODING_AGENT,
+    "lifestyle": LIFESTYLE_AGENT,
+    "pfc": PFC_AGENT,
+    "disabled": DISABLED_AGENT,
+}
+
+
+def get_main_agent_definition(profile: str) -> AgentDefinition:
+    """
+    Get MainAgent definition for a given profile.
+
+    Args:
+        profile: Agent profile name (general, coding, lifestyle, pfc, disabled)
+
+    Returns:
+        AgentDefinition for the profile, defaults to GENERAL_AGENT if not found
+    """
+    return MAIN_AGENT_PROFILES.get(profile, GENERAL_AGENT)
 
 
 # === PFC Explorer SubAgent ===
@@ -42,8 +100,7 @@ PFC_EXPLORER = AgentDefinition(
 )
 
 
-# === Agent Registry ===
-AGENT_DEFINITIONS: Dict[str, AgentDefinition] = {
-    "main": MAIN_AGENT,
+# === Agent Registry (SubAgents only) ===
+SUBAGENT_DEFINITIONS: Dict[str, AgentDefinition] = {
     "pfc_explorer": PFC_EXPLORER,
 }

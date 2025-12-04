@@ -41,12 +41,8 @@ class Agent:
         result = await explorer.execute(UserMessage(content="Find ball syntax"))
 
         # MainAgent (streaming, WebSocket, persistence)
-        nagisa = Agent(MAIN_AGENT, llm_client, session_id="abc123")
-        result = await nagisa.execute(
-            instruction=user_message,
-            agent_profile="coding",
-            enable_memory=True
-        )
+        nagisa = Agent(CODING_AGENT, llm_client, session_id="abc123")
+        result = await nagisa.execute(instruction=user_message)
     """
 
     def __init__(
@@ -54,6 +50,7 @@ class Agent:
         definition: AgentDefinition,
         llm_client: LLMClientBase,
         session_id: Optional[str] = None,
+        enable_memory: Optional[bool] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
     ):
         """
@@ -65,6 +62,8 @@ class Agent:
             session_id: Session ID for MainAgent (persistent session).
                        If provided, agent operates as MainAgent with streaming and persistence.
                        If None, agent operates as SubAgent with auto-generated temporary ID.
+            enable_memory: Whether to enable memory persistence.
+                          If None, uses definition.enable_memory as default.
             on_activity: Optional callback for activity events (SubAgent mode)
         """
         self.definition = definition
@@ -74,6 +73,9 @@ class Agent:
         # session_id is always str - auto-generate for SubAgent
         self._is_main_agent = session_id is not None
         self.session_id: str = session_id if session_id is not None else str(uuid.uuid4())[:8]
+
+        # enable_memory: use provided value or fall back to definition default
+        self._enable_memory = enable_memory if enable_memory is not None else definition.enable_memory
 
     @property
     def is_main_agent(self) -> bool:
@@ -90,12 +92,7 @@ class Agent:
         """Agent display name from definition."""
         return self.definition.display_name
 
-    async def execute(
-        self,
-        instruction: UserMessage,
-        agent_profile: Optional[str] = None,
-        enable_memory: Optional[bool] = None,
-    ) -> AgentResult:
+    async def execute(self, instruction: UserMessage) -> AgentResult:
         """
         Unified agent execution entry point.
 
@@ -103,10 +100,10 @@ class Agent:
         - MainAgent: streaming LLM calls, WebSocket notifications, persistence
         - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
+        All configuration comes from self.definition (tool_profile, enable_memory, etc.)
+
         Args:
             instruction: UserMessage object containing user input (required)
-            agent_profile: Agent profile for tool selection (MainAgent only)
-            enable_memory: Whether to enable memory persistence (MainAgent only)
 
         Returns:
             AgentResult with execution outcome
@@ -128,17 +125,9 @@ class Agent:
             # Setup context manager (cached as instance attribute)
             self._context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
-            # Configure context manager based on mode
-            if self.is_main_agent:
-                # MainAgent: use provided configuration
-                if agent_profile is not None:
-                    self._context_manager.agent_profile = agent_profile
-                if enable_memory is not None:
-                    self._context_manager.enable_memory = enable_memory
-            else:
-                # SubAgent: use definition defaults
-                self._context_manager.agent_profile = self.definition.tool_profile
-                self._context_manager.enable_memory = self.definition.enable_memory
+            # Configure context manager from definition and instance settings
+            self._context_manager.agent_profile = self.definition.tool_profile
+            self._context_manager.enable_memory = self._enable_memory
 
             # Build system prompt once (immutable during Agent lifecycle)
             prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
