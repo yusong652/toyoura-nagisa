@@ -325,10 +325,8 @@ class Agent:
             # === Execute tools ===
             if self.is_main_agent:
                 # MainAgent: Full tool execution with persistence
-                message_service = MessageService()
                 tool_executor = ToolExecutor(
                     self.llm_client.tool_manager,
-                    message_service,
                     self.session_id
                 )
                 execution_result = await tool_executor.execute_all(
@@ -375,7 +373,6 @@ class Agent:
 
                 tool_executor = ToolExecutor(
                     tool_manager=self.llm_client.tool_manager,
-                    message_service=MessageService(),
                     session_id=self.session_id,
                 )
                 execution_result = await tool_executor.execute_all(

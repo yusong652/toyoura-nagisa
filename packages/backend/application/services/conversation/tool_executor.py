@@ -39,7 +39,6 @@ class ToolExecutor:
     def __init__(
         self,
         tool_manager: Any,
-        message_service: Any,
         session_id: str
     ):
         """
@@ -47,11 +46,9 @@ class ToolExecutor:
 
         Args:
             tool_manager: ToolManager for tool execution
-            message_service: MessageService for persistence
             session_id: Session ID
         """
         self.tool_manager = tool_manager
-        self.message_service = message_service
         self.session_id = session_id
         self.confirmation_strategy = ConfirmationStrategy(tool_manager)
 
@@ -263,11 +260,14 @@ class ToolExecutor:
             tool_calls: Original tool calls list
             results: Results indexed by original order
         """
+        from backend.application.services.message_service import MessageService
+
+        message_service = MessageService()
         for i, tool_call in enumerate(tool_calls):
             result = results[i]
             if result is not None:
                 try:
-                    self.message_service.save_tool_result_message(
+                    message_service.save_tool_result_message(
                         tool_call_id=tool_call['id'],
                         tool_name=tool_call['name'],
                         tool_result=result,
