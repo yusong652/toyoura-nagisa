@@ -15,7 +15,7 @@ import uuid
 from typing import Any, Callable, Dict, List, Optional
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
-from backend.domain.models.messages import AssistantMessage, BaseMessage, UserMessage
+from backend.domain.models.messages import AssistantMessage, UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.conversation.models import StreamingState
@@ -97,7 +97,7 @@ class Agent:
 
         This is the primary method for SubAgents. The agent will:
         1. Build context from instruction
-        2. Call LLM
+        2. Call LLM (non-streaming)
         3. Execute tools if requested
         4. Repeat until done or limits reached
 
@@ -108,98 +108,46 @@ class Agent:
             AgentResult with execution outcome
         """
         start_time = time.time()
-        iteration = 0
 
         self._emit_activity("started", {"instruction": instruction})
 
         try:
-            # Setup context manager using session_id (auto-generated for SubAgent)
-            context_manager = self.llm_client.get_or_create_context_manager(
-                self.session_id
-            )
+            # Setup context manager
+            context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
             context_manager.agent_profile = self.definition.tool_profile
             context_manager.enable_memory = self.definition.enable_memory
 
-            # Build initial user message from instruction (task from parent agent)
+            # Add instruction as user message
             if instruction:
                 initial_message = UserMessage(content=instruction)
                 await context_manager.add_user_message(initial_message)
 
-            # Build system prompt using infrastructure
-            # Uses definition.name as the prompt profile to load {name}.md
-            from backend.shared.utils.prompt.builder import build_system_prompt
-            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-                self.session_id, self.definition.tool_profile
-            )
-            system_prompt = await build_system_prompt(
-                agent_profile=self.definition.name,  # name doubles as prompt profile
-                session_id=self.session_id,
-                enable_memory=self.definition.enable_memory,
-                tool_schemas=prompt_tool_schemas
-            )
+            # Execute unified loop
+            final_response = await self._execute_loop()
 
-            # Get api_config using infrastructure layer
-            messages, api_config = await self.llm_client._prepare_complete_context(
-                session_id=self.session_id,
-                system_prompt=system_prompt
-            )
-
-            # Execution loop
-            while iteration < self.definition.max_iterations:
-                # Get fresh messages from context_manager
-                messages = context_manager.get_working_contents()
-
-                # LLM call
-                self._emit_activity("thinking", {"iteration": iteration})
-                response = await self.llm_client.call_api_with_context(
-                    context_contents=messages,
-                    api_config=api_config,
+            # Format result
+            if final_response is None:
+                return AgentResult(
+                    status="max_iterations",
+                    iterations_used=self.definition.max_iterations,
+                    execution_time_seconds=time.time() - start_time,
                 )
-                self._emit_activity("llm_response", {"iteration": iteration})
 
-                # Extract response content and tool calls
-                response_text, tool_calls = self._parse_response(response)
+            # Extract text from response
+            response_text, _ = self._parse_response(final_response)
+            final_message = AssistantMessage(
+                role="assistant",
+                content=[{"type": "text", "text": response_text}]
+            )
 
-                # No tool calls = done
-                if not tool_calls:
-                    # Wrap response text in AssistantMessage for unified handling
-                    final_message = AssistantMessage(
-                        role="assistant",
-                        content=[{"type": "text", "text": response_text}]
-                    )
-                    return AgentResult(
-                        status="success",
-                        message=final_message,
-                        iterations_used=iteration + 1,
-                        execution_time_seconds=time.time() - start_time,
-                    )
-
-                # Add assistant response to context
-                context_manager.add_response(response)
-
-                # Execute tools and add results to context
-                tool_results = await self._execute_tools(tool_calls, iteration)
-                for tool_call, result in zip(tool_calls, tool_results):
-                    if result is not None:
-                        await context_manager.add_tool_result(
-                            tool_call_id=tool_call.get("id", ""),
-                            tool_name=tool_call.get("name", ""),
-                            result=result,
-                            inject_reminders=False
-                        )
-
-                iteration += 1
-
-            # Max iterations reached
             return AgentResult(
-                status="max_iterations",
-                iterations_used=iteration,
+                status="success",
+                message=final_message,
                 execution_time_seconds=time.time() - start_time,
             )
 
         except Exception as e:
             self._emit_activity("error", {"error": str(e)})
-            # Wrap error in AssistantMessage for unified handling
             error_message = AssistantMessage(
                 role="assistant",
                 content=[{"type": "text", "text": f"Error: {str(e)}"}]
@@ -207,15 +155,11 @@ class Agent:
             return AgentResult(
                 status="error",
                 message=error_message,
-                iterations_used=iteration,
                 execution_time_seconds=time.time() - start_time,
             )
 
         finally:
-            self._emit_activity("completed", {
-                "iterations": iteration,
-                "elapsed": time.time() - start_time,
-            })
+            self._emit_activity("completed", {"elapsed": time.time() - start_time})
 
     async def stream(
         self,
@@ -251,7 +195,7 @@ class Agent:
                     user_message = UserMessage(content=instruction)
                     await context_manager.add_user_message(user_message)
 
-            final_response = await self._stream_loop()
+            final_response = await self._execute_loop()
 
             # Format response for storage
             processor = self.llm_client._get_response_processor()
@@ -324,30 +268,40 @@ class Agent:
             # SubAgent mode: non-streaming, temporary context
             return await self.run(instruction)
 
-    async def _stream_loop(self) -> Any:
+    async def _execute_loop(self) -> Any:
         """
-        Loop-based streaming implementation with tool calling.
+        Unified execution loop for both streaming and non-streaming modes.
 
-        Uses self.session_id for all session-related operations.
+        Uses self.is_main_agent to control:
+        - LLM call method (streaming vs non-streaming)
+        - Message persistence (MainAgent only)
+        - Progress notifications (WebSocket vs activity callbacks)
+        - User interruption handling (MainAgent only)
+
+        Returns:
+            Final LLM response object
         """
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring import get_status_monitor
         from backend.shared.exceptions import UserRejectionInterruption
         from backend.shared.utils.prompt.builder import build_system_prompt
 
-        # Initialize services
+        # Initialize services based on mode
         message_service = MessageService()
-        streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
         context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
-        # Track conversation turn for todo reminders (once at start)
-        status_monitor = get_status_monitor(self.session_id)
-        if hasattr(status_monitor, 'todo_monitor'):
-            status_monitor.todo_monitor.track_conversation_turn()
+        # MainAgent: streaming processor and status monitor
+        streaming_processor = None
+        status_monitor = None
+        if self.is_main_agent:
+            streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
+            status_monitor = get_status_monitor(self.session_id)
+            if hasattr(status_monitor, 'todo_monitor'):
+                status_monitor.todo_monitor.track_conversation_turn()
 
         iteration = 0
         while True:
-            # Build system prompt (may change between iterations due to tool results)
+            # === Build system prompt ===
             prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
                 self.session_id, context_manager.agent_profile
             )
@@ -363,85 +317,158 @@ class Agent:
                 system_prompt=system_prompt
             )
 
-            # Create placeholder message for this iteration
-            message_id = message_service.save_assistant_message([], self.session_id)
-            await WebSocketNotificationService.send_message_create(
-                self.session_id, message_id, streaming=True
-            )
-            context_manager.streaming_message_id = message_id
-            state = StreamingState(message_id=message_id)
-
-            # Process stream
-            stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
-            was_interrupted, response = await streaming_processor.process_stream(stream, state)
-
-            # Handle interruption
-            if was_interrupted:
-                return await self._handle_stream_interruption(state, iteration, message_service)
-
-            # No tool calls = done
-            if not streaming_processor.has_tool_calls(response):
-                return await self._finalize_stream_response(
-                    response, message_id, state, streaming_processor, message_service
+            # === MainAgent: Create placeholder message ===
+            message_id = None
+            state = None
+            if self.is_main_agent:
+                message_id = message_service.save_assistant_message([], self.session_id)
+                await WebSocketNotificationService.send_message_create(
+                    self.session_id, message_id, streaming=True
                 )
+                context_manager.streaming_message_id = message_id
+                state = StreamingState(message_id=message_id)
 
-            # Has tool calls - add response to context first
+            # === LLM Call (streaming vs non-streaming) ===
+            if self.is_main_agent:
+                # Type narrowing for Pylance
+                assert streaming_processor is not None
+                assert state is not None
+                assert message_id is not None
+                assert status_monitor is not None
+
+                # Streaming call
+                stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
+                was_interrupted, response = await streaming_processor.process_stream(stream, state)
+
+                # Handle interruption
+                if was_interrupted:
+                    return await self._handle_stream_interruption(state, iteration, message_service)
+            else:
+                # Non-streaming call
+                self._emit_activity("thinking", {"iteration": iteration})
+                response = await self.llm_client.call_api_with_context(
+                    context_contents=context_manager.get_working_contents(),
+                    api_config=api_config,
+                )
+                self._emit_activity("llm_response", {"iteration": iteration})
+
+            # === Check for tool calls ===
+            if self.is_main_agent:
+                assert streaming_processor is not None  # Type narrowing
+                has_tools = streaming_processor.has_tool_calls(response)
+                tool_calls = streaming_processor.extract_tool_calls(response) if has_tools else []
+            else:
+                _, tool_calls = self._parse_response(response)
+                has_tools = bool(tool_calls)
+
+            # === No tool calls = done ===
+            if not has_tools:
+                if self.is_main_agent:
+                    assert message_id is not None and state is not None and streaming_processor is not None
+                    return await self._finalize_stream_response(
+                        response, message_id, state, streaming_processor, message_service
+                    )
+                else:
+                    # Non-streaming: just return response
+                    context_manager.add_response(response)
+                    return response
+
+            # === Has tool calls - process them ===
             context_manager.add_response(response)
-            tool_calls = streaming_processor.extract_tool_calls(response)
 
-            # Update streaming message with tool call content
-            await self._update_stream_tool_message(
-                response, message_id, state, streaming_processor, tool_calls, message_service
-            )
+            # MainAgent: Update streaming message with tool content
+            if self.is_main_agent:
+                assert message_id is not None and state is not None and streaming_processor is not None
+                await self._update_stream_tool_message(
+                    response, message_id, state, streaming_processor, tool_calls, message_service
+                )
 
             if not tool_calls:
                 return response
 
-            # Check iteration limit BEFORE executing tools
+            # === Check iteration limit BEFORE executing tools ===
             if iteration >= self.definition.max_iterations:
-                await self._handle_stream_iteration_limit(tool_calls, context_manager, message_service)
+                if self.is_main_agent:
+                    await self._handle_stream_iteration_limit(tool_calls, context_manager, message_service)
                 return response
 
-            # Execute tools
-            tool_executor = ToolExecutor(
-                self.llm_client.tool_manager,
-                message_service,
-                self.session_id
-            )
-            execution_result = await tool_executor.execute_all(
-                tool_calls, message_id, context_manager.agent_profile
-            )
+            # === Execute tools ===
+            if self.is_main_agent:
+                # Type narrowing for MainAgent-specific variables
+                assert message_id is not None and state is not None and status_monitor is not None
 
-            # Save to context and database
-            await tool_executor.save_results_to_context(
-                tool_calls, execution_result.results, context_manager
-            )
-            await tool_executor.save_results_to_database(
-                tool_calls, execution_result.results
-            )
-
-            # Handle rejection
-            if execution_result.rejected_tools:
-                await WebSocketNotificationService.send_streaming_update(
-                    session_id=self.session_id,
-                    message_id=message_id,
-                    content=state.get_content_blocks(),
-                    streaming=False,
-                    interrupted=False
+                # MainAgent: Full tool execution with persistence
+                tool_executor = ToolExecutor(
+                    self.llm_client.tool_manager,
+                    message_service,
+                    self.session_id
                 )
-                raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
-
-            # Check for user interrupt before next iteration
-            if status_monitor.is_user_interrupted():
-                print(f"[Agent.stream] Tool calling interrupted by user at iteration {iteration}")
-                await WebSocketNotificationService.send_streaming_update(
-                    session_id=self.session_id,
-                    message_id=state.message_id,
-                    content=state.get_content_blocks(),
-                    streaming=False,
-                    interrupted=True
+                execution_result = await tool_executor.execute_all(
+                    tool_calls, message_id, context_manager.agent_profile
                 )
-                return response
+
+                # Save to context and database
+                await tool_executor.save_results_to_context(
+                    tool_calls, execution_result.results, context_manager
+                )
+                await tool_executor.save_results_to_database(
+                    tool_calls, execution_result.results
+                )
+
+                # Handle rejection
+                if execution_result.rejected_tools:
+                    await WebSocketNotificationService.send_streaming_update(
+                        session_id=self.session_id,
+                        message_id=message_id,
+                        content=state.get_content_blocks(),
+                        streaming=False,
+                        interrupted=False
+                    )
+                    raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
+
+                # Check for user interrupt
+                if status_monitor.is_user_interrupted():
+                    print(f"[Agent] Tool calling interrupted by user at iteration {iteration}")
+                    await WebSocketNotificationService.send_streaming_update(
+                        session_id=self.session_id,
+                        message_id=state.message_id,
+                        content=state.get_content_blocks(),
+                        streaming=False,
+                        interrupted=True
+                    )
+                    return response
+            else:
+                # SubAgent: Simple tool execution with activity callbacks
+                for tool_call in tool_calls:
+                    self._emit_activity("tool_call_start", {
+                        "tool": tool_call.get("name", "unknown"),
+                        "args": tool_call.get("arguments", {}),
+                    })
+
+                tool_executor = ToolExecutor(
+                    tool_manager=self.llm_client.tool_manager,
+                    message_service=message_service,
+                    session_id=self.session_id,
+                )
+                execution_result = await tool_executor.execute_all(
+                    tool_calls=tool_calls,
+                    message_id=f"agent_{self.session_id}_{iteration}",
+                    agent_profile=self.definition.tool_profile,
+                )
+
+                # Save results to context only (no database persistence for SubAgent)
+                for tool_call, result in zip(tool_calls, execution_result.results):
+                    if result is not None:
+                        await context_manager.add_tool_result(
+                            tool_call_id=tool_call.get("id", ""),
+                            tool_name=tool_call.get("name", ""),
+                            result=result,
+                            inject_reminders=False
+                        )
+                    self._emit_activity("tool_call_end", {
+                        "tool": tool_call.get("name", "unknown"),
+                        "status": result.get("status", "unknown") if result else "rejected",
+                    })
 
             # Continue to next iteration
             iteration += 1
@@ -650,56 +677,6 @@ class Agent:
         except Exception as e:
             print(f"[Agent] Error parsing response: {e}")
             return "", []
-
-    async def _execute_tools(
-        self,
-        tool_calls: List[Dict],
-        iteration: int
-    ) -> List[Optional[Dict[str, Any]]]:
-        """
-        Execute tool calls.
-
-        Args:
-            tool_calls: List of tool call dicts
-            iteration: Current iteration number
-
-        Returns:
-            List of tool results
-        """
-        # Emit activity for each tool
-        for tool_call in tool_calls:
-            self._emit_activity("tool_call_start", {
-                "tool": tool_call.get("name", "unknown"),
-                "args": tool_call.get("arguments", {}),
-            })
-
-        # Create ToolExecutor
-        tool_executor = ToolExecutor(
-            tool_manager=self.llm_client.tool_manager,
-            message_service=MessageService(),
-            session_id=self.session_id,
-        )
-
-        # Generate message ID for tool execution
-        message_id = f"agent_{self.session_id}_{iteration}"
-
-        # Execute all tools
-        execution_result = await tool_executor.execute_all(
-            tool_calls=tool_calls,
-            message_id=message_id,
-            agent_profile=self.definition.tool_profile,
-        )
-
-        # Emit completion activity for each tool
-        for i, tool_call in enumerate(tool_calls):
-            result = execution_result.results[i]
-            status = result.get("status", "unknown") if result else "rejected"
-            self._emit_activity("tool_call_end", {
-                "tool": tool_call.get("name", "unknown"),
-                "status": status,
-            })
-
-        return execution_result.results
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit activity event if callback is registered."""
