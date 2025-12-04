@@ -28,6 +28,7 @@ from backend.infrastructure.mcp.tools.pfc import (
     register_pfc_query_command_tool
 )
 from backend.infrastructure.mcp.tools.planning import register_planning_tools
+from backend.infrastructure.mcp.tools.agent import register_agent_tools
 
 mcp = FastMCP(
     "Smart MCP Server for Nagisa",
@@ -58,6 +59,8 @@ register_pfc_query_python_api_tool(mcp)
 register_pfc_query_command_tool(mcp)
 # Planning tools - persistent todo tracking with cross-session awareness
 register_planning_tools(mcp)
+# Agent tools - SubAgent delegation
+register_agent_tools(mcp)
 
 # 启动服务器
 if __name__ == "__main__":

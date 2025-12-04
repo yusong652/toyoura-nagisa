@@ -140,10 +140,11 @@ class Agent:
                 self.session_id, self._context_manager.agent_profile
             )
             self._system_prompt = await build_system_prompt(
-                agent_profile=self._context_manager.agent_profile,
+                agent_profile=self.config.name,  # Use config.name for SubAgent prompt lookup
                 session_id=self.session_id,
                 enable_memory=self._context_manager.enable_memory,
-                tool_schemas=prompt_tool_schemas
+                tool_schemas=prompt_tool_schemas,
+                include_expression=self.is_main_agent,  # SubAgent: no expression instructions
             )
 
             # Add instruction to context

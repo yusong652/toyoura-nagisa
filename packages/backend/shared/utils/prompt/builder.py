@@ -82,6 +82,7 @@ async def build_system_prompt(
     user_id: Optional[str] = None,
     enable_memory: bool = False,
     tool_schemas: Optional[List[Dict[str, Any]]] = None,
+    include_expression: bool = True,
 ) -> str:
     """
     Build complete system prompt following Anthropic best practices.
@@ -90,14 +91,17 @@ async def build_system_prompt(
     - Base identity and instructions (profile-specific)
     - Tool schemas embedding (Anthropic function calling format)
     - Automatic memory context injection from conversation history
-    - Expression/Live2D instructions
+    - Expression/Live2D instructions (MainAgent only)
 
     Args:
         agent_profile: Agent profile type ("general", "pfc", "coding", "lifestyle", "disabled")
+                      For SubAgents, use the SubAgent name (e.g., "pfc_explorer")
         session_id: Session ID for memory retrieval
         user_id: User ID for memory operations
         enable_memory: Whether to enable memory injection (controlled by frontend)
         tool_schemas: Pre-fetched tool schemas from LLM provider's tool manager
+        include_expression: Whether to include expression/Live2D instructions (default True).
+                           Set to False for SubAgents.
 
     Returns:
         Complete system prompt string following Anthropic format with memory context
@@ -154,10 +158,11 @@ async def build_system_prompt(
         else:
             components.append("## Relevant Context from Memory\n\n(No relevant memories found for current query)")
 
-    # 6. Expression/Live2D instructions
-    expression = get_expression_prompt()
-    if expression:
-        components.append(expression)
+    # 6. Expression/Live2D instructions (MainAgent only)
+    if include_expression:
+        expression = get_expression_prompt()
+        if expression:
+            components.append(expression)
 
     # Join all components with separators
     return "\n\n---\n\n".join(filter(None, components))

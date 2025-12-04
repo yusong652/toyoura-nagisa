@@ -80,6 +80,8 @@ PFC_TOOLS: List[str] = [
     "pfc_execute_task",
     "pfc_check_task_status",
     "pfc_list_tasks",
+    # SubAgent delegation
+    "invoke_agent",
 ]
 
 GENERAL_TOOLS: List[str] = [
@@ -96,6 +98,8 @@ GENERAL_TOOLS: List[str] = [
     # PFC
     "pfc_query_python_api", "pfc_query_command",
     "pfc_execute_task", "pfc_check_task_status", "pfc_list_tasks",
+    # SubAgent delegation
+    "invoke_agent",
 ]
 
 
