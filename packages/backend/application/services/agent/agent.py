@@ -250,8 +250,7 @@ class Agent:
         if self.is_main_agent:
             self._streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
             self._status_monitor = get_status_monitor(self.session_id)
-            if hasattr(self._status_monitor, 'todo_monitor'):
-                self._status_monitor.todo_monitor.track_conversation_turn()
+            self._status_monitor.todo_monitor.track_conversation_turn()
 
         iteration = 0
         while True:

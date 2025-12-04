@@ -80,7 +80,7 @@ async def build_system_prompt(
     agent_profile: str = "general",
     session_id: Optional[str] = None,
     user_id: Optional[str] = None,
-    enable_memory: bool = True,
+    enable_memory: bool = False,
     tool_schemas: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
