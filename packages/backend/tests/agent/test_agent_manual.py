@@ -97,7 +97,7 @@ async def test_no_tools(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: What is 2 + 2?")
 
-    result = await agent.run("What is 2 + 2?")
+    result = await agent.execute("What is 2 + 2?")
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -124,7 +124,7 @@ async def test_with_tools(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Read the first 10 lines of pyproject.toml")
 
-    result = await agent.run(
+    result = await agent.execute(
         "Read the first 10 lines of the file pyproject.toml in the current directory and summarize what you see."
     )
 
@@ -155,7 +155,7 @@ async def test_pfc_explorer(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Query ball create command syntax")
 
-    result = await agent.run(
+    result = await agent.execute(
         "Find the syntax for creating balls in PFC using pfc_query_command. "
         "Context: I need to understand how to create particles in a DEM simulation."
     )

@@ -2,11 +2,11 @@
 Agent - First-class citizen with active behavior.
 
 This module provides the Agent class that encapsulates both
-configuration (AgentDefinition) and behavior (run/stream methods).
+configuration (AgentDefinition) and behavior (execute method).
 
-Execution modes:
-- run(): Non-streaming mode for SubAgents (no persistence, activity callbacks)
-- stream(): Streaming mode for MainAgent (WebSocket, persistence, user interruption)
+Execution modes (controlled by is_main_agent):
+- MainAgent: streaming LLM calls, WebSocket notifications, message persistence
+- SubAgent: non-streaming calls, activity callbacks, context-only storage
 """
 
 import asyncio
@@ -29,22 +29,17 @@ class Agent:
 
     An Agent encapsulates:
     - Configuration (AgentDefinition)
-    - Behavior (run for non-streaming, stream for streaming)
+    - Unified execution (execute() handles both streaming and non-streaming)
     - State management (context, execution tracking)
 
     Usage:
-        # Create agent instance
-        explorer = Agent(PFC_EXPLORER, llm_client)
+        # SubAgent (non-streaming, activity callbacks)
+        explorer = Agent(PFC_EXPLORER, llm_client, on_activity=callback)
+        result = await explorer.execute("Find ball syntax")
 
-        # Execute task (non-streaming)
-        result = await explorer.run({"objective": "Find ball syntax"})
-
-        # Or with activity monitoring
-        def on_activity(activity):
-            print(f"[{activity.event_type}] {activity.data}")
-
-        explorer = Agent(PFC_EXPLORER, llm_client, on_activity=on_activity)
-        result = await explorer.run(inputs)
+        # MainAgent (streaming, WebSocket, persistence)
+        nagisa = Agent(MAIN_AGENT, llm_client, session_id="abc123")
+        result = await nagisa.execute("Write a Python script")
     """
 
     def __init__(
@@ -88,44 +83,55 @@ class Agent:
         """Agent display name from definition."""
         return self.definition.display_name
 
-    async def run(
+    async def execute(
         self,
         instruction: Optional[str] = None,
     ) -> AgentResult:
         """
-        Execute agent task (non-streaming mode).
+        Unified agent execution entry point.
 
-        This is the primary method for SubAgents. The agent will:
-        1. Build context from instruction
-        2. Call LLM (non-streaming)
-        3. Execute tools if requested
-        4. Repeat until done or limits reached
+        Handles both MainAgent (streaming) and SubAgent (non-streaming) modes:
+        - MainAgent: streaming LLM calls, WebSocket notifications, persistence
+        - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
         Args:
-            instruction: Task instruction from parent agent
+            instruction: Task instruction for the agent
 
         Returns:
             AgentResult with execution outcome
+
+        Raises:
+            UserRejectionInterruption: When user rejects tool execution (MainAgent only)
         """
+        from backend.shared.exceptions import UserRejectionInterruption
+
         start_time = time.time()
 
-        self._emit_activity("started", {"instruction": instruction})
+        # SubAgent: emit started activity
+        if not self.is_main_agent:
+            self._emit_activity("started", {"instruction": instruction})
 
         try:
             # Setup context manager
             context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-            context_manager.agent_profile = self.definition.tool_profile
-            context_manager.enable_memory = self.definition.enable_memory
 
-            # Add instruction as user message
+            # SubAgent: set profile and memory from definition
+            if not self.is_main_agent:
+                context_manager.agent_profile = self.definition.tool_profile
+                context_manager.enable_memory = self.definition.enable_memory
+
+            # Add instruction as user message (check if needed for MainAgent)
             if instruction:
-                initial_message = UserMessage(content=instruction)
-                await context_manager.add_user_message(initial_message)
+                if self.is_main_agent:
+                    if self._should_inject_instruction(context_manager):
+                        await context_manager.add_user_message(UserMessage(content=instruction))
+                else:
+                    await context_manager.add_user_message(UserMessage(content=instruction))
 
             # Execute unified loop
             final_response = await self._execute_loop()
 
-            # Format result
+            # Format result based on mode
             if final_response is None:
                 return AgentResult(
                     status="max_iterations",
@@ -133,82 +139,25 @@ class Agent:
                     execution_time_seconds=time.time() - start_time,
                 )
 
-            # Extract text from response
-            response_text, _ = self._parse_response(final_response)
-            final_message = AssistantMessage(
-                role="assistant",
-                content=[{"type": "text", "text": response_text}]
-            )
-
-            return AgentResult(
-                status="success",
-                message=final_message,
-                execution_time_seconds=time.time() - start_time,
-            )
-
-        except Exception as e:
-            self._emit_activity("error", {"error": str(e)})
-            error_message = AssistantMessage(
-                role="assistant",
-                content=[{"type": "text", "text": f"Error: {str(e)}"}]
-            )
-            return AgentResult(
-                status="error",
-                message=error_message,
-                execution_time_seconds=time.time() - start_time,
-            )
-
-        finally:
-            self._emit_activity("completed", {"elapsed": time.time() - start_time})
-
-    async def stream(
-        self,
-        instruction: Optional[str] = None,
-    ) -> AgentResult:
-        """
-        Execute agent task (streaming mode) for MainAgent.
-
-        This method provides full streaming support:
-        - Streaming LLM calls with WebSocket notifications
-        - Message persistence to database
-        - User interruption support
-        - Recursive tool calling
-
-        Args:
-            instruction: Optional instruction to inject if context is empty
-
-        Returns:
-            AgentResult with execution outcome
-
-        Raises:
-            UserRejectionInterruption: When user rejects tool execution
-        """
-        from backend.shared.exceptions import UserRejectionInterruption
-
-        start_time = time.time()
-
-        try:
-            # Inject instruction if provided and context needs it
-            if instruction:
-                context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-                if self._should_inject_instruction(context_manager):
-                    user_message = UserMessage(content=instruction)
-                    await context_manager.add_user_message(user_message)
-
-            final_response = await self._execute_loop()
-
-            # Format response for storage
-            processor = self.llm_client._get_response_processor()
-            if processor:
-                final_message = processor.format_response_for_storage(final_response)
+            if self.is_main_agent:
+                # MainAgent: use processor for storage format
+                processor = self.llm_client._get_response_processor()
+                if processor:
+                    final_message = processor.format_response_for_storage(final_response)
+                else:
+                    final_message = AssistantMessage(
+                        role="assistant",
+                        content=[{"type": "text", "text": "Response processing unavailable"}]
+                    )
+                streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
             else:
+                # SubAgent: extract text content
+                response_text, _ = self._parse_response(final_response)
                 final_message = AssistantMessage(
                     role="assistant",
-                    content=[{"type": "text", "text": "Response processing unavailable"}]
+                    content=[{"type": "text", "text": response_text}]
                 )
-
-            context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+                streaming_message_id = None
 
             return AgentResult(
                 status="success",
@@ -218,24 +167,43 @@ class Agent:
             )
 
         except UserRejectionInterruption:
+            # MainAgent: re-raise user rejection
             raise
 
         except Exception as e:
-            import traceback
-            print(f"[Agent.stream] Exception: {e}")
-            print(f"[Agent.stream] Traceback: {traceback.format_exc()}")
+            if self.is_main_agent:
+                # MainAgent: clean up placeholder message on error
+                import traceback
+                print(f"[Agent] Exception: {e}")
+                print(f"[Agent] Traceback: {traceback.format_exc()}")
 
-            # Clean up placeholder message on error
-            context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-            streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
-            if streaming_message_id:
-                try:
-                    message_service = MessageService()
-                    await message_service.delete_message_async(self.session_id, streaming_message_id)
-                except Exception as cleanup_error:
-                    print(f"[Agent.stream] Failed to clean up placeholder: {cleanup_error}")
+                ctx = self.llm_client.get_or_create_context_manager(self.session_id)
+                streaming_message_id = getattr(ctx, 'streaming_message_id', None)
+                if streaming_message_id:
+                    try:
+                        message_service = MessageService()
+                        await message_service.delete_message_async(self.session_id, streaming_message_id)
+                    except Exception as cleanup_error:
+                        print(f"[Agent] Failed to clean up placeholder: {cleanup_error}")
 
-            raise Exception(f"Agent streaming failed: {e}")
+                raise Exception(f"Agent execution failed: {e}")
+            else:
+                # SubAgent: emit error activity and return error result
+                self._emit_activity("error", {"error": str(e)})
+                error_message = AssistantMessage(
+                    role="assistant",
+                    content=[{"type": "text", "text": f"Error: {str(e)}"}]
+                )
+                return AgentResult(
+                    status="error",
+                    message=error_message,
+                    execution_time_seconds=time.time() - start_time,
+                )
+
+        finally:
+            # SubAgent: emit completed activity
+            if not self.is_main_agent:
+                self._emit_activity("completed", {"elapsed": time.time() - start_time})
 
     def _should_inject_instruction(self, context_manager) -> bool:
         """Check if instruction should be injected (context is empty or no user message)."""
@@ -245,28 +213,6 @@ class Agent:
         # Check if last message is already a user message
         last_msg = contents[-1]
         return last_msg.get('role') != 'user'
-
-    async def execute(
-        self,
-        instruction: Optional[str] = None,
-    ) -> AgentResult:
-        """
-        Unified agent execution entry point (facade).
-
-        Dispatches to run() or stream() based on is_main_agent.
-
-        Args:
-            instruction: Task instruction for the agent
-
-        Returns:
-            AgentResult with execution outcome
-        """
-        if self.is_main_agent:
-            # MainAgent mode: streaming with persistence
-            return await self.stream(instruction)
-        else:
-            # SubAgent mode: non-streaming, temporary context
-            return await self.run(instruction)
 
     async def _execute_loop(self) -> Any:
         """

@@ -5,7 +5,7 @@ This handler serves as the primary entry point for WebSocket chat requests,
 coordinating the complete request lifecycle:
 - Request initialization and deduplication
 - WebSocket status notifications (sent/read/error)
-- Application service orchestration (Agent.stream(), ContentProcessor, Memory)
+- Application service orchestration (Agent.execute(), ContentProcessor, Memory)
 - Error handling and user interruption management
 
 As a presentation layer component, it bridges WebSocket-specific concerns
@@ -87,7 +87,7 @@ async def process_chat_request(
                 )
 
             # ========== PHASE 4: Memory persistence ==========
-            # Note: Title generation happens in Agent.stream() (Application layer)
+            # Note: Title generation happens in Agent.execute() (Application layer)
             # Save conversation to memory after successful response
             # Get enable_memory from the session's context manager
             context_manager = llm_client.get_or_create_context_manager(session_id)
