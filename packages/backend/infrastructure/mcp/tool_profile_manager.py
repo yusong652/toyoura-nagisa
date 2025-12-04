@@ -1,189 +1,70 @@
 """
-Tool Profile Manager - Simplified agent profile-based tool management system
+Tool Profile Manager - Adapter layer for profile-based tool management.
 
-Supports multiple modes: lifestyle assistant, coding assistant, etc.
+This module provides backward-compatible access to agent profile configurations.
+The actual configuration is defined in domain/models/agent_profiles.py.
+
+This adapter exists to:
+1. Maintain backward compatibility with existing code
+2. Allow infrastructure layer to access domain-defined profiles
+3. Provide the ToolProfileManager interface expected by tool_manager.py
 """
 
 from typing import Dict, List, Any
 from dataclasses import dataclass
-from enum import Enum
 
-
-class AgentProfile(Enum):
-    """Agent profile types"""
-    LIFESTYLE = "lifestyle"  # Lifestyle assistant
-    CODING = "coding"        # Coding assistant
-    PFC = "pfc"             # PFC simulation expert
-    GENERAL = "general"      # General mode with all tools
-    DISABLED = "disabled"    # All tools disabled
+# Re-export AgentProfile enum from domain layer
+from backend.domain.models.agent_profiles import (
+    AgentProfile,
+    ProfileConfig,
+    PROFILE_CONFIGS,
+    get_profile_config,
+    get_tools_for_profile,
+    get_all_profiles,
+)
 
 
 @dataclass
 class ToolProfile:
-    """Tool collection configuration"""
+    """
+    Tool collection configuration (backward compatibility).
+
+    Maps to ProfileConfig from domain layer.
+    """
     name: str
     description: str
     tools: List[str]
     estimated_tokens: int
-    color: str  # Frontend display color
-    icon: str   # Frontend display icon
+    color: str
+    icon: str
 
 
 class ToolProfileManager:
-    """Tool collection manager"""
+    """
+    Tool collection manager (backward compatibility adapter).
 
-    # Coding tools (including web_search and planning)
-    CODING_TOOLS = [
-        "write",
-        "read",
-        "edit",   # File editing tool
-        "bash",   # Shell command execution
-        "bash_output",  # Background bash output monitoring
-        "kill_shell",   # Background bash process termination
-        "glob",   # File pattern matching
-        "grep",
-        "web_search",  # Web search for programming
-        "todo_write"   # Persistent todo tracking (Claude Code compatible)
-    ]
+    Delegates to domain layer's agent_profiles module.
+    """
 
-    # Lifestyle tools (all non-coding tools, including web_search and planning)
-    LIFESTYLE_TOOLS = [
-        "send_email",
-        "check_emails",
-        "read_email",
-        "list_calendar_events",
-        "create_calendar_event",
-        "update_calendar_event",
-        "delete_calendar_event",
-        "list_contacts",
-        "search_contacts",
-        "generate_image",
-        "search_places",
-        "get_location",
-        "web_search",  # Web search for lifestyle
-        "get_current_time",
-        "todo_write"   # Persistent todo tracking (Claude Code compatible)
-    ]
-
-    # General tools (merged coding and lifestyle, deduplicated)
-    GENERAL_TOOLS = [
-        # Coding tools
-        "write", "read", "edit", "bash", "bash_output", "kill_shell",
-        "glob", "grep",
-        # Lifestyle tools (excluding duplicate web_search)
-        "send_email", "check_emails", "read_email",
-        "list_calendar_events", "create_calendar_event",
-        "update_calendar_event", "delete_calendar_event",
-        "list_contacts", "search_contacts",
-        "generate_image", "search_places", "get_location",
-        "get_current_time",
-        # Shared tools (only include once)
-        "web_search",
-        "todo_write",  # Persistent todo tracking (Claude Code compatible)
-        # PFC documentation query tools
-        "pfc_query_python_api",      # Query Python SDK docs (try first)
-        "pfc_query_command",          # Query command docs + model properties
-        # PFC execution tools (script-only workflow)
-        "pfc_execute_task",           # Execute project with entry script
-        "pfc_check_task_status",
-        "pfc_list_tasks"
-    ]
-
-    # PFC simulation tools (coding tools + PFC-specific tools + planning)
-    PFC_TOOLS = [
-        # File operation tools for PFC scripts and data files
-        "write",
-        "read",
-        "edit",
-        # System command tools for running PFC-related commands
-        "bash",
-        "bash_output",  # Background bash output monitoring for PFC simulations
-        "kill_shell",   # Background bash process termination for PFC simulations
-        "glob",  # File pattern matching for PFC data files
-        "grep",
-        # Search and planning tools
-        "web_search",
-        "todo_write",  # Persistent todo tracking (essential for PFC workflows, Claude Code compatible)
-        # PFC documentation query tools (MANDATORY: use before writing scripts)
-        "pfc_query_python_api",     # Query PFC Python SDK docs (try first for Python approach)
-        "pfc_query_command",         # Query PFC command docs + model properties (use for itasca.command() syntax)
-        # PFC execution tools (script-only workflow: all commands via itasca.command())
-        "pfc_execute_task",         # Execute project with entry script (creates git snapshot)
-        "pfc_check_task_status",    # Query status of long-running tasks
-        "pfc_list_tasks",           # List all tracked long-running tasks
-    ]
-    
-    # Tool profile definitions
-    TOOL_PROFILES: Dict[AgentProfile, ToolProfile] = {
-        AgentProfile.CODING: ToolProfile(
-            name="Coding",
-            description="Specialized in code development, file operations and programming tasks",
-            tools=CODING_TOOLS,
-            estimated_tokens=len(CODING_TOOLS) * 282,  # 10 tools (added todo_write)
-            color="#4CAF50",  # Green
-            icon="💻"
-        ),
-
-        AgentProfile.LIFESTYLE: ToolProfile(
-            name="Lifestyle",
-            description="Focused on daily life, communication, entertainment and information services",
-            tools=LIFESTYLE_TOOLS,
-            estimated_tokens=len(LIFESTYLE_TOOLS) * 282,  # 15 tools (added todo_write)
-            color="#FF9800",  # Orange
-            icon="🌟"
-        ),
-
-        AgentProfile.PFC: ToolProfile(
-            name="PFC Expert",
-            description="ITASCA PFC simulation specialist with script-based workflow (query docs → test → production)",
-            tools=PFC_TOOLS,
-            estimated_tokens=len(PFC_TOOLS) * 282,  # 15 tools: 10 basic + 1 planning + 4 PFC tools
-            color="#9C27B0",  # Purple
-            icon="⚛️"
-        ),
-
-        AgentProfile.GENERAL: ToolProfile(
-            name="General",
-            description="Full tool capabilities, suitable for complex tasks",
-            tools=GENERAL_TOOLS,
-            estimated_tokens=len(GENERAL_TOOLS) * 282,  # All tools including planning
-            color="#607D8B",  # Blue-grey
-            icon="🤖"
-        ),
-        
-        AgentProfile.DISABLED: ToolProfile(
-            name="Disabled",
-            description="No tools enabled, pure conversation mode",
-            tools=[],  # 空列表，但通过特殊逻辑处理为禁用所有工具
-            estimated_tokens=0,  # No tools
-            color="#F44336",  # Red
-            icon="🚫"
-        )
-    }
-    
     @classmethod
     def get_profile(cls, profile: AgentProfile) -> ToolProfile:
-        """Get agent profile configuration"""
-        return cls.TOOL_PROFILES[profile]
-    
+        """Get agent profile configuration."""
+        config = PROFILE_CONFIGS[profile]
+        return ToolProfile(
+            name=config.display_name,
+            description=config.description,
+            tools=list(config.tools),
+            estimated_tokens=config.estimated_tokens,
+            color=config.color,
+            icon=config.icon,
+        )
+
     @classmethod
     def get_tools_for_profile(cls, profile: AgentProfile) -> List[str]:
-        """Get tool list for specified profile"""
-        profile_config = cls.TOOL_PROFILES[profile]
-        return profile_config.tools
-    
+        """Get tool list for specified profile."""
+        return get_tools_for_profile(profile)
+
     @classmethod
     def get_available_profiles(cls) -> Dict[str, Dict[str, Any]]:
-        """Get all available agent profile configurations (for frontend display)"""
-        return {
-            profile.value: {
-                "name": config.name,
-                "description": config.description,
-                "estimated_tokens": config.estimated_tokens,
-                "tool_count": len(config.tools) if config.tools else 24,
-                "color": config.color,
-                "icon": config.icon
-            }
-            for profile, config in cls.TOOL_PROFILES.items()
-        }
-    
+        """Get all available agent profile configurations (for frontend display)."""
+        return get_all_profiles()

@@ -2,19 +2,19 @@
 Agent - First-class citizen with active behavior.
 
 This module provides the Agent class that encapsulates both
-configuration (AgentDefinition) and behavior (execute method).
+configuration (ProfileConfig/SubAgentConfig) and behavior (execute method).
 
 Execution modes (controlled by is_main_agent):
 - MainAgent: streaming LLM calls, WebSocket notifications, message persistence
 - SubAgent: non-streaming calls, activity callbacks, context-only storage
 """
 
-import asyncio
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 
-from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
+from backend.domain.models.agent import AgentActivity, AgentResult
+from backend.domain.models.agent_profiles import ProfileConfig, SubAgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
 from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.base.client import LLMClientBase
@@ -25,29 +25,35 @@ from backend.application.services.message_service import MessageService
 from backend.application.services.contents.title_service import trigger_title_generation
 from backend.infrastructure.storage.session_manager import save_token_usage
 
+# Type alias for agent configuration
+AgentConfig = Union[ProfileConfig, SubAgentConfig]
+
 
 class Agent:
     """
     Agent with active behavior - first-class citizen in the system.
 
     An Agent encapsulates:
-    - Configuration (AgentDefinition)
+    - Configuration (ProfileConfig or SubAgentConfig)
     - Unified execution (execute() handles both streaming and non-streaming)
     - State management (context, execution tracking)
 
     Usage:
+        # MainAgent (streaming, WebSocket, persistence)
+        from backend.domain.models.agent_profiles import get_profile_config
+        config = get_profile_config("coding")
+        agent = Agent(config, llm_client, session_id="abc123")
+        result = await agent.execute(instruction=user_message)
+
         # SubAgent (non-streaming, activity callbacks)
+        from backend.domain.models.agent_profiles import PFC_EXPLORER
         explorer = Agent(PFC_EXPLORER, llm_client, on_activity=callback)
         result = await explorer.execute(UserMessage(content="Find ball syntax"))
-
-        # MainAgent (streaming, WebSocket, persistence)
-        nagisa = Agent(CODING_AGENT, llm_client, session_id="abc123")
-        result = await nagisa.execute(instruction=user_message)
     """
 
     def __init__(
         self,
-        definition: AgentDefinition,
+        config: AgentConfig,
         llm_client: LLMClientBase,
         session_id: Optional[str] = None,
         enable_memory: Optional[bool] = None,
@@ -57,16 +63,16 @@ class Agent:
         Initialize Agent.
 
         Args:
-            definition: Agent configuration (name, tool_profile, limits)
+            config: Agent configuration (ProfileConfig or SubAgentConfig)
             llm_client: LLM client for API calls
             session_id: Session ID for MainAgent (persistent session).
                        If provided, agent operates as MainAgent with streaming and persistence.
                        If None, agent operates as SubAgent with auto-generated temporary ID.
             enable_memory: Whether to enable memory persistence.
-                          If None, uses definition.enable_memory as default.
+                          If None, uses config.enable_memory as default.
             on_activity: Optional callback for activity events (SubAgent mode)
         """
-        self.definition = definition
+        self.config = config
         self.llm_client = llm_client
         self.on_activity = on_activity
 
@@ -74,8 +80,8 @@ class Agent:
         self._is_main_agent = session_id is not None
         self.session_id: str = session_id if session_id is not None else str(uuid.uuid4())[:8]
 
-        # enable_memory: use provided value or fall back to definition default
-        self._enable_memory = enable_memory if enable_memory is not None else definition.enable_memory
+        # enable_memory: use provided value or fall back to config default
+        self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
 
     @property
     def is_main_agent(self) -> bool:
@@ -85,12 +91,12 @@ class Agent:
     @property
     def name(self) -> str:
         """Agent name from definition."""
-        return self.definition.name
+        return self.config.name
 
     @property
     def display_name(self) -> str:
         """Agent display name from definition."""
-        return self.definition.display_name
+        return self.config.display_name
 
     async def execute(self, instruction: UserMessage) -> AgentResult:
         """
@@ -100,7 +106,7 @@ class Agent:
         - MainAgent: streaming LLM calls, WebSocket notifications, persistence
         - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
-        All configuration comes from self.definition (tool_profile, enable_memory, etc.)
+        All configuration comes from self.config (tool_profile, enable_memory, etc.)
 
         Args:
             instruction: UserMessage object containing user input (required)
@@ -126,7 +132,7 @@ class Agent:
             self._context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
             # Configure context manager from definition and instance settings
-            self._context_manager.agent_profile = self.definition.tool_profile
+            self._context_manager.agent_profile = self.config.tool_profile
             self._context_manager.enable_memory = self._enable_memory
 
             # Build system prompt once (immutable during Agent lifecycle)
@@ -160,7 +166,7 @@ class Agent:
             if final_response is None:
                 return AgentResult(
                     status="max_iterations",
-                    iterations_used=self.definition.max_iterations,
+                    iterations_used=self.config.max_iterations,
                     execution_time_seconds=time.time() - start_time,
                 )
 
@@ -334,7 +340,7 @@ class Agent:
                 )
 
             # === Check iteration limit BEFORE executing tools ===
-            if iteration >= self.definition.max_iterations:
+            if iteration >= self.config.max_iterations:
                 if self.is_main_agent:
                     await self._handle_stream_iteration_limit(tool_calls, message_service)
                 return response
@@ -400,7 +406,7 @@ class Agent:
                 execution_result = await tool_executor.execute_all(
                     tool_calls=tool_calls,
                     message_id=f"agent_{self.session_id}_{iteration}",
-                    agent_profile=self.definition.tool_profile,
+                    agent_profile=self.config.tool_profile,
                 )
 
                 # Save results to context only (no database persistence for SubAgent)
@@ -549,11 +555,11 @@ class Agent:
         from backend.infrastructure.mcp.utils.tool_result import success_response
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
-        print(f"[Agent.stream] Reached iteration limit ({self.definition.max_iterations})")
+        print(f"[Agent.stream] Reached iteration limit ({self.config.max_iterations})")
 
         stop_message = (
             f"Tool execution stopped: Reached iteration limit "
-            f"({self.definition.max_iterations} iterations).\n\n"
+            f"({self.config.max_iterations} iterations).\n\n"
             f"The task may be incomplete. You can provide a summary of what was accomplished.\n\n"
             f"Note: This is a safety mechanism to prevent infinite loops."
         )
@@ -604,7 +610,7 @@ class Agent:
             return
 
         activity = AgentActivity(
-            agent_name=self.definition.name,
+            agent_name=self.config.name,
             event_type=event_type,  # type: ignore
             data=data,
         )

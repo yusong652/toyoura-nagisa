@@ -48,29 +48,33 @@ async def initialize_backend():
 
 
 # Import after path setup
-from backend.domain.models.agent import AgentDefinition, AgentActivity
+from backend.domain.models.agent import AgentActivity
+from backend.domain.models.agent_profiles import (
+    SubAgentConfig,
+    AgentProfile,
+    PFC_EXPLORER,
+)
+from backend.domain.models.messages import UserMessage
 from backend.application.services.agent.agent import Agent
 
 
 # Simple test agent definition (no tools, just text response)
-# Uses "general" profile which falls back to base_prompt.md
-TEST_AGENT_NO_TOOLS = AgentDefinition(
-    name="general",  # Uses config/prompts/base_prompt.md
+TEST_AGENT_NO_TOOLS = SubAgentConfig(
+    name="test_no_tools",
     display_name="Test Agent (No Tools)",
     description="Simple test agent that responds without using tools",
-    tool_profile="disabled",  # No tools
+    _tool_profile=AgentProfile.DISABLED,
     max_iterations=3,
     streaming_enabled=False,
     enable_memory=False,
 )
 
 # Test agent with coding tools
-# Uses "general" profile with coding tools
-TEST_AGENT_WITH_TOOLS = AgentDefinition(
-    name="general",  # Uses config/prompts/base_prompt.md
+TEST_AGENT_WITH_TOOLS = SubAgentConfig(
+    name="test_with_tools",
     display_name="Test Agent (With Tools)",
     description="Test agent that can use coding tools",
-    tool_profile="coding",  # Coding tool set
+    _tool_profile=AgentProfile.CODING,
     max_iterations=5,
     streaming_enabled=False,
     enable_memory=False,
@@ -89,7 +93,7 @@ async def test_no_tools(llm_client):
     print("=" * 60)
 
     agent = Agent(
-        definition=TEST_AGENT_NO_TOOLS,
+        config=TEST_AGENT_NO_TOOLS,
         llm_client=llm_client,
         on_activity=activity_callback,
     )
@@ -97,7 +101,7 @@ async def test_no_tools(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: What is 2 + 2?")
 
-    result = await agent.execute("What is 2 + 2?")
+    result = await agent.execute(UserMessage(content="What is 2 + 2?"))
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -116,7 +120,7 @@ async def test_with_tools(llm_client):
     print("=" * 60)
 
     agent = Agent(
-        definition=TEST_AGENT_WITH_TOOLS,
+        config=TEST_AGENT_WITH_TOOLS,
         llm_client=llm_client,
         on_activity=activity_callback,
     )
@@ -124,9 +128,9 @@ async def test_with_tools(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Read the first 10 lines of pyproject.toml")
 
-    result = await agent.execute(
-        "Read the first 10 lines of the file pyproject.toml in the current directory and summarize what you see."
-    )
+    result = await agent.execute(UserMessage(
+        content="Read the first 10 lines of the file pyproject.toml in the current directory and summarize what you see."
+    ))
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")
@@ -144,10 +148,8 @@ async def test_pfc_explorer(llm_client):
     print("TEST 3: PFC Explorer Agent")
     print("=" * 60)
 
-    from backend.domain.models.agent_definitions import PFC_EXPLORER
-
     agent = Agent(
-        definition=PFC_EXPLORER,
+        config=PFC_EXPLORER,
         llm_client=llm_client,
         on_activity=activity_callback,
     )
@@ -155,10 +157,10 @@ async def test_pfc_explorer(llm_client):
     print(f"\nRunning agent: {agent.display_name}")
     print(f"Input: Query ball create command syntax")
 
-    result = await agent.execute(
-        "Find the syntax for creating balls in PFC using pfc_query_command. "
+    result = await agent.execute(UserMessage(
+        content="Find the syntax for creating balls in PFC using pfc_query_command. "
         "Context: I need to understand how to create particles in a DEM simulation."
-    )
+    ))
 
     print(f"\n--- Result ---")
     print(f"Status: {result.status}")

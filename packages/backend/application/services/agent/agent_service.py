@@ -14,8 +14,11 @@ Responsibilities:
 from typing import Callable, Optional
 
 from backend.application.services.agent.agent import Agent
-from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
-from backend.domain.models.agent_definitions import get_main_agent_definition
+from backend.domain.models.agent import AgentActivity, AgentResult
+from backend.domain.models.agent_profiles import (
+    SubAgentConfig,
+    get_profile_config,
+)
 from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 
@@ -37,8 +40,9 @@ class AgentService:
         )
 
         # For SubAgent execution
+        from backend.domain.models.agent_profiles import PFC_EXPLORER
         result = await service.run_subagent(
-            definition=PFC_EXPLORER,
+            config=PFC_EXPLORER,
             instruction="Find ball syntax",
             on_activity=progress_callback
         )
@@ -63,7 +67,7 @@ class AgentService:
         """
         Process a chat request using MainAgent.
 
-        Creates a MainAgent with the appropriate definition based on profile
+        Creates a MainAgent with the appropriate configuration based on profile
         and executes the conversation turn with full streaming support.
 
         Args:
@@ -75,9 +79,9 @@ class AgentService:
         Returns:
             AgentResult with execution outcome and response message
         """
-        definition = get_main_agent_definition(agent_profile)
+        config = get_profile_config(agent_profile)
         agent = Agent(
-            definition=definition,
+            config=config,
             llm_client=self._llm_client,
             session_id=session_id,
             enable_memory=enable_memory,
@@ -86,7 +90,7 @@ class AgentService:
 
     async def run_subagent(
         self,
-        definition: AgentDefinition,
+        config: SubAgentConfig,
         instruction: str,
         context: Optional[str] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
@@ -98,7 +102,7 @@ class AgentService:
         the given instruction in non-streaming mode.
 
         Args:
-            definition: AgentDefinition for the SubAgent
+            config: SubAgentConfig for the SubAgent
             instruction: Task instruction to execute (string)
             context: Optional additional context to prepend
             on_activity: Optional callback for activity events
@@ -115,7 +119,7 @@ class AgentService:
         user_message = UserMessage(content=full_instruction)
 
         agent = Agent(
-            definition=definition,
+            config=config,
             llm_client=self._llm_client,
             on_activity=on_activity,
         )
