@@ -55,7 +55,7 @@ from backend.domain.models.agent_profiles import (
     PFC_EXPLORER,
 )
 from backend.domain.models.messages import UserMessage
-from backend.application.services.agent.agent import Agent
+from backend.application.services.agent import Agent
 
 
 # Simple test agent definition (no tools, just text response)

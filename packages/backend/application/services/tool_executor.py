@@ -6,7 +6,7 @@ Designed to support future subagent extensions.
 """
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from backend.application.services.conversation.confirmation import ConfirmationStrategy
+from backend.application.services.confirmation_strategy import ConfirmationStrategy
 
 
 @dataclass

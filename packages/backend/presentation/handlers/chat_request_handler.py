@@ -60,7 +60,7 @@ async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
 
-            from backend.application.services.agent.agent_service import AgentService
+            from backend.application.services.agent_service import AgentService
             agent_service = AgentService(llm_client)
 
             # Send WebSocket read status just before LLM processing starts

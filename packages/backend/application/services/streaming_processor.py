@@ -5,7 +5,7 @@ Extracts streaming-related logic from ChatOrchestrator for better separation of 
 """
 from typing import Any, Optional, AsyncGenerator
 from backend.domain.models.streaming import StreamingChunk
-from backend.application.services.conversation.models import StreamingState
+from backend.application.services.streaming_models import StreamingState
 
 
 class StreamingProcessor:

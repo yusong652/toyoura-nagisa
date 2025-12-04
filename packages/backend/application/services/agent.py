@@ -18,9 +18,9 @@ from backend.domain.models.agent_profiles import ProfileConfig, SubAgentConfig
 from backend.domain.models.messages import AssistantMessage, UserMessage
 from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.base.client import LLMClientBase
-from backend.application.services.conversation.tool_executor import ToolExecutor
-from backend.application.services.conversation.models import StreamingState
-from backend.application.services.conversation.streaming_processor import StreamingProcessor
+from backend.application.services.tool_executor import ToolExecutor
+from backend.application.services.streaming_models import StreamingState
+from backend.application.services.streaming_processor import StreamingProcessor
 from backend.application.services.message_service import MessageService
 from backend.application.services.contents.title_service import trigger_title_generation
 from backend.infrastructure.storage.session_manager import save_token_usage

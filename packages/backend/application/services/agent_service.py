@@ -13,7 +13,7 @@ Responsibilities:
 
 from typing import Callable, Optional
 
-from backend.application.services.agent.agent import Agent
+from backend.application.services.agent import Agent
 from backend.domain.models.agent import AgentActivity, AgentResult
 from backend.domain.models.agent_profiles import (
     SubAgentConfig,
