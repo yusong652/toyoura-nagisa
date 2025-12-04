@@ -85,20 +85,14 @@ class StreamingProcessor:
 
     def has_tool_calls(self, response: Any) -> bool:
         """Check if response contains tool calls."""
-        return self._processor and self._processor.has_tool_calls(response)
+        return self._processor.has_tool_calls(response)
 
     def extract_tool_calls(self, response: Any) -> list:
         """Extract tool calls from response."""
-        return self._processor.extract_tool_calls(response) if self._processor else []
+        return self._processor.extract_tool_calls(response)
 
     def format_for_storage(self, response: Any, tool_calls: Optional[list] = None) -> Any:
         """Format response for storage."""
-        if not self._processor:
-            from backend.domain.models.messages import AssistantMessage
-            return AssistantMessage(
-                role="assistant",
-                content=[{"type": "text", "text": "Response processing unavailable"}]
-            )
         if tool_calls:
             return self._processor.format_response_for_storage(response, tool_calls)
         return self._processor.format_response_for_storage(response)

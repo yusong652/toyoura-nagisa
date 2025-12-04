@@ -147,13 +147,12 @@ class LLMClientBase(ABC):
             yield
 
     @abstractmethod
-    def _get_response_processor(self) -> Optional[BaseResponseProcessor]:
+    def _get_response_processor(self) -> BaseResponseProcessor:
         """
         Get provider-specific response processor instance.
 
         Returns:
-            Optional[BaseResponseProcessor]: Provider-specific response processor instance (e.g., GeminiResponseProcessor)
-                                           Returns None if not implemented by provider
+            BaseResponseProcessor: Provider-specific response processor instance
         """
         pass
 

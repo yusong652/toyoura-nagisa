@@ -170,21 +170,14 @@ class Agent:
                     execution_time_seconds=time.time() - start_time,
                 )
 
+            processor = self.llm_client._get_response_processor()
             if self.is_main_agent:
                 # MainAgent: use processor for storage format
-                processor = self.llm_client._get_response_processor()
-                if processor:
-                    final_message = processor.format_response_for_storage(final_response)
-                else:
-                    final_message = AssistantMessage(
-                        role="assistant",
-                        content=[{"type": "text", "text": "Response processing unavailable"}]
-                    )
+                final_message = processor.format_response_for_storage(final_response)
                 streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
             else:
                 # SubAgent: extract text content
-                processor = self.llm_client._get_response_processor()
-                response_text = processor.extract_text_content(final_response) if processor else ""
+                response_text = processor.extract_text_content(final_response)
                 final_message = AssistantMessage(
                     role="assistant",
                     content=[{"type": "text", "text": response_text}]
@@ -253,17 +246,12 @@ class Agent:
         from backend.infrastructure.monitoring import get_status_monitor
         from backend.shared.exceptions import UserRejectionInterruption
 
-        # Initialize services based on mode
-        message_service = MessageService()
-
-        # MainAgent: streaming processor and status monitor
-        streaming_processor = None
-        status_monitor = None
+        # Initialize MainAgent execution context (stored as instance attributes)
         if self.is_main_agent:
-            streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
-            status_monitor = get_status_monitor(self.session_id)
-            if hasattr(status_monitor, 'todo_monitor'):
-                status_monitor.todo_monitor.track_conversation_turn()
+            self._streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
+            self._status_monitor = get_status_monitor(self.session_id)
+            if hasattr(self._status_monitor, 'todo_monitor'):
+                self._status_monitor.todo_monitor.track_conversation_turn()
 
         iteration = 0
         while True:
@@ -273,31 +261,24 @@ class Agent:
             )
 
             # === MainAgent: Create placeholder message ===
-            message_id = None
-            state = None
             if self.is_main_agent:
-                message_id = message_service.save_assistant_message([], self.session_id)
+                message_service = MessageService()
+                self._message_id = message_service.save_assistant_message([], self.session_id)
                 await WebSocketNotificationService.send_message_create(
-                    self.session_id, message_id, streaming=True
+                    self.session_id, self._message_id, streaming=True
                 )
-                self._context_manager.streaming_message_id = message_id
-                state = StreamingState(message_id=message_id)
+                self._context_manager.streaming_message_id = self._message_id
+                self._state = StreamingState(message_id=self._message_id)
 
             # === LLM Call (streaming vs non-streaming) ===
             if self.is_main_agent:
-                # Type narrowing for Pylance
-                assert streaming_processor is not None
-                assert state is not None
-                assert message_id is not None
-                assert status_monitor is not None
-
                 # Streaming call
                 stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
-                was_interrupted, response = await streaming_processor.process_stream(stream, state)
+                was_interrupted, response = await self._streaming_processor.process_stream(stream, self._state)
 
                 # Handle interruption
                 if was_interrupted:
-                    return await self._handle_stream_interruption(state, iteration, message_service)
+                    return await self._handle_stream_interruption(iteration)
             else:
                 # Non-streaming call
                 self._emit_activity("thinking", {"iteration": iteration})
@@ -309,21 +290,17 @@ class Agent:
 
             # === Check for tool calls ===
             if self.is_main_agent:
-                assert streaming_processor is not None  # Type narrowing
-                has_tools = streaming_processor.has_tool_calls(response)
-                tool_calls = streaming_processor.extract_tool_calls(response) if has_tools else []
+                has_tools = self._streaming_processor.has_tool_calls(response)
+                tool_calls = self._streaming_processor.extract_tool_calls(response) if has_tools else []
             else:
                 processor = self.llm_client._get_response_processor()
-                tool_calls = processor.extract_tool_calls(response) if processor else []
+                tool_calls = processor.extract_tool_calls(response)
                 has_tools = bool(tool_calls)
 
             # === No tool calls = done ===
             if not has_tools:
                 if self.is_main_agent:
-                    assert message_id is not None and state is not None and streaming_processor is not None
-                    return await self._finalize_stream_response(
-                        response, message_id, state, streaming_processor, message_service
-                    )
+                    return await self._finalize_stream_response(response)
                 else:
                     # Non-streaming: just return response
                     self._context_manager.add_response(response)
@@ -334,30 +311,25 @@ class Agent:
 
             # MainAgent: Update streaming message with tool content
             if self.is_main_agent:
-                assert message_id is not None and state is not None and streaming_processor is not None
-                await self._update_stream_tool_message(
-                    response, message_id, state, streaming_processor, tool_calls, message_service
-                )
+                await self._update_stream_tool_message(response, tool_calls)
 
             # === Check iteration limit BEFORE executing tools ===
             if iteration >= self.config.max_iterations:
                 if self.is_main_agent:
-                    await self._handle_stream_iteration_limit(tool_calls, message_service)
+                    await self._handle_stream_iteration_limit(tool_calls)
                 return response
 
             # === Execute tools ===
             if self.is_main_agent:
-                # Type narrowing for MainAgent-specific variables
-                assert message_id is not None and state is not None and status_monitor is not None
-
                 # MainAgent: Full tool execution with persistence
+                message_service = MessageService()
                 tool_executor = ToolExecutor(
                     self.llm_client.tool_manager,
                     message_service,
                     self.session_id
                 )
                 execution_result = await tool_executor.execute_all(
-                    tool_calls, message_id, self._context_manager.agent_profile
+                    tool_calls, self._message_id, self._context_manager.agent_profile
                 )
 
                 # Save to context and database
@@ -372,20 +344,20 @@ class Agent:
                 if execution_result.rejected_tools:
                     await WebSocketNotificationService.send_streaming_update(
                         session_id=self.session_id,
-                        message_id=message_id,
-                        content=state.get_content_blocks(),
+                        message_id=self._message_id,
+                        content=self._state.get_content_blocks(),
                         streaming=False,
                         interrupted=False
                     )
                     raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
 
                 # Check for user interrupt
-                if status_monitor.is_user_interrupted():
+                if self._status_monitor.is_user_interrupted():
                     print(f"[Agent] Tool calling interrupted by user at iteration {iteration}")
                     await WebSocketNotificationService.send_streaming_update(
                         session_id=self.session_id,
-                        message_id=state.message_id,
-                        content=state.get_content_blocks(),
+                        message_id=self._state.message_id,
+                        content=self._state.get_content_blocks(),
                         streaming=False,
                         interrupted=True
                     )
@@ -400,7 +372,7 @@ class Agent:
 
                 tool_executor = ToolExecutor(
                     tool_manager=self.llm_client.tool_manager,
-                    message_service=message_service,
+                    message_service=MessageService(),
                     session_id=self.session_id,
                 )
                 execution_result = await tool_executor.execute_all(
@@ -426,36 +398,26 @@ class Agent:
             # Continue to next iteration
             iteration += 1
 
-    async def _handle_stream_interruption(
-        self,
-        state: StreamingState,
-        iterations: int,
-        message_service: MessageService
-    ) -> Any:
+    async def _handle_stream_interruption(self, iteration: int) -> Any:
         """Handle user interruption during streaming."""
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-        from backend.infrastructure.monitoring import get_status_monitor
 
-        print(f"[Agent.stream] Interrupted by user at iteration {iterations}")
+        print(f"[Agent.stream] Interrupted by user at iteration {iteration}")
 
-        status_monitor = get_status_monitor(self.session_id)
-        status_monitor.set_interrupt_flag()
+        self._status_monitor.set_interrupt_flag()
 
         # Construct partial response
         processor = self.llm_client._get_response_processor()
-        if processor:
-            partial_response = processor.construct_response_from_chunks(state.collected_chunks)
-        else:
-            partial_response = None
+        partial_response = processor.construct_response_from_chunks(self._state.collected_chunks)
 
         # Delete placeholder message
-        await message_service.delete_message_async(self.session_id, state.message_id)
+        await MessageService().delete_message_async(self.session_id, self._state.message_id)
 
         # Send final update with interrupted=True
         await WebSocketNotificationService.send_streaming_update(
             session_id=self.session_id,
-            message_id=state.message_id,
-            content=state.get_content_blocks(),
+            message_id=self._state.message_id,
+            content=self._state.get_content_blocks(),
             streaming=False,
             interrupted=True
         )
@@ -465,14 +427,7 @@ class Agent:
 
         return partial_response
 
-    async def _finalize_stream_response(
-        self,
-        response: Any,
-        message_id: str,
-        state: StreamingState,
-        streaming_processor: StreamingProcessor,
-        message_service: MessageService
-    ) -> Any:
+    async def _finalize_stream_response(self, response: Any) -> Any:
         """Finalize streaming response without tool calls."""
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
@@ -480,19 +435,19 @@ class Agent:
         self._context_manager.add_response(response)
 
         # Format and save
-        final_message = streaming_processor.format_for_storage(response)
+        final_message = self._streaming_processor.format_for_storage(response)
         if final_message:
             content = final_message.content if isinstance(
                 final_message.content, list
             ) else [{"type": "text", "text": str(final_message.content)}]
-            message_service.update_assistant_message(message_id, content, self.session_id)
+            MessageService().update_assistant_message(self._message_id, content, self.session_id)
 
-            usage = streaming_processor.extract_usage(state)
+            usage = self._streaming_processor.extract_usage(self._state)
 
             # Send final update
             await WebSocketNotificationService.send_streaming_update(
                 session_id=self.session_id,
-                message_id=message_id,
+                message_id=self._message_id,
                 content=content,
                 streaming=False,
                 usage=usage
@@ -507,31 +462,23 @@ class Agent:
 
         return response
 
-    async def _update_stream_tool_message(
-        self,
-        response: Any,
-        message_id: str,
-        state: StreamingState,
-        streaming_processor: StreamingProcessor,
-        tool_calls: list,
-        message_service: MessageService
-    ) -> None:
+    async def _update_stream_tool_message(self, response: Any, tool_calls: list) -> None:
         """Update streaming message with tool call content."""
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
         try:
-            tool_call_message = streaming_processor.format_for_storage(response, tool_calls)
+            tool_call_message = self._streaming_processor.format_for_storage(response, tool_calls)
             content = tool_call_message.content if isinstance(
                 tool_call_message.content, list
             ) else [{"type": "text", "text": str(tool_call_message.content)}]
-            message_service.update_assistant_message(message_id, content, self.session_id)
+            MessageService().update_assistant_message(self._message_id, content, self.session_id)
 
-            usage = streaming_processor.extract_usage(state)
+            usage = self._streaming_processor.extract_usage(self._state)
 
             # Send streaming update and WAIT for completion
             await WebSocketNotificationService.send_streaming_update(
                 session_id=self.session_id,
-                message_id=message_id,
+                message_id=self._message_id,
                 content=content,
                 streaming=True,
                 usage=usage
@@ -546,11 +493,7 @@ class Agent:
         except Exception as e:
             print(f"[Agent.stream] Failed to update streaming message: {e}")
 
-    async def _handle_stream_iteration_limit(
-        self,
-        tool_calls: list,
-        message_service: MessageService
-    ) -> None:
+    async def _handle_stream_iteration_limit(self, tool_calls: list) -> None:
         """Handle iteration limit reached in streaming mode."""
         from backend.infrastructure.mcp.utils.tool_result import success_response
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
@@ -564,6 +507,7 @@ class Agent:
             f"Note: This is a safety mechanism to prevent infinite loops."
         )
 
+        message_service = MessageService()
         for i, tool_call in enumerate(tool_calls):
             is_last_tool = (i == len(tool_calls) - 1)
 
