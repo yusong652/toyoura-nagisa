@@ -174,48 +174,27 @@ class GeminiClient(LLMClientBase):
         """Get Gemini-specific context manager class."""
         return GeminiContextManager
 
-    async def _prepare_complete_context(
+    def _build_api_config(
         self,
-        session_id: str,
-        system_prompt: str
-    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        system_prompt: str,
+        tool_schemas: Optional[List[Any]]
+    ) -> Dict[str, Any]:
         """
-        Prepare complete context and API configuration for stateless Gemini API call.
-
-        This method consolidates context preparation logic for Gemini
-        and returns all necessary configuration for thread-safe API calls.
+        Build Gemini-specific API configuration.
 
         Args:
-            session_id: Session identifier
-            system_prompt: Pre-built system prompt from caller
+            system_prompt: Pre-built system prompt
+            tool_schemas: Tool schemas in Gemini format
 
         Returns:
-            Tuple containing:
-            - context_contents: Messages for Gemini API
-            - api_config: Dictionary with 'config' key containing GenerateContentConfig
+            Dict with 'config' key containing GenerateContentConfig
         """
-        # Get context manager and extract its properties
-        context_manager = self.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
-        # Get tool schemas for API
-        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
-
-        # Get working contents from context manager
-        working_contents = context_manager.get_working_contents()
-
-        # Build API configuration with tool schemas and system prompt
         config_kwargs = self.gemini_config.get_generation_config_kwargs(
             system_prompt=system_prompt,
             tool_schemas=tool_schemas
         )
-
-        # Create config object for stateless API call
         config = types.GenerateContentConfig(**config_kwargs)
-
-        # Return context and config as separate values for thread-safe API call
-        api_config = {'config': config}
-        return working_contents, api_config
+        return {'config': config}
 
     def _get_provider_config(self):
         """Get Gemini-specific configuration object."""

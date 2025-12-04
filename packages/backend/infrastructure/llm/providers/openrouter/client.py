@@ -295,41 +295,24 @@ class OpenRouterClient(LLMClientBase):
         """Get OpenRouter-specific configuration object."""
         return self.openrouter_config
 
-    async def _prepare_complete_context(
+    def _build_api_config(
         self,
-        session_id: str,
-        system_prompt: str
-    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        system_prompt: str,
+        tool_schemas: Optional[List[Any]]
+    ) -> Dict[str, Any]:
         """
-        Prepare complete context and API configuration for stateless OpenRouter API call.
-
-        This method consolidates context preparation logic for OpenRouter
-        and returns all necessary configuration for thread-safe API calls.
+        Build OpenRouter-specific API configuration.
 
         Args:
-            session_id: Session identifier
-            system_prompt: Pre-built system prompt from caller
+            system_prompt: Pre-built system prompt
+            tool_schemas: Tool schemas in OpenRouter format
 
         Returns:
-            Tuple containing:
-            - context_contents: Messages for OpenRouter API (without system prompt)
-            - api_config: Dictionary with 'tools' and 'system_prompt' keys
+            Dict with 'tools' and 'system_prompt' keys
         """
-        # Get context manager and extract its properties
-        context_manager = self.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
-        # Get tool schemas for API
-        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
-
-        # Get working contents from context manager
-        working_contents = context_manager.get_working_contents()
-
-        # Return context and config as separate values for thread-safe API call
-        api_config = {
-            'tools': tool_schemas,
+        return {
+            'tools': tool_schemas or [],
             'system_prompt': system_prompt
         }
-        return working_contents, api_config
 
     # _construct_response_from_streaming_chunks is now handled by ResponseProcessor

@@ -254,10 +254,11 @@ class Agent:
 
         iteration = 0
         while True:
-            complete_context, api_config = await self.llm_client._prepare_complete_context(
-                session_id=self.session_id,
-                system_prompt=self._system_prompt
+            # Get tool schemas and build API config
+            tool_schemas = await self.llm_client.tool_manager.get_function_call_schemas(
+                self.session_id, self._context_manager.agent_profile
             )
+            api_config = self.llm_client._build_api_config(self._system_prompt, tool_schemas)
 
             # === MainAgent: Create placeholder message ===
             if self.is_main_agent:
@@ -269,10 +270,13 @@ class Agent:
                 self._context_manager.streaming_message_id = self._message_id
                 self._state = StreamingState(message_id=self._message_id)
 
+            # Get working contents from context manager
+            working_contents = self._context_manager.get_working_contents()
+
             # === LLM Call (streaming vs non-streaming) ===
             if self.is_main_agent:
                 # Streaming call
-                stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
+                stream = self.llm_client.call_api_with_context_streaming(working_contents, api_config)
                 was_interrupted, response = await self._streaming_processor.process_stream(stream, self._state)
 
                 # Handle interruption
@@ -282,7 +286,7 @@ class Agent:
                 # Non-streaming call
                 self._emit_activity("thinking", {"iteration": iteration})
                 response = await self.llm_client.call_api_with_context(
-                    context_contents=self._context_manager.get_working_contents(),
+                    context_contents=working_contents,
                     api_config=api_config,
                 )
                 self._emit_activity("llm_response", {"iteration": iteration})

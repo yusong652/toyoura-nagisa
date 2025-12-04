@@ -87,8 +87,9 @@ class LLMClientBase(ABC):
 
         Example:
             # Thread-safe concurrent usage
-            context, config = await self._prepare_complete_context(session_id)
-            response = await self.call_api_with_context(context, config)
+            working_contents = context_manager.get_working_contents()
+            api_config = self._build_api_config(system_prompt, tool_schemas)
+            response = await self.call_api_with_context(working_contents, api_config)
 
         Note:
             This method is stateless and thread-safe. All session-specific
@@ -129,8 +130,9 @@ class LLMClientBase(ABC):
 
         Example:
             # Streaming usage
-            context, config = await self._prepare_complete_context(session_id)
-            async for chunk in self.call_api_with_context_streaming(context, config):
+            working_contents = context_manager.get_working_contents()
+            api_config = self._build_api_config(system_prompt, tool_schemas)
+            async for chunk in self.call_api_with_context_streaming(working_contents, api_config):
                 if chunk.chunk_type == "thinking":
                     await send_thinking_to_websocket(chunk.content)
                 elif chunk.chunk_type == "text":
@@ -167,40 +169,26 @@ class LLMClientBase(ABC):
         pass
 
     @abstractmethod
-    async def _prepare_complete_context(
+    def _build_api_config(
         self,
-        session_id: str,
-        system_prompt: str
-    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        system_prompt: str,
+        tool_schemas: Optional[List[Any]]
+    ) -> Dict[str, Any]:
         """
-        Prepare complete context and API configuration for stateless API call.
+        Build provider-specific API configuration.
 
-        This method consolidates context preparation logic including:
-        - Getting or creating context manager for the session
-        - Extracting agent_profile from context manager for tool loading
-        - Getting tool schemas for API
-        - Getting working contents from context manager
-        - Preparing provider-specific API configuration with system_prompt
+        This method constructs the API configuration dictionary specific to each
+        LLM provider, including system prompt and tool schemas in the required format.
 
         Args:
-            session_id: Session identifier
-            system_prompt: Pre-built system prompt. Caller is responsible for
-                          constructing this (via build_system_prompt or template rendering).
+            system_prompt: Pre-built system prompt
+            tool_schemas: Tool schemas in provider-specific format (can be None)
 
         Returns:
-            Tuple containing:
-            - context_contents: List[Dict[str, Any]] - Messages ready for API call
-                - For OpenAI: includes system message in the list
-                - For others: just conversation messages
-            - api_config: Dict[str, Any] - Provider-specific configuration:
-                - tools: Tool schemas in provider format (optional)
-                - system_prompt: System prompt string (for Anthropic)
-                - config: GenerateContentConfig (for Gemini)
-                - Any other provider-specific settings
-
-        Note:
-            This method must be stateless and return all necessary configuration.
-            Do NOT store configuration in instance attributes to avoid concurrency issues.
+            Dict[str, Any]: Provider-specific API configuration:
+                - Gemini: {'config': GenerateContentConfig}
+                - Anthropic: {'tools': [...], 'system_prompt': str}
+                - OpenAI: {'tools': [...], 'instructions': str}
         """
         pass
 

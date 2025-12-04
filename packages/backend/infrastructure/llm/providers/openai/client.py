@@ -171,43 +171,25 @@ class OpenAIClient(LLMClientBase):
         """Get OpenAI-specific context manager class."""
         return OpenAIContextManager
 
-    async def _prepare_complete_context(
+    def _build_api_config(
         self,
-        session_id: str,
-        system_prompt: str
-    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        system_prompt: str,
+        tool_schemas: Optional[List[Any]]
+    ) -> Dict[str, Any]:
         """
-        Prepare complete context and API configuration for stateless OpenAI API call.
-
-        This method consolidates context preparation logic for OpenAI
-        and returns all necessary configuration for thread-safe API calls.
+        Build OpenAI-specific API configuration.
 
         Args:
-            session_id: Session identifier
-            system_prompt: Pre-built system prompt from caller
+            system_prompt: Pre-built system prompt
+            tool_schemas: Tool schemas in OpenAI format
 
         Returns:
-            Tuple containing:
-            - context_contents: Conversation messages ready for Responses API input conversion
-            - api_config: Dictionary with tools and instructions for the API call
+            Dict with 'tools' and 'instructions' keys
         """
-        # Get context manager and extract its properties
-        context_manager = self.get_or_create_context_manager(session_id)
-        agent_profile = getattr(context_manager, 'agent_profile', 'general')
-
-        # Get tool schemas for API
-        tool_schemas = await self.tool_manager.get_function_call_schemas(session_id, agent_profile)
-        tool_schemas = tool_schemas or []  # Return empty list if None
-
-        # Get working contents from context manager
-        working_contents = context_manager.get_working_contents()
-
-        # Return context and config as separate values for stateless API call
-        api_config = {
-            'tools': tool_schemas,
+        return {
+            'tools': tool_schemas or [],
             'instructions': system_prompt
         }
-        return working_contents, api_config
 
     def _get_provider_config(self):
         """Get OpenAI-specific configuration object."""
