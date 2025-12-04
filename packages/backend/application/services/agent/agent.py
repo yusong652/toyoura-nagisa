@@ -251,7 +251,7 @@ class Agent:
                     user_message = UserMessage(content=instruction)
                     await context_manager.add_user_message(user_message)
 
-            final_response = await self._recursive_stream(iterations=0)
+            final_response = await self._stream_loop()
 
             # Format response for storage
             processor = self.llm_client._get_response_processor()
@@ -324,77 +324,127 @@ class Agent:
             # SubAgent mode: non-streaming, temporary context
             return await self.run(instruction)
 
-    async def _recursive_stream(
-        self,
-        iterations: int = 0
-    ) -> Any:
+    async def _stream_loop(self) -> Any:
         """
-        Recursive streaming implementation with tool calling.
+        Loop-based streaming implementation with tool calling.
 
         Uses self.session_id for all session-related operations.
         """
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring import get_status_monitor
+        from backend.shared.exceptions import UserRejectionInterruption
+        from backend.shared.utils.prompt.builder import build_system_prompt
 
-        # Track conversation turn for todo reminders
+        # Initialize services
+        message_service = MessageService()
+        streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
+        context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
+
+        # Track conversation turn for todo reminders (once at start)
         status_monitor = get_status_monitor(self.session_id)
         if hasattr(status_monitor, 'todo_monitor'):
             status_monitor.todo_monitor.track_conversation_turn()
 
-        # Get context manager
-        context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-
-        # Build system prompt
-        from backend.shared.utils.prompt.builder import build_system_prompt
-        prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-            self.session_id, context_manager.agent_profile
-        )
-        system_prompt = await build_system_prompt(
-            agent_profile=context_manager.agent_profile,
-            session_id=self.session_id,
-            enable_memory=context_manager.enable_memory,
-            tool_schemas=prompt_tool_schemas
-        )
-
-        complete_context, api_config = await self.llm_client._prepare_complete_context(
-            session_id=self.session_id,
-            system_prompt=system_prompt
-        )
-
-        # Create placeholder message
-        message_service = MessageService()
-        message_id = message_service.save_assistant_message([], self.session_id)
-
-        # Send MESSAGE_CREATE notification
-        await WebSocketNotificationService.send_message_create(
-            self.session_id, message_id, streaming=True
-        )
-
-        context_manager.streaming_message_id = message_id
-        state = StreamingState(message_id=message_id)
-
-        # Create streaming processor
-        streaming_processor = StreamingProcessor(self.llm_client, self.session_id)
-
-        # Process stream
-        stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
-        was_interrupted, current_response = await streaming_processor.process_stream(stream, state)
-
-        if was_interrupted:
-            return await self._handle_stream_interruption(
-                state, iterations, message_service
+        iteration = 0
+        while True:
+            # Build system prompt (may change between iterations due to tool results)
+            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
+                self.session_id, context_manager.agent_profile
+            )
+            system_prompt = await build_system_prompt(
+                agent_profile=context_manager.agent_profile,
+                session_id=self.session_id,
+                enable_memory=context_manager.enable_memory,
+                tool_schemas=prompt_tool_schemas
             )
 
-        # Check for tool calls
-        if not streaming_processor.has_tool_calls(current_response):
-            return await self._finalize_stream_response(
-                current_response, message_id, state, streaming_processor, message_service
+            complete_context, api_config = await self.llm_client._prepare_complete_context(
+                session_id=self.session_id,
+                system_prompt=system_prompt
             )
 
-        # Handle tool calls
-        return await self._handle_stream_tool_calls(
-            current_response, message_id, iterations, state, streaming_processor, message_service
-        )
+            # Create placeholder message for this iteration
+            message_id = message_service.save_assistant_message([], self.session_id)
+            await WebSocketNotificationService.send_message_create(
+                self.session_id, message_id, streaming=True
+            )
+            context_manager.streaming_message_id = message_id
+            state = StreamingState(message_id=message_id)
+
+            # Process stream
+            stream = self.llm_client.call_api_with_context_streaming(complete_context, api_config)
+            was_interrupted, response = await streaming_processor.process_stream(stream, state)
+
+            # Handle interruption
+            if was_interrupted:
+                return await self._handle_stream_interruption(state, iteration, message_service)
+
+            # No tool calls = done
+            if not streaming_processor.has_tool_calls(response):
+                return await self._finalize_stream_response(
+                    response, message_id, state, streaming_processor, message_service
+                )
+
+            # Has tool calls - add response to context first
+            context_manager.add_response(response)
+            tool_calls = streaming_processor.extract_tool_calls(response)
+
+            # Update streaming message with tool call content
+            await self._update_stream_tool_message(
+                response, message_id, state, streaming_processor, tool_calls, message_service
+            )
+
+            if not tool_calls:
+                return response
+
+            # Check iteration limit BEFORE executing tools
+            if iteration >= self.definition.max_iterations:
+                await self._handle_stream_iteration_limit(tool_calls, context_manager, message_service)
+                return response
+
+            # Execute tools
+            tool_executor = ToolExecutor(
+                self.llm_client.tool_manager,
+                message_service,
+                self.session_id
+            )
+            execution_result = await tool_executor.execute_all(
+                tool_calls, message_id, context_manager.agent_profile
+            )
+
+            # Save to context and database
+            await tool_executor.save_results_to_context(
+                tool_calls, execution_result.results, context_manager
+            )
+            await tool_executor.save_results_to_database(
+                tool_calls, execution_result.results
+            )
+
+            # Handle rejection
+            if execution_result.rejected_tools:
+                await WebSocketNotificationService.send_streaming_update(
+                    session_id=self.session_id,
+                    message_id=message_id,
+                    content=state.get_content_blocks(),
+                    streaming=False,
+                    interrupted=False
+                )
+                raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
+
+            # Check for user interrupt before next iteration
+            if status_monitor.is_user_interrupted():
+                print(f"[Agent.stream] Tool calling interrupted by user at iteration {iteration}")
+                await WebSocketNotificationService.send_streaming_update(
+                    session_id=self.session_id,
+                    message_id=state.message_id,
+                    content=state.get_content_blocks(),
+                    streaming=False,
+                    interrupted=True
+                )
+                return response
+
+            # Continue to next iteration
+            iteration += 1
 
     async def _handle_stream_interruption(
         self,
@@ -486,87 +536,6 @@ class Agent:
             )
 
         return response
-
-    async def _handle_stream_tool_calls(
-        self,
-        response: Any,
-        message_id: str,
-        iterations: int,
-        state: StreamingState,
-        streaming_processor: StreamingProcessor,
-        message_service: MessageService
-    ) -> Any:
-        """Handle tool calls in streaming response."""
-        from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
-        from backend.infrastructure.monitoring import get_status_monitor
-        from backend.shared.exceptions import UserRejectionInterruption
-
-        # Add response to context
-        context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-        context_manager.add_response(response)
-
-        # Extract tool calls
-        tool_calls = streaming_processor.extract_tool_calls(response)
-
-        # Update streaming message (await to ensure tool_use blocks are sent before tool_result_update)
-        await self._update_stream_tool_message(
-            response, message_id, state, streaming_processor, tool_calls, message_service
-        )
-
-        if not tool_calls:
-            return response
-
-        # Check iteration limit
-        if iterations >= self.definition.max_iterations:
-            await self._handle_stream_iteration_limit(tool_calls, context_manager, message_service)
-            return response
-
-        # Execute tools
-        tool_executor = ToolExecutor(
-            self.llm_client.tool_manager,
-            message_service,
-            self.session_id
-        )
-
-        execution_result = await tool_executor.execute_all(
-            tool_calls, message_id, context_manager.agent_profile
-        )
-
-        # Save to context and database
-        await tool_executor.save_results_to_context(
-            tool_calls, execution_result.results, context_manager
-        )
-        await tool_executor.save_results_to_database(
-            tool_calls, execution_result.results
-        )
-
-        # Handle rejection
-        if execution_result.rejected_tools:
-            await WebSocketNotificationService.send_streaming_update(
-                session_id=self.session_id,
-                message_id=message_id,
-                content=state.get_content_blocks(),
-                streaming=False,
-                interrupted=False
-            )
-            raise UserRejectionInterruption(self.session_id, execution_result.rejected_tools)
-
-        # Check for user interrupt before recursion
-        status_monitor = get_status_monitor(self.session_id)
-        if status_monitor.is_user_interrupted():
-            print(f"[Agent.stream] Tool calling interrupted by user at iteration {iterations}")
-
-            await WebSocketNotificationService.send_streaming_update(
-                session_id=self.session_id,
-                message_id=state.message_id,
-                content=state.get_content_blocks(),
-                streaming=False,
-                interrupted=True
-            )
-            return response
-
-        # Continue recursively
-        return await self._recursive_stream(iterations + 1)
 
     async def _update_stream_tool_message(
         self,
