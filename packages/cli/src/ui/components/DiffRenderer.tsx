@@ -133,9 +133,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
     // For new files, show content with truncation
     if (isNewFile) {
-      const addedLines = parsedLines
-        .filter((line) => line.type === 'add')
-        .map((line) => line.content);
+      const addedLines = parsedLines.filter((line) => line.type === 'add');
 
       // Apply height limit with truncation
       let linesToShow = addedLines;
@@ -147,8 +145,12 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         hiddenLines = addedLines.length - visibleLines;
       }
 
-      // Calculate gutter width
-      const gutterWidth = Math.max(3, addedLines.length.toString().length);
+      // Calculate gutter width based on max line number
+      const maxLineNumber = Math.max(
+        0,
+        ...addedLines.map((l) => l.newLine ?? 0)
+      );
+      const gutterWidth = Math.max(3, maxLineNumber.toString().length);
       const bgColor = theme.diff.addedBg;
 
       return (
@@ -159,7 +161,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
               {/* Line number gutter - fixed width to prevent compression */}
               <Box width={gutterWidth} flexShrink={0}>
                 <Text color={theme.text.muted} backgroundColor={bgColor}>
-                  {(index + 1).toString().padStart(gutterWidth)}
+                  {(line.newLine ?? index + 1).toString().padStart(gutterWidth)}
                 </Text>
               </Box>
               {/* Prefix symbol - fixed width */}
@@ -170,7 +172,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
               </Box>
               {/* Line content */}
               <Text color={theme.text.primary} backgroundColor={bgColor} wrap="truncate-end">
-                {line}
+                {line.content}
               </Text>
             </Box>
           ))}

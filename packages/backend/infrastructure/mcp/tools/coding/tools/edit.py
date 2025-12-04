@@ -302,13 +302,15 @@ PFC Script Guidelines (when editing .py files for PFC simulations):
         abs_path = path_to_llm_format(target_file)
         message = f"The file {abs_path} has been updated."
 
-        # Generate unified diff for CLI display
+        # Generate unified diff using full file content for correct line numbers
         import difflib
+        file_name = target_file.name
         diff_lines = list(difflib.unified_diff(
-            old_string.splitlines(),
-            new_string.splitlines(),
-            fromfile=abs_path,
-            tofile=abs_path,
+            current_content.splitlines(),
+            new_content.splitlines(),
+            fromfile=f"a/{file_name}",
+            tofile=f"b/{file_name}",
+            n=3,  # Context lines
             lineterm=''
         ))
         diff_content = '\n'.join(diff_lines) if diff_lines else ''

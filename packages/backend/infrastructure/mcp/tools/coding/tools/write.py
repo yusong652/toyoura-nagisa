@@ -149,11 +149,13 @@ async def write(
 
         # Generate unified diff for CLI display
         import difflib
+        file_name = abs_p.name
         diff_lines = list(difflib.unified_diff(
             original_content.splitlines(),
             content.splitlines(),
-            fromfile=abs_display,
-            tofile=abs_display,
+            fromfile=f"a/{file_name}",
+            tofile=f"b/{file_name}",
+            n=3,  # Context lines
             lineterm=''
         ))
         diff_content = '\n'.join(diff_lines) if diff_lines else ''
