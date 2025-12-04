@@ -256,7 +256,7 @@ class OpenAIClient(LLMClientBase):
 
         if final_response:
             # Extract usage metadata from final response
-            final_metadata = {"__openai_final_response": final_response}
+            final_metadata: Dict[str, Any] = {"__openai_final_response": final_response}
 
             if hasattr(final_response, 'usage') and final_response.usage:
                 usage = final_response.usage

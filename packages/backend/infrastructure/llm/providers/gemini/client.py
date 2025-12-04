@@ -191,7 +191,7 @@ class GeminiClient(LLMClientBase):
         """
         config_kwargs = self.gemini_config.get_generation_config_kwargs(
             system_prompt=system_prompt,
-            tool_schemas=tool_schemas
+            tool_schemas=tool_schemas or []
         )
         config = types.GenerateContentConfig(**config_kwargs)
         return {'config': config}

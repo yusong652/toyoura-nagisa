@@ -6,7 +6,7 @@ Since zai SDK is synchronous, we use asyncio.to_thread() for async compatibility
 """
 
 import asyncio
-from typing import List, Dict, Any, AsyncGenerator, cast
+from typing import List, Dict, Any, AsyncGenerator, cast, Optional
 from zai import ZhipuAiClient
 from zai.types.chat import Completion
 

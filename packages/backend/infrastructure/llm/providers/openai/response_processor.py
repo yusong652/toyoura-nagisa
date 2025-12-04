@@ -393,6 +393,12 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
 
         context_items: List[Dict[str, Any]] = []
 
+        # Check if response contains function_call - reasoning is only needed for tool calling
+        has_function_calls = any(
+            item.model_dump(mode='json').get("type") == "function_call"
+            for item in response.output
+        )
+
         # Process each output item and convert to input format
         for item in response.output:
             # Convert Pydantic model to dict
@@ -430,18 +436,15 @@ class OpenAIResponseProcessor(BaseResponseProcessor):
                     "content": content_value
                 })
 
-            # Handle reasoning items
-            # Note: Current request's reasoning MUST be kept for pairing with function_call
-            # Historical reasoning (from DB) is NOT loaded (format_single_message skips thinking)
-            # This dual approach works because API only requires pairing in current request
-            elif item_type == "reasoning":
+            # Handle reasoning items - ONLY when response contains function_calls
+            # Reasoning is required for pairing with function_call in tool calling scenarios
+            # When response is just a message (final answer), reasoning should NOT be kept
+            # Historical reasoning is never loaded from DB (format_single_message skips thinking)
+            elif item_type == "reasoning" and has_function_calls:
                 summary = item_dict.get("summary", [])
                 reasoning_id = item_dict.get("id")
 
-                # Keep reasoning item if it has an ID (required for pairing with function_call)
-                # Note: Empty summary ([]) should still be kept to maintain pairing
                 if reasoning_id:
-                    # Keep type, id, and summary for input
                     context_items.append({
                         "type": "reasoning",
                         "id": reasoning_id,

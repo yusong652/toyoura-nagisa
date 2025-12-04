@@ -59,7 +59,7 @@ class AnthropicClient(LLMClientBase):
         self.tool_manager = AnthropicToolManager()
 
 
-    def _get_response_processor(self) -> Optional['AnthropicResponseProcessor']:
+    def _get_response_processor(self) -> AnthropicResponseProcessor:
         """Get Anthropic-specific response processor instance."""
         return AnthropicResponseProcessor()
 
