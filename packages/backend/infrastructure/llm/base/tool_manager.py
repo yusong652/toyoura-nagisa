@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from backend.infrastructure.mcp.utils import extract_tool_result_from_mcp
 from backend.infrastructure.llm.shared.utils.tool_schema import ToolSchema
-from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager, AgentProfile
+from backend.domain.models.agent_profiles import AgentProfile, get_tools_for_profile
 from backend.config.llm import get_llm_settings
 # Security imports removed - all tools now require session ID
 
@@ -154,7 +154,7 @@ class BaseToolManager(ABC):
 
                 # Get tools for the specified profile
                 profile_enum = AgentProfile(agent_profile)
-                allowed_tools = set(ToolProfileManager.get_tools_for_profile(profile_enum))
+                allowed_tools = set(get_tools_for_profile(profile_enum))
 
                 # Add tools to dictionary
                 for mcp_tool in mcp_tools:

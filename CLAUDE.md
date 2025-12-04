@@ -101,7 +101,7 @@ class LLMClientBase(ABC):
 
 **Impact**: Coding profile uses 64% fewer tokens than General, enabling longer context windows.
 
-**Implementation**: `backend/infrastructure/mcp/tool_profile_manager.py:12`
+**Implementation**: `backend/domain/models/agent_profiles.py`
 
 **API**: `/api/profiles` endpoint (`backend/presentation/api/profiles.py:41`)
 
@@ -286,7 +286,6 @@ toyoura-nagisa/
 │   │   │   └── shared/
 │   │   ├── mcp/                   # Model Context Protocol system
 │   │   │   ├── smart_mcp_server.py      # Main MCP server
-│   │   │   ├── tool_profile_manager.py  # Agent profile system
 │   │   │   ├── tools/             # Tool implementations
 │   │   │   │   ├── builtin/
 │   │   │   │   ├── coding/

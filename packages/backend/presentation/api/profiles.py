@@ -6,21 +6,22 @@ This is a query-only API that returns available profiles and their metadata.
 """
 
 from fastapi import APIRouter
-from typing import List, Dict, Any
-from backend.infrastructure.mcp.tool_profile_manager import ToolProfileManager, AgentProfile
+from typing import Dict, Any
+
+from backend.domain.models.agent_profiles import AgentProfile, get_profile_config
 
 router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 
 
 def _get_profile_info(profile: AgentProfile) -> Dict[str, Any]:
-    """Get profile information from ToolProfileManager."""
+    """Get profile information from domain layer configuration."""
     try:
-        config = ToolProfileManager.get_profile(profile)
+        config = get_profile_config(profile)
         return {
             "profile_type": profile.value,
-            "name": config.name,
+            "name": config.display_name,
             "description": config.description,
-            "tool_count": len(config.tools) if config.tools else 0,
+            "tool_count": config.tool_count,
             "estimated_tokens": config.estimated_tokens,
             "color": config.color,
             "icon": config.icon
@@ -57,24 +58,9 @@ async def get_available_profiles() -> Dict[str, Any]:
         - icon: Display icon
     """
     try:
-        profiles = []
-        
-        # Add all configured profiles
-        for profile in AgentProfile:
-            profile_info = _get_profile_info(profile)
-            profiles.append(profile_info)
-        
-        # Add special "disabled" profile
-        profiles.append({
-            "profile_type": "disabled",
-            "name": "Disabled",
-            "description": "Pure text conversation mode with all tools disabled",
-            "tool_count": 0,
-            "estimated_tokens": 0,
-            "color": "#9E9E9E",
-            "icon": "🚫"
-        })
-        
+        # Add all configured profiles (includes DISABLED)
+        profiles = [_get_profile_info(profile) for profile in AgentProfile]
+
         return {
             "success": True,
             "profiles": profiles,

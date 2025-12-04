@@ -134,7 +134,7 @@ The CLI provides a terminal-based interface for interacting with the agent.
 1.  Create a new file for your tool (e.g., `my_tool.py`) inside the appropriate category in `backend/infrastructure/mcp/tools/`.
 2.  In that file, define your tool function (with Pydantic-annotated arguments) and its registration helper function (e.g., `register_my_tool`).
 3.  In the `__init__.py` for that tool category, import and call your new registration helper inside the aggregate registration function (e.g., `register_coding_tools`).
-4.  Finally, add your new tool's name to the desired profiles in `backend/infrastructure/mcp/tool_profile_manager.py`.
+4.  Finally, add your new tool's name to the desired profiles in `backend/domain/models/agent_profiles.py`.
 
 ## 7. Guiding Principles for Analyzing `toyoura-nagisa`
 

@@ -152,7 +152,6 @@ toyoura-nagisa/
 │   │   │   │   └── providers/     # Provider implementations (gemini, anthropic, openai, local)
 │   │   │   ├── mcp/               # Tool Execution (MCP)
 │   │   │   │   ├── smart_mcp_server.py # Main MCP server
-│   │   │   │   ├── tool_profile_manager.py # Agent profile management
 │   │   │   │   └── tools/         # Tool implementations by category
 │   │   │   ├── pfc/               # PFC WebSocket client integration
 │   │   │   ├── memory/            # Long-term memory system (ChromaDB)
