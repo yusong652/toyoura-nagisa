@@ -4,6 +4,7 @@ Title Service - Business logic for session title generation.
 This service handles automatic title generation for chat sessions
 based on conversation context.
 """
+import asyncio
 from typing import Dict, Any, Optional, List
 from backend.infrastructure.storage.session_manager import (
     get_all_sessions,
@@ -13,6 +14,24 @@ from backend.infrastructure.storage.session_manager import (
 )
 from backend.domain.models.message_factory import message_factory
 from backend.infrastructure.llm.content_generators.factory import ContentGeneratorFactory
+
+
+def trigger_title_generation(session_id: str, llm_client: Any) -> None:
+    """
+    Trigger background title generation for a session.
+
+    This is a fire-and-forget convenience function that schedules
+    title generation as a background task. Safe to call from any
+    async context without awaiting.
+
+    Args:
+        session_id: Session ID to generate title for
+        llm_client: LLM client instance for title generation
+    """
+    title_service = TitleService()
+    asyncio.create_task(
+        title_service.try_generate_title_if_needed_async(session_id, llm_client)
+    )
 
 
 class TitleService:

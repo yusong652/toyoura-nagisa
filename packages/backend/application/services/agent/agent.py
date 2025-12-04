@@ -22,6 +22,8 @@ from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.conversation.models import StreamingState
 from backend.application.services.conversation.streaming_processor import StreamingProcessor
 from backend.application.services.message_service import MessageService
+from backend.application.services.contents.title_service import trigger_title_generation
+from backend.infrastructure.storage.session_manager import save_token_usage
 
 
 class Agent:
@@ -123,34 +125,34 @@ class Agent:
             self._emit_activity("started", {"instruction": extract_text_from_message(instruction)})
 
         try:
-            # Setup context manager
-            context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
+            # Setup context manager (cached as instance attribute)
+            self._context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
             # Configure context manager based on mode
             if self.is_main_agent:
                 # MainAgent: use provided configuration
                 if agent_profile is not None:
-                    context_manager.agent_profile = agent_profile
+                    self._context_manager.agent_profile = agent_profile
                 if enable_memory is not None:
-                    context_manager.enable_memory = enable_memory
+                    self._context_manager.enable_memory = enable_memory
             else:
                 # SubAgent: use definition defaults
-                context_manager.agent_profile = self.definition.tool_profile
-                context_manager.enable_memory = self.definition.enable_memory
+                self._context_manager.agent_profile = self.definition.tool_profile
+                self._context_manager.enable_memory = self.definition.enable_memory
 
             # Build system prompt once (immutable during Agent lifecycle)
             prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-                self.session_id, context_manager.agent_profile
+                self.session_id, self._context_manager.agent_profile
             )
             self._system_prompt = await build_system_prompt(
-                agent_profile=context_manager.agent_profile,
+                agent_profile=self._context_manager.agent_profile,
                 session_id=self.session_id,
-                enable_memory=context_manager.enable_memory,
+                enable_memory=self._context_manager.enable_memory,
                 tool_schemas=prompt_tool_schemas
             )
 
             # Add instruction to context
-            await context_manager.add_user_message(instruction)
+            await self._context_manager.add_user_message(instruction)
 
             # MainAgent: persist to database
             if self.is_main_agent:
@@ -183,7 +185,7 @@ class Agent:
                         role="assistant",
                         content=[{"type": "text", "text": "Response processing unavailable"}]
                     )
-                streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
+                streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
             else:
                 # SubAgent: extract text content
                 processor = self.llm_client._get_response_processor()
@@ -212,8 +214,7 @@ class Agent:
                 print(f"[Agent] Exception: {e}")
                 print(f"[Agent] Traceback: {traceback.format_exc()}")
 
-                ctx = self.llm_client.get_or_create_context_manager(self.session_id)
-                streaming_message_id = getattr(ctx, 'streaming_message_id', None)
+                streaming_message_id = getattr(self._context_manager, 'streaming_message_id', None)
                 if streaming_message_id:
                     try:
                         message_service = MessageService()
@@ -259,7 +260,6 @@ class Agent:
 
         # Initialize services based on mode
         message_service = MessageService()
-        context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
         # MainAgent: streaming processor and status monitor
         streaming_processor = None
@@ -285,7 +285,7 @@ class Agent:
                 await WebSocketNotificationService.send_message_create(
                     self.session_id, message_id, streaming=True
                 )
-                context_manager.streaming_message_id = message_id
+                self._context_manager.streaming_message_id = message_id
                 state = StreamingState(message_id=message_id)
 
             # === LLM Call (streaming vs non-streaming) ===
@@ -307,7 +307,7 @@ class Agent:
                 # Non-streaming call
                 self._emit_activity("thinking", {"iteration": iteration})
                 response = await self.llm_client.call_api_with_context(
-                    context_contents=context_manager.get_working_contents(),
+                    context_contents=self._context_manager.get_working_contents(),
                     api_config=api_config,
                 )
                 self._emit_activity("llm_response", {"iteration": iteration})
@@ -331,11 +331,11 @@ class Agent:
                     )
                 else:
                     # Non-streaming: just return response
-                    context_manager.add_response(response)
+                    self._context_manager.add_response(response)
                     return response
 
             # === Has tool calls - process them ===
-            context_manager.add_response(response)
+            self._context_manager.add_response(response)
 
             # MainAgent: Update streaming message with tool content
             if self.is_main_agent:
@@ -344,13 +344,10 @@ class Agent:
                     response, message_id, state, streaming_processor, tool_calls, message_service
                 )
 
-            if not tool_calls:
-                return response
-
             # === Check iteration limit BEFORE executing tools ===
             if iteration >= self.definition.max_iterations:
                 if self.is_main_agent:
-                    await self._handle_stream_iteration_limit(tool_calls, context_manager, message_service)
+                    await self._handle_stream_iteration_limit(tool_calls, message_service)
                 return response
 
             # === Execute tools ===
@@ -365,12 +362,12 @@ class Agent:
                     self.session_id
                 )
                 execution_result = await tool_executor.execute_all(
-                    tool_calls, message_id, context_manager.agent_profile
+                    tool_calls, message_id, self._context_manager.agent_profile
                 )
 
                 # Save to context and database
                 await tool_executor.save_results_to_context(
-                    tool_calls, execution_result.results, context_manager
+                    tool_calls, execution_result.results, self._context_manager
                 )
                 await tool_executor.save_results_to_database(
                     tool_calls, execution_result.results
@@ -420,7 +417,7 @@ class Agent:
                 # Save results to context only (no database persistence for SubAgent)
                 for tool_call, result in zip(tool_calls, execution_result.results):
                     if result is not None:
-                        await context_manager.add_tool_result(
+                        await self._context_manager.add_tool_result(
                             tool_call_id=tool_call.get("id", ""),
                             tool_name=tool_call.get("name", ""),
                             result=result,
@@ -469,11 +466,7 @@ class Agent:
         )
 
         # Trigger title generation
-        from backend.application.services.contents import TitleService
-        title_service = TitleService()
-        asyncio.create_task(
-            title_service.try_generate_title_if_needed_async(self.session_id, self.llm_client)
-        )
+        trigger_title_generation(self.session_id, self.llm_client)
 
         return partial_response
 
@@ -489,8 +482,7 @@ class Agent:
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
         # Add to context
-        context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
-        context_manager.add_response(response)
+        self._context_manager.add_response(response)
 
         # Format and save
         final_message = streaming_processor.format_for_storage(response)
@@ -513,15 +505,10 @@ class Agent:
 
             # Save usage
             if usage:
-                from backend.infrastructure.storage.session_manager import save_token_usage
                 save_token_usage(self.session_id, usage)
 
             # Trigger title generation
-            from backend.application.services.contents import TitleService
-            title_service = TitleService()
-            asyncio.create_task(
-                title_service.try_generate_title_if_needed_async(self.session_id, self.llm_client)
-            )
+            trigger_title_generation(self.session_id, self.llm_client)
 
         return response
 
@@ -556,15 +543,10 @@ class Agent:
             )
 
             if usage:
-                from backend.infrastructure.storage.session_manager import save_token_usage
                 save_token_usage(self.session_id, usage)
 
             # Trigger title generation
-            from backend.application.services.contents import TitleService
-            title_service = TitleService()
-            asyncio.create_task(
-                title_service.try_generate_title_if_needed_async(self.session_id, self.llm_client)
-            )
+            trigger_title_generation(self.session_id, self.llm_client)
 
         except Exception as e:
             print(f"[Agent.stream] Failed to update streaming message: {e}")
@@ -572,7 +554,6 @@ class Agent:
     async def _handle_stream_iteration_limit(
         self,
         tool_calls: list,
-        context_manager: Any,
         message_service: MessageService
     ) -> None:
         """Handle iteration limit reached in streaming mode."""
@@ -596,7 +577,7 @@ class Agent:
                 llm_content={"parts": [{"type": "text", "text": stop_message}]}
             )
 
-            await context_manager.add_tool_result(
+            await self._context_manager.add_tool_result(
                 tool_call['id'],
                 tool_call['name'],
                 limit_result,
