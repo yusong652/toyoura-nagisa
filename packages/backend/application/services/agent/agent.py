@@ -90,21 +90,19 @@ class Agent:
 
     async def run(
         self,
-        inputs: Dict[str, str],
-        abort_signal: Optional[asyncio.Event] = None,
+        instruction: Optional[str] = None,
     ) -> AgentResult:
         """
         Execute agent task (non-streaming mode).
 
         This is the primary method for SubAgents. The agent will:
-        1. Build context from inputs
+        1. Build context from instruction
         2. Call LLM
         3. Execute tools if requested
         4. Repeat until done or limits reached
 
         Args:
-            inputs: Task inputs (e.g., {"objective": "...", "context": "..."})
-            abort_signal: Optional event to signal abort
+            instruction: Task instruction from parent agent
 
         Returns:
             AgentResult with execution outcome
@@ -112,7 +110,7 @@ class Agent:
         start_time = time.time()
         iteration = 0
 
-        self._emit_activity("started", {"inputs": inputs})
+        self._emit_activity("started", {"instruction": instruction})
 
         try:
             # Setup context manager using session_id (auto-generated for SubAgent)
@@ -122,9 +120,10 @@ class Agent:
             context_manager.agent_profile = self.definition.tool_profile
             context_manager.enable_memory = self.definition.enable_memory
 
-            # Build initial user message from inputs (task from parent agent)
-            initial_message = UserMessage(content=self._build_prompt_content(inputs))
-            await context_manager.add_user_message(initial_message)
+            # Build initial user message from instruction (task from parent agent)
+            if instruction:
+                initial_message = UserMessage(content=instruction)
+                await context_manager.add_user_message(initial_message)
 
             # Build system prompt using infrastructure
             # Uses definition.name as the prompt profile to load {name}.md
@@ -147,14 +146,6 @@ class Agent:
 
             # Execution loop
             while iteration < self.definition.max_iterations:
-                # Check abort signal
-                if abort_signal and abort_signal.is_set():
-                    return AgentResult(
-                        status="aborted",
-                        iterations_used=iteration,
-                        execution_time_seconds=time.time() - start_time,
-                    )
-
                 # Get fresh messages from context_manager
                 messages = context_manager.get_working_contents()
 
@@ -314,9 +305,6 @@ class Agent:
     async def execute(
         self,
         instruction: Optional[str] = None,
-        *,
-        context: Optional[str] = None,
-        abort_signal: Optional[asyncio.Event] = None,
     ) -> AgentResult:
         """
         Unified agent execution entry point (facade).
@@ -324,9 +312,7 @@ class Agent:
         Dispatches to run() or stream() based on is_main_agent.
 
         Args:
-            instruction: Task instruction for the agent (required for SubAgent)
-            context: Additional context (SubAgent mode only)
-            abort_signal: Optional abort signal
+            instruction: Task instruction for the agent
 
         Returns:
             AgentResult with execution outcome
@@ -336,12 +322,7 @@ class Agent:
             return await self.stream(instruction)
         else:
             # SubAgent mode: non-streaming, temporary context
-            if instruction is None:
-                raise ValueError("instruction is required for SubAgent execution")
-            inputs = {"task": instruction}
-            if context:
-                inputs["context"] = context
-            return await self.run(inputs=inputs, abort_signal=abort_signal)
+            return await self.run(instruction)
 
     async def _recursive_stream(
         self,
@@ -682,25 +663,6 @@ class Agent:
                 )
             except Exception as e:
                 print(f"[Agent.stream] Failed to save iteration limit result: {e}")
-
-    def _build_prompt_content(self, inputs: Dict[str, str]) -> str:
-        """
-        Build prompt content from inputs for initial user message.
-
-        Args:
-            inputs: Task inputs
-
-        Returns:
-            Prompt string for the initial user message
-        """
-        if len(inputs) == 1:
-            return str(list(inputs.values())[0])
-
-        parts = []
-        for key, value in inputs.items():
-            parts.append(f"## {key.replace('_', ' ').title()}\n{value}")
-
-        return "\n\n".join(parts)
 
     def _parse_response(self, response: Any) -> tuple[str, List[Dict]]:
         """
