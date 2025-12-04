@@ -434,31 +434,28 @@ class Agent:
         # Add to context
         self._context_manager.add_response(response)
 
-        # Format and save
+        # Format and save (format_for_storage always returns AssistantMessage with List content)
         final_message = self._streaming_processor.format_for_storage(response)
-        if final_message:
-            content = final_message.content if isinstance(
-                final_message.content, list
-            ) else [{"type": "text", "text": str(final_message.content)}]
-            MessageService().update_assistant_message(self._message_id, content, self.session_id)
+        content = final_message.content
+        MessageService().update_assistant_message(self._message_id, content, self.session_id)
 
-            usage = self._streaming_processor.extract_usage(self._state)
+        usage = self._streaming_processor.extract_usage(self._state)
 
-            # Send final update
-            await WebSocketNotificationService.send_streaming_update(
-                session_id=self.session_id,
-                message_id=self._message_id,
-                content=content,
-                streaming=False,
-                usage=usage
-            )
+        # Send final update
+        await WebSocketNotificationService.send_streaming_update(
+            session_id=self.session_id,
+            message_id=self._message_id,
+            content=content,
+            streaming=False,
+            usage=usage
+        )
 
-            # Save usage
-            if usage:
-                save_token_usage(self.session_id, usage)
+        # Save usage
+        if usage:
+            save_token_usage(self.session_id, usage)
 
-            # Trigger title generation
-            trigger_title_generation(self.session_id, self.llm_client)
+        # Trigger title generation
+        trigger_title_generation(self.session_id, self.llm_client)
 
         return response
 
@@ -468,9 +465,7 @@ class Agent:
 
         try:
             tool_call_message = self._streaming_processor.format_for_storage(response, tool_calls)
-            content = tool_call_message.content if isinstance(
-                tool_call_message.content, list
-            ) else [{"type": "text", "text": str(tool_call_message.content)}]
+            content = tool_call_message.content
             MessageService().update_assistant_message(self._message_id, content, self.session_id)
 
             usage = self._streaming_processor.extract_usage(self._state)
