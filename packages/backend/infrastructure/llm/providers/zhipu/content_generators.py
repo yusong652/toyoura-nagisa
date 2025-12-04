@@ -255,10 +255,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
         Returns:
             Dictionary containing search results with sources and metadata
         """
-        if debug:
-            print(f"[ZhipuWebSearch] Starting web search with query: {query}")
-            if kwargs:
-                print(f"[ZhipuWebSearch] Additional params (accepted): {kwargs}")
 
         try:
             # Use base class debug method
@@ -268,9 +264,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             llm_settings = get_llm_settings()
             zhipu_config = llm_settings.get_zhipu_config()
             model = zhipu_config.model
-
-            if debug:
-                print(f"[ZhipuWebSearch] Using model: {model}")
 
             # Prepare messages for web search
             messages = [
@@ -296,10 +289,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
                 }
             ]
 
-            if debug:
-                print(f"[ZhipuWebSearch] Messages: {messages}")
-                print(f"[ZhipuWebSearch] Tools: {tools}")
-
             # Call Zhipu API with web search tool
             # Wrap synchronous call with asyncio.to_thread
             response: Completion = cast(
@@ -315,10 +304,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
                 )
             )
 
-            if debug:
-                print(f"[ZhipuWebSearch] API response received")
-                print(f"[ZhipuWebSearch] Response choices: {len(response.choices)}")
-
             # Use base class debug method
             BaseWebSearchGenerator.debug_search_complete(debug)
 
@@ -330,15 +315,8 @@ class WebSearchGenerator(BaseWebSearchGenerator):
             choice = response.choices[0]
             finish_reason = choice.finish_reason
 
-            if debug:
-                print(f"[ZhipuWebSearch] Finish reason: {finish_reason}")
-
             # Extract response content
             response_text = choice.message.content or ""
-
-            if debug:
-                print(f"[ZhipuWebSearch] Response text length: {len(response_text)}")
-                print(f"[ZhipuWebSearch] Response text: {response_text}")
 
             # Handle token length limit
             if finish_reason == "length":
@@ -366,9 +344,6 @@ class WebSearchGenerator(BaseWebSearchGenerator):
                 "snippet": snippet
             }
             sources.append(source_info)
-
-            if debug:
-                print(f"[ZhipuWebSearch] Extracted {len(sources)} sources")
 
             # Format result using base class method
             result = BaseWebSearchGenerator.format_search_result(
