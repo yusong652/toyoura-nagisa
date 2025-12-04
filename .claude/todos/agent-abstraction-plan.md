@@ -693,7 +693,7 @@ packages/backend/
 
 ## Progress Tracking
 
-### Last Updated: 2025-12-04
+### Last Updated: 2025-12-05
 
 ### Overall Status: ✅ All Phases Completed
 
@@ -1006,9 +1006,24 @@ async for chunk in nagisa.stream({"user_input": "..."}):
 
 ### Next Steps (Future Enhancements)
 
-所有核心阶段已完成。以下是可选的未来增强：
+#### ✅ Completed (2025-12-05)
 
-1. **invoke_agent 工具**: 实现 `infrastructure/mcp/tools/agent/invoke_agent.py`，允许主 Agent 调用 SubAgent
-2. **SubAgent WebSocket 通知**: 在 `notification_service.py` 中添加 SubAgent 活动事件通知
-3. **结构化输出**: 为 PFC Explorer 等 SubAgent 添加 `output_schema` 验证
-4. **更多 SubAgent**: 根据需要定义新的专用 Agent（如代码审查、文档生成等）
+1. **invoke_agent 工具**: ✅ 已实现
+   - `infrastructure/mcp/tools/agent/invoke_agent.py`
+   - Claude Code Task 工具兼容的参数设计 (description, prompt, subagent_type)
+   - 注册到 PFC 和 GENERAL profiles
+   - 修复 SubAgent prompt 加载问题 (使用 config.name 而非 tool_profile)
+   - 添加 `include_expression` 参数，SubAgent 不包含表情指令
+
+#### 🟡 In Progress
+
+2. **SubAgent 工具确认机制**: 需要设计
+   - 当前状态：SubAgent 没有 WebSocket 连接，需要确认的工具会被自动拒绝
+   - 待解决：SubAgent 的危险工具（bash 等）需要用户确认
+   - 可能方案：继承父 session 的确认渠道 / SubAgent 跳过确认
+
+#### ⬜ Future
+
+3. **SubAgent WebSocket 通知**: 在 `notification_service.py` 中添加 SubAgent 活动事件通知
+4. **结构化输出**: 为 PFC Explorer 等 SubAgent 添加 `output_schema` 验证
+5. **更多 SubAgent**: 根据需要定义新的专用 Agent（如代码审查、文档生成等）
