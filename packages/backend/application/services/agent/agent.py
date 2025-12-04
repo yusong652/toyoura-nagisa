@@ -12,10 +12,11 @@ Execution modes (controlled by is_main_agent):
 import asyncio
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
 from backend.domain.models.messages import AssistantMessage, UserMessage
+from backend.domain.models.message_factory import extract_text_from_message
 from backend.infrastructure.llm.base.client import LLMClientBase
 from backend.application.services.conversation.tool_executor import ToolExecutor
 from backend.application.services.conversation.models import StreamingState
@@ -35,11 +36,15 @@ class Agent:
     Usage:
         # SubAgent (non-streaming, activity callbacks)
         explorer = Agent(PFC_EXPLORER, llm_client, on_activity=callback)
-        result = await explorer.execute("Find ball syntax")
+        result = await explorer.execute(instruction="Find ball syntax")
 
         # MainAgent (streaming, WebSocket, persistence)
         nagisa = Agent(MAIN_AGENT, llm_client, session_id="abc123")
-        result = await nagisa.execute("Write a Python script")
+        result = await nagisa.execute(
+            instruction=user_message,  # UserMessage object
+            agent_profile="coding",
+            enable_memory=True
+        )
     """
 
     def __init__(
@@ -85,7 +90,9 @@ class Agent:
 
     async def execute(
         self,
-        instruction: Optional[str] = None,
+        instruction: Optional[UserMessage] = None,
+        agent_profile: Optional[str] = None,
+        enable_memory: Optional[bool] = None,
     ) -> AgentResult:
         """
         Unified agent execution entry point.
@@ -95,7 +102,9 @@ class Agent:
         - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
         Args:
-            instruction: Task instruction for the agent
+            instruction: UserMessage object containing user input
+            agent_profile: Agent profile for tool selection (MainAgent only)
+            enable_memory: Whether to enable memory persistence (MainAgent only)
 
         Returns:
             AgentResult with execution outcome
@@ -104,29 +113,63 @@ class Agent:
             UserRejectionInterruption: When user rejects tool execution (MainAgent only)
         """
         from backend.shared.exceptions import UserRejectionInterruption
+        from backend.shared.utils.prompt.builder import build_system_prompt
 
         start_time = time.time()
+        message_service = MessageService()
 
         # SubAgent: emit started activity
         if not self.is_main_agent:
-            self._emit_activity("started", {"instruction": instruction})
+            instruction_text = extract_text_from_message(instruction) if instruction else None
+            self._emit_activity("started", {"instruction": instruction_text})
 
         try:
             # Setup context manager
             context_manager = self.llm_client.get_or_create_context_manager(self.session_id)
 
-            # SubAgent: set profile and memory from definition
-            if not self.is_main_agent:
+            # Configure context manager based on mode
+            if self.is_main_agent:
+                # MainAgent: use provided configuration
+                if agent_profile is not None:
+                    context_manager.agent_profile = agent_profile
+                if enable_memory is not None:
+                    context_manager.enable_memory = enable_memory
+            else:
+                # SubAgent: use definition defaults
                 context_manager.agent_profile = self.definition.tool_profile
                 context_manager.enable_memory = self.definition.enable_memory
 
-            # Add instruction as user message (check if needed for MainAgent)
+            # Build system prompt once (immutable during Agent lifecycle)
+            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
+                self.session_id, context_manager.agent_profile
+            )
+            self._system_prompt = await build_system_prompt(
+                agent_profile=context_manager.agent_profile,
+                session_id=self.session_id,
+                enable_memory=context_manager.enable_memory,
+                tool_schemas=prompt_tool_schemas
+            )
+
+            # Add instruction as user message
             if instruction:
+                # Add to context
+                await context_manager.add_user_message(instruction)
+
+                # MainAgent: persist to database
                 if self.is_main_agent:
-                    if self._should_inject_instruction(context_manager):
-                        await context_manager.add_user_message(UserMessage(content=instruction))
-                else:
-                    await context_manager.add_user_message(UserMessage(content=instruction))
+                    content = instruction.content if isinstance(
+                        instruction.content, list
+                    ) else [{"type": "text", "text": str(instruction.content)}]
+                    # Convert datetime to milliseconds if present
+                    timestamp_ms = None
+                    if instruction.timestamp:
+                        timestamp_ms = int(instruction.timestamp.timestamp() * 1000)
+                    message_service.save_user_message(
+                        content=content,
+                        session_id=self.session_id,
+                        timestamp=timestamp_ms,
+                        message_id=instruction.id
+                    )
 
             # Execute unified loop
             final_response = await self._execute_loop()
@@ -152,7 +195,8 @@ class Agent:
                 streaming_message_id = getattr(context_manager, 'streaming_message_id', None)
             else:
                 # SubAgent: extract text content
-                response_text, _ = self._parse_response(final_response)
+                processor = self.llm_client._get_response_processor()
+                response_text = processor.extract_text_content(final_response) if processor else ""
                 final_message = AssistantMessage(
                     role="assistant",
                     content=[{"type": "text", "text": response_text}]
@@ -205,15 +249,6 @@ class Agent:
             if not self.is_main_agent:
                 self._emit_activity("completed", {"elapsed": time.time() - start_time})
 
-    def _should_inject_instruction(self, context_manager) -> bool:
-        """Check if instruction should be injected (context is empty or no user message)."""
-        contents = context_manager.get_working_contents()
-        if not contents:
-            return True
-        # Check if last message is already a user message
-        last_msg = contents[-1]
-        return last_msg.get('role') != 'user'
-
     async def _execute_loop(self) -> Any:
         """
         Unified execution loop for both streaming and non-streaming modes.
@@ -230,7 +265,6 @@ class Agent:
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
         from backend.infrastructure.monitoring import get_status_monitor
         from backend.shared.exceptions import UserRejectionInterruption
-        from backend.shared.utils.prompt.builder import build_system_prompt
 
         # Initialize services based on mode
         message_service = MessageService()
@@ -247,20 +281,9 @@ class Agent:
 
         iteration = 0
         while True:
-            # === Build system prompt ===
-            prompt_tool_schemas = await self.llm_client.tool_manager.get_schemas_for_system_prompt(
-                self.session_id, context_manager.agent_profile
-            )
-            system_prompt = await build_system_prompt(
-                agent_profile=context_manager.agent_profile,
-                session_id=self.session_id,
-                enable_memory=context_manager.enable_memory,
-                tool_schemas=prompt_tool_schemas
-            )
-
             complete_context, api_config = await self.llm_client._prepare_complete_context(
                 session_id=self.session_id,
-                system_prompt=system_prompt
+                system_prompt=self._system_prompt
             )
 
             # === MainAgent: Create placeholder message ===
@@ -304,7 +327,8 @@ class Agent:
                 has_tools = streaming_processor.has_tool_calls(response)
                 tool_calls = streaming_processor.extract_tool_calls(response) if has_tools else []
             else:
-                _, tool_calls = self._parse_response(response)
+                processor = self.llm_client._get_response_processor()
+                tool_calls = processor.extract_tool_calls(response) if processor else []
                 has_tools = bool(tool_calls)
 
             # === No tool calls = done ===
@@ -605,24 +629,6 @@ class Agent:
                 )
             except Exception as e:
                 print(f"[Agent.stream] Failed to save iteration limit result: {e}")
-
-    def _parse_response(self, response: Any) -> tuple[str, List[Dict]]:
-        """
-        Parse LLM response to extract text and tool calls.
-
-        Uses the provider's response processor for format-agnostic parsing.
-        """
-        processor = self.llm_client._get_response_processor()
-        if not processor:
-            return "", []
-
-        try:
-            text_content = processor.extract_text_content(response)
-            tool_calls = processor.extract_tool_calls(response)
-            return text_content, tool_calls
-        except Exception as e:
-            print(f"[Agent] Error parsing response: {e}")
-            return "", []
 
     def _emit_activity(self, event_type: str, data: Dict[str, Any]) -> None:
         """Emit activity event if callback is registered."""

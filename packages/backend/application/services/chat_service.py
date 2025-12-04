@@ -4,11 +4,28 @@ Chat Service - Business logic for chat stream operations.
 This service handles chat streaming operations including message processing,
 conversation history management, and response generation.
 """
-from typing import List, Any
+from dataclasses import dataclass
+from typing import List, Any, Optional
 from fastapi import Request
 from backend.infrastructure.storage.session_manager import load_all_message_history
 from backend.domain.models.message_factory import message_factory
+from backend.domain.models.messages import UserMessage
 from backend.shared.utils.helpers import parse_message_data, MessageParseResult
+
+
+@dataclass
+class PreparedUserMessage:
+    """
+    Result of preparing a user message for Agent execution.
+
+    Contains the UserMessage object and associated configuration,
+    ready to be passed to Agent.execute().
+    """
+    session_id: str
+    message_id: str
+    instruction: UserMessage
+    agent_profile: str
+    enable_memory: bool
 
 
 def get_chat_service() -> "ChatService":
@@ -98,42 +115,16 @@ class ChatService:
         ]
     
 
-    def save_user_message_to_session(self, result: MessageParseResult) -> None:
+    async def prepare_user_message(self, request_data: dict) -> PreparedUserMessage:
         """
-        Save user message to session history.
+        Prepare user message for Agent execution.
 
-        Delegates to MessageService for consistent message handling across the application.
+        Parses and preprocesses the user message (including file mentions and
+        status reminders), returning a PreparedUserMessage ready for Agent.execute().
 
-        Args:
-            result: Unified MessageParseResult with complete message data including session_id
-
-        Raises:
-            ValueError: If message content is None or empty
-
-        Note:
-            This function provides a convenient wrapper around MessageService.save_user_message
-            for use with parsed WebSocket data.
-        """
-        # Validate content
-        if not result['content']:
-            raise ValueError("Invalid message content")
-
-        # Delegate to MessageService for consistent message handling
-        from backend.application.services.message_service import MessageService
-        MessageService.save_user_message(
-            content=result['content'],
-            session_id=result['session_id'],
-            timestamp=result.get('timestamp'),
-            message_id=result.get('id')
-        )
-
-
-    async def process_user_message(self, request_data: dict) -> dict:
-        """
-        Unified user message processing with pending rejection handling.
-
-        Combines message parsing, pending rejection state checking, and message saving
-        into a single operation, providing a clean interface for message handlers.
+        NOTE: This method does NOT save the message to database. Message persistence
+        is handled by Agent.execute() to maintain Agent as the first-class citizen
+        responsible for the complete message lifecycle.
 
         Args:
             request_data: Dictionary containing WebSocket message data with structure:
@@ -145,33 +136,30 @@ class ChatService:
                 - files: List - Attached files (if any)
 
         Returns:
-            dict: Complete message processing result with structure:
-                - session_id: str - Session identifier
-                - message_id: str - Message unique identifier
+            PreparedUserMessage containing:
+                - session_id: Session identifier
+                - message_id: Message unique identifier
+                - instruction: UserMessage object ready for Agent
+                - agent_profile: Agent profile configuration
+                - enable_memory: Memory persistence setting
 
-        Note:
-            This method processes all user messages uniformly.
-            User rejection feedback is handled as a normal user message in the new architecture.
+        Raises:
+            ValueError: If message data is invalid or missing required fields
         """
         # 1. Parse request data using unified parsing logic
         try:
             parsed_data = parse_message_data(request_data)
-
         except Exception as e:
             raise ValueError(f"WebSocket message parsing failed: {str(e)}")
 
-        # 2. Extract session ID
+        # 2. Extract and validate session ID
         session_id = parsed_data['session_id']
         if not session_id:
             raise ValueError("Session ID is required in the message data")
 
         # 3. Extract file mentions from frontend or fallback to backend parsing
-        # Priority: Use frontend-provided mentioned_files if available (supports spaces, unicode, etc.)
-        # Fallback: Parse from message text using regex (legacy support, limited to ASCII)
         mentioned_files = parsed_data.get('mentioned_files', [])
-
         if not mentioned_files:
-            # Fallback: Backend regex parsing (limited support for special characters)
             message_text = parsed_data.get('message', '')
             if message_text:
                 mentioned_files = self._extract_file_mentions(message_text)
@@ -180,39 +168,43 @@ class ChatService:
             parsed_data['mentioned_files'] = mentioned_files
             print(f"[DEBUG] Processing {len(mentioned_files)} file mentions: {mentioned_files}", flush=True)
 
-        # 4. Inject system status reminders BEFORE saving to database
-        # This ensures the database stores the complete message with context
+        # 4. Inject system status reminders into content
         await self._inject_status_reminders(session_id, parsed_data)
 
-        # 4. Save user message (with injected reminders) to persistent storage
-        print(f"[DEBUG] Processing user message for session {session_id}", flush=True)
-        self.save_user_message_to_session(parsed_data)
-        print(f"[DEBUG] Saved user message {parsed_data.get('id')} to session {session_id}", flush=True)
-
-        # 4. Force reload context manager from storage to get fresh state
-        from backend.shared.utils.app_context import get_llm_client
-        llm_client = get_llm_client()
-
-        # Clear cached context manager to force reload from database
-        # This ensures we always have the latest state including the newly saved message
-        llm_client.clear_context_manager(session_id)
-
-        # Get fresh context manager (will auto-load from database in __init__)
-        context_manager = llm_client.get_or_create_context_manager(session_id)
-
-        # Update configuration from parsed_data
-        context_manager.agent_profile = parsed_data.get('agent_profile', 'general')
-        context_manager.enable_memory = parsed_data.get('enable_memory', True)
-
-        # Reset interrupt flag for new conversation turn via StatusMonitor
+        # 5. Reset interrupt flag for new conversation turn
         from backend.infrastructure.monitoring import get_status_monitor
         status_monitor = get_status_monitor(session_id)
         status_monitor.reset_user_interrupted()
 
-        return {
-            'session_id': session_id,
-            'message_id': parsed_data.get('id')
-        }
+        # 6. Build UserMessage object
+        content = parsed_data.get('content', [])
+        message_id = parsed_data.get('id', '')
+        timestamp = parsed_data.get('timestamp')
+
+        # Convert timestamp to datetime if provided
+        from datetime import datetime
+        dt_timestamp = None
+        if timestamp:
+            try:
+                dt_timestamp = datetime.fromtimestamp(timestamp / 1000)
+            except (TypeError, ValueError):
+                pass
+
+        instruction = UserMessage(
+            content=content,
+            id=message_id,
+            timestamp=dt_timestamp
+        )
+
+        print(f"[DEBUG] Prepared user message {message_id} for session {session_id}", flush=True)
+
+        return PreparedUserMessage(
+            session_id=session_id,
+            message_id=message_id,
+            instruction=instruction,
+            agent_profile=parsed_data.get('agent_profile', 'general'),
+            enable_memory=parsed_data.get('enable_memory', True)
+        )
 
     def _extract_file_mentions(self, text: str) -> list[str]:
         """

@@ -253,15 +253,13 @@ class ChatHandler(MessageHandler):
         try:
             print(f"[ChatHandler] Processing message from queue for session {session_id}", flush=True)
 
-            # Process user message (save to history and add to LLM context)
-            processing_result = await self.chat_service.process_user_message(request_data)
+            # Prepare user message (parsing, reminders injection, but NO persistence)
+            # Agent.execute() is now responsible for message persistence
+            prepared_message = await self.chat_service.prepare_user_message(request_data)
 
-            # Generate streaming response for this message
+            # Generate streaming response with explicit instruction passing
             from backend.presentation.handlers.chat_request_handler import process_chat_request
-            await process_chat_request(
-                session_id=processing_result['session_id'],
-                user_message_id=processing_result['message_id']
-            )
+            await process_chat_request(prepared_message)
 
             print(f"[ChatHandler] Completed processing message for session {session_id}", flush=True)
 

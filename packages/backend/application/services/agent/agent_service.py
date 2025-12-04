@@ -16,6 +16,7 @@ from typing import Callable, Optional
 from backend.application.services.agent.agent import Agent
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
 from backend.domain.models.agent_definitions import MAIN_AGENT
+from backend.domain.models.messages import UserMessage
 from backend.infrastructure.llm.base.client import LLMClientBase
 
 
@@ -29,7 +30,12 @@ class AgentService:
     Usage:
         # In presentation layer (e.g., chat_request_handler)
         service = AgentService(llm_client)
-        result = await service.process_chat(session_id)
+        result = await service.process_chat(
+            session_id=session_id,
+            instruction=user_message,
+            agent_profile="coding",
+            enable_memory=True
+        )
 
         # For SubAgent execution
         result = await service.run_subagent(
@@ -48,7 +54,13 @@ class AgentService:
         """
         self._llm_client = llm_client
 
-    async def process_chat(self, session_id: str) -> AgentResult:
+    async def process_chat(
+        self,
+        session_id: str,
+        instruction: UserMessage,
+        agent_profile: str = "general",
+        enable_memory: bool = True,
+    ) -> AgentResult:
         """
         Process a chat request using MainAgent.
 
@@ -57,6 +69,9 @@ class AgentService:
 
         Args:
             session_id: Session ID for the conversation
+            instruction: UserMessage object containing user input
+            agent_profile: Agent profile for tool selection (default: "general")
+            enable_memory: Whether to enable memory persistence (default: True)
 
         Returns:
             AgentResult with execution outcome and response message
@@ -66,7 +81,11 @@ class AgentService:
             llm_client=self._llm_client,
             session_id=session_id,
         )
-        return await agent.execute()
+        return await agent.execute(
+            instruction=instruction,
+            agent_profile=agent_profile,
+            enable_memory=enable_memory,
+        )
 
     async def run_subagent(
         self,
@@ -83,19 +102,27 @@ class AgentService:
 
         Args:
             definition: AgentDefinition for the SubAgent
-            instruction: Task instruction to execute
-            context: Optional additional context
+            instruction: Task instruction to execute (string)
+            context: Optional additional context to prepend
             on_activity: Optional callback for activity events
 
         Returns:
             AgentResult with execution outcome
         """
+        # Build full instruction with context
+        full_instruction = instruction
+        if context:
+            full_instruction = f"{context}\n\n{instruction}"
+
+        # Convert string to UserMessage
+        user_message = UserMessage(content=full_instruction)
+
         agent = Agent(
             definition=definition,
             llm_client=self._llm_client,
             on_activity=on_activity,
         )
-        return await agent.execute(instruction=instruction, context=context)
+        return await agent.execute(instruction=user_message)
 
     @property
     def llm_client(self) -> LLMClientBase:

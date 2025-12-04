@@ -14,7 +14,7 @@ As a presentation layer component, it bridges WebSocket-specific concerns
 
 import uuid
 import logging
-from typing import Optional
+from backend.application.services.chat_service import PreparedUserMessage
 from backend.application.services.contents.content_processor import process_content_pipeline
 from backend.application.services.memory_service import save_session_conversation_memory
 from backend.application.services.notifications import get_message_status_service
@@ -24,29 +24,26 @@ from backend.shared.exceptions import UserRejectionInterruption
 logger = logging.getLogger(__name__)
 
 
-async def process_chat_request(
-    session_id: str,
-    user_message_id: Optional[str] = None
-) -> None:
+async def process_chat_request(prepared_message: PreparedUserMessage) -> None:
     """
-    Complete chat request processing pipeline using session-based approach.
+    Complete chat request processing pipeline.
 
-    Handles the entire chat request lifecycle using simplified parameter passing:
+    Handles the entire chat request lifecycle:
     1. Status notifications (sent/read/error)
-    2. LLM response processing with real-time tool notifications
-    3. Memory persistence after successful completion
-    4. Comprehensive error handling
-
-    All configuration (agent_profile, enable_memory) is retrieved from the session's
-    context manager, eliminating the need for complex parameter passing.
+    2. Agent execution with explicit instruction passing
+    3. Content processing pipeline (TTS, etc.)
+    4. Memory persistence after successful completion
+    5. Comprehensive error handling
 
     Args:
-        session_id: Current session ID for accessing context manager and configuration
-        user_message_id: Optional message ID for WebSocket status updates
+        prepared_message: PreparedUserMessage containing instruction and configuration
 
     Returns:
         None - All output is sent via WebSocket
     """
+    session_id = prepared_message.session_id
+    user_message_id = prepared_message.message_id
+
     # ========== PHASE 1: Request initialization and deduplication ==========
     request_id = f"REQ_{str(uuid.uuid4())[:8]}"
 
@@ -54,18 +51,15 @@ async def process_chat_request(
     async with request_manager.request_context(session_id, request_id, user_message_id):
 
         # ========== PHASE 1.5: Status notifications ==========
-        # Send WebSocket status update if service is available and message ID provided
         status_service = get_message_status_service()
         if status_service and user_message_id:
             await status_service.notify_sent(session_id, user_message_id)
 
         try:
             # ========== PHASE 2: Get LLM response using AgentService ==========
-            # Get LLM client from app state
             from backend.shared.utils.app_context import get_llm_client
             llm_client = get_llm_client()
 
-            # Use AgentService for clean separation of concerns
             from backend.application.services.agent.agent_service import AgentService
             agent_service = AgentService(llm_client)
 
@@ -73,34 +67,29 @@ async def process_chat_request(
             if status_service and user_message_id:
                 await status_service.notify_read(session_id, user_message_id)
 
-            # Execute conversation turn via AgentService (Application layer)
-            # Returns unified AgentResult with message and metadata
-            result = await agent_service.process_chat(session_id)
+            # Execute conversation turn via AgentService with explicit instruction
+            # Agent is now responsible for message persistence
+            result = await agent_service.process_chat(
+                session_id=session_id,
+                instruction=prepared_message.instruction,
+                agent_profile=prepared_message.agent_profile,
+                enable_memory=prepared_message.enable_memory,
+            )
 
             # ========== PHASE 3: Content processing pipeline ==========
             if result.status == "success" and result.message:
-                # Process content via WebSocket
-                # Note: keyword extraction is handled in content_processor
-                # Pass message_id to avoid duplicate message creation
                 await process_content_pipeline(
                     result.message, session_id, message_id=result.message_id
                 )
 
             # ========== PHASE 4: Memory persistence ==========
             # Note: Title generation happens in Agent.execute() (Application layer)
-            # Save conversation to memory after successful response
-            # Get enable_memory from the session's context manager
-            context_manager = llm_client.get_or_create_context_manager(session_id)
-            if context_manager and getattr(context_manager, 'enable_memory', True):
+            if prepared_message.enable_memory:
                 await save_session_conversation_memory(session_id)
 
         except UserRejectionInterruption as interruption:
             # User rejected tool execution - this is NOT an error
             print(f"[INFO] Request interrupted by user rejection in session {session_id}: {interruption.rejected_tools}")
-
-            # Context already saved by tool calling loop
-            # NO content processing (TTS, post-processing, etc.)
-            # Simply return and wait for user's next input
             return
 
         except Exception as e:
@@ -108,9 +97,7 @@ async def process_chat_request(
             import traceback
             traceback.print_exc()
 
-            # Send error status via WebSocket if message ID is available
-            if user_message_id:
-                if status_service:
-                    await status_service.notify_error(session_id, user_message_id, str(e))
+            if user_message_id and status_service:
+                await status_service.notify_error(session_id, user_message_id, str(e))
 
         # Request cleanup automatically handled by request_manager context
