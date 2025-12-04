@@ -382,14 +382,13 @@ class Agent:
                 )
 
                 # Save results to context only (no database persistence for SubAgent)
+                await tool_executor.save_results_to_context(
+                    tool_calls, execution_result.results, self._context_manager,
+                    inject_reminders=False
+                )
+
+                # Emit tool_call_end activities
                 for tool_call, result in zip(tool_calls, execution_result.results):
-                    if result is not None:
-                        await self._context_manager.add_tool_result(
-                            tool_call_id=tool_call.get("id", ""),
-                            tool_name=tool_call.get("name", ""),
-                            result=result,
-                            inject_reminders=False
-                        )
                     self._emit_activity("tool_call_end", {
                         "tool": tool_call.get("name", "unknown"),
                         "status": result.get("status", "unknown") if result else "rejected",

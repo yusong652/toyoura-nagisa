@@ -229,7 +229,8 @@ class ToolExecutor:
         self,
         tool_calls: List[Dict],
         results: List[Optional[Dict]],
-        context_manager: Any
+        context_manager: Any,
+        inject_reminders: bool = True
     ) -> None:
         """
         Save tool results to context manager in original order.
@@ -238,14 +239,19 @@ class ToolExecutor:
             tool_calls: Original tool calls list
             results: Results indexed by original order
             context_manager: Context manager for adding results
+            inject_reminders: Whether to inject reminders on the last tool result.
+                             True for MainAgent, False for SubAgent by default.
         """
         for i, tool_call in enumerate(tool_calls):
+            result = results[i]
+            if result is None:
+                continue
             is_last_tool = (i == len(tool_calls) - 1)
             await context_manager.add_tool_result(
                 tool_call['id'],
                 tool_call['name'],
-                results[i],
-                inject_reminders=is_last_tool
+                result,
+                inject_reminders=inject_reminders and is_last_tool
             )
 
     async def save_results_to_database(
