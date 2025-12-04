@@ -12,7 +12,7 @@ Execution modes (controlled by is_main_agent):
 import asyncio
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from backend.domain.models.agent import AgentActivity, AgentDefinition, AgentResult
 from backend.domain.models.messages import AssistantMessage, UserMessage
@@ -36,12 +36,12 @@ class Agent:
     Usage:
         # SubAgent (non-streaming, activity callbacks)
         explorer = Agent(PFC_EXPLORER, llm_client, on_activity=callback)
-        result = await explorer.execute(instruction="Find ball syntax")
+        result = await explorer.execute(UserMessage(content="Find ball syntax"))
 
         # MainAgent (streaming, WebSocket, persistence)
         nagisa = Agent(MAIN_AGENT, llm_client, session_id="abc123")
         result = await nagisa.execute(
-            instruction=user_message,  # UserMessage object
+            instruction=user_message,
             agent_profile="coding",
             enable_memory=True
         )
@@ -90,7 +90,7 @@ class Agent:
 
     async def execute(
         self,
-        instruction: Optional[UserMessage] = None,
+        instruction: UserMessage,
         agent_profile: Optional[str] = None,
         enable_memory: Optional[bool] = None,
     ) -> AgentResult:
@@ -102,7 +102,7 @@ class Agent:
         - SubAgent: non-streaming calls, activity callbacks, context-only storage
 
         Args:
-            instruction: UserMessage object containing user input
+            instruction: UserMessage object containing user input (required)
             agent_profile: Agent profile for tool selection (MainAgent only)
             enable_memory: Whether to enable memory persistence (MainAgent only)
 
@@ -120,8 +120,7 @@ class Agent:
 
         # SubAgent: emit started activity
         if not self.is_main_agent:
-            instruction_text = extract_text_from_message(instruction) if instruction else None
-            self._emit_activity("started", {"instruction": instruction_text})
+            self._emit_activity("started", {"instruction": extract_text_from_message(instruction)})
 
         try:
             # Setup context manager
@@ -150,26 +149,18 @@ class Agent:
                 tool_schemas=prompt_tool_schemas
             )
 
-            # Add instruction as user message
-            if instruction:
-                # Add to context
-                await context_manager.add_user_message(instruction)
+            # Add instruction to context
+            await context_manager.add_user_message(instruction)
 
-                # MainAgent: persist to database
-                if self.is_main_agent:
-                    content = instruction.content if isinstance(
-                        instruction.content, list
-                    ) else [{"type": "text", "text": str(instruction.content)}]
-                    # Convert datetime to milliseconds if present
-                    timestamp_ms = None
-                    if instruction.timestamp:
-                        timestamp_ms = int(instruction.timestamp.timestamp() * 1000)
-                    message_service.save_user_message(
-                        content=content,
-                        session_id=self.session_id,
-                        timestamp=timestamp_ms,
-                        message_id=instruction.id
-                    )
+            # MainAgent: persist to database
+            if self.is_main_agent:
+                timestamp_ms = int(instruction.timestamp.timestamp() * 1000) if instruction.timestamp else None
+                message_service.save_user_message(
+                    content=cast(List[Dict[str, Any]], instruction.content),
+                    session_id=self.session_id,
+                    timestamp=timestamp_ms,
+                    message_id=instruction.id
+                )
 
             # Execute unified loop
             final_response = await self._execute_loop()
