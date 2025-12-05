@@ -125,14 +125,21 @@ async def test_tool_registration():
     print("TEST 3: Tool Registration Check")
     print("=" * 60)
 
-    from backend.domain.models.agent_profiles import CODING_TOOLS, GENERAL_TOOLS
+    from backend.domain.models.agent_profiles import CODING_TOOLS, GENERAL_TOOLS, PFC_TOOLS
 
-    print(f"\ninvoke_agent in CODING_TOOLS: {'invoke_agent' in CODING_TOOLS}")
-    print(f"invoke_agent in GENERAL_TOOLS: {'invoke_agent' in GENERAL_TOOLS}")
+    print(f"\ninvoke_agent in CODING_TOOLS: {'invoke_agent' in CODING_TOOLS} (should be False)")
+    print(f"invoke_agent in PFC_TOOLS: {'invoke_agent' in PFC_TOOLS} (should be True)")
+    print(f"invoke_agent in GENERAL_TOOLS: {'invoke_agent' in GENERAL_TOOLS} (should be True)")
     print(f"CODING_TOOLS count: {len(CODING_TOOLS)}")
     print(f"GENERAL_TOOLS count: {len(GENERAL_TOOLS)}")
 
-    return 'invoke_agent' in CODING_TOOLS and 'invoke_agent' in GENERAL_TOOLS
+    # invoke_agent should be in PFC_TOOLS and GENERAL_TOOLS (for MainAgent to delegate)
+    # but NOT in CODING_TOOLS (no SubAgent delegation needed for coding tasks)
+    return (
+        'invoke_agent' not in CODING_TOOLS and
+        'invoke_agent' in PFC_TOOLS and
+        'invoke_agent' in GENERAL_TOOLS
+    )
 
 
 async def test_subagent_config():
@@ -155,10 +162,15 @@ async def test_subagent_config():
     print(f"  Memory: {config.enable_memory}")
     print(f"  Tools (first 5): {list(config.tools)[:5]}...")
 
+    # Critical: SubAgents must NOT have invoke_agent to prevent recursive spawning
+    has_invoke_agent = 'invoke_agent' in config.tools
+    print(f"  Has invoke_agent: {has_invoke_agent} (should be False)")
+
     return (
         config.name == 'pfc_explorer' and
         config.streaming_enabled is False and
-        config.enable_memory is False
+        config.enable_memory is False and
+        not has_invoke_agent  # SubAgents cannot spawn other SubAgents
     )
 
 

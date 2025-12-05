@@ -94,6 +94,7 @@ class AgentService:
         instruction: str,
         context: Optional[str] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
+        notification_session_id: Optional[str] = None,
     ) -> AgentResult:
         """
         Execute a SubAgent task.
@@ -106,6 +107,9 @@ class AgentService:
             instruction: Task instruction to execute (string)
             context: Optional additional context to prepend
             on_activity: Optional callback for activity events
+            notification_session_id: Session ID for WebSocket notifications.
+                                    If provided, confirmation requests will be routed
+                                    to this session (typically MainAgent's session).
 
         Returns:
             AgentResult with execution outcome
@@ -122,6 +126,7 @@ class AgentService:
             config=config,
             llm_client=self._llm_client,
             on_activity=on_activity,
+            notification_session_id=notification_session_id,
         )
         return await agent.execute(instruction=user_message)
 

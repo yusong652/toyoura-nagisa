@@ -58,6 +58,7 @@ class Agent:
         session_id: Optional[str] = None,
         enable_memory: Optional[bool] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
+        notification_session_id: Optional[str] = None,
     ):
         """
         Initialize Agent.
@@ -71,6 +72,9 @@ class Agent:
             enable_memory: Whether to enable memory persistence.
                           If None, uses config.enable_memory as default.
             on_activity: Optional callback for activity events (SubAgent mode)
+            notification_session_id: Session ID for WebSocket notifications and confirmations.
+                                    If None, uses session_id. This allows SubAgents to route
+                                    confirmation requests to MainAgent's WebSocket connection.
         """
         self.config = config
         self.llm_client = llm_client
@@ -79,6 +83,9 @@ class Agent:
         # session_id is always str - auto-generate for SubAgent
         self._is_main_agent = session_id is not None
         self.session_id: str = session_id if session_id is not None else str(uuid.uuid4())[:8]
+
+        # notification_session_id: for SubAgent, route to parent's WebSocket
+        self._notification_session_id = notification_session_id or self.session_id
 
         # enable_memory: use provided value or fall back to config default
         self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
@@ -328,7 +335,8 @@ class Agent:
                 # MainAgent: Full tool execution with persistence
                 tool_executor = ToolExecutor(
                     self.llm_client.tool_manager,
-                    self.session_id
+                    self.session_id,
+                    notification_session_id=self._notification_session_id
                 )
                 execution_result = await tool_executor.execute_all(
                     tool_calls, self._message_id, self._context_manager.agent_profile
@@ -375,6 +383,7 @@ class Agent:
                 tool_executor = ToolExecutor(
                     tool_manager=self.llm_client.tool_manager,
                     session_id=self.session_id,
+                    notification_session_id=self._notification_session_id,
                 )
                 execution_result = await tool_executor.execute_all(
                     tool_calls=tool_calls,

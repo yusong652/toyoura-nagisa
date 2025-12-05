@@ -84,6 +84,29 @@ PFC_TOOLS: List[str] = [
     "invoke_agent",
 ]
 
+# SubAgent-specific tool list (excludes invoke_agent to prevent recursive spawning)
+SUBAGENT_PFC_TOOLS: List[str] = [
+    # File operations (read-only for SubAgent)
+    "read",
+    # System commands
+    "bash",
+    "bash_output",
+    "kill_shell",
+    "glob",
+    "grep",
+    # Search and planning
+    "web_search",
+    "todo_write",
+    # PFC documentation (use before writing scripts)
+    "pfc_query_python_api",
+    "pfc_query_command",
+    # PFC execution (script-only workflow)
+    "pfc_execute_task",
+    "pfc_check_task_status",
+    "pfc_list_tasks",
+    # NOTE: invoke_agent, write, edit excluded - SubAgents have limited write access
+]
+
 GENERAL_TOOLS: List[str] = [
     # Coding
     "write", "read", "edit", "bash", "bash_output", "kill_shell", "glob", "grep",
@@ -225,32 +248,28 @@ class SubAgentConfig:
     SubAgent configuration.
 
     SubAgents have their own prompt file (config/prompts/{name}.md)
-    but reuse an existing tool profile.
+    and an explicit tool list that MUST NOT include invoke_agent
+    to prevent recursive SubAgent spawning.
     """
     name: str                    # Unique name, also prompt file name
     display_name: str
     description: str
-    _tool_profile: AgentProfile  # References existing profile's tools
+    tools: tuple                 # Explicit tool list (no invoke_agent!)
     max_iterations: int = 10
     streaming_enabled: bool = False
     enable_memory: bool = False
 
     @property
     def tool_profile(self) -> str:
-        """Tool profile name as string."""
-        return self._tool_profile.value
-
-    @property
-    def tools(self) -> tuple:
-        """Get tools from referenced profile."""
-        return PROFILE_CONFIGS[self._tool_profile].tools
+        """Tool profile name (same as name for SubAgentConfig)."""
+        return self.name
 
 
 PFC_EXPLORER = SubAgentConfig(
     name="pfc_explorer",
     display_name="PFC Explorer",
     description="PFC documentation query and syntax validation agent",
-    _tool_profile=AgentProfile.PFC,
+    tools=tuple(SUBAGENT_PFC_TOOLS),
     max_iterations=10,
     streaming_enabled=False,
     enable_memory=False,
@@ -284,7 +303,20 @@ def get_profile_config(profile: str | AgentProfile) -> ProfileConfig:
 
 
 def get_tools_for_profile(profile: str | AgentProfile) -> List[str]:
-    """Get tool list for a profile."""
+    """
+    Get tool list for a profile or SubAgent.
+
+    Args:
+        profile: Profile name string, AgentProfile enum, or SubAgent name
+
+    Returns:
+        List of tool names for the profile/SubAgent
+    """
+    # First check if it's a SubAgent name
+    if isinstance(profile, str) and profile in SUBAGENT_CONFIGS:
+        return list(SUBAGENT_CONFIGS[profile].tools)
+
+    # Otherwise, look up in PROFILE_CONFIGS
     config = get_profile_config(profile)
     return list(config.tools)
 

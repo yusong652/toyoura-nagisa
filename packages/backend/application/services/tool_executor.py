@@ -39,17 +39,22 @@ class ToolExecutor:
     def __init__(
         self,
         tool_manager: Any,
-        session_id: str
+        session_id: str,
+        notification_session_id: Optional[str] = None
     ):
         """
         Initialize ToolExecutor.
 
         Args:
             tool_manager: ToolManager for tool execution
-            session_id: Session ID
+            session_id: Session ID for context and tool execution
+            notification_session_id: Session ID for WebSocket notifications and confirmations.
+                                    If None, uses session_id. This allows SubAgents to route
+                                    confirmation requests to MainAgent's WebSocket connection.
         """
         self.tool_manager = tool_manager
         self.session_id = session_id
+        self.notification_session_id = notification_session_id or session_id
         self.confirmation_strategy = ConfirmationStrategy(tool_manager)
 
     def classify_tools(self, tool_calls: List[Dict]) -> ClassifiedTools:
@@ -161,9 +166,9 @@ class ToolExecutor:
         # Build confirmation info
         info = await self.confirmation_strategy.build_confirmation_info(tool_call)
 
-        # Request confirmation
+        # Request confirmation (use notification_session_id for WebSocket routing)
         approved, user_message = await self.confirmation_strategy.request_confirmation(
-            info, self.session_id, message_id
+            info, self.notification_session_id, message_id
         )
 
         if approved:
@@ -206,7 +211,7 @@ class ToolExecutor:
 
         try:
             await WebSocketNotificationService.send_tool_result_update(
-                session_id=self.session_id,
+                session_id=self.notification_session_id,
                 message_id=tool_call['id'],
                 tool_call_id=tool_call['id'],
                 tool_name=tool_name,
@@ -220,8 +225,8 @@ class ToolExecutor:
             try:
                 from backend.application.services.todo_service import get_todo_service
                 todo_service = get_todo_service()
-                current_todo = await todo_service.get_current_todo(agent_profile, self.session_id)
-                await WebSocketNotificationService.send_todo_update(self.session_id, current_todo)
+                current_todo = await todo_service.get_current_todo(agent_profile, self.notification_session_id)
+                await WebSocketNotificationService.send_todo_update(self.notification_session_id, current_todo)
             except Exception as e:
                 print(f"[ToolExecutor] Failed to send todo update: {e}")
 

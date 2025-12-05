@@ -86,12 +86,13 @@ Usage notes:
         def track_activity(activity):
             logger.debug(f"[SubAgent:{subagent_type}] {activity.event_type}: {activity.data}")
 
-        # Execute SubAgent
+        # Execute SubAgent (pass MainAgent's session_id for confirmation routing)
         logger.info(f"[invoke_agent] Starting SubAgent '{subagent_type}' ({description}) for session {session_id[:8]}")
         result = await agent_service.run_subagent(
             config=config,
             instruction=prompt,
             on_activity=track_activity,
+            notification_session_id=session_id,  # Route confirmations to MainAgent's WebSocket
         )
 
         # Format result based on execution status
