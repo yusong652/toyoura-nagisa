@@ -63,18 +63,19 @@ TEST_AGENT_NO_TOOLS = SubAgentConfig(
     name="test_no_tools",
     display_name="Test Agent (No Tools)",
     description="Simple test agent that responds without using tools",
-    _tool_profile=AgentProfile.DISABLED,
+    tools=(),  # Empty tuple = no tools
     max_iterations=3,
     streaming_enabled=False,
     enable_memory=False,
 )
 
 # Test agent with coding tools
+from backend.domain.models.agent_profiles import CODING_TOOLS
 TEST_AGENT_WITH_TOOLS = SubAgentConfig(
     name="test_with_tools",
     display_name="Test Agent (With Tools)",
     description="Test agent that can use coding tools",
-    _tool_profile=AgentProfile.CODING,
+    tools=tuple(CODING_TOOLS),
     max_iterations=5,
     streaming_enabled=False,
     enable_memory=False,

@@ -42,8 +42,8 @@ async def get_workspace_for_profile(agent_profile: str, session_id: Optional[str
         For PFC profile, session_id is currently not used for workspace isolation
         because PFC server's working directory is determined by the PFC project itself.
     """
-    # PFC-specific workspace logic
-    if agent_profile == "pfc":
+    # PFC-specific workspace logic (pfc, pfc_explorer, etc.)
+    if agent_profile.startswith("pfc"):
         # Try to get PFC server's actual working directory
         try:
             from backend.infrastructure.pfc.websocket_client import get_client

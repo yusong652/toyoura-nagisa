@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.infrastructure.mcp.tools.agent.invoke_agent import invoke_agent, AVAILABLE_AGENTS
+from backend.infrastructure.mcp.tools.agent.invoke_agent import invoke_agent, AVAILABLE_SUBAGENTS
 from backend.domain.models.agent_profiles import get_subagent_config, PFC_EXPLORER
 from backend.domain.models.agent import AgentResult
 from backend.domain.models.messages import AssistantMessage
@@ -17,8 +17,8 @@ class TestInvokeAgentTool:
     """Tests for the invoke_agent tool."""
 
     def test_available_agents_configured(self):
-        """Verify AVAILABLE_AGENTS matches SUBAGENT_CONFIGS."""
-        for agent_type in AVAILABLE_AGENTS:
+        """Verify AVAILABLE_SUBAGENTS matches SUBAGENT_CONFIGS."""
+        for agent_type in AVAILABLE_SUBAGENTS:
             config = get_subagent_config(agent_type)
             assert config is not None
             assert config.name == agent_type
@@ -49,12 +49,13 @@ class TestInvokeAgentExecution:
         """Test that unknown agent type returns error."""
         result = await invoke_agent(
             context=mock_context,
+            description="Test task",
             prompt="test prompt",
-            agent_type="unknown_agent"  # type: ignore
+            subagent_type="unknown_agent"  # type: ignore
         )
 
         assert result["status"] == "error"
-        assert "Unknown agent type" in result["message"]
+        assert "Unknown subagent type" in result["message"]
 
     @pytest.mark.asyncio
     async def test_successful_subagent_execution(self, mock_context):
@@ -82,8 +83,9 @@ class TestInvokeAgentExecution:
 
             result = await invoke_agent(
                 context=mock_context,
+                description="Find ball syntax",
                 prompt="Find ball create syntax",
-                agent_type="pfc_explorer"
+                subagent_type="pfc_explorer"
             )
 
             assert result["status"] == "success"
@@ -114,8 +116,9 @@ class TestInvokeAgentExecution:
 
             result = await invoke_agent(
                 context=mock_context,
+                description="Complex query",
                 prompt="Complex query",
-                agent_type="pfc_explorer"
+                subagent_type="pfc_explorer"
             )
 
             assert result["status"] == "error"
@@ -130,8 +133,9 @@ class TestInvokeAgentExecution:
         with pytest.raises(RuntimeError, match="Session ID not found"):
             await invoke_agent(
                 context=context,
+                description="Test",
                 prompt="test",
-                agent_type="pfc_explorer"
+                subagent_type="pfc_explorer"
             )
 
 
@@ -186,8 +190,9 @@ class TestActivityTracking:
 
             result = await invoke_agent(
                 context=mock_context,
+                description="Test query",
                 prompt="Test query",
-                agent_type="pfc_explorer"
+                subagent_type="pfc_explorer"
             )
 
             # Activities are logged internally
