@@ -127,6 +127,8 @@ const PendingAssistantMessage: React.FC<{ item: AssistantHistoryItemWithoutId }>
 const STATUS_INDICATOR_WIDTH = 3;
 // Maximum lines for tool result content
 const MAX_RESULT_LINES = 10;
+// Maximum SubAgent tools to show (shows most recent, older ones collapsed)
+const MAX_SUBAGENT_TOOLS_SHOWN = 5;
 
 /**
  * Get tool description from input parameters
@@ -209,6 +211,13 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   const statusColor = isError ? theme.status.error : theme.status.success;
   const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
 
+  // Limit SubAgent tools displayed (show most recent, collapse older ones)
+  const totalSubagentTools = subagentTools.length;
+  const hiddenCount = Math.max(0, totalSubagentTools - MAX_SUBAGENT_TOOLS_SHOWN);
+  const visibleSubagentTools = hiddenCount > 0
+    ? subagentTools.slice(-MAX_SUBAGENT_TOOLS_SHOWN)
+    : subagentTools;
+
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box paddingX={1}>
@@ -228,8 +237,15 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
           )}
         </Text>
       </Box>
-      {/* Render SubAgent tools (for invoke_agent) */}
-      {subagentTools.map((tool) => (
+      {/* Render SubAgent tools (for invoke_agent) with auto-scroll effect */}
+      {hiddenCount > 0 && (
+        <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + 2}>
+          <Text color={theme.text.muted} dimColor>
+            ... {hiddenCount} more tool{hiddenCount > 1 ? 's' : ''} above
+          </Text>
+        </Box>
+      )}
+      {visibleSubagentTools.map((tool) => (
         <SubagentToolItemDisplay
           key={tool.toolCallId}
           toolName={tool.toolName}
