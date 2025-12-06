@@ -7,7 +7,11 @@ import type {
   ContentBlock,
   ToolCallHistoryItemWithoutId,
   ToolResultHistoryItemWithoutId,
+  SubagentToolItem,
 } from '../types.js';
+
+// Re-export for convenience
+export type { SubagentToolItem };
 
 /**
  * Pending tool pair: tool call with its result (or placeholder)
@@ -17,6 +21,7 @@ export interface PendingToolPair {
   toolCallId: string;
   toolCall: ToolCallHistoryItemWithoutId;
   toolResult: ToolResultHistoryItemWithoutId | null; // null = waiting for result
+  subagentTools?: SubagentToolItem[]; // SubAgent tools for invoke_agent (rendered below)
 }
 
 /**
@@ -85,4 +90,17 @@ export interface ToolResultUpdateEvent {
       [key: string]: any;
     };
   }>;
+}
+
+/**
+ * SubAgent tool use notification from backend
+ * Sent when a SubAgent (launched by invoke_agent) executes a tool
+ */
+export interface SubagentToolUseEvent {
+  type: 'SUBAGENT_TOOL_USE';
+  session_id: string;
+  parent_tool_call_id: string;  // ID of the invoke_agent tool call
+  tool_call_id: string;
+  tool_name: string;
+  tool_input: Record<string, unknown>;
 }

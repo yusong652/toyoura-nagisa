@@ -57,12 +57,20 @@ export interface AssistantHistoryItem extends HistoryItemBase {
   isStreaming?: boolean;
 }
 
+/** SubAgent tool item for display (nested under invoke_agent) */
+export interface SubagentToolItem {
+  toolCallId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+}
+
 export interface ToolCallHistoryItem extends HistoryItemBase {
   type: MessageType.TOOL_CALL;
   toolName: string;
   toolInput: Record<string, unknown>;
   toolCallId: string;
   isError?: boolean;    // True if the tool result was an error
+  subagentTools?: SubagentToolItem[];  // SubAgent tools for invoke_agent
 }
 
 /** Diff information for file modification tools (edit, write) */
@@ -122,6 +130,7 @@ export interface ToolCallHistoryItemWithoutId {
   timestamp?: number;
   hasResult?: boolean;  // True when tool result has been received
   isError?: boolean;    // True if the tool result was an error
+  subagentTools?: SubagentToolItem[];  // SubAgent tools for invoke_agent
 }
 
 export interface ToolResultHistoryItemWithoutId {

@@ -82,8 +82,12 @@ Usage notes:
         llm_client = get_llm_client()
         agent_service = AgentService(llm_client)
 
-        # Use request_id as parent_tool_call_id for frontend association
-        parent_tool_call_id = context.request_id
+        # Get tool_call_id from request_context.meta (passed by tool_manager)
+        # This is the LLM-generated tool_call_id for frontend association
+        parent_tool_call_id = ""
+        req_ctx = context.request_context
+        if req_ctx and hasattr(req_ctx, 'meta') and req_ctx.meta:
+            parent_tool_call_id = getattr(req_ctx.meta, 'tool_call_id', "") or ""
 
         # Activity tracking (optional - for future WebSocket integration)
         def track_activity(activity):

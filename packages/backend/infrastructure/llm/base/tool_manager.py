@@ -206,7 +206,7 @@ class BaseToolManager(ABC):
             return False
 
     async def _execute_mcp_tool(self, tool_name: str, tool_args: Dict[str, Any],
-                               session_id: str) -> CallToolResult:
+                               session_id: str, tool_call_id: str = "") -> CallToolResult:
         """
         Unified method for executing MCP tool calls with mandatory session injection.
         Pure tool execution logic - confirmation should be handled by caller.
@@ -215,6 +215,7 @@ class BaseToolManager(ABC):
             tool_name: Tool name
             tool_args: Tool arguments
             session_id: Session ID for dependency injection (required for all tools)
+            tool_call_id: LLM-generated tool call ID (for SubAgent parent association)
 
         Returns:
             CallToolResult: MCP tool execution result containing content, structuredContent, and isError fields
@@ -226,10 +227,11 @@ class BaseToolManager(ABC):
         async with mcp_client as mcp_async_client:
             # Session isolation is handled by FastMCP per request via _meta.client_id
             # Create params with _meta as dict (FastMCP will handle conversion)
+            # tool_call_id is passed for SubAgent to associate with parent invoke_agent
             params = CallToolRequestParams(
                 name=tool_name,
                 arguments=tool_args,
-                _meta={"client_id": session_id}  # type: ignore
+                _meta={"client_id": session_id, "tool_call_id": tool_call_id}  # type: ignore
             )
             call_req = ClientRequest(CallToolRequest(method="tools/call", params=params))
             return await mcp_async_client.session.send_request(call_req, CallToolResult)
@@ -326,6 +328,7 @@ class BaseToolManager(ABC):
         """
         tool_name = function_call.get("name", "")
         tool_args = function_call.get("arguments", {})
+        tool_call_id = function_call.get("id", "")
 
         try:
             # Step 0: Validate edit prerequisite (must read file before editing)
@@ -363,7 +366,7 @@ class BaseToolManager(ABC):
             # This method only handles pure tool execution
 
             # Step 1: Execute the tool
-            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id)
+            call_tool_result = await self._execute_mcp_tool(tool_name, tool_args, session_id, tool_call_id)
             tool_result = extract_tool_result_from_mcp(call_tool_result)
 
             # Step 2: Track successful read operations for edit prerequisite validation

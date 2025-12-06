@@ -163,6 +163,33 @@ function getToolDescription(toolName: string, input: Record<string, unknown>): s
   return '';
 }
 
+// SubAgent Tool Item (nested under invoke_agent)
+// Displayed with additional indentation and dimmer styling
+const SubagentToolItemDisplay: React.FC<{
+  toolName: string;
+  toolInput: Record<string, unknown>;
+}> = ({ toolName, toolInput }) => {
+  const description = getToolDescription(toolName, toolInput);
+  // Additional indent for nested tools (2 spaces)
+  const SUBAGENT_INDENT = 2;
+
+  return (
+    <Box paddingX={1} paddingLeft={STATUS_INDICATOR_WIDTH + SUBAGENT_INDENT}>
+      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+        <BlinkingCircle color={theme.text.muted} />
+      </Box>
+      <Text wrap="truncate" dimColor>
+        <Text bold color={theme.text.muted}>
+          {toolName}
+        </Text>
+        {description && (
+          <Text color={theme.text.muted}> {description}</Text>
+        )}
+      </Text>
+    </Box>
+  );
+};
+
 // Pending Tool Call Message
 // Layout matches ToolCallMessage for visual consistency
 // Shows BlinkingCircle when executing, success/error icon when result received
@@ -170,28 +197,39 @@ const PendingToolCallMessage: React.FC<{ item: ToolCallHistoryItemWithoutId }> =
   const description = getToolDescription(item.toolName, item.toolInput);
   const hasResult = item.hasResult === true;
   const isError = item.isError === true;
+  const subagentTools = item.subagentTools || [];
 
   // Color based on result status: success (green) or error (red)
   const statusColor = isError ? theme.status.error : theme.status.success;
   const statusIcon = isError ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS;
 
   return (
-    <Box paddingX={1} marginBottom={1}>
-      <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
-        {hasResult ? (
-          <Text color={statusColor}>{statusIcon}</Text>
-        ) : (
-          <BlinkingCircle color={theme.status.success} />
-        )}
-      </Box>
-      <Text wrap="truncate">
-        <Text bold color={theme.text.primary}>
-          {item.toolName}
+    <Box flexDirection="column" marginBottom={1}>
+      <Box paddingX={1}>
+        <Box width={STATUS_INDICATOR_WIDTH} flexShrink={0}>
+          {hasResult ? (
+            <Text color={statusColor}>{statusIcon}</Text>
+          ) : (
+            <BlinkingCircle color={theme.status.success} />
+          )}
+        </Box>
+        <Text wrap="truncate">
+          <Text bold color={theme.text.primary}>
+            {item.toolName}
+          </Text>
+          {description && (
+            <Text color={theme.text.secondary}> {description}</Text>
+          )}
         </Text>
-        {description && (
-          <Text color={theme.text.secondary}> {description}</Text>
-        )}
-      </Text>
+      </Box>
+      {/* Render SubAgent tools (for invoke_agent) */}
+      {subagentTools.map((tool) => (
+        <SubagentToolItemDisplay
+          key={tool.toolCallId}
+          toolName={tool.toolName}
+          toolInput={tool.toolInput}
+        />
+      ))}
     </Box>
   );
 };

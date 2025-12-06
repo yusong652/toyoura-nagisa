@@ -17,7 +17,7 @@ import {
   type ToolResultHistoryItemWithoutId,
   type ContentBlock,
 } from '../types.js';
-import type { PendingToolPair } from '../types/streamEvents.js';
+import type { PendingToolPair, SubagentToolItem } from '../types/streamEvents.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 export interface UsePendingItemsOptions {
@@ -41,6 +41,7 @@ export interface UsePendingItemsReturn {
   stopAssistantStreaming: () => void;
   addToolPair: (toolCall: ToolCallHistoryItemWithoutId) => void;
   fillToolResult: (toolCallId: string, result: ToolResultHistoryItemWithoutId) => boolean;
+  addSubagentTool: (parentToolCallId: string, tool: SubagentToolItem) => void;
   commitAssistantToHistory: () => void;
   commitAllPendingToHistory: () => void;
   clearAll: () => void;
@@ -71,9 +72,20 @@ export function usePendingItems({
   // Track confirmed tool calls (already committed to history)
   const confirmedToolCallIdsRef = useRef<Set<string>>(new Set());
 
-  // Trigger re-render when tool pairs change
+  // Debounce ref to avoid too frequent re-renders (Ink rendering issue)
+  const rerenderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Trigger re-render when tool pairs change (debounced to avoid Ink artifacts)
   const triggerRerender = useCallback(() => {
-    setToolPairsVersion((v) => v + 1);
+    // Clear any pending rerender
+    if (rerenderTimeoutRef.current) {
+      clearTimeout(rerenderTimeoutRef.current);
+    }
+    // Debounce: wait 50ms before triggering rerender
+    rerenderTimeoutRef.current = setTimeout(() => {
+      setToolPairsVersion((v) => v + 1);
+      rerenderTimeoutRef.current = null;
+    }, 50);
   }, []);
 
   // Create a new assistant item
@@ -160,6 +172,27 @@ export function usePendingItems({
     [triggerRerender]
   );
 
+  // Add a SubAgent tool to its parent invoke_agent tool pair
+  const addSubagentTool = useCallback(
+    (parentToolCallId: string, tool: SubagentToolItem) => {
+      const pair = pendingToolPairsRef.current.find((p) => p.toolCallId === parentToolCallId);
+      if (!pair) {
+        // Parent tool call not found in pending - might be already committed
+        // In this case, we silently ignore (SubAgent tools are ephemeral)
+        return;
+      }
+      if (!pair.subagentTools) {
+        pair.subagentTools = [];
+      }
+      // Avoid duplicates
+      if (!pair.subagentTools.some((t) => t.toolCallId === tool.toolCallId)) {
+        pair.subagentTools.push(tool);
+        triggerRerender();
+      }
+    },
+    [triggerRerender]
+  );
+
   // Commit pending assistant to history (filters empty content)
   const commitAssistantToHistory = useCallback(() => {
     const assistantItem = pendingAssistantItemRef.current;
@@ -217,7 +250,12 @@ export function usePendingItems({
 
     // Flatten pairs: toolCall always shown, toolResult shown if available
     for (const pair of pendingToolPairsRef.current) {
-      items.push(pair.toolCall);
+      // Copy subagentTools to toolCall for rendering
+      const toolCallWithSubagent = {
+        ...pair.toolCall,
+        subagentTools: pair.subagentTools,
+      };
+      items.push(toolCallWithSubagent);
       if (pair.toolResult) {
         items.push(pair.toolResult);
       }
@@ -244,6 +282,7 @@ export function usePendingItems({
     stopAssistantStreaming,
     addToolPair,
     fillToolResult,
+    addSubagentTool,
     commitAssistantToHistory,
     commitAllPendingToHistory,
     clearAll,

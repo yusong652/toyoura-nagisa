@@ -20,6 +20,7 @@ import type {
   MessageCreateEvent,
   StreamingUpdateEvent,
   ToolResultUpdateEvent,
+  SubagentToolUseEvent,
 } from '../types/streamEvents.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { UsePendingItemsReturn } from './usePendingItems.js';
@@ -39,6 +40,7 @@ export interface UseStreamHandlersReturn {
   handleMessageCreate: (event: MessageCreateEvent) => void;
   handleStreamingUpdate: (event: StreamingUpdateEvent) => void;
   handleToolResultUpdate: (event: ToolResultUpdateEvent) => void;
+  handleSubagentToolUse: (event: SubagentToolUseEvent) => void;
   handleError: (err: Error) => void;
 }
 
@@ -65,6 +67,7 @@ export function useStreamHandlers({
     stopAssistantStreaming,
     addToolPair,
     fillToolResult,
+    addSubagentTool,
     commitAssistantToHistory,
     commitAllPendingToHistory,
     clearAll,
@@ -291,10 +294,24 @@ export function useStreamHandlers({
     [historyManager, setError, setIsStreaming, clearAll]
   );
 
+  // Handle SUBAGENT_TOOL_USE event
+  // Adds SubAgent tool to its parent invoke_agent tool pair for display
+  const handleSubagentToolUse = useCallback(
+    (event: SubagentToolUseEvent) => {
+      addSubagentTool(event.parent_tool_call_id, {
+        toolCallId: event.tool_call_id,
+        toolName: event.tool_name,
+        toolInput: event.tool_input,
+      });
+    },
+    [addSubagentTool]
+  );
+
   return {
     handleMessageCreate,
     handleStreamingUpdate,
     handleToolResultUpdate,
+    handleSubagentToolUse,
     handleError,
   };
 }
