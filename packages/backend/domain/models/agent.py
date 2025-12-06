@@ -78,10 +78,14 @@ class AgentResult(BaseModel):
         Convenience property to get plain text response.
 
         Uses existing infrastructure from message_factory.
+        Strips whitespace to handle empty responses from some LLM APIs
+        (e.g., Zhipu returns "\n" as default empty response).
         """
         if self.message:
             from backend.domain.models.message_factory import extract_text_from_message
-            return extract_text_from_message(self.message)
+            text = extract_text_from_message(self.message)
+            # Strip whitespace - empty/whitespace-only responses have no meaning
+            return text.strip() if text else ""
         return ""
 
 
