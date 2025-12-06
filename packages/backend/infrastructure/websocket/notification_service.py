@@ -353,3 +353,64 @@ class WebSocketNotificationService:
         except Exception as e:
             logger.warning(f"Failed to send tool result update notification: {e}")
             # Don't re-raise - this is a non-critical notification
+
+    @staticmethod
+    async def send_subagent_tool_use(
+        session_id: str,
+        parent_tool_call_id: str,
+        tool_call_id: str,
+        tool_name: str,
+        tool_input: Dict[str, Any]
+    ) -> None:
+        """
+        Send SubAgent tool use notification to frontend for real-time progress display.
+
+        This notification informs the frontend when a SubAgent starts executing a tool,
+        allowing the UI to show progress under the parent invoke_agent tool call.
+
+        Args:
+            session_id: Target session ID (MainAgent's session)
+            parent_tool_call_id: ID of the invoke_agent tool call (for UI association)
+            tool_call_id: ID of this SubAgent tool call
+            tool_name: Name of the tool being executed
+            tool_input: Tool input parameters
+
+        Example:
+            await WebSocketNotificationService.send_subagent_tool_use(
+                session_id="main-session-123",
+                parent_tool_call_id="invoke_agent_call_456",
+                tool_call_id="bash_call_789",
+                tool_name="bash",
+                tool_input={"command": "date"}
+            )
+        """
+        if not session_id:
+            return
+
+        try:
+            from backend.infrastructure.websocket.connection_manager import get_connection_manager
+
+            connection_manager = get_connection_manager()
+            if not connection_manager:
+                logger.debug("Connection manager not available for SUBAGENT_TOOL_USE")
+                return
+
+            notification = {
+                'type': 'SUBAGENT_TOOL_USE',
+                'session_id': session_id,
+                'parent_tool_call_id': parent_tool_call_id,
+                'tool_call_id': tool_call_id,
+                'tool_name': tool_name,
+                'tool_input': tool_input
+            }
+
+            success = await connection_manager.send_json(session_id, notification)
+
+            if success:
+                logger.debug(f"Sent SUBAGENT_TOOL_USE for tool {tool_name} in session {session_id}")
+            else:
+                logger.debug(f"Failed to send SUBAGENT_TOOL_USE (no connection for session {session_id})")
+
+        except Exception as e:
+            logger.warning(f"Failed to send subagent tool use notification: {e}")
+            # Don't re-raise - this is a non-critical notification

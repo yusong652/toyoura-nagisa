@@ -59,6 +59,7 @@ class Agent:
         enable_memory: Optional[bool] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
         notification_session_id: Optional[str] = None,
+        parent_tool_call_id: Optional[str] = None,
     ):
         """
         Initialize Agent.
@@ -75,6 +76,8 @@ class Agent:
             notification_session_id: Session ID for WebSocket notifications and confirmations.
                                     If None, uses session_id. This allows SubAgents to route
                                     confirmation requests to MainAgent's WebSocket connection.
+            parent_tool_call_id: ID of the parent tool call (invoke_agent) for SubAgent.
+                                Used to associate SubAgent tool uses with parent in frontend.
         """
         self.config = config
         self.llm_client = llm_client
@@ -86,6 +89,9 @@ class Agent:
 
         # notification_session_id: for SubAgent, route to parent's WebSocket
         self._notification_session_id = notification_session_id or self.session_id
+
+        # parent_tool_call_id: for SubAgent, associate tool uses with parent invoke_agent
+        self._parent_tool_call_id = parent_tool_call_id
 
         # enable_memory: use provided value or fall back to config default
         self._enable_memory = enable_memory if enable_memory is not None else config.enable_memory
@@ -380,10 +386,21 @@ class Agent:
                         "args": tool_call.get("arguments", {}),
                     })
 
+                    # Send SUBAGENT_TOOL_USE notification to frontend (SubAgent only)
+                    if not self.is_main_agent and self._parent_tool_call_id:
+                        await WebSocketNotificationService.send_subagent_tool_use(
+                            session_id=self._notification_session_id,
+                            parent_tool_call_id=self._parent_tool_call_id,
+                            tool_call_id=tool_call.get("id", ""),
+                            tool_name=tool_call.get("name", "unknown"),
+                            tool_input=tool_call.get("arguments", {}),
+                        )
+
                 tool_executor = ToolExecutor(
                     tool_manager=self.llm_client.tool_manager,
                     session_id=self.session_id,
                     notification_session_id=self._notification_session_id,
+                    send_tool_result_notifications=False,  # SubAgent: don't pollute MainAgent's stream
                 )
                 execution_result = await tool_executor.execute_all(
                     tool_calls=tool_calls,

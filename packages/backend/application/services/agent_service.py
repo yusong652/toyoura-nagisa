@@ -95,6 +95,7 @@ class AgentService:
         context: Optional[str] = None,
         on_activity: Optional[Callable[[AgentActivity], None]] = None,
         notification_session_id: Optional[str] = None,
+        parent_tool_call_id: Optional[str] = None,
     ) -> AgentResult:
         """
         Execute a SubAgent task.
@@ -110,6 +111,8 @@ class AgentService:
             notification_session_id: Session ID for WebSocket notifications.
                                     If provided, confirmation requests will be routed
                                     to this session (typically MainAgent's session).
+            parent_tool_call_id: ID of the parent tool call (invoke_agent) for
+                                frontend to associate SubAgent tool uses.
 
         Returns:
             AgentResult with execution outcome
@@ -127,6 +130,7 @@ class AgentService:
             llm_client=self._llm_client,
             on_activity=on_activity,
             notification_session_id=notification_session_id,
+            parent_tool_call_id=parent_tool_call_id,
         )
         return await agent.execute(instruction=user_message)
 

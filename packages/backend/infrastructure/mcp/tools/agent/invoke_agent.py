@@ -82,6 +82,9 @@ Usage notes:
         llm_client = get_llm_client()
         agent_service = AgentService(llm_client)
 
+        # Use request_id as parent_tool_call_id for frontend association
+        parent_tool_call_id = context.request_id
+
         # Activity tracking (optional - for future WebSocket integration)
         def track_activity(activity):
             logger.debug(f"[SubAgent:{subagent_type}] {activity.event_type}: {activity.data}")
@@ -93,6 +96,7 @@ Usage notes:
             instruction=prompt,
             on_activity=track_activity,
             notification_session_id=session_id,  # Route confirmations to MainAgent's WebSocket
+            parent_tool_call_id=parent_tool_call_id,  # For frontend to associate SubAgent tools
         )
 
         # Format result based on execution status

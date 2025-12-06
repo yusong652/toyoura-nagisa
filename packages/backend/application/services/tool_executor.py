@@ -40,7 +40,8 @@ class ToolExecutor:
         self,
         tool_manager: Any,
         session_id: str,
-        notification_session_id: Optional[str] = None
+        notification_session_id: Optional[str] = None,
+        send_tool_result_notifications: bool = True
     ):
         """
         Initialize ToolExecutor.
@@ -51,10 +52,14 @@ class ToolExecutor:
             notification_session_id: Session ID for WebSocket notifications and confirmations.
                                     If None, uses session_id. This allows SubAgents to route
                                     confirmation requests to MainAgent's WebSocket connection.
+            send_tool_result_notifications: Whether to send TOOL_RESULT_UPDATE notifications.
+                                           Set to False for SubAgents to avoid polluting
+                                           MainAgent's message stream with internal tool results.
         """
         self.tool_manager = tool_manager
         self.session_id = session_id
         self.notification_session_id = notification_session_id or session_id
+        self.send_tool_result_notifications = send_tool_result_notifications
         self.confirmation_strategy = ConfirmationStrategy(tool_manager)
 
     def classify_tools(self, tool_calls: List[Dict]) -> ClassifiedTools:
@@ -205,6 +210,10 @@ class ToolExecutor:
         agent_profile: str
     ) -> None:
         """Send WebSocket notification for tool result."""
+        # Skip notification if disabled (e.g., for SubAgent internal tools)
+        if not self.send_tool_result_notifications:
+            return
+
         from backend.infrastructure.websocket.notification_service import WebSocketNotificationService
 
         tool_name = tool_call.get('name', 'unknown')
