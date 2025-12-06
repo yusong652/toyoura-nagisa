@@ -27,6 +27,11 @@ class AgentResult(BaseModel):
 
     Attributes:
         status: Execution outcome status
+            - success: Completed with meaningful response
+            - error: Execution failed with error
+            - max_iterations: Reached iteration limit
+            - aborted: Execution was aborted
+            - empty_response: Completed but returned empty/whitespace-only content
         message: Structured response message (BaseMessage)
         message_id: Streaming message ID for WebSocket updates (MainAgent only)
         iterations_used: Number of tool call iterations used
@@ -42,9 +47,12 @@ class AgentResult(BaseModel):
         result = await agent.execute(instruction)
         if result.status == "success":
             response_text = result.text  # Convenience property
+        elif result.status == "empty_response":
+            # SubAgent completed but returned no content - may need prompt adjustment
+            pass
     """
 
-    status: Literal["success", "error", "max_iterations", "aborted"] = Field(
+    status: Literal["success", "error", "max_iterations", "aborted", "empty_response"] = Field(
         description="Execution outcome status"
     )
 

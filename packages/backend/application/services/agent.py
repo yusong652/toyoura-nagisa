@@ -198,6 +198,16 @@ class Agent:
                 )
                 streaming_message_id = None
 
+                # SubAgent: check for empty response (domain-level validation)
+                # Some LLM APIs return whitespace-only content as "empty" response
+                if not response_text or not response_text.strip():
+                    return AgentResult(
+                        status="empty_response",
+                        message=final_message,
+                        iterations_used=self.config.max_iterations,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+
             return AgentResult(
                 status="success",
                 message=final_message,
