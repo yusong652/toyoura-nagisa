@@ -459,6 +459,7 @@ class BaseToolManager(ABC):
             "edit": True,              # All file edits require confirmation
             "write": True,             # All file writes require confirmation
             "pfc_execute_task": True,  # PFC task execution requires confirmation
+            "invoke_agent": True,      # SubAgent invocation - prevents blocking other confirmations
             # Add other tools here as needed
             # "system_command": True,  # Example: other system commands
         }

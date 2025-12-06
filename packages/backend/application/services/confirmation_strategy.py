@@ -71,6 +71,8 @@ class ConfirmationStrategy:
             return await self._build_write_confirmation(tool_id, tool_name, tool_args)
         elif tool_name == "pfc_execute_task":
             return self._build_pfc_confirmation(tool_id, tool_name, tool_args)
+        elif tool_name == "invoke_agent":
+            return self._build_invoke_agent_confirmation(tool_id, tool_name, tool_args)
         else:
             return self._build_generic_confirmation(tool_id, tool_name, tool_args)
 
@@ -183,6 +185,29 @@ class ConfirmationStrategy:
             command=command,
             description=description,
             confirmation_type="exec"
+        )
+
+    def _build_invoke_agent_confirmation(
+        self,
+        tool_id: str,
+        tool_name: str,
+        tool_args: Dict
+    ) -> ConfirmationInfo:
+        """Build confirmation info for SubAgent invocation."""
+        agent_type = tool_args.get("agent_type", "unknown")
+        instruction = tool_args.get("instruction", "")
+        # Truncate long instructions
+        if len(instruction) > 100:
+            instruction = instruction[:100] + "..."
+        command = f"Invoke SubAgent: {agent_type}"
+        description = f"Task: {instruction}" if instruction else None
+
+        return ConfirmationInfo(
+            tool_name=tool_name,
+            tool_id=tool_id,
+            command=command,
+            description=description,
+            confirmation_type="info"
         )
 
     def _build_generic_confirmation(
